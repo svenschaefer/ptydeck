@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRuntime } from "../src/runtime.js";
@@ -138,5 +138,79 @@ test("REST rejects oversized request body with 413", async () => {
     assert.equal(oversizeBody.error, "PayloadTooLarge");
   } finally {
     await runtime.stop();
+  }
+});
+
+test("runtime restore keeps persisted createdAt and updatedAt timestamps", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    maxBodyBytes: 1024 * 1024
+  });
+
+  let createdId = "";
+  let createdAt = 0;
+  let updatedAt = 0;
+
+  try {
+    await runtimeA.start();
+    const { port } = runtimeA.getAddress();
+    const baseUrlA = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+    createdAt = created.createdAt;
+
+    const inputRes = await fetch(`${baseUrlA}/sessions/${createdId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "echo timestamp\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    const sessionRes = await fetch(`${baseUrlA}/sessions/${createdId}`);
+    assert.equal(sessionRes.status, 200);
+    const afterInput = await sessionRes.json();
+    updatedAt = afterInput.updatedAt;
+    assert.equal(afterInput.createdAt, createdAt);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persisted = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSession = persisted.find((session) => session.id === createdId);
+  assert.ok(persistedSession);
+  assert.equal(persistedSession.createdAt, createdAt);
+  assert.equal(persistedSession.updatedAt, updatedAt);
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    maxBodyBytes: 1024 * 1024
+  });
+
+  try {
+    await runtimeB.start();
+    const { port } = runtimeB.getAddress();
+    const baseUrlB = `http://127.0.0.1:${port}/api/v1`;
+    const restoredRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(restoredRes.status, 200);
+    const restored = await restoredRes.json();
+    assert.equal(restored.createdAt, createdAt);
+    assert.equal(restored.updatedAt, updatedAt);
+  } finally {
+    await runtimeB.stop();
   }
 });

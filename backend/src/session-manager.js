@@ -36,8 +36,15 @@ export class SessionManager {
     return session;
   }
 
-  create({ id = randomUUID(), cwd = process.cwd(), shell = this.defaultShell } = {}) {
-    const createdAt = now();
+  create({
+    id = randomUUID(),
+    cwd = process.cwd(),
+    shell = this.defaultShell,
+    createdAt,
+    updatedAt
+  } = {}) {
+    const createdTimestamp = Number.isInteger(createdAt) ? createdAt : now();
+    const updatedTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
 
     const ptyProcess = this.createPty({ shell, cwd, cols: 80, rows: 24 });
 
@@ -48,8 +55,8 @@ export class SessionManager {
         id,
         cwd,
         shell,
-        createdAt,
-        updatedAt: createdAt
+        createdAt: createdTimestamp,
+        updatedAt: updatedTimestamp
       }
     };
 

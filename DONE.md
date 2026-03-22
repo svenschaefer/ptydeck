@@ -57,6 +57,11 @@ Completed and verified topics belong here.
 - [x] Added backend test coverage for oversized request rejection in `backend/test/runtime.integration.test.js`.
 - [x] Backend configuration now includes `MAX_BODY_BYTES` (default `1048576`) and deployment docs include the variable.
 - [x] Coverage after `QLT-007`: backend `94.43%` lines, frontend `97.12%` lines.
+- [x] `QLT-008` completed: backend restart restore now preserves persisted `createdAt` and `updatedAt` metadata values deterministically.
+- [x] Runtime shutdown persistence path hardened to save a consistent snapshot before PTY cleanup, preventing timestamp/session metadata loss on stop.
+- [x] `QLT-009` completed: JSON persistence writes are atomic (`temp file -> rename`) with temp cleanup on failure paths.
+- [x] Added crash-safety persistence test ensuring previous persisted state survives interrupted write attempts without temp-file residue.
+- [x] Coverage after `QLT-008`/`QLT-009`: backend `95.47%` lines, frontend `97.12%` lines.
 
 ## Maintenance Rules
 

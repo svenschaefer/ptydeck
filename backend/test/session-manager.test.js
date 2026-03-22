@@ -93,3 +93,21 @@ test("SessionManager throws on unknown session", () => {
   assert.throws(() => manager.resize("missing", 80, 24));
   assert.throws(() => manager.delete("missing"));
 });
+
+test("SessionManager create honors persisted timestamps when provided", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({
+    id: "restore-1",
+    cwd: "/tmp",
+    shell: "bash",
+    createdAt: 1710000000000,
+    updatedAt: 1710000001234
+  });
+
+  assert.equal(created.createdAt, 1710000000000);
+  assert.equal(created.updatedAt, 1710000001234);
+});

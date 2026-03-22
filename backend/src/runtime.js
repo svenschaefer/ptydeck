@@ -103,6 +103,7 @@ export function createRuntime(config) {
   const wsServer = new WebSocketServer({ noServer: true });
   const sockets = new Set();
   let isReady = false;
+  let isStopping = false;
   let persistTimer = null;
 
   function writeJson(res, statusCode, body) {
@@ -122,6 +123,9 @@ export function createRuntime(config) {
   }
 
   function persistSoon() {
+    if (isStopping) {
+      return;
+    }
     if (persistTimer) {
       clearTimeout(persistTimer);
     }
@@ -273,7 +277,9 @@ export function createRuntime(config) {
         manager.create({
           id: session.id,
           cwd: session.cwd || process.cwd(),
-          shell: session.shell || config.shell
+          shell: session.shell || config.shell,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt
         });
       } catch (err) {
         console.error("failed to restore session", session.id, err);
@@ -287,9 +293,11 @@ export function createRuntime(config) {
   }
 
   async function stop() {
+    isStopping = true;
     clearInterval(heartbeat);
     if (persistTimer) {
       clearTimeout(persistTimer);
+      persistTimer = null;
     }
 
     for (const ws of sockets) {
@@ -297,6 +305,8 @@ export function createRuntime(config) {
     }
     sockets.clear();
     wsServer.close();
+
+    const persistedSnapshot = manager.list().map((session) => ({ ...session }));
 
     for (const session of manager.list()) {
       try {
@@ -306,7 +316,7 @@ export function createRuntime(config) {
       }
     }
 
-    await persistence.save(manager.list());
+    await persistence.save(persistedSnapshot);
     await new Promise((resolve) => server.close(resolve));
   }
 

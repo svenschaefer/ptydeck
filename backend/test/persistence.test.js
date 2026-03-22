@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { JsonPersistence } from "../src/persistence.js";
@@ -35,4 +35,35 @@ test("JsonPersistence loads and saves sessions", async () => {
   await writeFile(file, "{\"invalid\":true}", "utf8");
   const fallback = await persistence.load();
   assert.deepEqual(fallback, []);
+});
+
+test("JsonPersistence save keeps previous file on write failure and avoids temp leftovers", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  await writeFile(
+    file,
+    JSON.stringify([{ id: "stable", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }], null, 2),
+    "utf8"
+  );
+
+  let wroteTempFile = false;
+  const persistence = new JsonPersistence(file, {
+    writeFileFn: async (path, content, encoding) => {
+      wroteTempFile = true;
+      await writeFile(path, content, encoding);
+      throw new Error("simulated write interruption");
+    }
+  });
+
+  await assert.rejects(
+    persistence.save([{ id: "next", cwd: "/srv", shell: "sh", createdAt: 2, updatedAt: 2 }]),
+    /simulated write interruption/
+  );
+  assert.equal(wroteTempFile, true);
+
+  const stableRaw = await persistence.load();
+  assert.deepEqual(stableRaw, [{ id: "stable", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }]);
+
+  const entries = await readdir(dir);
+  assert.equal(entries.some((name) => name.includes(".tmp-")), false);
 });

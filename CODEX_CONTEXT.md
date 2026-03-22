@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-001/002/004/007/013 delivered, coverage baseline updated)
+Last updated: 2026-03-22 (QLT-001/002/004/007/008/009/013 delivered, coverage baseline updated)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -59,12 +59,15 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend WebSocket client behavior now has dedicated unit test coverage for reconnect and close paths.
 - Backend runtime negative/error REST paths are covered by integration tests.
 - Backend runtime now enforces configurable max request body size and returns `413` for oversized payloads.
+- Backend persistence now writes atomically with temp-file rename semantics and cleanup on failure.
+- Backend restart restore now preserves persisted `createdAt`/`updatedAt` session metadata deterministically.
+- Runtime shutdown persistence now saves a consistent session snapshot before PTY cleanup.
 - Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-017`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
-  - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-004`, `QLT-007`, `QLT-013`.
+  - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-013`.
 
 ## Session Behavior Notes
 
