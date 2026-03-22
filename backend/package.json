@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "node src/server.js",
-    "build": "node --check src/server.js src/runtime.js src/config.js src/proxy.js src/auth.js src/errors.js src/persistence.js src/session-manager.js src/validation.js",
-    "lint": "node --check src/server.js src/runtime.js src/config.js src/proxy.js src/auth.js src/errors.js src/persistence.js src/session-manager.js src/validation.js",
+    "build": "node --check src/server.js src/runtime.js src/config.js src/proxy.js src/rate-limiter.js src/auth.js src/errors.js src/persistence.js src/session-manager.js src/validation.js",
+    "lint": "node --check src/server.js src/runtime.js src/config.js src/proxy.js src/rate-limiter.js src/auth.js src/errors.js src/persistence.js src/session-manager.js src/validation.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"
   },

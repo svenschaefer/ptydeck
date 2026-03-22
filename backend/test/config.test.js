@@ -11,6 +11,9 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.corsOrigin, "*");
   assert.deepEqual(config.corsAllowedOrigins, ["*"]);
   assert.equal(config.maxBodyBytes, 1024 * 1024);
+  assert.equal(config.rateLimitWindowMs, 60000);
+  assert.equal(config.rateLimitRestCreateMax, 60);
+  assert.equal(config.rateLimitWsConnectMax, 60);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
@@ -29,6 +32,9 @@ test("loadConfig maps environment values", () => {
     DATA_PATH: "/tmp/ptydeck.json",
     CORS_ORIGIN: "http://localhost:3000",
     MAX_BODY_BYTES: "4096",
+    RATE_LIMIT_WINDOW_MS: "30000",
+    RATE_LIMIT_REST_CREATE_MAX: "10",
+    RATE_LIMIT_WS_CONNECT_MAX: "15",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
     TRUST_PROXY: "loopback",
@@ -46,6 +52,9 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.corsOrigin, "http://localhost:3000");
   assert.deepEqual(config.corsAllowedOrigins, ["http://localhost:3000"]);
   assert.equal(config.maxBodyBytes, 4096);
+  assert.equal(config.rateLimitWindowMs, 30000);
+  assert.equal(config.rateLimitRestCreateMax, 10);
+  assert.equal(config.rateLimitWsConnectMax, 15);
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
@@ -76,6 +85,15 @@ test("loadConfig parses comma-separated CORS allowlist", () => {
 test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(() => loadConfig({ PORT: "0" }), /PORT must be an integer between 1 and 65535\./);
   assert.throws(() => loadConfig({ MAX_BODY_BYTES: "0" }), /MAX_BODY_BYTES must be a positive integer\./);
+  assert.throws(() => loadConfig({ RATE_LIMIT_WINDOW_MS: "0" }), /RATE_LIMIT_WINDOW_MS must be a positive integer\./);
+  assert.throws(
+    () => loadConfig({ RATE_LIMIT_REST_CREATE_MAX: "-1" }),
+    /RATE_LIMIT_REST_CREATE_MAX must be a non-negative integer\./
+  );
+  assert.throws(
+    () => loadConfig({ RATE_LIMIT_WS_CONNECT_MAX: "-1" }),
+    /RATE_LIMIT_WS_CONNECT_MAX must be a non-negative integer\./
+  );
 });
 
 test("loadConfig rejects invalid CORS origin values", () => {

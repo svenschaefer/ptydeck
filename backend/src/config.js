@@ -14,6 +14,14 @@ function parsePositiveInt(rawValue, key) {
   return parsed;
 }
 
+function parseNonNegativeInt(rawValue, key) {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${key} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
 function parseOrigin(value, key) {
   try {
     const url = new URL(value);
@@ -77,6 +85,15 @@ export function loadConfig(env = process.env) {
   }
   const port = parsePort(env.PORT || 18080, "PORT");
   const maxBodyBytes = parsePositiveInt(env.MAX_BODY_BYTES || 1024 * 1024, "MAX_BODY_BYTES");
+  const rateLimitWindowMs = parsePositiveInt(env.RATE_LIMIT_WINDOW_MS || 60000, "RATE_LIMIT_WINDOW_MS");
+  const rateLimitRestCreateMax = parseNonNegativeInt(
+    env.RATE_LIMIT_REST_CREATE_MAX || 60,
+    "RATE_LIMIT_REST_CREATE_MAX"
+  );
+  const rateLimitWsConnectMax = parseNonNegativeInt(
+    env.RATE_LIMIT_WS_CONNECT_MAX || 60,
+    "RATE_LIMIT_WS_CONNECT_MAX"
+  );
   const authDevTokenTtlSeconds = parsePositiveInt(
     env.AUTH_DEV_TOKEN_TTL_SECONDS || 900,
     "AUTH_DEV_TOKEN_TTL_SECONDS"
@@ -89,6 +106,9 @@ export function loadConfig(env = process.env) {
     corsOrigin: corsAllowedOrigins[0] || "",
     corsAllowedOrigins,
     maxBodyBytes,
+    rateLimitWindowMs,
+    rateLimitRestCreateMax,
+    rateLimitWsConnectMax,
     debugLogs,
     debugLogFile,
     trustedProxy,

@@ -192,6 +192,11 @@ Completed and verified topics belong here.
 - [x] Added proxy utility unit coverage (`backend/test/proxy.test.js`) plus config validation coverage for invalid `TRUST_PROXY` values.
 - [x] Validation for `ENT-019` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-019` cycle: backend `96.29%` lines, frontend `88.36%` lines.
+- [x] `ENT-006` completed: added configurable fixed-window abuse controls for `POST /api/v1/sessions` and WebSocket connection creation (`/ws`) with per-client-IP limits.
+- [x] New backend config variables added: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_REST_CREATE_MAX`, `RATE_LIMIT_WS_CONNECT_MAX` (non-negative limits; `0` disables respective limiter).
+- [x] Added backend coverage for rate-limiter unit behavior, REST `429` session-create throttling, and WS connection-create throttling.
+- [x] Validation for `ENT-006` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-006` cycle: backend `96.51%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

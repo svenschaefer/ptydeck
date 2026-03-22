@@ -306,6 +306,25 @@ Recommended production baseline:
 - Run with explicit proxy IP allowlist, not `all`.
 - Keep ingress and backend in a fixed network topology so trusted proxy source IPs are deterministic.
 
+## 9.4 Abuse-Control Rate Limiting Baseline (ENT-006)
+
+Backend runtime applies fixed-window limits per resolved client IP:
+
+- REST create-session endpoint: `POST /api/v1/sessions`
+- WebSocket connection creation endpoint: `/ws`
+
+Configuration:
+
+- `RATE_LIMIT_WINDOW_MS` (default `60000`)
+- `RATE_LIMIT_REST_CREATE_MAX` (default `60`, `0` disables REST create limiter)
+- `RATE_LIMIT_WS_CONNECT_MAX` (default `60`, `0` disables WS connect limiter)
+
+Behavior:
+
+- Exceeded REST create limit returns `429` with `RateLimitExceeded` error payload.
+- Exceeded WS connect limit returns HTTP `429` during upgrade with `Retry-After` header.
+- Client identity for limits uses trusted-proxy-aware request context (`TRUST_PROXY`).
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date

@@ -23,13 +23,14 @@ function waitFor(predicate, timeoutMs = 4000) {
   });
 }
 
-async function createStartedRuntime() {
+async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-ws-"));
   const runtime = createRuntime({
     port: 0,
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
-    corsOrigin: "*"
+    corsOrigin: "*",
+    ...overrides
   });
   await runtime.start();
   const { port } = runtime.getAddress();
@@ -39,6 +40,36 @@ async function createStartedRuntime() {
     wsUrl: `ws://127.0.0.1:${port}/ws`
   };
 }
+
+test("WS connection creation is rate limited per client", async () => {
+  const { runtime, wsUrl } = await createStartedRuntime({
+    rateLimitWindowMs: 60000,
+    rateLimitWsConnectMax: 1
+  });
+
+  try {
+    const firstEvents = [];
+    const firstWs = new WebSocket(wsUrl);
+    firstWs.on("message", (buffer) => {
+      firstEvents.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => firstEvents.some((event) => event.type === "snapshot"));
+
+    const secondEvents = [];
+    const secondWs = new WebSocket(wsUrl);
+    secondWs.on("error", () => {
+      secondEvents.push("error");
+    });
+    secondWs.on("close", () => {
+      secondEvents.push("close");
+    });
+    await waitFor(() => secondEvents.includes("close"));
+
+    firstWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
 
 test("WS emits session events and reconnect receives snapshot", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime();

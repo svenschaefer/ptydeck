@@ -6,6 +6,7 @@ import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from 
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
 import { resolveRequestContext } from "./proxy.js";
+import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
@@ -141,6 +142,8 @@ export function createRuntime(config) {
   const debugLogs = config.debugLogs === true;
   const manager = new SessionManager({ defaultShell: config.shell });
   const persistence = new JsonPersistence(config.dataPath);
+  const createSessionRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
+  const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsServer = new WebSocketServer({ noServer: true });
   const sockets = new Set();
   const metrics = {
@@ -445,6 +448,14 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "createSession") {
+        const rateLimitResult = createSessionRateLimiter.check(requestContext.clientIp, config.rateLimitRestCreateMax);
+        if (!rateLimitResult.allowed) {
+          throw new ApiError(
+            429,
+            "RateLimitExceeded",
+            `Session creation rate limit exceeded. Retry in ${rateLimitResult.retryAfterSeconds} seconds.`
+          );
+        }
         const payload = manager.create({ cwd: body?.cwd, shell: body?.shell });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
         persistSoon();
@@ -517,6 +528,24 @@ export function createRuntime(config) {
       socket.destroy();
       return;
     }
+
+    const wsRateLimitResult = wsConnectRateLimiter.check(requestContext.clientIp, config.rateLimitWsConnectMax);
+    if (!wsRateLimitResult.allowed) {
+      const payload = {
+        error: "RateLimitExceeded",
+        message: `WebSocket connection rate limit exceeded. Retry in ${wsRateLimitResult.retryAfterSeconds} seconds.`
+      };
+      logDebug("ws.upgrade.rate_limited", {
+        clientIp: requestContext.clientIp,
+        trustedProxy: requestContext.trustedProxy
+      });
+      socket.write(
+        `HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nConnection: close\r\nRetry-After: ${wsRateLimitResult.retryAfterSeconds}\r\n\r\n${JSON.stringify(payload)}`
+      );
+      socket.destroy();
+      return;
+    }
+
     if (config.authEnabled) {
       try {
         const token = resolveBearerToken(request, requestUrl);

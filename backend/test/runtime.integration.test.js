@@ -177,6 +177,33 @@ test("REST rejects oversized request body with 413", async () => {
   }
 });
 
+test("REST create session is rate limited per client", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    rateLimitWindowMs: 60000,
+    rateLimitRestCreateMax: 1
+  });
+
+  try {
+    const firstRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(firstRes.status, 201);
+
+    const secondRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(secondRes.status, 429);
+    const secondBody = await secondRes.json();
+    assert.equal(secondBody.error, "RateLimitExceeded");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("OPTIONS advertises PATCH for CORS preflight", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
   try {
