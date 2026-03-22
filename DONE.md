@@ -111,6 +111,11 @@ Completed and verified topics belong here.
 - [x] Frontend app integration test now verifies quick-ID assignment for multi-session snapshots.
 - [x] Validation for `QLT-036` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
 - [x] Coverage after `QLT-036` cycle: backend `96.64%` lines, frontend `89.88%` lines.
+- [x] `QLT-011` completed: frontend WebSocket client now emits explicit `error` state and uses bounded exponential reconnect backoff with jitter.
+- [x] Added WebSocket tests for error-state emission and jitter/backoff bounds in `frontend/test/ws-client.test.js`.
+- [x] `QLT-012` completed: CI workflow now runs dependency install and a smoke boot check (`scripts/ci-smoke.sh`) validating backend `/health` + `/ready` and frontend initial HTML response.
+- [x] Validation for `QLT-011`/`QLT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `./scripts/ci-smoke.sh`.
+- [x] Coverage after `QLT-011`/`QLT-012` cycle: backend `96.30%` lines, frontend `90.37%` lines.
 
 ## Maintenance Rules
 

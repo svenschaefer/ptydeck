@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Backend lint
         run: npm --prefix backend run lint
       - name: Frontend lint
@@ -30,3 +32,6 @@ jobs:
         run: npm --prefix backend run build
       - name: Frontend build
         run: npm --prefix frontend run build
+      - name: Smoke boot checks
+        if: matrix.node-version == '18'
+        run: ./scripts/ci-smoke.sh

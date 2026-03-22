@@ -35,7 +35,10 @@ function withMockedGlobals(t) {
   const previousWebSocket = global.WebSocket;
   const previousSetTimeout = global.setTimeout;
   const previousClearTimeout = global.clearTimeout;
+  const previousRandom = Math.random;
   const timers = [];
+  let randomValues = [0.5];
+  let randomIndex = 0;
 
   MockWebSocket.instances = [];
   global.WebSocket = MockWebSocket;
@@ -49,18 +52,30 @@ function withMockedGlobals(t) {
       handle.cleared = true;
     }
   };
+  Math.random = () => {
+    const value = randomValues[Math.min(randomIndex, randomValues.length - 1)];
+    randomIndex += 1;
+    return value;
+  };
 
   t.after(() => {
     global.WebSocket = previousWebSocket;
     global.setTimeout = previousSetTimeout;
     global.clearTimeout = previousClearTimeout;
+    Math.random = previousRandom;
   });
 
-  return timers;
+  return {
+    timers,
+    setRandomSequence(values) {
+      randomValues = Array.isArray(values) && values.length > 0 ? values.slice() : [0.5];
+      randomIndex = 0;
+    }
+  };
 }
 
 test("ws client reconnects and reports state transitions", (t) => {
-  const timers = withMockedGlobals(t);
+  const { timers } = withMockedGlobals(t);
   const states = [];
   const messages = [];
   createWsClient("ws://localhost:8080/ws", {
@@ -82,7 +97,7 @@ test("ws client reconnects and reports state transitions", (t) => {
   first.emit("close");
   assert.deepEqual(states, ["connecting", "connected", "reconnecting"]);
   assert.equal(timers.length, 1);
-  assert.equal(timers[0].ms, 1000);
+  assert.equal(timers[0].ms, 500);
 
   timers[0].fn();
   assert.equal(MockWebSocket.instances.length, 2);
@@ -94,7 +109,7 @@ test("ws client reconnects and reports state transitions", (t) => {
 });
 
 test("ws client close stops reconnect and clears scheduled timer", (t) => {
-  const timers = withMockedGlobals(t);
+  const { timers } = withMockedGlobals(t);
   const states = [];
   const client = createWsClient("ws://localhost:8080/ws", {
     onState: (state) => states.push(state),
@@ -113,4 +128,48 @@ test("ws client close stops reconnect and clears scheduled timer", (t) => {
 
   first.emit("close");
   assert.deepEqual(states, ["connecting", "reconnecting"]);
+});
+
+test("ws client emits error state and applies bounded reconnect backoff with jitter", (t) => {
+  const globals = withMockedGlobals(t);
+  const { timers, setRandomSequence } = globals;
+  setRandomSequence([0, 1, 1, 1, 1, 1, 1]);
+
+  const states = [];
+  createWsClient("ws://localhost:8080/ws", {
+    onState: (state) => states.push(state),
+    onMessage: () => {}
+  });
+
+  const first = MockWebSocket.instances[0];
+  first.emit("error");
+  assert.deepEqual(states, ["connecting", "error"]);
+
+  first.emit("close");
+  assert.equal(timers[0].ms, 400);
+  timers[0].fn();
+
+  const second = MockWebSocket.instances[1];
+  second.emit("close");
+  assert.equal(timers[1].ms, 1200);
+  timers[1].fn();
+
+  const third = MockWebSocket.instances[2];
+  third.emit("close");
+  assert.equal(timers[2].ms, 2400);
+  timers[2].fn();
+
+  const fourth = MockWebSocket.instances[3];
+  fourth.emit("close");
+  assert.equal(timers[3].ms, 4800);
+  timers[3].fn();
+
+  const fifth = MockWebSocket.instances[4];
+  fifth.emit("close");
+  assert.equal(timers[4].ms, 9600);
+  timers[4].fn();
+
+  const sixth = MockWebSocket.instances[5];
+  sixth.emit("close");
+  assert.equal(timers[5].ms, 10000);
 });

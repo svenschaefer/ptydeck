@@ -80,8 +80,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-008` Owner: `BE` Task: Persist and restore `createdAt`/`updatedAt` metadata deterministically instead of resetting timestamps on restart.
 - [x] `QLT-009` Owner: `BE` Task: Make JSON persistence writes atomic (temp file + rename) and add crash-safety tests for partial-write scenarios.
 - [x] `QLT-010` Owner: `FE` Task: Add frontend integration tests for DOM behavior in `app.js` (terminal card lifecycle, active state switching, empty/error status messaging).
-- [ ] `QLT-011` Owner: `FE` Task: Add WebSocket `error` event handling and bounded reconnect backoff with jitter in `ws-client.js`.
-- [ ] `QLT-012` Owner: `PLAT` Task: Add CI smoke step that boots backend+frontend and verifies `/health`, `/ready`, and initial frontend HTML response before merge.
+- [x] `QLT-011` Owner: `FE` Task: Add WebSocket `error` event handling and bounded reconnect backoff with jitter in `ws-client.js`.
+- [x] `QLT-012` Owner: `PLAT` Task: Add CI smoke step that boots backend+frontend and verifies `/health`, `/ready`, and initial frontend HTML response before merge.
 - [x] `QLT-013` Owner: `FE` Task: Harden `frontend/src/dev-server.js` against path traversal (`..`) and add tests for safe static file resolution.
 - [x] `QLT-014` Owner: `BE` Task: Add runtime tests for readiness state transitions (`starting` -> `ready`) and idempotent graceful shutdown behavior.
 - [x] `QLT-015` Owner: `BE` Task: Add contract conformance test that verifies implemented runtime routes/status codes against `backend/openapi/openapi.yaml`.
