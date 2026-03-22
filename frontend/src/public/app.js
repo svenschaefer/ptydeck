@@ -63,6 +63,10 @@ let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteState = null;
 let commandAutocompleteRequestId = 0;
+const slashCommandHistory = [];
+let slashHistoryCursor = -1;
+let slashHistoryDraft = "";
+let recalledSlashCommand = "";
 const uiState = {
   loading: true,
   error: "",
@@ -110,6 +114,76 @@ function setCommandPreview(message) {
 
 function resetCommandAutocompleteState() {
   commandAutocompleteState = null;
+}
+
+function isSingleLineSlashModeInput(value) {
+  return typeof value === "string" && value.startsWith("/") && !value.includes("\n");
+}
+
+function resetSlashHistoryNavigationState() {
+  slashHistoryCursor = -1;
+  slashHistoryDraft = "";
+  recalledSlashCommand = "";
+}
+
+function recordSlashHistory(rawCommand) {
+  const normalized = String(rawCommand || "").trim();
+  if (!isSingleLineSlashModeInput(normalized)) {
+    return;
+  }
+  if (slashCommandHistory[slashCommandHistory.length - 1] === normalized) {
+    return;
+  }
+  slashCommandHistory.push(normalized);
+  if (slashCommandHistory.length > 200) {
+    slashCommandHistory.splice(0, slashCommandHistory.length - 200);
+  }
+}
+
+function applySlashHistoryValue(value) {
+  commandInput.value = value;
+  recalledSlashCommand = value;
+  resetCommandAutocompleteState();
+  scheduleCommandPreview();
+}
+
+function navigateSlashHistory(direction) {
+  const current = commandInput.value || "";
+  if (!isSingleLineSlashModeInput(current)) {
+    return false;
+  }
+  if (slashCommandHistory.length === 0) {
+    return false;
+  }
+
+  if (direction === "up") {
+    if (slashHistoryCursor < 0) {
+      slashHistoryDraft = current;
+      slashHistoryCursor = slashCommandHistory.length - 1;
+    } else if (slashHistoryCursor > 0) {
+      slashHistoryCursor -= 1;
+    }
+    applySlashHistoryValue(slashCommandHistory[slashHistoryCursor]);
+    return true;
+  }
+
+  if (direction === "down") {
+    if (slashHistoryCursor < 0) {
+      return false;
+    }
+    if (slashHistoryCursor < slashCommandHistory.length - 1) {
+      slashHistoryCursor += 1;
+      applySlashHistoryValue(slashCommandHistory[slashHistoryCursor]);
+      return true;
+    }
+    commandInput.value = slashHistoryDraft;
+    resetSlashHistoryNavigationState();
+    resetCommandAutocompleteState();
+    scheduleCommandPreview();
+    return true;
+  }
+
+  return false;
 }
 
 function parseSlashInputForAutocomplete(rawInput) {
@@ -1235,9 +1309,11 @@ async function submitCommand() {
     try {
       const feedback = await executeControlCommand(interpreted);
       setCommandFeedback(feedback);
+      recordSlashHistory(command);
       debugLog("command.control.ok", { command: interpreted.command });
       commandInput.value = "";
       setCommandPreview("");
+      resetSlashHistoryNavigationState();
     } catch {
       setCommandFeedback("Failed to execute control command.");
     }
@@ -1256,6 +1332,7 @@ async function submitCommand() {
     commandInput.value = "";
     setCommandPreview("");
     uiState.error = "";
+    resetSlashHistoryNavigationState();
     debugLog("command.send.ok", { activeSessionId });
   } catch {
     setError("Failed to send command.");
@@ -1346,6 +1423,18 @@ commandInput.addEventListener("input", () => {
   scheduleCommandPreview();
 });
 commandInput.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowUp") {
+    if (navigateSlashHistory("up")) {
+      event.preventDefault();
+    }
+    return;
+  }
+  if (event.key === "ArrowDown") {
+    if (navigateSlashHistory("down")) {
+      event.preventDefault();
+    }
+    return;
+  }
   if (event.key === "Tab") {
     if (parseSlashInputForAutocomplete(commandInput.value || "")) {
       event.preventDefault();
@@ -1355,6 +1444,14 @@ commandInput.addEventListener("keydown", (event) => {
   }
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
+    if (slashHistoryCursor >= 0 && isSingleLineSlashModeInput(commandInput.value || "")) {
+      if (commandInput.value === recalledSlashCommand) {
+        submitCommand();
+      } else {
+        setCommandFeedback("Repeat blocked: recalled slash command was modified.");
+      }
+      return;
+    }
     submitCommand();
   }
 });

@@ -75,6 +75,8 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Non-blocking custom-command preview panel before execution (`/<customName>`): exact payload, target resolution, and newline append indicator
 - Slash-command name autocomplete via `Tab`/`Shift+Tab` with deterministic cycling and system-command precedence
 - Context-sensitive slash-argument autocomplete via `Tab`/`Shift+Tab` for `/switch`, `/close`, `/custom show`, `/custom remove`, and `/<customName> <target>`
+- Slash-command history recall via `ArrowUp`/`ArrowDown` (slash mode only; non-slash multiline input remains unaffected)
+- Re-run recalled slash command via `Ctrl/Cmd+Enter` with guardrail feedback when recalled content was modified
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)

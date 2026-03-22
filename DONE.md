@@ -274,6 +274,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for argument autocomplete forward/reverse cycling across session/custom-command contexts.
 - [x] Validation for `QLT-044` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-044` cycle: backend `96.97%` lines, frontend `87.51%` lines.
+- [x] `QLT-045` completed: slash-command history navigation (`ArrowUp`/`ArrowDown`) added for slash-mode input, without changing non-slash multiline composer behavior.
+- [x] `QLT-050` completed: recalled slash commands can be repeated via `Ctrl/Cmd+Enter`, with explicit guardrail feedback when recalled content was modified.
+- [x] Added frontend integration coverage for slash-history recall cycle, slash-repeat shortcut, and repeat guardrail behavior.
+- [x] Validation for `QLT-045`/`QLT-050` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-045`/`QLT-050` cycle: backend `96.70%` lines, frontend `87.90%` lines.
 
 ## Maintenance Rules
 

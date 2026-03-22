@@ -667,6 +667,93 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(restartCalls.length, 1);
   assert.match(fixture.elements.commandFeedback.textContent, /^Restarted session \[1\]/);
 
+  const arrowUpEvent = {
+    type: "keydown",
+    key: "ArrowUp",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.value = "/";
+  fixture.elements.commandInput.dispatchEvent(arrowUpEvent);
+  await tick();
+  assert.equal(arrowUpEvent.defaultPrevented, true);
+  assert.equal(fixture.elements.commandInput.value, "/restart 1");
+
+  const repeatEvent = {
+    type: "keydown",
+    key: "Enter",
+    ctrlKey: true,
+    metaKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(repeatEvent);
+  await tick();
+  assert.equal(repeatEvent.defaultPrevented, true);
+  assert.equal(restartCalls.length, 2);
+
+  fixture.elements.commandInput.value = "/";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "ArrowUp",
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/restart 1");
+
+  fixture.elements.commandInput.value = "/restart 1 --modified";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Enter",
+    ctrlKey: true,
+    metaKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(restartCalls.length, 2);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Repeat blocked: recalled slash command was modified.");
+
+  const nonSlashArrowUp = {
+    type: "keydown",
+    key: "ArrowUp",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.value = "echo still-multiline-normal";
+  fixture.elements.commandInput.dispatchEvent(nonSlashArrowUp);
+  await tick();
+  assert.equal(nonSlashArrowUp.defaultPrevented, false);
+  assert.equal(fixture.elements.commandInput.value, "echo still-multiline-normal");
+
+  fixture.elements.commandInput.value = "/";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "ArrowUp",
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/switch 1");
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/restart 1");
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/");
+
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";
   fixture.elements.settingsApply.click();
