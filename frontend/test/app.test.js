@@ -313,6 +313,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const inputPayloads = [];
   const restartCalls = [];
   const customCommandUpserts = [];
+  const customCommandDeletes = [];
+  const customCommands = new Map();
   let listSessionsCalls = 0;
   const win = {
     document: fixture.document,
@@ -378,8 +380,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(500, { error: "DeleteFailed", message: "boom" });
     }
     if (path === "/api/v1/sessions/s-1/input" && options.method === "POST") {
-      inputPayloads.push(JSON.parse(options.body || "{}"));
-      return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
+      const payload = JSON.parse(options.body || "{}");
+      inputPayloads.push(payload);
+      if (payload.data === "pwd\n") {
+        return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
+      }
+      return makeJsonResponse(204, {});
     }
     if (path === "/api/v1/sessions/s-1/restart" && options.method === "POST") {
       restartCalls.push("s-1");
@@ -396,12 +402,33 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       const body = JSON.parse(options.body || "{}");
       customCommandUpserts.push({ commandName, content: body.content });
-      return makeJsonResponse(200, {
+      const next = {
         name: commandName,
         content: body.content,
         createdAt: Date.now(),
         updatedAt: Date.now()
-      });
+      };
+      customCommands.set(commandName, next);
+      return makeJsonResponse(200, next);
+    }
+    if (path === "/api/v1/custom-commands" && (!options.method || options.method === "GET")) {
+      return makeJsonResponse(200, Array.from(customCommands.values()));
+    }
+    if (path.startsWith("/api/v1/custom-commands/") && (!options.method || options.method === "GET")) {
+      const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
+      if (!customCommands.has(commandName)) {
+        return makeJsonResponse(404, { error: "CustomCommandNotFound", message: "missing" });
+      }
+      return makeJsonResponse(200, customCommands.get(commandName));
+    }
+    if (path.startsWith("/api/v1/custom-commands/") && options.method === "DELETE") {
+      const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
+      if (!customCommands.has(commandName)) {
+        return makeJsonResponse(404, { error: "CustomCommandNotFound", message: "missing" });
+      }
+      customCommands.delete(commandName);
+      customCommandDeletes.push(commandName);
+      return makeJsonResponse(204, {});
     }
     if (path.endsWith("/resize")) {
       resizePayloads.push(JSON.parse(options.body || "{}"));
@@ -487,6 +514,37 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     fixture.elements.commandFeedback.textContent,
     /^Custom command definition error: Block definition must end with a closing '---' line\.$/
   );
+
+  fixture.elements.commandInput.value = "/custom list";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /\/docu/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/blockcmd/);
+
+  fixture.elements.commandInput.value = "/custom show docu";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^\/docu\n---\necho verify\n---$/);
+
+  fixture.elements.commandInput.value = "/docu";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, 2);
+  assert.equal(inputPayloads[1].data, "echo verify\n");
+  assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
+
+  fixture.elements.commandInput.value = "/custom remove docu";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandDeletes.length, 1);
+  assert.equal(customCommandDeletes[0], "docu");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Removed custom command /docu.");
+
+  fixture.elements.commandInput.value = "/docu";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, 2);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
 
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();

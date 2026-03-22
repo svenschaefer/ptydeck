@@ -70,7 +70,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Central command input targeting the active session
-- Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/help`
+- Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)

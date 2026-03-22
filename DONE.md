@@ -251,6 +251,11 @@ Completed and verified topics belong here.
 - [x] Added frontend test coverage for `/custom` inline and block definitions plus malformed block validation feedback, and API-client coverage for custom-command upsert endpoint.
 - [x] Validation for `QLT-039` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-039` cycle: backend `96.97%` lines, frontend `87.96%` lines.
+- [x] `QLT-047` completed: frontend command plane now supports `/custom list`, `/custom show <name>`, and `/custom remove <name>` with deterministic feedback and explicit not-found handling.
+- [x] `QLT-040` completed: custom commands can be executed via `/<customName>` and `/<customName> <target>` with target resolution (session ID, quick ID, name, unique prefix) and auto-trailing newline behavior.
+- [x] Frontend API client extended with custom-command list/get/delete methods, and integration behavior validated in app tests.
+- [x] Validation for `QLT-040`/`QLT-047` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-040`/`QLT-047` cycle: backend `96.97%` lines, frontend `87.50%` lines.
 
 ## Maintenance Rules
 

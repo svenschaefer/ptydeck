@@ -169,3 +169,29 @@ test("api client calls upsert custom command endpoint", async () => {
   assert.equal(calls[0].options.method, "PUT");
   assert.deepEqual(JSON.parse(calls[0].options.body), { content: "echo docs\n" });
 });
+
+test("api client calls custom command list/get/delete endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    if ((options.method || "GET") === "DELETE") {
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => [{ name: "docu", content: "echo docs\n", createdAt: 1, updatedAt: 2 }]
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listCustomCommands();
+  await api.getCustomCommand("docu");
+  await api.deleteCustomCommand("docu");
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/custom-commands");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/custom-commands/docu");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/custom-commands/docu");
+  assert.equal(calls[2].options.method, "DELETE");
+});

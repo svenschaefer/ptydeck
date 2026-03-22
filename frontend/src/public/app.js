@@ -654,7 +654,8 @@ function parseCustomDefinition(rawInput) {
 }
 
 async function executeControlCommand(interpreted) {
-  const command = interpreted.command.toLowerCase();
+  const commandRaw = interpreted.command;
+  const command = commandRaw.toLowerCase();
   const args = interpreted.args;
   const state = store.getState();
   const sessions = state.sessions;
@@ -772,6 +773,46 @@ async function executeControlCommand(interpreted) {
   }
 
   if (command === "custom") {
+    if (args[0] === "list") {
+      const commands = await api.listCustomCommands();
+      if (!Array.isArray(commands) || commands.length === 0) {
+        return "No custom commands defined.";
+      }
+      return commands.map((entry) => `/${entry.name}`).join("\n");
+    }
+
+    if (args[0] === "show") {
+      const name = typeof args[1] === "string" ? args[1].trim() : "";
+      if (!name) {
+        return "Usage: /custom show <name>";
+      }
+      try {
+        const custom = await api.getCustomCommand(name);
+        return `/${custom.name}\n---\n${custom.content}\n---`;
+      } catch (err) {
+        if (err && err.status === 404) {
+          return `Custom command not found: /${name}`;
+        }
+        throw err;
+      }
+    }
+
+    if (args[0] === "remove") {
+      const name = typeof args[1] === "string" ? args[1].trim() : "";
+      if (!name) {
+        return "Usage: /custom remove <name>";
+      }
+      try {
+        await api.deleteCustomCommand(name);
+        return `Removed custom command /${name}.`;
+      } catch (err) {
+        if (err && err.status === 404) {
+          return `Custom command not found: /${name}`;
+        }
+        throw err;
+      }
+    }
+
     const parsed = parseCustomDefinition(interpreted.raw);
     if (!parsed.ok) {
       return `Custom command definition error: ${parsed.error}`;
@@ -780,7 +821,34 @@ async function executeControlCommand(interpreted) {
     return `Saved custom command /${saved.name} (${parsed.mode}).`;
   }
 
-  return `Unknown command: /${command}`;
+  if (args.length > 1) {
+    return `Usage: /${commandRaw} [target]`;
+  }
+
+  try {
+    const custom = await api.getCustomCommand(commandRaw);
+    let targetSessionId = activeSessionId;
+    if (args.length === 1) {
+      const resolved = resolveSessionToken(args[0], sessions);
+      if (!resolved.session) {
+        return resolved.error;
+      }
+      targetSessionId = resolved.session.id;
+    }
+    if (!targetSessionId) {
+      return "No active session for custom command execution.";
+    }
+    const payload = custom.content.endsWith("\n") ? custom.content : `${custom.content}\n`;
+    await api.sendInput(targetSessionId, payload);
+    return `Executed /${custom.name} on [${formatSessionToken(targetSessionId)}].`;
+  } catch (err) {
+    if (err && err.status === 404) {
+      return `Unknown command: /${commandRaw}`;
+    }
+    throw err;
+  }
+
+  return `Unknown command: /${commandRaw}`;
 }
 
 async function bootstrapSessions() {

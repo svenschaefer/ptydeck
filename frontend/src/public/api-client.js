@@ -135,6 +135,15 @@ export function createApiClient(baseUrl, options = {}) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ content })
       });
+    },
+    async listCustomCommands() {
+      return request("/custom-commands");
+    },
+    async getCustomCommand(commandName) {
+      return request(`/custom-commands/${encodeURIComponent(commandName)}`);
+    },
+    async deleteCustomCommand(commandName) {
+      await request(`/custom-commands/${encodeURIComponent(commandName)}`, { method: "DELETE" }, { expectJson: false });
     }
   };
 }
