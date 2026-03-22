@@ -125,7 +125,7 @@ Exit criteria:
 - Disaster recovery drills are automated and measured against RTO/RPO.
 - Release evidence bundle is generated for audit/compliance traceability.
 - WebSocket origin checks are enforced alongside REST origin policy.
-- Reverse-proxy deployment guidance exists for Traefik-based HTTPS/WSS host routing.
+- Reverse-proxy deployment guidance exists for provider-agnostic HTTPS/WSS host routing.
 - Trusted proxy handling is explicitly configured and validated.
 - Session guardrail policies (concurrency/idle/lifetime) are enforced and tested.
 - Monitoring metrics are exposed and consumed by alerting baselines.

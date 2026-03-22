@@ -2,3 +2,4 @@ node_modules/
 coverage/
 .npm/
 backend/data/
+local-config/

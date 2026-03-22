@@ -78,15 +78,16 @@ Frontend:
 - Send command (for example `pwd`)
 - Confirm output appears in the corresponding terminal panel
 
-## 7. Local Reverse Proxy (Traefik) Note
+## 7. Local Reverse Proxy Note
 
 If local TLS/domain routing is used, route frontend and backend with explicit hosts, for example:
 
-- Frontend host: `https://ptydeck.local.secos.rocks`
-- Backend API host: `https://api.ptydeck.local.secos.rocks/api/v1`
-- Backend WS host: `wss://api.ptydeck.local.secos.rocks/ws`
+- Frontend host: `https://app.local.example`
+- Backend API host: `https://api.local.example/api/v1`
+- Backend WS host: `wss://api.local.example/ws`
 
 When this mode is enabled, `CORS_ORIGIN` and WebSocket origin checks should use explicit allowlists instead of wildcard values.
+Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
 ## 8. Rollback
 
