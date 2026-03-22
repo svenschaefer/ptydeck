@@ -173,6 +173,14 @@ button:hover {
   overflow: hidden;
 }
 
+.terminal-mount .xterm {
+  height: 100%;
+}
+
+.terminal-mount .xterm-viewport {
+  overflow-y: auto !important;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;

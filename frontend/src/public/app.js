@@ -25,6 +25,7 @@ const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
 
 const terminals = new Map();
+const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 let globalResizeTimer = null;
@@ -154,9 +155,14 @@ function render() {
   for (const sessionId of terminals.keys()) {
     if (!activeIds.has(sessionId)) {
       const entry = terminals.get(sessionId);
+      const observer = terminalObservers.get(sessionId);
+      if (observer) {
+        observer.disconnect();
+      }
       entry.terminal.dispose();
       entry.element.remove();
       terminals.delete(sessionId);
+      terminalObservers.delete(sessionId);
       const timer = resizeTimers.get(sessionId);
       if (timer) {
         clearTimeout(timer);
@@ -253,7 +259,17 @@ function render() {
     });
 
     terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, mount });
+
+    const observer = new ResizeObserver(() => {
+      applyResizeForSession(session.id);
+    });
+    observer.observe(mount);
+    terminalObservers.set(session.id, observer);
+
     applyResizeForSession(session.id);
+    setTimeout(() => applyResizeForSession(session.id), 120);
+    setTimeout(() => applyResizeForSession(session.id), 400);
+    setTimeout(() => applyResizeForSession(session.id), 900);
     shouldRunResizePass = true;
   }
 
@@ -382,6 +398,9 @@ window.addEventListener("beforeunload", () => {
   }
   for (const timer of resizeTimers.values()) {
     clearTimeout(timer);
+  }
+  for (const observer of terminalObservers.values()) {
+    observer.disconnect();
   }
   for (const entry of terminals.values()) {
     entry.terminal.dispose();
