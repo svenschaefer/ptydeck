@@ -62,6 +62,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 ## Features
 
 - Multiple terminal sessions displayed side by side
+- Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Central command input targeting the active session
 - Full PTY support (interactive applications like `vim`, `nano`, `top`)
 - Session persistence (restores working directory after restart)

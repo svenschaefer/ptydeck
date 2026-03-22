@@ -18,6 +18,10 @@ const store = createStore();
 const stateEl = document.getElementById("connection-state");
 const gridEl = document.getElementById("terminal-grid");
 const createBtn = document.getElementById("create-session");
+const settingsFixedSizeEl = document.getElementById("settings-fixed-size");
+const settingsColsEl = document.getElementById("settings-cols");
+const settingsRowsEl = document.getElementById("settings-rows");
+const settingsApplyBtn = document.getElementById("settings-apply");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
@@ -30,6 +34,10 @@ const resizeTimers = new Map();
 const terminalSizes = new Map();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
+const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
+const TERMINAL_FONT_SIZE = 16;
+const TERMINAL_LINE_HEIGHT = 1.2;
+let terminalSettings = loadTerminalSettings();
 const uiState = {
   loading: true,
   error: ""
@@ -50,9 +58,97 @@ function setError(message) {
   render();
 }
 
+function clampInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isInteger(parsed)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function readStoredSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
+      return null;
+    }
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveTerminalSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
+      return;
+    }
+    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(terminalSettings));
+  } catch {
+    // ignore storage failures (private mode / quota)
+  }
+}
+
+function loadTerminalSettings() {
+  const stored = readStoredSettings();
+  return {
+    fixedSize: Boolean(stored?.fixedSize ?? true),
+    cols: clampInt(stored?.cols, 80, 20, 400),
+    rows: clampInt(stored?.rows, 20, 5, 120)
+  };
+}
+
+function syncSettingsUi() {
+  if (settingsFixedSizeEl) {
+    settingsFixedSizeEl.checked = terminalSettings.fixedSize;
+  }
+  if (settingsColsEl) {
+    settingsColsEl.value = String(terminalSettings.cols);
+  }
+  if (settingsRowsEl) {
+    settingsRowsEl.value = String(terminalSettings.rows);
+  }
+}
+
+function readSettingsFromUi() {
+  return {
+    fixedSize: settingsFixedSizeEl ? settingsFixedSizeEl.checked : terminalSettings.fixedSize,
+    cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
+    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120)
+  };
+}
+
+function applyMountHeight(entry, rows) {
+  if (!entry || !entry.mount) {
+    return;
+  }
+  if (!terminalSettings.fixedSize) {
+    entry.mount.style.height = "";
+    return;
+  }
+  const targetPx = Math.max(160, Math.round(rows * TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT + 18));
+  entry.mount.style.height = `${targetPx}px`;
+}
+
+function applySettingsToAllTerminals() {
+  for (const sessionId of terminals.keys()) {
+    applyResizeForSession(sessionId, { force: true });
+  }
+}
+
 function computeTerminalSize(entry) {
   if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
     return null;
+  }
+
+  if (terminalSettings.fixedSize) {
+    return {
+      cols: terminalSettings.cols,
+      rows: terminalSettings.rows
+    };
   }
 
   entry.fitAddon.fit();
@@ -62,7 +158,7 @@ function computeTerminalSize(entry) {
   };
 }
 
-function applyResizeForSession(sessionId) {
+function applyResizeForSession(sessionId, options = {}) {
   const entry = terminals.get(sessionId);
   if (!entry) {
     return;
@@ -77,11 +173,12 @@ function applyResizeForSession(sessionId) {
     return;
   }
   const previous = terminalSizes.get(sessionId);
-  if (previous && previous.cols === cols && previous.rows === rows) {
+  if (!options.force && previous && previous.cols === cols && previous.rows === rows) {
     return;
   }
 
   terminalSizes.set(sessionId, { cols, rows });
+  applyMountHeight(entry, rows);
   entry.terminal.resize(cols, rows);
   debugLog("terminal.resize.local", { sessionId, cols, rows });
 
@@ -97,6 +194,15 @@ function applyResizeForSession(sessionId) {
     });
   }, 180);
   resizeTimers.set(sessionId, timer);
+}
+
+function onApplySettings() {
+  terminalSettings = readSettingsFromUi();
+  saveTerminalSettings();
+  syncSettingsUi();
+  uiState.error = "";
+  applySettingsToAllTerminals();
+  scheduleGlobalResize();
 }
 
 function scheduleGlobalResize() {
@@ -221,8 +327,8 @@ function render() {
 
     const terminal = new window.Terminal({
       convertEol: true,
-      fontSize: 16,
-      lineHeight: 1.2,
+      fontSize: TERMINAL_FONT_SIZE,
+      lineHeight: TERMINAL_LINE_HEIGHT,
       fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace',
       cursorBlink: true,
       theme: {
@@ -334,6 +440,7 @@ async function bootstrapSessions() {
 }
 
 store.subscribe(render);
+syncSettingsUi();
 render();
 bootstrapSessions();
 
@@ -385,6 +492,29 @@ createBtn.addEventListener("click", async () => {
     setError("Failed to create session.");
   }
 });
+
+if (settingsApplyBtn) {
+  settingsApplyBtn.addEventListener("click", onApplySettings);
+}
+if (settingsFixedSizeEl) {
+  settingsFixedSizeEl.addEventListener("change", onApplySettings);
+}
+if (settingsColsEl) {
+  settingsColsEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onApplySettings();
+    }
+  });
+}
+if (settingsRowsEl) {
+  settingsRowsEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onApplySettings();
+    }
+  });
+}
 
 async function submitCommand() {
   const command = commandInput.value;

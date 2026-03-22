@@ -209,6 +209,13 @@ function createDocumentFixture() {
   const connectionState = new FakeElement({ id: "connection-state" });
   const terminalGrid = new FakeElement({ id: "terminal-grid" });
   const createSession = new FakeElement({ id: "create-session", tagName: "button" });
+  const settingsFixedSize = new FakeElement({ id: "settings-fixed-size", tagName: "input" });
+  settingsFixedSize.checked = true;
+  const settingsCols = new FakeElement({ id: "settings-cols", tagName: "input" });
+  settingsCols.value = "80";
+  const settingsRows = new FakeElement({ id: "settings-rows", tagName: "input" });
+  settingsRows.value = "20";
+  const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
@@ -224,7 +231,19 @@ function createDocumentFixture() {
     }
   };
 
-  for (const element of [connectionState, terminalGrid, createSession, commandInput, sendCommand, emptyState, statusMessage]) {
+  for (const element of [
+    connectionState,
+    terminalGrid,
+    createSession,
+    settingsFixedSize,
+    settingsCols,
+    settingsRows,
+    settingsApply,
+    commandInput,
+    sendCommand,
+    emptyState,
+    statusMessage
+  ]) {
     byId.set(element.id, element);
   }
   byId.set("terminal-card-template", template);
@@ -234,6 +253,10 @@ function createDocumentFixture() {
       connectionState,
       terminalGrid,
       createSession,
+      settingsFixedSize,
+      settingsCols,
+      settingsRows,
+      settingsApply,
       commandInput,
       sendCommand,
       emptyState,
@@ -265,6 +288,10 @@ async function tick() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test("app handles critical error paths, DOM lifecycle, and connection state rendering", async (t) => {
   const previousDocument = global.document;
   const previousWindow = global.window;
@@ -276,6 +303,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   MockWebSocket.instances = [];
 
   const listeners = new Map();
+  const localStorageData = new Map();
+  const resizePayloads = [];
   const win = {
     document: fixture.document,
     location: {
@@ -287,6 +316,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       apiBaseUrl: "http://127.0.0.1:8080/api/v1",
       wsUrl: "ws://127.0.0.1:8080/ws",
       debugLogs: false
+    },
+    localStorage: {
+      getItem(key) {
+        return localStorageData.has(key) ? localStorageData.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageData.set(key, String(value));
+      }
     },
     Terminal: MockTerminal,
     FitAddon: {
@@ -328,6 +365,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
     }
     if (path.endsWith("/resize")) {
+      resizePayloads.push(JSON.parse(options.body || "{}"));
       return makeJsonResponse(204, {});
     }
     return makeJsonResponse(200, {});
@@ -362,6 +400,15 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
+
+  fixture.elements.settingsCols.value = "90";
+  fixture.elements.settingsRows.value = "30";
+  fixture.elements.settingsApply.click();
+  await sleep(260);
+  assert.ok(
+    resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
+    "expected resize request with updated settings"
+  );
 
   assert.equal(MockWebSocket.instances.length, 1);
   const ws = MockWebSocket.instances[0];

@@ -107,6 +107,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-032` Owner: `BE` Task: Remove persistence flushes for high-frequency `input`/`resize` operations to avoid interactive I/O overhead.
 - [x] `QLT-033` Owner: `BE` Task: Include buffered terminal output in WebSocket snapshot payload so reconnecting clients can restore prompt/output context immediately.
 - [x] `QLT-034` Owner: `FE` Task: Prevent terminal-grid stretch from inflating card height and causing large unused visual terminal areas.
+- [x] `QLT-035` Owner: `FE` Task: Add sidebar settings for terminal geometry (fixed-size toggle and configurable cols/rows such as `80x20`) with persistent user preferences and immediate resize apply.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

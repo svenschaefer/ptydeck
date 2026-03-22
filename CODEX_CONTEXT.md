@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-003/QLT-010 app behavior tests added; context synchronized)
+Last updated: 2026-03-22 (QLT-035 sidebar terminal-size settings added; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -84,11 +84,12 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - Frontend app behavior tests now cover create-session failure, delete-session failure, command-send failure, and reconnecting/disconnected status rendering.
 - Frontend app integration tests now cover terminal card lifecycle updates, active-session focus switching, and empty-state rendering.
+- Frontend sidebar now includes terminal settings with fixed-size toggle and user-configurable `cols`/`rows` (default `80x20`) persisted via `localStorage`.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-034`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
-  - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`.
+  - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`.
   - Planned next in cycle A: `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027`, `QLT-011`, `QLT-012`, `QLT-005`, `QLT-006` (control-plane command interpreter/restart support plus remaining frontend/CI hardening tasks).
 
 ## Session Behavior Notes

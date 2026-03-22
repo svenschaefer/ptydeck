@@ -103,6 +103,10 @@ Completed and verified topics belong here.
 - [x] Coverage after `QLT-003` cycle: backend `96.64%` lines, frontend `85.21%` lines (`node --test --experimental-test-coverage` aggregate report).
 - [x] `QLT-010` completed: extended frontend app integration coverage for terminal card lifecycle updates, active-session switching, and empty-state rendering.
 - [x] Coverage after `QLT-010` cycle: frontend `89.23%` lines (`npm --prefix frontend run test:coverage` aggregate report).
+- [x] `QLT-035` completed: added sidebar `Settings` with fixed terminal-size toggle and configurable `cols`/`rows` (for example `80x20`) applied live to all sessions.
+- [x] Terminal geometry preferences now persist in browser `localStorage` and are restored on reload.
+- [x] Validation for `QLT-035` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
+- [x] Coverage after `QLT-035` cycle: backend `96.41%` lines, frontend `89.70%` lines.
 
 ## Maintenance Rules
 
