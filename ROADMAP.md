@@ -103,16 +103,13 @@ Exit criteria:
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
-- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-017`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`, `ENT-025`
+- `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
 
 Dependencies:
 
 - `ENT-001` should run after `QLT-015` to build on stable API contract behavior.
-- `ENT-002` depends on `ENT-001` identity model and token claims.
-- `ENT-003` depends on `ENT-001` to include authenticated actor identity in audit records.
-- `ENT-006` depends on `QLT-007` request-size guard and should be validated by `ENT-010`.
-- `ENT-010` depends on completion of `ENT-001`, `ENT-002`, and `ENT-006`.
-- `ENT-008` should run after observability-producing changes in `ENT-003` and `ENT-004`.
+- `ENT-006` depends on `QLT-007` request-size guard and should be validated by non-functional and security regression coverage.
+- `ENT-008` should run after observability-producing changes in `ENT-004` logging baseline.
 - `ENT-009` should run after `QLT-009` atomic persistence write hardening.
 - `ENT-011` should run before any production deployment cutover.
 - `ENT-012` depends on `ENT-005` secrets/key management strategy.
@@ -120,19 +117,16 @@ Dependencies:
 - `ENT-014` depends on `ENT-009` backup/restore mechanics.
 - `ENT-015` depends on `ENT-007` security scanning artifacts.
 - `ENT-016` should run with `ENT-011` to align transport and header-level security posture.
-- `ENT-017` depends on `ENT-001` auth model and should align with `QLT-006` CORS policy split.
 - `ENT-018` should run with `ENT-011` to keep HTTPS/WSS ingress and certificate handling aligned.
-- `ENT-019` depends on `ENT-018` ingress topology and should be validated together with `ENT-003` audit context fields.
+- `ENT-019` depends on `ENT-018` ingress topology.
 - `ENT-020` depends on `ENT-006` abuse-control baseline and should be validated by `ENT-022`.
 - `ENT-021` should run before `ENT-008` alerting implementation to provide metric signals.
 - `ENT-022` depends on `ENT-020` and should run after `ENT-021` metric instrumentation for measurable thresholds.
 - `ENT-023` should run before production hardening tasks to prevent invalid runtime config drift.
-- `ENT-024` depends on `ENT-003`, `ENT-004`, and `ENT-009` to align session and log retention behavior.
-- `ENT-025` depends on `ENT-001` middleware baseline and should align with `ENT-005` secrets/key-management strategy.
+- `ENT-024` depends on `ENT-004` and `ENT-009` to align session/log retention behavior.
 
 Exit criteria:
 
-- AuthN/AuthZ and tenant isolation are enforced on REST and WS paths.
 - Audit logs and operational logs are structured, correlated, and retention-governed.
 - Security scanning and SBOM generation are active in CI.
 - SLOs and alerting are defined and documented.
@@ -143,7 +137,6 @@ Exit criteria:
 - Runtime least-privilege profile is implemented and documented.
 - Disaster recovery drills are automated and measured against RTO/RPO.
 - Release evidence bundle is generated for audit/compliance traceability.
-- WebSocket origin checks are enforced alongside REST origin policy.
 - Reverse-proxy deployment guidance exists for provider-agnostic HTTPS/WSS host routing.
 - Trusted proxy handling is explicitly configured and validated.
 - Session guardrail policies (concurrency/idle/lifetime) are enforced and tested.

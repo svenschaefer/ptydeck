@@ -113,22 +113,18 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
 - [x] `ENT-001` Owner: `BE` Task: Implement authentication and authorization middleware baseline for REST and WebSocket (JWT dev-mode token validation, route scope checks, `401`/`403` responses).
-- [ ] `ENT-002` Owner: `BE` Task: Add tenant-aware session scoping model (tenantId propagation, API filtering, WS event isolation by tenant).
-- [ ] `ENT-003` Owner: `BE` Task: Add structured audit logging for security-relevant actions (session create/delete/input/resize, auth failures) with actor identity and outcome.
 - [ ] `ENT-004` Owner: `PLAT` Task: Add production logging standards (JSON logs, correlation IDs, PII redaction rules, log retention policy) and document in `DEPLOYMENT.md`.
 - [ ] `ENT-005` Owner: `PLAT` Task: Integrate secrets management strategy (no plaintext secrets in repo, runtime secret injection pattern, secret rotation procedure).
 - [ ] `ENT-006` Owner: `BE` Task: Add configurable rate limiting and abuse controls for REST and WebSocket connection creation.
 - [ ] `ENT-007` Owner: `PLAT` Task: Add dependency and image security scanning in CI (SCA + vulnerability gate) and generate SBOM artifact per release.
 - [ ] `ENT-008` Owner: `PLAT` Task: Define SLOs/SLIs and alerting baseline for API availability, WS disconnect rate, and error-rate thresholds.
 - [ ] `ENT-009` Owner: `PLAT` Task: Add backup/restore automation for persistence data and include periodic restore verification procedure.
-- [ ] `ENT-010` Owner: `QA` Task: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).
 - [ ] `ENT-011` Owner: `PLAT` Task: Enforce TLS-only ingress in production (HTTPS/WSS), document certificate lifecycle, and add automated expiry checks.
 - [ ] `ENT-012` Owner: `BE` Task: Add encryption-at-rest option for persistence data (key-provider abstraction + key rotation support) and tests for decrypt/rotate paths.
 - [ ] `ENT-013` Owner: `PLAT` Task: Define and implement least-privilege runtime profile (container/user permissions, filesystem write scope, network egress policy).
 - [ ] `ENT-014` Owner: `PLAT` Task: Add disaster-recovery runbook with RTO/RPO targets and automate periodic restore drill verification in CI/non-prod.
 - [ ] `ENT-015` Owner: `PLAT` Task: Add release evidence bundle generation (test results, SBOM, vulnerability scan output, commit provenance) for audit/compliance.
 - [ ] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).
-- [ ] `ENT-017` Owner: `BE` Task: Enforce WebSocket `Origin` allowlist checks on upgrade requests and return explicit unauthorized-origin errors.
 - [x] `ENT-018` Owner: `PLAT` Task: Add reverse-proxy reference setup for local HTTPS/WSS host routing (provider-agnostic) in `DEPLOYMENT.md`.
 - [ ] `ENT-019` Owner: `BE` Task: Add trusted-proxy configuration and safe `X-Forwarded-*` handling to avoid spoofed client/protocol metadata behind ingress.
 - [ ] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.
@@ -136,4 +132,3 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
 - [x] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.
 - [ ] `ENT-024` Owner: `PLAT` Task: Define and document data retention/purge policy for persisted session metadata and audit/security logs, including automated cleanup cadence.
-- [ ] `ENT-025` Owner: `BE` Task: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_DEV_MODE` as local-only fallback.
