@@ -8,25 +8,29 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <h1>ptydeck</h1>
-      <div id="connection-state" class="pill">connecting</div>
-      <button id="create-session" type="button">New Session</button>
-    </header>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <h1>ptydeck</h1>
+        <div id="connection-state" class="pill">connecting</div>
+        <button id="create-session" type="button">New Session</button>
+      </aside>
 
-    <p id="status-message" class="status-message"></p>
+      <section class="workspace">
+        <p id="status-message" class="status-message"></p>
 
-    <main id="terminal-grid" class="terminal-grid"></main>
-    <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
+        <main id="terminal-grid" class="terminal-grid"></main>
+        <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
 
-    <section class="command-row">
-      <textarea
-        id="command-input"
-        rows="10"
-        placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
-      ></textarea>
-      <button id="send-command" type="button">Send</button>
-    </section>
+        <section class="command-row">
+          <textarea
+            id="command-input"
+            rows="10"
+            placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+          ></textarea>
+          <button id="send-command" type="button">Send</button>
+        </section>
+      </section>
+    </div>
 
     <template id="terminal-card-template">
       <article class="terminal-card">

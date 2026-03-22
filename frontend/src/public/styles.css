@@ -18,23 +18,27 @@
 body {
   margin: 0;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
   background: linear-gradient(180deg, #101723 0%, #0a0d12 100%);
   color: var(--text);
 }
 
-.topbar {
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.sidebar {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-right: 1px solid var(--border);
   background: #0f151f;
 }
 
-.topbar h1 {
+.sidebar h1 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
@@ -43,8 +47,14 @@ body {
   text-transform: uppercase;
 }
 
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .pill {
-  margin-left: auto;
+  align-self: flex-start;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -91,6 +101,7 @@ body {
   min-height: 20px;
   color: #ff8f8f;
   font-size: 13px;
+  padding-top: 10px;
 }
 
 button {
@@ -163,12 +174,13 @@ button:hover {
 }
 
 @media (max-width: 900px) {
-  .topbar {
-    flex-wrap: wrap;
+  .app-shell {
+    grid-template-columns: 1fr;
   }
 
-  .pill {
-    margin-left: 0;
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
 
   .terminal-grid {
