@@ -310,8 +310,9 @@ export function createRuntime(config) {
         logDebug("ws.client.closed", { socketCount: sockets.size });
       });
 
-      ws.send(JSON.stringify({ type: "snapshot", sessions: manager.list() }));
-      logDebug("ws.snapshot.sent", { sessionCount: manager.list().length });
+      const snapshot = manager.getSnapshot();
+      ws.send(JSON.stringify({ type: "snapshot", sessions: snapshot.sessions, outputs: snapshot.outputs }));
+      logDebug("ws.snapshot.sent", { sessionCount: snapshot.sessions.length, outputCount: snapshot.outputs.length });
     });
   });
 

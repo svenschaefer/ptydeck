@@ -9,6 +9,8 @@ function now() {
   return Date.now();
 }
 
+const MAX_OUTPUT_BUFFER_CHARS = 16 * 1024;
+
 function consumeCwdMarkers(session, chunk) {
   const markerStart = "__CWD__";
   const markerEnd = "__";
@@ -75,6 +77,18 @@ export class SessionManager {
     return Array.from(this.sessions.values()).map((session) => session.meta);
   }
 
+  getSnapshot() {
+    const sessions = [];
+    const outputs = [];
+    for (const session of this.sessions.values()) {
+      sessions.push(session.meta);
+      if (session.outputBuffer) {
+        outputs.push({ sessionId: session.id, data: session.outputBuffer });
+      }
+    }
+    return { sessions, outputs };
+  }
+
   get(sessionId) {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -101,6 +115,7 @@ export class SessionManager {
       id,
       ptyProcess,
       cwdMarkerBuffer: "",
+      outputBuffer: "",
       meta: {
         id,
         cwd,
@@ -114,6 +129,10 @@ export class SessionManager {
     ptyProcess.onData((data) => {
       const cleaned = consumeCwdMarkers(session, data);
       if (cleaned) {
+        session.outputBuffer = `${session.outputBuffer}${cleaned}`;
+        if (session.outputBuffer.length > MAX_OUTPUT_BUFFER_CHARS) {
+          session.outputBuffer = session.outputBuffer.slice(-MAX_OUTPUT_BUFFER_CHARS);
+        }
         this.events.emit("session.data", { sessionId: id, data: cleaned });
       }
     });

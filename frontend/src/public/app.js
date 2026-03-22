@@ -279,6 +279,29 @@ function render() {
   }
 }
 
+function replaySnapshotOutputs(outputs, attempt = 0) {
+  if (!Array.isArray(outputs) || outputs.length === 0) {
+    return;
+  }
+
+  let missing = 0;
+  for (const entry of outputs) {
+    if (!entry || typeof entry.sessionId !== "string" || typeof entry.data !== "string" || entry.data.length === 0) {
+      continue;
+    }
+    const terminalEntry = terminals.get(entry.sessionId);
+    if (!terminalEntry) {
+      missing += 1;
+      continue;
+    }
+    terminalEntry.terminal.write(entry.data);
+  }
+
+  if (missing > 0 && attempt < 4) {
+    setTimeout(() => replaySnapshotOutputs(outputs, attempt + 1), 80);
+  }
+}
+
 function upsertSession(nextSession) {
   const currentSessions = store.getState().sessions;
   const nextSessions = currentSessions.slice();
@@ -327,6 +350,7 @@ const ws = createWsClient(config.wsUrl, {
     debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
     if (event.type === "snapshot") {
       store.setSessions(event.sessions || []);
+      replaySnapshotOutputs(event.outputs);
       uiState.loading = false;
       uiState.error = "";
       return;

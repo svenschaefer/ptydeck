@@ -125,6 +125,23 @@ test("SessionManager strips split cwd markers across chunks", () => {
   assert.deepEqual(chunks, ["echo ok\r\nok\r\n"]);
 });
 
+test("SessionManager snapshot includes buffered terminal output", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp" });
+
+  fakePty.write("hello\r\n");
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.sessions.length, 1);
+  assert.equal(snapshot.sessions[0].id, created.id);
+  assert.equal(snapshot.outputs.length, 1);
+  assert.equal(snapshot.outputs[0].sessionId, created.id);
+  assert.equal(snapshot.outputs[0].data, "hello\r\n");
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()
