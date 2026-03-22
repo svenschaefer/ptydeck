@@ -468,10 +468,16 @@ export function createRuntime(config) {
 
   function deleteCustomCommand(name) {
     const normalizedName = normalizeCustomCommandName(name);
-    if (!customCommands.has(normalizedName)) {
+    const existing = customCommands.get(normalizedName);
+    if (!existing) {
       throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
     }
     customCommands.delete(normalizedName);
+    return { ...existing };
+  }
+
+  function hasCustomCommand(name) {
+    return customCommands.has(normalizeCustomCommandName(name));
   }
 
   function snapshotRuntimeState() {
@@ -649,15 +655,24 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "upsertCustomCommand") {
+        const existed = hasCustomCommand(match.params.commandName);
         const payload = upsertCustomCommand(match.params.commandName, body.content);
         validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
+        broadcast({
+          type: existed ? "custom-command.updated" : "custom-command.created",
+          command: payload
+        });
         persistSoon();
         writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "deleteCustomCommand") {
-        deleteCustomCommand(match.params.commandName);
+        const deletedCommand = deleteCustomCommand(match.params.commandName);
+        broadcast({
+          type: "custom-command.deleted",
+          command: deletedCommand
+        });
         persistSoon();
         writeJson(req, res, 204);
         return;
@@ -831,8 +846,20 @@ export function createRuntime(config) {
       });
 
       const snapshot = manager.getSnapshot();
-      ws.send(JSON.stringify({ type: "snapshot", sessions: snapshot.sessions, outputs: snapshot.outputs }));
-      logDebug("ws.snapshot.sent", { sessionCount: snapshot.sessions.length, outputCount: snapshot.outputs.length });
+      const customCommandSnapshot = listCustomCommands();
+      ws.send(
+        JSON.stringify({
+          type: "snapshot",
+          sessions: snapshot.sessions,
+          outputs: snapshot.outputs,
+          customCommands: customCommandSnapshot
+        })
+      );
+      logDebug("ws.snapshot.sent", {
+        sessionCount: snapshot.sessions.length,
+        outputCount: snapshot.outputs.length,
+        customCommandCount: customCommandSnapshot.length
+      });
     });
   });
 

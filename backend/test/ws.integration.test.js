@@ -109,6 +109,34 @@ test("WS emits session events and reconnect receives snapshot", async () => {
       )
     );
 
+    const customCreateRes = await fetch(`${baseUrl}/custom-commands/Docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo WS_CUSTOM_A\n" })
+    });
+    assert.equal(customCreateRes.status, 200);
+    await waitFor(() =>
+      events.some(
+        (event) => event.type === "custom-command.created" && event.command && event.command.name === "docu"
+      )
+    );
+
+    const customUpdateRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo WS_CUSTOM_B\n" })
+    });
+    assert.equal(customUpdateRes.status, 200);
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "custom-command.updated" &&
+          event.command &&
+          event.command.name === "docu" &&
+          event.command.content === "echo WS_CUSTOM_B\n"
+      )
+    );
+
     ws.close();
     await waitFor(() => ws.readyState === WebSocket.CLOSED);
 
@@ -119,6 +147,21 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     });
 
     await waitFor(() => reconnectEvents.some((event) => event.type === "snapshot"));
+    const reconnectSnapshot = reconnectEvents.find((event) => event.type === "snapshot");
+    assert.ok(Array.isArray(reconnectSnapshot.customCommands));
+    assert.equal(reconnectSnapshot.customCommands.length, 1);
+    assert.equal(reconnectSnapshot.customCommands[0].name, "docu");
+
+    const customDeleteRes = await fetch(`${baseUrl}/custom-commands/DoCu`, {
+      method: "DELETE"
+    });
+    assert.equal(customDeleteRes.status, 204);
+    await waitFor(() =>
+      reconnectEvents.some(
+        (event) => event.type === "custom-command.deleted" && event.command && event.command.name === "docu"
+      )
+    );
+
     wsReconnect.close();
   } finally {
     await runtime.stop();

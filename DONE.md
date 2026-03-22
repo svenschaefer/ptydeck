@@ -323,6 +323,11 @@ Completed and verified topics belong here.
 - [x] Added backend integration coverage for mixed-case upsert/get/delete behavior and deterministic list ordering in `backend/test/runtime.integration.test.js`.
 - [x] Validation for `QLT-052` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-052` cycle: backend `96.87%` lines, frontend `89.00%` lines.
+- [x] `QLT-048` completed: backend WebSocket stream now emits custom-command lifecycle events (`custom-command.created`, `custom-command.updated`, `custom-command.deleted`) and includes `customCommands` in snapshot payloads.
+- [x] Custom-command upsert/delete REST paths now broadcast deterministic WS event payloads (`command` object with canonical normalized name).
+- [x] Added WS integration coverage for custom-command event streaming and reconnect snapshot custom-command payload in `backend/test/ws.integration.test.js`.
+- [x] Validation for `QLT-048` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-048` cycle: backend `96.58%` lines, frontend `89.00%` lines.
 
 ## Maintenance Rules
 
