@@ -109,3 +109,15 @@ Exit criteria:
 - `BE-016` completed on 2026-03-22.
 - `BE-017` completed on 2026-03-22.
 - `BE-018` completed on 2026-03-22.
+- `FE-002` completed on 2026-03-22.
+- `FE-003` completed on 2026-03-22.
+- `FE-004` completed on 2026-03-22.
+- `FE-005` completed on 2026-03-22.
+- `FE-006` completed on 2026-03-22.
+- `FE-008` completed on 2026-03-22.
+- `FE-009` completed on 2026-03-22.
+- `FE-010` completed on 2026-03-22.
+- `FE-011` completed on 2026-03-22.
+- `FE-012` completed on 2026-03-22.
+- `FE-014` completed on 2026-03-22.
+- `INT-007` completed early on 2026-03-22 (originally planned for `v0.5.0`).

@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "node src/dev-server.js",
-    "build": "node --check src/dev-server.js src/config.js",
-    "lint": "node --check src/dev-server.js src/config.js",
+    "build": "node --check src/dev-server.js src/config.js src/public/app.js src/public/api-client.js src/public/store.js src/public/ws-client.js",
+    "lint": "node --check src/dev-server.js src/config.js src/public/app.js src/public/api-client.js src/public/store.js src/public/ws-client.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"
   }

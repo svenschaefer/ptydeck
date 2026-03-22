@@ -25,6 +25,10 @@ Completed and verified topics belong here.
 - [x] Added CWD marker extraction (`__CWD__...__`) from PTY output into session metadata.
 - [x] Added graceful shutdown flow with PTY cleanup and persistence flush.
 - [x] Backend coverage after `v0.3.0` changes: `93.89%` total lines.
+- [x] `v0.4.0` frontend progress delivered: `FE-002`, `FE-003`, `FE-004`, `FE-005`, `FE-006`, `FE-008`, `FE-009`, `FE-010`, `FE-011`, `FE-012`, `FE-014`.
+- [x] Added browser UI with xterm terminals, active-session control, and central command input.
+- [x] Added WS reconnect/status handling and per-session output routing.
+- [x] Added frontend tests for API client and state store (`INT-007`).
 
 ## Maintenance Rules
 

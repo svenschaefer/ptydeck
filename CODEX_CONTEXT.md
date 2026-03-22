@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.3.0 realtime and persistence delivered)
+Last updated: 2026-03-22 (v0.4.0 frontend in progress)
 Owner: `CODX`
 
 ## Project Purpose
@@ -46,6 +46,10 @@ The system separates backend execution concerns from frontend rendering concerns
 - Backend now includes WebSocket event streaming (`/ws`) with heartbeat handling.
 - Backend now persists session metadata to JSON and restores sessions at startup.
 - Backend includes graceful shutdown with PTY cleanup and persistence flush.
+- Frontend now includes a real multi-session xterm UI, session actions, and central command input.
+- Frontend now consumes backend snapshots/events via WebSocket reconnect flow.
+- Frontend now performs per-session debounced resize calls to backend.
+- `v0.4.0` status: in progress (`FE-007` and `FE-013` remain open).
 
 ## Session Behavior Notes
 

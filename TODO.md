@@ -36,19 +36,19 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Frontend Tasks (Classic Node.js FE stack)
 
 - [x] `FE-001` Owner: `FE` Task: Create frontend workspace in `frontend/` with TypeScript build, lint, and test scripts.
-- [ ] `FE-002` Owner: `FE` Task: Integrate `xterm.js` terminal component with one instance per session.
-- [ ] `FE-003` Owner: `FE` Task: Build multi-terminal grid layout with explicit active-session highlight.
-- [ ] `FE-004` Owner: `FE` Task: Build session list/actions UI for create, focus, and close.
-- [ ] `FE-005` Owner: `FE` Task: Build central command input that sends `value + "\\n"` to active session.
-- [ ] `FE-006` Owner: `FE` Task: Forward direct keyboard input from active terminal to REST input endpoint.
+- [x] `FE-002` Owner: `FE` Task: Integrate `xterm.js` terminal component with one instance per session.
+- [x] `FE-003` Owner: `FE` Task: Build multi-terminal grid layout with explicit active-session highlight.
+- [x] `FE-004` Owner: `FE` Task: Build session list/actions UI for create, focus, and close.
+- [x] `FE-005` Owner: `FE` Task: Build central command input that sends `value + "\\n"` to active session.
+- [x] `FE-006` Owner: `FE` Task: Forward direct keyboard input from active terminal to REST input endpoint.
 - [ ] `FE-007` Owner: `FE` Task: Generate typed API client from `backend/openapi/openapi.yaml`.
-- [ ] `FE-008` Owner: `FE` Task: Implement REST bootstrap flow to fetch sessions on app load.
-- [ ] `FE-009` Owner: `FE` Task: Implement WebSocket client with reconnect strategy and connection status indicator.
-- [ ] `FE-010` Owner: `FE` Task: Route WS events to terminals by `sessionId` and append terminal output efficiently.
-- [ ] `FE-011` Owner: `FE` Task: Implement terminal resize detection with debounced call to resize endpoint.
-- [ ] `FE-012` Owner: `FE` Task: Implement client state store (`sessions`, `activeSessionId`, `connectionState`).
+- [x] `FE-008` Owner: `FE` Task: Implement REST bootstrap flow to fetch sessions on app load.
+- [x] `FE-009` Owner: `FE` Task: Implement WebSocket client with reconnect strategy and connection status indicator.
+- [x] `FE-010` Owner: `FE` Task: Route WS events to terminals by `sessionId` and append terminal output efficiently.
+- [x] `FE-011` Owner: `FE` Task: Implement terminal resize detection with debounced call to resize endpoint.
+- [x] `FE-012` Owner: `FE` Task: Implement client state store (`sessions`, `activeSessionId`, `connectionState`).
 - [ ] `FE-013` Owner: `FE` Task: Add explicit UI states for loading, empty, error, and disconnected WS.
-- [ ] `FE-014` Owner: `FE` Task: Add cleanup of event listeners and terminal instances to prevent memory leaks.
+- [x] `FE-014` Owner: `FE` Task: Add cleanup of event listeners and terminal instances to prevent memory leaks.
 
 ## Integration, Quality, and Delivery Tasks
 
@@ -58,7 +58,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `INT-004` Owner: `QA` Task: Add backend unit tests for session manager and persistence adapter.
 - [ ] `INT-005` Owner: `QA` Task: Add backend integration tests for all REST endpoints in OpenAPI.
 - [ ] `INT-006` Owner: `QA` Task: Add backend WS integration tests for event ordering and reconnect behavior.
-- [ ] `INT-007` Owner: `QA` Task: Add frontend unit/component tests for store and terminal UI behaviors.
+- [x] `INT-007` Owner: `QA` Task: Add frontend unit/component tests for store and terminal UI behaviors.
 - [ ] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
 - [x] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
 - [ ] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
