@@ -19,6 +19,12 @@ Completed and verified topics belong here.
 - [x] Added runtime request/response validation and centralized API error mapping for backend routes.
 - [x] Added backend unit tests for `SessionManager`, `validation`, and `errors` modules.
 - [x] Backend coverage raised to `93.61%` total lines in local `npm run test:coverage`.
+- [x] `v0.3.0` backend realtime/persistence delivery completed: `BE-012`, `BE-013`, `BE-014`, `BE-015`, `BE-016`, `BE-017`, `BE-018`.
+- [x] Added WebSocket endpoint `/ws` with heartbeat and live `session.*` event broadcasting.
+- [x] Added JSON persistence adapter and startup restore from persisted metadata (`id`, `cwd`, `shell`, timestamps).
+- [x] Added CWD marker extraction (`__CWD__...__`) from PTY output into session metadata.
+- [x] Added graceful shutdown flow with PTY cleanup and persistence flush.
+- [x] Backend coverage after `v0.3.0` changes: `93.89%` total lines.
 
 ## Maintenance Rules
 

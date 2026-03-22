@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import pty from "node-pty";
+import { EventEmitter } from "node:events";
 import { ApiError } from "./errors.js";
 
 function now() {
@@ -10,6 +11,7 @@ export class SessionManager {
   constructor({ defaultShell = "bash", createPty } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
+    this.events = new EventEmitter();
     this.createPty =
       createPty ||
       (({ shell, cwd, cols, rows }) =>
@@ -34,8 +36,7 @@ export class SessionManager {
     return session;
   }
 
-  create({ cwd = process.cwd(), shell = this.defaultShell } = {}) {
-    const id = randomUUID();
+  create({ id = randomUUID(), cwd = process.cwd(), shell = this.defaultShell } = {}) {
     const createdAt = now();
 
     const ptyProcess = this.createPty({ shell, cwd, cols: 80, rows: 24 });
@@ -52,11 +53,31 @@ export class SessionManager {
       }
     };
 
-    ptyProcess.onExit(() => {
+    ptyProcess.onData((data) => {
+      const markerMatches = data.match(/__CWD__(.*?)__/g);
+      if (markerMatches && markerMatches.length > 0) {
+        const last = markerMatches[markerMatches.length - 1];
+        const cwdCandidate = last.replace("__CWD__", "").replace("__", "").trim();
+        if (cwdCandidate) {
+          session.meta.cwd = cwdCandidate;
+          session.meta.updatedAt = now();
+        }
+      }
+
+      this.events.emit("session.data", { sessionId: id, data });
+    });
+
+    ptyProcess.onExit((exit) => {
+      this.events.emit("session.exit", {
+        sessionId: id,
+        exitCode: exit.exitCode,
+        signal: exit.signal
+      });
       this.sessions.delete(id);
     });
 
     this.sessions.set(id, session);
+    this.events.emit("session.created", { session: session.meta });
     return session.meta;
   }
 
@@ -64,6 +85,7 @@ export class SessionManager {
     const session = this.get(sessionId);
     session.ptyProcess.kill();
     this.sessions.delete(sessionId);
+    this.events.emit("session.closed", { sessionId });
   }
 
   sendInput(sessionId, data) {
@@ -76,5 +98,13 @@ export class SessionManager {
     const session = this.get(sessionId);
     session.ptyProcess.resize(cols, rows);
     session.meta.updatedAt = now();
+  }
+
+  on(eventName, listener) {
+    this.events.on(eventName, listener);
+  }
+
+  off(eventName, listener) {
+    this.events.off(eventName, listener);
   }
 }

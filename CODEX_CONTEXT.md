@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.2.0 backend core delivered)
+Last updated: 2026-03-22 (v0.3.0 realtime and persistence delivered)
 Owner: `CODX`
 
 ## Project Purpose
@@ -43,7 +43,9 @@ The system separates backend execution concerns from frontend rendering concerns
 - Environment templates exist in `backend/.env.example` and `frontend/.env.example`.
 - Backend core REST lifecycle is implemented for session list/create/get/delete/input/resize.
 - Backend includes centralized API errors (`ApiError` + mapper) and runtime request/response validation.
-- Backend currently uses in-memory session metadata; persisted restore is still pending in `v0.3.0`.
+- Backend now includes WebSocket event streaming (`/ws`) with heartbeat handling.
+- Backend now persists session metadata to JSON and restores sessions at startup.
+- Backend includes graceful shutdown with PTY cleanup and persistence flush.
 
 ## Session Behavior Notes
 

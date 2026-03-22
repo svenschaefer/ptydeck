@@ -1,12 +1,48 @@
 import http from "node:http";
 import { URL } from "node:url";
+import { WebSocketServer } from "ws";
 import { loadConfig } from "./config.js";
 import { ApiError, toErrorResponse } from "./errors.js";
+import { JsonPersistence } from "./persistence.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
 const config = loadConfig();
 const manager = new SessionManager({ defaultShell: config.shell });
+const persistence = new JsonPersistence(config.dataPath);
+const wsServer = new WebSocketServer({ noServer: true });
+const sockets = new Set();
+let isReady = false;
+let persistTimer = null;
+
+function persistSoon() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+  persistTimer = setTimeout(async () => {
+    persistTimer = null;
+    await persistence.save(manager.list());
+  }, 100);
+}
+
+function broadcast(payload) {
+  const message = JSON.stringify(payload);
+  for (const socket of sockets) {
+    if (socket.readyState === socket.OPEN) {
+      socket.send(message);
+    }
+  }
+}
+
+const wsEventNames = ["session.created", "session.data", "session.exit", "session.closed"];
+for (const eventName of wsEventNames) {
+  manager.on(eventName, (event) => {
+    broadcast({ type: eventName, ...event });
+    if (eventName !== "session.data") {
+      persistSoon();
+    }
+  });
+}
 
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -111,7 +147,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (match.kind === "ready") {
-      const payload = { status: "ready" };
+      const payload = { status: isReady ? "ready" : "starting" };
       writeJson(res, 200, payload);
       return;
     }
@@ -126,6 +162,7 @@ const server = http.createServer(async (req, res) => {
     if (match.kind === "createSession") {
       const payload = manager.create({ cwd: body?.cwd, shell: body?.shell });
       validateResponse({ statusCode: 201, body: payload, expect: "session" });
+      persistSoon();
       writeJson(res, 201, payload);
       return;
     }
@@ -139,18 +176,21 @@ const server = http.createServer(async (req, res) => {
 
     if (match.kind === "deleteSession") {
       manager.delete(match.params.sessionId);
+      persistSoon();
       writeJson(res, 204);
       return;
     }
 
     if (match.kind === "input") {
       manager.sendInput(match.params.sessionId, body.data);
+      persistSoon();
       writeJson(res, 204);
       return;
     }
 
     if (match.kind === "resize") {
       manager.resize(match.params.sessionId, body.cols, body.rows);
+      persistSoon();
       writeJson(res, 204);
       return;
     }
@@ -163,6 +203,85 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(config.port, () => {
-  console.log(`backend listening on :${config.port}`);
+server.on("upgrade", (request, socket, head) => {
+  const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  if (requestUrl.pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+
+  wsServer.handleUpgrade(request, socket, head, (ws) => {
+    sockets.add(ws);
+    ws.isAlive = true;
+
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
+
+    ws.on("close", () => {
+      sockets.delete(ws);
+    });
+
+    ws.send(JSON.stringify({ type: "snapshot", sessions: manager.list() }));
+  });
+});
+
+const heartbeat = setInterval(() => {
+  for (const ws of sockets) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      sockets.delete(ws);
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+
+async function start() {
+  const persisted = await persistence.load();
+  for (const session of persisted) {
+    try {
+      manager.create({
+        id: session.id,
+        cwd: session.cwd || process.cwd(),
+        shell: session.shell || config.shell
+      });
+    } catch (err) {
+      console.error("failed to restore session", session.id, err);
+    }
+  }
+
+  isReady = true;
+  server.listen(config.port, () => {
+    console.log(`backend listening on :${config.port}`);
+  });
+}
+
+async function shutdown() {
+  clearInterval(heartbeat);
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+
+  for (const session of manager.list()) {
+    try {
+      manager.delete(session.id);
+    } catch {
+      // Ignore shutdown cleanup errors.
+    }
+  }
+
+  await persistence.save(manager.list());
+  server.close(() => {
+    process.exit(0);
+  });
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+start().catch((err) => {
+  console.error("startup failed", err);
+  process.exit(1);
 });

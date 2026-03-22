@@ -4,11 +4,13 @@ A lightweight web-based multi-terminal system for managing and interacting with 
 
 ## Repository Status
 
-Current state: foundational bootstrap and backend core REST lifecycle are in place (`v0.2.0`).
+Current state: foundational bootstrap, backend core REST lifecycle, and backend realtime/persistence are in place (`v0.3.0`).
 
 - Monorepo structure with `backend/` and `frontend/`
 - OpenAPI contract scaffold in `backend/openapi/openapi.yaml`
 - Backend session lifecycle endpoints implemented (`GET/POST /api/v1/sessions`, `GET/DELETE /api/v1/sessions/{sessionId}`, `POST /input`, `POST /resize`)
+- WebSocket endpoint `/ws` implemented with `session.created`, `session.data`, `session.exit`, and `session.closed` events
+- Session metadata persistence and startup restore implemented (JSON adapter)
 - Root scripts for local dev, lint, test, and coverage
 - CI workflow for backend/frontend lint, test, and build
 - Environment templates for backend and frontend

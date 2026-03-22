@@ -4,6 +4,7 @@ import { SessionManager } from "../src/session-manager.js";
 
 function createFakePty() {
   let lastExitHandler = null;
+  let lastDataHandler = null;
 
   return {
     writes: [],
@@ -12,8 +13,14 @@ function createFakePty() {
     onExit(handler) {
       lastExitHandler = handler;
     },
+    onData(handler) {
+      lastDataHandler = handler;
+    },
     write(data) {
       this.writes.push(data);
+      if (lastDataHandler) {
+        lastDataHandler(data);
+      }
     },
     resize(cols, rows) {
       this.resizeCalls.push({ cols, rows });
@@ -62,6 +69,18 @@ test("SessionManager sendInput and resize call PTY", () => {
 
   assert.deepEqual(fakePty.writes, ["ls\n"]);
   assert.deepEqual(fakePty.resizeCalls, [{ cols: 120, rows: 40 }]);
+});
+
+test("SessionManager updates cwd from marker output", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({ cwd: "/tmp" });
+  fakePty.write("__CWD__/home/wsl/workspace__");
+
+  assert.equal(manager.get(created.id).meta.cwd, "/home/wsl/workspace");
 });
 
 test("SessionManager throws on unknown session", () => {

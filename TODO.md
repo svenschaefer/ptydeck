@@ -24,13 +24,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `BE-009` Owner: `BE` Task: Add runtime OpenAPI request and response validation middleware.
 - [x] `BE-010` Owner: `BE` Task: Add centralized API error mapper with stable JSON payloads and HTTP status codes.
 - [x] `BE-011` Owner: `BE` Task: Build `SessionManager` with lifecycle hooks (create, exit, close, cleanup).
-- [ ] `BE-012` Owner: `BE` Task: Add WebSocket endpoint `/ws` with events `session.created`, `session.data`, `session.exit`, `session.closed`, `error`.
-- [ ] `BE-013` Owner: `BE` Task: Implement WS routing by `sessionId` and heartbeat ping/pong timeout handling.
-- [ ] `BE-014` Owner: `BE` Task: Add persistence adapter (`json` initial) with load/save for `id`, `cwd`, `shell`, timestamps.
-- [ ] `BE-015` Owner: `BE` Task: Recreate sessions on backend boot using persisted `cwd`.
-- [ ] `BE-016` Owner: `BE` Task: Implement cwd marker parsing (`__CWD__...__`) and persist updates.
-- [ ] `BE-017` Owner: `BE` Task: Add graceful shutdown handler that closes all PTYs and flushes persistence.
-- [ ] `BE-018` Owner: `BE` Task: Add `/health` and `/ready` endpoints.
+- [x] `BE-012` Owner: `BE` Task: Add WebSocket endpoint `/ws` with events `session.created`, `session.data`, `session.exit`, `session.closed`, `error`.
+- [x] `BE-013` Owner: `BE` Task: Implement WS routing by `sessionId` and heartbeat ping/pong timeout handling.
+- [x] `BE-014` Owner: `BE` Task: Add persistence adapter (`json` initial) with load/save for `id`, `cwd`, `shell`, timestamps.
+- [x] `BE-015` Owner: `BE` Task: Recreate sessions on backend boot using persisted `cwd`.
+- [x] `BE-016` Owner: `BE` Task: Implement cwd marker parsing (`__CWD__...__`) and persist updates.
+- [x] `BE-017` Owner: `BE` Task: Add graceful shutdown handler that closes all PTYs and flushes persistence.
+- [x] `BE-018` Owner: `BE` Task: Add `/health` and `/ready` endpoints.
 - [x] `BE-019` Owner: `BE` Task: Add CORS configuration for frontend origin and configurable allowed origins.
 
 ## Frontend Tasks (Classic Node.js FE stack)
