@@ -23,6 +23,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `FE`: Frontend implementation owner
 - `PLAT`: CI/CD, runtime, and operational owner
 - `QA`: Automated test owner
+- Decision authority (`SAS`): Sven A. Schaefer (`svenschaefer`, `sven.schaefer@gmail.com`) is the final decision maker when a product or implementation decision is required.
 
 ## Core Technical Decisions (Current)
 
