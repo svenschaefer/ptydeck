@@ -5,13 +5,15 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRuntime } from "../src/runtime.js";
 
-async function createStartedRuntime() {
+async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const runtime = createRuntime({
     port: 0,
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
-    corsOrigin: "*"
+    corsOrigin: "*",
+    maxBodyBytes: 1024 * 1024,
+    ...overrides
   });
   await runtime.start();
   const { port } = runtime.getAddress();
@@ -116,6 +118,24 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(unknownDeleteRes.status, 404);
     const unknownDeleteBody = await unknownDeleteRes.json();
     assert.equal(unknownDeleteBody.error, "SessionNotFound");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("REST rejects oversized request body with 413", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({ maxBodyBytes: 32 });
+
+  try {
+    const oversizeRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", cwd: "/tmp", data: "x".repeat(512) })
+    });
+
+    assert.equal(oversizeRes.status, 413);
+    const oversizeBody = await oversizeRes.json();
+    assert.equal(oversizeBody.error, "PayloadTooLarge");
   } finally {
     await runtime.stop();
   }

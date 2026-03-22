@@ -6,28 +6,57 @@ import { JsonPersistence } from "./persistence.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
-function parseJsonBody(req) {
+function parseJsonBody(req, maxBodyBytes) {
   return new Promise((resolve, reject) => {
     let data = "";
+    let size = 0;
+    let completed = false;
+
+    function resolveOnce(value) {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      resolve(value);
+    }
+
+    function rejectOnce(error) {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      reject(error);
+    }
 
     req.on("data", (chunk) => {
+      if (completed) {
+        return;
+      }
+      size += Buffer.byteLength(chunk);
+      if (size > maxBodyBytes) {
+        rejectOnce(new ApiError(413, "PayloadTooLarge", "Request body exceeds configured maximum size."));
+        return;
+      }
       data += chunk;
     });
 
     req.on("end", () => {
+      if (completed) {
+        return;
+      }
       if (!data) {
-        resolve(undefined);
+        resolveOnce(undefined);
         return;
       }
 
       try {
-        resolve(JSON.parse(data));
+        resolveOnce(JSON.parse(data));
       } catch {
-        reject(new ApiError(400, "InvalidJson", "Malformed JSON body."));
+        rejectOnce(new ApiError(400, "InvalidJson", "Malformed JSON body."));
       }
     });
 
-    req.on("error", (err) => reject(err));
+    req.on("error", (err) => rejectOnce(err));
   });
 }
 
@@ -67,6 +96,8 @@ function route(pathname, method) {
 }
 
 export function createRuntime(config) {
+  const maxBodyBytes =
+    Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const manager = new SessionManager({ defaultShell: config.shell });
   const persistence = new JsonPersistence(config.dataPath);
   const wsServer = new WebSocketServer({ noServer: true });
@@ -129,7 +160,7 @@ export function createRuntime(config) {
       }
 
       const match = route(parsedUrl.pathname, req.method || "GET");
-      const body = await parseJsonBody(req);
+      const body = await parseJsonBody(req, maxBodyBytes);
       const params = match.params || {};
 
       validateRequest({

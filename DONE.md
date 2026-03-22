@@ -53,6 +53,10 @@ Completed and verified topics belong here.
 - [x] `QLT-013` completed: frontend dev server static-path resolution hardened against traversal and malformed-encoding paths.
 - [x] Added static-path unit tests (`frontend/test/static-path.test.js`) for root mapping, traversal rejection, query/hash stripping, and malformed URI handling.
 - [x] Coverage after `QLT-013`: backend `94.71%` lines, frontend `97.12%` lines.
+- [x] `QLT-007` completed: backend runtime now enforces configurable request-body limit and returns explicit `413 PayloadTooLarge`.
+- [x] Added backend test coverage for oversized request rejection in `backend/test/runtime.integration.test.js`.
+- [x] Backend configuration now includes `MAX_BODY_BYTES` (default `1048576`) and deployment docs include the variable.
+- [x] Coverage after `QLT-007`: backend `94.43%` lines, frontend `97.12%` lines.
 
 ## Maintenance Rules
 

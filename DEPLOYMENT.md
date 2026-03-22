@@ -38,7 +38,7 @@ cp frontend/.env.example frontend/.env
 
 Set at least:
 
-- Backend: `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`
+- Backend: `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
 - Frontend: `FRONTEND_PORT`, `API_BASE_URL`, `WS_URL`
 
 ## 5. Start in Production Mode

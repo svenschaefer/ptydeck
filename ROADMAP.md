@@ -147,3 +147,4 @@ Exit criteria:
 - `INT-001` ... `INT-010`
 - `QLT-001`, `QLT-002`, `QLT-004`
 - `QLT-013`
+- `QLT-007`
