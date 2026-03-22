@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (planning sync: custom slash-command backlog `QLT-037` ... `QLT-057` sequenced in roadmap; enterprise open set unchanged)
+Last updated: 2026-03-22 (terminal fixed-size geometry/overflow rendering fix documented; custom slash-command backlog `QLT-037` ... `QLT-057` sequenced in roadmap)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -85,6 +85,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend app behavior tests now cover create-session failure, delete-session failure, command-send failure, and reconnecting/disconnected status rendering.
 - Frontend app integration tests now cover terminal card lifecycle updates, active-session focus switching, and empty-state rendering.
 - Frontend sidebar now includes terminal settings with fixed-size toggle and user-configurable `cols`/`rows` (default `80x20`) persisted via `localStorage`.
+- Frontend fixed-size terminal rendering now derives card width and mount height deterministically from configured `cols`/`rows`, with uniform per-card sizing so row packing depends only on viewport width.
+- Frontend terminal workspace now hardens horizontal overflow behavior via fixed-size grid column constraints, card shrink guards, toolbar text truncation, and root `overflow-x` containment.
 - Frontend terminal cards now display compact quick IDs (`1..9`, `A..Z`) next to session names for concise reference and future command alias support.
 - Frontend WebSocket client now reports explicit `error` connection state and reconnects with bounded exponential backoff plus jitter.
 - CI quality workflow now installs workspace dependencies and runs smoke boot validation (`scripts/ci-smoke.sh`) for backend and frontend startup readiness.
