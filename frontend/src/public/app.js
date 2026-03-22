@@ -32,11 +32,13 @@ const terminals = new Map();
 const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
+const sessionQuickIds = new Map();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
+const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 let terminalSettings = loadTerminalSettings();
 const uiState = {
   loading: true,
@@ -139,6 +141,32 @@ function applySettingsToAllTerminals() {
   }
 }
 
+function findNextQuickId() {
+  const used = new Set(sessionQuickIds.values());
+  for (const candidate of QUICK_ID_POOL) {
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+  }
+  return "?";
+}
+
+function ensureQuickId(sessionId) {
+  if (!sessionQuickIds.has(sessionId)) {
+    sessionQuickIds.set(sessionId, findNextQuickId());
+  }
+  return sessionQuickIds.get(sessionId);
+}
+
+function pruneQuickIds(activeSessionIds) {
+  const activeSet = new Set(activeSessionIds);
+  for (const sessionId of sessionQuickIds.keys()) {
+    if (!activeSet.has(sessionId)) {
+      sessionQuickIds.delete(sessionId);
+    }
+  }
+}
+
 function computeTerminalSize(entry) {
   if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
     return null;
@@ -237,6 +265,7 @@ function scheduleDeferredResizePasses() {
 
 function render() {
   const state = store.getState();
+  pruneQuickIds(state.sessions.map((session) => session.id));
   debugLog("ui.render", {
     sessions: state.sessions.length,
     activeSessionId: state.activeSessionId,
@@ -284,16 +313,20 @@ function render() {
       const entry = terminals.get(session.id);
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
+      entry.quickIdEl.textContent = ensureQuickId(session.id);
       continue;
     }
 
     const node = template.content.firstElementChild.cloneNode(true);
+    const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
     const mount = node.querySelector(".terminal-mount");
+    const quickId = ensureQuickId(session.id);
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
+    quickIdEl.textContent = quickId;
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
     renameBtn.addEventListener("click", async () => {
       const nextName = window.prompt("Session name", session.name || session.id.slice(0, 8));
@@ -364,7 +397,7 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, mount });
+    terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, quickIdEl, mount });
 
     const observer = new ResizeObserver(() => {
       applyResizeForSession(session.id);

@@ -107,6 +107,10 @@ Completed and verified topics belong here.
 - [x] Terminal geometry preferences now persist in browser `localStorage` and are restored on reload.
 - [x] Validation for `QLT-035` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
 - [x] Coverage after `QLT-035` cycle: backend `96.41%` lines, frontend `89.70%` lines.
+- [x] `QLT-036` completed: added terminal quick IDs (`1..9`, `A..Z`) shown next to session names and stabilized per active session set.
+- [x] Frontend app integration test now verifies quick-ID assignment for multi-session snapshots.
+- [x] Validation for `QLT-036` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
+- [x] Coverage after `QLT-036` cycle: backend `96.64%` lines, frontend `89.88%` lines.
 
 ## Maintenance Rules
 

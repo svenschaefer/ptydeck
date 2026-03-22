@@ -191,10 +191,12 @@ class MockWebSocket {
 function createTerminalCardTemplateNode() {
   const card = new FakeElement({ className: "terminal-card", tagName: "article" });
   const toolbar = new FakeElement({ className: "terminal-toolbar" });
+  const quickId = new FakeElement({ className: "session-quick-id", tagName: "span" });
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
+  toolbar.appendChild(quickId);
   toolbar.appendChild(focus);
   toolbar.appendChild(rename);
   toolbar.appendChild(close);
@@ -430,6 +432,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   const firstCard = fixture.elements.terminalGrid.children[0];
   const secondCard = fixture.elements.terminalGrid.children[1];
+  const firstQuickId = firstCard.querySelector(".session-quick-id");
+  const secondQuickId = secondCard.querySelector(".session-quick-id");
+  assert.equal(firstQuickId.textContent, "1");
+  assert.equal(secondQuickId.textContent, "2");
   const secondFocus = secondCard.querySelector(".session-focus");
   secondFocus.click();
   await tick();

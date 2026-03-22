@@ -108,6 +108,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-033` Owner: `BE` Task: Include buffered terminal output in WebSocket snapshot payload so reconnecting clients can restore prompt/output context immediately.
 - [x] `QLT-034` Owner: `FE` Task: Prevent terminal-grid stretch from inflating card height and causing large unused visual terminal areas.
 - [x] `QLT-035` Owner: `FE` Task: Add sidebar settings for terminal geometry (fixed-size toggle and configurable cols/rows such as `80x20`) with persistent user preferences and immediate resize apply.
+- [x] `QLT-036` Owner: `FE` Task: Add terminal quick IDs (`1..9`, `A..Z`) displayed next to session names for compact reference and future command-alias usage.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
