@@ -131,7 +131,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-056` Owner: `FE` Task: Render custom-command preview as strict text-only output (escaped/no HTML interpretation) with deterministic truncation rules for very large payloads.
 - [ ] `QLT-057` Owner: `QA` Task: Add regression tests that autocomplete/suggestion logic remains disabled for non-slash input and for multiline input where `/` is not first character of line 1.
 - [x] `QLT-058` Owner: `FE` Task: Add per-terminal settings entry via dedicated settings icon on each terminal card (gear icon) opening a per-session settings panel.
-- [ ] `QLT-059` Owner: `FE` Task: Move terminal-card `Rename` and `Close` actions into per-session settings panel and remove direct toolbar buttons.
+- [x] `QLT-059` Owner: `FE` Task: Move terminal-card `Rename` and `Close` actions into per-session settings panel and remove direct toolbar buttons.
 - [ ] `QLT-060` Owner: `BE` Task: Extend OpenAPI/runtime session model and REST payloads for per-session startup config (`startCwd`, `startCommand`, `env`) with persistence and validation guardrails.
 - [ ] `QLT-061` Owner: `BE` Task: Apply persisted per-session startup config deterministically on session (re)spawn (`startCwd` as initial working directory, `startCommand` execution after PTY ready, `env` injection).
 - [ ] `QLT-062` Owner: `FE` Task: Implement per-session settings form for startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`) with stable client-side validation and explicit save feedback.

@@ -308,6 +308,10 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for settings-entry visibility and panel open/close toggle behavior on terminal cards.
 - [x] Validation for `QLT-058` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-058` cycle: backend `96.97%` lines, frontend `88.88%` lines.
+- [x] `QLT-059` completed: terminal-card `Rename` and `Close` actions were moved into the per-session settings panel; direct toolbar buttons were removed.
+- [x] Added frontend integration coverage verifying toolbar action removal and settings-panel ownership of `Rename`/`Close` controls.
+- [x] Validation for `QLT-059` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-059` cycle: backend `96.97%` lines, frontend `88.90%` lines.
 
 ## Maintenance Rules
 
