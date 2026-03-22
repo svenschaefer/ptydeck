@@ -263,14 +263,12 @@ export function createRuntime(config) {
 
       if (match.kind === "input") {
         manager.sendInput(match.params.sessionId, body.data);
-        persistSoon();
         writeJson(res, 204);
         return;
       }
 
       if (match.kind === "resize") {
         manager.resize(match.params.sessionId, body.cols, body.rows);
-        persistSoon();
         writeJson(res, 204);
         return;
       }
