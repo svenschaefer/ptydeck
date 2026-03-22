@@ -56,7 +56,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-017`).
-- Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-010`).
+- Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-016`).
 
 ## Session Behavior Notes
 

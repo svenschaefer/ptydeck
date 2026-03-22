@@ -100,3 +100,9 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `ENT-008` Owner: `PLAT` Task: Define SLOs/SLIs and alerting baseline for API availability, WS disconnect rate, and error-rate thresholds.
 - [ ] `ENT-009` Owner: `PLAT` Task: Add backup/restore automation for persistence data and include periodic restore verification procedure.
 - [ ] `ENT-010` Owner: `QA` Task: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).
+- [ ] `ENT-011` Owner: `PLAT` Task: Enforce TLS-only ingress in production (HTTPS/WSS), document certificate lifecycle, and add automated expiry checks.
+- [ ] `ENT-012` Owner: `BE` Task: Add encryption-at-rest option for persistence data (key-provider abstraction + key rotation support) and tests for decrypt/rotate paths.
+- [ ] `ENT-013` Owner: `PLAT` Task: Define and implement least-privilege runtime profile (container/user permissions, filesystem write scope, network egress policy).
+- [ ] `ENT-014` Owner: `PLAT` Task: Add disaster-recovery runbook with RTO/RPO targets and automate periodic restore drill verification in CI/non-prod.
+- [ ] `ENT-015` Owner: `PLAT` Task: Add release evidence bundle generation (test results, SBOM, vulnerability scan output, commit provenance) for audit/compliance.
+- [ ] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).

@@ -85,7 +85,7 @@ Exit criteria:
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
-- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`
+- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`
 
 Dependencies:
 
@@ -96,6 +96,12 @@ Dependencies:
 - `ENT-010` depends on completion of `ENT-001`, `ENT-002`, and `ENT-006`.
 - `ENT-008` should run after observability-producing changes in `ENT-003` and `ENT-004`.
 - `ENT-009` should run after `QLT-009` atomic persistence write hardening.
+- `ENT-011` should run before any production deployment cutover.
+- `ENT-012` depends on `ENT-005` secrets/key management strategy.
+- `ENT-013` should run before `ENT-015` to include hardened runtime evidence in release bundles.
+- `ENT-014` depends on `ENT-009` backup/restore mechanics.
+- `ENT-015` depends on `ENT-007` security scanning artifacts.
+- `ENT-016` should run with `ENT-011` to align transport and header-level security posture.
 
 Exit criteria:
 
@@ -105,6 +111,11 @@ Exit criteria:
 - SLOs and alerting are defined and documented.
 - Backup/restore is automated and periodically verified.
 - Security and isolation tests are automated and passing.
+- TLS-only production ingress and certificate operations are enforced.
+- At-rest encryption and key rotation are implemented for persistence data.
+- Runtime least-privilege profile is implemented and documented.
+- Disaster recovery drills are automated and measured against RTO/RPO.
+- Release evidence bundle is generated for audit/compliance traceability.
 
 ## Current Status
 
