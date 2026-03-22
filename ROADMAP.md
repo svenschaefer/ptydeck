@@ -55,19 +55,26 @@ Exit criteria:
 
 ### v0.3.0-H1 - Quality Hardening Backlog
 
-- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`
 
 Dependencies:
 
 - `QLT-003` depends on `QLT-001` and `QLT-002`.
+- `QLT-010` depends on `QLT-001`.
 - `QLT-005` depends on test additions from `QLT-002`, `QLT-003`, and `QLT-004`.
+- `QLT-005` should also include thresholds for new tests from `QLT-010`.
 - `QLT-006` should be completed before production deployment updates.
+- `QLT-009` depends on `QLT-008` session metadata persistence behavior.
+- `QLT-012` should run after runtime-hardening items `QLT-007` and `QLT-011`.
 
 Exit criteria:
 
 - Frontend error-path behavior is covered by tests.
 - Backend negative-path behavior is covered by tests.
+- Frontend DOM integration behavior is covered by tests.
+- Backend persistence and restart behavior are resilient under partial-write risk.
 - CI enforces coverage minimums.
+- CI performs runtime smoke checks before merge.
 - Deployment docs include secure production CORS guidance.
 
 ## Current Status

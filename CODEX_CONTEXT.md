@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.3.0 hardening backlog added)
+Last updated: 2026-03-22 (v0.3.0 hardening backlog expanded)
 Owner: `CODY`
 
 ## Project Purpose
@@ -55,7 +55,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
-- Active next cycle: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-006`).
+- Active next cycle: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-012`).
 
 ## Session Behavior Notes
 
