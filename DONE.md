@@ -115,10 +115,12 @@ Completed and verified topics belong here.
 - [x] Added WebSocket tests for error-state emission and jitter/backoff bounds in `frontend/test/ws-client.test.js`.
 - [x] `QLT-012` completed: CI workflow now runs dependency install and a smoke boot check (`scripts/ci-smoke.sh`) validating backend `/health` + `/ready` and frontend initial HTML response.
 - [x] `QLT-006` completed: backend CORS defaults now split by environment (`development` wildcard fallback, `production` explicit allowlist only).
+- [x] `QLT-005` completed: CI now enforces backend/frontend minimum line-coverage thresholds via `scripts/check-coverage.sh` (`90%` backend, `85%` frontend).
+- [x] Added root script `npm run test:coverage:check` and wired CI `Coverage thresholds` gate for Node `18`.
 - [x] Added backend tests for production CORS config parsing and runtime allowlist behavior (`Origin` echo for allowed origins, no allow header for disallowed origins).
 - [x] Deployment runbook and backend `.env` template updated with secure production CORS guidance (`NODE_ENV=production`, explicit comma-separated `CORS_ORIGIN`).
-- [x] Validation for `QLT-011`/`QLT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `./scripts/ci-smoke.sh`.
-- [x] Coverage after `QLT-006`/`QLT-011`/`QLT-012` cycle: backend `96.30%` lines, frontend `90.37%` lines.
+- [x] Validation for `QLT-005`/`QLT-006`/`QLT-011`/`QLT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and `./scripts/ci-smoke.sh`.
+- [x] Coverage after `QLT-005`/`QLT-006`/`QLT-011`/`QLT-012` cycle: backend `96.78%` lines, frontend `90.37%` lines.
 
 ## Maintenance Rules
 

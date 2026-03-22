@@ -32,6 +32,9 @@ jobs:
         run: npm --prefix backend run build
       - name: Frontend build
         run: npm --prefix frontend run build
+      - name: Coverage thresholds
+        if: matrix.node-version == '18'
+        run: npm run test:coverage:check
       - name: Smoke boot checks
         if: matrix.node-version == '18'
         run: ./scripts/ci-smoke.sh
