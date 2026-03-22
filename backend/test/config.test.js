@@ -7,7 +7,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.port, 8080);
   assert.equal(config.shell, "bash");
   assert.equal(config.dataPath, "./data/sessions.json");
-  assert.equal(config.corsOrigin, "http://localhost:5173");
+  assert.equal(config.corsOrigin, "*");
 });
 
 test("loadConfig maps environment values", () => {
