@@ -289,6 +289,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for `@<target>` success path (payload delivery to target without focus switch) and unresolved-target guardrail behavior.
 - [x] Validation for `QLT-049` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-049` cycle: backend `96.70%` lines, frontend `88.72%` lines.
+- [x] `QLT-054` completed: `/custom` block mode now supports literal delimiter lines via escaped payload line `\---`, mapped deterministically to `---` in stored content.
+- [x] Unescaped delimiter edge case now returns explicit guidance (`For a literal delimiter line inside payload, use '\---'.`) when payload content appears after the first closing delimiter.
+- [x] Added frontend integration coverage for escaped delimiter success path and unescaped delimiter error guidance.
+- [x] Validation for `QLT-054` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-054` cycle: backend `96.97%` lines, frontend `88.85%` lines.
 
 ## Maintenance Rules
 

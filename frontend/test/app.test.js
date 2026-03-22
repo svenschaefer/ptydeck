@@ -527,13 +527,29 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.deepEqual(customCommandUpserts[3], { commandName: "longpreview", content: longPreviewPayload });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /longpreview (inline).");
 
+  fixture.elements.commandInput.value = "/custom escdelim\n---\nline 1\n\\---\nline 3\n---";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 5);
+  assert.deepEqual(customCommandUpserts[4], { commandName: "escdelim", content: "line 1\n---\nline 3" });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /escdelim (block).");
+
   fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(customCommandUpserts.length, 4);
+  assert.equal(customCommandUpserts.length, 5);
   assert.match(
     fixture.elements.commandFeedback.textContent,
     /^Custom command definition error: Block definition must end with a closing '---' line\.$/
+  );
+
+  fixture.elements.commandInput.value = "/custom delimedge\n---\nline 1\n---\nline 2\n---";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 5);
+  assert.match(
+    fixture.elements.commandFeedback.textContent,
+    /^Custom command definition error: Block payload contains content after closing '---'\. For a literal delimiter line inside payload, use '\\---'\.$/
   );
 
   fixture.elements.commandInput.value = "/custom list";
@@ -662,7 +678,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.equal(fixture.elements.commandInput.value, "/custom show longpreview");
+  assert.equal(fixture.elements.commandInput.value, "/custom show escdelim");
 
   fixture.elements.commandInput.value = "/closeit ";
   fixture.elements.commandInput.dispatchEvent({

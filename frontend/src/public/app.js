@@ -963,14 +963,19 @@ function parseCustomDefinition(rawInput) {
   }
 
   const contentLines = lines.slice(1, closingIndex);
-  const blockContent = contentLines.join("\n");
+  const normalizedContentLines = contentLines.map((line) => (line.trim() === "\\---" ? "---" : line));
+  const blockContent = normalizedContentLines.join("\n");
   if (!blockContent) {
     return { ok: false, error: "Block custom-command content cannot be empty." };
   }
 
-  const afterClosing = lines.slice(closingIndex + 1).join("\n").trim();
+  const trailingLines = lines.slice(closingIndex + 1);
+  const afterClosing = trailingLines.join("\n").trim();
   if (afterClosing) {
-    return { ok: false, error: "No content is allowed after closing '---' in block definition." };
+    return {
+      ok: false,
+      error: "Block payload contains content after closing '---'. For a literal delimiter line inside payload, use '\\---'."
+    };
   }
 
   return { ok: true, name: header, content: blockContent, mode: "block" };
