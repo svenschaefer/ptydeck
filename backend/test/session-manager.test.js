@@ -45,6 +45,9 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   const created = manager.create({ cwd: "/tmp", shell: "bash" });
   assert.equal(typeof created.id, "string");
   assert.equal(created.cwd, "/tmp");
+  assert.equal(created.startCwd, "/tmp");
+  assert.equal(created.startCommand, "");
+  assert.deepEqual(created.env, {});
 
   const listed = manager.list();
   assert.equal(listed.length, 1);
@@ -230,17 +233,51 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
     }
   });
 
-  const created = manager.create({ cwd: "/tmp", shell: "bash", name: "ops-shell" });
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash",
+    name: "ops-shell",
+    startCwd: "/var/tmp",
+    startCommand: "echo START",
+    env: { FOO: "BAR" }
+  });
   const restarted = manager.restart(created.id);
 
   assert.equal(firstPty.killed, true);
   assert.equal(restarted.id, created.id);
-  assert.equal(restarted.cwd, "/tmp");
+  assert.equal(restarted.cwd, "/var/tmp");
   assert.equal(restarted.shell, "bash");
   assert.equal(restarted.name, "ops-shell");
+  assert.equal(restarted.startCwd, "/var/tmp");
+  assert.equal(restarted.startCommand, "echo START");
+  assert.deepEqual(restarted.env, { FOO: "BAR" });
   assert.equal(restarted.createdAt, created.createdAt);
   assert.ok(restarted.updatedAt >= created.createdAt);
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
+  assert.deepEqual(secondPty.writes, ["echo START\n"]);
+});
+
+test("SessionManager passes startup env overrides to PTY spawn", () => {
+  const fakePty = createFakePty();
+  let spawnOptions = null;
+  const manager = new SessionManager({
+    createPty: (options) => {
+      spawnOptions = options;
+      return fakePty;
+    }
+  });
+
+  manager.create({
+    shell: "bash",
+    startCwd: "/opt/work",
+    startCommand: "",
+    env: { FOO: "BAR", HELLO: "WORLD" }
+  });
+
+  assert.ok(spawnOptions);
+  assert.equal(spawnOptions.cwd, "/opt/work");
+  assert.equal(spawnOptions.env.FOO, "BAR");
+  assert.equal(spawnOptions.env.HELLO, "WORLD");
 });
 
 test("SessionManager enforces max concurrent session guardrail", () => {

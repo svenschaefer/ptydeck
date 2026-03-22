@@ -91,6 +91,57 @@ test("REST lifecycle endpoints work end-to-end", async () => {
   }
 });
 
+test("session startup settings persist through patch and apply on restart", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        shell: "sh",
+        name: "ops-shell",
+        startCwd: "/tmp",
+        startCommand: "echo BOOT",
+        env: { APP_MODE: "dev" }
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.startCwd, "/tmp");
+    assert.equal(created.startCommand, "echo BOOT");
+    assert.deepEqual(created.env, { APP_MODE: "dev" });
+
+    const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        startCwd: "/var/tmp",
+        startCommand: "echo RESTART",
+        env: { APP_MODE: "prod", FEATURE_X: "1" }
+      })
+    });
+    assert.equal(patchRes.status, 200);
+    const patched = await patchRes.json();
+    assert.equal(patched.startCwd, "/var/tmp");
+    assert.equal(patched.startCommand, "echo RESTART");
+    assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
+
+    const restartRes = await fetch(`${baseUrl}/sessions/${created.id}/restart`, {
+      method: "POST"
+    });
+    assert.equal(restartRes.status, 200);
+    const restarted = await restartRes.json();
+    assert.equal(restarted.id, created.id);
+    assert.equal(restarted.cwd, "/var/tmp");
+    assert.equal(restarted.startCwd, "/var/tmp");
+    assert.equal(restarted.startCommand, "echo RESTART");
+    assert.deepEqual(restarted.env, { APP_MODE: "prod", FEATURE_X: "1" });
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("custom command endpoints work end-to-end and persist across restart", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-custom-"));
   const dataPath = join(dir, "sessions.json");

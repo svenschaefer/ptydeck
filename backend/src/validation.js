@@ -18,6 +18,17 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body?.name !== undefined && typeof body.name !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
     }
+    if (body?.startCwd !== undefined && typeof body.startCwd !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
+    }
+    if (body?.startCommand !== undefined && typeof body.startCommand !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
+    }
+    if (body?.env !== undefined) {
+      if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
+      }
+    }
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/sessions\/[^/]+$/)) {
@@ -27,8 +38,27 @@ export function validateRequest({ method, pathname, params, body }) {
     if (!isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
-    if (typeof body.name !== "string") {
+    if (
+      body.name === undefined &&
+      body.startCwd === undefined &&
+      body.startCommand === undefined &&
+      body.env === undefined
+    ) {
+      throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
+    }
+    if (body.name !== undefined && typeof body.name !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+    if (body.startCwd !== undefined && typeof body.startCwd !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
+    }
+    if (body.startCommand !== undefined && typeof body.startCommand !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
+    }
+    if (body.env !== undefined) {
+      if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
+      }
     }
   }
 
@@ -116,6 +146,10 @@ function isSession(value) {
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&
+    typeof value.startCwd === "string" &&
+    typeof value.startCommand === "string" &&
+    isObject(value.env) &&
+    Object.values(value.env).every((entry) => typeof entry === "string") &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );

@@ -344,6 +344,14 @@ components:
           type: string
         name:
           type: string
+        startCwd:
+          type: string
+        startCommand:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
         createdAt:
           type: integer
           format: int64
@@ -382,12 +390,27 @@ components:
           type: string
         name:
           type: string
+        startCwd:
+          type: string
+        startCommand:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
     UpdateSessionRequest:
       type: object
-      required: [name]
       properties:
         name:
           type: string
+        startCwd:
+          type: string
+        startCommand:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
     ErrorResponse:
       type: object
       required:

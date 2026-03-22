@@ -263,6 +263,7 @@ Exit criteria:
 - `QLT-047`
 - `QLT-052`
 - `QLT-048`
+- `QLT-060`, `QLT-061`
 - `QLT-058`, `QLT-059`, `QLT-063`
 - `ENT-023`
 - `ENT-018`

@@ -55,6 +55,20 @@ function withCwdMarkerPromptCommand(shell, env) {
   };
 }
 
+function normalizeSessionEnv(env) {
+  if (!env || typeof env !== "object" || Array.isArray(env)) {
+    return {};
+  }
+  const normalized = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (typeof key !== "string" || typeof value !== "string") {
+      continue;
+    }
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
 export class SessionManager {
   constructor({
     defaultShell = "bash",
@@ -111,9 +125,12 @@ export class SessionManager {
 
   create({
     id = randomUUID(),
-    cwd = homedir(),
+    cwd,
     shell = this.defaultShell,
     name,
+    startCwd,
+    startCommand = "",
+    env = {},
     createdAt,
     updatedAt
   } = {}) {
@@ -128,9 +145,21 @@ export class SessionManager {
     const createdTimestamp = Number.isInteger(createdAt) ? createdAt : this.nowFn();
     const updatedTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
     const initialActivityTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
+    const normalizedStartCwd =
+      typeof startCwd === "string" && startCwd.trim()
+        ? startCwd
+        : typeof cwd === "string" && cwd.trim()
+          ? cwd
+          : homedir();
+    const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
+    const normalizedEnv = normalizeSessionEnv(env);
+    const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
 
-    const ptyEnv = withCwdMarkerPromptCommand(shell, process.env);
-    const ptyProcess = this.createPty({ shell, cwd, cols: 80, rows: 24, env: ptyEnv });
+    const ptyEnv = withCwdMarkerPromptCommand(shell, {
+      ...process.env,
+      ...normalizedEnv
+    });
+    const ptyProcess = this.createPty({ shell, cwd: spawnCwd, cols: 80, rows: 24, env: ptyEnv });
 
     const session = {
       id,
@@ -140,9 +169,12 @@ export class SessionManager {
       lastActivityAt: initialActivityTimestamp,
       meta: {
         id,
-        cwd,
+        cwd: spawnCwd,
         shell,
         ...(typeof name === "string" ? { name } : {}),
+        startCwd: normalizedStartCwd,
+        startCommand: normalizedStartCommand,
+        env: normalizedEnv,
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
       }
@@ -175,6 +207,9 @@ export class SessionManager {
     });
 
     this.sessions.set(id, session);
+    if (normalizedStartCommand.trim()) {
+      ptyProcess.write(`${normalizedStartCommand}\n`);
+    }
     this.events.emit("session.created", { session: session.meta });
     return session.meta;
   }
@@ -199,11 +234,26 @@ export class SessionManager {
     session.meta.updatedAt = timestamp;
   }
 
-  rename(sessionId, name) {
+  updateSession(sessionId, patch = {}) {
     const session = this.get(sessionId);
-    session.meta.name = name;
+    if (patch.name !== undefined) {
+      session.meta.name = patch.name;
+    }
+    if (patch.startCwd !== undefined) {
+      session.meta.startCwd = patch.startCwd;
+    }
+    if (patch.startCommand !== undefined) {
+      session.meta.startCommand = patch.startCommand;
+    }
+    if (patch.env !== undefined) {
+      session.meta.env = normalizeSessionEnv(patch.env);
+    }
     session.meta.updatedAt = now();
     return session.meta;
+  }
+
+  rename(sessionId, name) {
+    return this.updateSession(sessionId, { name });
   }
 
   restart(sessionId) {
@@ -212,9 +262,12 @@ export class SessionManager {
     this.delete(sessionId);
     return this.create({
       id: snapshot.id,
-      cwd: snapshot.cwd,
+      cwd: snapshot.startCwd || snapshot.cwd,
       shell: snapshot.shell,
       name: snapshot.name,
+      startCwd: snapshot.startCwd || snapshot.cwd,
+      startCommand: snapshot.startCommand || "",
+      env: snapshot.env || {},
       createdAt: snapshot.createdAt,
       updatedAt: this.nowFn()
     });

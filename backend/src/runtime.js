@@ -1,5 +1,6 @@
 import http from "node:http";
 import { appendFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
@@ -27,6 +28,12 @@ const DEFAULT_CUSTOM_COMMAND_MAX_COUNT = 256;
 const DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH = 32;
 const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
 const CUSTOM_COMMAND_NAME_LOCALE = "en-US";
+const SESSION_START_CWD_MAX_LENGTH = 1024;
+const SESSION_START_COMMAND_MAX_LENGTH = 4096;
+const SESSION_ENV_MAX_ENTRIES = 64;
+const SESSION_ENV_KEY_MAX_LENGTH = 128;
+const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
+const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function decodePathParam(value, name) {
   try {
@@ -203,6 +210,80 @@ function compareCustomCommandEntries(a, b) {
     return a.updatedAt - b.updatedAt;
   }
   return a.content.localeCompare(b.content, CUSTOM_COMMAND_NAME_LOCALE);
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
+  const fallbackCwd =
+    typeof input.fallbackCwd === "string" && input.fallbackCwd.trim() ? input.fallbackCwd.trim() : homedir();
+  const startCwdRaw = typeof input.startCwd === "string" ? input.startCwd.trim() : "";
+  const startCwd = startCwdRaw || fallbackCwd;
+  if (!startCwd) {
+    throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a non-empty string.");
+  }
+  if (startCwd.length > SESSION_START_CWD_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'startCwd' exceeds maximum length (${SESSION_START_CWD_MAX_LENGTH}).`
+      );
+    }
+    return null;
+  }
+
+  const startCommand = typeof input.startCommand === "string" ? input.startCommand : "";
+  if (startCommand.length > SESSION_START_COMMAND_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'startCommand' exceeds maximum length (${SESSION_START_COMMAND_MAX_LENGTH}).`
+      );
+    }
+    return null;
+  }
+
+  const envInput = input.env === undefined ? {} : input.env;
+  if (!isPlainObject(envInput)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string key/value pairs.");
+    }
+    return null;
+  }
+  const envEntries = Object.entries(envInput);
+  if (envEntries.length > SESSION_ENV_MAX_ENTRIES) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field 'env' exceeds maximum entries (${SESSION_ENV_MAX_ENTRIES}).`);
+    }
+    return null;
+  }
+
+  const env = {};
+  for (const [rawKey, rawValue] of envEntries) {
+    if (typeof rawKey !== "string" || !SESSION_ENV_KEY_PATTERN.test(rawKey) || rawKey.length > SESSION_ENV_KEY_MAX_LENGTH) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'env' contains an invalid variable name.");
+      }
+      return null;
+    }
+    if (typeof rawValue !== "string" || rawValue.length > SESSION_ENV_VALUE_MAX_LENGTH) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'env' contains an invalid variable value.");
+      }
+      return null;
+    }
+    env[rawKey] = rawValue;
+  }
+
+  return {
+    startCwd,
+    startCommand,
+    env
+  };
 }
 
 export function createRuntime(config) {
@@ -694,7 +775,23 @@ export function createRuntime(config) {
             `Session creation rate limit exceeded. Retry in ${rateLimitResult.retryAfterSeconds} seconds.`
           );
         }
-        const payload = manager.create({ cwd: body?.cwd, shell: body?.shell });
+        const startupConfig = normalizeSessionStartupConfig(
+          {
+            startCwd: body?.startCwd !== undefined ? body.startCwd : body?.cwd,
+            startCommand: body?.startCommand,
+            env: body?.env,
+            fallbackCwd: body?.cwd
+          },
+          { strict: true }
+        );
+        const payload = manager.create({
+          cwd: startupConfig.startCwd,
+          shell: body?.shell,
+          name: body?.name,
+          startCwd: startupConfig.startCwd,
+          startCommand: startupConfig.startCommand,
+          env: startupConfig.env
+        });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
         persistSoon();
         writeJson(req, res, 201, payload);
@@ -716,7 +813,31 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "updateSession") {
-        const payload = manager.rename(match.params.sessionId, body.name);
+        const patch = {};
+        if (body?.name !== undefined) {
+          patch.name = body.name;
+        }
+        const hasStartupUpdates =
+          body?.startCwd !== undefined || body?.startCommand !== undefined || body?.env !== undefined;
+        if (hasStartupUpdates) {
+          const current = manager.get(match.params.sessionId).meta;
+          const startupConfig = normalizeSessionStartupConfig(
+            {
+              startCwd: body?.startCwd !== undefined ? body.startCwd : current.startCwd || current.cwd,
+              startCommand: body?.startCommand !== undefined ? body.startCommand : current.startCommand || "",
+              env: body?.env !== undefined ? body.env : current.env || {},
+              fallbackCwd: current.startCwd || current.cwd
+            },
+            { strict: true }
+          );
+          patch.startCwd = startupConfig.startCwd;
+          patch.startCommand = startupConfig.startCommand;
+          patch.env = startupConfig.env;
+        }
+        if (!Object.keys(patch).length) {
+          throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
+        }
+        const payload = manager.updateSession(match.params.sessionId, patch);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
         persistSoon();
         writeJson(req, res, 200, payload);
@@ -887,11 +1008,26 @@ export function createRuntime(config) {
     });
     for (const session of persistedState.sessions) {
       try {
+        const startupConfig = normalizeSessionStartupConfig(
+          {
+            startCwd: session.startCwd !== undefined ? session.startCwd : session.cwd,
+            startCommand: session.startCommand,
+            env: session.env,
+            fallbackCwd: session.cwd
+          },
+          { strict: false }
+        );
+        if (!startupConfig) {
+          continue;
+        }
         manager.create({
           id: session.id,
-          cwd: session.cwd,
+          cwd: startupConfig.startCwd,
           shell: session.shell || config.shell,
           name: session.name,
+          startCwd: startupConfig.startCwd,
+          startCommand: startupConfig.startCommand,
+          env: startupConfig.env,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt
         });

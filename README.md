@@ -75,6 +75,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Per-terminal settings entry on each terminal card (`Settings`) with session-scoped settings panel shell
 - Terminal `Rename` and `Close` actions are available inside each session settings panel (removed from direct toolbar)
 - Per-session terminal color sets in session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` values persisted in browser storage)
+- Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - `/custom` block mode supports escaped delimiter payload lines (`\---`) for literal `---` content and returns explicit guidance for unescaped delimiter edge cases

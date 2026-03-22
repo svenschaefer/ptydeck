@@ -328,6 +328,12 @@ Completed and verified topics belong here.
 - [x] Added WS integration coverage for custom-command event streaming and reconnect snapshot custom-command payload in `backend/test/ws.integration.test.js`.
 - [x] Validation for `QLT-048` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-048` cycle: backend `96.58%` lines, frontend `89.00%` lines.
+- [x] `QLT-060` completed: OpenAPI/session model and backend runtime now include per-session startup config fields (`startCwd`, `startCommand`, `env`) for create/get/list/update/restart flows.
+- [x] Validation guardrails added for startup config shape/limits (non-empty `startCwd`, bounded `startCommand` length, bounded/validated `env` map entries and key format).
+- [x] `QLT-061` completed: startup config is applied deterministically on spawn/restart (`startCwd` controls spawn cwd, `startCommand` auto-sent after PTY spawn, `env` merged into spawn env).
+- [x] Added backend integration coverage for startup-config lifecycle across create/patch/restart and unit coverage for `SessionManager` startup env/spawn behavior.
+- [x] Validation for `QLT-060`/`QLT-061` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-060`/`QLT-061` cycle: backend `96.03%` lines, frontend `89.00%` lines.
 
 ## Maintenance Rules
 
