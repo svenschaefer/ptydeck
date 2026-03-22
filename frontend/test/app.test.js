@@ -223,6 +223,7 @@ function createDocumentFixture() {
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
+  const commandPreview = new FakeElement({ id: "command-preview", tagName: "pre" });
   const template = {
     id: "terminal-card-template",
     content: {
@@ -246,7 +247,8 @@ function createDocumentFixture() {
     sendCommand,
     emptyState,
     statusMessage,
-    commandFeedback
+    commandFeedback,
+    commandPreview
   ]) {
     byId.set(element.id, element);
   }
@@ -265,7 +267,8 @@ function createDocumentFixture() {
       sendCommand,
       emptyState,
       statusMessage,
-      commandFeedback
+      commandFeedback,
+      commandPreview
     },
     document: {
       getElementById(id) {
@@ -527,11 +530,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(fixture.elements.commandFeedback.textContent, /^\/docu\n---\necho verify\n---$/);
 
   fixture.elements.commandInput.value = "/docu";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.match(fixture.elements.commandPreview.textContent, /^Preview \/docu/);
+  assert.match(fixture.elements.commandPreview.textContent, /Target: \[1\] (one|s-1)/);
+  assert.match(fixture.elements.commandPreview.textContent, /Append newline on send: yes/);
+  assert.match(fixture.elements.commandPreview.textContent, /Payload:\necho verify$/);
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
   assert.equal(inputPayloads[1].data, "echo verify\n");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
+  assert.equal(fixture.elements.commandPreview.textContent, "");
 
   fixture.elements.commandInput.value = "/custom remove docu";
   fixture.elements.sendCommand.click();
@@ -541,6 +551,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Removed custom command /docu.");
 
   fixture.elements.commandInput.value = "/docu";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);

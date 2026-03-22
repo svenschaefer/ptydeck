@@ -12,6 +12,7 @@ Current state: compressed roadmap complete: `v0.1.0` to `v0.3.0`.
 - Backend custom-command REST endpoints implemented (`GET /api/v1/custom-commands`, `PUT/GET/DELETE /api/v1/custom-commands/{commandName}`)
 - Backend custom-command guardrails implemented (reserved-name rejection, name/size limits, and explicit API errors)
 - Frontend supports `/custom` definition command in inline and multiline block modes with deterministic malformed-block validation feedback
+- Frontend supports non-blocking preview for `/<customName>` execution (payload, target, newline behavior)
 - WebSocket endpoint `/ws` implemented with `session.created`, `session.data`, `session.exit`, and `session.closed` events
 - Session metadata persistence and startup restore implemented (JSON adapter)
 - Frontend runtime UI implemented with `xterm.js`, multi-session cards, command input, and WS reconnect
@@ -71,6 +72,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
+- Non-blocking custom-command preview panel before execution (`/<customName>`): exact payload, target resolution, and newline append indicator
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)

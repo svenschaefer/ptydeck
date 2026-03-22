@@ -260,6 +260,10 @@ Completed and verified topics belong here.
 - [x] Added command-interpreter regression coverage for strict slash boundary semantics (leading-space and later-line slash cases).
 - [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
+- [x] `QLT-042` completed: frontend now shows a non-blocking custom-command preview panel for `/<customName>` (payload, resolved target, newline append indicator) before execution.
+- [x] Added frontend integration coverage for custom-command preview rendering and preview cleanup after execution.
+- [x] Validation for `QLT-042` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-042` cycle: backend `96.97%` lines, frontend `87.13%` lines.
 
 ## Maintenance Rules
 

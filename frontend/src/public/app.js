@@ -28,6 +28,7 @@ const template = document.getElementById("terminal-card-template");
 const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
 const commandFeedbackEl = document.getElementById("command-feedback");
+const commandPreviewEl = document.getElementById("command-preview");
 
 const terminals = new Map();
 const terminalObservers = new Map();
@@ -37,6 +38,8 @@ const sessionQuickIds = new Map();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
 let bootstrapPromise = null;
+let commandPreviewTimer = null;
+let commandPreviewRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
@@ -49,7 +52,8 @@ let wsClient = null;
 const uiState = {
   loading: true,
   error: "",
-  commandFeedback: ""
+  commandFeedback: "",
+  commandPreview: ""
 };
 const nowMs =
   typeof window !== "undefined" &&
@@ -82,6 +86,11 @@ function setError(message) {
 
 function setCommandFeedback(message) {
   uiState.commandFeedback = message;
+  render();
+}
+
+function setCommandPreview(message) {
+  uiState.commandPreview = message;
   render();
 }
 
@@ -360,6 +369,9 @@ function render() {
   }
   if (commandFeedbackEl) {
     commandFeedbackEl.textContent = uiState.commandFeedback || "";
+  }
+  if (commandPreviewEl) {
+    commandPreviewEl.textContent = uiState.commandPreview || "";
   }
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
@@ -1005,6 +1017,7 @@ async function submitCommand() {
       setCommandFeedback(feedback);
       debugLog("command.control.ok", { command: interpreted.command });
       commandInput.value = "";
+      setCommandPreview("");
     } catch {
       setCommandFeedback("Failed to execute control command.");
     }
@@ -1021,6 +1034,7 @@ async function submitCommand() {
     debugLog("command.send.start", { activeSessionId, length: payload.length });
     await api.sendInput(activeSessionId, payload);
     commandInput.value = "";
+    setCommandPreview("");
     uiState.error = "";
     debugLog("command.send.ok", { activeSessionId });
   } catch {
@@ -1028,7 +1042,86 @@ async function submitCommand() {
   }
 }
 
+function formatPreviewTarget(session) {
+  return `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
+}
+
+async function refreshCommandPreview() {
+  const rawInput = commandInput.value || "";
+  const interpreted = interpretComposerInput(rawInput);
+  if (interpreted.kind !== "control") {
+    setCommandPreview("");
+    return;
+  }
+
+  const commandRaw = interpreted.command;
+  const command = commandRaw.toLowerCase();
+  if (!commandRaw || command === "custom" || command === "help") {
+    setCommandPreview("");
+    return;
+  }
+
+  if (interpreted.args.length > 1) {
+    setCommandPreview(`Preview unavailable for /${commandRaw}: usage /${commandRaw} [target]`);
+    return;
+  }
+
+  const requestId = ++commandPreviewRequestId;
+  try {
+    const custom = await api.getCustomCommand(commandRaw);
+    if (requestId !== commandPreviewRequestId) {
+      return;
+    }
+
+    const state = store.getState();
+    const sessions = state.sessions;
+    let targetDescription = "";
+
+    if (interpreted.args.length === 1) {
+      const resolved = resolveSessionToken(interpreted.args[0], sessions);
+      targetDescription = resolved.session
+        ? formatPreviewTarget(resolved.session)
+        : `unresolved (${resolved.error})`;
+    } else if (state.activeSessionId) {
+      const active = sessions.find((session) => session.id === state.activeSessionId);
+      targetDescription = active ? formatPreviewTarget(active) : "unresolved (active session not found)";
+    } else {
+      targetDescription = "unresolved (no active session)";
+    }
+
+    const appendNewline = custom.content.endsWith("\n") ? "no" : "yes";
+    const preview = [
+      `Preview /${custom.name}`,
+      `Target: ${targetDescription}`,
+      `Append newline on send: ${appendNewline}`,
+      "Payload:",
+      custom.content
+    ].join("\n");
+    setCommandPreview(preview);
+  } catch (err) {
+    if (requestId !== commandPreviewRequestId) {
+      return;
+    }
+    if (err && err.status === 404) {
+      setCommandPreview("");
+      return;
+    }
+    setCommandPreview(`Preview unavailable for /${commandRaw}.`);
+  }
+}
+
+function scheduleCommandPreview() {
+  if (commandPreviewTimer) {
+    clearTimeout(commandPreviewTimer);
+  }
+  commandPreviewTimer = setTimeout(() => {
+    commandPreviewTimer = null;
+    refreshCommandPreview();
+  }, 120);
+}
+
 sendBtn.addEventListener("click", submitCommand);
+commandInput.addEventListener("input", scheduleCommandPreview);
 commandInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
@@ -1045,6 +1138,9 @@ window.addEventListener("beforeunload", () => {
   }
   if (deferredResizeTimer) {
     clearTimeout(deferredResizeTimer);
+  }
+  if (commandPreviewTimer) {
+    clearTimeout(commandPreviewTimer);
   }
   for (const timer of resizeTimers.values()) {
     clearTimeout(timer);
