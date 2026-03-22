@@ -4,7 +4,7 @@ A lightweight web-based multi-terminal system for managing and interacting with 
 
 ## Repository Status
 
-Current state: backend `v0.3.0`, frontend `v0.4.0`, and quality gate `v0.5.0` are complete.
+Current state: backend `v0.3.0`, frontend `v0.4.0`, quality gate `v0.5.0`, and production baseline `v1.0.0` are complete.
 
 - Monorepo structure with `backend/` and `frontend/`
 - OpenAPI contract scaffold in `backend/openapi/openapi.yaml`
@@ -25,6 +25,10 @@ npm run lint
 npm run test
 npm run test:coverage
 ```
+
+## Deployment
+
+See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, and rollback steps.
 
 ## Overview
 

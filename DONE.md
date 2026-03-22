@@ -36,6 +36,7 @@ Completed and verified topics belong here.
 - [x] Added backend REST integration test covering session lifecycle endpoints.
 - [x] Added backend WS integration test covering event flow and reconnect snapshot behavior.
 - [x] Added runtime-based backend E2E core flow coverage in automated tests.
+- [x] `v1.0.0` production baseline completed with deployment runbook (`INT-010`).
 
 ## Maintenance Rules
 

@@ -77,8 +77,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.5.0`
-- Next milestone in progress: `v1.0.0`
+- Latest completed milestone: `v1.0.0`
+- Next milestone in progress: none
 - Blockers: none recorded
 
 ### Completed Items in Current Milestone
@@ -127,3 +127,4 @@ Exit criteria:
 - `INT-005` completed on 2026-03-22.
 - `INT-006` completed on 2026-03-22.
 - `INT-008` completed on 2026-03-22.
+- `INT-010` completed on 2026-03-22.

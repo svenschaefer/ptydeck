@@ -61,7 +61,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `INT-007` Owner: `QA` Task: Add frontend unit/component tests for store and terminal UI behaviors.
 - [x] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
 - [x] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
-- [ ] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
+- [x] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
 
 ## Documentation Tasks (Codex Ownership)
 
