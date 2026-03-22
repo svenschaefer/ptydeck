@@ -245,6 +245,12 @@ Completed and verified topics belong here.
 - [x] Added backend integration coverage for guardrail error paths (`CustomCommandNameReserved`, `CustomCommandNameInvalid`, `CustomCommandNameTooLong`, `CustomCommandContentTooLarge`, `CustomCommandLimitExceeded`).
 - [x] Validation for `QLT-038` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-038` cycle: backend `96.97%` lines, frontend `87.99%` lines.
+- [x] `QLT-039` completed: frontend now supports `/custom` definition parsing in inline mode (`/custom <name> <text>`) and multiline block mode (`/custom <name>` + `---` ... `---`).
+- [x] Added deterministic malformed-block feedback for `/custom` (missing/misplaced delimiters, invalid block header, empty block payload, and trailing content after closing delimiter).
+- [x] Frontend API client now includes `upsertCustomCommand(commandName, content)` and the command plane persists custom definitions via backend `PUT /api/v1/custom-commands/{commandName}`.
+- [x] Added frontend test coverage for `/custom` inline and block definitions plus malformed block validation feedback, and API-client coverage for custom-command upsert endpoint.
+- [x] Validation for `QLT-039` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-039` cycle: backend `96.97%` lines, frontend `87.96%` lines.
 
 ## Maintenance Rules
 

@@ -144,3 +144,28 @@ test("api client calls create dev token endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/auth/dev-token");
   assert.equal(calls[0].options.method, "POST");
 });
+
+test("api client calls upsert custom command endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        name: "docu",
+        content: "echo docs\n",
+        createdAt: 1,
+        updatedAt: 2
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.upsertCustomCommand("docu", "echo docs\n");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/custom-commands/docu");
+  assert.equal(calls[0].options.method, "PUT");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { content: "echo docs\n" });
+});

@@ -128,6 +128,13 @@ export function createApiClient(baseUrl, options = {}) {
     },
     async createDevToken(payload = {}) {
       return request("/auth/dev-token", withJson(payload));
+    },
+    async upsertCustomCommand(commandName, content) {
+      return request(`/custom-commands/${encodeURIComponent(commandName)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content })
+      });
     }
   };
 }

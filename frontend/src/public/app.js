@@ -586,6 +586,73 @@ function resolveSessionToken(token, sessions) {
   return { session: null, error: `Unknown session identifier: ${normalized}` };
 }
 
+function parseCustomDefinition(rawInput) {
+  const raw = String(rawInput || "").replaceAll("\r\n", "\n");
+  const trimmedStart = raw.trimStart();
+  const prefix = "/custom";
+  if (!trimmedStart.startsWith(prefix)) {
+    return { ok: false, error: "Invalid /custom command input." };
+  }
+
+  const afterPrefix = trimmedStart.slice(prefix.length);
+  const newlineIndex = afterPrefix.indexOf("\n");
+
+  if (newlineIndex === -1) {
+    const trimmed = afterPrefix.trim();
+    if (!trimmed) {
+      return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+    }
+    const firstWhitespace = trimmed.search(/\s/);
+    if (firstWhitespace < 0) {
+      return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+    }
+    const name = trimmed.slice(0, firstWhitespace);
+    const content = trimmed.slice(firstWhitespace).trimStart();
+    if (!content) {
+      return { ok: false, error: "Inline custom-command content cannot be empty." };
+    }
+    return { ok: true, name, content, mode: "inline" };
+  }
+
+  const header = afterPrefix.slice(0, newlineIndex).trim();
+  if (!header) {
+    return { ok: false, error: "Missing custom-command name in block definition." };
+  }
+  if (/\s/.test(header)) {
+    return { ok: false, error: "Block definition header must be '/custom <name>' only." };
+  }
+
+  const trailing = afterPrefix.slice(newlineIndex + 1);
+  const lines = trailing.split("\n");
+  if (lines.length === 0 || lines[0].trim() !== "---") {
+    return { ok: false, error: "Block definition must start with '---' on its own line." };
+  }
+
+  let closingIndex = -1;
+  for (let index = 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === "---") {
+      closingIndex = index;
+      break;
+    }
+  }
+  if (closingIndex < 0) {
+    return { ok: false, error: "Block definition must end with a closing '---' line." };
+  }
+
+  const contentLines = lines.slice(1, closingIndex);
+  const blockContent = contentLines.join("\n");
+  if (!blockContent) {
+    return { ok: false, error: "Block custom-command content cannot be empty." };
+  }
+
+  const afterClosing = lines.slice(closingIndex + 1).join("\n").trim();
+  if (afterClosing) {
+    return { ok: false, error: "No content is allowed after closing '---' in block definition." };
+  }
+
+  return { ok: true, name: header, content: blockContent, mode: "block" };
+}
+
 async function executeControlCommand(interpreted) {
   const command = interpreted.command.toLowerCase();
   const args = interpreted.args;
@@ -594,7 +661,7 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /restart [id], /help";
+    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /restart [id], /custom <name> <text>, /custom <name> + block, /help";
   }
 
   if (command === "list") {
@@ -702,6 +769,15 @@ async function executeControlCommand(interpreted) {
     upsertSession(restarted);
     store.setActiveSession(restarted.id);
     return `Restarted session [${formatSessionToken(restarted.id)}] ${formatSessionDisplayName(restarted)}.`;
+  }
+
+  if (command === "custom") {
+    const parsed = parseCustomDefinition(interpreted.raw);
+    if (!parsed.ok) {
+      return `Custom command definition error: ${parsed.error}`;
+    }
+    const saved = await api.upsertCustomCommand(parsed.name, parsed.content);
+    return `Saved custom command /${saved.name} (${parsed.mode}).`;
   }
 
   return `Unknown command: /${command}`;

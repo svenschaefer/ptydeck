@@ -312,6 +312,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const resizePayloads = [];
   const inputPayloads = [];
   const restartCalls = [];
+  const customCommandUpserts = [];
   let listSessionsCalls = 0;
   const win = {
     document: fixture.document,
@@ -391,6 +392,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         updatedAt: Date.now()
       });
     }
+    if (path.startsWith("/api/v1/custom-commands/") && options.method === "PUT") {
+      const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
+      const body = JSON.parse(options.body || "{}");
+      customCommandUpserts.push({ commandName, content: body.content });
+      return makeJsonResponse(200, {
+        name: commandName,
+        content: body.content,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
     if (path.endsWith("/resize")) {
       resizePayloads.push(JSON.parse(options.body || "{}"));
       return makeJsonResponse(204, {});
@@ -451,6 +463,30 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[id\]/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/custom <name> <text>/);
+
+  fixture.elements.commandInput.value = "/custom docu echo verify";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 1);
+  assert.deepEqual(customCommandUpserts[0], { commandName: "docu", content: "echo verify" });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /docu (inline).");
+
+  fixture.elements.commandInput.value = "/custom blockcmd\n---\nline 1\nline 2\n---";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 2);
+  assert.deepEqual(customCommandUpserts[1], { commandName: "blockcmd", content: "line 1\nline 2" });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /blockcmd (block).");
+
+  fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 2);
+  assert.match(
+    fixture.elements.commandFeedback.textContent,
+    /^Custom command definition error: Block definition must end with a closing '---' line\.$/
+  );
 
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();
