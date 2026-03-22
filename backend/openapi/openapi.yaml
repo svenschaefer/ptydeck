@@ -6,6 +6,35 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /auth/dev-token:
+    post:
+      operationId: createDevToken
+      summary: Create development bearer token (available only in auth dev mode).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDevTokenRequest'
+      responses:
+        '200':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Auth dev mode is disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /sessions:
     get:
       operationId: listSessions
@@ -229,4 +258,31 @@ components:
         error:
           type: string
         message:
+          type: string
+    CreateDevTokenRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+        tenantId:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    AuthTokenResponse:
+      type: object
+      required:
+        - accessToken
+        - tokenType
+        - expiresIn
+        - scope
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+        scope:
           type: string

@@ -51,6 +51,12 @@ Optional for troubleshooting:
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 
+Optional local auth baseline (development only):
+
+- Backend: `AUTH_DEV_MODE=1`
+- Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
+- Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
+
 ## 5. Start in Production Mode
 
 Terminal 1:
@@ -107,6 +113,7 @@ Behavior summary:
 
 - `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
 - `production` without `CORS_ORIGIN`: startup fails fast (`CORS_ORIGIN` is required).
+- `AUTH_ENABLED=true` without `AUTH_DEV_MODE=1`: startup fails (only dev-mode auth provider is implemented in current baseline).
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
 ### 7.1 Provider-Agnostic HTTPS/WSS Reverse-Proxy Contract

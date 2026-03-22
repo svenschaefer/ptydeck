@@ -112,7 +112,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
-- [ ] `ENT-001` Owner: `BE` Task: Implement authentication and authorization middleware for REST and WebSocket (JWT/OIDC, role scopes, unauthorized/forbidden responses).
+- [x] `ENT-001` Owner: `BE` Task: Implement authentication and authorization middleware baseline for REST and WebSocket (JWT dev-mode token validation, route scope checks, `401`/`403` responses).
 - [ ] `ENT-002` Owner: `BE` Task: Add tenant-aware session scoping model (tenantId propagation, API filtering, WS event isolation by tenant).
 - [ ] `ENT-003` Owner: `BE` Task: Add structured audit logging for security-relevant actions (session create/delete/input/resize, auth failures) with actor identity and outcome.
 - [ ] `ENT-004` Owner: `PLAT` Task: Add production logging standards (JSON logs, correlation IDs, PII redaction rules, log retention policy) and document in `DEPLOYMENT.md`.
@@ -136,3 +136,4 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
 - [x] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.
 - [ ] `ENT-024` Owner: `PLAT` Task: Define and document data retention/purge policy for persisted session metadata and audit/security logs, including automated cleanup cadence.
+- [ ] `ENT-025` Owner: `BE` Task: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_DEV_MODE` as local-only fallback.

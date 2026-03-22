@@ -26,6 +26,11 @@ function parseOrigin(value, key) {
   }
 }
 
+function parseBoolean(rawValue) {
+  const normalized = String(rawValue || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
 export function loadConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
   const rawCorsOrigins = String(env.CORS_ORIGIN || "").trim();
@@ -41,20 +46,40 @@ export function loadConfig(env = process.env) {
   const corsAllowedOrigins = corsAllowedOriginsRaw.map((origin) =>
     origin === "*" ? origin : parseOrigin(origin, "CORS_ORIGIN")
   );
-  const debugLogsRaw = String(env.BACKEND_DEBUG_LOGS || "").trim().toLowerCase();
-  const debugLogs =
-    debugLogsRaw === "1" || debugLogsRaw === "true" || debugLogsRaw === "yes" || debugLogsRaw === "on";
+  const debugLogs = parseBoolean(env.BACKEND_DEBUG_LOGS);
+  const authEnabledRaw = parseBoolean(env.AUTH_ENABLED);
+  const authDevMode = parseBoolean(env.AUTH_DEV_MODE);
+  const authEnabled = authEnabledRaw || authDevMode;
+  if (authEnabled && !authDevMode) {
+    throw new Error("AUTH_ENABLED currently requires AUTH_DEV_MODE=1.");
+  }
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
   const debugLogFile = String(env.BACKEND_DEBUG_LOG_FILE || "").trim();
+  const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
+  const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
+  const authAudience = String(env.AUTH_AUDIENCE || "ptydeck-local").trim();
   if (!shell) {
     throw new Error("SHELL must not be empty.");
   }
   if (!dataPath) {
     throw new Error("DATA_PATH must not be empty.");
   }
+  if (authEnabled && !authDevSecret) {
+    throw new Error("AUTH_DEV_SECRET must not be empty when auth is enabled.");
+  }
+  if (authEnabled && !authIssuer) {
+    throw new Error("AUTH_ISSUER must not be empty when auth is enabled.");
+  }
+  if (authEnabled && !authAudience) {
+    throw new Error("AUTH_AUDIENCE must not be empty when auth is enabled.");
+  }
   const port = parsePort(env.PORT || 18080, "PORT");
   const maxBodyBytes = parsePositiveInt(env.MAX_BODY_BYTES || 1024 * 1024, "MAX_BODY_BYTES");
+  const authDevTokenTtlSeconds = parsePositiveInt(
+    env.AUTH_DEV_TOKEN_TTL_SECONDS || 900,
+    "AUTH_DEV_TOKEN_TTL_SECONDS"
+  );
   return {
     nodeEnv,
     port,
@@ -64,6 +89,12 @@ export function loadConfig(env = process.env) {
     corsAllowedOrigins,
     maxBodyBytes,
     debugLogs,
-    debugLogFile
+    debugLogFile,
+    authEnabled,
+    authDevMode,
+    authDevSecret,
+    authIssuer,
+    authAudience,
+    authDevTokenTtlSeconds
   };
 }

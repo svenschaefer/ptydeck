@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (ENT-018 and ENT-023 completed; reverse-proxy reference contract and fail-fast startup config validation synchronized)
+Last updated: 2026-03-22 (ENT-001 auth/authz middleware baseline completed with AUTH_DEV_MODE flow; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -90,7 +90,6 @@ The system separates backend execution concerns from frontend rendering concerns
 - CI quality workflow now installs workspace dependencies and runs smoke boot validation (`scripts/ci-smoke.sh`) for backend and frontend startup readiness.
 - CI now enforces backend/frontend line-coverage thresholds (`scripts/check-coverage.sh`) before merge on Node `18`.
 - Frontend composer input now routes slash-prefixed commands to control-plane handling via `command-interpreter.js` and forwards non-slash input unchanged to terminal execution.
-- Frontend command plane now executes `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, and `/help`, with session token resolution via full ID, quick ID, name, or unique ID prefix.
 - Frontend command plane now executes `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, and `/help`, with session token resolution via full ID, quick ID, name, or unique ID prefix.
 - Frontend now renders command-plane results in a dedicated feedback panel (`command-feedback`) separated from loading/connection/error status and PTY terminal output stream.
 - Backend now provides `POST /api/v1/sessions/{sessionId}/restart` to restart PTY processes without changing session identity, with OpenAPI/validation/contract-test coverage.
@@ -99,14 +98,17 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend app integration coverage now includes delayed-bootstrap regression behavior to ensure deterministic loading state and single list-bootstrap request under slow-load conditions.
 - Backend and frontend startup config loaders now enforce fail-fast validation for critical runtime env fields (port bounds, URL protocol checks, production CORS requirement, and positive numeric limits).
 - Deployment runbook now includes a provider-agnostic reverse-proxy routing contract for local HTTPS/WSS host routing, including `/api/v1` and `/ws` mapping expectations and WebSocket upgrade requirements.
+- Backend auth/authz middleware baseline now supports JWT validation in `AUTH_DEV_MODE=1`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
+- Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
 - Frontend runtime config now supports no-parameter domain operation: `ptydeck.*` browser hosts auto-target `api.<current-host>` for REST/WS, while localhost/IP hosts retain `18080` fallback for development.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycle: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
+- Active next cycle: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-025`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
-  - Completed in cycle B: `ENT-018`, `ENT-023`.
+  - Completed in cycle B: `ENT-001`, `ENT-018`, `ENT-023`.
+  - Planned next in cycle B: `ENT-025` (OIDC/JWKS provider integration replacing dev-secret validation for production).
 
 ## Session Behavior Notes
 

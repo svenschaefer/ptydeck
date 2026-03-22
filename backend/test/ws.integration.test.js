@@ -93,3 +93,53 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     await runtime.stop();
   }
 });
+
+test("WS auth rejects missing token and accepts valid dev token", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-ws-auth-"));
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath: join(dir, "sessions.json"),
+    corsOrigin: "*",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+  const wsUrl = `ws://127.0.0.1:${port}/ws`;
+
+  try {
+    const unauthEvents = [];
+    const unauthWs = new WebSocket(wsUrl);
+    unauthWs.on("error", () => {
+      unauthEvents.push("error");
+    });
+    unauthWs.on("close", () => {
+      unauthEvents.push("close");
+    });
+    await waitFor(() => unauthEvents.includes("close"));
+
+    const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(tokenRes.status, 200);
+    const tokenPayload = await tokenRes.json();
+
+    const events = [];
+    const authedWs = new WebSocket(`${wsUrl}?access_token=${encodeURIComponent(tokenPayload.accessToken)}`);
+    authedWs.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+    authedWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});

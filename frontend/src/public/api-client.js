@@ -47,6 +47,7 @@ async function readResponse(response, { expectJson = true } = {}) {
 export function createApiClient(baseUrl, options = {}) {
   const debug = options.debug === true;
   const log = typeof options.log === "function" ? options.log : () => {};
+  let authToken = typeof options.authToken === "string" ? options.authToken.trim() : "";
 
   async function request(path, fetchOptions = {}, { expectJson = true } = {}) {
     const method = fetchOptions.method || "GET";
@@ -56,7 +57,16 @@ export function createApiClient(baseUrl, options = {}) {
     }
 
     try {
-      const res = await fetch(`${baseUrl}${path}`, fetchOptions);
+      const headers = {
+        ...(fetchOptions.headers || {})
+      };
+      if (authToken && !headers.authorization) {
+        headers.authorization = `Bearer ${authToken}`;
+      }
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...fetchOptions,
+        headers
+      });
       const data = await readResponse(res, { expectJson });
       if (debug) {
         log("api.request.ok", { method, path, status: res.status, durationMs: Date.now() - startedAt });
@@ -76,6 +86,9 @@ export function createApiClient(baseUrl, options = {}) {
   }
 
   return {
+    setAuthToken(token) {
+      authToken = typeof token === "string" ? token.trim() : "";
+    },
     /** @returns {Promise<Session[]>} */
     async listSessions() {
       return request("/sessions");
@@ -112,6 +125,9 @@ export function createApiClient(baseUrl, options = {}) {
         headers: { "content-type": "application/json" },
         body: "{}"
       });
+    },
+    async createDevToken(payload = {}) {
+      return request("/auth/dev-token", withJson(payload));
     }
   };
 }

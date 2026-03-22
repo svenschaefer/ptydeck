@@ -66,6 +66,23 @@ export function validateRequest({ method, pathname, params, body }) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
   }
+
+  if (method === "POST" && pathname === "/api/v1/auth/dev-token") {
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body?.subject !== undefined && typeof body.subject !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'subject' must be a string.");
+    }
+    if (body?.tenantId !== undefined && typeof body.tenantId !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'tenantId' must be a string.");
+    }
+    if (body?.scopes !== undefined) {
+      if (!Array.isArray(body.scopes) || !body.scopes.every((entry) => typeof entry === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'scopes' must be a string array.");
+      }
+    }
+  }
 }
 
 function isSession(value) {
@@ -77,6 +94,16 @@ function isSession(value) {
     (value.name === undefined || typeof value.name === "string") &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
+  );
+}
+
+function isAuthToken(value) {
+  return (
+    isObject(value) &&
+    typeof value.accessToken === "string" &&
+    typeof value.tokenType === "string" &&
+    Number.isInteger(value.expiresIn) &&
+    typeof value.scope === "string"
   );
 }
 
@@ -95,5 +122,9 @@ export function validateResponse({ statusCode, body, expect }) {
     if (!isObject(body) || typeof body.error !== "string" || typeof body.message !== "string") {
       throw new ApiError(statusCode, "ResponseValidationError", "Error response schema mismatch.");
     }
+  }
+
+  if (expect === "authToken" && !isAuthToken(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match AuthTokenResponse schema.");
   }
 }

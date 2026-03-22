@@ -215,6 +215,52 @@ test("CORS allowlist echoes allowed origin and omits disallowed origin", async (
   }
 });
 
+test("auth dev mode issues token and protects session routes", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const unauthorizedRes = await fetch(`${baseUrl}/sessions`);
+    assert.equal(unauthorizedRes.status, 401);
+    const unauthorizedBody = await unauthorizedRes.json();
+    assert.equal(unauthorizedBody.error, "Unauthorized");
+
+    const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scopes: ["sessions:read", "ws:connect"] })
+    });
+    assert.equal(tokenRes.status, 200);
+    const tokenPayload = await tokenRes.json();
+    assert.equal(typeof tokenPayload.accessToken, "string");
+
+    const listRes = await fetch(`${baseUrl}/sessions`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.equal(listRes.status, 200);
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tokenPayload.accessToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    assert.equal(createRes.status, 403);
+    const createBody = await createRes.json();
+    assert.equal(createBody.error, "Forbidden");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime restore keeps persisted createdAt and updatedAt timestamps", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

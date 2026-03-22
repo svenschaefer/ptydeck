@@ -13,6 +13,12 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.maxBodyBytes, 1024 * 1024);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.equal(config.authEnabled, false);
+  assert.equal(config.authDevMode, false);
+  assert.equal(config.authDevSecret, "ptydeck-dev-secret");
+  assert.equal(config.authIssuer, "ptydeck-dev");
+  assert.equal(config.authAudience, "ptydeck-local");
+  assert.equal(config.authDevTokenTtlSeconds, 900);
 });
 
 test("loadConfig maps environment values", () => {
@@ -23,7 +29,13 @@ test("loadConfig maps environment values", () => {
     CORS_ORIGIN: "http://localhost:3000",
     MAX_BODY_BYTES: "4096",
     BACKEND_DEBUG_LOGS: "true",
-    BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log"
+    BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
+    AUTH_ENABLED: "true",
+    AUTH_DEV_MODE: "true",
+    AUTH_DEV_SECRET: "custom-secret",
+    AUTH_ISSUER: "issuer-a",
+    AUTH_AUDIENCE: "aud-a",
+    AUTH_DEV_TOKEN_TTL_SECONDS: "1200"
   });
 
   assert.equal(config.port, 9090);
@@ -34,6 +46,12 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.maxBodyBytes, 4096);
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+  assert.equal(config.authEnabled, true);
+  assert.equal(config.authDevMode, true);
+  assert.equal(config.authDevSecret, "custom-secret");
+  assert.equal(config.authIssuer, "issuer-a");
+  assert.equal(config.authAudience, "aud-a");
+  assert.equal(config.authDevTokenTtlSeconds, 1200);
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
@@ -65,5 +83,12 @@ test("loadConfig rejects invalid CORS origin values", () => {
         CORS_ORIGIN: "ftp://example.com"
       }),
     /CORS_ORIGIN contains invalid origin/
+  );
+});
+
+test("loadConfig rejects unsupported auth mode without dev mode", () => {
+  assert.throws(
+    () => loadConfig({ AUTH_ENABLED: "true", AUTH_DEV_MODE: "false" }),
+    /AUTH_ENABLED currently requires AUTH_DEV_MODE=1\./
   );
 });

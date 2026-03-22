@@ -163,6 +163,12 @@ Completed and verified topics belong here.
 - [x] `ENT-018` completed: added provider-agnostic reverse-proxy reference contract in `DEPLOYMENT.md` for HTTPS/WSS local host routing.
 - [x] Deployment guide now explicitly documents host/path routing contract (`/api/v1`, `/ws`), required forwarded headers, TLS expectation, and WebSocket upgrade requirements.
 - [x] Deployment guide behavior summary updated to match fail-fast production CORS validation (`CORS_ORIGIN` required in production).
+- [x] `ENT-001` completed (baseline): added auth/authz middleware for REST and WebSocket with JWT dev-mode validation and route scope enforcement.
+- [x] Backend now provides `POST /api/v1/auth/dev-token` in `AUTH_DEV_MODE=1`, and protected routes return explicit `401 Unauthorized` / `403 Forbidden` responses.
+- [x] Frontend now auto-requests a dev token when available and applies it to REST bearer auth and WS `access_token` connection parameter.
+- [x] Added backend auth coverage for protected REST and WS behavior plus contract/validation coverage for new auth token endpoint.
+- [x] Validation for `ENT-001` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-001` cycle: backend `96.01%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

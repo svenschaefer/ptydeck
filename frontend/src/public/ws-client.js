@@ -8,6 +8,17 @@ export function createWsClient(url, handlers, options = {}) {
   let reconnectAttempts = 0;
   const debug = options.debug === true;
   const log = typeof options.log === "function" ? options.log : () => {};
+  const tokenProvider = typeof options.tokenProvider === "function" ? options.tokenProvider : null;
+
+  function resolveConnectUrl() {
+    const token = tokenProvider ? String(tokenProvider() || "").trim() : "";
+    if (!token) {
+      return url;
+    }
+    const parsed = new URL(url);
+    parsed.searchParams.set("access_token", token);
+    return parsed.toString();
+  }
 
   function nextReconnectDelayMs() {
     const base = Math.min(MAX_RECONNECT_MS, BASE_RECONNECT_MS * (2 ** reconnectAttempts));
@@ -18,16 +29,17 @@ export function createWsClient(url, handlers, options = {}) {
   }
 
   function connect() {
+    const connectUrl = resolveConnectUrl();
     if (debug) {
-      log("ws.connecting", { url });
+      log("ws.connecting", { url: connectUrl });
     }
     handlers.onState("connecting");
-    socket = new WebSocket(url);
+    socket = new WebSocket(connectUrl);
 
     socket.addEventListener("open", () => {
       reconnectAttempts = 0;
       if (debug) {
-        log("ws.open", { url });
+        log("ws.open", { url: connectUrl });
       }
       handlers.onState("connected");
     });
@@ -49,7 +61,7 @@ export function createWsClient(url, handlers, options = {}) {
 
     socket.addEventListener("error", () => {
       if (debug) {
-        log("ws.error", { url });
+        log("ws.error", { url: connectUrl });
       }
       handlers.onState("error");
     });
@@ -57,13 +69,13 @@ export function createWsClient(url, handlers, options = {}) {
     socket.addEventListener("close", () => {
       if (closed) {
         if (debug) {
-          log("ws.closed.manual", { url });
+          log("ws.closed.manual", { url: connectUrl });
         }
         return;
       }
       const delayMs = nextReconnectDelayMs();
       if (debug) {
-        log("ws.closed.reconnect", { url, delayMs, reconnectAttempts });
+        log("ws.closed.reconnect", { url: connectUrl, delayMs, reconnectAttempts });
       }
       handlers.onState("reconnecting");
       reconnectTimer = setTimeout(() => {

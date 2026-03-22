@@ -16,6 +16,21 @@ test("api client calls list sessions endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions");
 });
 
+test("api client includes bearer auth header when token is set", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return { ok: true, status: 200, json: async () => [] };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  api.setAuthToken("dev-token");
+  await api.listSessions();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.headers.authorization, "Bearer dev-token");
+});
+
 test("api client calls input endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {
@@ -109,4 +124,23 @@ test("api client calls restart session endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/restart");
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[0].options.headers["content-type"], "application/json");
+});
+
+test("api client calls create dev token endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ accessToken: "abc", tokenType: "Bearer", expiresIn: 900, scope: "sessions:read" })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.createDevToken();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/auth/dev-token");
+  assert.equal(calls[0].options.method, "POST");
 });

@@ -2,6 +2,7 @@ import http from "node:http";
 import { appendFile } from "node:fs/promises";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
+import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
 import { SessionManager } from "./session-manager.js";
@@ -73,6 +74,9 @@ function route(pathname, method) {
   }
   if (pathname === "/api/v1/sessions" && method === "POST") {
     return { kind: "createSession" };
+  }
+  if (pathname === "/api/v1/auth/dev-token" && method === "POST") {
+    return { kind: "devToken" };
   }
 
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
@@ -171,6 +175,36 @@ export function createRuntime(config) {
     res.end(JSON.stringify(body));
   }
 
+  function requiredScopeForRoute(kind) {
+    if (kind === "listSessions" || kind === "getSession") {
+      return "sessions:read";
+    }
+    if (kind === "createSession") {
+      return "sessions:create";
+    }
+    if (kind === "deleteSession") {
+      return "sessions:delete";
+    }
+    if (kind === "updateSession" || kind === "input" || kind === "resize" || kind === "restart") {
+      return "sessions:write";
+    }
+    return "";
+  }
+
+  function authenticateRequest(req, parsedUrl, requiredScope) {
+    if (!config.authEnabled) {
+      return null;
+    }
+    const token = resolveBearerToken(req, parsedUrl);
+    const auth = verifyDevToken(token, {
+      secret: config.authDevSecret,
+      issuer: config.authIssuer,
+      audience: config.authAudience
+    });
+    ensureScope(auth, requiredScope);
+    return auth;
+  }
+
   function persistSoon() {
     if (isStopping) {
       return;
@@ -252,6 +286,38 @@ export function createRuntime(config) {
         return;
       }
 
+      if (match.kind === "devToken") {
+        if (!config.authEnabled || !config.authDevMode) {
+          throw new ApiError(404, "NotFound", `No route for ${req.method} ${parsedUrl.pathname}`);
+        }
+        const scopeDefaults = ["sessions:read", "sessions:create", "sessions:write", "sessions:delete", "ws:connect"];
+        const requestedScopes =
+          Array.isArray(body?.scopes) && body.scopes.every((entry) => typeof entry === "string")
+            ? body.scopes
+            : scopeDefaults;
+        const payload = {
+          accessToken: createDevToken({
+            secret: config.authDevSecret,
+            issuer: config.authIssuer,
+            audience: config.authAudience,
+            subject: typeof body?.subject === "string" && body.subject.trim() ? body.subject.trim() : "dev-user",
+            tenantId: typeof body?.tenantId === "string" && body.tenantId.trim() ? body.tenantId.trim() : "dev",
+            scopes: requestedScopes,
+            ttlSeconds: config.authDevTokenTtlSeconds
+          }),
+          tokenType: "Bearer",
+          expiresIn: config.authDevTokenTtlSeconds,
+          scope: requestedScopes.join(" ")
+        };
+        validateResponse({ statusCode: 200, body: payload, expect: "authToken" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind !== "notFound") {
+        authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
+      }
+
       if (match.kind === "listSessions") {
         const payload = manager.list();
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
@@ -330,6 +396,29 @@ export function createRuntime(config) {
       logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
       socket.destroy();
       return;
+    }
+    if (config.authEnabled) {
+      try {
+        const token = resolveBearerToken(request, requestUrl);
+        const auth = verifyDevToken(token, {
+          secret: config.authDevSecret,
+          issuer: config.authIssuer,
+          audience: config.authAudience
+        });
+        ensureScope(auth, "ws:connect");
+      } catch (err) {
+        const mapped = toErrorResponse(err);
+        logDebug("ws.upgrade.auth_rejected", {
+          statusCode: mapped.statusCode,
+          error: mapped.body.error,
+          message: mapped.body.message
+        });
+        socket.write(
+          `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
+        );
+        socket.destroy();
+        return;
+      }
     }
 
     wsServer.handleUpgrade(request, socket, head, (ws) => {

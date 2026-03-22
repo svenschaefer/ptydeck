@@ -49,6 +49,7 @@ function parseOperations(yamlText) {
 
 function runtimeOperationKeys() {
   return new Set([
+    "POST /auth/dev-token",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -67,6 +68,12 @@ async function startRuntime() {
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
     corsOrigin: "*",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900,
     maxBodyBytes: 1024 * 1024
   });
   await runtime.start();
@@ -84,52 +91,67 @@ test("runtime routes and statuses conform to openapi contract", async () => {
 
   const { runtime, baseUrl } = await startRuntime();
   try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
+    const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.ok(operations.get("POST /auth/dev-token").has(tokenRes.status));
+    const tokenPayload = await tokenRes.json();
+    const authHeaders = { authorization: `Bearer ${tokenPayload.accessToken}`, "content-type": "application/json" };
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: authHeaders,
       body: JSON.stringify({})
     });
     assert.ok(operations.get("POST /sessions").has(createRes.status));
 
     const createInvalidRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify([])
     });
     assert.ok(operations.get("POST /sessions").has(createInvalidRes.status));
 
-    const listRes = await fetch(`${baseUrl}/sessions`);
+    const listRes = await fetch(`${baseUrl}/sessions`, { headers: { authorization: `Bearer ${tokenPayload.accessToken}` } });
     assert.ok(operations.get("GET /sessions").has(listRes.status));
 
-    const getMissingRes = await fetch(`${baseUrl}/sessions/missing-id`);
+    const getMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
     assert.ok(operations.get("GET /sessions/{sessionId}").has(getMissingRes.status));
 
     const patchMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
       method: "PATCH",
-      headers: { "content-type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify({ name: "renamed" })
     });
     assert.ok(operations.get("PATCH /sessions/{sessionId}").has(patchMissingRes.status));
 
-    const deleteMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, { method: "DELETE" });
+    const deleteMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
     assert.ok(operations.get("DELETE /sessions/{sessionId}").has(deleteMissingRes.status));
 
     const inputMissingRes = await fetch(`${baseUrl}/sessions/missing-id/input`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify({ data: "echo hi\n" })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/input").has(inputMissingRes.status));
 
     const resizeMissingRes = await fetch(`${baseUrl}/sessions/missing-id/resize`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify({ cols: 80, rows: 24 })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/resize").has(resizeMissingRes.status));
 
     const restartMissingRes = await fetch(`${baseUrl}/sessions/missing-id/restart`, {
-      method: "POST"
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
   } finally {

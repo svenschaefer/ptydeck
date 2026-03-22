@@ -103,7 +103,7 @@ Exit criteria:
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
-- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-017`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
+- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-017`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`, `ENT-025`
 
 Dependencies:
 
@@ -128,6 +128,7 @@ Dependencies:
 - `ENT-022` depends on `ENT-020` and should run after `ENT-021` metric instrumentation for measurable thresholds.
 - `ENT-023` should run before production hardening tasks to prevent invalid runtime config drift.
 - `ENT-024` depends on `ENT-003`, `ENT-004`, and `ENT-009` to align session and log retention behavior.
+- `ENT-025` depends on `ENT-001` middleware baseline and should align with `ENT-005` secrets/key-management strategy.
 
 Exit criteria:
 
@@ -190,3 +191,4 @@ Exit criteria:
 - `QLT-036`
 - `ENT-023`
 - `ENT-018`
+- `ENT-001`

@@ -43,6 +43,8 @@ const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 let terminalSettings = loadTerminalSettings();
+let wsAuthToken = "";
+let wsClient = null;
 const uiState = {
   loading: true,
   error: "",
@@ -712,47 +714,82 @@ async function bootstrapSessions() {
   return bootstrapPromise;
 }
 
+async function bootstrapDevAuthToken() {
+  try {
+    const payload = await api.createDevToken();
+    if (payload && typeof payload.accessToken === "string" && payload.accessToken.trim()) {
+      wsAuthToken = payload.accessToken.trim();
+      api.setAuthToken(wsAuthToken);
+      debugLog("auth.dev_token.ok", { expiresIn: payload.expiresIn || 0, scope: payload.scope || "" });
+      return true;
+    }
+  } catch (err) {
+    const status = err && typeof err.status === "number" ? err.status : 0;
+    if (status === 404 || status === 405) {
+      debugLog("auth.dev_token.unavailable", {});
+      return false;
+    }
+    debugLog("auth.dev_token.error", {
+      status,
+      message: err instanceof Error ? err.message : String(err)
+    });
+    return false;
+  }
+  return false;
+}
+
+function startWs() {
+  wsClient = createWsClient(config.wsUrl, {
+    onState(status) {
+      debugLog("ws.state", { status });
+      store.setConnectionState(status);
+      if (status === "connected") {
+        uiState.loading = false;
+        uiState.error = "";
+      }
+    },
+    onMessage(event) {
+      debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
+      if (event.type === "snapshot") {
+        store.setSessions(event.sessions || []);
+        replaySnapshotOutputs(event.outputs);
+        uiState.loading = false;
+        uiState.error = "";
+        return;
+      }
+
+      if (event.type === "session.data" && terminals.has(event.sessionId)) {
+        terminals.get(event.sessionId).terminal.write(event.data);
+        return;
+      }
+
+      if (event.type === "session.created" && event.session) {
+        upsertSession(event.session);
+        uiState.error = "";
+        return;
+      }
+
+      if (event.type === "session.closed" && event.sessionId) {
+        removeSession(event.sessionId);
+        uiState.error = "";
+      }
+    }
+  }, { debug: debugLogs, log: debugLog, tokenProvider: () => wsAuthToken });
+}
+
 store.subscribe(render);
 syncSettingsUi();
 render();
-bootstrapSessions();
 
-const ws = createWsClient(config.wsUrl, {
-  onState(status) {
-    debugLog("ws.state", { status });
-    store.setConnectionState(status);
-    if (status === "connected") {
-      uiState.loading = false;
-      uiState.error = "";
-    }
-  },
-  onMessage(event) {
-    debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
-    if (event.type === "snapshot") {
-      store.setSessions(event.sessions || []);
-      replaySnapshotOutputs(event.outputs);
-      uiState.loading = false;
-      uiState.error = "";
-      return;
-    }
+async function initializeRuntime() {
+  await bootstrapDevAuthToken();
+  await bootstrapSessions();
+  startWs();
+}
 
-    if (event.type === "session.data" && terminals.has(event.sessionId)) {
-      terminals.get(event.sessionId).terminal.write(event.data);
-      return;
-    }
-
-    if (event.type === "session.created" && event.session) {
-      upsertSession(event.session);
-      uiState.error = "";
-      return;
-    }
-
-    if (event.type === "session.closed" && event.sessionId) {
-      removeSession(event.sessionId);
-      uiState.error = "";
-    }
-  }
-}, { debug: debugLogs, log: debugLog });
+initializeRuntime().catch(() => {
+  setError("Failed to initialize application runtime.");
+});
 
 createBtn.addEventListener("click", async () => {
   try {
@@ -838,7 +875,9 @@ commandInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("beforeunload", () => {
-  ws.close();
+  if (wsClient) {
+    wsClient.close();
+  }
   if (globalResizeTimer) {
     clearTimeout(globalResizeTimer);
   }

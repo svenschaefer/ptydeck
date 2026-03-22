@@ -173,3 +173,17 @@ test("ws client emits error state and applies bounded reconnect backoff with jit
   sixth.emit("close");
   assert.equal(timers[5].ms, 10000);
 });
+
+test("ws client appends access_token query when token provider is set", (t) => {
+  withMockedGlobals(t);
+  const client = createWsClient("ws://localhost:18080/ws", {
+    onState: () => {},
+    onMessage: () => {}
+  }, {
+    tokenProvider: () => "dev-token"
+  });
+
+  assert.equal(MockWebSocket.instances.length, 1);
+  assert.equal(MockWebSocket.instances[0].url, "ws://localhost:18080/ws?access_token=dev-token");
+  client.close();
+});

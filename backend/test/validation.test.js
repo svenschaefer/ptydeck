@@ -87,3 +87,29 @@ test("validateRequest accepts valid session patch payload", () => {
     });
   });
 });
+
+test("validateRequest accepts valid dev token request payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/auth/dev-token",
+      params: {},
+      body: { subject: "alice", tenantId: "dev", scopes: ["sessions:read"] }
+    });
+  });
+});
+
+test("validateResponse accepts auth token response", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "authToken",
+      body: {
+        accessToken: "token",
+        tokenType: "Bearer",
+        expiresIn: 900,
+        scope: "sessions:read"
+      }
+    });
+  });
+});
