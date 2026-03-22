@@ -19,7 +19,6 @@ const store = createStore();
 const stateEl = document.getElementById("connection-state");
 const gridEl = document.getElementById("terminal-grid");
 const createBtn = document.getElementById("create-session");
-const settingsFixedSizeEl = document.getElementById("settings-fixed-size");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
 const settingsApplyBtn = document.getElementById("settings-apply");
@@ -74,10 +73,6 @@ if (typeof window.Terminal !== "function") {
   setError("Terminal library failed to load.");
   throw new Error("window.Terminal is not available.");
 }
-if (!window.FitAddon || typeof window.FitAddon.FitAddon !== "function") {
-  setError("Terminal fit addon failed to load.");
-  throw new Error("window.FitAddon.FitAddon is not available.");
-}
 
 function setError(message) {
   debugLog("ui.error", { message });
@@ -127,7 +122,6 @@ function saveTerminalSettings() {
 function loadTerminalSettings() {
   const stored = readStoredSettings();
   return {
-    fixedSize: Boolean(stored?.fixedSize ?? true),
     cols: clampInt(stored?.cols, 80, 20, 400),
     rows: clampInt(stored?.rows, 20, 5, 120)
   };
@@ -167,14 +161,11 @@ function syncTerminalGeometryCss() {
   root.style.setProperty("--ptydeck-terminal-card-width", `${cardWidthPx}px`);
   root.style.setProperty("--ptydeck-terminal-mount-height", `${mountHeightPx}px`);
   if (gridEl) {
-    gridEl.classList.toggle("fixed-size", terminalSettings.fixedSize);
+    gridEl.classList.add("fixed-size");
   }
 }
 
 function syncSettingsUi() {
-  if (settingsFixedSizeEl) {
-    settingsFixedSizeEl.checked = terminalSettings.fixedSize;
-  }
   if (settingsColsEl) {
     settingsColsEl.value = String(terminalSettings.cols);
   }
@@ -186,7 +177,6 @@ function syncSettingsUi() {
 
 function readSettingsFromUi() {
   return {
-    fixedSize: settingsFixedSizeEl ? settingsFixedSizeEl.checked : terminalSettings.fixedSize,
     cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
     rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120)
   };
@@ -194,12 +184,6 @@ function readSettingsFromUi() {
 
 function applyMountHeight(entry, rows) {
   if (!entry || !entry.mount) {
-    return;
-  }
-  if (!terminalSettings.fixedSize) {
-    entry.mount.style.height = "";
-    entry.mount.style.width = "";
-    entry.element.style.width = "";
     return;
   }
   const mountHeightPx = computeFixedMountHeightPx(rows);
@@ -246,18 +230,9 @@ function computeTerminalSize(entry) {
   if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
     return null;
   }
-
-  if (terminalSettings.fixedSize) {
-    return {
-      cols: terminalSettings.cols,
-      rows: terminalSettings.rows
-    };
-  }
-
-  entry.fitAddon.fit();
   return {
-    cols: entry.terminal.cols,
-    rows: entry.terminal.rows
+    cols: terminalSettings.cols,
+    rows: terminalSettings.rows
   };
 }
 
@@ -488,8 +463,6 @@ function render() {
         brightWhite: "#f5f7fa"
       }
     });
-    const fitAddon = new window.FitAddon.FitAddon();
-    terminal.loadAddon(fitAddon);
     debugLog("terminal.created", { sessionId: session.id });
 
     gridEl.appendChild(node);
@@ -499,7 +472,7 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, quickIdEl, mount });
+    terminals.set(session.id, { terminal, element: node, focusBtn, quickIdEl, mount });
     if (startupPerf.firstTerminalMountedAtMs === null) {
       startupPerf.firstTerminalMountedAtMs = nowMs();
       maybeReportStartupPerf();
@@ -853,9 +826,6 @@ createBtn.addEventListener("click", async () => {
 
 if (settingsApplyBtn) {
   settingsApplyBtn.addEventListener("click", onApplySettings);
-}
-if (settingsFixedSizeEl) {
-  settingsFixedSizeEl.addEventListener("change", onApplySettings);
 }
 if (settingsColsEl) {
   settingsColsEl.addEventListener("keydown", (event) => {

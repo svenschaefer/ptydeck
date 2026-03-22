@@ -233,6 +233,7 @@ Completed and verified topics belong here.
 - [x] Fixed terminal geometry drift between configured `cols/rows` and rendered card size by deriving fixed-mode card width and mount height from terminal settings and applying them uniformly across all terminal cards.
 - [x] Fixed horizontal overflow causes in terminal workspace by adding fixed-size grid column sizing, card shrink guards (`min-width: 0`), toolbar text truncation, and root `overflow-x: hidden`.
 - [x] Fixed fixed-size rendering consistency by enforcing per-terminal mount width/height in fixed mode and clearing inline sizing in non-fixed mode.
+- [x] Simplified settings UX by removing `Use fixed terminal size`; terminal sizing now always follows the configured `Cols/Rows` values.
 - [x] Validation for terminal-rendering fix cycle passed: `npm run lint`, `npm run test` (backend + frontend).
 
 ## Maintenance Rules

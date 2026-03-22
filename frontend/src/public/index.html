@@ -15,10 +15,6 @@
         <button id="create-session" type="button">New Session</button>
         <section class="settings-panel">
           <h2>Settings</h2>
-          <label class="settings-checkbox">
-            <input id="settings-fixed-size" type="checkbox" />
-            Use fixed terminal size
-          </label>
           <div class="settings-grid">
             <label for="settings-cols">Cols</label>
             <input id="settings-cols" type="number" min="20" max="400" step="1" value="80" />
@@ -60,7 +56,6 @@
     </template>
 
     <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
     <script type="module" src="/app.js"></script>
   </body>
 </html>
