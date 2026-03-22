@@ -176,6 +176,8 @@ Completed and verified topics belong here.
 - [x] Added integration coverage for metrics endpoint and WS gauge observation under active socket connection.
 - [x] Validation for `ENT-021` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-021` cycle: backend `96.22%` lines, frontend `88.36%` lines.
+- [x] `ENT-005` completed: added runtime secrets-management strategy baseline in `DEPLOYMENT.md` (no plaintext secrets in repo, runtime injection pattern, rotation procedure).
+- [x] Deployment runbook now includes explicit secret handling guardrails across development, CI, and production environments.
 
 ## Maintenance Rules
 

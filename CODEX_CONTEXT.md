@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (ENT-021 metrics baseline completed; scrape endpoint and monitoring gauges/counters documented)
+Last updated: 2026-03-22 (ENT-005 secrets-management strategy documented; ENT-021 metrics baseline retained)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -100,6 +100,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Deployment runbook now includes a provider-agnostic reverse-proxy routing contract for local HTTPS/WSS host routing, including `/api/v1` and `/ws` mapping expectations and WebSocket upgrade requirements.
 - Deployment runbook now includes a production logging standard (JSON log contract, correlation ID handling, PII redaction rules, retention policy baseline).
 - Backend now exposes `GET /metrics` with Prometheus-style baseline metrics for HTTP traffic, request durations, active sessions, and active WebSocket connections.
+- Deployment runbook now includes secrets-management baseline guidance (runtime injection, no plaintext in repo, and rotation procedure).
 - Backend auth/authz middleware baseline now supports JWT validation in `AUTH_DEV_MODE=1`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
 - Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `OUTLOOK-TODO.md`.
@@ -110,8 +111,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
 - Active next cycle: `v0.3.0-H2` enterprise readiness backlog (current-scope subset in `TODO.md`; deferred auth/tenant items in `OUTLOOK-TODO.md`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
-  - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-018`, `ENT-021`, `ENT-023`.
-  - Planned next in cycle B: non-auth enterprise hardening tasks from `TODO.md` (for example `ENT-005`, `ENT-007`).
+  - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-018`, `ENT-021`, `ENT-023`.
+  - Planned next in cycle B: non-auth enterprise hardening tasks from `TODO.md` (for example `ENT-007`, `ENT-009`).
 
 ## Session Behavior Notes
 

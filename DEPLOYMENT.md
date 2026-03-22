@@ -45,6 +45,12 @@ Optional frontend overrides:
 
 - `API_BASE_URL`, `WS_URL` (leave unset to auto-derive from browser host)
 
+Secrets policy baseline:
+
+- Never commit real secrets to git (`.env` files stay local/untracked).
+- Keep local machine-specific secrets only in gitignored paths.
+- In shared/prod environments inject secrets at runtime from secret stores or orchestrator secret primitives.
+
 Optional for troubleshooting:
 
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
@@ -56,6 +62,40 @@ Optional local auth baseline (development only):
 - Backend: `AUTH_DEV_MODE=1`
 - Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
 - Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
+
+## 4.1 Secrets Management Strategy (ENT-005 Baseline)
+
+Runtime secret injection pattern:
+
+- Development:
+  - Use local `.env` files only on the developer machine.
+  - Keep sensitive local values out of tracked files.
+- CI:
+  - Provide secrets via CI secret store and inject as environment variables at runtime.
+  - Do not print secrets in logs or test output.
+- Production:
+  - Use managed secret storage (for example platform-native secrets manager) as source of truth.
+  - Inject secrets into process env at deploy/start time.
+  - Avoid baking secrets into container images or repository artifacts.
+
+Minimum secret inventory (current baseline):
+
+- `AUTH_DEV_SECRET` (when `AUTH_DEV_MODE=1`)
+- Future production auth credentials/keys (OIDC/JWKS-related values)
+- Any future encryption-at-rest keys
+
+Rotation procedure baseline:
+
+1. Create new secret version in secret store.
+2. Deploy runtime with new secret version and validate health/smoke checks.
+3. Revoke old secret version after successful cutover window.
+4. Record rotation event (who/when/what) in ops change log.
+
+Operational guardrails:
+
+- Never return secrets in API responses.
+- Redact known secret fields from logs (`authorization`, `token`, `secret`, `password`, `cookie`).
+- Keep secret access limited to least-privilege runtime identities.
 
 ## 5. Start in Production Mode
 

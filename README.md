@@ -74,6 +74,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Optional local auth baseline via `AUTH_DEV_MODE=1` with automatic frontend dev-token acquisition (`/api/v1/auth/dev-token`)
 - Production logging standard documented in `DEPLOYMENT.md` (JSON format, correlation IDs, redaction, retention baseline)
 - Monitoring baseline via `GET /metrics` (Prometheus-style counters/gauges for requests, sessions, and WebSocket connections)
+- Secrets-management strategy baseline documented in `DEPLOYMENT.md` (runtime injection and rotation guidance)
 - Full PTY support (interactive applications like `vim`, `nano`, `top`)
 - Session persistence (restores working directory after restart)
 - Clean multiplexing over a single WebSocket connection
