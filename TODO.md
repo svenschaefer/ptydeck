@@ -92,6 +92,14 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-020` Owner: `BE` Task: Support session naming (`PATCH /sessions/{sessionId}` + FE rename UI) and default new-session cwd to user home when no persisted cwd exists.
 - [x] `QLT-021` Owner: `FE` Task: Move command input area to page bottom, support multiline input cleanly, and set default command input height to 10 rows.
 
+## Command Interface and Control Plane (v0.3.0 continuation)
+
+- [ ] `QLT-022` Owner: `FE` Task: Add command interpreter in command composer that routes `/...` inputs to control-plane actions and forwards non-slash input unchanged to active session.
+- [ ] `QLT-023` Owner: `FE` Task: Implement control commands `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help` in the frontend command interpreter.
+- [ ] `QLT-024` Owner: `FE` Task: Add explicit command execution feedback area (success/error/help output) separated from PTY output stream.
+- [ ] `QLT-025` Owner: `BE` Task: Add session restart endpoint (`POST /api/v1/sessions/{sessionId}/restart`) to support `/restart` command semantics without restarting backend process.
+- [ ] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).
+
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
 - [ ] `ENT-001` Owner: `BE` Task: Implement authentication and authorization middleware for REST and WebSocket (JWT/OIDC, role scopes, unauthorized/forbidden responses).

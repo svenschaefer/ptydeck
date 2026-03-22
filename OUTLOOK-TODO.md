@@ -8,6 +8,8 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 - [ ] Add persistent layout profiles.
 - [ ] Add a command palette and keyboard-first navigation.
 - [ ] Add output-focused reading mode for long-running logs.
+- [ ] Add split-based layout model (horizontal/vertical) with drag/resize behavior.
+- [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
 
 ## Security and Multi-Tenancy
 
@@ -22,6 +24,7 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 - [ ] Add isolated worker runtime mode for PTY execution.
 - [ ] Add container-per-session runtime option.
 - [ ] Add load and soak testing for high concurrent session counts.
+- [ ] Add tmux-backed runtime option for true process/session persistence across backend restarts.
 
 ## Developer Productivity
 
@@ -41,3 +44,7 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 - [ ] Add optional controlled mouse forwarding.
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
+- [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
+- [ ] Add remote execution adapters (SSH sessions and multi-host routing).
+- [ ] Add multi-client shared sessions with separate view/control permissions.
+- [ ] Add broadcast input modes for explicit session groups.
