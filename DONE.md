@@ -65,6 +65,9 @@ Completed and verified topics belong here.
 - [x] `QLT-014` completed: added runtime tests for `/ready` transition (`starting` -> `ready`) using a startup readiness gate.
 - [x] Runtime shutdown flow is now explicitly idempotent (`stop()` safe on repeated calls) and covered by integration test.
 - [x] Coverage after `QLT-014`: backend `96.26%` lines, frontend `97.12%` lines.
+- [x] `QLT-015` completed: added OpenAPI contract conformance test for runtime route/method surface and per-route status code compliance.
+- [x] Contract test validates operation key parity between runtime API routes and `backend/openapi/openapi.yaml`.
+- [x] Coverage after `QLT-015`: backend `96.58%` lines, frontend `97.12%` lines.
 
 ## Maintenance Rules
 
