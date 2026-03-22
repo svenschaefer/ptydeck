@@ -12,6 +12,8 @@
 npm run lint
 npm run test
 npm run test:coverage
+npm run security:sca
+npm run security:sbom
 ```
 
 ## 3. Build
@@ -401,6 +403,38 @@ Automated expiry check:
   - Workflow step `TLS certificate expiry check` runs on Node `18`.
   - Uses repository variables `TLS_EXPIRY_CHECK_HOSTS` / `TLS_EXPIRY_THRESHOLD_DAYS`.
   - If host list is empty, the check is skipped with explicit log output.
+
+## 9.8 Security Scanning and SBOM Baseline (ENT-007)
+
+Dependency vulnerability gate:
+
+- Script: `./scripts/security-scan.sh`
+- Default threshold: `SCA_AUDIT_LEVEL=high` (allowed values: `low|moderate|high|critical`)
+- Current behavior:
+  - Runs `npm audit` for backend and frontend dependency trees.
+  - Exits non-zero when vulnerabilities at or above configured threshold are found.
+
+SBOM generation:
+
+- Script: `./scripts/generate-sbom.sh`
+- Output directory: `artifacts/security/sbom`
+- Generated files (format depends on generator availability):
+  - SPDX via `npm sbom`: `root.spdx.json`, `backend.spdx.json`, `frontend.spdx.json`
+  - CycloneDX fallback: `root.cdx.json`, `backend.cdx.json`, `frontend.cdx.json`
+
+CI integration:
+
+- CI `security` job runs:
+  - dependency vulnerability gate (`scripts/security-scan.sh`)
+  - SBOM generation (`scripts/generate-sbom.sh`)
+  - SBOM upload as workflow artifact (`sbom-spdx`)
+- Optional image scan:
+  - If repository variable `SECURITY_IMAGE_REF` is set, CI runs Trivy image scan and fails on `HIGH`/`CRITICAL`.
+
+Suggested CI variables:
+
+- `SCA_AUDIT_LEVEL` (optional, defaults to `high`)
+- `SECURITY_IMAGE_REF` (optional, enables image scan when set)
 
 ## 10. Release Checklist
 

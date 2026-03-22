@@ -116,7 +116,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `ENT-004` Owner: `PLAT` Task: Add production logging standards (JSON logs, correlation IDs, PII redaction rules, log retention policy) and document in `DEPLOYMENT.md`.
 - [x] `ENT-005` Owner: `PLAT` Task: Integrate secrets management strategy (no plaintext secrets in repo, runtime secret injection pattern, secret rotation procedure).
 - [x] `ENT-006` Owner: `BE` Task: Add configurable rate limiting and abuse controls for REST and WebSocket connection creation.
-- [ ] `ENT-007` Owner: `PLAT` Task: Add dependency and image security scanning in CI (SCA + vulnerability gate) and generate SBOM artifact per release.
+- [x] `ENT-007` Owner: `PLAT` Task: Add dependency and image security scanning in CI (SCA + vulnerability gate) and generate SBOM artifact per release.
 - [x] `ENT-008` Owner: `PLAT` Task: Define SLOs/SLIs and alerting baseline for API availability, WS disconnect rate, and error-rate thresholds.
 - [ ] `ENT-009` Owner: `PLAT` Task: Add backup/restore automation for persistence data and include periodic restore verification procedure.
 - [x] `ENT-011` Owner: `PLAT` Task: Enforce TLS-only ingress in production (HTTPS/WSS), document certificate lifecycle, and add automated expiry checks.

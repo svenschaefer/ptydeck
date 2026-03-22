@@ -3,3 +3,4 @@ coverage/
 .npm/
 backend/data/
 local-config/
+artifacts/

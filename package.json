@@ -17,6 +17,8 @@
     "test": "npm --prefix backend run test && npm --prefix frontend run test",
     "test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage",
     "test:coverage:check": "./scripts/check-coverage.sh",
-    "tls:check": "./scripts/check-cert-expiry.sh"
+    "tls:check": "./scripts/check-cert-expiry.sh",
+    "security:sca": "./scripts/security-scan.sh",
+    "security:sbom": "./scripts/generate-sbom.sh"
   }
 }

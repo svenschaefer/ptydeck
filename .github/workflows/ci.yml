@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -44,3 +45,34 @@ jobs:
           TLS_EXPIRY_CHECK_HOSTS: ${{ vars.TLS_EXPIRY_CHECK_HOSTS }}
           TLS_EXPIRY_THRESHOLD_DAYS: ${{ vars.TLS_EXPIRY_THRESHOLD_DAYS }}
         run: ./scripts/check-cert-expiry.sh
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Dependency vulnerability gate (SCA)
+        env:
+          SCA_AUDIT_LEVEL: ${{ vars.SCA_AUDIT_LEVEL }}
+        run: ./scripts/security-scan.sh
+      - name: Generate SBOM artifacts
+        run: ./scripts/generate-sbom.sh
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx
+          path: artifacts/security/sbom/*.json
+      - name: Optional image vulnerability scan (Trivy)
+        if: vars.SECURITY_IMAGE_REF != ''
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: image
+          image-ref: ${{ vars.SECURITY_IMAGE_REF }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

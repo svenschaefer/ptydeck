@@ -212,6 +212,11 @@ Completed and verified topics belong here.
 - [x] Added automated certificate expiry check baseline (`scripts/check-cert-expiry.sh`) and CI integration using repository variables (`TLS_EXPIRY_CHECK_HOSTS`, `TLS_EXPIRY_THRESHOLD_DAYS`).
 - [x] Validation for `ENT-011` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and `npm run tls:check`.
 - [x] Coverage after `ENT-011` cycle: backend `96.68%` lines, frontend `88.36%` lines.
+- [x] `ENT-007` completed: CI security baseline now includes dependency vulnerability gate (`npm audit`) and SBOM generation/upload.
+- [x] Added reusable security scripts: `scripts/security-scan.sh` (SCA gate) and `scripts/generate-sbom.sh` (SBOM outputs for root/backend/frontend with SPDX primary and CycloneDX fallback).
+- [x] CI now uploads SBOM artifacts (`artifacts/security/sbom/*.json`) and supports optional Trivy image scan when `SECURITY_IMAGE_REF` is configured.
+- [x] Validation for `ENT-007` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, and `npm run security:sbom`.
+- [x] Coverage after `ENT-007` cycle: backend `96.68%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 
