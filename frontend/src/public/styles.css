@@ -122,6 +122,8 @@ button:hover {
   border-radius: 10px;
   background: var(--panel);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .terminal-card.active {
@@ -152,8 +154,9 @@ button:hover {
 }
 
 .terminal-mount {
-  min-height: 275px;
+  height: 345px;
   padding: 6px;
+  overflow: hidden;
 }
 
 @media (max-width: 900px) {
@@ -170,7 +173,7 @@ button:hover {
   }
 
   .terminal-mount {
-    min-height: 240px;
+    height: 280px;
   }
 
   .command-row {

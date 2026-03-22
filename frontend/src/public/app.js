@@ -50,8 +50,8 @@ function computeTerminalSize(mount) {
     return null;
   }
   return {
-    cols: Math.max(20, Math.floor(mount.clientWidth / 10)),
-    rows: Math.max(6, Math.floor(mount.clientHeight / 20))
+    cols: Math.min(320, Math.max(20, Math.floor(mount.clientWidth / 10))),
+    rows: Math.min(80, Math.max(6, Math.floor(mount.clientHeight / 20)))
   };
 }
 
