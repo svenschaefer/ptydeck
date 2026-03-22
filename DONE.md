@@ -90,6 +90,13 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix: terminal card initialization/resize flow hardened to avoid repeated resize loops that delayed or blocked session rendering.
 - [x] Terminal resize behavior now skips invalid pre-layout dimensions, de-duplicates unchanged resize values, and ignores transient resize API failures.
 - [x] Smoke validation for this hotfix passed: `npm run dev` startup + `/health`, `/ready`, and frontend HTML reachability checks.
+- [x] `QLT-028` completed: frontend terminal startup sizing stabilized with deferred resize passes and rerender-safe resize scheduling.
+- [x] `QLT-029` completed: backend CWD marker control lines are removed from terminal output stream, including split marker chunks.
+- [x] `QLT-030` completed: frontend terminal geometry switched to `xterm-addon-fit` so backend rows/cols follow actual rendered terminal size.
+- [x] `QLT-031` completed: frontend shell layout switched to sidebar-first workspace and command send action aligned horizontally with command composer.
+- [x] `QLT-032` completed: backend no longer persists on each high-frequency `input`/`resize` request, reducing interactive overhead.
+- [x] `QLT-033` completed: backend WS snapshot now includes buffered session output, and frontend replays it on reconnect to restore prompt/output context.
+- [x] `QLT-034` completed: terminal grid stretch behavior corrected to prevent inflated cards with large unused terminal area.
 
 ## Maintenance Rules
 

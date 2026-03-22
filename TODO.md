@@ -100,6 +100,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-025` Owner: `BE` Task: Add session restart endpoint (`POST /api/v1/sessions/{sessionId}/restart`) to support `/restart` command semantics without restarting backend process.
 - [ ] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).
 - [ ] `QLT-027` Owner: `FE` Task: Add frontend performance guardrails for session bootstrap and event handling (avoid redundant session list roundtrips, measure render latency for multi-session startup, and add regression test coverage for slow-load scenarios).
+- [x] `QLT-028` Owner: `FE` Task: Stabilize terminal startup sizing with deferred resize passes and prevent repeated deferred scheduling on unrelated rerenders.
+- [x] `QLT-029` Owner: `BE` Task: Strip CWD control markers from terminal output stream (including split marker chunks) while preserving CWD metadata updates.
+- [x] `QLT-030` Owner: `FE` Task: Replace heuristic terminal size math with `xterm-addon-fit` and synchronize rows/cols from actual rendered terminal dimensions.
+- [x] `QLT-031` Owner: `FE` Task: Switch shell layout to sidebar-first workspace and keep command send action horizontally aligned with command composer.
+- [x] `QLT-032` Owner: `BE` Task: Remove persistence flushes for high-frequency `input`/`resize` operations to avoid interactive I/O overhead.
+- [x] `QLT-033` Owner: `BE` Task: Include buffered terminal output in WebSocket snapshot payload so reconnecting clients can restore prompt/output context immediately.
+- [x] `QLT-034` Owner: `FE` Task: Prevent terminal-grid stretch from inflating card height and causing large unused visual terminal areas.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

@@ -55,7 +55,7 @@ Exit criteria:
 
 ### v0.3.0-H1 - Quality Hardening Backlog
 
-- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027`
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`
 
 Dependencies:
 
@@ -74,6 +74,9 @@ Dependencies:
 - `QLT-025` should run before `/restart` command support is marked complete in `QLT-023`.
 - `QLT-026` depends on completion of `QLT-022`, `QLT-023`, and `QLT-025`.
 - `QLT-027` should run after `QLT-021` and alongside `QLT-010` to pair performance hardening with DOM behavior coverage.
+- `QLT-030` depends on `QLT-028` to ensure startup resize scheduling is stable before switching to strict fit-based geometry.
+- `QLT-033` depends on `QLT-029` marker-cleaned output semantics to avoid replaying control markers on reconnect snapshots.
+- `QLT-034` should run with `QLT-030` so rendered terminal geometry matches visual card height constraints.
 
 Exit criteria:
 
@@ -93,6 +96,8 @@ Exit criteria:
 - Slash-command control plane is explicitly separated from terminal execution input.
 - Core command set (`/new`, `/close`, `/switch`, `/next`, `/prev`, `/list`, `/rename`, `/restart`, `/help`) is implemented and integration-tested.
 - Frontend startup and session event paths avoid redundant roundtrips and are validated against slow-load regression scenarios.
+- Reconnect snapshots restore visible terminal prompt/output context without waiting for new PTY output.
+- Rendered terminal card height and effective rows/cols stay visually consistent after layout updates.
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
@@ -167,3 +172,4 @@ Exit criteria:
 - `QLT-018`
 - `QLT-019`, `QLT-020`
 - `QLT-021`
+- `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`
