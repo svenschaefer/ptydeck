@@ -382,10 +382,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     if (path === "/api/v1/sessions/s-1" && options.method === "DELETE") {
       return makeJsonResponse(500, { error: "DeleteFailed", message: "boom" });
     }
-    if (path === "/api/v1/sessions/s-1/input" && options.method === "POST") {
+    const inputMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/input$/);
+    if (inputMatch && options.method === "POST") {
+      const sessionId = decodeURIComponent(inputMatch[1]);
       const payload = JSON.parse(options.body || "{}");
-      inputPayloads.push(payload);
-      if (payload.data === "pwd\n") {
+      inputPayloads.push({ sessionId, ...payload });
+      if (payload.data === "pwd\n" && sessionId === "s-1") {
         return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
       }
       return makeJsonResponse(204, {});
@@ -473,6 +475,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
   assert.equal(inputPayloads.length, 1);
+  assert.equal(inputPayloads[0].sessionId, "s-1");
   assert.equal(inputPayloads[0].data, "pwd\n");
 
   fixture.elements.commandInput.value = "/noop";
@@ -806,6 +809,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   secondFocus.click();
   await tick();
   assert.equal(firstCard.classList.contains("active"), false);
+  assert.equal(secondCard.classList.contains("active"), true);
+
+  const routedBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "@1 echo routed";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, routedBefore + 1);
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\n" });
+  assert.equal(secondCard.classList.contains("active"), true);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
+
+  const unresolvedBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "@does-not-exist echo routed";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, unresolvedBefore);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
   assert.equal(secondCard.classList.contains("active"), true);
 
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });

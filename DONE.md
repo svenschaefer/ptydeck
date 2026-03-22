@@ -284,6 +284,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for large custom-command preview truncation behavior.
 - [x] Validation for `QLT-056` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-056` cycle: backend `96.97%` lines, frontend `88.03%` lines.
+- [x] `QLT-049` completed: non-slash direct target routing now supports `@<target> <text>` in the composer, routing input to resolved target sessions without changing active-session focus.
+- [x] Direct target resolver reuses existing session token semantics (quick ID, full ID, exact name, unique ID prefix) and returns deterministic unresolved-target feedback.
+- [x] Added frontend integration coverage for `@<target>` success path (payload delivery to target without focus switch) and unresolved-target guardrail behavior.
+- [x] Validation for `QLT-049` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-049` cycle: backend `96.70%` lines, frontend `88.72%` lines.
 
 ## Maintenance Rules
 

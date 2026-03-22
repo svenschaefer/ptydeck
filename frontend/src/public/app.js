@@ -892,6 +892,23 @@ function resolveSessionToken(token, sessions) {
   return { session: null, error: `Unknown session identifier: ${normalized}` };
 }
 
+function parseDirectTargetRoutingInput(rawInput) {
+  const input = String(rawInput || "");
+  const match = /^@([^\s]+)\s+([\s\S]+)$/.exec(input);
+  if (!match) {
+    return {
+      matched: false,
+      targetToken: "",
+      payload: ""
+    };
+  }
+  return {
+    matched: true,
+    targetToken: match[1],
+    payload: match[2]
+  };
+}
+
 function parseCustomDefinition(rawInput) {
   const raw = String(rawInput || "").replaceAll("\r\n", "\n");
   const trimmedStart = raw.trimStart();
@@ -1321,20 +1338,41 @@ async function submitCommand() {
     return;
   }
 
-  const activeSessionId = store.getState().activeSessionId;
-  if (!activeSessionId) {
+  const state = store.getState();
+  const sessions = state.sessions;
+  const directRouting = parseDirectTargetRoutingInput(interpreted.data);
+
+  let targetSessionId = state.activeSessionId;
+  let targetPayload = interpreted.data;
+  let routeFeedback = "";
+
+  if (directRouting.matched) {
+    const resolved = resolveSessionToken(directRouting.targetToken, sessions);
+    if (!resolved.session) {
+      setCommandFeedback(resolved.error);
+      return;
+    }
+    targetSessionId = resolved.session.id;
+    targetPayload = directRouting.payload;
+    routeFeedback = `Sent to [${formatSessionToken(resolved.session.id)}] ${formatSessionDisplayName(resolved.session)}.`;
+  }
+
+  if (!targetSessionId) {
     return;
   }
 
   try {
-    const payload = interpreted.data.endsWith("\n") ? interpreted.data : `${interpreted.data}\n`;
-    debugLog("command.send.start", { activeSessionId, length: payload.length });
-    await api.sendInput(activeSessionId, payload);
+    const payload = targetPayload.endsWith("\n") ? targetPayload : `${targetPayload}\n`;
+    debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
+    await api.sendInput(targetSessionId, payload);
     commandInput.value = "";
     setCommandPreview("");
     uiState.error = "";
+    if (routeFeedback) {
+      setCommandFeedback(routeFeedback);
+    }
     resetSlashHistoryNavigationState();
-    debugLog("command.send.ok", { activeSessionId });
+    debugLog("command.send.ok", { activeSessionId: targetSessionId, directRoute: directRouting.matched });
   } catch {
     setError("Failed to send command.");
   }
