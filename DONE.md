@@ -226,6 +226,10 @@ Completed and verified topics belong here.
 - [x] CI non-prod validation now runs retention purge in dry-run mode to continuously verify cleanup cadence wiring.
 - [x] Validation for `ENT-024` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, `npm run security:sbom`, `npm run backup:verify`, and `PURGE_DRY_RUN=1 npm run retention:purge`.
 - [x] Coverage after `ENT-024` cycle: backend `96.68%` lines, frontend `88.36%` lines.
+- [x] `ENT-015` completed: release evidence bundle generation baseline implemented for test logs, coverage gate output, SCA output, SBOM files, and CI commit provenance metadata.
+- [x] Added `scripts/generate-release-evidence.sh` and root script `npm run release:evidence` to produce `artifacts/release-evidence/release-evidence-<timestamp>.tar.gz` with manifest and checksums.
+- [x] CI security workflow now captures test/security logs, generates release evidence bundles, and uploads `release-evidence` artifact for audit/compliance traceability.
+- [x] Validation for `ENT-015` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run release:evidence`.
 
 ## Maintenance Rules
 

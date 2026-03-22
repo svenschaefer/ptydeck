@@ -16,6 +16,7 @@ npm run security:sca
 npm run security:sbom
 npm run backup:verify
 PURGE_DRY_RUN=1 npm run retention:purge
+npm run release:evidence
 ```
 
 ## 3. Build
@@ -503,6 +504,36 @@ Example (actual deletion run):
 ```bash
 PURGE_DRY_RUN=0 npm run retention:purge
 ```
+
+## 9.11 Release Evidence Bundle Baseline (ENT-015)
+
+Release evidence generation:
+
+- Script: `./scripts/generate-release-evidence.sh`
+- Root shortcut: `npm run release:evidence`
+- Output: `artifacts/release-evidence/release-evidence-<UTC_TIMESTAMP>.tar.gz`
+
+Evidence bundle contents:
+
+- quality evidence logs:
+  - `quality/backend-test.log`
+  - `quality/frontend-test.log`
+  - `quality/coverage-check.log`
+- security evidence logs:
+  - `security/sca.log`
+  - `security/sbom.log`
+  - `security/backup-verify.log`
+  - `security/retention-purge.log`
+- SBOM payloads:
+  - `security/sbom/*.json`
+- provenance and integrity:
+  - `manifest.json` with CI provenance (`GITHUB_SHA`, `GITHUB_REF`, workflow/run metadata)
+  - `checksums.sha256` for included evidence files
+
+CI integration:
+
+- Security workflow captures test/security logs, generates SBOM, and invokes release evidence generation.
+- CI uploads the `release-evidence` artifact for audit/compliance traceability.
 
 ## 10. Release Checklist
 

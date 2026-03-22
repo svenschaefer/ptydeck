@@ -55,23 +55,47 @@ jobs:
           node-version: 18
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Collect test evidence logs
+        run: |
+          mkdir -p artifacts/quality
+          set -o pipefail
+          npm --prefix backend run test 2>&1 | tee artifacts/quality/backend-test.log
+          npm --prefix frontend run test 2>&1 | tee artifacts/quality/frontend-test.log
+          npm run test:coverage:check 2>&1 | tee artifacts/quality/coverage-check.log
       - name: Dependency vulnerability gate (SCA)
         env:
           SCA_AUDIT_LEVEL: ${{ vars.SCA_AUDIT_LEVEL }}
-        run: ./scripts/security-scan.sh
+        run: |
+          mkdir -p artifacts/security
+          set -o pipefail
+          ./scripts/security-scan.sh 2>&1 | tee artifacts/security/sca.log
       - name: Generate SBOM artifacts
-        run: ./scripts/generate-sbom.sh
+        run: |
+          mkdir -p artifacts/security
+          set -o pipefail
+          ./scripts/generate-sbom.sh 2>&1 | tee artifacts/security/sbom.log
       - name: Verify backup/restore roundtrip
-        run: ./scripts/verify-backup-restore.sh
+        run: |
+          set -o pipefail
+          ./scripts/verify-backup-restore.sh 2>&1 | tee artifacts/security/backup-verify.log
       - name: Retention purge dry-run
         env:
           PURGE_DRY_RUN: "1"
-        run: ./scripts/purge-retention.sh
+        run: |
+          set -o pipefail
+          ./scripts/purge-retention.sh 2>&1 | tee artifacts/security/retention-purge.log
+      - name: Generate release evidence bundle
+        run: ./scripts/generate-release-evidence.sh
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
           name: sbom-spdx
           path: artifacts/security/sbom/*.json
+      - name: Upload release evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: artifacts/release-evidence/*
       - name: Optional image vulnerability scan (Trivy)
         if: vars.SECURITY_IMAGE_REF != ''
         uses: aquasecurity/trivy-action@0.30.0

@@ -188,6 +188,7 @@ Exit criteria:
 - `ENT-007`
 - `ENT-009`
 - `ENT-024`
+- `ENT-015`
 - `ENT-001`
 - `ENT-004`
 - `ENT-021`
