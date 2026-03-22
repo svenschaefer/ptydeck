@@ -261,6 +261,31 @@ test("auth dev mode issues token and protects session routes", async () => {
   }
 });
 
+test("metrics endpoint exposes request counters and active session gauge", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(createRes.status, 201);
+
+    const metricsRes = await fetch(`http://${new URL(baseUrl).host}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metrics = await metricsRes.text();
+
+    assert.match(metrics, /# TYPE ptydeck_http_requests_total counter/);
+    assert.match(metrics, /ptydeck_http_requests_total \d+/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_active gauge/);
+    assert.match(metrics, /ptydeck_sessions_active 1/);
+    assert.match(metrics, /ptydeck_http_requests_by_route_total\{method="POST",route="\/api\/v1\/sessions"\} \d+/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime restore keeps persisted createdAt and updatedAt timestamps", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

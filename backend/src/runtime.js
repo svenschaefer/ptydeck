@@ -69,6 +69,9 @@ function route(pathname, method) {
   if (pathname === "/ready" && method === "GET") {
     return { kind: "ready" };
   }
+  if (pathname === "/metrics" && method === "GET") {
+    return { kind: "metrics" };
+  }
   if (pathname === "/api/v1/sessions" && method === "GET") {
     return { kind: "listSessions" };
   }
@@ -108,6 +111,29 @@ function route(pathname, method) {
   return { kind: "notFound" };
 }
 
+function normalizeMetricsPath(pathname) {
+  if (/^\/api\/v1\/sessions\/[^/]+\/input$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/input";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/resize$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/resize";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/restart";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}";
+  }
+  return pathname;
+}
+
+function escapePrometheusLabel(value) {
+  return String(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\"", "\\\"")
+    .replaceAll("\n", "\\n");
+}
+
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
@@ -116,6 +142,16 @@ export function createRuntime(config) {
   const persistence = new JsonPersistence(config.dataPath);
   const wsServer = new WebSocketServer({ noServer: true });
   const sockets = new Set();
+  const metrics = {
+    httpRequestsTotal: 0,
+    httpErrorsTotal: 0,
+    httpDurationMsSum: 0,
+    httpDurationMsCount: 0,
+    wsConnectionsOpenedTotal: 0,
+    wsConnectionsClosedTotal: 0,
+    httpRequestsByStatus: new Map(),
+    httpRequestsByRoute: new Map()
+  };
   let isReady = false;
   let isStopping = false;
   let isStopped = false;
@@ -173,6 +209,48 @@ export function createRuntime(config) {
     }
 
     res.end(JSON.stringify(body));
+  }
+
+  function renderMetrics() {
+    const lines = [];
+    lines.push("# HELP ptydeck_http_requests_total Total number of HTTP requests.");
+    lines.push("# TYPE ptydeck_http_requests_total counter");
+    lines.push(`ptydeck_http_requests_total ${metrics.httpRequestsTotal}`);
+    lines.push("# HELP ptydeck_http_errors_total Total number of HTTP requests with status >= 400.");
+    lines.push("# TYPE ptydeck_http_errors_total counter");
+    lines.push(`ptydeck_http_errors_total ${metrics.httpErrorsTotal}`);
+    lines.push("# HELP ptydeck_http_request_duration_ms_sum Sum of HTTP request duration in milliseconds.");
+    lines.push("# TYPE ptydeck_http_request_duration_ms_sum counter");
+    lines.push(`ptydeck_http_request_duration_ms_sum ${metrics.httpDurationMsSum}`);
+    lines.push("# HELP ptydeck_http_request_duration_ms_count Total number of observed HTTP request durations.");
+    lines.push("# TYPE ptydeck_http_request_duration_ms_count counter");
+    lines.push(`ptydeck_http_request_duration_ms_count ${metrics.httpDurationMsCount}`);
+    lines.push("# HELP ptydeck_sessions_active Number of active PTY sessions.");
+    lines.push("# TYPE ptydeck_sessions_active gauge");
+    lines.push(`ptydeck_sessions_active ${manager.list().length}`);
+    lines.push("# HELP ptydeck_ws_connections_active Number of active WebSocket connections.");
+    lines.push("# TYPE ptydeck_ws_connections_active gauge");
+    lines.push(`ptydeck_ws_connections_active ${sockets.size}`);
+    lines.push("# HELP ptydeck_ws_connections_opened_total Total number of accepted WebSocket connections.");
+    lines.push("# TYPE ptydeck_ws_connections_opened_total counter");
+    lines.push(`ptydeck_ws_connections_opened_total ${metrics.wsConnectionsOpenedTotal}`);
+    lines.push("# HELP ptydeck_ws_connections_closed_total Total number of closed WebSocket connections.");
+    lines.push("# TYPE ptydeck_ws_connections_closed_total counter");
+    lines.push(`ptydeck_ws_connections_closed_total ${metrics.wsConnectionsClosedTotal}`);
+    lines.push("# HELP ptydeck_http_requests_by_status_total HTTP requests grouped by status code.");
+    lines.push("# TYPE ptydeck_http_requests_by_status_total counter");
+    for (const [statusCode, count] of metrics.httpRequestsByStatus.entries()) {
+      lines.push(`ptydeck_http_requests_by_status_total{status="${escapePrometheusLabel(statusCode)}"} ${count}`);
+    }
+    lines.push("# HELP ptydeck_http_requests_by_route_total HTTP requests grouped by normalized route.");
+    lines.push("# TYPE ptydeck_http_requests_by_route_total counter");
+    for (const [routeKey, count] of metrics.httpRequestsByRoute.entries()) {
+      const [method, route] = routeKey.split(" ", 2);
+      lines.push(
+        `ptydeck_http_requests_by_route_total{method="${escapePrometheusLabel(method)}",route="${escapePrometheusLabel(route)}"} ${count}`
+      );
+    }
+    return `${lines.join("\n")}\n`;
   }
 
   function requiredScopeForRoute(kind) {
@@ -246,18 +324,31 @@ export function createRuntime(config) {
     const startedAt = Date.now();
     const methodForLog = req.method || "GET";
     let pathnameForLog = req.url || "/";
+    let normalizedMetricsPathForLog = pathnameForLog;
     res.on("finish", () => {
+      const durationMs = Date.now() - startedAt;
+      const statusCode = String(res.statusCode);
+      const routeKey = `${methodForLog} ${normalizedMetricsPathForLog}`;
+      metrics.httpRequestsTotal += 1;
+      metrics.httpDurationMsCount += 1;
+      metrics.httpDurationMsSum += durationMs;
+      if (res.statusCode >= 400) {
+        metrics.httpErrorsTotal += 1;
+      }
+      metrics.httpRequestsByStatus.set(statusCode, (metrics.httpRequestsByStatus.get(statusCode) || 0) + 1);
+      metrics.httpRequestsByRoute.set(routeKey, (metrics.httpRequestsByRoute.get(routeKey) || 0) + 1);
       logDebug("http.request.done", {
         method: methodForLog,
         pathname: pathnameForLog,
         statusCode: res.statusCode,
-        durationMs: Date.now() - startedAt
+        durationMs
       });
     });
 
     try {
       const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       pathnameForLog = parsedUrl.pathname;
+      normalizedMetricsPathForLog = normalizeMetricsPath(parsedUrl.pathname);
       logDebug("http.request.start", { method: methodForLog, pathname: pathnameForLog });
 
       if (req.method === "OPTIONS") {
@@ -283,6 +374,16 @@ export function createRuntime(config) {
 
       if (match.kind === "ready") {
         writeJson(req, res, 200, { status: isReady ? "ready" : "starting" });
+        return;
+      }
+
+      if (match.kind === "metrics") {
+        const payload = renderMetrics();
+        res.writeHead(200, {
+          "content-type": "text/plain; version=0.0.4; charset=utf-8",
+          "cache-control": "no-store"
+        });
+        res.end(payload);
         return;
       }
 
@@ -423,6 +524,7 @@ export function createRuntime(config) {
 
     wsServer.handleUpgrade(request, socket, head, (ws) => {
       sockets.add(ws);
+      metrics.wsConnectionsOpenedTotal += 1;
       ws.isAlive = true;
       logDebug("ws.upgrade.accepted", { socketCount: sockets.size });
 
@@ -432,6 +534,7 @@ export function createRuntime(config) {
 
       ws.on("close", () => {
         sockets.delete(ws);
+        metrics.wsConnectionsClosedTotal += 1;
         logDebug("ws.client.closed", { socketCount: sockets.size });
       });
 

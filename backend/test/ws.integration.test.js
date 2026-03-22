@@ -138,6 +138,12 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
       events.push(JSON.parse(buffer.toString()));
     });
     await waitFor(() => events.some((event) => event.type === "snapshot"));
+
+    const metricsRes = await fetch(`http://127.0.0.1:${port}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metricsText = await metricsRes.text();
+    assert.match(metricsText, /ptydeck_ws_connections_active 1/);
+
     authedWs.close();
   } finally {
     await runtime.stop();

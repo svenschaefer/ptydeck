@@ -171,6 +171,11 @@ Completed and verified topics belong here.
 - [x] Coverage after `ENT-001` cycle: backend `96.01%` lines, frontend `88.36%` lines.
 - [x] `ENT-004` completed: documented production logging standards in `DEPLOYMENT.md` (JSON logging contract, correlation IDs, PII redaction, retention policy baseline).
 - [x] Deployment runbook now includes explicit required log fields and recommended runtime env pattern for production logging controls.
+- [x] `ENT-021` completed: backend now exposes Prometheus-style scrape endpoint `GET /metrics` with baseline runtime/traffic metrics.
+- [x] Metrics baseline includes request counters, error counters, request-duration aggregates, active session gauge, active WS connection gauge, and WS open/close totals.
+- [x] Added integration coverage for metrics endpoint and WS gauge observation under active socket connection.
+- [x] Validation for `ENT-021` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-021` cycle: backend `96.22%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

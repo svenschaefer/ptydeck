@@ -78,6 +78,7 @@ Backend health:
 ```bash
 curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/ready
+curl -s http://127.0.0.1:18080/metrics | head -n 20
 ```
 
 Session API:
