@@ -1,0 +1,20 @@
+{
+  "name": "ptydeck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo for ptydeck backend and frontend.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "bash -lc 'npm --prefix backend run dev & npm --prefix frontend run dev & wait'",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "test": "npm --prefix backend run test && npm --prefix frontend run test",
+    "test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage"
+  }
+}

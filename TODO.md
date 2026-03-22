@@ -13,8 +13,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Backend Tasks (OpenAPI-based REST)
 
-- [ ] `BE-001` Owner: `BE` Task: Create backend workspace in `backend/` with TypeScript build, lint, and test scripts.
-- [ ] `BE-002` Owner: `BE` Task: Add `backend/openapi/openapi.yaml` with `/api/v1` and schemas (`Session`, `CreateSessionRequest`, `ErrorResponse`).
+- [x] `BE-001` Owner: `BE` Task: Create backend workspace in `backend/` with TypeScript build, lint, and test scripts.
+- [x] `BE-002` Owner: `BE` Task: Add `backend/openapi/openapi.yaml` with `/api/v1` and schemas (`Session`, `CreateSessionRequest`, `ErrorResponse`).
 - [ ] `BE-003` Owner: `BE` Task: Implement `GET /api/v1/sessions` returning all persisted/live sessions.
 - [ ] `BE-004` Owner: `BE` Task: Implement `POST /api/v1/sessions` to create a PTY session and return session metadata.
 - [ ] `BE-005` Owner: `BE` Task: Implement `GET /api/v1/sessions/{sessionId}` with 404 for missing sessions.
@@ -35,7 +35,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Frontend Tasks (Classic Node.js FE stack)
 
-- [ ] `FE-001` Owner: `FE` Task: Create frontend workspace in `frontend/` with TypeScript build, lint, and test scripts.
+- [x] `FE-001` Owner: `FE` Task: Create frontend workspace in `frontend/` with TypeScript build, lint, and test scripts.
 - [ ] `FE-002` Owner: `FE` Task: Integrate `xterm.js` terminal component with one instance per session.
 - [ ] `FE-003` Owner: `FE` Task: Build multi-terminal grid layout with explicit active-session highlight.
 - [ ] `FE-004` Owner: `FE` Task: Build session list/actions UI for create, focus, and close.
@@ -52,15 +52,15 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Integration, Quality, and Delivery Tasks
 
-- [ ] `INT-001` Owner: `PLAT` Task: Create root scripts for parallel BE/FE local dev (`npm run dev`).
-- [ ] `INT-002` Owner: `PLAT` Task: Add root `.nvmrc` and align Node.js engine versions in all package manifests.
-- [ ] `INT-003` Owner: `PLAT` Task: Add CI workflow for lint, build, and test in backend and frontend.
+- [x] `INT-001` Owner: `PLAT` Task: Create root scripts for parallel BE/FE local dev (`npm run dev`).
+- [x] `INT-002` Owner: `PLAT` Task: Add root `.nvmrc` and align Node.js engine versions in all package manifests.
+- [x] `INT-003` Owner: `PLAT` Task: Add CI workflow for lint, build, and test in backend and frontend.
 - [ ] `INT-004` Owner: `QA` Task: Add backend unit tests for session manager and persistence adapter.
 - [ ] `INT-005` Owner: `QA` Task: Add backend integration tests for all REST endpoints in OpenAPI.
 - [ ] `INT-006` Owner: `QA` Task: Add backend WS integration tests for event ordering and reconnect behavior.
 - [ ] `INT-007` Owner: `QA` Task: Add frontend unit/component tests for store and terminal UI behaviors.
 - [ ] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
-- [ ] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
+- [x] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
 - [ ] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
 
 ## Documentation Tasks (Codex Ownership)

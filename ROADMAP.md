@@ -77,11 +77,18 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: none
-- Next milestone in progress: `v0.1.0`
+- Latest completed milestone: `v0.1.0`
+- Next milestone in progress: `v0.2.0`
 - Blockers: none recorded
 
 ### Completed Items in Current Milestone
 
 - `DOC-001` completed on 2026-03-22.
 - `DOC-002` completed on 2026-03-22.
+- `BE-001` completed on 2026-03-22.
+- `BE-002` completed on 2026-03-22.
+- `FE-001` completed on 2026-03-22.
+- `INT-001` completed on 2026-03-22.
+- `INT-002` completed on 2026-03-22.
+- `INT-009` completed on 2026-03-22.
+- `INT-003` completed early on 2026-03-22 (originally planned for `v0.5.0`).

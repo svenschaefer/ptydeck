@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Backend lint
+        run: npm --prefix backend run lint
+      - name: Frontend lint
+        run: npm --prefix frontend run lint
+      - name: Backend test
+        run: npm --prefix backend run test
+      - name: Frontend test
+        run: npm --prefix frontend run test
+      - name: Backend build
+        run: npm --prefix backend run build
+      - name: Frontend build
+        run: npm --prefix frontend run build

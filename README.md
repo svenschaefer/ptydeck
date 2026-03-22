@@ -2,6 +2,26 @@
 
 A lightweight web-based multi-terminal system for managing and interacting with multiple PTY-backed sessions in parallel.
 
+## Repository Status
+
+Current state: foundational bootstrap is in place (`v0.1.0`).
+
+- Monorepo structure with `backend/` and `frontend/`
+- OpenAPI contract scaffold in `backend/openapi/openapi.yaml`
+- Root scripts for local dev, lint, test, and coverage
+- CI workflow for backend/frontend lint, test, and build
+- Environment templates for backend and frontend
+
+## Quick Start
+
+Prerequisite: Node.js `22` (see `.nvmrc`).
+
+```bash
+npm run lint
+npm run test
+npm run test:coverage
+```
+
 ## Overview
 
 `ptydeck` provides a browser UI for running and controlling multiple terminal sessions side by side.

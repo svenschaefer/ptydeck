@@ -1,0 +1,175 @@
+openapi: 3.1.0
+info:
+  title: ptydeck API
+  version: 0.1.0
+  description: OpenAPI contract for ptydeck session lifecycle and terminal control.
+servers:
+  - url: /api/v1
+paths:
+  /sessions:
+    get:
+      operationId: listSessions
+      summary: List sessions
+      responses:
+        '200':
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+    post:
+      operationId: createSession
+      summary: Create session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    get:
+      operationId: getSession
+      summary: Get session
+      responses:
+        '200':
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteSession
+      summary: Delete session
+      responses:
+        '204':
+          description: Session deleted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sessions/{sessionId}/input:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: sendInput
+      summary: Send input bytes to a session PTY.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+      responses:
+        '204':
+          description: Input accepted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sessions/{sessionId}/resize:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: resizeSession
+      summary: Resize session terminal dimensions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cols, rows]
+              properties:
+                cols:
+                  type: integer
+                  minimum: 1
+                rows:
+                  type: integer
+                  minimum: 1
+      responses:
+        '204':
+          description: Resize accepted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Session:
+      type: object
+      required:
+        - id
+        - cwd
+        - shell
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        cwd:
+          type: string
+        shell:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+    CreateSessionRequest:
+      type: object
+      properties:
+        cwd:
+          type: string
+        shell:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

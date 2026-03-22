@@ -11,6 +11,9 @@ Completed and verified topics belong here.
 - [x] `DOC-001` completed: `CODEX_CONTEXT.md` synchronized with current architecture, ownership model, and process rules.
 - [x] `DOC-002` completed: planning docs (`TODO.md`, `ROADMAP.md`, `DONE.md`, `OUTLOOK-TODO.md`) aligned and kept consistent.
 - [x] Git repository initialized in `/home/wsl/workspace/code/ptydeck`.
+- [x] `v0.1.0` baseline delivery completed: `BE-001`, `BE-002`, `FE-001`, `INT-001`, `INT-002`, `INT-009` implemented.
+- [x] CI baseline implemented (`INT-003`) with lint, test, and build jobs for backend and frontend.
+- [x] Local validation completed for current changes: `npm run lint`, `npm run test`, and `npm run test:coverage` all pass.
 
 ## Maintenance Rules
 

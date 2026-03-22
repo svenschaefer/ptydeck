@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (docs sync + git init)
+Last updated: 2026-03-22 (v0.1.0 baseline delivered)
 Owner: `CODX`
 
 ## Project Purpose
@@ -31,6 +31,16 @@ The system separates backend execution concerns from frontend rendering concerns
 - Realtime channel uses WebSocket multiplexed by `sessionId`.
 - Frontend is a classic Node.js stack with `xterm.js`.
 - Session persistence currently targets metadata restoration (`cwd`, shell, timestamps), not running process restoration.
+
+## Implemented Baseline (Current)
+
+- Monorepo structure exists with `backend/` and `frontend/`.
+- Root scripts exist for `dev`, `build`, `lint`, `test`, and `test:coverage`.
+- Node version policy defined in `.nvmrc` and package `engines`.
+- Backend bootstrap includes config loader, minimal HTTP server, and OpenAPI contract at `backend/openapi/openapi.yaml`.
+- Frontend bootstrap includes config loader and minimal development HTTP page.
+- CI workflow exists in `.github/workflows/ci.yml` for backend/frontend lint, test, and build.
+- Environment templates exist in `backend/.env.example` and `frontend/.env.example`.
 
 ## Session Behavior Notes
 

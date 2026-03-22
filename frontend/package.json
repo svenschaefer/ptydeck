@@ -1,0 +1,16 @@
+{
+  "name": "ptydeck-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "node src/dev-server.js",
+    "build": "node --check src/dev-server.js src/config.js",
+    "lint": "node --check src/dev-server.js src/config.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
+  }
+}
