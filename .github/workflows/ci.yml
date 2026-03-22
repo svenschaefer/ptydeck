@@ -8,11 +8,16 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version:
+          - 18
+          - lts/*
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node-version }}
       - name: Backend lint
         run: npm --prefix backend run lint
       - name: Frontend lint

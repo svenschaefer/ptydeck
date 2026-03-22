@@ -71,6 +71,8 @@ Completed and verified topics belong here.
 - [x] `QLT-016` completed: frontend runtime config now supports injected override object (`window.__PTYDECK_CONFIG__`) with explicit precedence rules.
 - [x] Added runtime-config unit tests for fallback host/port behavior, host/port overrides, and explicit URL override precedence.
 - [x] Coverage after `QLT-016`: backend `96.58%` lines, frontend `97.59%` lines.
+- [x] `QLT-017` completed: CI now runs quality workflow on a Node matrix (`18` and `lts/*`) to detect runtime drift earlier.
+- [x] Coverage after `QLT-017` validation cycle: backend `96.72%` lines, frontend `97.59%` lines.
 
 ## Maintenance Rules
 

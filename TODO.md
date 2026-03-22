@@ -86,7 +86,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-014` Owner: `BE` Task: Add runtime tests for readiness state transitions (`starting` -> `ready`) and idempotent graceful shutdown behavior.
 - [x] `QLT-015` Owner: `BE` Task: Add contract conformance test that verifies implemented runtime routes/status codes against `backend/openapi/openapi.yaml`.
 - [x] `QLT-016` Owner: `FE` Task: Add runtime-config override support (API/WS ports/hosts via injected config object) and tests for fallback precedence.
-- [ ] `QLT-017` Owner: `PLAT` Task: Add CI matrix run for Node `18` and latest LTS to detect engine/runtime drift early.
+- [x] `QLT-017` Owner: `PLAT` Task: Add CI matrix run for Node `18` and latest LTS to detect engine/runtime drift early.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
