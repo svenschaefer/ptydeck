@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-022 command routing foundation applied; default ports moved to 18080/18081; context synchronized)
+Last updated: 2026-03-22 (QLT-022 applied; default ports 18080/18081; domain auto-routing fallback updated; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -91,6 +91,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - CI now enforces backend/frontend line-coverage thresholds (`scripts/check-coverage.sh`) before merge on Node `18`.
 - Frontend composer input now routes slash-prefixed commands to control-plane handling via `command-interpreter.js` and forwards non-slash input unchanged to terminal execution.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
+- Frontend runtime config now supports no-parameter domain operation: `ptydeck.*` browser hosts auto-target `api.<current-host>` for REST/WS, while localhost/IP hosts retain `18080` fallback for development.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-036`).

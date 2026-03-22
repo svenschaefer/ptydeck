@@ -2,18 +2,34 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveRuntimeConfig } from "../src/public/runtime-config.js";
 
-test("runtime config falls back to browser host and default ports", () => {
+test("runtime config falls back to localhost dev ports", () => {
   const config = resolveRuntimeConfig({
     location: {
       protocol: "http:",
-      hostname: "example.local",
+      hostname: "127.0.0.1",
       search: ""
     }
   });
 
   assert.deepEqual(config, {
-    apiBaseUrl: "http://example.local:18080/api/v1",
-    wsUrl: "ws://example.local:18080/ws",
+    apiBaseUrl: "http://127.0.0.1:18080/api/v1",
+    wsUrl: "ws://127.0.0.1:18080/ws",
+    debugLogs: false
+  });
+});
+
+test("runtime config derives api host from ptydeck domain without explicit env", () => {
+  const config = resolveRuntimeConfig({
+    location: {
+      protocol: "https:",
+      hostname: "ptydeck.local.secos.rocks",
+      search: ""
+    }
+  });
+
+  assert.deepEqual(config, {
+    apiBaseUrl: "https://api.ptydeck.local.secos.rocks/api/v1",
+    wsUrl: "wss://api.ptydeck.local.secos.rocks/ws",
     debugLogs: false
   });
 });

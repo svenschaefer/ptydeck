@@ -32,7 +32,9 @@ See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, a
 
 ## WSL Local Testing Note
 
-When testing from a Windows browser against services running in WSL, frontend runtime uses the current browser host to reach backend REST and WebSocket endpoints.
+When testing from a Windows browser against services running in WSL, frontend runtime auto-derives backend REST and WebSocket endpoints from the browser host.
+For `ptydeck.*` hosts, frontend uses `api.<current-host>` automatically.
+`API_BASE_URL` and `WS_URL` remain optional explicit overrides.
 
 ## Debug Logging (Troubleshooting)
 

@@ -39,7 +39,11 @@ cp frontend/.env.example frontend/.env
 Set at least:
 
 - Backend: `NODE_ENV`, `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
-- Frontend: `FRONTEND_PORT`, `API_BASE_URL`, `WS_URL`
+- Frontend: `FRONTEND_PORT`
+
+Optional frontend overrides:
+
+- `API_BASE_URL`, `WS_URL` (leave unset to auto-derive from browser host)
 
 Optional for troubleshooting:
 
