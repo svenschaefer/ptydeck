@@ -68,6 +68,9 @@ Completed and verified topics belong here.
 - [x] `QLT-015` completed: added OpenAPI contract conformance test for runtime route/method surface and per-route status code compliance.
 - [x] Contract test validates operation key parity between runtime API routes and `backend/openapi/openapi.yaml`.
 - [x] Coverage after `QLT-015`: backend `96.58%` lines, frontend `97.12%` lines.
+- [x] `QLT-016` completed: frontend runtime config now supports injected override object (`window.__PTYDECK_CONFIG__`) with explicit precedence rules.
+- [x] Added runtime-config unit tests for fallback host/port behavior, host/port overrides, and explicit URL override precedence.
+- [x] Coverage after `QLT-016`: backend `96.58%` lines, frontend `97.59%` lines.
 
 ## Maintenance Rules
 
