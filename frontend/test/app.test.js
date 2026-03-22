@@ -111,12 +111,12 @@ class FakeElement {
 class MockTerminal {
   static instances = [];
 
-  constructor() {
+  constructor(options = {}) {
     this.cols = 120;
     this.rows = 24;
     this.writes = [];
     this.refreshCalls = [];
-    this.options = {};
+    this.options = { ...options };
     MockTerminal.instances.push(this);
   }
 
@@ -218,6 +218,18 @@ function createTerminalCardTemplateNode() {
   const settingsPanel = new FakeElement({ className: "session-settings-panel", tagName: "section" });
   const settingsTitle = new FakeElement({ className: "session-settings-title", tagName: "p" });
   const settingsHint = new FakeElement({ className: "session-settings-hint", tagName: "p" });
+  const startControls = new FakeElement({ className: "session-startup-controls", tagName: "div" });
+  const startCwdLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const startCwd = new FakeElement({ className: "session-start-cwd", tagName: "input" });
+  startCwd.value = "";
+  const startCommandLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const startCommand = new FakeElement({ className: "session-start-command", tagName: "textarea" });
+  startCommand.value = "";
+  const startEnvLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const startEnv = new FakeElement({ className: "session-start-env", tagName: "textarea" });
+  startEnv.value = "";
+  const startSave = new FakeElement({ className: "session-start-save", tagName: "button" });
+  const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
   const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
   const themeLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
   const themeSelect = new FakeElement({ className: "session-theme-select", tagName: "select" });
@@ -238,6 +250,15 @@ function createTerminalCardTemplateNode() {
   settingsActions.appendChild(close);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
+  startControls.appendChild(startCwdLabel);
+  startControls.appendChild(startCwd);
+  startControls.appendChild(startCommandLabel);
+  startControls.appendChild(startCommand);
+  startControls.appendChild(startEnvLabel);
+  startControls.appendChild(startEnv);
+  startControls.appendChild(startSave);
+  startControls.appendChild(startFeedback);
+  settingsPanel.appendChild(startControls);
   themeControls.appendChild(themeLabel);
   themeControls.appendChild(themeSelect);
   themeControls.appendChild(themeBgLabel);
@@ -367,6 +388,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const resizePayloads = [];
   const inputPayloads = [];
   const restartCalls = [];
+  const updateSessionCalls = [];
   const customCommandUpserts = [];
   const customCommandDeletes = [];
   const customCommands = new Map();
@@ -430,6 +452,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     }
     if (path === "/api/v1/sessions" && options.method === "POST") {
       return makeJsonResponse(500, { error: "CreateFailed", message: "boom" });
+    }
+    const patchMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)$/);
+    if (patchMatch && options.method === "PATCH") {
+      const sessionId = decodeURIComponent(patchMatch[1]);
+      const payload = JSON.parse(options.body || "{}");
+      updateSessionCalls.push({ sessionId, payload });
+      return makeJsonResponse(200, {
+        id: sessionId,
+        shell: "bash",
+        cwd: "~",
+        name: payload.name || "one",
+        startCwd: payload.startCwd || "~",
+        startCommand: payload.startCommand || "",
+        env: payload.env || {},
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
     }
     if (path === "/api/v1/sessions/s-1" && options.method === "DELETE") {
       return makeJsonResponse(500, { error: "DeleteFailed", message: "boom" });
@@ -916,6 +955,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondThemeBg = secondSettingsPanel.querySelector(".session-theme-bg");
   const secondThemeFg = secondSettingsPanel.querySelector(".session-theme-fg");
   const secondThemeApply = secondSettingsPanel.querySelector(".session-theme-apply");
+  const secondStartCwd = secondSettingsPanel.querySelector(".session-start-cwd");
+  const secondStartCommand = secondSettingsPanel.querySelector(".session-start-command");
+  const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
+  const secondStartSave = secondSettingsPanel.querySelector(".session-start-save");
+  const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   assert.equal(secondSettingsPanel.classList.contains("open"), false);
   secondSettings.click();
   await tick();
@@ -929,6 +973,29 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
   assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
+  secondStartCwd.value = "/var/tmp";
+  secondStartCommand.value = "echo start";
+  secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
+  secondStartSave.click();
+  await tick();
+  assert.equal(updateSessionCalls.length > 0, true);
+  assert.deepEqual(updateSessionCalls[updateSessionCalls.length - 1], {
+    sessionId: "s-2",
+    payload: {
+      startCwd: "/var/tmp",
+      startCommand: "echo start",
+      env: {
+        APP_MODE: "dev",
+        FEATURE_X: "1"
+      }
+    }
+  });
+  assert.equal(secondStartFeedback.textContent, "Startup settings saved.");
+  secondStartEnv.value = "1INVALID=value";
+  secondStartSave.click();
+  await tick();
+  assert.equal(updateSessionCalls.length, 1);
+  assert.equal(secondStartFeedback.textContent, "Invalid env variable name '1INVALID'.");
   secondSettings.click();
   await tick();
   assert.equal(secondSettingsPanel.classList.contains("open"), false);
@@ -962,9 +1029,29 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
   assert.equal(secondCard.classList.contains("active"), true);
 
+  const persistedThemes = JSON.parse(localStorageData.get("ptydeck.session-theme.v1") || "{}");
+  assert.deepEqual(persistedThemes["s-2"], {
+    preset: "custom",
+    custom: {
+      background: "#101010",
+      foreground: "#e0e0e0"
+    }
+  });
+
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 1);
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.created",
+      session: { id: "s-2", shell: "bash", cwd: "~", name: "two", createdAt: Date.now(), updatedAt: Date.now() }
+    })
+  });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 2);
+  const reopenedSecondTerminal = MockTerminal.instances[2];
+  assert.equal(reopenedSecondTerminal.options.theme.background, "#101010");
+  assert.equal(reopenedSecondTerminal.options.theme.foreground, "#e0e0e0");
 
   ws.emit("message", { data: JSON.stringify({ type: "snapshot", sessions: [], outputs: [] }) });
   await tick();

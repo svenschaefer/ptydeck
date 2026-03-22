@@ -258,6 +258,9 @@ Completed and verified topics belong here.
 - [x] Coverage after `QLT-040`/`QLT-047` cycle: backend `96.97%` lines, frontend `87.50%` lines.
 - [x] `QLT-041` completed: slash-command mode is now strict (`/` must be the first character of the full input); leading whitespace or later-line slashes remain terminal-plane input.
 - [x] Added command-interpreter regression coverage for strict slash boundary semantics (leading-space and later-line slash cases).
+- [x] `QLT-064` completed: added frontend settings-lifecycle regression coverage in `frontend/test/app.test.js`.
+- [x] Settings lifecycle tests now verify icon/panel access, rename/close placement in settings, startup-settings save payload + env validation guardrails, and per-session theme persistence across session close/recreate.
+- [x] Validation for `QLT-064` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
 - [x] `QLT-042` completed: frontend now shows a non-blocking custom-command preview panel for `/<customName>` (payload, resolved target, newline append indicator) before execution.
@@ -334,6 +337,11 @@ Completed and verified topics belong here.
 - [x] Added backend integration coverage for startup-config lifecycle across create/patch/restart and unit coverage for `SessionManager` startup env/spawn behavior.
 - [x] Validation for `QLT-060`/`QLT-061` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-060`/`QLT-061` cycle: backend `96.03%` lines, frontend `89.00%` lines.
+- [x] `QLT-062` completed: per-session startup settings form added to terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save action.
+- [x] Client-side validation added for startup settings form (`startCwd` required, env lines must match `KEY=VALUE`, env key format guardrails, env entry count limit) with in-panel success/error feedback.
+- [x] Added frontend integration coverage validating startup-settings save flow in terminal settings panel (`frontend/test/app.test.js`).
+- [x] Validation for `QLT-062` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-062` cycle: backend `96.03%` lines, frontend `88.79%` lines.
 
 ## Maintenance Rules
 

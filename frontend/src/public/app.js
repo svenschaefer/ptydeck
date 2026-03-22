@@ -52,6 +52,8 @@ const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberati
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const COMMAND_PREVIEW_MAX_CHARS = 4000;
+const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SESSION_ENV_MAX_ENTRIES = 64;
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -682,6 +684,63 @@ function syncSessionThemeControls(entry, sessionId) {
   entry.themeFg.disabled = !customSelected;
 }
 
+function formatSessionEnv(env) {
+  if (!env || typeof env !== "object") {
+    return "";
+  }
+  return Object.entries(env)
+    .filter(([key, value]) => typeof key === "string" && typeof value === "string")
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+}
+
+function parseSessionEnv(rawText) {
+  const lines = String(rawText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length > SESSION_ENV_MAX_ENTRIES) {
+    return {
+      ok: false,
+      error: `Environment variable list exceeds maximum entries (${SESSION_ENV_MAX_ENTRIES}).`
+    };
+  }
+  const env = {};
+  for (const line of lines) {
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) {
+      return { ok: false, error: `Invalid env line '${line}'. Expected KEY=VALUE.` };
+    }
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1);
+    if (!SESSION_ENV_KEY_PATTERN.test(key)) {
+      return { ok: false, error: `Invalid env variable name '${key}'.` };
+    }
+    env[key] = value;
+  }
+  return { ok: true, env };
+}
+
+function setStartupSettingsFeedback(entry, message, isError = false) {
+  if (!entry || !entry.startFeedback) {
+    return;
+  }
+  entry.startFeedback.textContent = message || "";
+  entry.startFeedback.classList.toggle("error", Boolean(isError));
+}
+
+function syncSessionStartupControls(entry, session) {
+  if (!entry || !entry.startCwdInput || !entry.startCommandInput || !entry.startEnvInput) {
+    return;
+  }
+  const startCwd = typeof session.startCwd === "string" && session.startCwd.trim() ? session.startCwd : session.cwd || "";
+  const startCommand = typeof session.startCommand === "string" ? session.startCommand : "";
+  entry.startCwdInput.value = startCwd;
+  entry.startCommandInput.value = startCommand;
+  entry.startEnvInput.value = formatSessionEnv(session.env);
+}
+
 function measureTerminalCellWidthPx() {
   if (!document || typeof document.createElement !== "function") {
     return 10;
@@ -954,6 +1013,7 @@ function render() {
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       entry.settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
+      syncSessionStartupControls(entry, session);
       syncSessionThemeControls(entry, session.id);
       continue;
     }
@@ -965,6 +1025,11 @@ function render() {
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
     const settingsPanel = node.querySelector(".session-settings-panel");
+    const startCwdInput = node.querySelector(".session-start-cwd");
+    const startCommandInput = node.querySelector(".session-start-command");
+    const startEnvInput = node.querySelector(".session-start-env");
+    const startSaveBtn = node.querySelector(".session-start-save");
+    const startFeedback = node.querySelector(".session-start-feedback");
     const themeSelect = node.querySelector(".session-theme-select");
     const themeBg = node.querySelector(".session-theme-bg");
     const themeFg = node.querySelector(".session-theme-fg");
@@ -1009,6 +1074,35 @@ function render() {
         uiState.error = "";
       } catch {
         setError("Failed to delete session.");
+      }
+    });
+    startSaveBtn.addEventListener("click", async () => {
+      const startCwd = String(startCwdInput.value || "").trim();
+      if (!startCwd) {
+        setStartupSettingsFeedback(
+          { startFeedback },
+          "Working Directory cannot be empty.",
+          true
+        );
+        return;
+      }
+      const envResult = parseSessionEnv(startEnvInput.value);
+      if (!envResult.ok) {
+        setStartupSettingsFeedback({ startFeedback }, envResult.error, true);
+        return;
+      }
+
+      try {
+        const updated = await api.updateSession(session.id, {
+          startCwd,
+          startCommand: String(startCommandInput.value || ""),
+          env: envResult.env
+        });
+        upsertSession(updated);
+        setStartupSettingsFeedback({ startFeedback }, "Startup settings saved.");
+        uiState.error = "";
+      } catch {
+        setStartupSettingsFeedback({ startFeedback }, "Failed to save startup settings.", true);
       }
     });
     themeSelect.addEventListener("change", () => {
@@ -1073,11 +1167,16 @@ function render() {
       focusBtn,
       quickIdEl,
       settingsPanel,
+      startCwdInput,
+      startCommandInput,
+      startEnvInput,
+      startFeedback,
       themeSelect,
       themeBg,
       themeFg,
       mount
     });
+    syncSessionStartupControls(terminals.get(session.id), session);
     syncSessionThemeControls(terminals.get(session.id), session.id);
     if (startupPerf.firstTerminalMountedAtMs === null) {
       startupPerf.firstTerminalMountedAtMs = nowMs();

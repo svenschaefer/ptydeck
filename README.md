@@ -74,6 +74,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Per-terminal settings entry on each terminal card (`Settings`) with session-scoped settings panel shell
 - Terminal `Rename` and `Close` actions are available inside each session settings panel (removed from direct toolbar)
+- Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save feedback
 - Per-session terminal color sets in session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` values persisted in browser storage)
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Central command input targeting the active session

@@ -55,6 +55,16 @@
         <section class="session-settings-panel">
           <p class="session-settings-title">Session Settings</p>
           <p class="session-settings-hint">Session-scoped settings controls are available here.</p>
+          <div class="session-startup-controls">
+            <label class="session-startup-label">Working Directory</label>
+            <input class="session-start-cwd" type="text" value="" />
+            <label class="session-startup-label">Start Command Line</label>
+            <textarea class="session-start-command" rows="2"></textarea>
+            <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
+            <textarea class="session-start-env" rows="4"></textarea>
+            <button class="session-start-save" type="button">Save Startup Settings</button>
+            <p class="session-start-feedback"></p>
+          </div>
           <div class="session-theme-controls">
             <label class="session-theme-label" for="">Color Set</label>
             <select class="session-theme-select">
