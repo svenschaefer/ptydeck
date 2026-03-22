@@ -4,10 +4,12 @@ import { loadConfig } from "../src/config.js";
 
 test("loadConfig applies defaults", () => {
   const config = loadConfig({});
+  assert.equal(config.nodeEnv, "development");
   assert.equal(config.port, 8080);
   assert.equal(config.shell, "bash");
   assert.equal(config.dataPath, "./data/sessions.json");
   assert.equal(config.corsOrigin, "*");
+  assert.deepEqual(config.corsAllowedOrigins, ["*"]);
   assert.equal(config.maxBodyBytes, 1024 * 1024);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
@@ -28,7 +30,24 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.shell, "zsh");
   assert.equal(config.dataPath, "/tmp/ptydeck.json");
   assert.equal(config.corsOrigin, "http://localhost:3000");
+  assert.deepEqual(config.corsAllowedOrigins, ["http://localhost:3000"]);
   assert.equal(config.maxBodyBytes, 4096);
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+});
+
+test("loadConfig requires explicit CORS allowlist in production", () => {
+  const config = loadConfig({ NODE_ENV: "production" });
+  assert.equal(config.nodeEnv, "production");
+  assert.equal(config.corsOrigin, "");
+  assert.deepEqual(config.corsAllowedOrigins, []);
+});
+
+test("loadConfig parses comma-separated CORS allowlist", () => {
+  const config = loadConfig({
+    NODE_ENV: "production",
+    CORS_ORIGIN: " https://app.example.com , https://ops.example.com "
+  });
+  assert.deepEqual(config.corsAllowedOrigins, ["https://app.example.com", "https://ops.example.com"]);
+  assert.equal(config.corsOrigin, "https://app.example.com");
 });

@@ -114,8 +114,11 @@ Completed and verified topics belong here.
 - [x] `QLT-011` completed: frontend WebSocket client now emits explicit `error` state and uses bounded exponential reconnect backoff with jitter.
 - [x] Added WebSocket tests for error-state emission and jitter/backoff bounds in `frontend/test/ws-client.test.js`.
 - [x] `QLT-012` completed: CI workflow now runs dependency install and a smoke boot check (`scripts/ci-smoke.sh`) validating backend `/health` + `/ready` and frontend initial HTML response.
+- [x] `QLT-006` completed: backend CORS defaults now split by environment (`development` wildcard fallback, `production` explicit allowlist only).
+- [x] Added backend tests for production CORS config parsing and runtime allowlist behavior (`Origin` echo for allowed origins, no allow header for disallowed origins).
+- [x] Deployment runbook and backend `.env` template updated with secure production CORS guidance (`NODE_ENV=production`, explicit comma-separated `CORS_ORIGIN`).
 - [x] Validation for `QLT-011`/`QLT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `./scripts/ci-smoke.sh`.
-- [x] Coverage after `QLT-011`/`QLT-012` cycle: backend `96.30%` lines, frontend `90.37%` lines.
+- [x] Coverage after `QLT-006`/`QLT-011`/`QLT-012` cycle: backend `96.30%` lines, frontend `90.37%` lines.
 
 ## Maintenance Rules
 

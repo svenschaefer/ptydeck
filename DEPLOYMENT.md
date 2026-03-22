@@ -38,7 +38,7 @@ cp frontend/.env.example frontend/.env
 
 Set at least:
 
-- Backend: `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
+- Backend: `NODE_ENV`, `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
 - Frontend: `FRONTEND_PORT`, `API_BASE_URL`, `WS_URL`
 
 Optional for troubleshooting:
@@ -93,6 +93,16 @@ If local TLS/domain routing is used, route frontend and backend with explicit ho
 - Backend WS host: `wss://api.local.example/ws`
 
 When this mode is enabled, `CORS_ORIGIN` and WebSocket origin checks should use explicit allowlists instead of wildcard values.
+Recommended production setup:
+
+- `NODE_ENV=production`
+- `CORS_ORIGIN=https://app.example.com,https://ops.example.com`
+- Do not use `CORS_ORIGIN=*` in production.
+
+Behavior summary:
+
+- `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
+- `production` without `CORS_ORIGIN`: no cross-origin allow header is emitted (explicit allowlist required).
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
 ## 8. Rollback

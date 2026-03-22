@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-011/QLT-012 ws+ci smoke hardening applied; context synchronized)
+Last updated: 2026-03-22 (QLT-006/QLT-011/QLT-012 hardening applied; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -53,7 +53,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now consumes backend snapshots/events via WebSocket reconnect flow.
 - Frontend now performs per-session debounced resize calls to backend.
 - Frontend resolves backend API/WS endpoints from the browser host at runtime (WSL IP friendly).
-- Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
+- Backend CORS defaults are environment-split: development falls back to wildcard `*`, production requires explicit allowlist values.
 - Local reverse-proxy and local-domain configuration must remain provider-agnostic in repo docs and be stored only in ignored local configuration paths.
 - Frontend API client now enforces explicit non-2xx handling and surfaces backend error payload fields.
 - Frontend WebSocket client behavior now has dedicated unit test coverage for reconnect and close paths.
@@ -90,10 +90,10 @@ The system separates backend execution concerns from frontend rendering concerns
 - CI quality workflow now installs workspace dependencies and runs smoke boot validation (`scripts/ci-smoke.sh`) for backend and frontend startup readiness.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
-- Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-034`).
+- Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-036`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
-  - Planned next in cycle A: `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027`, `QLT-005`, `QLT-006` (control-plane command interpreter/restart support plus remaining CI coverage/CORS hardening tasks).
+  - Planned next in cycle A: `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027`, `QLT-005` (control-plane command interpreter/restart support plus remaining CI coverage hardening tasks).
 
 ## Session Behavior Notes
 

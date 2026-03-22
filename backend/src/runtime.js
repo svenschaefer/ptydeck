@@ -112,6 +112,9 @@ export function createRuntime(config) {
   let isStopped = false;
   let stopPromise = null;
   let persistTimer = null;
+  const corsAllowedOrigins = Array.isArray(config.corsAllowedOrigins)
+    ? config.corsAllowedOrigins.filter((origin) => typeof origin === "string" && origin)
+    : [config.corsOrigin || "*"].filter(Boolean);
 
   function logDebug(event, details = {}) {
     if (!debugLogs) {
@@ -127,13 +130,33 @@ export function createRuntime(config) {
     }
   }
 
-  function writeJson(res, statusCode, body) {
-    res.writeHead(statusCode, {
+  function buildCorsHeaders(req) {
+    const requestOrigin = typeof req.headers.origin === "string" ? req.headers.origin : "";
+    const allowAnyOrigin = corsAllowedOrigins.includes("*");
+    const allowedOrigin = allowAnyOrigin
+      ? "*"
+      : requestOrigin && corsAllowedOrigins.includes(requestOrigin)
+        ? requestOrigin
+        : "";
+
+    const headers = {
       "content-type": "application/json",
-      "access-control-allow-origin": config.corsOrigin,
       "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
       "access-control-allow-headers": "content-type"
-    });
+    };
+
+    if (allowedOrigin) {
+      headers["access-control-allow-origin"] = allowedOrigin;
+    }
+    if (!allowAnyOrigin) {
+      headers.vary = "origin";
+    }
+
+    return headers;
+  }
+
+  function writeJson(req, res, statusCode, body) {
+    res.writeHead(statusCode, buildCorsHeaders(req));
 
     if (body === undefined) {
       res.end();
@@ -199,7 +222,7 @@ export function createRuntime(config) {
       logDebug("http.request.start", { method: methodForLog, pathname: pathnameForLog });
 
       if (req.method === "OPTIONS") {
-        writeJson(res, 204);
+        writeJson(req, res, 204);
         return;
       }
 
@@ -215,19 +238,19 @@ export function createRuntime(config) {
       });
 
       if (match.kind === "health") {
-        writeJson(res, 200, { status: "ok" });
+        writeJson(req, res, 200, { status: "ok" });
         return;
       }
 
       if (match.kind === "ready") {
-        writeJson(res, 200, { status: isReady ? "ready" : "starting" });
+        writeJson(req, res, 200, { status: isReady ? "ready" : "starting" });
         return;
       }
 
       if (match.kind === "listSessions") {
         const payload = manager.list();
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
-        writeJson(res, 200, payload);
+        writeJson(req, res, 200, payload);
         return;
       }
 
@@ -235,21 +258,21 @@ export function createRuntime(config) {
         const payload = manager.create({ cwd: body?.cwd, shell: body?.shell });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
         persistSoon();
-        writeJson(res, 201, payload);
+        writeJson(req, res, 201, payload);
         return;
       }
 
       if (match.kind === "getSession") {
         const payload = manager.get(match.params.sessionId).meta;
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
-        writeJson(res, 200, payload);
+        writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
         persistSoon();
-        writeJson(res, 204);
+        writeJson(req, res, 204);
         return;
       }
 
@@ -257,19 +280,19 @@ export function createRuntime(config) {
         const payload = manager.rename(match.params.sessionId, body.name);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
         persistSoon();
-        writeJson(res, 200, payload);
+        writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "input") {
         manager.sendInput(match.params.sessionId, body.data);
-        writeJson(res, 204);
+        writeJson(req, res, 204);
         return;
       }
 
       if (match.kind === "resize") {
         manager.resize(match.params.sessionId, body.cols, body.rows);
-        writeJson(res, 204);
+        writeJson(req, res, 204);
         return;
       }
 
@@ -277,7 +300,7 @@ export function createRuntime(config) {
     } catch (err) {
       const mapped = toErrorResponse(err);
       validateResponse({ statusCode: mapped.statusCode, body: mapped.body, expect: "error" });
-      writeJson(res, mapped.statusCode, mapped.body);
+      writeJson(req, res, mapped.statusCode, mapped.body);
       logDebug("http.request.error", {
         method: methodForLog,
         pathname: pathnameForLog,

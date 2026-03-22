@@ -75,7 +75,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-003` Owner: `FE` Task: Add UI behavior tests for `frontend/src/public/app.js` critical paths (create/delete session errors, disconnected state rendering, command send failure).
 - [x] `QLT-004` Owner: `BE` Task: Add backend tests for `runtime.js` negative/error routes (invalid JSON body, unknown route, invalid payload schema, unknown session on input/resize/delete).
 - [ ] `QLT-005` Owner: `PLAT` Task: Enforce minimum coverage thresholds in CI for backend and frontend test runs (fail pipeline when below threshold).
-- [ ] `QLT-006` Owner: `PLAT` Task: Split CORS defaults by environment (dev wildcard, explicit production allowlist) and document secure production setup in `DEPLOYMENT.md`.
+- [x] `QLT-006` Owner: `PLAT` Task: Split CORS defaults by environment (dev wildcard, explicit production allowlist) and document secure production setup in `DEPLOYMENT.md`.
 - [x] `QLT-007` Owner: `BE` Task: Add request body size guard in backend runtime (reject oversized JSON payloads with explicit 413 response).
 - [x] `QLT-008` Owner: `BE` Task: Persist and restore `createdAt`/`updatedAt` metadata deterministically instead of resetting timestamps on restart.
 - [x] `QLT-009` Owner: `BE` Task: Make JSON persistence writes atomic (temp file + rename) and add crash-safety tests for partial-write scenarios.

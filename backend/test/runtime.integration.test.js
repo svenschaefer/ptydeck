@@ -12,6 +12,7 @@ async function createStartedRuntime(overrides = {}) {
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
     corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
     ...overrides
   });
@@ -176,6 +177,30 @@ test("OPTIONS advertises PATCH for CORS preflight", async () => {
   }
 });
 
+test("CORS allowlist echoes allowed origin and omits disallowed origin", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    corsOrigin: "https://app.example.com",
+    corsAllowedOrigins: ["https://app.example.com"]
+  });
+  try {
+    const allowedRes = await fetch(`${baseUrl}/sessions`, {
+      headers: { origin: "https://app.example.com" }
+    });
+    assert.equal(allowedRes.status, 200);
+    assert.equal(allowedRes.headers.get("access-control-allow-origin"), "https://app.example.com");
+    assert.equal(allowedRes.headers.get("vary"), "origin");
+
+    const blockedRes = await fetch(`${baseUrl}/sessions`, {
+      headers: { origin: "https://evil.example.com" }
+    });
+    assert.equal(blockedRes.status, 200);
+    assert.equal(blockedRes.headers.get("access-control-allow-origin"), null);
+    assert.equal(blockedRes.headers.get("vary"), "origin");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime restore keeps persisted createdAt and updatedAt timestamps", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
@@ -184,6 +209,7 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     shell: "sh",
     dataPath,
     corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024
   });
 
@@ -233,6 +259,7 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     shell: "sh",
     dataPath,
     corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024
   });
 
@@ -262,6 +289,7 @@ test("ready endpoint returns starting before startup gate and ready after releas
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
     corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
     onBeforeReady: async () => {
       await readyGate;
