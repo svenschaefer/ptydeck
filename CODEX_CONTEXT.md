@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-022 applied; default ports 18080/18081; domain auto-routing fallback updated; context synchronized)
+Last updated: 2026-03-22 (QLT-022 applied; default ports 18080/18081; domain auto-routing fallback updated; markdown sync audit completed; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 

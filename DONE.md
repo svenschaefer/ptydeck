@@ -128,6 +128,7 @@ Completed and verified topics belong here.
 - [x] Coverage after `QLT-022` cycle: backend `96.67%` lines, frontend `90.64%` lines.
 - [x] Default runtime ports switched to low-conflict defaults: backend `18080`, frontend `18081` (including `.env.example`, runtime config defaults, tests, smoke script, and runbook links).
 - [x] Frontend runtime endpoint resolution now works without env parameters for domain routing: for `ptydeck.*` hosts it auto-targets `api.<current-host>` (`https/wss`), while localhost/IP keeps dev-port fallback (`18080`).
+- [x] Repository markdown synchronization pass completed: `TODO.md`/`ROADMAP.md` separation reconfirmed, open-task ownership model validated, and environment-specific domain references kept out of tracked docs/tests.
 
 ## Maintenance Rules
 
