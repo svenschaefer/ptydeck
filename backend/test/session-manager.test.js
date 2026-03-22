@@ -133,3 +133,30 @@ test("SessionManager can rename sessions", () => {
   const updated = manager.rename(created.id, "ops-shell");
   assert.equal(updated.name, "ops-shell");
 });
+
+test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
+  const originalPromptCommand = process.env.PROMPT_COMMAND;
+  const fakePty = createFakePty();
+  let capturedEnv = null;
+  const manager = new SessionManager({
+    createPty: ({ env }) => {
+      capturedEnv = env;
+      return fakePty;
+    }
+  });
+
+  try {
+    process.env.PROMPT_COMMAND = "echo existing";
+    manager.create({ shell: "bash" });
+    assert.ok(capturedEnv);
+    assert.ok(typeof capturedEnv.PROMPT_COMMAND === "string");
+    assert.ok(capturedEnv.PROMPT_COMMAND.includes('printf "__CWD__%s__\\n" "$PWD"'));
+    assert.ok(capturedEnv.PROMPT_COMMAND.includes("echo existing"));
+  } finally {
+    if (originalPromptCommand === undefined) {
+      delete process.env.PROMPT_COMMAND;
+    } else {
+      process.env.PROMPT_COMMAND = originalPromptCommand;
+    }
+  }
+});

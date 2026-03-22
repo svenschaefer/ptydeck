@@ -2,10 +2,25 @@ import { randomUUID } from "node:crypto";
 import pty from "node-pty";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
+import { basename } from "node:path";
 import { ApiError } from "./errors.js";
 
 function now() {
   return Date.now();
+}
+
+function withCwdMarkerPromptCommand(shell, env) {
+  const shellName = basename(shell || "").toLowerCase();
+  if (!shellName.includes("bash")) {
+    return env;
+  }
+
+  const markerCommand = 'printf "__CWD__%s__\\n" "$PWD"';
+  const existing = typeof env.PROMPT_COMMAND === "string" ? env.PROMPT_COMMAND.trim() : "";
+  return {
+    ...env,
+    PROMPT_COMMAND: existing ? `${markerCommand};${existing}` : markerCommand
+  };
 }
 
 export class SessionManager {
@@ -15,13 +30,13 @@ export class SessionManager {
     this.events = new EventEmitter();
     this.createPty =
       createPty ||
-      (({ shell, cwd, cols, rows }) =>
+      (({ shell, cwd, cols, rows, env }) =>
         pty.spawn(shell, [], {
           name: "xterm-color",
           cwd,
           cols,
           rows,
-          env: process.env
+          env: env || process.env
         }));
   }
 
@@ -48,7 +63,8 @@ export class SessionManager {
     const createdTimestamp = Number.isInteger(createdAt) ? createdAt : now();
     const updatedTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
 
-    const ptyProcess = this.createPty({ shell, cwd, cols: 80, rows: 24 });
+    const ptyEnv = withCwdMarkerPromptCommand(shell, process.env);
+    const ptyProcess = this.createPty({ shell, cwd, cols: 80, rows: 24, env: ptyEnv });
 
     const session = {
       id,
