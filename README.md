@@ -67,7 +67,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Central command input targeting the active session
-- Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help`
+- Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/help`
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
 - Full PTY support (interactive applications like `vim`, `nano`, `top`)
 - Session persistence (restores working directory after restart)

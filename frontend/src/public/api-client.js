@@ -104,6 +104,14 @@ export function createApiClient(baseUrl, options = {}) {
     },
     async resizeSession(sessionId, cols, rows) {
       await request(`/sessions/${sessionId}/resize`, withJson({ cols, rows }), { expectJson: false });
+    },
+    /** @returns {Promise<Session>} */
+    async restartSession(sessionId) {
+      return request(`/sessions/${sessionId}/restart`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
     }
   };
 }

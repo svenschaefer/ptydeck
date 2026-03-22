@@ -90,3 +90,23 @@ test("api client calls update session endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc");
   assert.equal(calls[0].options.method, "PATCH");
 });
+
+test("api client calls restart session endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "abc", cwd: "/tmp", shell: "bash", name: "renamed", createdAt: 1, updatedAt: 3 })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.restartSession("abc");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/restart");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.headers["content-type"], "application/json");
+});

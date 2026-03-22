@@ -526,7 +526,7 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /help";
+    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /restart [id], /help";
   }
 
   if (command === "list") {
@@ -613,6 +613,27 @@ async function executeControlCommand(interpreted) {
     const updated = await api.updateSession(activeSessionId, { name });
     upsertSession(updated);
     return `Renamed active session to ${updated.name}.`;
+  }
+
+  if (command === "restart") {
+    if (sessions.length === 0) {
+      return "No sessions available.";
+    }
+    let targetSessionId = activeSessionId;
+    if (args.length > 0) {
+      const resolved = resolveSessionToken(args[0], sessions);
+      if (!resolved.session) {
+        return resolved.error;
+      }
+      targetSessionId = resolved.session.id;
+    }
+    if (!targetSessionId) {
+      return "No active session to restart.";
+    }
+    const restarted = await api.restartSession(targetSessionId);
+    upsertSession(restarted);
+    store.setActiveSession(restarted.id);
+    return `Restarted session [${formatSessionToken(restarted.id)}] ${formatSessionDisplayName(restarted)}.`;
   }
 
   return `Unknown command: /${command}`;

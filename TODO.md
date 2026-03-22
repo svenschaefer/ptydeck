@@ -98,7 +98,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-023` Owner: `FE` Task: Implement control commands `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help` in the frontend command interpreter.
 - [x] `QLT-024` Owner: `FE` Task: Add explicit command execution feedback area (success/error/help output) separated from PTY output stream.
 - [x] `QLT-025` Owner: `BE` Task: Add session restart endpoint (`POST /api/v1/sessions/{sessionId}/restart`) to support `/restart` command semantics without restarting backend process.
-- [ ] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).
+- [x] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).
 - [ ] `QLT-027` Owner: `FE` Task: Add frontend performance guardrails for session bootstrap and event handling (avoid redundant session list roundtrips, measure render latency for multi-session startup, and add regression test coverage for slow-load scenarios).
 - [x] `QLT-028` Owner: `FE` Task: Stabilize terminal startup sizing with deferred resize passes and prevent repeated deferred scheduling on unrelated rerenders.
 - [x] `QLT-029` Owner: `BE` Task: Strip CWD control markers from terminal output stream (including split marker chunks) while preserving CWD metadata updates.

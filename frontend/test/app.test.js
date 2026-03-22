@@ -311,6 +311,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const localStorageData = new Map();
   const resizePayloads = [];
   const inputPayloads = [];
+  const restartCalls = [];
   const win = {
     document: fixture.document,
     location: {
@@ -371,6 +372,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       inputPayloads.push(JSON.parse(options.body || "{}"));
       return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
     }
+    if (path === "/api/v1/sessions/s-1/restart" && options.method === "POST") {
+      restartCalls.push("s-1");
+      return makeJsonResponse(200, {
+        id: "s-1",
+        shell: "bash",
+        cwd: "~",
+        name: "one",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
     if (path.endsWith("/resize")) {
       resizePayloads.push(JSON.parse(options.body || "{}"));
       return makeJsonResponse(204, {});
@@ -408,6 +420,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
   assert.equal(inputPayloads.length, 1);
+  assert.equal(inputPayloads[0].data, "pwd\n");
+
+  fixture.elements.commandInput.value = "/noop";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /noop");
+  assert.equal(inputPayloads.length, 1);
 
   fixture.elements.commandInput.value = "/list";
   fixture.elements.sendCommand.click();
@@ -420,11 +439,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[id\]/);
 
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /Active session:/);
+
+  fixture.elements.commandInput.value = "/restart 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(restartCalls.length, 1);
+  assert.match(fixture.elements.commandFeedback.textContent, /^Restarted session \[1\]/);
 
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";

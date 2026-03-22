@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (QLT-025 restart endpoint applied; command-plane and backend restart baseline advanced; context synchronized)
+Last updated: 2026-03-22 (QLT-026 command-plane integration coverage completed; frontend `/restart` command wired to backend restart endpoint; context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -91,8 +91,10 @@ The system separates backend execution concerns from frontend rendering concerns
 - CI now enforces backend/frontend line-coverage thresholds (`scripts/check-coverage.sh`) before merge on Node `18`.
 - Frontend composer input now routes slash-prefixed commands to control-plane handling via `command-interpreter.js` and forwards non-slash input unchanged to terminal execution.
 - Frontend command plane now executes `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, and `/help`, with session token resolution via full ID, quick ID, name, or unique ID prefix.
+- Frontend command plane now executes `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, and `/help`, with session token resolution via full ID, quick ID, name, or unique ID prefix.
 - Frontend now renders command-plane results in a dedicated feedback panel (`command-feedback`) separated from loading/connection/error status and PTY terminal output stream.
 - Backend now provides `POST /api/v1/sessions/{sessionId}/restart` to restart PTY processes without changing session identity, with OpenAPI/validation/contract-test coverage.
+- Frontend integration coverage now validates command-plane slash behavior end-to-end in app runtime (`unknown command`, non-slash pass-through to terminal input, `/restart` side-effect path).
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
 - Frontend runtime config now supports no-parameter domain operation: `ptydeck.*` browser hosts auto-target `api.<current-host>` for REST/WS, while localhost/IP hosts retain `18080` fallback for development.
 - `v0.3.0` status: completed.
@@ -100,7 +102,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-036`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
-  - Planned next in cycle A: `QLT-026`, `QLT-027` (command-plane integration verification and performance guardrail completion).
+  - Planned next in cycle A: `QLT-027` (performance guardrail completion for startup and slow-load resilience).
 
 ## Session Behavior Notes
 

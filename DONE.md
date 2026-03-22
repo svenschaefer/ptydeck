@@ -143,6 +143,11 @@ Completed and verified topics belong here.
 - [x] Added backend tests for restart lifecycle behavior in REST integration and `SessionManager` unit tests.
 - [x] Validation for `QLT-025` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-025` cycle: backend `96.71%` lines, frontend `87.31%` lines.
+- [x] `QLT-026` completed: added command-plane integration coverage in frontend app runtime tests for slash parsing and side effects.
+- [x] Command-plane integration test now verifies unknown-command handling and non-slash pass-through to terminal input without command-plane mutation.
+- [x] Frontend command set updated to include `/restart [id]` and wired to backend restart endpoint via API client (`POST /sessions/{sessionId}/restart`).
+- [x] Validation for `QLT-026` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-026` cycle: backend `96.71%` lines, frontend `88.11%` lines.
 
 ## Maintenance Rules
 
