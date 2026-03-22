@@ -67,3 +67,12 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 - [x] `DOC-001` Owner: `CODY` Task: Keep `CODEX_CONTEXT.md` synchronized with architecture, conventions, and decision history.
 - [x] `DOC-002` Owner: `CODY` Task: Keep `TODO.md`, `ROADMAP.md`, `DONE.md`, and `OUTLOOK-TODO.md` consistent after each planning change.
+
+## Quality and Coverage Hardening (v0.3.0 continuation)
+
+- [ ] `QLT-001` Owner: `FE` Task: Handle non-2xx REST responses explicitly in `frontend/src/public/api-client.js` (check `response.ok`, parse and surface backend `ErrorResponse`).
+- [ ] `QLT-002` Owner: `FE` Task: Add unit tests for `frontend/src/public/ws-client.js` covering reconnect transitions and close behavior.
+- [ ] `QLT-003` Owner: `FE` Task: Add UI behavior tests for `frontend/src/public/app.js` critical paths (create/delete session errors, disconnected state rendering, command send failure).
+- [ ] `QLT-004` Owner: `BE` Task: Add backend tests for `runtime.js` negative/error routes (invalid JSON body, unknown route, invalid payload schema, unknown session on input/resize/delete).
+- [ ] `QLT-005` Owner: `PLAT` Task: Enforce minimum coverage thresholds in CI for backend and frontend test runs (fail pipeline when below threshold).
+- [ ] `QLT-006` Owner: `PLAT` Task: Split CORS defaults by environment (dev wildcard, explicit production allowlist) and document secure production setup in `DEPLOYMENT.md`.

@@ -53,10 +53,27 @@ Exit criteria:
 - Unit, integration, and E2E coverage exists for critical paths.
 - Repeatable deployment runbook and smoke checks are documented.
 
+### v0.3.0-H1 - Quality Hardening Backlog
+
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`
+
+Dependencies:
+
+- `QLT-003` depends on `QLT-001` and `QLT-002`.
+- `QLT-005` depends on test additions from `QLT-002`, `QLT-003`, and `QLT-004`.
+- `QLT-006` should be completed before production deployment updates.
+
+Exit criteria:
+
+- Frontend error-path behavior is covered by tests.
+- Backend negative-path behavior is covered by tests.
+- CI enforces coverage minimums.
+- Deployment docs include secure production CORS guidance.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0`
-- Next milestone in progress: none
+- Next milestone in progress: `v0.3.0-H1`
 - Blockers: none recorded
 
 ### Completed Items
