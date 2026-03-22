@@ -5,7 +5,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Ownership and Release Control
 
-- Roadmap owner: `CODX`
+- Roadmap owner: `CODY`
 - Release execution owners: `BE`, `FE`, `PLAT`, `QA`
 - Versioning scheme: compressed pre-1.0 milestones up to `v0.3.0`
 

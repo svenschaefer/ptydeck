@@ -1,7 +1,7 @@
 # CODEX_CONTEXT - ptydeck
 
 Last updated: 2026-03-22 (compressed roadmap aligned to v0.3.0 max)
-Owner: `CODX`
+Owner: `CODY`
 
 ## Project Purpose
 
@@ -18,7 +18,7 @@ The system separates backend execution concerns from frontend rendering concerns
 
 ## Ownership Model
 
-- `CODX`: Documentation consistency, roadmap governance, context persistence
+- `CODY`: Documentation consistency, roadmap governance, context persistence
 - `BE`: Backend implementation owner
 - `FE`: Frontend implementation owner
 - `PLAT`: CI/CD, runtime, and operational owner

@@ -5,7 +5,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Ownership Model
 
-- `CODX`: Codex documentation and delivery owner
+- `CODY`: Codex documentation and delivery owner
 - `BE`: Backend implementation owner
 - `FE`: Frontend implementation owner
 - `PLAT`: Tooling, CI/CD, and runtime owner
@@ -65,5 +65,5 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Documentation Tasks (Codex Ownership)
 
-- [x] `DOC-001` Owner: `CODX` Task: Keep `CODEX_CONTEXT.md` synchronized with architecture, conventions, and decision history.
-- [x] `DOC-002` Owner: `CODX` Task: Keep `TODO.md`, `ROADMAP.md`, `DONE.md`, and `OUTLOOK-TODO.md` consistent after each planning change.
+- [x] `DOC-001` Owner: `CODY` Task: Keep `CODEX_CONTEXT.md` synchronized with architecture, conventions, and decision history.
+- [x] `DOC-002` Owner: `CODY` Task: Keep `TODO.md`, `ROADMAP.md`, `DONE.md`, and `OUTLOOK-TODO.md` consistent after each planning change.
