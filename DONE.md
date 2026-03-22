@@ -39,6 +39,12 @@ Completed and verified topics belong here.
 - [x] `v0.3.0` production baseline completed with deployment runbook (`INT-010`).
 - [x] Dev hotfix: frontend now resolves API/WS target from browser host to support WSL-IP access from Windows browsers.
 - [x] Dev hotfix: backend default CORS origin set to `*` to avoid local cross-origin blocks in WSL dev scenarios.
+- [x] Documentation governance updated: Codex ownership role standardized as `CODY`, with `SAS` recorded as final decision authority.
+- [x] `AGENTS.md` created and integrated as collaboration/governance reference.
+- [x] Version-plan labels compressed and aligned to pre-`v1.0.0` scope up to `v0.3.0`.
+- [x] Enterprise readiness backlog extended with concrete tasks `ENT-017` ... `ENT-024` and linked roadmap dependencies.
+- [x] Repository docs normalized to provider-agnostic local reverse-proxy guidance; instance-specific local-domain references removed.
+- [x] Local configuration policy enforced via gitignored `local-config/` path for non-generic setup artifacts.
 
 ## Maintenance Rules
 

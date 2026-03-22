@@ -2,6 +2,7 @@
 
 Last updated: 2026-03-22 (enterprise backlog expanded, local config policy clarified)
 Owner: `CODY`
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
 ## Project Purpose
 
