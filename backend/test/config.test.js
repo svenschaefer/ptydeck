@@ -37,10 +37,10 @@ test("loadConfig maps environment values", () => {
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
-  const config = loadConfig({ NODE_ENV: "production" });
-  assert.equal(config.nodeEnv, "production");
-  assert.equal(config.corsOrigin, "");
-  assert.deepEqual(config.corsAllowedOrigins, []);
+  assert.throws(
+    () => loadConfig({ NODE_ENV: "production" }),
+    /CORS_ORIGIN must be set in production\./
+  );
 });
 
 test("loadConfig parses comma-separated CORS allowlist", () => {
@@ -50,4 +50,20 @@ test("loadConfig parses comma-separated CORS allowlist", () => {
   });
   assert.deepEqual(config.corsAllowedOrigins, ["https://app.example.com", "https://ops.example.com"]);
   assert.equal(config.corsOrigin, "https://app.example.com");
+});
+
+test("loadConfig rejects invalid critical numeric values", () => {
+  assert.throws(() => loadConfig({ PORT: "0" }), /PORT must be an integer between 1 and 65535\./);
+  assert.throws(() => loadConfig({ MAX_BODY_BYTES: "0" }), /MAX_BODY_BYTES must be a positive integer\./);
+});
+
+test("loadConfig rejects invalid CORS origin values", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        NODE_ENV: "production",
+        CORS_ORIGIN: "ftp://example.com"
+      }),
+    /CORS_ORIGIN contains invalid origin/
+  );
 });

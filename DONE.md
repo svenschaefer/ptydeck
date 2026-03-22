@@ -154,6 +154,12 @@ Completed and verified topics belong here.
 - [x] Added slow-load regression coverage in frontend app integration test (delayed initial session load keeps loading state deterministic and list bootstrap remains single-request).
 - [x] Validation for `QLT-027` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-027` cycle: backend `96.92%` lines, frontend `88.28%` lines.
+- [x] `ENT-023` completed: startup configuration schema validation now fails fast on invalid critical env values for backend and frontend config loaders.
+- [x] Backend config validation now enforces valid `PORT`, positive `MAX_BODY_BYTES`, non-empty `SHELL`/`DATA_PATH`, valid `CORS_ORIGIN` values, and required production CORS origin.
+- [x] Frontend config validation now enforces valid `FRONTEND_PORT`, `API_BASE_URL` (`http/https`), and `WS_URL` (`ws/wss`) when overrides are set.
+- [x] Added backend/frontend config tests for invalid env input rejection paths and updated `.env.example` comments for required constraints.
+- [x] Validation for `ENT-023` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-023` cycle: backend `96.81%` lines, frontend `88.47%` lines.
 
 ## Maintenance Rules
 

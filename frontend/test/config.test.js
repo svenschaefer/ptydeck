@@ -23,3 +23,15 @@ test("loadClientConfig maps environment values", () => {
   assert.equal(config.wsUrl, "ws://localhost:9000/ws");
   assert.equal(config.debugLogs, true);
 });
+
+test("loadClientConfig rejects invalid critical values", () => {
+  assert.throws(() => loadClientConfig({ FRONTEND_PORT: "0" }), /FRONTEND_PORT must be an integer between 1 and 65535\./);
+  assert.throws(
+    () => loadClientConfig({ API_BASE_URL: "ftp://example.com/api/v1" }),
+    /API_BASE_URL must be a valid URL with protocol http: or https:\./
+  );
+  assert.throws(
+    () => loadClientConfig({ WS_URL: "http://example.com/ws" }),
+    /WS_URL must be a valid URL with protocol ws: or wss:\./
+  );
+});
