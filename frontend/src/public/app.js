@@ -803,6 +803,21 @@ function render() {
   }
 }
 
+function appendTerminalData(sessionId, data) {
+  const entry = terminals.get(sessionId);
+  if (!entry || typeof data !== "string" || data.length === 0) {
+    return false;
+  }
+  const terminal = entry.terminal;
+  terminal.write(data, () => {
+    if (typeof terminal.refresh === "function") {
+      const lastRow = Math.max(0, terminal.rows - 1);
+      terminal.refresh(0, lastRow);
+    }
+  });
+  return true;
+}
+
 function replaySnapshotOutputs(outputs, attempt = 0) {
   if (!Array.isArray(outputs) || outputs.length === 0) {
     return;
@@ -813,12 +828,11 @@ function replaySnapshotOutputs(outputs, attempt = 0) {
     if (!entry || typeof entry.sessionId !== "string" || typeof entry.data !== "string" || entry.data.length === 0) {
       continue;
     }
-    const terminalEntry = terminals.get(entry.sessionId);
-    if (!terminalEntry) {
+    if (!terminals.has(entry.sessionId)) {
       missing += 1;
       continue;
     }
-    terminalEntry.terminal.write(entry.data);
+    appendTerminalData(entry.sessionId, entry.data);
   }
 
   if (missing > 0 && attempt < 4) {
@@ -1251,7 +1265,7 @@ function startWs() {
       }
 
       if (event.type === "session.data" && terminals.has(event.sessionId)) {
-        terminals.get(event.sessionId).terminal.write(event.data);
+        appendTerminalData(event.sessionId, event.data);
         return;
       }
 

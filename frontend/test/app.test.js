@@ -109,9 +109,14 @@ class FakeElement {
 }
 
 class MockTerminal {
+  static instances = [];
+
   constructor() {
     this.cols = 120;
     this.rows = 24;
+    this.writes = [];
+    this.refreshCalls = [];
+    MockTerminal.instances.push(this);
   }
 
   loadAddon(addon) {
@@ -127,7 +132,16 @@ class MockTerminal {
     this.dataHandler = handler;
   }
 
-  write() {}
+  write(data, callback) {
+    this.writes.push(data);
+    if (typeof callback === "function") {
+      callback();
+    }
+  }
+
+  refresh(start, end) {
+    this.refreshCalls.push({ start, end });
+  }
 
   resize(cols, rows) {
     this.cols = cols;
@@ -309,6 +323,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   const fixture = createDocumentFixture();
   MockWebSocket.instances = [];
+  MockTerminal.instances = [];
 
   const listeners = new Map();
   const localStorageData = new Map();
@@ -826,6 +841,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(firstCard.classList.contains("active"), false);
   assert.equal(secondCard.classList.contains("active"), true);
+
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-1", data: "\u001b[2J\u001b[H" })
+  });
+  await tick();
+  assert.ok(MockTerminal.instances[0].writes.includes("\u001b[2J\u001b[H"));
+  assert.ok(MockTerminal.instances[0].refreshCalls.length > 0);
 
   const routedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@1 echo routed";

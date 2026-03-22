@@ -138,6 +138,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now supports slash-repeat shortcut for recalled commands (`Ctrl/Cmd+Enter`) with guardrail feedback when recalled content was modified.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
+- Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
 - Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-064`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), and per-session color sets.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.

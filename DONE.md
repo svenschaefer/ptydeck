@@ -294,6 +294,10 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for escaped delimiter success path and unescaped delimiter error guidance.
 - [x] Validation for `QLT-054` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-054` cycle: backend `96.97%` lines, frontend `88.85%` lines.
+- [x] Frontend terminal repaint bugfix: WS `session.data` writes now use a centralized append path with explicit post-write terminal refresh to avoid delayed visual updates on non-focused terminals (for example after `@<target> clear`).
+- [x] Added regression coverage ensuring non-active session output still triggers terminal write+refresh immediately.
+- [x] Validation for repaint bugfix passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after repaint bugfix: backend `96.70%` lines, frontend `89.02%` lines.
 
 ## Maintenance Rules
 
