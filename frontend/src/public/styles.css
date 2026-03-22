@@ -154,8 +154,9 @@ button:hover {
 }
 
 .terminal-mount {
-  height: 345px;
-  padding: 6px;
+  height: 172px;
+  padding: 0;
+  background: #0a0d12;
   overflow: hidden;
 }
 
@@ -173,7 +174,7 @@ button:hover {
   }
 
   .terminal-mount {
-    height: 280px;
+    height: 140px;
   }
 
   .command-row {
