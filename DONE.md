@@ -207,6 +207,11 @@ Completed and verified topics belong here.
 - [x] Added tests for encryption provider validation plus persistence encrypt/decrypt/rotate paths.
 - [x] Validation for `ENT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-012` cycle: backend `96.46%` lines, frontend `88.36%` lines.
+- [x] `ENT-011` completed: backend now enforces TLS-only ingress mode with trusted-proxy-aware protocol checks for REST and WebSocket upgrade paths.
+- [x] Startup validation now blocks insecure production ingress settings (`CORS_ORIGIN=*` in production, non-HTTPS origins with `ENFORCE_TLS_INGRESS=1`, and missing trusted-proxy config when TLS enforcement is enabled).
+- [x] Added automated certificate expiry check baseline (`scripts/check-cert-expiry.sh`) and CI integration using repository variables (`TLS_EXPIRY_CHECK_HOSTS`, `TLS_EXPIRY_THRESHOLD_DAYS`).
+- [x] Validation for `ENT-011` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and `npm run tls:check`.
+- [x] Coverage after `ENT-011` cycle: backend `96.68%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

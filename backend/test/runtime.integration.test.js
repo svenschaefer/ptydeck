@@ -333,6 +333,44 @@ test("HTTP responses include hardened security headers", async () => {
   }
 });
 
+test("TLS ingress enforcement rejects non-HTTPS requests", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    enforceTlsIngress: true,
+    trustedProxy: { mode: "all", ips: [] },
+    corsOrigin: "https://app.example.com",
+    corsAllowedOrigins: ["https://app.example.com"]
+  });
+  try {
+    const res = await fetch(`${baseUrl}/sessions`);
+    assert.equal(res.status, 426);
+    const body = await res.json();
+    assert.equal(body.error, "TlsRequired");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("TLS ingress enforcement accepts trusted forwarded HTTPS requests", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    enforceTlsIngress: true,
+    trustedProxy: { mode: "all", ips: [] },
+    corsOrigin: "https://app.example.com",
+    corsAllowedOrigins: ["https://app.example.com"]
+  });
+  try {
+    const res = await fetch(`${baseUrl}/sessions`, {
+      headers: {
+        origin: "https://app.example.com",
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "api.example.com"
+      }
+    });
+    assert.equal(res.status, 200);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("auth dev mode issues token and protects session routes", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
     authEnabled: true,

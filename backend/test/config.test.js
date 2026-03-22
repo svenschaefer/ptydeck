@@ -20,6 +20,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.equal(config.enforceTlsIngress, false);
   assert.equal(config.dataEncryptionProvider, null);
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
   assert.equal(config.authEnabled, false);
@@ -35,7 +36,7 @@ test("loadConfig maps environment values", () => {
     PORT: "9090",
     SHELL: "zsh",
     DATA_PATH: "/tmp/ptydeck.json",
-    CORS_ORIGIN: "http://localhost:3000",
+    CORS_ORIGIN: "https://localhost:3000",
     MAX_BODY_BYTES: "4096",
     RATE_LIMIT_WINDOW_MS: "30000",
     RATE_LIMIT_REST_CREATE_MAX: "10",
@@ -54,14 +55,15 @@ test("loadConfig maps environment values", () => {
     AUTH_DEV_SECRET: "custom-secret",
     AUTH_ISSUER: "issuer-a",
     AUTH_AUDIENCE: "aud-a",
-    AUTH_DEV_TOKEN_TTL_SECONDS: "1200"
+    AUTH_DEV_TOKEN_TTL_SECONDS: "1200",
+    ENFORCE_TLS_INGRESS: "true"
   });
 
   assert.equal(config.port, 9090);
   assert.equal(config.shell, "zsh");
   assert.equal(config.dataPath, "/tmp/ptydeck.json");
-  assert.equal(config.corsOrigin, "http://localhost:3000");
-  assert.deepEqual(config.corsAllowedOrigins, ["http://localhost:3000"]);
+  assert.equal(config.corsOrigin, "https://localhost:3000");
+  assert.deepEqual(config.corsAllowedOrigins, ["https://localhost:3000"]);
   assert.equal(config.maxBodyBytes, 4096);
   assert.equal(config.rateLimitWindowMs, 30000);
   assert.equal(config.rateLimitRestCreateMax, 10);
@@ -73,6 +75,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.dataEncryptionProvider?.getActiveKey().id, "key-a");
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+  assert.equal(config.enforceTlsIngress, true);
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
   assert.equal(config.authEnabled, true);
   assert.equal(config.authDevMode, true);
@@ -92,10 +95,20 @@ test("loadConfig requires explicit CORS allowlist in production", () => {
 test("loadConfig parses comma-separated CORS allowlist", () => {
   const config = loadConfig({
     NODE_ENV: "production",
-    CORS_ORIGIN: " https://app.example.com , https://ops.example.com "
+    CORS_ORIGIN: " https://app.example.com , https://ops.example.com ",
+    TRUST_PROXY: "loopback"
   });
   assert.deepEqual(config.corsAllowedOrigins, ["https://app.example.com", "https://ops.example.com"]);
   assert.equal(config.corsOrigin, "https://app.example.com");
+});
+
+test("loadConfig enables TLS ingress enforcement by default in production", () => {
+  const config = loadConfig({
+    NODE_ENV: "production",
+    CORS_ORIGIN: "https://app.example.com",
+    TRUST_PROXY: "loopback"
+  });
+  assert.equal(config.enforceTlsIngress, true);
 });
 
 test("loadConfig rejects invalid critical numeric values", () => {
@@ -136,6 +149,36 @@ test("loadConfig rejects invalid CORS origin values", () => {
         CORS_ORIGIN: "ftp://example.com"
       }),
     /CORS_ORIGIN contains invalid origin/
+  );
+});
+
+test("loadConfig rejects insecure production CORS wildcard and TLS ingress mismatches", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        NODE_ENV: "production",
+        CORS_ORIGIN: "*",
+        TRUST_PROXY: "loopback"
+      }),
+    /CORS_ORIGIN wildcard is not allowed in production/
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        ENFORCE_TLS_INGRESS: "true",
+        CORS_ORIGIN: "http://app.example.com",
+        TRUST_PROXY: "loopback"
+      }),
+    /ENFORCE_TLS_INGRESS requires HTTPS CORS_ORIGIN values/
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        ENFORCE_TLS_INGRESS: "true",
+        CORS_ORIGIN: "https://app.example.com",
+        TRUST_PROXY: "off"
+      }),
+    /ENFORCE_TLS_INGRESS requires TRUST_PROXY to be configured/
   );
 });
 

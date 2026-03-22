@@ -44,6 +44,7 @@ function parseBoolean(rawValue) {
 
 export function loadConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
+  const enforceTlsIngress = parseBoolean(env.ENFORCE_TLS_INGRESS ?? (nodeEnv === "production" ? "1" : "0"));
   const rawCorsOrigins = String(env.CORS_ORIGIN || "").trim();
   const parsedCorsOrigins = rawCorsOrigins
     .split(",")
@@ -54,6 +55,9 @@ export function loadConfig(env = process.env) {
   if (nodeEnv === "production" && corsAllowedOriginsRaw.length === 0) {
     throw new Error("CORS_ORIGIN must be set in production.");
   }
+  if (nodeEnv === "production" && corsAllowedOriginsRaw.includes("*")) {
+    throw new Error("CORS_ORIGIN wildcard is not allowed in production.");
+  }
   const corsAllowedOrigins = corsAllowedOriginsRaw.map((origin) =>
     origin === "*" ? origin : parseOrigin(origin, "CORS_ORIGIN")
   );
@@ -63,6 +67,23 @@ export function loadConfig(env = process.env) {
     env.DATA_ENCRYPTION_ACTIVE_KEY_ID
   );
   const trustedProxy = parseTrustedProxy(env.TRUST_PROXY);
+  if (enforceTlsIngress && corsAllowedOrigins.includes("*")) {
+    throw new Error("ENFORCE_TLS_INGRESS requires explicit CORS_ORIGIN values without wildcard.");
+  }
+  if (enforceTlsIngress) {
+    for (const origin of corsAllowedOrigins) {
+      if (origin === "*") {
+        continue;
+      }
+      const parsedOrigin = new URL(origin);
+      if (parsedOrigin.protocol !== "https:") {
+        throw new Error(`ENFORCE_TLS_INGRESS requires HTTPS CORS_ORIGIN values: ${origin}`);
+      }
+    }
+    if (trustedProxy.mode === "off") {
+      throw new Error("ENFORCE_TLS_INGRESS requires TRUST_PROXY to be configured.");
+    }
+  }
   const authEnabledRaw = parseBoolean(env.AUTH_ENABLED);
   const authDevMode = parseBoolean(env.AUTH_DEV_MODE);
   const authEnabled = authEnabledRaw || authDevMode;
@@ -126,6 +147,7 @@ export function loadConfig(env = process.env) {
     sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,
+    enforceTlsIngress,
     dataEncryptionProvider,
     trustedProxy,
     authEnabled,

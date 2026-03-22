@@ -38,3 +38,9 @@ jobs:
       - name: Smoke boot checks
         if: matrix.node-version == '18'
         run: ./scripts/ci-smoke.sh
+      - name: TLS certificate expiry check
+        if: matrix.node-version == '18'
+        env:
+          TLS_EXPIRY_CHECK_HOSTS: ${{ vars.TLS_EXPIRY_CHECK_HOSTS }}
+          TLS_EXPIRY_THRESHOLD_DAYS: ${{ vars.TLS_EXPIRY_THRESHOLD_DAYS }}
+        run: ./scripts/check-cert-expiry.sh

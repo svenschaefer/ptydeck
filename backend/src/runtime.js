@@ -310,6 +310,15 @@ export function createRuntime(config) {
     return auth;
   }
 
+  function ensureTlsIngress(requestContext) {
+    if (!config.enforceTlsIngress) {
+      return;
+    }
+    if (requestContext.protocol !== "https") {
+      throw new ApiError(426, "TlsRequired", "TLS is required for this endpoint.");
+    }
+  }
+
   function persistSoon() {
     if (isStopping) {
       return;
@@ -386,6 +395,7 @@ export function createRuntime(config) {
       });
 
       if (req.method === "OPTIONS") {
+        ensureTlsIngress(requestContext);
         writeJson(req, res, 204);
         return;
       }
@@ -400,6 +410,7 @@ export function createRuntime(config) {
         params,
         body
       });
+      ensureTlsIngress(requestContext);
 
       if (match.kind === "health") {
         writeJson(req, res, 200, { status: "ok" });
@@ -539,6 +550,22 @@ export function createRuntime(config) {
     const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
     if (requestUrl.pathname !== "/ws") {
       logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
+      socket.destroy();
+      return;
+    }
+    if (config.enforceTlsIngress && requestContext.protocol !== "https") {
+      const payload = {
+        error: "TlsRequired",
+        message: "TLS is required for this endpoint."
+      };
+      logDebug("ws.upgrade.tls_rejected", {
+        clientIp: requestContext.clientIp,
+        trustedProxy: requestContext.trustedProxy,
+        protocol: requestContext.protocol
+      });
+      socket.write(
+        `HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(payload)}`
+      );
       socket.destroy();
       return;
     }

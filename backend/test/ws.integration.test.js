@@ -180,3 +180,39 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     await runtime.stop();
   }
 });
+
+test("WS TLS ingress enforcement rejects non-HTTPS and accepts trusted forwarded HTTPS", async () => {
+  const { runtime, wsUrl } = await createStartedRuntime({
+    enforceTlsIngress: true,
+    trustedProxy: { mode: "all", ips: [] },
+    corsOrigin: "https://app.example.com",
+    corsAllowedOrigins: ["https://app.example.com"]
+  });
+
+  try {
+    const rejectedEvents = [];
+    const rejectedWs = new WebSocket(wsUrl);
+    rejectedWs.on("error", () => {
+      rejectedEvents.push("error");
+    });
+    rejectedWs.on("close", () => {
+      rejectedEvents.push("close");
+    });
+    await waitFor(() => rejectedEvents.includes("close"));
+
+    const acceptedEvents = [];
+    const acceptedWs = new WebSocket(wsUrl, {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "api.example.com"
+      }
+    });
+    acceptedWs.on("message", (buffer) => {
+      acceptedEvents.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => acceptedEvents.some((event) => event.type === "snapshot"));
+    acceptedWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});

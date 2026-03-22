@@ -38,7 +38,7 @@ cp frontend/.env.example frontend/.env
 
 Set at least:
 
-- Backend: `NODE_ENV`, `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
+- Backend: `NODE_ENV`, `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`, `TRUST_PROXY`, `ENFORCE_TLS_INGRESS`
 - Frontend: `FRONTEND_PORT`
 
 Optional frontend overrides:
@@ -154,6 +154,7 @@ Behavior summary:
 
 - `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
 - `production` without `CORS_ORIGIN`: startup fails fast (`CORS_ORIGIN` is required).
+- `production` with `CORS_ORIGIN=*`: startup fails fast (wildcard is blocked in production).
 - `AUTH_ENABLED=true` without `AUTH_DEV_MODE=1`: startup fails (only dev-mode auth provider is implemented in current baseline).
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
@@ -368,6 +369,38 @@ Rotation baseline:
 2. Restart service and allow next persistence save cycle to rewrite payload with new key id.
 3. Verify persisted payload now references new key id.
 4. Remove retired key id from `DATA_ENCRYPTION_KEYS` after successful cutover.
+
+## 9.7 TLS-Only Ingress and Certificate Lifecycle Baseline (ENT-011)
+
+Runtime TLS ingress enforcement:
+
+- Config: `ENFORCE_TLS_INGRESS`
+  - Defaults: `0` in development, `1` in production.
+- Requirement: `TRUST_PROXY` must be configured (`loopback`, `all`, or explicit IP allowlist) when TLS ingress enforcement is enabled.
+- Behavior:
+  - REST/API requests using non-HTTPS request context are rejected with `426 TlsRequired`.
+  - WS upgrades using non-HTTPS request context are rejected with HTTP `426`.
+- Startup guardrails:
+  - Production mode requires explicit `CORS_ORIGIN` allowlist (already enforced).
+  - Production mode rejects `CORS_ORIGIN=*`.
+  - With TLS ingress enforcement enabled, every configured CORS origin must be `https://...`.
+
+Certificate lifecycle baseline:
+
+- Keep a renewal window of at least `30` days before expiration.
+- Monitor all ingress host certificates continuously.
+- Validate post-renewal by checking served certificate expiry and end-to-end HTTPS/WSS reachability.
+
+Automated expiry check:
+
+- Script: `./scripts/check-cert-expiry.sh`
+- Inputs:
+  - `TLS_EXPIRY_CHECK_HOSTS` as comma/space-separated host list (`host` or `host:port`)
+  - `TLS_EXPIRY_THRESHOLD_DAYS` (default `30`)
+- CI integration:
+  - Workflow step `TLS certificate expiry check` runs on Node `18`.
+  - Uses repository variables `TLS_EXPIRY_CHECK_HOSTS` / `TLS_EXPIRY_THRESHOLD_DAYS`.
+  - If host list is empty, the check is skipped with explicit log output.
 
 ## 10. Release Checklist
 
