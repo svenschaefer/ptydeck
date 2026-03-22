@@ -52,6 +52,10 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
+- [ ] Add parameterized custom commands (for example `/deploy <env>`) with explicit placeholder rules.
+- [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.
+- [ ] Add scoped custom-command sets (global, project, session scopes) with deterministic precedence.
+- [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
 - [ ] Add remote execution adapters (SSH sessions and multi-host routing).
 - [ ] Add multi-client shared sessions with separate view/control permissions.
 - [ ] Add broadcast input modes for explicit session groups.

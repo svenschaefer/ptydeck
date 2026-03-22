@@ -101,6 +101,42 @@ Exit criteria:
 - Reconnect snapshots restore visible terminal prompt/output context without waiting for new PTY output.
 - Rendered terminal card height and effective rows/cols stay visually consistent after layout updates.
 
+### v0.3.0-H1C - Command Extensibility and UX Hardening
+
+- `QLT-037`, `QLT-038`, `QLT-048`, `QLT-052`
+- `QLT-039`, `QLT-041`, `QLT-054`
+- `QLT-047`, `QLT-040`, `QLT-042`, `QLT-056`
+- `QLT-043`, `QLT-053`, `QLT-044`, `QLT-045`, `QLT-050`, `QLT-049`
+- `QLT-046`, `QLT-051`, `QLT-055`, `QLT-057`
+
+Dependencies:
+
+- `QLT-038` depends on `QLT-037` so command guardrails are enforced on top of persisted command CRUD behavior.
+- `QLT-048` depends on `QLT-037` because WS custom-command lifecycle events require a persisted custom-command source.
+- `QLT-052` depends on `QLT-037` and should complete before `QLT-047` and `QLT-043` so FE list/autocomplete behavior is deterministic.
+- `QLT-039` depends on `QLT-037` and `QLT-038` to ensure `/custom` definition paths align with backend validation and persistence.
+- `QLT-041` should run before `QLT-043`, `QLT-045`, and `QLT-053` so slash mode entry is stable before keyboard UX logic.
+- `QLT-054` depends on `QLT-039` to harden block-definition delimiter edge cases.
+- `QLT-047` depends on `QLT-037`, `QLT-038`, and `QLT-052` for deterministic management command behavior.
+- `QLT-040` depends on `QLT-039` and `QLT-047` so execution uses established definition/management behavior.
+- `QLT-042` depends on `QLT-040`; `QLT-056` depends on `QLT-042` to harden preview rendering safety and truncation behavior.
+- `QLT-043` depends on `QLT-047` and `QLT-052`; `QLT-053` depends on `QLT-043`.
+- `QLT-044` depends on `QLT-040`, `QLT-047`, and `QLT-043` for context-aware argument completion.
+- `QLT-045` depends on `QLT-041`; `QLT-050` depends on `QLT-045`.
+- `QLT-049` should run after `QLT-040` and `QLT-044` so target resolution behavior is reused consistently.
+- `QLT-046` depends on `QLT-037` through `QLT-045`; `QLT-051` depends on `QLT-047`, `QLT-048`, `QLT-049`, and `QLT-050`.
+- `QLT-055` depends on `QLT-052`, `QLT-053`, and `QLT-054`; `QLT-057` depends on `QLT-041` and `QLT-053`.
+
+Exit criteria:
+
+- Custom commands are persisted globally with deterministic naming, sorting, overwrite, and limit behavior.
+- `/custom` management (`list`, `show`, `remove`, define inline/block) is implemented with stable command-feedback semantics.
+- Custom command execution supports active-session and explicit target routing with deterministic resolver behavior.
+- Slash mode boundaries are explicit and keyboard behavior is deterministic (`TAB`, `Shift+TAB`, arrows, `Enter`, repeat shortcut).
+- Suggestion list and preview are non-blocking, text-safe, and do not auto-execute commands.
+- Multi-client custom-command state synchronization works via WebSocket lifecycle events.
+- Integration/regression coverage exists for all listed custom-command and slash UX edge cases.
+
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
@@ -148,7 +184,7 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0`
-- Next milestone in progress: `v0.3.0-H2`
+- Next milestones in progress: `v0.3.0-H1C`, `v0.3.0-H2`
 - Blockers: none recorded
 
 ### Completed Items

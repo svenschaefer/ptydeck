@@ -109,6 +109,27 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-034` Owner: `FE` Task: Prevent terminal-grid stretch from inflating card height and causing large unused visual terminal areas.
 - [x] `QLT-035` Owner: `FE` Task: Add sidebar settings for terminal geometry (fixed-size toggle and configurable cols/rows such as `80x20`) with persistent user preferences and immediate resize apply.
 - [x] `QLT-036` Owner: `FE` Task: Add terminal quick IDs (`1..9`, `A..Z`) displayed next to session names for compact reference and future command-alias usage.
+- [ ] `QLT-037` Owner: `BE` Task: Add global custom-command persistence and OpenAPI REST CRUD (`GET /api/v1/custom-commands`, `PUT /api/v1/custom-commands/{name}`, `GET /api/v1/custom-commands/{name}`, `DELETE /api/v1/custom-commands/{name}`) with deterministic overwrite semantics.
+- [ ] `QLT-038` Owner: `BE` Task: Enforce custom-command naming/size guardrails (reserved system-command name collision rejection, regex validation, max name length, max content length, max command count) with explicit API errors.
+- [ ] `QLT-039` Owner: `FE` Task: Implement `/custom` management command parser with inline (`/custom <name> <text>`) and block mode (`/custom <name>` + `---` multiline + `---`) including stable validation errors for malformed blocks.
+- [ ] `QLT-040` Owner: `FE` Task: Implement custom-command execution (`/<customName>` and `/<customName> <target>`) that resolves target by session ID, quick ID, exact name, or unique ID-prefix and sends content 1:1 to PTY with auto-trailing newline when missing.
+- [ ] `QLT-041` Owner: `FE` Task: Enforce strict slash-command mode boundary: command mode only when first character of first line is `/`; any leading whitespace or later-line slash remains plain terminal input.
+- [ ] `QLT-042` Owner: `FE` Task: Add non-blocking custom-command preview panel for `/<customName>` before execution (shows exact payload, target resolution, and newline append indicator).
+- [ ] `QLT-043` Owner: `FE` Task: Add TAB/SHIFT+TAB autocomplete for slash command names with deterministic cycling, system-command precedence over custom-command aliases, and no-op on zero matches.
+- [ ] `QLT-044` Owner: `FE` Task: Add context-sensitive argument autocomplete for slash commands (`/switch`, `/close`, `/custom remove`, `/custom show`, `/<customName> <target>`) with session/custom-command candidate cycling.
+- [ ] `QLT-045` Owner: `FE` Task: Add slash-command history navigation (`ArrowUp`/`ArrowDown`) scoped to slash-mode only, preserving existing multiline composer behavior for non-slash input.
+- [ ] `QLT-046` Owner: `QA` Task: Add integration tests for custom-command lifecycle and edge cases (reserved name collision, malformed/missing block delimiters, ambiguous target token, no active session, multiline payload fidelity, large payload rejection, autocomplete cycle stability, history behavior).
+- [ ] `QLT-047` Owner: `FE` Task: Implement `/custom list`, `/custom show <name>`, and `/custom remove <name>` command execution with deterministic command-feedback output and explicit not-found handling.
+- [ ] `QLT-048` Owner: `BE` Task: Add custom-command change events (`custom-command.created`, `custom-command.updated`, `custom-command.deleted`) to WebSocket snapshots/streams so multiple connected clients stay in sync without manual reload.
+- [ ] `QLT-049` Owner: `FE` Task: Add optional direct target prefix routing (`@<target> <text>`) for non-slash composer input to send text to a resolved target session without switching active session.
+- [ ] `QLT-050` Owner: `FE` Task: Add slash-command repeat shortcut (`Ctrl/Cmd+Enter` on recalled slash command) with guardrails preventing accidental repeat when composer content differs from recalled history item.
+- [ ] `QLT-051` Owner: `QA` Task: Add integration tests for `/custom` management commands, multi-client custom-command sync events, `@<target>` routing ambiguity handling, and repeat-shortcut guardrail behavior.
+- [ ] `QLT-052` Owner: `BE` Task: Define deterministic custom-command naming normalization and listing order (case policy, duplicate-name conflict rules, stable sort in REST responses) and enforce it in validation/storage.
+- [ ] `QLT-053` Owner: `FE` Task: Add slash-mode suggestion list UI (non-blocking) with keyboard selection (`TAB`, `Shift+TAB`, arrow keys, `Enter`) and explicit no-auto-execute behavior.
+- [ ] `QLT-054` Owner: `FE` Task: Define and implement block-delimiter edge-case behavior for `/custom` multiline definitions when payload contains standalone `---` lines (deterministic escape or explicit validation error with guidance).
+- [ ] `QLT-055` Owner: `QA` Task: Add regression tests for custom-command normalization/sort order, suggestion-list keyboard behavior, and multiline delimiter edge-case handling.
+- [ ] `QLT-056` Owner: `FE` Task: Render custom-command preview as strict text-only output (escaped/no HTML interpretation) with deterministic truncation rules for very large payloads.
+- [ ] `QLT-057` Owner: `QA` Task: Add regression tests that autocomplete/suggestion logic remains disabled for non-slash input and for multiline input where `/` is not first character of line 1.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
