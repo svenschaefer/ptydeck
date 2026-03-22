@@ -20,6 +20,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.equal(config.dataEncryptionProvider, null);
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
   assert.equal(config.authEnabled, false);
   assert.equal(config.authDevMode, false);
@@ -43,6 +44,8 @@ test("loadConfig maps environment values", () => {
     SESSION_IDLE_TIMEOUT_MS: "120000",
     SESSION_MAX_LIFETIME_MS: "3600000",
     SESSION_GUARDRAIL_SWEEP_MS: "250",
+    DATA_ENCRYPTION_KEYS: `key-a:${Buffer.alloc(32, 1).toString("base64")}`,
+    DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
     TRUST_PROXY: "loopback",
@@ -67,6 +70,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.sessionIdleTimeoutMs, 120000);
   assert.equal(config.sessionMaxLifetimeMs, 3600000);
   assert.equal(config.sessionGuardrailSweepMs, 250);
+  assert.equal(config.dataEncryptionProvider?.getActiveKey().id, "key-a");
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
@@ -144,4 +148,16 @@ test("loadConfig rejects unsupported auth mode without dev mode", () => {
 
 test("loadConfig rejects invalid trusted proxy configuration", () => {
   assert.throws(() => loadConfig({ TRUST_PROXY: "invalid-ip" }), /TRUST_PROXY contains invalid IP address/);
+});
+
+test("loadConfig rejects invalid data encryption configuration", () => {
+  const keyA = Buffer.alloc(32, 1).toString("base64");
+  assert.throws(
+    () => loadConfig({ DATA_ENCRYPTION_KEYS: `key-a:${keyA}` }),
+    /DATA_ENCRYPTION_KEYS and DATA_ENCRYPTION_ACTIVE_KEY_ID must be set together/
+  );
+  assert.throws(
+    () => loadConfig({ DATA_ENCRYPTION_KEYS: "key-a:not-base64", DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a" }),
+    /must be 32 bytes/
+  );
 });

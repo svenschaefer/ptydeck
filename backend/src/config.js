@@ -1,3 +1,6 @@
+import { createDataEncryptionProvider } from "./key-provider.js";
+import { parseTrustedProxy } from "./proxy.js";
+
 function parsePort(rawPort, key) {
   const parsed = Number(rawPort);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
@@ -55,6 +58,10 @@ export function loadConfig(env = process.env) {
     origin === "*" ? origin : parseOrigin(origin, "CORS_ORIGIN")
   );
   const debugLogs = parseBoolean(env.BACKEND_DEBUG_LOGS);
+  const dataEncryptionProvider = createDataEncryptionProvider(
+    env.DATA_ENCRYPTION_KEYS,
+    env.DATA_ENCRYPTION_ACTIVE_KEY_ID
+  );
   const trustedProxy = parseTrustedProxy(env.TRUST_PROXY);
   const authEnabledRaw = parseBoolean(env.AUTH_ENABLED);
   const authDevMode = parseBoolean(env.AUTH_DEV_MODE);
@@ -119,6 +126,7 @@ export function loadConfig(env = process.env) {
     sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,
+    dataEncryptionProvider,
     trustedProxy,
     authEnabled,
     authDevMode,
@@ -128,4 +136,3 @@ export function loadConfig(env = process.env) {
     authDevTokenTtlSeconds
   };
 }
-import { parseTrustedProxy } from "./proxy.js";

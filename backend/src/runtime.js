@@ -146,7 +146,9 @@ export function createRuntime(config) {
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     sessionMaxLifetimeMs: config.sessionMaxLifetimeMs
   });
-  const persistence = new JsonPersistence(config.dataPath);
+  const persistence = new JsonPersistence(config.dataPath, {
+    encryptionProvider: config.dataEncryptionProvider || null
+  });
   const createSessionRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsServer = new WebSocketServer({ noServer: true });

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createDataEncryptionProvider } from "../src/key-provider.js";
 import { JsonPersistence } from "../src/persistence.js";
 
 test("JsonPersistence returns empty list when file does not exist", async () => {
@@ -66,4 +67,45 @@ test("JsonPersistence save keeps previous file on write failure and avoids temp 
 
   const entries = await readdir(dir);
   assert.equal(entries.some((name) => name.includes(".tmp-")), false);
+});
+
+test("JsonPersistence encrypts and decrypts payload when provider is configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 1).toString("base64");
+  const provider = createDataEncryptionProvider(`a:${keyA}`, "a");
+  const persistence = new JsonPersistence(file, { encryptionProvider: provider });
+  const sessions = [{ id: "enc-1", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }];
+
+  await persistence.save(sessions);
+  const rawEncrypted = await persistence.readFileFn(file, "utf8");
+  assert.ok(rawEncrypted.includes("\"format\": \"ptydeck.encrypted.v1\""));
+  assert.equal(rawEncrypted.includes("enc-1"), false);
+
+  const loaded = await persistence.load();
+  assert.deepEqual(loaded, sessions);
+});
+
+test("JsonPersistence supports key rotation via active key switch", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 1).toString("base64");
+  const keyB = Buffer.alloc(32, 2).toString("base64");
+  const sessions = [{ id: "enc-rotate", cwd: "/srv", shell: "sh", createdAt: 2, updatedAt: 3 }];
+
+  const persistenceA = new JsonPersistence(file, {
+    encryptionProvider: createDataEncryptionProvider(`a:${keyA},b:${keyB}`, "a")
+  });
+  await persistenceA.save(sessions);
+  const firstRaw = await persistenceA.readFileFn(file, "utf8");
+  assert.ok(firstRaw.includes("\"keyId\": \"a\""));
+
+  const persistenceB = new JsonPersistence(file, {
+    encryptionProvider: createDataEncryptionProvider(`a:${keyA},b:${keyB}`, "b")
+  });
+  const loaded = await persistenceB.load();
+  assert.deepEqual(loaded, sessions);
+  await persistenceB.save(loaded);
+  const rotatedRaw = await persistenceB.readFileFn(file, "utf8");
+  assert.ok(rotatedRaw.includes("\"keyId\": \"b\""));
 });

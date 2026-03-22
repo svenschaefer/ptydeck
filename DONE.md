@@ -202,6 +202,11 @@ Completed and verified topics belong here.
 - [x] Added backend coverage for session guardrail behavior in unit and integration tests (create limit `409`, idle/lifetime auto-close behavior).
 - [x] Validation for `ENT-020` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-020` cycle: backend `96.70%` lines, frontend `88.36%` lines.
+- [x] `ENT-012` completed: persistence encryption-at-rest option added with AES-256-GCM envelope format and key-provider abstraction.
+- [x] Key rotation support implemented via key-id based decrypt + active-key based re-encryption on save.
+- [x] Added tests for encryption provider validation plus persistence encrypt/decrypt/rotate paths.
+- [x] Validation for `ENT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-012` cycle: backend `96.46%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

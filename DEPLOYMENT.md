@@ -348,6 +348,27 @@ Operational guidance:
 - Keep `SESSION_MAX_CONCURRENT` aligned with host capacity and PTY process limits.
 - Tune idle/lifetime thresholds to expected operator workflows to avoid premature termination.
 
+## 9.6 Persistence Encryption-at-Rest Baseline (ENT-012)
+
+Persistence encryption is optional and uses AES-256-GCM envelope format:
+
+- `DATA_ENCRYPTION_KEYS`: comma-separated `keyId:base64Key` entries.
+- `DATA_ENCRYPTION_ACTIVE_KEY_ID`: active key id used for new writes.
+
+Behavior:
+
+- If encryption settings are not provided, persistence remains plaintext JSON.
+- If encryption is configured, writes are encrypted with active key id.
+- Reads resolve key by stored `keyId`, enabling key rotation windows with old+new keys loaded.
+- Invalid encryption configuration fails fast at startup.
+
+Rotation baseline:
+
+1. Add new key to `DATA_ENCRYPTION_KEYS` and set `DATA_ENCRYPTION_ACTIVE_KEY_ID` to new key id.
+2. Restart service and allow next persistence save cycle to rewrite payload with new key id.
+3. Verify persisted payload now references new key id.
+4. Remove retired key id from `DATA_ENCRYPTION_KEYS` after successful cutover.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date
