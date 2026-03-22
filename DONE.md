@@ -197,6 +197,11 @@ Completed and verified topics belong here.
 - [x] Added backend coverage for rate-limiter unit behavior, REST `429` session-create throttling, and WS connection-create throttling.
 - [x] Validation for `ENT-006` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-006` cycle: backend `96.51%` lines, frontend `88.36%` lines.
+- [x] `ENT-020` completed: added session lifecycle guardrails for concurrent-session cap, idle-timeout auto-close, and max-lifetime auto-close with explicit API errors.
+- [x] New backend session guardrail config variables added: `SESSION_MAX_CONCURRENT`, `SESSION_IDLE_TIMEOUT_MS`, `SESSION_MAX_LIFETIME_MS`, `SESSION_GUARDRAIL_SWEEP_MS`.
+- [x] Added backend coverage for session guardrail behavior in unit and integration tests (create limit `409`, idle/lifetime auto-close behavior).
+- [x] Validation for `ENT-020` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-020` cycle: backend `96.70%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

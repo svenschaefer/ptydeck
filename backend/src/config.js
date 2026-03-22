@@ -94,6 +94,10 @@ export function loadConfig(env = process.env) {
     env.RATE_LIMIT_WS_CONNECT_MAX || 60,
     "RATE_LIMIT_WS_CONNECT_MAX"
   );
+  const sessionMaxConcurrent = parseNonNegativeInt(env.SESSION_MAX_CONCURRENT || 0, "SESSION_MAX_CONCURRENT");
+  const sessionIdleTimeoutMs = parseNonNegativeInt(env.SESSION_IDLE_TIMEOUT_MS || 0, "SESSION_IDLE_TIMEOUT_MS");
+  const sessionMaxLifetimeMs = parseNonNegativeInt(env.SESSION_MAX_LIFETIME_MS || 0, "SESSION_MAX_LIFETIME_MS");
+  const sessionGuardrailSweepMs = parsePositiveInt(env.SESSION_GUARDRAIL_SWEEP_MS || 1000, "SESSION_GUARDRAIL_SWEEP_MS");
   const authDevTokenTtlSeconds = parsePositiveInt(
     env.AUTH_DEV_TOKEN_TTL_SECONDS || 900,
     "AUTH_DEV_TOKEN_TTL_SECONDS"
@@ -109,6 +113,10 @@ export function loadConfig(env = process.env) {
     rateLimitWindowMs,
     rateLimitRestCreateMax,
     rateLimitWsConnectMax,
+    sessionMaxConcurrent,
+    sessionIdleTimeoutMs,
+    sessionMaxLifetimeMs,
+    sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,
     trustedProxy,

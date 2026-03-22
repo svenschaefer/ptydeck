@@ -14,6 +14,10 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.rateLimitWindowMs, 60000);
   assert.equal(config.rateLimitRestCreateMax, 60);
   assert.equal(config.rateLimitWsConnectMax, 60);
+  assert.equal(config.sessionMaxConcurrent, 0);
+  assert.equal(config.sessionIdleTimeoutMs, 0);
+  assert.equal(config.sessionMaxLifetimeMs, 0);
+  assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
@@ -35,6 +39,10 @@ test("loadConfig maps environment values", () => {
     RATE_LIMIT_WINDOW_MS: "30000",
     RATE_LIMIT_REST_CREATE_MAX: "10",
     RATE_LIMIT_WS_CONNECT_MAX: "15",
+    SESSION_MAX_CONCURRENT: "7",
+    SESSION_IDLE_TIMEOUT_MS: "120000",
+    SESSION_MAX_LIFETIME_MS: "3600000",
+    SESSION_GUARDRAIL_SWEEP_MS: "250",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
     TRUST_PROXY: "loopback",
@@ -55,6 +63,10 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.rateLimitWindowMs, 30000);
   assert.equal(config.rateLimitRestCreateMax, 10);
   assert.equal(config.rateLimitWsConnectMax, 15);
+  assert.equal(config.sessionMaxConcurrent, 7);
+  assert.equal(config.sessionIdleTimeoutMs, 120000);
+  assert.equal(config.sessionMaxLifetimeMs, 3600000);
+  assert.equal(config.sessionGuardrailSweepMs, 250);
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
@@ -93,6 +105,22 @@ test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(
     () => loadConfig({ RATE_LIMIT_WS_CONNECT_MAX: "-1" }),
     /RATE_LIMIT_WS_CONNECT_MAX must be a non-negative integer\./
+  );
+  assert.throws(
+    () => loadConfig({ SESSION_MAX_CONCURRENT: "-1" }),
+    /SESSION_MAX_CONCURRENT must be a non-negative integer\./
+  );
+  assert.throws(
+    () => loadConfig({ SESSION_IDLE_TIMEOUT_MS: "-1" }),
+    /SESSION_IDLE_TIMEOUT_MS must be a non-negative integer\./
+  );
+  assert.throws(
+    () => loadConfig({ SESSION_MAX_LIFETIME_MS: "-1" }),
+    /SESSION_MAX_LIFETIME_MS must be a non-negative integer\./
+  );
+  assert.throws(
+    () => loadConfig({ SESSION_GUARDRAIL_SWEEP_MS: "0" }),
+    /SESSION_GUARDRAIL_SWEEP_MS must be a positive integer\./
   );
 });
 

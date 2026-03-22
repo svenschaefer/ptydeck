@@ -242,3 +242,57 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.ok(restarted.updatedAt >= created.createdAt);
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
 });
+
+test("SessionManager enforces max concurrent session guardrail", () => {
+  const manager = new SessionManager({
+    sessionMaxConcurrent: 1,
+    createPty: () => createFakePty()
+  });
+
+  manager.create({ cwd: "/tmp/a" });
+  assert.throws(() => manager.create({ cwd: "/tmp/b" }), /Maximum concurrent session limit/);
+});
+
+test("SessionManager closes idle sessions via guardrail enforcement", () => {
+  let currentTime = 1_000;
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionIdleTimeoutMs: 500,
+    nowFn: () => currentTime
+  });
+  const closed = [];
+  manager.on("session.closed", (event) => closed.push(event));
+
+  const created = manager.create({ cwd: "/tmp" });
+  currentTime = 1_400;
+  manager.enforceGuardrails(currentTime);
+  assert.equal(manager.list().length, 1);
+
+  currentTime = 1_500;
+  manager.enforceGuardrails(currentTime);
+  assert.equal(manager.list().length, 0);
+  assert.deepEqual(closed, [{ sessionId: created.id, reason: "idle-timeout" }]);
+});
+
+test("SessionManager closes over-lifetime sessions via guardrail enforcement", () => {
+  let currentTime = 5_000;
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionMaxLifetimeMs: 300,
+    nowFn: () => currentTime
+  });
+  const closed = [];
+  manager.on("session.closed", (event) => closed.push(event));
+
+  const created = manager.create({ cwd: "/tmp" });
+  currentTime = 5_250;
+  manager.enforceGuardrails(currentTime);
+  assert.equal(manager.list().length, 1);
+
+  currentTime = 5_300;
+  manager.enforceGuardrails(currentTime);
+  assert.equal(manager.list().length, 0);
+  assert.deepEqual(closed, [{ sessionId: created.id, reason: "max-lifetime" }]);
+});

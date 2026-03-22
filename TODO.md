@@ -127,7 +127,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).
 - [x] `ENT-018` Owner: `PLAT` Task: Add reverse-proxy reference setup for local HTTPS/WSS host routing (provider-agnostic) in `DEPLOYMENT.md`.
 - [x] `ENT-019` Owner: `BE` Task: Add trusted-proxy configuration and safe `X-Forwarded-*` handling to avoid spoofed client/protocol metadata behind ingress.
-- [ ] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.
+- [x] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.
 - [x] `ENT-021` Owner: `PLAT` Task: Add metrics baseline (request latency/error counters, active session gauge, WS connection gauge) and expose scrape endpoint for monitoring.
 - [ ] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
 - [x] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.

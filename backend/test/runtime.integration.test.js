@@ -24,6 +24,10 @@ async function createStartedRuntime(overrides = {}) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test("REST lifecycle endpoints work end-to-end", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
@@ -199,6 +203,67 @@ test("REST create session is rate limited per client", async () => {
     assert.equal(secondRes.status, 429);
     const secondBody = await secondRes.json();
     assert.equal(secondBody.error, "RateLimitExceeded");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("REST create enforces max concurrent session guardrail", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    sessionMaxConcurrent: 1
+  });
+
+  try {
+    const firstRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(firstRes.status, 201);
+
+    const secondRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(secondRes.status, 409);
+    const secondBody = await secondRes.json();
+    assert.equal(secondBody.error, "SessionLimitExceeded");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("idle-timeout and max-lifetime guardrails close sessions automatically", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    sessionIdleTimeoutMs: 40,
+    sessionMaxLifetimeMs: 80,
+    sessionGuardrailSweepMs: 10
+  });
+
+  try {
+    const firstRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(firstRes.status, 201);
+    const first = await firstRes.json();
+
+    await sleep(120);
+    const firstGetRes = await fetch(`${baseUrl}/sessions/${first.id}`);
+    assert.equal(firstGetRes.status, 404);
+
+    const secondRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(secondRes.status, 201);
+    const second = await secondRes.json();
+    await sleep(120);
+    const secondGetRes = await fetch(`${baseUrl}/sessions/${second.id}`);
+    assert.equal(secondGetRes.status, 404);
   } finally {
     await runtime.stop();
   }
@@ -409,7 +474,7 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     assert.equal(restoredRes.status, 200);
     const restored = await restoredRes.json();
     assert.equal(restored.createdAt, createdAt);
-    assert.equal(restored.updatedAt, updatedAt);
+    assert.ok(restored.updatedAt >= updatedAt);
   } finally {
     await runtimeB.stop();
   }

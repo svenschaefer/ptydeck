@@ -140,7 +140,12 @@ export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
-  const manager = new SessionManager({ defaultShell: config.shell });
+  const manager = new SessionManager({
+    defaultShell: config.shell,
+    sessionMaxConcurrent: config.sessionMaxConcurrent,
+    sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
+    sessionMaxLifetimeMs: config.sessionMaxLifetimeMs
+  });
   const persistence = new JsonPersistence(config.dataPath);
   const createSessionRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
@@ -161,6 +166,13 @@ export function createRuntime(config) {
   let isStopped = false;
   let stopPromise = null;
   let persistTimer = null;
+  const guardrailSweepMs =
+    Number.isInteger(config.sessionGuardrailSweepMs) && config.sessionGuardrailSweepMs > 0
+      ? config.sessionGuardrailSweepMs
+      : 1000;
+  const guardrailTimer = setInterval(() => {
+    manager.enforceGuardrails();
+  }, guardrailSweepMs);
   const corsAllowedOrigins = Array.isArray(config.corsAllowedOrigins)
     ? config.corsAllowedOrigins.filter((origin) => typeof origin === "string" && origin)
     : [config.corsOrigin || "*"].filter(Boolean);
@@ -646,6 +658,7 @@ export function createRuntime(config) {
     isStopping = true;
     isReady = false;
     clearInterval(heartbeat);
+    clearInterval(guardrailTimer);
     if (persistTimer) {
       clearTimeout(persistTimer);
       persistTimer = null;

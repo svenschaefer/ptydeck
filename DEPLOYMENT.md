@@ -325,6 +325,29 @@ Behavior:
 - Exceeded WS connect limit returns HTTP `429` during upgrade with `Retry-After` header.
 - Client identity for limits uses trusted-proxy-aware request context (`TRUST_PROXY`).
 
+## 9.5 Session Lifecycle Guardrails Baseline (ENT-020)
+
+Backend runtime enforces optional lifecycle guardrails for PTY sessions:
+
+- Max concurrent sessions:
+  - Config: `SESSION_MAX_CONCURRENT` (`0` disables).
+  - Behavior: `POST /api/v1/sessions` returns `409 SessionLimitExceeded` when cap is reached.
+- Idle timeout:
+  - Config: `SESSION_IDLE_TIMEOUT_MS` (`0` disables).
+  - Behavior: session is auto-closed when idle threshold is reached.
+- Max lifetime:
+  - Config: `SESSION_MAX_LIFETIME_MS` (`0` disables).
+  - Behavior: session is auto-closed when lifetime threshold is reached.
+- Sweep interval:
+  - Config: `SESSION_GUARDRAIL_SWEEP_MS` (default `1000` ms).
+  - Behavior: periodic enforcement loop for idle/lifetime policies.
+
+Operational guidance:
+
+- Start with conservative non-zero values in production-like environments.
+- Keep `SESSION_MAX_CONCURRENT` aligned with host capacity and PTY process limits.
+- Tune idle/lifetime thresholds to expected operator workflows to avoid premature termination.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date
