@@ -112,7 +112,7 @@ function resetCommandAutocompleteState() {
   commandAutocompleteState = null;
 }
 
-function parseCommandAutocompleteInput(rawInput) {
+function parseSlashInputForAutocomplete(rawInput) {
   const value = typeof rawInput === "string" ? rawInput : "";
   if (!value.startsWith("/")) {
     return null;
@@ -120,12 +120,9 @@ function parseCommandAutocompleteInput(rawInput) {
   if (value.includes("\n")) {
     return null;
   }
-  const afterSlash = value.slice(1);
-  if (/\s/.test(afterSlash)) {
-    return null;
-  }
   return {
-    prefix: afterSlash.toLowerCase()
+    value,
+    afterSlash: value.slice(1)
   };
 }
 
@@ -154,8 +151,103 @@ function buildCommandAutocompleteCandidates(customCommands) {
   return ordered;
 }
 
-async function autocompleteCommandName(reverse = false) {
-  const parsed = parseCommandAutocompleteInput(commandInput.value || "");
+function buildCustomCommandNameList(customCommands) {
+  const ordered = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(customCommands) ? customCommands : []) {
+    const normalized = String(entry?.name || "").trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    ordered.push(normalized);
+  }
+  return ordered;
+}
+
+function buildSessionAutocompleteCandidates(prefix = "") {
+  const normalizedPrefix = String(prefix || "").toLowerCase();
+  const state = store.getState();
+  const candidates = [];
+  for (const session of state.sessions) {
+    const token = formatSessionToken(session.id);
+    if (!token) {
+      continue;
+    }
+    const normalizedToken = token.toLowerCase();
+    if (!normalizedToken.startsWith(normalizedPrefix)) {
+      continue;
+    }
+    if (!candidates.includes(token)) {
+      candidates.push(token);
+    }
+  }
+  return candidates;
+}
+
+function resolveSlashAutocompleteContext(rawInput, customCommands) {
+  const parsed = parseSlashInputForAutocomplete(rawInput);
+  if (!parsed) {
+    return null;
+  }
+
+  const afterSlash = parsed.afterSlash;
+  const trailingSpace = /\s$/.test(afterSlash);
+  const trimmed = afterSlash.trim();
+  const customCandidates = buildCommandAutocompleteCandidates(customCommands);
+  const customNames = buildCustomCommandNameList(customCommands);
+  const customSet = new Set(customNames);
+
+  if (!trimmed) {
+    return {
+      replacePrefix: "/",
+      matches: customCandidates
+    };
+  }
+
+  const hasWhitespace = /\s/.test(afterSlash);
+  const parts = trimmed.split(/\s+/);
+  const commandRaw = parts[0] || "";
+  const command = commandRaw.toLowerCase();
+
+  if (!hasWhitespace) {
+    const matches = customCandidates.filter((name) => name.startsWith(command));
+    return {
+      replacePrefix: "/",
+      matches
+    };
+  }
+
+  if ((command === "switch" || command === "close") && parts.length <= 2) {
+    const targetPrefix = parts.length === 2 ? parts[1] : "";
+    return {
+      replacePrefix: `/${commandRaw} `,
+      matches: buildSessionAutocompleteCandidates(targetPrefix)
+    };
+  }
+
+  if (command === "custom" && (parts[1] === "show" || parts[1] === "remove") && parts.length <= 3) {
+    const subcommand = parts[1];
+    const namePrefix = parts.length === 3 ? parts[2].toLowerCase() : "";
+    return {
+      replacePrefix: `/custom ${subcommand} `,
+      matches: customNames.filter((name) => name.startsWith(namePrefix))
+    };
+  }
+
+  if (customSet.has(command) && (trailingSpace || parts.length === 2) && parts.length <= 2) {
+    const targetPrefix = parts.length === 2 ? parts[1] : "";
+    return {
+      replacePrefix: `/${commandRaw} `,
+      matches: buildSessionAutocompleteCandidates(targetPrefix)
+    };
+  }
+
+  return null;
+}
+
+async function autocompleteSlashInput(reverse = false) {
+  const parsed = parseSlashInputForAutocomplete(commandInput.value || "");
   if (!parsed) {
     resetCommandAutocompleteState();
     return false;
@@ -169,13 +261,16 @@ async function autocompleteCommandName(reverse = false) {
     Number.isInteger(activeState.index) &&
     activeState.index >= 0 &&
     activeState.index < activeState.matches.length &&
-    commandInput.value === `/${activeState.matches[activeState.index]}`;
+    typeof activeState.replacePrefix === "string" &&
+    commandInput.value === `${activeState.replacePrefix}${activeState.matches[activeState.index]}`;
 
   let matches = [];
+  let replacePrefix = "/";
   let nextIndex = reverse ? -1 : 0;
 
   if (canCycleExisting) {
     matches = activeState.matches;
+    replacePrefix = activeState.replacePrefix;
     const delta = reverse ? -1 : 1;
     nextIndex = (activeState.index + delta + matches.length) % matches.length;
   } else {
@@ -189,8 +284,13 @@ async function autocompleteCommandName(reverse = false) {
     if (requestId !== commandAutocompleteRequestId) {
       return true;
     }
-    const candidates = buildCommandAutocompleteCandidates(customCommands);
-    matches = candidates.filter((name) => name.startsWith(parsed.prefix));
+    const context = resolveSlashAutocompleteContext(commandInput.value || "", customCommands);
+    if (!context) {
+      resetCommandAutocompleteState();
+      return true;
+    }
+    replacePrefix = context.replacePrefix;
+    matches = context.matches;
     if (matches.length === 0) {
       resetCommandAutocompleteState();
       return true;
@@ -205,9 +305,10 @@ async function autocompleteCommandName(reverse = false) {
 
   commandAutocompleteState = {
     matches,
-    index: nextIndex
+    index: nextIndex,
+    replacePrefix
   };
-  commandInput.value = `/${matches[nextIndex]}`;
+  commandInput.value = `${replacePrefix}${matches[nextIndex]}`;
   scheduleCommandPreview();
   return true;
 }
@@ -1246,9 +1347,9 @@ commandInput.addEventListener("input", () => {
 });
 commandInput.addEventListener("keydown", (event) => {
   if (event.key === "Tab") {
-    if (parseCommandAutocompleteInput(commandInput.value || "")) {
+    if (parseSlashInputForAutocomplete(commandInput.value || "")) {
       event.preventDefault();
-      autocompleteCommandName(event.shiftKey).catch(() => {});
+      autocompleteSlashInput(event.shiftKey).catch(() => {});
     }
     return;
   }

@@ -269,6 +269,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for command-name autocomplete cycling order, reverse cycling, and zero-match behavior.
 - [x] Validation for `QLT-043` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-043` cycle: backend `96.97%` lines, frontend `87.46%` lines.
+- [x] `QLT-044` completed: slash-command argument autocomplete now supports context-sensitive cycling for `/switch`, `/close`, `/custom show`, `/custom remove`, and `/<customName> <target>`.
+- [x] Argument candidates are deterministic by context: session-token candidates for target-taking commands and custom-command-name candidates for `/custom show|remove`.
+- [x] Added frontend integration coverage for argument autocomplete forward/reverse cycling across session/custom-command contexts.
+- [x] Validation for `QLT-044` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-044` cycle: backend `96.97%` lines, frontend `87.51%` lines.
 
 ## Maintenance Rules
 

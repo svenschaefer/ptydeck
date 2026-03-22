@@ -617,6 +617,45 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandInput.value, "/zzzz");
 
+  fixture.elements.commandInput.value = "/switch ";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/switch 1");
+
+  fixture.elements.commandInput.value = "/custom show ";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/custom show blockcmd");
+
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: true,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/custom show closeit");
+
+  fixture.elements.commandInput.value = "/closeit ";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/closeit 1");
+
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();
   await tick();
