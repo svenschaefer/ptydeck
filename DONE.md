@@ -160,6 +160,9 @@ Completed and verified topics belong here.
 - [x] Added backend/frontend config tests for invalid env input rejection paths and updated `.env.example` comments for required constraints.
 - [x] Validation for `ENT-023` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-023` cycle: backend `96.81%` lines, frontend `88.47%` lines.
+- [x] `ENT-018` completed: added provider-agnostic reverse-proxy reference contract in `DEPLOYMENT.md` for HTTPS/WSS local host routing.
+- [x] Deployment guide now explicitly documents host/path routing contract (`/api/v1`, `/ws`), required forwarded headers, TLS expectation, and WebSocket upgrade requirements.
+- [x] Deployment guide behavior summary updated to match fail-fast production CORS validation (`CORS_ORIGIN` required in production).
 
 ## Maintenance Rules
 

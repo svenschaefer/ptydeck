@@ -106,8 +106,32 @@ Recommended production setup:
 Behavior summary:
 
 - `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
-- `production` without `CORS_ORIGIN`: no cross-origin allow header is emitted (explicit allowlist required).
+- `production` without `CORS_ORIGIN`: startup fails fast (`CORS_ORIGIN` is required).
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
+
+### 7.1 Provider-Agnostic HTTPS/WSS Reverse-Proxy Contract
+
+Use this routing contract independent of ingress provider:
+
+- Frontend host routes to frontend service port `18081`.
+- API host routes path prefix `/api/v1` to backend service port `18080`.
+- API host routes path `/ws` to backend service port `18080` with WebSocket upgrade pass-through.
+- Preserve `Host`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-For` headers.
+- Enforce TLS at ingress and use `https://` + `wss://` URLs in frontend runtime config.
+
+Minimal abstract route map:
+
+```text
+https://app.example.com                  -> http://backend-frontend:18081
+https://api.example.com/api/v1/*         -> http://backend-api:18080/api/v1/*
+wss://api.example.com/ws                 -> ws://backend-api:18080/ws
+```
+
+WebSocket requirements:
+
+- HTTP/1.1 upgrade support must be enabled.
+- `Connection: upgrade` and `Upgrade: websocket` headers must be forwarded.
+- Idle timeouts must be long enough for interactive terminal sessions.
 
 ## 8. Rollback
 
