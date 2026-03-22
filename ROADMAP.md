@@ -181,6 +181,7 @@ Exit criteria:
 - `QLT-021`
 - `QLT-022`
 - `QLT-023`
+- `QLT-024`
 - `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`
 - `QLT-035`
 - `QLT-036`

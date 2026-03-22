@@ -134,6 +134,10 @@ Completed and verified topics belong here.
 - [x] Frontend integration test coverage updated for command-plane behavior in `frontend/test/app.test.js` (`/list`, `/help`, `/switch`).
 - [x] Validation for `QLT-023` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-023` cycle: backend `96.78%` lines, frontend `87.23%` lines.
+- [x] `QLT-024` completed: added explicit command feedback panel in frontend UI (`#command-feedback`) so command-plane output is separated from runtime status/error messaging and PTY terminal output.
+- [x] Frontend app tests updated to verify command feedback is rendered in dedicated panel and status messages remain isolated.
+- [x] Validation for `QLT-024` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-024` cycle: backend `96.78%` lines, frontend `87.31%` lines.
 
 ## Maintenance Rules
 

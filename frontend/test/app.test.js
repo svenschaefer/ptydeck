@@ -222,6 +222,7 @@ function createDocumentFixture() {
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
+  const commandFeedback = new FakeElement({ id: "command-feedback" });
   const template = {
     id: "terminal-card-template",
     content: {
@@ -244,7 +245,8 @@ function createDocumentFixture() {
     commandInput,
     sendCommand,
     emptyState,
-    statusMessage
+    statusMessage,
+    commandFeedback
   ]) {
     byId.set(element.id, element);
   }
@@ -262,7 +264,8 @@ function createDocumentFixture() {
       commandInput,
       sendCommand,
       emptyState,
-      statusMessage
+      statusMessage,
+      commandFeedback
     },
     document: {
       getElementById(id) {
@@ -409,18 +412,19 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/list";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.statusMessage.textContent, /\[1\]/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\[1\]/);
+  assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
   assert.equal(inputPayloads.length, 1);
 
   fixture.elements.commandInput.value = "/help";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.statusMessage.textContent, /^Commands:/);
+  assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
 
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.statusMessage.textContent, /Active session:/);
+  assert.match(fixture.elements.commandFeedback.textContent, /Active session:/);
 
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";

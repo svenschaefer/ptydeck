@@ -28,6 +28,7 @@ const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
 const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
+const commandFeedbackEl = document.getElementById("command-feedback");
 
 const terminals = new Map();
 const terminalObservers = new Map();
@@ -43,7 +44,8 @@ const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 let terminalSettings = loadTerminalSettings();
 const uiState = {
   loading: true,
-  error: ""
+  error: "",
+  commandFeedback: ""
 };
 
 if (typeof window.Terminal !== "function") {
@@ -58,6 +60,11 @@ if (!window.FitAddon || typeof window.FitAddon.FitAddon !== "function") {
 function setError(message) {
   debugLog("ui.error", { message });
   uiState.error = message;
+  render();
+}
+
+function setCommandFeedback(message) {
+  uiState.commandFeedback = message;
   render();
 }
 
@@ -284,6 +291,9 @@ function render() {
     statusMessageEl.textContent = `Connection state: ${state.connectionState}`;
   } else {
     statusMessageEl.textContent = "";
+  }
+  if (commandFeedbackEl) {
+    commandFeedbackEl.textContent = uiState.commandFeedback || "";
   }
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
@@ -712,12 +722,11 @@ async function submitCommand() {
     });
     try {
       const feedback = await executeControlCommand(interpreted);
-      uiState.error = feedback;
+      setCommandFeedback(feedback);
       debugLog("command.control.ok", { command: interpreted.command });
       commandInput.value = "";
-      render();
     } catch {
-      setError("Failed to execute control command.");
+      setCommandFeedback("Failed to execute control command.");
     }
     return;
   }

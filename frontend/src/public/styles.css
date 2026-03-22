@@ -151,6 +151,14 @@ body {
   padding-top: 10px;
 }
 
+.command-feedback {
+  margin: 6px 18px 0;
+  min-height: 20px;
+  color: #8ec07c;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
 button {
   border: 1px solid var(--border);
   border-radius: 6px;
