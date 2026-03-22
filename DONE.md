@@ -32,6 +32,10 @@ Completed and verified topics belong here.
 - [x] `FE-007` completed with generated frontend API types from `backend/openapi/openapi.yaml`.
 - [x] `FE-013` completed with explicit loading, empty, error, and disconnected UI states.
 - [x] `v0.4.0` milestone completed.
+- [x] `v0.5.0` quality gate completed: `INT-004`, `INT-005`, `INT-006`, `INT-008`.
+- [x] Added backend REST integration test covering session lifecycle endpoints.
+- [x] Added backend WS integration test covering event flow and reconnect snapshot behavior.
+- [x] Added runtime-based backend E2E core flow coverage in automated tests.
 
 ## Maintenance Rules
 

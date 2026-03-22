@@ -55,11 +55,11 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `INT-001` Owner: `PLAT` Task: Create root scripts for parallel BE/FE local dev (`npm run dev`).
 - [x] `INT-002` Owner: `PLAT` Task: Add root `.nvmrc` and align Node.js engine versions in all package manifests.
 - [x] `INT-003` Owner: `PLAT` Task: Add CI workflow for lint, build, and test in backend and frontend.
-- [ ] `INT-004` Owner: `QA` Task: Add backend unit tests for session manager and persistence adapter.
-- [ ] `INT-005` Owner: `QA` Task: Add backend integration tests for all REST endpoints in OpenAPI.
-- [ ] `INT-006` Owner: `QA` Task: Add backend WS integration tests for event ordering and reconnect behavior.
+- [x] `INT-004` Owner: `QA` Task: Add backend unit tests for session manager and persistence adapter.
+- [x] `INT-005` Owner: `QA` Task: Add backend integration tests for all REST endpoints in OpenAPI.
+- [x] `INT-006` Owner: `QA` Task: Add backend WS integration tests for event ordering and reconnect behavior.
 - [x] `INT-007` Owner: `QA` Task: Add frontend unit/component tests for store and terminal UI behaviors.
-- [ ] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
+- [x] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
 - [x] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
 - [ ] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
 

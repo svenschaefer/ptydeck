@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.4.0 frontend completed)
+Last updated: 2026-03-22 (v0.5.0 quality gate completed)
 Owner: `CODX`
 
 ## Project Purpose
@@ -50,6 +50,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now consumes backend snapshots/events via WebSocket reconnect flow.
 - Frontend now performs per-session debounced resize calls to backend.
 - `v0.4.0` status: completed.
+- `v0.5.0` status: completed with backend unit/integration/WS/E2E automation.
 
 ## Session Behavior Notes
 
