@@ -25,9 +25,10 @@ const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
 
 const terminals = new Map();
-const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
+let globalResizeTimer = null;
+let deferredResizeTimer = null;
 const uiState = {
   loading: true,
   error: ""
@@ -52,6 +53,70 @@ function computeTerminalSize(mount) {
     cols: Math.max(20, Math.floor(mount.clientWidth / 10)),
     rows: Math.max(6, Math.floor(mount.clientHeight / 20))
   };
+}
+
+function applyResizeForSession(sessionId) {
+  const entry = terminals.get(sessionId);
+  if (!entry) {
+    return;
+  }
+  const size = computeTerminalSize(entry.mount);
+  if (!size) {
+    return;
+  }
+
+  const { cols, rows } = size;
+  const previous = terminalSizes.get(sessionId);
+  if (previous && previous.cols === cols && previous.rows === rows) {
+    return;
+  }
+
+  terminalSizes.set(sessionId, { cols, rows });
+  entry.terminal.resize(cols, rows);
+  debugLog("terminal.resize.local", { sessionId, cols, rows });
+
+  const pendingTimer = resizeTimers.get(sessionId);
+  if (pendingTimer) {
+    clearTimeout(pendingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    debugLog("terminal.resize.remote.start", { sessionId, cols, rows });
+    api.resizeSession(sessionId, cols, rows).catch(() => {
+      debugLog("terminal.resize.remote.error", { sessionId, cols, rows });
+    });
+  }, 180);
+  resizeTimers.set(sessionId, timer);
+}
+
+function scheduleGlobalResize() {
+  if (globalResizeTimer) {
+    clearTimeout(globalResizeTimer);
+  }
+  globalResizeTimer = setTimeout(() => {
+    globalResizeTimer = null;
+    for (const sessionId of terminals.keys()) {
+      applyResizeForSession(sessionId);
+    }
+  }, 120);
+}
+
+function scheduleDeferredResizePasses() {
+  if (deferredResizeTimer) {
+    clearTimeout(deferredResizeTimer);
+  }
+  const delays = [250, 700, 1400];
+  let index = 0;
+  function runNext() {
+    scheduleGlobalResize();
+    index += 1;
+    if (index < delays.length) {
+      deferredResizeTimer = setTimeout(runNext, delays[index]);
+    } else {
+      deferredResizeTimer = null;
+    }
+  }
+  deferredResizeTimer = setTimeout(runNext, delays[index]);
 }
 
 function render() {
@@ -79,14 +144,9 @@ function render() {
   for (const sessionId of terminals.keys()) {
     if (!activeIds.has(sessionId)) {
       const entry = terminals.get(sessionId);
-      const observer = terminalObservers.get(sessionId);
-      if (observer) {
-        observer.disconnect();
-      }
       entry.terminal.dispose();
       entry.element.remove();
       terminals.delete(sessionId);
-      terminalObservers.delete(sessionId);
       const timer = resizeTimers.get(sessionId);
       if (timer) {
         clearTimeout(timer);
@@ -178,46 +238,14 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    function applyResize() {
-      const size = computeTerminalSize(mount);
-      if (!size) {
-        return;
-      }
-
-      const { cols, rows } = size;
-      const previous = terminalSizes.get(session.id);
-      if (previous && previous.cols === cols && previous.rows === rows) {
-        return;
-      }
-
-      terminalSizes.set(session.id, { cols, rows });
-      terminal.resize(cols, rows);
-      debugLog("terminal.resize.local", { sessionId: session.id, cols, rows });
-
-      const pendingTimer = resizeTimers.get(session.id);
-      if (pendingTimer) {
-        clearTimeout(pendingTimer);
-      }
-
-      const timer = setTimeout(() => {
-        debugLog("terminal.resize.remote.start", { sessionId: session.id, cols, rows });
-        api.resizeSession(session.id, cols, rows).catch(() => {
-          debugLog("terminal.resize.remote.error", { sessionId: session.id, cols, rows });
-          // Ignore transient resize errors (for example session closed during debounce window).
-        });
-      }, 120);
-      resizeTimers.set(session.id, timer);
-    }
-
-    const observer = new ResizeObserver(applyResize);
-    observer.observe(mount);
-
     gridEl.appendChild(node);
-    applyResize();
 
-    terminals.set(session.id, { terminal, element: node, focusBtn });
-    terminalObservers.set(session.id, observer);
+    terminals.set(session.id, { terminal, element: node, focusBtn, mount });
+    applyResizeForSession(session.id);
   }
+
+  scheduleGlobalResize();
+  scheduleDeferredResizePasses();
 }
 
 function upsertSession(nextSession) {
@@ -331,8 +359,11 @@ commandInput.addEventListener("keydown", (event) => {
 
 window.addEventListener("beforeunload", () => {
   ws.close();
-  for (const observer of terminalObservers.values()) {
-    observer.disconnect();
+  if (globalResizeTimer) {
+    clearTimeout(globalResizeTimer);
+  }
+  if (deferredResizeTimer) {
+    clearTimeout(deferredResizeTimer);
   }
   for (const timer of resizeTimers.values()) {
     clearTimeout(timer);
@@ -342,15 +373,4 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-api
-  .listSessions()
-  .then((sessions) => {
-    store.setSessions(sessions);
-    uiState.loading = false;
-    uiState.error = "";
-    render();
-  })
-  .catch(() => {
-    uiState.loading = false;
-    setError("Failed to load sessions.");
-  });
+window.addEventListener("resize", scheduleGlobalResize);
