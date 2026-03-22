@@ -38,6 +38,10 @@ if (typeof window.Terminal !== "function") {
   setError("Terminal library failed to load.");
   throw new Error("window.Terminal is not available.");
 }
+if (!window.FitAddon || typeof window.FitAddon.FitAddon !== "function") {
+  setError("Terminal fit addon failed to load.");
+  throw new Error("window.FitAddon.FitAddon is not available.");
+}
 
 function setError(message) {
   debugLog("ui.error", { message });
@@ -45,13 +49,15 @@ function setError(message) {
   render();
 }
 
-function computeTerminalSize(mount) {
-  if (!mount || mount.clientWidth < 40 || mount.clientHeight < 40) {
+function computeTerminalSize(entry) {
+  if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
     return null;
   }
+
+  entry.fitAddon.fit();
   return {
-    cols: Math.min(320, Math.max(20, Math.floor(mount.clientWidth / 10))),
-    rows: Math.min(80, Math.max(6, Math.floor(mount.clientHeight / 20)))
+    cols: entry.terminal.cols,
+    rows: entry.terminal.rows
   };
 }
 
@@ -60,12 +66,15 @@ function applyResizeForSession(sessionId) {
   if (!entry) {
     return;
   }
-  const size = computeTerminalSize(entry.mount);
+  const size = computeTerminalSize(entry);
   if (!size) {
     return;
   }
 
   const { cols, rows } = size;
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 2) {
+    return;
+  }
   const previous = terminalSizes.get(sessionId);
   if (previous && previous.cols === cols && previous.rows === rows) {
     return;
@@ -232,17 +241,18 @@ function render() {
         brightWhite: "#f5f7fa"
       }
     });
+    const fitAddon = new window.FitAddon.FitAddon();
+    terminal.loadAddon(fitAddon);
     debugLog("terminal.created", { sessionId: session.id });
 
+    gridEl.appendChild(node);
     terminal.open(mount);
     terminal.onData((data) => {
       store.setActiveSession(session.id);
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    gridEl.appendChild(node);
-
-    terminals.set(session.id, { terminal, element: node, focusBtn, mount });
+    terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, mount });
     applyResizeForSession(session.id);
     shouldRunResizePass = true;
   }
