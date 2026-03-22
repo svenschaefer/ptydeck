@@ -141,6 +141,7 @@ function render() {
   }
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
+  let shouldRunResizePass = false;
   for (const sessionId of terminals.keys()) {
     if (!activeIds.has(sessionId)) {
       const entry = terminals.get(sessionId);
@@ -153,6 +154,7 @@ function render() {
       }
       resizeTimers.delete(sessionId);
       terminalSizes.delete(sessionId);
+      shouldRunResizePass = true;
     }
   }
 
@@ -242,10 +244,13 @@ function render() {
 
     terminals.set(session.id, { terminal, element: node, focusBtn, mount });
     applyResizeForSession(session.id);
+    shouldRunResizePass = true;
   }
 
-  scheduleGlobalResize();
-  scheduleDeferredResizePasses();
+  if (shouldRunResizePass) {
+    scheduleGlobalResize();
+    scheduleDeferredResizePasses();
+  }
 }
 
 function upsertSession(nextSession) {

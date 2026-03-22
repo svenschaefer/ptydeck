@@ -27,12 +27,21 @@ export function createStore() {
         state.activeSessionId && sessions.some((s) => s.id === state.activeSessionId)
           ? state.activeSessionId
           : sessions[0]?.id || null;
+      if (state.sessions === sessions && state.activeSessionId === activeSessionId) {
+        return;
+      }
       set({ sessions, activeSessionId });
     },
     setActiveSession(sessionId) {
+      if (state.activeSessionId === sessionId) {
+        return;
+      }
       set({ activeSessionId: sessionId });
     },
     setConnectionState(connectionState) {
+      if (state.connectionState === connectionState) {
+        return;
+      }
       set({ connectionState });
     }
   };
