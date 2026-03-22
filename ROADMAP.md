@@ -162,6 +162,7 @@ Exit criteria:
 - `FE-001` ... `FE-014`
 - `INT-001` ... `INT-010`
 - `QLT-001`, `QLT-002`, `QLT-004`
+- `QLT-003`
 - `QLT-013`
 - `QLT-007`
 - `QLT-008`, `QLT-009`

@@ -97,6 +97,10 @@ Completed and verified topics belong here.
 - [x] `QLT-032` completed: backend no longer persists on each high-frequency `input`/`resize` request, reducing interactive overhead.
 - [x] `QLT-033` completed: backend WS snapshot now includes buffered session output, and frontend replays it on reconnect to restore prompt/output context.
 - [x] `QLT-034` completed: terminal grid stretch behavior corrected to prevent inflated cards with large unused terminal area.
+- [x] `QLT-003` completed: added frontend app behavior tests for create-session error, delete-session error, command-send error, and reconnecting/disconnected state rendering.
+- [x] Added `frontend/test/app.test.js` lightweight DOM/runtime harness to execute `frontend/src/public/app.js` behavior without browser dependencies.
+- [x] Validation for this cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
+- [x] Coverage after `QLT-003` cycle: backend `96.64%` lines, frontend `85.21%` lines (`node --test --experimental-test-coverage` aggregate report).
 
 ## Maintenance Rules
 
