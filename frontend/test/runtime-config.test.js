@@ -22,14 +22,14 @@ test("runtime config derives api host from ptydeck domain without explicit env",
   const config = resolveRuntimeConfig({
     location: {
       protocol: "https:",
-      hostname: "ptydeck.local.secos.rocks",
+      hostname: "ptydeck.local.example",
       search: ""
     }
   });
 
   assert.deepEqual(config, {
-    apiBaseUrl: "https://api.ptydeck.local.secos.rocks/api/v1",
-    wsUrl: "wss://api.ptydeck.local.secos.rocks/ws",
+    apiBaseUrl: "https://api.ptydeck.local.example/api/v1",
+    wsUrl: "wss://api.ptydeck.local.example/ws",
     debugLogs: false
   });
 });
