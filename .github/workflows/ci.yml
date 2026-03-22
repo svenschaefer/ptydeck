@@ -61,6 +61,8 @@ jobs:
         run: ./scripts/security-scan.sh
       - name: Generate SBOM artifacts
         run: ./scripts/generate-sbom.sh
+      - name: Verify backup/restore roundtrip
+        run: ./scripts/verify-backup-restore.sh
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:

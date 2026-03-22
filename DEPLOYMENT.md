@@ -14,6 +14,7 @@ npm run test
 npm run test:coverage
 npm run security:sca
 npm run security:sbom
+npm run backup:verify
 ```
 
 ## 3. Build
@@ -435,6 +436,38 @@ Suggested CI variables:
 
 - `SCA_AUDIT_LEVEL` (optional, defaults to `high`)
 - `SECURITY_IMAGE_REF` (optional, enables image scan when set)
+
+## 9.9 Persistence Backup/Restore Baseline (ENT-009)
+
+Backup creation:
+
+- Script: `./scripts/backup-sessions.sh`
+- Inputs:
+  - `DATA_PATH` (default `./backend/data/sessions.json`)
+  - `BACKUP_DIR` (default `./backups/sessions`)
+- Output:
+  - Gzip-compressed backup file: `sessions-<UTC_TIMESTAMP>.json.gz`
+
+Restore:
+
+- Script: `./scripts/restore-sessions.sh`
+- Inputs:
+  - `TARGET_DATA_PATH` (default `./backend/data/sessions.json`)
+  - `BACKUP_DIR` (default `./backups/sessions`)
+  - `BACKUP_FILE` (optional explicit file; if omitted, latest backup in `BACKUP_DIR` is used)
+
+Roundtrip verification (non-prod/CI):
+
+- Script: `./scripts/verify-backup-restore.sh`
+- Behavior:
+  - Creates deterministic sample persistence payload.
+  - Executes backup and restore scripts.
+  - Fails if restored payload does not byte-match source payload.
+
+CI integration:
+
+- Security job runs `./scripts/verify-backup-restore.sh` after SBOM generation.
+- This provides periodic restore verification as part of non-production automation.
 
 ## 10. Release Checklist
 

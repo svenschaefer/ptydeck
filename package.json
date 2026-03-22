@@ -19,6 +19,9 @@
     "test:coverage:check": "./scripts/check-coverage.sh",
     "tls:check": "./scripts/check-cert-expiry.sh",
     "security:sca": "./scripts/security-scan.sh",
-    "security:sbom": "./scripts/generate-sbom.sh"
+    "security:sbom": "./scripts/generate-sbom.sh",
+    "backup:create": "./scripts/backup-sessions.sh",
+    "backup:restore": "./scripts/restore-sessions.sh",
+    "backup:verify": "./scripts/verify-backup-restore.sh"
   }
 }

@@ -4,3 +4,4 @@ coverage/
 backend/data/
 local-config/
 artifacts/
+backups/

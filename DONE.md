@@ -217,6 +217,10 @@ Completed and verified topics belong here.
 - [x] CI now uploads SBOM artifacts (`artifacts/security/sbom/*.json`) and supports optional Trivy image scan when `SECURITY_IMAGE_REF` is configured.
 - [x] Validation for `ENT-007` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, and `npm run security:sbom`.
 - [x] Coverage after `ENT-007` cycle: backend `96.68%` lines, frontend `88.36%` lines.
+- [x] `ENT-009` completed: backup/restore automation added for persistence data using `scripts/backup-sessions.sh` and `scripts/restore-sessions.sh`.
+- [x] Added deterministic backup/restore roundtrip verification script (`scripts/verify-backup-restore.sh`) and wired it into CI non-prod automation.
+- [x] Validation for `ENT-009` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, `npm run security:sbom`, and `npm run backup:verify`.
+- [x] Coverage after `ENT-009` cycle: backend `96.68%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 
