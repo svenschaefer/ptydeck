@@ -128,7 +128,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-053` Owner: `FE` Task: Add slash-mode suggestion list UI (non-blocking) with keyboard selection (`TAB`, `Shift+TAB`, arrow keys, `Enter`) and explicit no-auto-execute behavior.
 - [ ] `QLT-054` Owner: `FE` Task: Define and implement block-delimiter edge-case behavior for `/custom` multiline definitions when payload contains standalone `---` lines (deterministic escape or explicit validation error with guidance).
 - [ ] `QLT-055` Owner: `QA` Task: Add regression tests for custom-command normalization/sort order, suggestion-list keyboard behavior, and multiline delimiter edge-case handling.
-- [ ] `QLT-056` Owner: `FE` Task: Render custom-command preview as strict text-only output (escaped/no HTML interpretation) with deterministic truncation rules for very large payloads.
+- [x] `QLT-056` Owner: `FE` Task: Render custom-command preview as strict text-only output (escaped/no HTML interpretation) with deterministic truncation rules for very large payloads.
 - [ ] `QLT-057` Owner: `QA` Task: Add regression tests that autocomplete/suggestion logic remains disabled for non-slash input and for multiline input where `/` is not first character of line 1.
 - [ ] `QLT-058` Owner: `FE` Task: Add per-terminal settings entry via dedicated settings icon on each terminal card (gear icon) opening a per-session settings panel.
 - [ ] `QLT-059` Owner: `FE` Task: Move terminal-card `Rename` and `Close` actions into per-session settings panel and remove direct toolbar buttons.

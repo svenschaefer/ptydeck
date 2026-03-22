@@ -279,6 +279,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for slash-history recall cycle, slash-repeat shortcut, and repeat guardrail behavior.
 - [x] Validation for `QLT-045`/`QLT-050` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-045`/`QLT-050` cycle: backend `96.70%` lines, frontend `87.90%` lines.
+- [x] `QLT-056` completed: custom-command preview rendering is now strictly text-only and applies deterministic truncation (`4000` chars max preview payload) for large command content.
+- [x] Preview feedback now includes explicit truncation metadata (`Payload truncated: omitted <N> chars.`) when payload exceeds preview limit.
+- [x] Added frontend integration coverage for large custom-command preview truncation behavior.
+- [x] Validation for `QLT-056` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-056` cycle: backend `96.97%` lines, frontend `88.03%` lines.
 
 ## Maintenance Rules
 

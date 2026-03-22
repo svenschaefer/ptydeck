@@ -516,10 +516,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.deepEqual(customCommandUpserts[2], { commandName: "closeit", content: "echo close" });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /closeit (inline).");
 
+  const longPreviewPayload = "x".repeat(5000);
+  fixture.elements.commandInput.value = `/custom longpreview ${longPreviewPayload}`;
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 4);
+  assert.deepEqual(customCommandUpserts[3], { commandName: "longpreview", content: longPreviewPayload });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /longpreview (inline).");
+
   fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(customCommandUpserts.length, 3);
+  assert.equal(customCommandUpserts.length, 4);
   assert.match(
     fixture.elements.commandFeedback.textContent,
     /^Custom command definition error: Block definition must end with a closing '---' line\.$/
@@ -564,6 +572,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(inputPayloads.length, 2);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
+
+  fixture.elements.commandInput.value = "/longpreview";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.match(fixture.elements.commandPreview.textContent, /^Preview \/longpreview/);
+  assert.match(fixture.elements.commandPreview.textContent, /Payload truncated: omitted 1000 chars\./);
+  assert.match(fixture.elements.commandPreview.textContent, /Payload:\n/);
 
   fixture.elements.commandInput.value = "/c";
   const tabForward = {
@@ -644,7 +659,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.equal(fixture.elements.commandInput.value, "/custom show closeit");
+  assert.equal(fixture.elements.commandInput.value, "/custom show longpreview");
 
   fixture.elements.commandInput.value = "/closeit ";
   fixture.elements.commandInput.dispatchEvent({
