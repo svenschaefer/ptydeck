@@ -41,13 +41,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `FE-004` Owner: `FE` Task: Build session list/actions UI for create, focus, and close.
 - [x] `FE-005` Owner: `FE` Task: Build central command input that sends `value + "\\n"` to active session.
 - [x] `FE-006` Owner: `FE` Task: Forward direct keyboard input from active terminal to REST input endpoint.
-- [ ] `FE-007` Owner: `FE` Task: Generate typed API client from `backend/openapi/openapi.yaml`.
+- [x] `FE-007` Owner: `FE` Task: Generate typed API client from `backend/openapi/openapi.yaml`.
 - [x] `FE-008` Owner: `FE` Task: Implement REST bootstrap flow to fetch sessions on app load.
 - [x] `FE-009` Owner: `FE` Task: Implement WebSocket client with reconnect strategy and connection status indicator.
 - [x] `FE-010` Owner: `FE` Task: Route WS events to terminals by `sessionId` and append terminal output efficiently.
 - [x] `FE-011` Owner: `FE` Task: Implement terminal resize detection with debounced call to resize endpoint.
 - [x] `FE-012` Owner: `FE` Task: Implement client state store (`sessions`, `activeSessionId`, `connectionState`).
-- [ ] `FE-013` Owner: `FE` Task: Add explicit UI states for loading, empty, error, and disconnected WS.
+- [x] `FE-013` Owner: `FE` Task: Add explicit UI states for loading, empty, error, and disconnected WS.
 - [x] `FE-014` Owner: `FE` Task: Add cleanup of event listeners and terminal instances to prevent memory leaks.
 
 ## Integration, Quality, and Delivery Tasks

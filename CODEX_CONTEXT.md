@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.4.0 frontend in progress)
+Last updated: 2026-03-22 (v0.4.0 frontend completed)
 Owner: `CODX`
 
 ## Project Purpose
@@ -49,7 +49,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now includes a real multi-session xterm UI, session actions, and central command input.
 - Frontend now consumes backend snapshots/events via WebSocket reconnect flow.
 - Frontend now performs per-session debounced resize calls to backend.
-- `v0.4.0` status: in progress (`FE-007` and `FE-013` remain open).
+- `v0.4.0` status: completed.
 
 ## Session Behavior Notes
 

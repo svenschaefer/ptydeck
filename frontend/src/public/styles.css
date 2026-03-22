@@ -55,6 +55,13 @@ body {
   padding: 10px;
 }
 
+.status-message {
+  margin: 0 18px;
+  min-height: 20px;
+  color: #9c2c2c;
+  font-size: 13px;
+}
+
 button {
   border: 1px solid var(--border);
   border-radius: 8px;

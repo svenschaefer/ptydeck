@@ -1,11 +1,4 @@
-/**
- * @typedef {Object} Session
- * @property {string} id
- * @property {string} cwd
- * @property {string} shell
- * @property {number} createdAt
- * @property {number} updatedAt
- */
+/** @typedef {import("./api-types").Session} Session */
 
 function withJson(body) {
   return {

@@ -77,8 +77,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0`
-- Next milestone in progress: `v0.4.0`
+- Latest completed milestone: `v0.4.0`
+- Next milestone in progress: `v0.5.0`
 - Blockers: none recorded
 
 ### Completed Items in Current Milestone
@@ -120,4 +120,6 @@ Exit criteria:
 - `FE-011` completed on 2026-03-22.
 - `FE-012` completed on 2026-03-22.
 - `FE-014` completed on 2026-03-22.
+- `FE-007` completed on 2026-03-22.
+- `FE-013` completed on 2026-03-22.
 - `INT-007` completed early on 2026-03-22 (originally planned for `v0.5.0`).

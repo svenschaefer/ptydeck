@@ -4,7 +4,7 @@ A lightweight web-based multi-terminal system for managing and interacting with 
 
 ## Repository Status
 
-Current state: backend `v0.3.0` is complete and frontend `v0.4.0` is in progress.
+Current state: backend `v0.3.0` and frontend `v0.4.0` are complete.
 
 - Monorepo structure with `backend/` and `frontend/`
 - OpenAPI contract scaffold in `backend/openapi/openapi.yaml`

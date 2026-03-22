@@ -29,6 +29,9 @@ Completed and verified topics belong here.
 - [x] Added browser UI with xterm terminals, active-session control, and central command input.
 - [x] Added WS reconnect/status handling and per-session output routing.
 - [x] Added frontend tests for API client and state store (`INT-007`).
+- [x] `FE-007` completed with generated frontend API types from `backend/openapi/openapi.yaml`.
+- [x] `FE-013` completed with explicit loading, empty, error, and disconnected UI states.
+- [x] `v0.4.0` milestone completed.
 
 ## Maintenance Rules
 
