@@ -50,10 +50,15 @@
         <div class="terminal-toolbar">
           <span class="session-quick-id"></span>
           <button class="session-focus" type="button"></button>
-          <button class="session-settings" type="button" aria-label="Session settings">Settings</button>
+          <button class="session-settings" type="button" aria-label="Session settings">
+            <span class="session-settings-icon" aria-hidden="true">&#9881;</span>
+          </button>
         </div>
-        <section class="session-settings-panel">
-          <p class="session-settings-title">Session Settings</p>
+        <dialog class="session-settings-dialog">
+          <div class="session-settings-head">
+            <p class="session-settings-title">Session Settings</p>
+            <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
+          </div>
           <p class="session-settings-hint">Session-scoped settings controls are available here.</p>
           <div class="session-startup-controls">
             <label class="session-startup-label">Working Directory</label>
@@ -83,7 +88,7 @@
             <button class="session-rename" type="button">Rename</button>
             <button class="session-close" type="button">Close</button>
           </div>
-        </section>
+        </dialog>
         <div class="terminal-mount"></div>
       </article>
     </template>

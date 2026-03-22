@@ -53,6 +53,7 @@ class FakeElement {
     this.clientWidth = clientWidth;
     this.clientHeight = clientHeight;
     this.listeners = new Map();
+    this.open = false;
   }
 
   appendChild(child) {
@@ -88,6 +89,14 @@ class FakeElement {
 
   click() {
     this.dispatchEvent({ type: "click" });
+  }
+
+  showModal() {
+    this.open = true;
+  }
+
+  close() {
+    this.open = false;
   }
 
   querySelector(selector) {
@@ -215,7 +224,8 @@ function createTerminalCardTemplateNode() {
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
-  const settingsPanel = new FakeElement({ className: "session-settings-panel", tagName: "section" });
+  const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
+  const settingsDismiss = new FakeElement({ className: "session-settings-dismiss", tagName: "button" });
   const settingsTitle = new FakeElement({ className: "session-settings-title", tagName: "p" });
   const settingsHint = new FakeElement({ className: "session-settings-hint", tagName: "p" });
   const startControls = new FakeElement({ className: "session-startup-controls", tagName: "div" });
@@ -248,6 +258,7 @@ function createTerminalCardTemplateNode() {
   toolbar.appendChild(settings);
   settingsActions.appendChild(rename);
   settingsActions.appendChild(close);
+  settingsPanel.appendChild(settingsDismiss);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
   startControls.appendChild(startCwdLabel);
@@ -945,7 +956,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(firstQuickId.textContent, "1");
   assert.equal(secondQuickId.textContent, "2");
   const secondSettings = secondCard.querySelector(".session-settings");
-  const secondSettingsPanel = secondCard.querySelector(".session-settings-panel");
+  const secondSettingsPanel = secondCard.querySelector(".session-settings-dialog");
   const secondToolbar = secondCard.querySelector(".terminal-toolbar");
   assert.equal(secondToolbar.querySelector(".session-rename"), null);
   assert.equal(secondToolbar.querySelector(".session-close"), null);
@@ -960,10 +971,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
   const secondStartSave = secondSettingsPanel.querySelector(".session-start-save");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
-  assert.equal(secondSettingsPanel.classList.contains("open"), false);
+  assert.equal(secondSettingsPanel.open, false);
   secondSettings.click();
   await tick();
-  assert.equal(secondSettingsPanel.classList.contains("open"), true);
+  assert.equal(secondSettingsPanel.open, true);
   secondThemeSelect.value = "custom";
   secondThemeSelect.dispatchEvent({ type: "change" });
   await tick();
@@ -998,7 +1009,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(secondStartFeedback.textContent, "Invalid env variable name '1INVALID'.");
   secondSettings.click();
   await tick();
-  assert.equal(secondSettingsPanel.classList.contains("open"), false);
+  assert.equal(secondSettingsPanel.open, false);
   const secondFocus = secondCard.querySelector(".session-focus");
   secondFocus.click();
   await tick();

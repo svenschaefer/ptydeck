@@ -261,6 +261,9 @@ Completed and verified topics belong here.
 - [x] `QLT-064` completed: added frontend settings-lifecycle regression coverage in `frontend/test/app.test.js`.
 - [x] Settings lifecycle tests now verify icon/panel access, rename/close placement in settings, startup-settings save payload + env validation guardrails, and per-session theme persistence across session close/recreate.
 - [x] Validation for `QLT-064` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `QLT-065` completed: per-terminal settings UI switched from inline panel to a true modal dialog (`<dialog>`) opened from a settings icon button.
+- [x] Settings dialog now supports explicit close action and native Escape cancel handling while keeping session-scoped settings behavior unchanged.
+- [x] Frontend regression test harness updated for dialog open/close semantics (`open` state, `showModal`, `close`) and validated against the settings lifecycle flow.
 - [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
 - [x] `QLT-042` completed: frontend now shows a non-blocking custom-command preview panel for `/<customName>` (payload, resolved target, newline append indicator) before execution.

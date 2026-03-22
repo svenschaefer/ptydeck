@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings panel entry/action migration and color-set personalization completed in `QLT-058`, `QLT-059`, and `QLT-063`; backend startup-settings contract/apply completed in `QLT-060` and `QLT-061`; frontend startup-settings form and lifecycle QA regression coverage completed in `QLT-062` and `QLT-064`; remaining per-terminal settings/theme backlog `QLT-065`, `QLT-066`, `QLT-067`, `QLT-068`)
+Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply completed in `QLT-060` and `QLT-061`; remaining per-terminal settings/theme backlog `QLT-066`, `QLT-067`, `QLT-068`)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -145,7 +145,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
 - Frontend now exposes per-terminal settings entry points on terminal cards, with session-scoped settings panel shell/toggle behavior.
-- Frontend `Rename` and `Close` actions now live inside the per-session settings panel instead of the direct terminal toolbar.
+- Frontend per-terminal settings now open as a true modal dialog (`<dialog>`) from a gear-icon button, replacing inline panel rendering.
+- Frontend `Rename` and `Close` actions now live inside the per-session settings dialog instead of the direct terminal toolbar.
 - Frontend per-session settings now include terminal color-set controls with persisted preset/custom palette state and deterministic xterm theme application per session.
 - Frontend settings lifecycle regression coverage now verifies settings icon/panel access, rename/close relocation into settings, startup-settings save payload and env validation behavior, and per-session theme persistence across session close/recreate.
 - Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-068`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), proper settings-dialog UX, and advanced per-session theme profiles.
@@ -158,7 +159,7 @@ The system separates backend execution concerns from frontend rendering concerns
   - Planned next in cycle B: remaining enterprise hardening tasks from `TODO.md` (`ENT-013`, `ENT-014`, `ENT-022`).
   - Completed in cycle C: `QLT-042`, `QLT-043`, `QLT-044`, `QLT-045`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, `QLT-056`.
   - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-046`, `QLT-051`, `QLT-055`, `QLT-057`).
-  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-065`, `QLT-066`, `QLT-067`, `QLT-068`).
+  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-066`, `QLT-067`, `QLT-068`).
 
 ## Session Behavior Notes
 

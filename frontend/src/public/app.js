@@ -36,7 +36,6 @@ const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
-const openSessionSettingsPanels = new Set();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
 let bootstrapPromise = null;
@@ -909,6 +908,45 @@ function scheduleGlobalResize() {
   }, 120);
 }
 
+function openSettingsDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    return;
+  }
+  dialog.open = true;
+  dialog.classList.add("open");
+}
+
+function closeSettingsDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+  if (typeof dialog.close === "function") {
+    if (dialog.open) {
+      dialog.close();
+    }
+    return;
+  }
+  dialog.open = false;
+  dialog.classList.remove("open");
+}
+
+function toggleSettingsDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+  if (dialog.open) {
+    closeSettingsDialog(dialog);
+    return;
+  }
+  openSettingsDialog(dialog);
+}
+
 function scheduleDeferredResizePasses() {
   if (deferredResizeTimer) {
     clearTimeout(deferredResizeTimer);
@@ -995,7 +1033,7 @@ function render() {
       entry.element.remove();
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
-      openSessionSettingsPanels.delete(sessionId);
+      closeSettingsDialog(entry.settingsDialog);
       const timer = resizeTimers.get(sessionId);
       if (timer) {
         clearTimeout(timer);
@@ -1012,7 +1050,6 @@ function render() {
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
-      entry.settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
       syncSessionStartupControls(entry, session);
       syncSessionThemeControls(entry, session.id);
       continue;
@@ -1024,7 +1061,8 @@ function render() {
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
-    const settingsPanel = node.querySelector(".session-settings-panel");
+    const settingsDialog = node.querySelector(".session-settings-dialog");
+    const settingsDismissBtn = node.querySelector(".session-settings-dismiss");
     const startCwdInput = node.querySelector(".session-start-cwd");
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
@@ -1039,16 +1077,19 @@ function render() {
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
     quickIdEl.textContent = quickId;
-    settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
-    settingsBtn.addEventListener("click", () => {
-      if (openSessionSettingsPanels.has(session.id)) {
-        openSessionSettingsPanels.delete(session.id);
-      } else {
-        openSessionSettingsPanels.add(session.id);
-      }
-      settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
-    });
+    settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
+    if (settingsDismissBtn) {
+      settingsDismissBtn.addEventListener("click", () => closeSettingsDialog(settingsDialog));
+    }
+    if (settingsDialog && typeof settingsDialog.addEventListener === "function") {
+      settingsDialog.addEventListener("cancel", (event) => {
+        if (event && typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        closeSettingsDialog(settingsDialog);
+      });
+    }
     renameBtn.addEventListener("click", async () => {
       const nextName = window.prompt("Session name", session.name || session.id.slice(0, 8));
       if (nextName === null) {
@@ -1166,7 +1207,7 @@ function render() {
       element: node,
       focusBtn,
       quickIdEl,
-      settingsPanel,
+      settingsDialog,
       startCwdInput,
       startCommandInput,
       startEnvInput,

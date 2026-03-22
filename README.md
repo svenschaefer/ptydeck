@@ -72,7 +72,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Multiple terminal sessions displayed side by side
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
-- Per-terminal settings entry on each terminal card (`Settings`) with session-scoped settings panel shell
+- Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Close` actions are available inside each session settings panel (removed from direct toolbar)
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save feedback
 - Per-session terminal color sets in session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` values persisted in browser storage)
