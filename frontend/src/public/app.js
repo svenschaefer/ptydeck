@@ -67,16 +67,37 @@ function render() {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
+      entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       continue;
     }
 
     const node = template.content.firstElementChild.cloneNode(true);
     const focusBtn = node.querySelector(".session-focus");
+    const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
     const mount = node.querySelector(".terminal-mount");
 
-    focusBtn.textContent = session.id.slice(0, 8);
+    focusBtn.textContent = session.name || session.id.slice(0, 8);
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
+    renameBtn.addEventListener("click", async () => {
+      const nextName = window.prompt("Session name", session.name || session.id.slice(0, 8));
+      if (nextName === null) {
+        return;
+      }
+      const trimmed = nextName.trim();
+      if (!trimmed) {
+        setError("Session name cannot be empty.");
+        return;
+      }
+      try {
+        await api.updateSession(session.id, { name: trimmed });
+        const sessions = await api.listSessions();
+        store.setSessions(sessions);
+        uiState.error = "";
+      } catch {
+        setError("Failed to rename session.");
+      }
+    });
     closeBtn.addEventListener("click", async () => {
       try {
         await api.deleteSession(session.id);
@@ -139,7 +160,7 @@ function render() {
     });
     observer.observe(mount);
 
-    terminals.set(session.id, { terminal, element: node });
+    terminals.set(session.id, { terminal, element: node, focusBtn });
     terminalObservers.set(session.id, observer);
     gridEl.appendChild(node);
   }

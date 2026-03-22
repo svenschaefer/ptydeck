@@ -76,3 +76,14 @@ test("validateResponse rejects invalid session shape", () => {
     });
   });
 });
+
+test("validateRequest accepts valid session patch payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: { name: "renamed" }
+    });
+  });
+});

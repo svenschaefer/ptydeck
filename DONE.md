@@ -76,6 +76,10 @@ Completed and verified topics belong here.
 - [x] `QLT-018` completed: frontend default UI switched to tmux-like dark console style.
 - [x] Terminal display baseline increased to roughly `125%` (`fontSize: 16`, larger terminal mount and responsive grid sizing).
 - [x] Coverage after `QLT-018` validation cycle: backend `96.58%` lines, frontend `97.59%` lines.
+- [x] `QLT-019` completed: dark-mode background gradient corrected and terminal-grid minimum column width enforced before creating additional columns.
+- [x] `QLT-020` completed: sessions can be renamed (`PATCH /api/v1/sessions/{sessionId}` + frontend rename action), and new sessions default to user home directory when no persisted cwd exists.
+- [x] OpenAPI contract and runtime validation updated for session metadata update request/response shape including optional session `name`.
+- [x] Coverage after `QLT-019`/`QLT-020` validation cycle: backend `96.68%` lines, frontend `97.71%` lines.
 
 ## Maintenance Rules
 

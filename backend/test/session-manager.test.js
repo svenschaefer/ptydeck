@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
 import { SessionManager } from "../src/session-manager.js";
 
 function createFakePty() {
@@ -110,4 +111,25 @@ test("SessionManager create honors persisted timestamps when provided", () => {
 
   assert.equal(created.createdAt, 1710000000000);
   assert.equal(created.updatedAt, 1710000001234);
+});
+
+test("SessionManager defaults cwd to user home when not provided", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({ shell: "bash" });
+  assert.equal(created.cwd, homedir());
+});
+
+test("SessionManager can rename sessions", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  const updated = manager.rename(created.id, "ops-shell");
+  assert.equal(updated.name, "ops-shell");
 });

@@ -9,7 +9,7 @@ const outputPath = join(repoRoot, "frontend", "src", "public", "api-types.d.ts")
 
 const openapi = await readFile(openapiPath, "utf8");
 
-const requiredMarkers = ["Session:", "CreateSessionRequest:", "ErrorResponse:"];
+const requiredMarkers = ["Session:", "CreateSessionRequest:", "UpdateSessionRequest:", "ErrorResponse:"];
 for (const marker of requiredMarkers) {
   if (!openapi.includes(marker)) {
     throw new Error(`OpenAPI schema marker missing: ${marker}`);
@@ -22,6 +22,7 @@ export type Session = {
   id: string;
   cwd: string;
   shell: string;
+  name?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -29,6 +30,11 @@ export type Session = {
 export type CreateSessionRequest = {
   cwd?: string;
   shell?: string;
+  name?: string;
+};
+
+export type UpdateSessionRequest = {
+  name: string;
 };
 
 export type ErrorResponse = {

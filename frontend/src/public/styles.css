@@ -18,9 +18,7 @@
 body {
   margin: 0;
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
-  background:
-    radial-gradient(circle at 10% -10%, #1b2330 0%, rgba(27, 35, 48, 0) 38%),
-    linear-gradient(180deg, var(--bg-grid) 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, #101723 0%, #0a0d12 100%);
   color: var(--text);
 }
 
@@ -95,7 +93,7 @@ button:hover {
   padding: 12px 18px 18px;
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
 }
 
 .empty-state {
@@ -128,8 +126,11 @@ button:hover {
   font-weight: 700;
 }
 
-.session-close {
+.session-rename {
   margin-left: auto;
+}
+
+.session-close {
   border-color: #5f2c2c;
   color: #ff9f9f;
 }

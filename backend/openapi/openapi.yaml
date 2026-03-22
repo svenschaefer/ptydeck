@@ -72,6 +72,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateSession
+      summary: Update session metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSessionRequest'
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /sessions/{sessionId}/input:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -150,6 +178,8 @@ components:
           type: string
         shell:
           type: string
+        name:
+          type: string
         createdAt:
           type: integer
           format: int64
@@ -162,6 +192,14 @@ components:
         cwd:
           type: string
         shell:
+          type: string
+        name:
+          type: string
+    UpdateSessionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
           type: string
     ErrorResponse:
       type: object

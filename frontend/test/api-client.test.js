@@ -71,3 +71,22 @@ test("api client throws fallback error when non-2xx body is not json", async () 
       err.message === "Request failed with status 502."
   );
 });
+
+test("api client calls update session endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "abc", cwd: "/tmp", shell: "bash", name: "renamed", createdAt: 1, updatedAt: 2 })
+    };
+  };
+
+  const api = createApiClient("http://localhost:8080/api/v1");
+  await api.updateSession("abc", { name: "renamed" });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:8080/api/v1/sessions/abc");
+  assert.equal(calls[0].options.method, "PATCH");
+});

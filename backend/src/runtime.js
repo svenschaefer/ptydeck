@@ -78,6 +78,9 @@ function route(pathname, method) {
   if (getSessionMatch && method === "GET") {
     return { kind: "getSession", params: { sessionId: getSessionMatch[1] } };
   }
+  if (getSessionMatch && method === "PATCH") {
+    return { kind: "updateSession", params: { sessionId: getSessionMatch[1] } };
+  }
   if (getSessionMatch && method === "DELETE") {
     return { kind: "deleteSession", params: { sessionId: getSessionMatch[1] } };
   }
@@ -215,6 +218,14 @@ export function createRuntime(config) {
         return;
       }
 
+      if (match.kind === "updateSession") {
+        const payload = manager.rename(match.params.sessionId, body.name);
+        validateResponse({ statusCode: 200, body: payload, expect: "session" });
+        persistSoon();
+        writeJson(res, 200, payload);
+        return;
+      }
+
       if (match.kind === "input") {
         manager.sendInput(match.params.sessionId, body.data);
         persistSoon();
@@ -282,8 +293,9 @@ export function createRuntime(config) {
       try {
         manager.create({
           id: session.id,
-          cwd: session.cwd || process.cwd(),
+          cwd: session.cwd,
           shell: session.shell || config.shell,
+          name: session.name,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt
         });

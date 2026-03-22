@@ -15,6 +15,21 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body?.shell !== undefined && typeof body.shell !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'shell' must be a string.");
     }
+    if (body?.name !== undefined && typeof body.name !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+  }
+
+  if (method === "PATCH" && pathname.match(/^\/api\/v1\/sessions\/[^/]+$/)) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.name !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
   }
 
   if (method === "POST" && pathname.endsWith("/input")) {
@@ -50,6 +65,7 @@ function isSession(value) {
     typeof value.id === "string" &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
+    (value.name === undefined || typeof value.name === "string") &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );

@@ -4,6 +4,7 @@ export type Session = {
   id: string;
   cwd: string;
   shell: string;
+  name?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -11,6 +12,11 @@ export type Session = {
 export type CreateSessionRequest = {
   cwd?: string;
   shell?: string;
+  name?: string;
+};
+
+export type UpdateSessionRequest = {
+  name: string;
 };
 
 export type ErrorResponse = {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pty from "node-pty";
 import { EventEmitter } from "node:events";
+import { homedir } from "node:os";
 import { ApiError } from "./errors.js";
 
 function now() {
@@ -38,8 +39,9 @@ export class SessionManager {
 
   create({
     id = randomUUID(),
-    cwd = process.cwd(),
+    cwd = homedir(),
     shell = this.defaultShell,
+    name,
     createdAt,
     updatedAt
   } = {}) {
@@ -55,6 +57,7 @@ export class SessionManager {
         id,
         cwd,
         shell,
+        ...(typeof name === "string" ? { name } : {}),
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
       }
@@ -105,6 +108,13 @@ export class SessionManager {
     const session = this.get(sessionId);
     session.ptyProcess.resize(cols, rows);
     session.meta.updatedAt = now();
+  }
+
+  rename(sessionId, name) {
+    const session = this.get(sessionId);
+    session.meta.name = name;
+    session.meta.updatedAt = now();
+    return session.meta;
   }
 
   on(eventName, listener) {

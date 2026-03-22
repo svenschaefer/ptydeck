@@ -61,6 +61,15 @@ export function createApiClient(baseUrl) {
       const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
       return readResponse(res);
     },
+    /** @returns {Promise<Session>} */
+    async updateSession(sessionId, payload) {
+      const res = await fetch(`${baseUrl}/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return readResponse(res);
+    },
     async deleteSession(sessionId) {
       const res = await fetch(`${baseUrl}/sessions/${sessionId}`, { method: "DELETE" });
       await readResponse(res, { expectJson: false });

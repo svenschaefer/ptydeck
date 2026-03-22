@@ -43,6 +43,18 @@ test("REST lifecycle endpoints work end-to-end", async () => {
 
     const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
     assert.equal(getRes.status, 200);
+    const getPayload = await getRes.json();
+    assert.equal(typeof getPayload.cwd, "string");
+    assert.ok(getPayload.cwd.length > 0);
+
+    const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "main-shell" })
+    });
+    assert.equal(patchRes.status, 200);
+    const patched = await patchRes.json();
+    assert.equal(patched.name, "main-shell");
 
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
@@ -118,6 +130,15 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(unknownDeleteRes.status, 404);
     const unknownDeleteBody = await unknownDeleteRes.json();
     assert.equal(unknownDeleteBody.error, "SessionNotFound");
+
+    const invalidPatchRes = await fetch(`${baseUrl}/sessions/unknown`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: 123 })
+    });
+    assert.equal(invalidPatchRes.status, 400);
+    const invalidPatchBody = await invalidPatchRes.json();
+    assert.equal(invalidPatchBody.error, "ValidationError");
   } finally {
     await runtime.stop();
   }
