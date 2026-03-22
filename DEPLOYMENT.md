@@ -146,7 +146,43 @@ WebSocket requirements:
 2. Restart backend and frontend.
 3. Re-run smoke checks above.
 
-## 9. Release Checklist
+## 9. Production Logging Standard
+
+Use the following production logging contract for backend and frontend serving processes:
+
+- Log format:
+  - JSON line logs in production (`one JSON object per line`).
+  - Plain text logs are allowed only for local development troubleshooting.
+- Required base fields:
+  - `ts` (ISO-8601 timestamp)
+  - `level` (`debug|info|warn|error`)
+  - `service` (`ptydeck-backend` or `ptydeck-frontend`)
+  - `event` (stable event name)
+  - `requestId` (when request-scoped)
+- Correlation and request tracing:
+  - Accept inbound `X-Request-Id` if present.
+  - Generate one if missing.
+  - Propagate `X-Request-Id` to downstream logs/events for the same request.
+- PII and secret redaction rules:
+  - Never log bearer tokens, cookies, passwords, secret keys, session command payloads, or full terminal output bodies.
+  - Redact sensitive headers/fields at source (`authorization`, `cookie`, `set-cookie`, `access_token`, `refresh_token`, `password`, `secret`, `token`).
+  - For troubleshooting, log metadata only (lengths, IDs, status, timing), not sensitive values.
+- Retention policy baseline:
+  - Keep hot logs for `14` days in non-prod and `30` days in prod.
+  - Archive storage may keep compressed logs longer per compliance policy, but runtime logs must have enforced TTL.
+  - Document and automate purge cadence in operations tooling.
+- Access control:
+  - Restrict production log access to least-privilege operator roles.
+  - Keep audit trail for log access in managed logging platform.
+
+Recommended runtime env pattern:
+
+- `NODE_ENV=production`
+- `LOG_FORMAT=json`
+- `LOG_RETENTION_DAYS=30`
+- `LOG_REDACT_FIELDS=authorization,cookie,set-cookie,access_token,refresh_token,password,secret,token`
+
+## 10. Release Checklist
 
 - [ ] `main` branch is up to date
 - [ ] Quality gate passed

@@ -169,6 +169,8 @@ Completed and verified topics belong here.
 - [x] Added backend auth coverage for protected REST and WS behavior plus contract/validation coverage for new auth token endpoint.
 - [x] Validation for `ENT-001` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-001` cycle: backend `96.01%` lines, frontend `88.36%` lines.
+- [x] `ENT-004` completed: documented production logging standards in `DEPLOYMENT.md` (JSON logging contract, correlation IDs, PII redaction, retention policy baseline).
+- [x] Deployment runbook now includes explicit required log fields and recommended runtime env pattern for production logging controls.
 
 ## Maintenance Rules
 

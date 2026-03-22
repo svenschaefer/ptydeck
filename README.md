@@ -72,6 +72,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)
 - Optional local auth baseline via `AUTH_DEV_MODE=1` with automatic frontend dev-token acquisition (`/api/v1/auth/dev-token`)
+- Production logging standard documented in `DEPLOYMENT.md` (JSON format, correlation IDs, redaction, retention baseline)
 - Full PTY support (interactive applications like `vim`, `nano`, `top`)
 - Session persistence (restores working directory after restart)
 - Clean multiplexing over a single WebSocket connection
