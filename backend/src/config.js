@@ -9,6 +9,7 @@ export function loadConfig(env = process.env) {
     dataPath: env.DATA_PATH || "./data/sessions.json",
     corsOrigin: env.CORS_ORIGIN || "*",
     maxBodyBytes: Number.isFinite(maxBodyBytes) && maxBodyBytes > 0 ? maxBodyBytes : 1024 * 1024,
-    debugLogs
+    debugLogs,
+    debugLogFile: env.BACKEND_DEBUG_LOG_FILE || ""
   };
 }

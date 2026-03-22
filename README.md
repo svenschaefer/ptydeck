@@ -41,7 +41,7 @@ To trace session-loading problems end to end:
 1. Start backend with logs enabled:
 
 ```bash
-BACKEND_DEBUG_LOGS=1 npm run dev
+BACKEND_DEBUG_LOGS=1 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log npm run dev
 ```
 
 2. Open frontend with debug query parameter:
@@ -51,6 +51,8 @@ http://127.0.0.1:5173/?debug=1
 ```
 
 Browser console will print `ptydeck` events for REST calls, WebSocket state/messages, render cycles, and terminal resize actions.
+Backend lifecycle/request logs are also written to `/tmp/ptydeck-backend-debug.log`.
+For dev-server injected runtime config, you can also set `FRONTEND_DEBUG_LOGS=1` before `npm run dev`.
 
 ## Overview
 

@@ -14,6 +14,16 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8"
 };
 
+function injectRuntimeConfig(html) {
+  const runtimeConfig = {
+    apiBaseUrl: config.apiBaseUrl,
+    wsUrl: config.wsUrl,
+    debugLogs: config.debugLogs
+  };
+  const script = `<script>window.__PTYDECK_CONFIG__=${JSON.stringify(runtimeConfig)};</script>`;
+  return html.replace("</head>", `  ${script}\n  </head>`);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const filePath = resolvePublicFilePath(root, req.url || "/");
@@ -23,8 +33,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const body = await readFile(filePath);
+    let body = await readFile(filePath);
     const contentType = mimeTypes[extname(filePath)] || "application/octet-stream";
+
+    if (contentType.startsWith("text/html")) {
+      body = Buffer.from(injectRuntimeConfig(body.toString("utf8")), "utf8");
+    }
 
     res.writeHead(200, { "content-type": contentType });
     res.end(body);

@@ -10,6 +10,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.corsOrigin, "*");
   assert.equal(config.maxBodyBytes, 1024 * 1024);
   assert.equal(config.debugLogs, false);
+  assert.equal(config.debugLogFile, "");
 });
 
 test("loadConfig maps environment values", () => {
@@ -19,7 +20,8 @@ test("loadConfig maps environment values", () => {
     DATA_PATH: "/tmp/ptydeck.json",
     CORS_ORIGIN: "http://localhost:3000",
     MAX_BODY_BYTES: "4096",
-    BACKEND_DEBUG_LOGS: "true"
+    BACKEND_DEBUG_LOGS: "true",
+    BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log"
   });
 
   assert.equal(config.port, 9090);
@@ -28,4 +30,5 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.corsOrigin, "http://localhost:3000");
   assert.equal(config.maxBodyBytes, 4096);
   assert.equal(config.debugLogs, true);
+  assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
 });

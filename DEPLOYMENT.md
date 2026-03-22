@@ -44,7 +44,8 @@ Set at least:
 Optional for troubleshooting:
 
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
-- Frontend: add `?debug=1` to URL for browser-side REST/WS/render/resize logs
+- Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
+- Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 
 ## 5. Start in Production Mode
 

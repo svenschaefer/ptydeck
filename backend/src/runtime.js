@@ -1,4 +1,5 @@
 import http from "node:http";
+import { appendFile } from "node:fs/promises";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { ApiError, toErrorResponse } from "./errors.js";
@@ -117,7 +118,13 @@ export function createRuntime(config) {
       return;
     }
     const timestamp = new Date().toISOString();
-    console.log(`[ptydeck-backend][${timestamp}] ${event}`, details);
+    const line = `[ptydeck-backend][${timestamp}] ${event} ${JSON.stringify(details)}`;
+    console.log(line);
+    if (config.debugLogFile) {
+      appendFile(config.debugLogFile, `${line}\n`).catch(() => {
+        // Ignore debug log write failures.
+      });
+    }
   }
 
   function writeJson(res, statusCode, body) {

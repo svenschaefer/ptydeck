@@ -99,6 +99,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-024` Owner: `FE` Task: Add explicit command execution feedback area (success/error/help output) separated from PTY output stream.
 - [ ] `QLT-025` Owner: `BE` Task: Add session restart endpoint (`POST /api/v1/sessions/{sessionId}/restart`) to support `/restart` command semantics without restarting backend process.
 - [ ] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).
+- [ ] `QLT-027` Owner: `FE` Task: Add frontend performance guardrails for session bootstrap and event handling (avoid redundant session list roundtrips, measure render latency for multi-session startup, and add regression test coverage for slow-load scenarios).
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

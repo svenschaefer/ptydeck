@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (frontend terminal-load hotfix applied, context synchronized)
+Last updated: 2026-03-22 (frontend latency/debug hardening applied, context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -72,13 +72,17 @@ The system separates backend execution concerns from frontend rendering concerns
 - Sessions now support explicit naming via API/UI, and new sessions default cwd to user home when no prior history exists.
 - Command composer is bottom-docked, multiline by default (10 rows), and supports explicit submit via `Ctrl/Cmd+Enter`.
 - Frontend terminal initialization/resize path now guards against invalid pre-layout dimensions and duplicate resize calls to prevent session load stalls.
+- Frontend debug mode (`?debug=1`) now logs API, WebSocket, render, and resize flow events for browser-side troubleshooting.
+- Backend debug mode now supports optional persistent debug file output via `BACKEND_DEBUG_LOG_FILE`.
+- Frontend dev server now injects runtime API/WS/debug values into `window.__PTYDECK_CONFIG__` for deterministic runtime endpoint/debug wiring.
+- Frontend session lifecycle updates now avoid redundant `listSessions` roundtrips by applying local upsert/remove updates on create/rename/close and WS lifecycle events.
 - Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-026`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`.
-  - Planned next in cycle A: `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026` (control-plane command interpreter and restart support).
+  - Planned next in cycle A: `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-026`, `QLT-027` (control-plane command interpreter/restart support and frontend latency guardrails).
 
 ## Session Behavior Notes
 

@@ -83,6 +83,10 @@ Completed and verified topics belong here.
 - [x] `QLT-021` completed: command composer moved to page bottom and switched to 10-row multiline textarea.
 - [x] Command submit behavior now preserves line breaks; `Ctrl+Enter`/`Cmd+Enter` submits, plain `Enter` inserts newline.
 - [x] Coverage after `QLT-021` validation cycle: backend `96.81%` lines, frontend `97.71%` lines.
+- [x] Troubleshooting instrumentation added: frontend debug logs (`?debug=1`) now cover REST, WS, render lifecycle, and resize flow.
+- [x] Backend debug logging extended with optional file sink (`BACKEND_DEBUG_LOG_FILE`) for reproducible request/session/ws traces independent of terminal output.
+- [x] Frontend latency hotfix: removed redundant `listSessions` roundtrips during create/rename/close and WS `session.created`/`session.closed` handling; switched to local store upsert/remove updates.
+- [x] Frontend dev server now injects runtime config (`API_BASE_URL`, `WS_URL`, `FRONTEND_DEBUG_LOGS`) into `window.__PTYDECK_CONFIG__` to keep browser runtime wiring deterministic.
 - [x] Frontend hotfix: terminal card initialization/resize flow hardened to avoid repeated resize loops that delayed or blocked session rendering.
 - [x] Terminal resize behavior now skips invalid pre-layout dimensions, de-duplicates unchanged resize values, and ignores transient resize API failures.
 - [x] Smoke validation for this hotfix passed: `npm run dev` startup + `/health`, `/ready`, and frontend HTML reachability checks.

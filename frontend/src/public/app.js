@@ -123,9 +123,8 @@ function render() {
         return;
       }
       try {
-        await api.updateSession(session.id, { name: trimmed });
-        const sessions = await api.listSessions();
-        store.setSessions(sessions);
+        const updated = await api.updateSession(session.id, { name: trimmed });
+        upsertSession(updated);
         uiState.error = "";
       } catch {
         setError("Failed to rename session.");
@@ -134,8 +133,8 @@ function render() {
     closeBtn.addEventListener("click", async () => {
       try {
         await api.deleteSession(session.id);
-        const sessions = await api.listSessions();
-        store.setSessions(sessions);
+        removeSession(session.id);
+        uiState.error = "";
       } catch {
         setError("Failed to delete session.");
       }
@@ -221,8 +220,40 @@ function render() {
   }
 }
 
+function upsertSession(nextSession) {
+  const currentSessions = store.getState().sessions;
+  const nextSessions = currentSessions.slice();
+  const index = nextSessions.findIndex((entry) => entry.id === nextSession.id);
+  if (index >= 0) {
+    nextSessions[index] = { ...nextSessions[index], ...nextSession };
+  } else {
+    nextSessions.push(nextSession);
+  }
+  store.setSessions(nextSessions);
+}
+
+function removeSession(sessionId) {
+  const currentSessions = store.getState().sessions;
+  const nextSessions = currentSessions.filter((entry) => entry.id !== sessionId);
+  store.setSessions(nextSessions);
+}
+
+async function bootstrapSessions() {
+  try {
+    debugLog("sessions.bootstrap.start");
+    const sessions = await api.listSessions();
+    store.setSessions(sessions);
+    uiState.loading = false;
+    uiState.error = "";
+    debugLog("sessions.bootstrap.ok", { count: sessions.length });
+  } catch {
+    setError("Failed to load sessions.");
+  }
+}
+
 store.subscribe(render);
 render();
+bootstrapSessions();
 
 const ws = createWsClient(config.wsUrl, {
   onState(status) {
@@ -237,6 +268,8 @@ const ws = createWsClient(config.wsUrl, {
     debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
     if (event.type === "snapshot") {
       store.setSessions(event.sessions || []);
+      uiState.loading = false;
+      uiState.error = "";
       return;
     }
 
@@ -245,15 +278,15 @@ const ws = createWsClient(config.wsUrl, {
       return;
     }
 
-    if (event.type === "session.created" || event.type === "session.closed") {
-      api
-        .listSessions()
-        .then((sessions) => {
-          store.setSessions(sessions);
-          uiState.error = "";
-          debugLog("sessions.refresh.ok", { count: sessions.length });
-        })
-        .catch(() => setError("Failed to refresh sessions from server."));
+    if (event.type === "session.created" && event.session) {
+      upsertSession(event.session);
+      uiState.error = "";
+      return;
+    }
+
+    if (event.type === "session.closed" && event.sessionId) {
+      removeSession(event.sessionId);
+      uiState.error = "";
     }
   }
 }, { debug: debugLogs, log: debugLog });
@@ -261,11 +294,10 @@ const ws = createWsClient(config.wsUrl, {
 createBtn.addEventListener("click", async () => {
   try {
     debugLog("sessions.create.start");
-    await api.createSession();
-    const sessions = await api.listSessions();
-    store.setSessions(sessions);
+    const session = await api.createSession();
+    upsertSession(session);
     uiState.error = "";
-    debugLog("sessions.create.ok", { count: sessions.length });
+    debugLog("sessions.create.ok", { sessionId: session.id });
   } catch {
     setError("Failed to create session.");
   }
