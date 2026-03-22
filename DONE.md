@@ -240,6 +240,11 @@ Completed and verified topics belong here.
 - [x] Added backend contract/integration/validation/persistence coverage for custom-command CRUD paths and restart-persistence behavior.
 - [x] Validation for `QLT-037` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, `npm --prefix backend run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-037` cycle: backend `96.87%` lines, frontend `87.99%` lines.
+- [x] `QLT-038` completed: backend custom-command guardrails now enforce reserved-name collision rejection, name regex, max name length, max content length, and max command count with explicit API errors.
+- [x] OpenAPI contract for `PUT /api/v1/custom-commands/{commandName}` extended with `409` conflict response for reserved-name and limit-exceeded guardrail outcomes.
+- [x] Added backend integration coverage for guardrail error paths (`CustomCommandNameReserved`, `CustomCommandNameInvalid`, `CustomCommandNameTooLong`, `CustomCommandContentTooLarge`, `CustomCommandLimitExceeded`).
+- [x] Validation for `QLT-038` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-038` cycle: backend `96.97%` lines, frontend `87.99%` lines.
 
 ## Maintenance Rules
 

@@ -163,6 +163,70 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
   }
 });
 
+test("custom command guardrails reject reserved names, invalid names, oversized payloads, and count overflow", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    customCommandMaxCount: 1,
+    customCommandMaxNameLength: 8,
+    customCommandMaxContentLength: 16
+  });
+
+  try {
+    const reservedRes = await fetch(`${baseUrl}/custom-commands/new`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo ok\n" })
+    });
+    assert.equal(reservedRes.status, 409);
+    const reservedBody = await reservedRes.json();
+    assert.equal(reservedBody.error, "CustomCommandNameReserved");
+
+    const invalidNameRes = await fetch(`${baseUrl}/custom-commands/bad%20name`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo ok\n" })
+    });
+    assert.equal(invalidNameRes.status, 400);
+    const invalidNameBody = await invalidNameRes.json();
+    assert.equal(invalidNameBody.error, "CustomCommandNameInvalid");
+
+    const longNameRes = await fetch(`${baseUrl}/custom-commands/toolongggg`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo ok\n" })
+    });
+    assert.equal(longNameRes.status, 400);
+    const longNameBody = await longNameRes.json();
+    assert.equal(longNameBody.error, "CustomCommandNameTooLong");
+
+    const largeContentRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "x".repeat(17) })
+    });
+    assert.equal(largeContentRes.status, 400);
+    const largeContentBody = await largeContentRes.json();
+    assert.equal(largeContentBody.error, "CustomCommandContentTooLarge");
+
+    const firstCreateRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo ok\n" })
+    });
+    assert.equal(firstCreateRes.status, 200);
+
+    const overflowRes = await fetch(`${baseUrl}/custom-commands/build`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo ok\n" })
+    });
+    assert.equal(overflowRes.status, 409);
+    const overflowBody = await overflowRes.json();
+    assert.equal(overflowBody.error, "CustomCommandLimitExceeded");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 

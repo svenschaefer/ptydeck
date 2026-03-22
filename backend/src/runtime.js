@@ -10,6 +10,23 @@ import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
+const CUSTOM_COMMAND_RESERVED_NAMES = new Set([
+  "new",
+  "close",
+  "switch",
+  "next",
+  "prev",
+  "list",
+  "rename",
+  "restart",
+  "help",
+  "custom"
+]);
+const CUSTOM_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const DEFAULT_CUSTOM_COMMAND_MAX_COUNT = 256;
+const DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH = 32;
+const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
+
 function decodePathParam(value, name) {
   try {
     return decodeURIComponent(value);
@@ -195,6 +212,18 @@ export function createRuntime(config) {
     httpRequestsByStatus: new Map(),
     httpRequestsByRoute: new Map()
   };
+  const customCommandMaxCount =
+    Number.isInteger(config.customCommandMaxCount) && config.customCommandMaxCount > 0
+      ? config.customCommandMaxCount
+      : DEFAULT_CUSTOM_COMMAND_MAX_COUNT;
+  const customCommandMaxNameLength =
+    Number.isInteger(config.customCommandMaxNameLength) && config.customCommandMaxNameLength > 0
+      ? config.customCommandMaxNameLength
+      : DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH;
+  const customCommandMaxContentLength =
+    Number.isInteger(config.customCommandMaxContentLength) && config.customCommandMaxContentLength > 0
+      ? config.customCommandMaxContentLength
+      : DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH;
   let isReady = false;
   let isStopping = false;
   let isStopped = false;
@@ -370,6 +399,38 @@ export function createRuntime(config) {
   }
 
   function upsertCustomCommand(name, content) {
+    if (name.length > customCommandMaxNameLength) {
+      throw new ApiError(
+        400,
+        "CustomCommandNameTooLong",
+        `Custom command name exceeds maximum length (${customCommandMaxNameLength}).`
+      );
+    }
+    if (!CUSTOM_COMMAND_NAME_PATTERN.test(name)) {
+      throw new ApiError(
+        400,
+        "CustomCommandNameInvalid",
+        "Custom command name must match pattern [A-Za-z0-9][A-Za-z0-9_-]*."
+      );
+    }
+    if (CUSTOM_COMMAND_RESERVED_NAMES.has(name.toLowerCase())) {
+      throw new ApiError(409, "CustomCommandNameReserved", "Custom command name collides with a system command.");
+    }
+    if (content.length > customCommandMaxContentLength) {
+      throw new ApiError(
+        400,
+        "CustomCommandContentTooLarge",
+        `Custom command content exceeds maximum length (${customCommandMaxContentLength}).`
+      );
+    }
+    if (!customCommands.has(name) && customCommands.size >= customCommandMaxCount) {
+      throw new ApiError(
+        409,
+        "CustomCommandLimitExceeded",
+        `Custom command limit reached (${customCommandMaxCount}).`
+      );
+    }
+
     const current = customCommands.get(name);
     const now = Date.now();
     const next = {
@@ -789,6 +850,15 @@ export function createRuntime(config) {
     }
     for (const customCommand of persistedState.customCommands) {
       if (!customCommand || typeof customCommand.name !== "string" || typeof customCommand.content !== "string") {
+        continue;
+      }
+      if (
+        customCommand.name.length > customCommandMaxNameLength ||
+        !CUSTOM_COMMAND_NAME_PATTERN.test(customCommand.name) ||
+        CUSTOM_COMMAND_RESERVED_NAMES.has(customCommand.name.toLowerCase()) ||
+        customCommand.content.length > customCommandMaxContentLength ||
+        customCommands.size >= customCommandMaxCount
+      ) {
         continue;
       }
       customCommands.set(customCommand.name, {
