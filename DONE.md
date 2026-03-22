@@ -317,6 +317,12 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage validating preset selection, custom-color apply flow, and xterm theme option updates in `frontend/test/app.test.js`.
 - [x] Validation for `QLT-063` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-063` cycle: backend `96.97%` lines, frontend `89.00%` lines.
+- [x] `QLT-052` completed: backend custom-command names are now normalized deterministically (trim + lowercase) for `PUT`, `GET`, and `DELETE` paths.
+- [x] Duplicate-name conflict policy is now canonicalized by normalized name, so mixed-case aliases map to one persisted command identity.
+- [x] Custom-command list ordering is now stable and deterministic via explicit comparator (`name`, `createdAt`, `updatedAt`, `content`).
+- [x] Added backend integration coverage for mixed-case upsert/get/delete behavior and deterministic list ordering in `backend/test/runtime.integration.test.js`.
+- [x] Validation for `QLT-052` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-052` cycle: backend `96.87%` lines, frontend `89.00%` lines.
 
 ## Maintenance Rules
 

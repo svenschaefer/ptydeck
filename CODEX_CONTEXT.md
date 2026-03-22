@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings panel entry/action migration and color-set personalization completed in `QLT-058`, `QLT-059`, and `QLT-063`; remaining per-terminal settings/theme backlog `QLT-060`, `QLT-061`, `QLT-062`, `QLT-064`)
+Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings panel entry/action migration and color-set personalization completed in `QLT-058`, `QLT-059`, and `QLT-063`; remaining per-terminal settings/theme backlog `QLT-060`, `QLT-061`, `QLT-062`, `QLT-064`, `QLT-065`, `QLT-066`, `QLT-067`, `QLT-068`)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -125,6 +125,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Backend now persists global custom commands and exposes OpenAPI-backed CRUD endpoints at `/api/v1/custom-commands` and `/api/v1/custom-commands/{commandName}`.
 - Persistence format now supports runtime state object storage (`sessions` + `customCommands`) with backward-compatible restore from legacy session-array snapshots.
 - Backend custom-command guardrails now enforce reserved system-command collision rejection, name regex, max name length, max content length, and max command count with explicit API errors.
+- Backend custom-command naming policy now normalizes names via trim+lowercase for deterministic identity, mixed-case conflict handling, and stable REST list ordering.
 - Frontend command plane now supports `/custom` definition parsing for inline and multiline block syntax with deterministic validation feedback for malformed block payloads.
 - Frontend API client now supports custom-command upsert calls used by `/custom` definition flows.
 - Frontend command plane now supports `/custom list`, `/custom show <name>`, and `/custom remove <name>` management flows.
@@ -143,7 +144,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now exposes per-terminal settings entry points on terminal cards, with session-scoped settings panel shell/toggle behavior.
 - Frontend `Rename` and `Close` actions now live inside the per-session settings panel instead of the direct terminal toolbar.
 - Frontend per-session settings now include terminal color-set controls with persisted preset/custom palette state and deterministic xterm theme application per session.
-- Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-064`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), and per-session color sets.
+- Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-068`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), proper settings-dialog UX, and advanced per-session theme profiles.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
@@ -152,8 +153,8 @@ The system separates backend execution concerns from frontend rendering concerns
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: remaining enterprise hardening tasks from `TODO.md` (`ENT-013`, `ENT-014`, `ENT-022`).
   - Completed in cycle C: `QLT-042`, `QLT-043`, `QLT-044`, `QLT-045`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, `QLT-056`.
-  - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-046`, `QLT-048`, `QLT-051`, `QLT-052`, `QLT-055`, `QLT-057`).
-  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-060`, `QLT-061`, `QLT-062`, `QLT-064`).
+  - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-046`, `QLT-048`, `QLT-051`, `QLT-055`, `QLT-057`).
+  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-060`, `QLT-061`, `QLT-062`, `QLT-064`, `QLT-065`, `QLT-066`, `QLT-067`, `QLT-068`).
 
 ## Session Behavior Notes
 

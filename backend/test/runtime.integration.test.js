@@ -163,6 +163,67 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
   }
 });
 
+test("custom command names normalize deterministically and list order is stable", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const firstPutRes = await fetch(`${baseUrl}/custom-commands/Docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo A\n" })
+    });
+    assert.equal(firstPutRes.status, 200);
+    const firstPutBody = await firstPutRes.json();
+    assert.equal(firstPutBody.name, "docu");
+
+    const secondPutRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo B\n" })
+    });
+    assert.equal(secondPutRes.status, 200);
+    const secondPutBody = await secondPutRes.json();
+    assert.equal(secondPutBody.name, "docu");
+    assert.equal(secondPutBody.createdAt, firstPutBody.createdAt);
+    assert.ok(secondPutBody.updatedAt >= firstPutBody.updatedAt);
+
+    const zetaPutRes = await fetch(`${baseUrl}/custom-commands/Zeta`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo Z\n" })
+    });
+    assert.equal(zetaPutRes.status, 200);
+
+    const alphaPutRes = await fetch(`${baseUrl}/custom-commands/alpha`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo C\n" })
+    });
+    assert.equal(alphaPutRes.status, 200);
+
+    const getUpperRes = await fetch(`${baseUrl}/custom-commands/DOCU`);
+    assert.equal(getUpperRes.status, 200);
+    const getUpperBody = await getUpperRes.json();
+    assert.equal(getUpperBody.name, "docu");
+    assert.equal(getUpperBody.content, "echo B\n");
+
+    const listRes = await fetch(`${baseUrl}/custom-commands`);
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.deepEqual(
+      listed.map((entry) => entry.name),
+      ["alpha", "docu", "zeta"]
+    );
+
+    const deleteMixedCaseRes = await fetch(`${baseUrl}/custom-commands/DoCu`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteMixedCaseRes.status, 204);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("custom command guardrails reject reserved names, invalid names, oversized payloads, and count overflow", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
     customCommandMaxCount: 1,

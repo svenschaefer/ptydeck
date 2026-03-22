@@ -26,6 +26,7 @@ const CUSTOM_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const DEFAULT_CUSTOM_COMMAND_MAX_COUNT = 256;
 const DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH = 32;
 const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
+const CUSTOM_COMMAND_NAME_LOCALE = "en-US";
 
 function decodePathParam(value, name) {
   try {
@@ -182,6 +183,26 @@ function escapePrometheusLabel(value) {
     .replaceAll("\\", "\\\\")
     .replaceAll("\"", "\\\"")
     .replaceAll("\n", "\\n");
+}
+
+function normalizeCustomCommandName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function compareCustomCommandEntries(a, b) {
+  const nameCompare = a.name.localeCompare(b.name, CUSTOM_COMMAND_NAME_LOCALE, { sensitivity: "base" });
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  if (a.updatedAt !== b.updatedAt) {
+    return a.updatedAt - b.updatedAt;
+  }
+  return a.content.localeCompare(b.content, CUSTOM_COMMAND_NAME_LOCALE);
 }
 
 export function createRuntime(config) {
@@ -387,11 +408,12 @@ export function createRuntime(config) {
   }
 
   function listCustomCommands() {
-    return Array.from(customCommands.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(customCommands.values()).sort(compareCustomCommandEntries);
   }
 
   function getCustomCommandOrThrow(name) {
-    const entry = customCommands.get(name);
+    const normalizedName = normalizeCustomCommandName(name);
+    const entry = customCommands.get(normalizedName);
     if (!entry) {
       throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
     }
@@ -399,21 +421,22 @@ export function createRuntime(config) {
   }
 
   function upsertCustomCommand(name, content) {
-    if (name.length > customCommandMaxNameLength) {
+    const normalizedName = normalizeCustomCommandName(name);
+    if (normalizedName.length > customCommandMaxNameLength) {
       throw new ApiError(
         400,
         "CustomCommandNameTooLong",
         `Custom command name exceeds maximum length (${customCommandMaxNameLength}).`
       );
     }
-    if (!CUSTOM_COMMAND_NAME_PATTERN.test(name)) {
+    if (!CUSTOM_COMMAND_NAME_PATTERN.test(normalizedName)) {
       throw new ApiError(
         400,
         "CustomCommandNameInvalid",
         "Custom command name must match pattern [A-Za-z0-9][A-Za-z0-9_-]*."
       );
     }
-    if (CUSTOM_COMMAND_RESERVED_NAMES.has(name.toLowerCase())) {
+    if (CUSTOM_COMMAND_RESERVED_NAMES.has(normalizedName)) {
       throw new ApiError(409, "CustomCommandNameReserved", "Custom command name collides with a system command.");
     }
     if (content.length > customCommandMaxContentLength) {
@@ -423,7 +446,7 @@ export function createRuntime(config) {
         `Custom command content exceeds maximum length (${customCommandMaxContentLength}).`
       );
     }
-    if (!customCommands.has(name) && customCommands.size >= customCommandMaxCount) {
+    if (!customCommands.has(normalizedName) && customCommands.size >= customCommandMaxCount) {
       throw new ApiError(
         409,
         "CustomCommandLimitExceeded",
@@ -431,23 +454,24 @@ export function createRuntime(config) {
       );
     }
 
-    const current = customCommands.get(name);
+    const current = customCommands.get(normalizedName);
     const now = Date.now();
     const next = {
-      name,
+      name: normalizedName,
       content,
       createdAt: current ? current.createdAt : now,
       updatedAt: now
     };
-    customCommands.set(name, next);
+    customCommands.set(normalizedName, next);
     return { ...next };
   }
 
   function deleteCustomCommand(name) {
-    if (!customCommands.has(name)) {
+    const normalizedName = normalizeCustomCommandName(name);
+    if (!customCommands.has(normalizedName)) {
       throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
     }
-    customCommands.delete(name);
+    customCommands.delete(normalizedName);
   }
 
   function snapshotRuntimeState() {
@@ -848,27 +872,39 @@ export function createRuntime(config) {
         console.error("failed to restore session", session.id, err);
       }
     }
+    const restoreCandidates = [];
     for (const customCommand of persistedState.customCommands) {
       if (!customCommand || typeof customCommand.name !== "string" || typeof customCommand.content !== "string") {
         continue;
       }
+      const normalizedName = normalizeCustomCommandName(customCommand.name);
+      const now = Date.now();
+      const candidate = {
+        name: normalizedName,
+        content: customCommand.content,
+        createdAt: Number.isInteger(customCommand.createdAt) && customCommand.createdAt > 0 ? customCommand.createdAt : now,
+        updatedAt: Number.isInteger(customCommand.updatedAt) && customCommand.updatedAt > 0 ? customCommand.updatedAt : now
+      };
       if (
-        customCommand.name.length > customCommandMaxNameLength ||
-        !CUSTOM_COMMAND_NAME_PATTERN.test(customCommand.name) ||
-        CUSTOM_COMMAND_RESERVED_NAMES.has(customCommand.name.toLowerCase()) ||
-        customCommand.content.length > customCommandMaxContentLength ||
-        customCommands.size >= customCommandMaxCount
+        candidate.name.length > customCommandMaxNameLength ||
+        !CUSTOM_COMMAND_NAME_PATTERN.test(candidate.name) ||
+        CUSTOM_COMMAND_RESERVED_NAMES.has(candidate.name) ||
+        candidate.content.length > customCommandMaxContentLength
       ) {
         continue;
       }
-      customCommands.set(customCommand.name, {
-        name: customCommand.name,
-        content: customCommand.content,
-        createdAt:
-          Number.isInteger(customCommand.createdAt) && customCommand.createdAt > 0 ? customCommand.createdAt : Date.now(),
-        updatedAt:
-          Number.isInteger(customCommand.updatedAt) && customCommand.updatedAt > 0 ? customCommand.updatedAt : Date.now()
-      });
+      restoreCandidates.push(candidate);
+    }
+    restoreCandidates.sort(compareCustomCommandEntries);
+    for (const candidate of restoreCandidates) {
+      if (customCommands.has(candidate.name)) {
+        customCommands.set(candidate.name, candidate);
+        continue;
+      }
+      if (customCommands.size >= customCommandMaxCount) {
+        continue;
+      }
+      customCommands.set(candidate.name, candidate);
     }
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,

@@ -11,6 +11,7 @@ Current state: compressed roadmap complete: `v0.1.0` to `v0.3.0`.
 - Backend session lifecycle endpoints implemented (`GET/POST /api/v1/sessions`, `GET/DELETE /api/v1/sessions/{sessionId}`, `POST /input`, `POST /resize`)
 - Backend custom-command REST endpoints implemented (`GET /api/v1/custom-commands`, `PUT/GET/DELETE /api/v1/custom-commands/{commandName}`)
 - Backend custom-command guardrails implemented (reserved-name rejection, name/size limits, and explicit API errors)
+- Backend custom-command naming policy is deterministic (`trim + lowercase` normalization, stable list ordering, and case-insensitive lookup semantics across REST paths)
 - Frontend supports `/custom` definition command in inline and multiline block modes with deterministic malformed-block validation feedback
 - Frontend supports non-blocking preview for `/<customName>` execution (payload, target, newline behavior) with text-only rendering and deterministic truncation for large payloads
 - WebSocket endpoint `/ws` implemented with `session.created`, `session.data`, `session.exit`, and `session.closed` events

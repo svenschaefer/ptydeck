@@ -142,7 +142,8 @@ Exit criteria:
 - `QLT-060`, `QLT-061`
 - `QLT-058`, `QLT-062`, `QLT-059`
 - `QLT-063`
-- `QLT-064`
+- `QLT-065`, `QLT-066`, `QLT-067`
+- `QLT-064`, `QLT-068`
 
 Dependencies:
 
@@ -152,7 +153,11 @@ Dependencies:
 - `QLT-062` depends on `QLT-058` and `QLT-060` so FE forms map to finalized backend fields and validation semantics.
 - `QLT-059` depends on `QLT-058` and should complete after `QLT-062` to keep rename/close behavior discoverable inside the settings panel.
 - `QLT-063` depends on `QLT-058`; it should run after panel shell exists so per-session color settings stay scoped and deterministic.
+- `QLT-065` depends on `QLT-058` and should run before final QA hardening so settings UX behavior is stabilized behind a proper dialog contract.
+- `QLT-066` depends on `QLT-060` so full theme profile persistence aligns with finalized per-session backend settings schema.
+- `QLT-067` depends on `QLT-063`, `QLT-065`, and `QLT-066` so advanced theme editing lands on top of final dialog UX and persisted theme-profile contract.
 - `QLT-064` depends on `QLT-058` through `QLT-063`.
+- `QLT-068` depends on `QLT-065` through `QLT-067`.
 
 Exit criteria:
 
@@ -160,7 +165,9 @@ Exit criteria:
 - `Rename` and `Close` actions are available in settings and removed from the direct card toolbar.
 - Per-session startup settings (`Working Directory`, `Start Command Line`, `Environment Variables`) are persisted and applied deterministically.
 - Per-session color sets are configurable and applied consistently after reload.
-- Integration/regression coverage exists for per-session settings lifecycle and startup-apply behavior.
+- Per-terminal settings use a proper dialog UX with deterministic open/close/save/cancel behavior.
+- Full terminal theme profiles (cursor + ANSI palette) are configurable and persisted per session.
+- Integration/regression coverage exists for per-session settings lifecycle and startup/theme apply behavior.
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
@@ -254,6 +261,7 @@ Exit criteria:
 - `QLT-045`
 - `QLT-050`
 - `QLT-047`
+- `QLT-052`
 - `QLT-058`, `QLT-059`, `QLT-063`
 - `ENT-023`
 - `ENT-018`
