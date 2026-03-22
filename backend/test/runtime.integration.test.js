@@ -214,3 +214,47 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     await runtimeB.stop();
   }
 });
+
+test("ready endpoint returns starting before startup gate and ready after release", async () => {
+  let releaseReadyGate = null;
+  const readyGate = new Promise((resolve) => {
+    releaseReadyGate = resolve;
+  });
+
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath: join(dir, "sessions.json"),
+    corsOrigin: "*",
+    maxBodyBytes: 1024 * 1024,
+    onBeforeReady: async () => {
+      await readyGate;
+    }
+  });
+
+  const startPromise = runtime.start();
+  while (!runtime.getAddress()) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  const { port } = runtime.getAddress();
+  const readyBefore = await fetch(`http://127.0.0.1:${port}/ready`);
+  assert.equal(readyBefore.status, 200);
+  assert.deepEqual(await readyBefore.json(), { status: "starting" });
+
+  releaseReadyGate();
+  await startPromise;
+
+  const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);
+  assert.equal(readyAfter.status, 200);
+  assert.deepEqual(await readyAfter.json(), { status: "ready" });
+
+  await runtime.stop();
+});
+
+test("runtime stop is idempotent", async () => {
+  const { runtime } = await createStartedRuntime();
+  await runtime.stop();
+  await runtime.stop();
+});

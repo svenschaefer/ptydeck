@@ -62,6 +62,9 @@ Completed and verified topics belong here.
 - [x] `QLT-009` completed: JSON persistence writes are atomic (`temp file -> rename`) with temp cleanup on failure paths.
 - [x] Added crash-safety persistence test ensuring previous persisted state survives interrupted write attempts without temp-file residue.
 - [x] Coverage after `QLT-008`/`QLT-009`: backend `95.47%` lines, frontend `97.12%` lines.
+- [x] `QLT-014` completed: added runtime tests for `/ready` transition (`starting` -> `ready`) using a startup readiness gate.
+- [x] Runtime shutdown flow is now explicitly idempotent (`stop()` safe on repeated calls) and covered by integration test.
+- [x] Coverage after `QLT-014`: backend `96.26%` lines, frontend `97.12%` lines.
 
 ## Maintenance Rules
 

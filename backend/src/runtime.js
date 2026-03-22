@@ -104,6 +104,8 @@ export function createRuntime(config) {
   const sockets = new Set();
   let isReady = false;
   let isStopping = false;
+  let isStopped = false;
+  let stopPromise = null;
   let persistTimer = null;
 
   function writeJson(res, statusCode, body) {
@@ -271,6 +273,10 @@ export function createRuntime(config) {
   }, 30000);
 
   async function start() {
+    isStopped = false;
+    isStopping = false;
+    isReady = false;
+
     const persisted = await persistence.load();
     for (const session of persisted) {
       try {
@@ -289,11 +295,15 @@ export function createRuntime(config) {
     await new Promise((resolve) => {
       server.listen(config.port, resolve);
     });
+    if (typeof config.onBeforeReady === "function") {
+      await config.onBeforeReady();
+    }
     isReady = true;
   }
 
-  async function stop() {
+  async function stopInternal() {
     isStopping = true;
+    isReady = false;
     clearInterval(heartbeat);
     if (persistTimer) {
       clearTimeout(persistTimer);
@@ -317,7 +327,26 @@ export function createRuntime(config) {
     }
 
     await persistence.save(persistedSnapshot);
-    await new Promise((resolve) => server.close(resolve));
+
+    if (server.listening) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    isStopped = true;
+    isStopping = false;
+  }
+
+  async function stop() {
+    if (isStopped) {
+      return;
+    }
+    if (stopPromise) {
+      return stopPromise;
+    }
+    stopPromise = stopInternal().finally(() => {
+      stopPromise = null;
+    });
+    return stopPromise;
   }
 
   function getAddress() {
