@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v0.1.0 baseline delivered)
+Last updated: 2026-03-22 (v0.2.0 backend core delivered)
 Owner: `CODX`
 
 ## Project Purpose
@@ -41,6 +41,9 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend bootstrap includes config loader and minimal development HTTP page.
 - CI workflow exists in `.github/workflows/ci.yml` for backend/frontend lint, test, and build.
 - Environment templates exist in `backend/.env.example` and `frontend/.env.example`.
+- Backend core REST lifecycle is implemented for session list/create/get/delete/input/resize.
+- Backend includes centralized API errors (`ApiError` + mapper) and runtime request/response validation.
+- Backend currently uses in-memory session metadata; persisted restore is still pending in `v0.3.0`.
 
 ## Session Behavior Notes
 

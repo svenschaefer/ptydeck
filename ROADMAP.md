@@ -77,8 +77,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.1.0`
-- Next milestone in progress: `v0.2.0`
+- Latest completed milestone: `v0.2.0`
+- Next milestone in progress: `v0.3.0`
 - Blockers: none recorded
 
 ### Completed Items in Current Milestone
@@ -92,3 +92,13 @@ Exit criteria:
 - `INT-002` completed on 2026-03-22.
 - `INT-009` completed on 2026-03-22.
 - `INT-003` completed early on 2026-03-22 (originally planned for `v0.5.0`).
+- `BE-003` completed on 2026-03-22.
+- `BE-004` completed on 2026-03-22.
+- `BE-005` completed on 2026-03-22.
+- `BE-006` completed on 2026-03-22.
+- `BE-007` completed on 2026-03-22.
+- `BE-008` completed on 2026-03-22.
+- `BE-009` completed on 2026-03-22.
+- `BE-010` completed on 2026-03-22.
+- `BE-011` completed on 2026-03-22.
+- `BE-019` completed on 2026-03-22.

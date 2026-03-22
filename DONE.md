@@ -14,6 +14,11 @@ Completed and verified topics belong here.
 - [x] `v0.1.0` baseline delivery completed: `BE-001`, `BE-002`, `FE-001`, `INT-001`, `INT-002`, `INT-009` implemented.
 - [x] CI baseline implemented (`INT-003`) with lint, test, and build jobs for backend and frontend.
 - [x] Local validation completed for current changes: `npm run lint`, `npm run test`, and `npm run test:coverage` all pass.
+- [x] `v0.2.0` backend core delivery completed: `BE-003`, `BE-004`, `BE-005`, `BE-006`, `BE-007`, `BE-008`, `BE-009`, `BE-010`, `BE-011`, `BE-019`.
+- [x] Added `SessionManager` with PTY lifecycle integration and REST control endpoints under `/api/v1/sessions`.
+- [x] Added runtime request/response validation and centralized API error mapping for backend routes.
+- [x] Added backend unit tests for `SessionManager`, `validation`, and `errors` modules.
+- [x] Backend coverage raised to `93.61%` total lines in local `npm run test:coverage`.
 
 ## Maintenance Rules
 

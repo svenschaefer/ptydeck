@@ -15,15 +15,15 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 - [x] `BE-001` Owner: `BE` Task: Create backend workspace in `backend/` with TypeScript build, lint, and test scripts.
 - [x] `BE-002` Owner: `BE` Task: Add `backend/openapi/openapi.yaml` with `/api/v1` and schemas (`Session`, `CreateSessionRequest`, `ErrorResponse`).
-- [ ] `BE-003` Owner: `BE` Task: Implement `GET /api/v1/sessions` returning all persisted/live sessions.
-- [ ] `BE-004` Owner: `BE` Task: Implement `POST /api/v1/sessions` to create a PTY session and return session metadata.
-- [ ] `BE-005` Owner: `BE` Task: Implement `GET /api/v1/sessions/{sessionId}` with 404 for missing sessions.
-- [ ] `BE-006` Owner: `BE` Task: Implement `DELETE /api/v1/sessions/{sessionId}` to terminate PTY and remove state.
-- [ ] `BE-007` Owner: `BE` Task: Implement `POST /api/v1/sessions/{sessionId}/input` to write stdin bytes to PTY.
-- [ ] `BE-008` Owner: `BE` Task: Implement `POST /api/v1/sessions/{sessionId}/resize` and map to `pty.resize(cols, rows)`.
-- [ ] `BE-009` Owner: `BE` Task: Add runtime OpenAPI request and response validation middleware.
-- [ ] `BE-010` Owner: `BE` Task: Add centralized API error mapper with stable JSON payloads and HTTP status codes.
-- [ ] `BE-011` Owner: `BE` Task: Build `SessionManager` with lifecycle hooks (create, exit, close, cleanup).
+- [x] `BE-003` Owner: `BE` Task: Implement `GET /api/v1/sessions` returning all persisted/live sessions.
+- [x] `BE-004` Owner: `BE` Task: Implement `POST /api/v1/sessions` to create a PTY session and return session metadata.
+- [x] `BE-005` Owner: `BE` Task: Implement `GET /api/v1/sessions/{sessionId}` with 404 for missing sessions.
+- [x] `BE-006` Owner: `BE` Task: Implement `DELETE /api/v1/sessions/{sessionId}` to terminate PTY and remove state.
+- [x] `BE-007` Owner: `BE` Task: Implement `POST /api/v1/sessions/{sessionId}/input` to write stdin bytes to PTY.
+- [x] `BE-008` Owner: `BE` Task: Implement `POST /api/v1/sessions/{sessionId}/resize` and map to `pty.resize(cols, rows)`.
+- [x] `BE-009` Owner: `BE` Task: Add runtime OpenAPI request and response validation middleware.
+- [x] `BE-010` Owner: `BE` Task: Add centralized API error mapper with stable JSON payloads and HTTP status codes.
+- [x] `BE-011` Owner: `BE` Task: Build `SessionManager` with lifecycle hooks (create, exit, close, cleanup).
 - [ ] `BE-012` Owner: `BE` Task: Add WebSocket endpoint `/ws` with events `session.created`, `session.data`, `session.exit`, `session.closed`, `error`.
 - [ ] `BE-013` Owner: `BE` Task: Implement WS routing by `sessionId` and heartbeat ping/pong timeout handling.
 - [ ] `BE-014` Owner: `BE` Task: Add persistence adapter (`json` initial) with load/save for `id`, `cwd`, `shell`, timestamps.
@@ -31,7 +31,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `BE-016` Owner: `BE` Task: Implement cwd marker parsing (`__CWD__...__`) and persist updates.
 - [ ] `BE-017` Owner: `BE` Task: Add graceful shutdown handler that closes all PTYs and flushes persistence.
 - [ ] `BE-018` Owner: `BE` Task: Add `/health` and `/ready` endpoints.
-- [ ] `BE-019` Owner: `BE` Task: Add CORS configuration for frontend origin and configurable allowed origins.
+- [x] `BE-019` Owner: `BE` Task: Add CORS configuration for frontend origin and configurable allowed origins.
 
 ## Frontend Tasks (Classic Node.js FE stack)
 
