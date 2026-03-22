@@ -73,10 +73,11 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
-- Terminal `Rename` and `Close` actions are available inside each session settings panel (removed from direct toolbar)
+- Terminal `Rename` and `Close` actions are available inside each session settings dialog (removed from direct toolbar)
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save feedback
 - Per-session terminal color sets in session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` values persisted in browser storage)
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
+- Backend per-session theme profile contract via REST (`themeProfile`) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - `/custom` block mode supports escaped delimiter payload lines (`\---`) for literal `---` content and returns explicit guidance for unescaped delimiter edge cases

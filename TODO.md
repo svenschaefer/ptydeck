@@ -138,7 +138,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-063` Owner: `FE` Task: Implement per-session terminal color-set selection and editing (custom palette fields applied to xterm theme) with deterministic persistence in frontend settings storage.
 - [x] `QLT-064` Owner: `QA` Task: Add integration/regression tests for per-session settings lifecycle (icon/panel access, rename/close relocation, startup config persistence/apply behavior, env validation, color-set apply persistence).
 - [x] `QLT-065` Owner: `FE` Task: Replace inline session settings panel with a proper per-terminal settings dialog (modal semantics, focus trap, Escape close, explicit save/cancel) opened via the terminal settings icon.
-- [ ] `QLT-066` Owner: `BE` Task: Extend per-session settings contract/persistence for full terminal theme profiles (background, foreground, cursor, and ANSI 16-color palette) with validation and deterministic storage shape.
+- [x] `QLT-066` Owner: `BE` Task: Extend per-session settings contract/persistence for full terminal theme profiles (background, foreground, cursor, and ANSI 16-color palette) with validation and deterministic storage shape.
 - [ ] `QLT-067` Owner: `FE` Task: Implement advanced per-terminal theme editor with full palette fields, deterministic preset selection beyond the current minimal set, and per-session apply/preview behavior.
 - [ ] `QLT-068` Owner: `QA` Task: Add integration/regression coverage for settings-dialog UX and full-palette theme lifecycle (open/close semantics, validation, persistence, reload consistency, and rendering apply behavior).
 

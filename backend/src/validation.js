@@ -4,6 +4,45 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+const THEME_PROFILE_KEYS = [
+  "background",
+  "foreground",
+  "cursor",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite"
+];
+const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+function isThemeProfile(value) {
+  if (!isObject(value)) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  if (keys.length !== THEME_PROFILE_KEYS.length) {
+    return false;
+  }
+  for (const key of THEME_PROFILE_KEYS) {
+    if (typeof value[key] !== "string" || !THEME_HEX_PATTERN.test(value[key])) {
+      return false;
+    }
+  }
+  return keys.every((key) => THEME_PROFILE_KEYS.includes(key));
+}
+
 export function validateRequest({ method, pathname, params, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -29,6 +68,9 @@ export function validateRequest({ method, pathname, params, body }) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
       }
     }
+    if (body?.themeProfile !== undefined && !isObject(body.themeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
+    }
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/sessions\/[^/]+$/)) {
@@ -42,7 +84,8 @@ export function validateRequest({ method, pathname, params, body }) {
       body.name === undefined &&
       body.startCwd === undefined &&
       body.startCommand === undefined &&
-      body.env === undefined
+      body.env === undefined &&
+      body.themeProfile === undefined
     ) {
       throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
     }
@@ -59,6 +102,9 @@ export function validateRequest({ method, pathname, params, body }) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
       }
+    }
+    if (body.themeProfile !== undefined && !isObject(body.themeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
     }
   }
 
@@ -150,6 +196,7 @@ function isSession(value) {
     typeof value.startCommand === "string" &&
     isObject(value.env) &&
     Object.values(value.env).every((entry) => typeof entry === "string") &&
+    isThemeProfile(value.themeProfile) &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );

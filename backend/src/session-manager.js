@@ -10,6 +10,28 @@ function now() {
 }
 
 const MAX_OUTPUT_BUFFER_CHARS = 16 * 1024;
+const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const DEFAULT_SESSION_THEME_PROFILE = {
+  background: "#0a0d12",
+  foreground: "#d8dee9",
+  cursor: "#8ec07c",
+  black: "#0a0d12",
+  red: "#fb4934",
+  green: "#8ec07c",
+  yellow: "#fabd2f",
+  blue: "#83a598",
+  magenta: "#b48ead",
+  cyan: "#8fbcbb",
+  white: "#d8dee9",
+  brightBlack: "#4b5563",
+  brightRed: "#ff6b5a",
+  brightGreen: "#a5d68a",
+  brightYellow: "#ffd36a",
+  brightBlue: "#98b6cc",
+  brightMagenta: "#c8a7d8",
+  brightCyan: "#a9d9d6",
+  brightWhite: "#f5f7fa"
+};
 
 function consumeCwdMarkers(session, chunk) {
   const markerStart = "__CWD__";
@@ -65,6 +87,16 @@ function normalizeSessionEnv(env) {
       continue;
     }
     normalized[key] = value;
+  }
+  return normalized;
+}
+
+function normalizeSessionThemeProfile(themeProfile) {
+  const input = themeProfile && typeof themeProfile === "object" && !Array.isArray(themeProfile) ? themeProfile : {};
+  const normalized = {};
+  for (const [key, defaultValue] of Object.entries(DEFAULT_SESSION_THEME_PROFILE)) {
+    const candidate = typeof input[key] === "string" ? input[key] : defaultValue;
+    normalized[key] = THEME_COLOR_HEX_PATTERN.test(candidate) ? candidate : defaultValue;
   }
   return normalized;
 }
@@ -131,6 +163,7 @@ export class SessionManager {
     startCwd,
     startCommand = "",
     env = {},
+    themeProfile = {},
     createdAt,
     updatedAt
   } = {}) {
@@ -153,6 +186,7 @@ export class SessionManager {
           : homedir();
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
+    const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
 
     const ptyEnv = withCwdMarkerPromptCommand(shell, {
@@ -175,6 +209,7 @@ export class SessionManager {
         startCwd: normalizedStartCwd,
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
+        themeProfile: normalizedThemeProfile,
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
       }
@@ -248,6 +283,9 @@ export class SessionManager {
     if (patch.env !== undefined) {
       session.meta.env = normalizeSessionEnv(patch.env);
     }
+    if (patch.themeProfile !== undefined) {
+      session.meta.themeProfile = normalizeSessionThemeProfile(patch.themeProfile);
+    }
     session.meta.updatedAt = now();
     return session.meta;
   }
@@ -268,6 +306,7 @@ export class SessionManager {
       startCwd: snapshot.startCwd || snapshot.cwd,
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
+      themeProfile: snapshot.themeProfile || {},
       createdAt: snapshot.createdAt,
       updatedAt: this.nowFn()
     });

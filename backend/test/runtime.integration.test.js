@@ -103,7 +103,28 @@ test("session startup settings persist through patch and apply on restart", asyn
         name: "ops-shell",
         startCwd: "/tmp",
         startCommand: "echo BOOT",
-        env: { APP_MODE: "dev" }
+        env: { APP_MODE: "dev" },
+        themeProfile: {
+          background: "#111111",
+          foreground: "#eeeeee",
+          cursor: "#ffcc00",
+          black: "#000000",
+          red: "#ff0000",
+          green: "#00ff00",
+          yellow: "#ffff00",
+          blue: "#0000ff",
+          magenta: "#ff00ff",
+          cyan: "#00ffff",
+          white: "#ffffff",
+          brightBlack: "#222222",
+          brightRed: "#ff6666",
+          brightGreen: "#66ff66",
+          brightYellow: "#ffff66",
+          brightBlue: "#6666ff",
+          brightMagenta: "#ff66ff",
+          brightCyan: "#66ffff",
+          brightWhite: "#fefefe"
+        }
       })
     });
     assert.equal(createRes.status, 201);
@@ -111,6 +132,8 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(created.startCwd, "/tmp");
     assert.equal(created.startCommand, "echo BOOT");
     assert.deepEqual(created.env, { APP_MODE: "dev" });
+    assert.equal(created.themeProfile.background, "#111111");
+    assert.equal(created.themeProfile.brightWhite, "#fefefe");
 
     const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "PATCH",
@@ -118,7 +141,28 @@ test("session startup settings persist through patch and apply on restart", asyn
       body: JSON.stringify({
         startCwd: "/var/tmp",
         startCommand: "echo RESTART",
-        env: { APP_MODE: "prod", FEATURE_X: "1" }
+        env: { APP_MODE: "prod", FEATURE_X: "1" },
+        themeProfile: {
+          background: "#202020",
+          foreground: "#dddddd",
+          cursor: "#aaffaa",
+          black: "#0a0a0a",
+          red: "#ff1010",
+          green: "#10ff10",
+          yellow: "#ffff10",
+          blue: "#1010ff",
+          magenta: "#ff10ff",
+          cyan: "#10ffff",
+          white: "#f0f0f0",
+          brightBlack: "#303030",
+          brightRed: "#ff8080",
+          brightGreen: "#80ff80",
+          brightYellow: "#ffff80",
+          brightBlue: "#8080ff",
+          brightMagenta: "#ff80ff",
+          brightCyan: "#80ffff",
+          brightWhite: "#ffffff"
+        }
       })
     });
     assert.equal(patchRes.status, 200);
@@ -126,6 +170,8 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(patched.startCwd, "/var/tmp");
     assert.equal(patched.startCommand, "echo RESTART");
     assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
+    assert.equal(patched.themeProfile.background, "#202020");
+    assert.equal(patched.themeProfile.brightWhite, "#ffffff");
 
     const restartRes = await fetch(`${baseUrl}/sessions/${created.id}/restart`, {
       method: "POST"
@@ -137,6 +183,8 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restarted.startCwd, "/var/tmp");
     assert.equal(restarted.startCommand, "echo RESTART");
     assert.deepEqual(restarted.env, { APP_MODE: "prod", FEATURE_X: "1" });
+    assert.equal(restarted.themeProfile.background, "#202020");
+    assert.equal(restarted.themeProfile.cursor, "#aaffaa");
   } finally {
     await runtime.stop();
   }

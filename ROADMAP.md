@@ -144,7 +144,8 @@ Exit criteria:
 - `QLT-063`
 - `QLT-064`
 - `QLT-065`
-- `QLT-066`, `QLT-067`
+- `QLT-066`
+- `QLT-067`
 - `QLT-068`
 
 Dependencies:
@@ -270,6 +271,7 @@ Exit criteria:
 - `QLT-058`, `QLT-059`, `QLT-063`
 - `QLT-064`
 - `QLT-065`
+- `QLT-066`
 - `ENT-023`
 - `ENT-018`
 - `ENT-011`

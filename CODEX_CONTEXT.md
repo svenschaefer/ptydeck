@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply completed in `QLT-060` and `QLT-061`; remaining per-terminal settings/theme backlog `QLT-066`, `QLT-067`, `QLT-068`)
+Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply and full theme-profile contract/persistence completed in `QLT-060`, `QLT-061`, and `QLT-066`; remaining per-terminal settings/theme backlog `QLT-067`, `QLT-068`)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -128,6 +128,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Backend custom-command naming policy now normalizes names via trim+lowercase for deterministic identity, mixed-case conflict handling, and stable REST list ordering.
 - Backend WebSocket snapshot/stream now includes custom-command synchronization payloads (`customCommands` snapshot field plus `custom-command.created|updated|deleted` events).
 - Backend session model now includes startup settings (`startCwd`, `startCommand`, `env`) with deterministic create/patch/restart persistence/apply behavior.
+- Backend session model now includes full `themeProfile` contract/persistence (background, foreground, cursor, ANSI 16-color palette) with deterministic normalization/defaulting on create/patch/restore.
 - Frontend terminal settings now include startup-settings form controls with explicit save workflow and client-side validation feedback for `startCwd`, `startCommand`, and `env`.
 - Frontend command plane now supports `/custom` definition parsing for inline and multiline block syntax with deterministic validation feedback for malformed block payloads.
 - Frontend API client now supports custom-command upsert calls used by `/custom` definition flows.
@@ -159,7 +160,7 @@ The system separates backend execution concerns from frontend rendering concerns
   - Planned next in cycle B: remaining enterprise hardening tasks from `TODO.md` (`ENT-013`, `ENT-014`, `ENT-022`).
   - Completed in cycle C: `QLT-042`, `QLT-043`, `QLT-044`, `QLT-045`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, `QLT-056`.
   - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-046`, `QLT-051`, `QLT-055`, `QLT-057`).
-  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-066`, `QLT-067`, `QLT-068`).
+  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-067`, `QLT-068`).
 
 ## Session Behavior Notes
 

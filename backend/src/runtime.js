@@ -34,6 +34,28 @@ const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
 const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const DEFAULT_SESSION_THEME_PROFILE = {
+  background: "#0a0d12",
+  foreground: "#d8dee9",
+  cursor: "#8ec07c",
+  black: "#0a0d12",
+  red: "#fb4934",
+  green: "#8ec07c",
+  yellow: "#fabd2f",
+  blue: "#83a598",
+  magenta: "#b48ead",
+  cyan: "#8fbcbb",
+  white: "#d8dee9",
+  brightBlack: "#4b5563",
+  brightRed: "#ff6b5a",
+  brightGreen: "#a5d68a",
+  brightYellow: "#ffd36a",
+  brightBlue: "#98b6cc",
+  brightMagenta: "#c8a7d8",
+  brightCyan: "#a9d9d6",
+  brightWhite: "#f5f7fa"
+};
 
 function decodePathParam(value, name) {
   try {
@@ -284,6 +306,41 @@ function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
     startCommand,
     env
   };
+}
+
+function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
+  if (input === undefined || input === null) {
+    return { ...DEFAULT_SESSION_THEME_PROFILE };
+  }
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
+    }
+    return null;
+  }
+
+  const normalized = {};
+  const allowedKeys = new Set(Object.keys(DEFAULT_SESSION_THEME_PROFILE));
+  for (const [key, value] of Object.entries(input)) {
+    if (!allowedKeys.has(key)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field 'themeProfile.${key}' is not supported.`);
+      }
+      return null;
+    }
+    if (typeof value !== "string" || !SESSION_THEME_COLOR_PATTERN.test(value)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field 'themeProfile.${key}' must be a hex color like '#1d2021'.`);
+      }
+      return null;
+    }
+  }
+
+  for (const [key, defaultValue] of Object.entries(DEFAULT_SESSION_THEME_PROFILE)) {
+    normalized[key] = typeof input[key] === "string" ? input[key] : defaultValue;
+  }
+
+  return normalized;
 }
 
 export function createRuntime(config) {
@@ -784,13 +841,15 @@ export function createRuntime(config) {
           },
           { strict: true }
         );
+        const themeProfile = normalizeSessionThemeProfile(body?.themeProfile, { strict: true });
         const payload = manager.create({
           cwd: startupConfig.startCwd,
           shell: body?.shell,
           name: body?.name,
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
-          env: startupConfig.env
+          env: startupConfig.env,
+          themeProfile
         });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
         persistSoon();
@@ -833,6 +892,9 @@ export function createRuntime(config) {
           patch.startCwd = startupConfig.startCwd;
           patch.startCommand = startupConfig.startCommand;
           patch.env = startupConfig.env;
+        }
+        if (body?.themeProfile !== undefined) {
+          patch.themeProfile = normalizeSessionThemeProfile(body.themeProfile, { strict: true });
         }
         if (!Object.keys(patch).length) {
           throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
@@ -1020,6 +1082,10 @@ export function createRuntime(config) {
         if (!startupConfig) {
           continue;
         }
+        const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
+        if (!themeProfile) {
+          continue;
+        }
         manager.create({
           id: session.id,
           cwd: startupConfig.startCwd,
@@ -1028,6 +1094,7 @@ export function createRuntime(config) {
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
+          themeProfile,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt
         });
