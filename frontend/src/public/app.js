@@ -37,6 +37,7 @@ const terminalSizes = new Map();
 const sessionQuickIds = new Map();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
+let bootstrapPromise = null;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
@@ -47,6 +48,23 @@ const uiState = {
   error: "",
   commandFeedback: ""
 };
+const nowMs =
+  typeof window !== "undefined" &&
+  window.performance &&
+  typeof window.performance.now === "function"
+    ? () => window.performance.now()
+    : () => Date.now();
+const startupPerf = {
+  appStartAtMs: nowMs(),
+  bootstrapRequestCount: 0,
+  bootstrapReadyAtMs: null,
+  firstNonEmptyRenderAtMs: null,
+  firstTerminalMountedAtMs: null,
+  startupReported: false
+};
+if (typeof window !== "undefined") {
+  window.__PTYDECK_PERF__ = startupPerf;
+}
 
 if (typeof window.Terminal !== "function") {
   setError("Terminal library failed to load.");
@@ -271,9 +289,33 @@ function scheduleDeferredResizePasses() {
   deferredResizeTimer = setTimeout(runNext, delays[index]);
 }
 
+function maybeReportStartupPerf() {
+  if (startupPerf.startupReported) {
+    return;
+  }
+  if (
+    startupPerf.bootstrapReadyAtMs === null ||
+    startupPerf.firstNonEmptyRenderAtMs === null ||
+    startupPerf.firstTerminalMountedAtMs === null
+  ) {
+    return;
+  }
+  startupPerf.startupReported = true;
+  debugLog("perf.startup.ready", {
+    bootstrapRequestCount: startupPerf.bootstrapRequestCount,
+    toBootstrapReadyMs: Math.round(startupPerf.bootstrapReadyAtMs - startupPerf.appStartAtMs),
+    toFirstNonEmptyRenderMs: Math.round(startupPerf.firstNonEmptyRenderAtMs - startupPerf.appStartAtMs),
+    toFirstTerminalMountedMs: Math.round(startupPerf.firstTerminalMountedAtMs - startupPerf.appStartAtMs)
+  });
+}
+
 function render() {
   const state = store.getState();
   pruneQuickIds(state.sessions.map((session) => session.id));
+  if (state.sessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
+    startupPerf.firstNonEmptyRenderAtMs = nowMs();
+    maybeReportStartupPerf();
+  }
   debugLog("ui.render", {
     sessions: state.sessions.length,
     activeSessionId: state.activeSessionId,
@@ -409,6 +451,10 @@ function render() {
     });
 
     terminals.set(session.id, { terminal, fitAddon, element: node, focusBtn, quickIdEl, mount });
+    if (startupPerf.firstTerminalMountedAtMs === null) {
+      startupPerf.firstTerminalMountedAtMs = nowMs();
+      maybeReportStartupPerf();
+    }
 
     const observer = new ResizeObserver(() => {
       applyResizeForSession(session.id);
@@ -640,16 +686,30 @@ async function executeControlCommand(interpreted) {
 }
 
 async function bootstrapSessions() {
+  if (bootstrapPromise) {
+    return bootstrapPromise;
+  }
+  startupPerf.bootstrapRequestCount += 1;
+  debugLog("sessions.bootstrap.request", {
+    bootstrapRequestCount: startupPerf.bootstrapRequestCount
+  });
+  bootstrapPromise = (async () => {
   try {
     debugLog("sessions.bootstrap.start");
     const sessions = await api.listSessions();
     store.setSessions(sessions);
     uiState.loading = false;
     uiState.error = "";
+    if (startupPerf.bootstrapReadyAtMs === null) {
+      startupPerf.bootstrapReadyAtMs = nowMs();
+    }
+    maybeReportStartupPerf();
     debugLog("sessions.bootstrap.ok", { count: sessions.length });
   } catch {
     setError("Failed to load sessions.");
   }
+  })();
+  return bootstrapPromise;
 }
 
 store.subscribe(render);

@@ -148,6 +148,12 @@ Completed and verified topics belong here.
 - [x] Frontend command set updated to include `/restart [id]` and wired to backend restart endpoint via API client (`POST /sessions/{sessionId}/restart`).
 - [x] Validation for `QLT-026` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-026` cycle: backend `96.71%` lines, frontend `88.11%` lines.
+- [x] `QLT-027` completed: frontend startup performance guardrails added for bootstrap/event handling paths.
+- [x] Added bootstrap request de-duplication in frontend app runtime to avoid redundant session list roundtrips under re-entry conditions.
+- [x] Added startup latency instrumentation (`window.__PTYDECK_PERF__` + debug `perf.startup.ready`) for bootstrap-ready, first non-empty render, and first terminal mount timing.
+- [x] Added slow-load regression coverage in frontend app integration test (delayed initial session load keeps loading state deterministic and list bootstrap remains single-request).
+- [x] Validation for `QLT-027` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-027` cycle: backend `96.92%` lines, frontend `88.28%` lines.
 
 ## Maintenance Rules
 

@@ -312,6 +312,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const resizePayloads = [];
   const inputPayloads = [];
   const restartCalls = [];
+  let listSessionsCalls = 0;
   const win = {
     document: fixture.document,
     location: {
@@ -360,7 +361,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     const path = parsePath(url);
 
     if (path === "/api/v1/sessions" && (!options.method || options.method === "GET")) {
-      return makeJsonResponse(200, [{ id: "s-1", shell: "bash", cwd: "~", createdAt: Date.now(), updatedAt: Date.now() }]);
+      listSessionsCalls += 1;
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(
+            makeJsonResponse(200, [{ id: "s-1", shell: "bash", cwd: "~", createdAt: Date.now(), updatedAt: Date.now() }])
+          );
+        }, 60);
+      });
     }
     if (path === "/api/v1/sessions" && options.method === "POST") {
       return makeJsonResponse(500, { error: "CreateFailed", message: "boom" });
@@ -403,6 +411,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   await import("../src/public/app.js?app-test");
   await tick();
+  assert.equal(fixture.elements.statusMessage.textContent, "Loading sessions...");
+  await sleep(90);
+  assert.equal(listSessionsCalls, 1);
 
   fixture.elements.createSession.click();
   await tick();
@@ -505,4 +516,6 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   assert.equal(fixture.elements.connectionState.textContent, "reconnecting");
   assert.equal(fixture.elements.statusMessage.textContent, "Connection state: reconnecting");
+  assert.equal(listSessionsCalls, 1);
+  assert.equal(win.__PTYDECK_PERF__.bootstrapRequestCount, 1);
 });

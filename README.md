@@ -69,6 +69,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/help`
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
+- Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Full PTY support (interactive applications like `vim`, `nano`, `top`)
 - Session persistence (restores working directory after restart)
 - Clean multiplexing over a single WebSocket connection
