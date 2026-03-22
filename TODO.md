@@ -90,6 +90,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-018` Owner: `FE` Task: Switch frontend default UI to tmux-like dark console style and increase terminal display size to about 125% of current baseline.
 - [x] `QLT-019` Owner: `FE` Task: Correct dark-theme background gradient and enforce terminal-grid minimum column width before opening a new column.
 - [x] `QLT-020` Owner: `BE` Task: Support session naming (`PATCH /sessions/{sessionId}` + FE rename UI) and default new-session cwd to user home when no persisted cwd exists.
+- [x] `QLT-021` Owner: `FE` Task: Move command input area to page bottom, support multiline input cleanly, and set default command input height to 10 rows.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

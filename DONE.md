@@ -80,6 +80,9 @@ Completed and verified topics belong here.
 - [x] `QLT-020` completed: sessions can be renamed (`PATCH /api/v1/sessions/{sessionId}` + frontend rename action), and new sessions default to user home directory when no persisted cwd exists.
 - [x] OpenAPI contract and runtime validation updated for session metadata update request/response shape including optional session `name`.
 - [x] Coverage after `QLT-019`/`QLT-020` validation cycle: backend `96.68%` lines, frontend `97.71%` lines.
+- [x] `QLT-021` completed: command composer moved to page bottom and switched to 10-row multiline textarea.
+- [x] Command submit behavior now preserves line breaks; `Ctrl+Enter`/`Cmd+Enter` submits, plain `Enter` inserts newline.
+- [x] Coverage after `QLT-021` validation cycle: backend `96.81%` lines, frontend `97.71%` lines.
 
 ## Maintenance Rules
 

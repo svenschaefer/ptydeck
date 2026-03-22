@@ -212,13 +212,14 @@ createBtn.addEventListener("click", async () => {
 });
 
 async function submitCommand() {
-  const command = commandInput.value.trim();
+  const command = commandInput.value;
   const activeSessionId = store.getState().activeSessionId;
-  if (!command || !activeSessionId) {
+  if (!command.trim() || !activeSessionId) {
     return;
   }
   try {
-    await api.sendInput(activeSessionId, `${command}\n`);
+    const payload = command.endsWith("\n") ? command : `${command}\n`;
+    await api.sendInput(activeSessionId, payload);
     commandInput.value = "";
     uiState.error = "";
   } catch {
@@ -228,7 +229,7 @@ async function submitCommand() {
 
 sendBtn.addEventListener("click", submitCommand);
 commandInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     submitCommand();
   }

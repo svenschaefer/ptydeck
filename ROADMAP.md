@@ -55,7 +55,7 @@ Exit criteria:
 
 ### v0.3.0-H1 - Quality Hardening Backlog
 
-- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`
 
 Dependencies:
 
@@ -84,6 +84,7 @@ Exit criteria:
 - Deployment docs include secure production CORS guidance.
 - Frontend default visual baseline is dark console style with improved terminal readability.
 - Session rename flow and home-directory default behavior are available in baseline runtime.
+- Command input supports multiline workflows in a bottom-docked composer area.
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
@@ -157,3 +158,4 @@ Exit criteria:
 - `QLT-017`
 - `QLT-018`
 - `QLT-019`, `QLT-020`
+- `QLT-021`

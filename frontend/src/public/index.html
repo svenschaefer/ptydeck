@@ -14,14 +14,19 @@
       <button id="create-session" type="button">New Session</button>
     </header>
 
-    <section class="command-row">
-      <input id="command-input" type="text" placeholder="Run command in active session" />
-      <button id="send-command" type="button">Send</button>
-    </section>
     <p id="status-message" class="status-message"></p>
 
     <main id="terminal-grid" class="terminal-grid"></main>
     <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
+
+    <section class="command-row">
+      <textarea
+        id="command-input"
+        rows="10"
+        placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+      ></textarea>
+      <button id="send-command" type="button">Send</button>
+    </section>
 
     <template id="terminal-card-template">
       <article class="terminal-card">

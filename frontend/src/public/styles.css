@@ -17,6 +17,9 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
   background: linear-gradient(180deg, #101723 0%, #0a0d12 100%);
   color: var(--text);
@@ -52,21 +55,33 @@ body {
 
 .command-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 10px;
   padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: #0f151f;
+  position: sticky;
+  bottom: 0;
 }
 
-.command-row input {
+.command-row textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   background: #0f151f;
   color: var(--text);
+  resize: vertical;
+  min-height: 10.5rem;
+  line-height: 1.35;
+  font-family: inherit;
 }
 
-.command-row input::placeholder {
+.command-row textarea::placeholder {
   color: var(--muted);
+}
+
+.command-row button {
+  justify-self: end;
 }
 
 .status-message {
@@ -94,6 +109,7 @@ button:hover {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+  flex: 1;
 }
 
 .empty-state {
@@ -155,5 +171,9 @@ button:hover {
 
   .terminal-mount {
     min-height: 240px;
+  }
+
+  .command-row {
+    position: static;
   }
 }
