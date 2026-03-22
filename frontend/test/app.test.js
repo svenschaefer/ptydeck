@@ -409,8 +409,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/list";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.statusMessage.textContent, "Control command is routed: /list (implementation pending).");
+  assert.match(fixture.elements.statusMessage.textContent, /\[1\]/);
   assert.equal(inputPayloads.length, 1);
+
+  fixture.elements.commandInput.value = "/help";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.statusMessage.textContent, /^Commands:/);
+
+  fixture.elements.commandInput.value = "/switch 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.statusMessage.textContent, /Active session:/);
 
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";

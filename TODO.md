@@ -95,7 +95,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Command Interface and Control Plane (v0.3.0 continuation)
 
 - [x] `QLT-022` Owner: `FE` Task: Add command interpreter in command composer that routes `/...` inputs to control-plane actions and forwards non-slash input unchanged to active session.
-- [ ] `QLT-023` Owner: `FE` Task: Implement control commands `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help` in the frontend command interpreter.
+- [x] `QLT-023` Owner: `FE` Task: Implement control commands `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help` in the frontend command interpreter.
 - [ ] `QLT-024` Owner: `FE` Task: Add explicit command execution feedback area (success/error/help output) separated from PTY output stream.
 - [ ] `QLT-025` Owner: `BE` Task: Add session restart endpoint (`POST /api/v1/sessions/{sessionId}/restart`) to support `/restart` command semantics without restarting backend process.
 - [ ] `QLT-026` Owner: `QA` Task: Add integration tests for command-plane behavior (slash-command parsing, unknown-command handling, pass-through for non-slash input, command side effects).

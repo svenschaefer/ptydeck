@@ -129,6 +129,11 @@ Completed and verified topics belong here.
 - [x] Default runtime ports switched to low-conflict defaults: backend `18080`, frontend `18081` (including `.env.example`, runtime config defaults, tests, smoke script, and runbook links).
 - [x] Frontend runtime endpoint resolution now works without env parameters for domain routing: for `ptydeck.*` hosts it auto-targets `api.<current-host>` (`https/wss`), while localhost/IP keeps dev-port fallback (`18080`).
 - [x] Repository markdown synchronization pass completed: `TODO.md`/`ROADMAP.md` separation reconfirmed, open-task ownership model validated, and environment-specific domain references kept out of tracked docs/tests.
+- [x] `QLT-023` completed: frontend control commands now execute in command plane (`/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/help`).
+- [x] Session token resolution for control commands supports full session ID, quick ID (`1..9`, `A..Z`), exact session name match, and unique ID prefix.
+- [x] Frontend integration test coverage updated for command-plane behavior in `frontend/test/app.test.js` (`/list`, `/help`, `/switch`).
+- [x] Validation for `QLT-023` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-023` cycle: backend `96.78%` lines, frontend `87.23%` lines.
 
 ## Maintenance Rules
 

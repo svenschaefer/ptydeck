@@ -460,6 +460,154 @@ function removeSession(sessionId) {
   store.setSessions(nextSessions);
 }
 
+function formatSessionDisplayName(session) {
+  return session.name || session.id.slice(0, 8);
+}
+
+function formatSessionToken(sessionId) {
+  return sessionQuickIds.get(sessionId) || ensureQuickId(sessionId);
+}
+
+function resolveSessionToken(token, sessions) {
+  const normalized = String(token || "").trim();
+  if (!normalized) {
+    return { session: null, error: "Missing session identifier." };
+  }
+
+  const exactId = sessions.find((session) => session.id === normalized);
+  if (exactId) {
+    return { session: exactId, error: "" };
+  }
+
+  const normalizedUpper = normalized.toUpperCase();
+  const quickIdMatches = sessions.filter((session) => formatSessionToken(session.id).toUpperCase() === normalizedUpper);
+  if (quickIdMatches.length === 1) {
+    return { session: quickIdMatches[0], error: "" };
+  }
+  if (quickIdMatches.length > 1) {
+    return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+  }
+
+  const lower = normalized.toLowerCase();
+  const exactNameMatches = sessions.filter((session) => typeof session.name === "string" && session.name.toLowerCase() === lower);
+  if (exactNameMatches.length === 1) {
+    return { session: exactNameMatches[0], error: "" };
+  }
+  if (exactNameMatches.length > 1) {
+    return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+  }
+
+  const prefixMatches = sessions.filter((session) => session.id.startsWith(normalized));
+  if (prefixMatches.length === 1) {
+    return { session: prefixMatches[0], error: "" };
+  }
+  if (prefixMatches.length > 1) {
+    return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+  }
+
+  return { session: null, error: `Unknown session identifier: ${normalized}` };
+}
+
+async function executeControlCommand(interpreted) {
+  const command = interpreted.command.toLowerCase();
+  const args = interpreted.args;
+  const state = store.getState();
+  const sessions = state.sessions;
+  const activeSessionId = state.activeSessionId;
+
+  if (command === "help" || command === "") {
+    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /help";
+  }
+
+  if (command === "list") {
+    if (sessions.length === 0) {
+      return "No sessions available.";
+    }
+    const lines = sessions.map((session) => {
+      const marker = session.id === activeSessionId ? "*" : " ";
+      const token = formatSessionToken(session.id);
+      return `${marker} [${token}] ${formatSessionDisplayName(session)} (${session.id.slice(0, 8)})`;
+    });
+    return lines.join("\n");
+  }
+
+  if (command === "new") {
+    const payload = {};
+    if (args.length > 0) {
+      payload.shell = args[0];
+    }
+    const session = await api.createSession(payload);
+    upsertSession(session);
+    store.setActiveSession(session.id);
+    return `Created session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
+  }
+
+  if (command === "close") {
+    if (sessions.length === 0) {
+      return "No sessions available.";
+    }
+    let targetSessionId = activeSessionId;
+    if (args.length > 0) {
+      const resolved = resolveSessionToken(args[0], sessions);
+      if (!resolved.session) {
+        return resolved.error;
+      }
+      targetSessionId = resolved.session.id;
+    }
+    if (!targetSessionId) {
+      return "No active session to close.";
+    }
+    await api.deleteSession(targetSessionId);
+    removeSession(targetSessionId);
+    return `Closed session ${targetSessionId.slice(0, 8)}.`;
+  }
+
+  if (command === "switch") {
+    if (args.length === 0) {
+      return "Usage: /switch <id>";
+    }
+    const resolved = resolveSessionToken(args[0], sessions);
+    if (!resolved.session) {
+      return resolved.error;
+    }
+    store.setActiveSession(resolved.session.id);
+    return `Active session: [${formatSessionToken(resolved.session.id)}] ${formatSessionDisplayName(resolved.session)}.`;
+  }
+
+  if (command === "next" || command === "prev") {
+    if (sessions.length === 0) {
+      return "No sessions available.";
+    }
+    const currentIndex = Math.max(
+      0,
+      sessions.findIndex((session) => session.id === activeSessionId)
+    );
+    const delta = command === "next" ? 1 : -1;
+    const nextIndex = (currentIndex + delta + sessions.length) % sessions.length;
+    const nextSession = sessions[nextIndex];
+    store.setActiveSession(nextSession.id);
+    return `Active session: [${formatSessionToken(nextSession.id)}] ${formatSessionDisplayName(nextSession)}.`;
+  }
+
+  if (command === "rename") {
+    if (args.length === 0) {
+      return "Usage: /rename <name>";
+    }
+    if (!activeSessionId) {
+      return "No active session to rename.";
+    }
+    const name = args.join(" ").trim();
+    if (!name) {
+      return "Usage: /rename <name>";
+    }
+    const updated = await api.updateSession(activeSessionId, { name });
+    upsertSession(updated);
+    return `Renamed active session to ${updated.name}.`;
+  }
+
+  return `Unknown command: /${command}`;
+}
+
 async function bootstrapSessions() {
   try {
     debugLog("sessions.bootstrap.start");
@@ -558,13 +706,19 @@ async function submitCommand() {
 
   const interpreted = interpretComposerInput(command);
   if (interpreted.kind === "control") {
-    const commandName = interpreted.command || "(empty)";
-    setError(`Control command is routed: /${commandName} (implementation pending).`);
-    debugLog("command.control.routed", {
+    debugLog("command.control.start", {
       command: interpreted.command,
       argsCount: interpreted.args.length
     });
-    commandInput.value = "";
+    try {
+      const feedback = await executeControlCommand(interpreted);
+      uiState.error = feedback;
+      debugLog("command.control.ok", { command: interpreted.command });
+      commandInput.value = "";
+      render();
+    } catch {
+      setError("Failed to execute control command.");
+    }
     return;
   }
 
