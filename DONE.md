@@ -73,6 +73,9 @@ Completed and verified topics belong here.
 - [x] Coverage after `QLT-016`: backend `96.58%` lines, frontend `97.59%` lines.
 - [x] `QLT-017` completed: CI now runs quality workflow on a Node matrix (`18` and `lts/*`) to detect runtime drift earlier.
 - [x] Coverage after `QLT-017` validation cycle: backend `96.72%` lines, frontend `97.59%` lines.
+- [x] `QLT-018` completed: frontend default UI switched to tmux-like dark console style.
+- [x] Terminal display baseline increased to roughly `125%` (`fontSize: 16`, larger terminal mount and responsive grid sizing).
+- [x] Coverage after `QLT-018` validation cycle: backend `96.58%` lines, frontend `97.59%` lines.
 
 ## Maintenance Rules
 

@@ -55,7 +55,7 @@ Exit criteria:
 
 ### v0.3.0-H1 - Quality Hardening Backlog
 
-- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`
 
 Dependencies:
 
@@ -82,6 +82,7 @@ Exit criteria:
 - CI performs runtime smoke checks before merge.
 - CI validates runtime across supported Node versions.
 - Deployment docs include secure production CORS guidance.
+- Frontend default visual baseline is dark console style with improved terminal readability.
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
@@ -153,3 +154,4 @@ Exit criteria:
 - `QLT-015`
 - `QLT-016`
 - `QLT-017`
+- `QLT-018`

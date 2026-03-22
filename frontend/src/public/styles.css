@@ -1,10 +1,14 @@
 :root {
-  --bg: #f7f8fb;
-  --panel: #ffffff;
-  --border: #d5dae3;
-  --active: #2f6fed;
-  --text: #172030;
-  --muted: #5f6d85;
+  --bg: #0a0d12;
+  --bg-grid: #0f141c;
+  --panel: #121923;
+  --panel-muted: #1a2431;
+  --border: #2d3949;
+  --active: #8ec07c;
+  --warn: #fabd2f;
+  --danger: #fb4934;
+  --text: #d8dee9;
+  --muted: #92a4bb;
 }
 
 * {
@@ -13,8 +17,10 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(180deg, #f3f6fc 0%, #f8f8fa 100%);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  background:
+    radial-gradient(circle at 10% -10%, #1b2330 0%, rgba(27, 35, 48, 0) 38%),
+    linear-gradient(180deg, var(--bg-grid) 0%, var(--bg) 100%);
   color: var(--text);
 }
 
@@ -24,13 +30,16 @@ body {
   align-items: center;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  background: #0f151f;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--active);
+  text-transform: uppercase;
 }
 
 .pill {
@@ -38,7 +47,8 @@ body {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--warn);
+  background: #111a24;
   font-size: 12px;
 }
 
@@ -51,30 +61,41 @@ body {
 
 .command-row input {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 10px;
+  background: #0f151f;
+  color: var(--text);
+}
+
+.command-row input::placeholder {
+  color: var(--muted);
 }
 
 .status-message {
   margin: 0 18px;
   min-height: 20px;
-  color: #9c2c2c;
+  color: #ff8f8f;
   font-size: 13px;
 }
 
 button {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--panel-muted);
+  color: var(--text);
   cursor: pointer;
+}
+
+button:hover {
+  border-color: #465b74;
 }
 
 .terminal-grid {
   padding: 12px 18px 18px;
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
 }
 
 .empty-state {
@@ -91,7 +112,7 @@ button {
 
 .terminal-card.active {
   border-color: var(--active);
-  box-shadow: 0 0 0 2px rgba(47, 111, 237, 0.18);
+  box-shadow: 0 0 0 1px rgba(142, 192, 124, 0.35);
 }
 
 .terminal-toolbar {
@@ -100,13 +121,38 @@ button {
   gap: 8px;
   border-bottom: 1px solid var(--border);
   align-items: center;
+  background: #0f151f;
 }
 
 .session-focus {
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.session-close {
+  margin-left: auto;
+  border-color: #5f2c2c;
+  color: #ff9f9f;
 }
 
 .terminal-mount {
-  min-height: 220px;
-  padding: 4px;
+  min-height: 275px;
+  padding: 6px;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    margin-left: 0;
+  }
+
+  .terminal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-mount {
+    min-height: 240px;
+  }
 }

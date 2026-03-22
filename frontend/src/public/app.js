@@ -91,8 +91,31 @@ function render() {
 
     const terminal = new window.Terminal({
       convertEol: true,
-      fontSize: 13,
-      cursorBlink: true
+      fontSize: 16,
+      lineHeight: 1.2,
+      fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace',
+      cursorBlink: true,
+      theme: {
+        background: "#0a0d12",
+        foreground: "#d8dee9",
+        cursor: "#8ec07c",
+        black: "#0a0d12",
+        red: "#fb4934",
+        green: "#8ec07c",
+        yellow: "#fabd2f",
+        blue: "#83a598",
+        magenta: "#b48ead",
+        cyan: "#8fbcbb",
+        white: "#d8dee9",
+        brightBlack: "#4b5563",
+        brightRed: "#ff6b5a",
+        brightGreen: "#a5d68a",
+        brightYellow: "#ffd36a",
+        brightBlue: "#98b6cc",
+        brightMagenta: "#c8a7d8",
+        brightCyan: "#a9d9d6",
+        brightWhite: "#f5f7fa"
+      }
     });
 
     terminal.open(mount);
