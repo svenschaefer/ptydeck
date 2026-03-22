@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings/theme backlog added as `QLT-058` ... `QLT-064`)
+Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings panel entry completed in `QLT-058`; remaining per-terminal settings/theme backlog `QLT-059` ... `QLT-064`)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -140,6 +140,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
+- Frontend now exposes per-terminal settings entry points on terminal cards, with session-scoped settings panel shell/toggle behavior.
 - Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-064`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), and per-session color sets.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
@@ -150,7 +151,7 @@ The system separates backend execution concerns from frontend rendering concerns
   - Planned next in cycle B: remaining enterprise hardening tasks from `TODO.md` (`ENT-013`, `ENT-014`, `ENT-022`).
   - Completed in cycle C: `QLT-042`, `QLT-043`, `QLT-044`, `QLT-045`, `QLT-049`, `QLT-050`, `QLT-053`, `QLT-054`, `QLT-056`.
   - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-046`, `QLT-048`, `QLT-051`, `QLT-052`, `QLT-055`, `QLT-057`).
-  - Planned next in cycle D (`v0.3.0-H1D`): per-terminal settings/theme tasks from `TODO.md` (`QLT-058` ... `QLT-064`).
+  - Planned next in cycle D (`v0.3.0-H1D`): remaining per-terminal settings/theme tasks from `TODO.md` (`QLT-059` ... `QLT-064`).
 
 ## Session Behavior Notes
 

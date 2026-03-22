@@ -303,6 +303,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for suggestion-list rendering and keyboard selection/no-auto-execute behavior.
 - [x] Validation for `QLT-053` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-053` cycle: backend `96.70%` lines, frontend `88.79%` lines.
+- [x] `QLT-058` completed: each terminal card now provides a dedicated per-session settings entry (`Settings` button) that toggles an embedded session settings panel.
+- [x] Per-session settings panel toggle state is preserved across rerenders for existing sessions and cleaned up when sessions are removed.
+- [x] Added frontend integration coverage for settings-entry visibility and panel open/close toggle behavior on terminal cards.
+- [x] Validation for `QLT-058` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-058` cycle: backend `96.97%` lines, frontend `88.88%` lines.
 
 ## Maintenance Rules
 

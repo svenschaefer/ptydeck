@@ -36,6 +36,7 @@ const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
+const openSessionSettingsPanels = new Set();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
 let bootstrapPromise = null;
@@ -806,6 +807,7 @@ function render() {
       entry.element.remove();
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
+      openSessionSettingsPanels.delete(sessionId);
       const timer = resizeTimers.get(sessionId);
       if (timer) {
         clearTimeout(timer);
@@ -822,20 +824,32 @@ function render() {
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
+      entry.settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
       continue;
     }
 
     const node = template.content.firstElementChild.cloneNode(true);
     const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
+    const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
+    const settingsPanel = node.querySelector(".session-settings-panel");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
     quickIdEl.textContent = quickId;
+    settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
+    settingsBtn.addEventListener("click", () => {
+      if (openSessionSettingsPanels.has(session.id)) {
+        openSessionSettingsPanels.delete(session.id);
+      } else {
+        openSessionSettingsPanels.add(session.id);
+      }
+      settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
+    });
     renameBtn.addEventListener("click", async () => {
       const nextName = window.prompt("Session name", session.name || session.id.slice(0, 8));
       if (nextName === null) {
@@ -903,7 +917,7 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    terminals.set(session.id, { terminal, element: node, focusBtn, quickIdEl, mount });
+    terminals.set(session.id, { terminal, element: node, focusBtn, quickIdEl, settingsPanel, mount });
     if (startupPerf.firstTerminalMountedAtMs === null) {
       startupPerf.firstTerminalMountedAtMs = nowMs();
       maybeReportStartupPerf();

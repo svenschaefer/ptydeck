@@ -207,14 +207,22 @@ function createTerminalCardTemplateNode() {
   const toolbar = new FakeElement({ className: "terminal-toolbar" });
   const quickId = new FakeElement({ className: "session-quick-id", tagName: "span" });
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
+  const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
+  const settingsPanel = new FakeElement({ className: "session-settings-panel", tagName: "section" });
+  const settingsTitle = new FakeElement({ className: "session-settings-title", tagName: "p" });
+  const settingsHint = new FakeElement({ className: "session-settings-hint", tagName: "p" });
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
   toolbar.appendChild(quickId);
   toolbar.appendChild(focus);
+  toolbar.appendChild(settings);
   toolbar.appendChild(rename);
   toolbar.appendChild(close);
+  settingsPanel.appendChild(settingsTitle);
+  settingsPanel.appendChild(settingsHint);
   card.appendChild(toolbar);
+  card.appendChild(settingsPanel);
   card.appendChild(mount);
   return card;
 }
@@ -871,6 +879,15 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondQuickId = secondCard.querySelector(".session-quick-id");
   assert.equal(firstQuickId.textContent, "1");
   assert.equal(secondQuickId.textContent, "2");
+  const secondSettings = secondCard.querySelector(".session-settings");
+  const secondSettingsPanel = secondCard.querySelector(".session-settings-panel");
+  assert.equal(secondSettingsPanel.classList.contains("open"), false);
+  secondSettings.click();
+  await tick();
+  assert.equal(secondSettingsPanel.classList.contains("open"), true);
+  secondSettings.click();
+  await tick();
+  assert.equal(secondSettingsPanel.classList.contains("open"), false);
   const secondFocus = secondCard.querySelector(".session-focus");
   secondFocus.click();
   await tick();

@@ -288,6 +288,37 @@ button:hover {
   flex: 0 0 auto;
 }
 
+.session-settings {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #a9d9d6;
+}
+
+.session-settings-panel {
+  display: none;
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  background: #0f151f;
+}
+
+.session-settings-panel.open {
+  display: block;
+}
+
+.session-settings-title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session-settings-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #a9d9d6;
+}
+
 .terminal-mount {
   height: var(--ptydeck-terminal-mount-height, 172px);
   padding: 0;
