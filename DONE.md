@@ -256,6 +256,10 @@ Completed and verified topics belong here.
 - [x] Frontend API client extended with custom-command list/get/delete methods, and integration behavior validated in app tests.
 - [x] Validation for `QLT-040`/`QLT-047` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-040`/`QLT-047` cycle: backend `96.97%` lines, frontend `87.50%` lines.
+- [x] `QLT-041` completed: slash-command mode is now strict (`/` must be the first character of the full input); leading whitespace or later-line slashes remain terminal-plane input.
+- [x] Added command-interpreter regression coverage for strict slash boundary semantics (leading-space and later-line slash cases).
+- [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
 
 ## Maintenance Rules
 
