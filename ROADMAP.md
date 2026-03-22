@@ -55,7 +55,7 @@ Exit criteria:
 
 ### v0.3.0-H1 - Quality Hardening Backlog
 
-- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`
+- `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-005`, `QLT-006`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`
 
 Dependencies:
 
@@ -66,6 +66,9 @@ Dependencies:
 - `QLT-006` should be completed before production deployment updates.
 - `QLT-009` depends on `QLT-008` session metadata persistence behavior.
 - `QLT-012` should run after runtime-hardening items `QLT-007` and `QLT-011`.
+- `QLT-014` should run after `QLT-007` to validate shutdown behavior under guarded request handling.
+- `QLT-015` depends on stable route/error behavior from `QLT-004`.
+- `QLT-016` should run before `QLT-012` smoke checks to ensure runtime-config consistency.
 
 Exit criteria:
 
@@ -73,8 +76,11 @@ Exit criteria:
 - Backend negative-path behavior is covered by tests.
 - Frontend DOM integration behavior is covered by tests.
 - Backend persistence and restart behavior are resilient under partial-write risk.
+- Dev static-file serving is path-safe.
+- Route behavior is continuously checked against OpenAPI contract.
 - CI enforces coverage minimums.
 - CI performs runtime smoke checks before merge.
+- CI validates runtime across supported Node versions.
 - Deployment docs include secure production CORS guidance.
 
 ## Current Status
