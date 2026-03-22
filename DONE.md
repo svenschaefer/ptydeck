@@ -264,6 +264,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for custom-command preview rendering and preview cleanup after execution.
 - [x] Validation for `QLT-042` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-042` cycle: backend `96.97%` lines, frontend `87.13%` lines.
+- [x] `QLT-043` completed: slash-command name autocomplete now supports `Tab`/`Shift+Tab` deterministic cycling with system-command precedence over custom commands.
+- [x] Zero-match autocomplete keeps slash input unchanged (no mutation) and multiline/non-slash inputs are unaffected.
+- [x] Added frontend integration coverage for command-name autocomplete cycling order, reverse cycling, and zero-match behavior.
+- [x] Validation for `QLT-043` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-043` cycle: backend `96.97%` lines, frontend `87.46%` lines.
 
 ## Maintenance Rules
 

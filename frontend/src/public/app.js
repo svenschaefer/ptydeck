@@ -46,9 +46,23 @@ const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const SYSTEM_SLASH_COMMANDS = [
+  "new",
+  "close",
+  "switch",
+  "next",
+  "prev",
+  "list",
+  "rename",
+  "restart",
+  "custom",
+  "help"
+];
 let terminalSettings = loadTerminalSettings();
 let wsAuthToken = "";
 let wsClient = null;
+let commandAutocompleteState = null;
+let commandAutocompleteRequestId = 0;
 const uiState = {
   loading: true,
   error: "",
@@ -92,6 +106,110 @@ function setCommandFeedback(message) {
 function setCommandPreview(message) {
   uiState.commandPreview = message;
   render();
+}
+
+function resetCommandAutocompleteState() {
+  commandAutocompleteState = null;
+}
+
+function parseCommandAutocompleteInput(rawInput) {
+  const value = typeof rawInput === "string" ? rawInput : "";
+  if (!value.startsWith("/")) {
+    return null;
+  }
+  if (value.includes("\n")) {
+    return null;
+  }
+  const afterSlash = value.slice(1);
+  if (/\s/.test(afterSlash)) {
+    return null;
+  }
+  return {
+    prefix: afterSlash.toLowerCase()
+  };
+}
+
+function buildCommandAutocompleteCandidates(customCommands) {
+  const ordered = [];
+  const seen = new Set();
+
+  for (const name of SYSTEM_SLASH_COMMANDS) {
+    const normalized = String(name || "").trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    ordered.push(normalized);
+  }
+
+  for (const entry of Array.isArray(customCommands) ? customCommands : []) {
+    const normalized = String(entry?.name || "").trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    ordered.push(normalized);
+  }
+
+  return ordered;
+}
+
+async function autocompleteCommandName(reverse = false) {
+  const parsed = parseCommandAutocompleteInput(commandInput.value || "");
+  if (!parsed) {
+    resetCommandAutocompleteState();
+    return false;
+  }
+
+  const activeState = commandAutocompleteState;
+  const canCycleExisting =
+    activeState &&
+    Array.isArray(activeState.matches) &&
+    activeState.matches.length > 0 &&
+    Number.isInteger(activeState.index) &&
+    activeState.index >= 0 &&
+    activeState.index < activeState.matches.length &&
+    commandInput.value === `/${activeState.matches[activeState.index]}`;
+
+  let matches = [];
+  let nextIndex = reverse ? -1 : 0;
+
+  if (canCycleExisting) {
+    matches = activeState.matches;
+    const delta = reverse ? -1 : 1;
+    nextIndex = (activeState.index + delta + matches.length) % matches.length;
+  } else {
+    const requestId = ++commandAutocompleteRequestId;
+    let customCommands = [];
+    try {
+      customCommands = await api.listCustomCommands();
+    } catch {
+      customCommands = [];
+    }
+    if (requestId !== commandAutocompleteRequestId) {
+      return true;
+    }
+    const candidates = buildCommandAutocompleteCandidates(customCommands);
+    matches = candidates.filter((name) => name.startsWith(parsed.prefix));
+    if (matches.length === 0) {
+      resetCommandAutocompleteState();
+      return true;
+    }
+    nextIndex = reverse ? matches.length - 1 : 0;
+  }
+
+  if (matches.length === 0) {
+    resetCommandAutocompleteState();
+    return true;
+  }
+
+  commandAutocompleteState = {
+    matches,
+    index: nextIndex
+  };
+  commandInput.value = `/${matches[nextIndex]}`;
+  scheduleCommandPreview();
+  return true;
 }
 
 function clampInt(value, fallback, min, max) {
@@ -1001,6 +1119,7 @@ if (settingsRowsEl) {
 }
 
 async function submitCommand() {
+  resetCommandAutocompleteState();
   const command = commandInput.value;
   if (!command.trim()) {
     return;
@@ -1121,8 +1240,18 @@ function scheduleCommandPreview() {
 }
 
 sendBtn.addEventListener("click", submitCommand);
-commandInput.addEventListener("input", scheduleCommandPreview);
+commandInput.addEventListener("input", () => {
+  resetCommandAutocompleteState();
+  scheduleCommandPreview();
+});
 commandInput.addEventListener("keydown", (event) => {
+  if (event.key === "Tab") {
+    if (parseCommandAutocompleteInput(commandInput.value || "")) {
+      event.preventDefault();
+      autocompleteCommandName(event.shiftKey).catch(() => {});
+    }
+    return;
+  }
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     submitCommand();

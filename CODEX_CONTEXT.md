@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + `/custom` management/execution + strict slash-mode boundary + preview panel completed in `QLT-037` ... `QLT-042` and `QLT-047`; per-terminal settings/theme backlog added as `QLT-058` ... `QLT-064`)
+Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name autocomplete completed in `QLT-037` ... `QLT-043` and `QLT-047`; per-terminal settings/theme backlog added as `QLT-058` ... `QLT-064`)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -131,6 +131,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now executes custom commands via `/<customName> [target]` with existing session-token resolver semantics and auto-newline append when missing.
 - Slash mode boundary is strict: control-plane parsing activates only when `/` is the first character of input; leading spaces or later-line slashes remain terminal input.
 - Frontend now renders a non-blocking preview panel for `/<customName>` showing exact payload, target resolution, and newline-append behavior before send.
+- Frontend slash-command name autocomplete now supports deterministic `Tab`/`Shift+Tab` cycling with system-command precedence before custom-command aliases.
 - Planning baseline now includes per-terminal settings/theming tasks (`QLT-058` ... `QLT-064`) covering settings-icon entry, rename/close relocation into settings, startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`), and per-session color sets.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
@@ -139,8 +140,8 @@ The system separates backend execution concerns from frontend rendering concerns
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: remaining enterprise hardening tasks from `TODO.md` (`ENT-013`, `ENT-014`, `ENT-022`).
-  - Completed in cycle C: `QLT-042`.
-  - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-043` ... `QLT-057`).
+  - Completed in cycle C: `QLT-042`, `QLT-043`.
+  - Planned next in cycle C (`v0.3.0-H1C`): remaining custom slash-command and command-UX tasks from `TODO.md` (`QLT-044` ... `QLT-057`).
   - Planned next in cycle D (`v0.3.0-H1D`): per-terminal settings/theme tasks from `TODO.md` (`QLT-058` ... `QLT-064`).
 
 ## Session Behavior Notes

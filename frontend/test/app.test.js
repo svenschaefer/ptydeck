@@ -509,10 +509,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.deepEqual(customCommandUpserts[1], { commandName: "blockcmd", content: "line 1\nline 2" });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /blockcmd (block).");
 
+  fixture.elements.commandInput.value = "/custom closeit echo close";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 3);
+  assert.deepEqual(customCommandUpserts[2], { commandName: "closeit", content: "echo close" });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /closeit (inline).");
+
   fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(customCommandUpserts.length, 2);
+  assert.equal(customCommandUpserts.length, 3);
   assert.match(
     fixture.elements.commandFeedback.textContent,
     /^Custom command definition error: Block definition must end with a closing '---' line\.$/
@@ -557,6 +564,58 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(inputPayloads.length, 2);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
+
+  fixture.elements.commandInput.value = "/c";
+  const tabForward = {
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(tabForward);
+  await tick();
+  assert.equal(tabForward.defaultPrevented, true);
+  assert.equal(fixture.elements.commandInput.value, "/close");
+
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/custom");
+
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/closeit");
+
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: true,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/custom");
+
+  fixture.elements.commandInput.value = "/zzzz";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/zzzz");
 
   fixture.elements.commandInput.value = "/switch 1";
   fixture.elements.sendCommand.click();
