@@ -106,3 +106,11 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `ENT-014` Owner: `PLAT` Task: Add disaster-recovery runbook with RTO/RPO targets and automate periodic restore drill verification in CI/non-prod.
 - [ ] `ENT-015` Owner: `PLAT` Task: Add release evidence bundle generation (test results, SBOM, vulnerability scan output, commit provenance) for audit/compliance.
 - [ ] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).
+- [ ] `ENT-017` Owner: `BE` Task: Enforce WebSocket `Origin` allowlist checks on upgrade requests and return explicit unauthorized-origin errors.
+- [ ] `ENT-018` Owner: `PLAT` Task: Add reverse-proxy reference setup for Traefik (HTTPS + WSS + host routing for `ptydeck.local.secos.rocks` and `api.ptydeck.local.secos.rocks`) in `DEPLOYMENT.md`.
+- [ ] `ENT-019` Owner: `BE` Task: Add trusted-proxy configuration and safe `X-Forwarded-*` handling to avoid spoofed client/protocol metadata behind ingress.
+- [ ] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.
+- [ ] `ENT-021` Owner: `PLAT` Task: Add metrics baseline (request latency/error counters, active session gauge, WS connection gauge) and expose scrape endpoint for monitoring.
+- [ ] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
+- [ ] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.
+- [ ] `ENT-024` Owner: `PLAT` Task: Define and document data retention/purge policy for persisted session metadata and audit/security logs, including automated cleanup cadence.

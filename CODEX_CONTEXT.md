@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (enterprise readiness backlog added)
+Last updated: 2026-03-22 (enterprise backlog expanded, Traefik local-domain context added)
 Owner: `CODY`
 
 ## Project Purpose
@@ -53,10 +53,11 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now performs per-session debounced resize calls to backend.
 - Frontend resolves backend API/WS endpoints from the browser host at runtime (WSL IP friendly).
 - Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
+- Local HTTPS/domain setup in use: Traefik on `*.local.secos.rocks` (example hosts: `ptydeck.local.secos.rocks`, `api.ptydeck.local.secos.rocks`).
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-017`).
-- Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-016`).
+- Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
 
 ## Session Behavior Notes
 

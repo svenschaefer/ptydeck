@@ -78,13 +78,23 @@ Frontend:
 - Send command (for example `pwd`)
 - Confirm output appears in the corresponding terminal panel
 
-## 7. Rollback
+## 7. Local Reverse Proxy (Traefik) Note
+
+If local TLS/domain routing is used, route frontend and backend with explicit hosts, for example:
+
+- Frontend host: `https://ptydeck.local.secos.rocks`
+- Backend API host: `https://api.ptydeck.local.secos.rocks/api/v1`
+- Backend WS host: `wss://api.ptydeck.local.secos.rocks/ws`
+
+When this mode is enabled, `CORS_ORIGIN` and WebSocket origin checks should use explicit allowlists instead of wildcard values.
+
+## 8. Rollback
 
 1. Checkout previous stable commit/tag.
 2. Restart backend and frontend.
 3. Re-run smoke checks above.
 
-## 8. Release Checklist
+## 9. Release Checklist
 
 - [ ] `main` branch is up to date
 - [ ] Quality gate passed

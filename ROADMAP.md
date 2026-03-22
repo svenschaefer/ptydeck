@@ -85,7 +85,7 @@ Exit criteria:
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
-- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`
+- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-017`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
 
 Dependencies:
 
@@ -102,6 +102,14 @@ Dependencies:
 - `ENT-014` depends on `ENT-009` backup/restore mechanics.
 - `ENT-015` depends on `ENT-007` security scanning artifacts.
 - `ENT-016` should run with `ENT-011` to align transport and header-level security posture.
+- `ENT-017` depends on `ENT-001` auth model and should align with `QLT-006` CORS policy split.
+- `ENT-018` should run with `ENT-011` to keep HTTPS/WSS ingress and certificate handling aligned.
+- `ENT-019` depends on `ENT-018` ingress topology and should be validated together with `ENT-003` audit context fields.
+- `ENT-020` depends on `ENT-006` abuse-control baseline and should be validated by `ENT-022`.
+- `ENT-021` should run before `ENT-008` alerting implementation to provide metric signals.
+- `ENT-022` depends on `ENT-020` and should run after `ENT-021` metric instrumentation for measurable thresholds.
+- `ENT-023` should run before production hardening tasks to prevent invalid runtime config drift.
+- `ENT-024` depends on `ENT-003`, `ENT-004`, and `ENT-009` to align session and log retention behavior.
 
 Exit criteria:
 
@@ -116,6 +124,14 @@ Exit criteria:
 - Runtime least-privilege profile is implemented and documented.
 - Disaster recovery drills are automated and measured against RTO/RPO.
 - Release evidence bundle is generated for audit/compliance traceability.
+- WebSocket origin checks are enforced alongside REST origin policy.
+- Reverse-proxy deployment guidance exists for Traefik-based HTTPS/WSS host routing.
+- Trusted proxy handling is explicitly configured and validated.
+- Session guardrail policies (concurrency/idle/lifetime) are enforced and tested.
+- Monitoring metrics are exposed and consumed by alerting baselines.
+- Load and fanout non-functional thresholds are automated and tracked.
+- Runtime configuration fails fast on invalid critical env values.
+- Data retention and purge policies are automated and documented.
 
 ## Current Status
 
