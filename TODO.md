@@ -87,3 +87,16 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-015` Owner: `BE` Task: Add contract conformance test that verifies implemented runtime routes/status codes against `backend/openapi/openapi.yaml`.
 - [ ] `QLT-016` Owner: `FE` Task: Add runtime-config override support (API/WS ports/hosts via injected config object) and tests for fallback precedence.
 - [ ] `QLT-017` Owner: `PLAT` Task: Add CI matrix run for Node `18` and latest LTS to detect engine/runtime drift early.
+
+## Enterprise Readiness Backlog (v0.3.0 continuation)
+
+- [ ] `ENT-001` Owner: `BE` Task: Implement authentication and authorization middleware for REST and WebSocket (JWT/OIDC, role scopes, unauthorized/forbidden responses).
+- [ ] `ENT-002` Owner: `BE` Task: Add tenant-aware session scoping model (tenantId propagation, API filtering, WS event isolation by tenant).
+- [ ] `ENT-003` Owner: `BE` Task: Add structured audit logging for security-relevant actions (session create/delete/input/resize, auth failures) with actor identity and outcome.
+- [ ] `ENT-004` Owner: `PLAT` Task: Add production logging standards (JSON logs, correlation IDs, PII redaction rules, log retention policy) and document in `DEPLOYMENT.md`.
+- [ ] `ENT-005` Owner: `PLAT` Task: Integrate secrets management strategy (no plaintext secrets in repo, runtime secret injection pattern, secret rotation procedure).
+- [ ] `ENT-006` Owner: `BE` Task: Add configurable rate limiting and abuse controls for REST and WebSocket connection creation.
+- [ ] `ENT-007` Owner: `PLAT` Task: Add dependency and image security scanning in CI (SCA + vulnerability gate) and generate SBOM artifact per release.
+- [ ] `ENT-008` Owner: `PLAT` Task: Define SLOs/SLIs and alerting baseline for API availability, WS disconnect rate, and error-rate thresholds.
+- [ ] `ENT-009` Owner: `PLAT` Task: Add backup/restore automation for persistence data and include periodic restore verification procedure.
+- [ ] `ENT-010` Owner: `QA` Task: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).

@@ -83,6 +83,29 @@ Exit criteria:
 - CI validates runtime across supported Node versions.
 - Deployment docs include secure production CORS guidance.
 
+### v0.3.0-H2 - Enterprise Readiness Backlog
+
+- `ENT-001`, `ENT-002`, `ENT-003`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-010`
+
+Dependencies:
+
+- `ENT-001` should run after `QLT-015` to build on stable API contract behavior.
+- `ENT-002` depends on `ENT-001` identity model and token claims.
+- `ENT-003` depends on `ENT-001` to include authenticated actor identity in audit records.
+- `ENT-006` depends on `QLT-007` request-size guard and should be validated by `ENT-010`.
+- `ENT-010` depends on completion of `ENT-001`, `ENT-002`, and `ENT-006`.
+- `ENT-008` should run after observability-producing changes in `ENT-003` and `ENT-004`.
+- `ENT-009` should run after `QLT-009` atomic persistence write hardening.
+
+Exit criteria:
+
+- AuthN/AuthZ and tenant isolation are enforced on REST and WS paths.
+- Audit logs and operational logs are structured, correlated, and retention-governed.
+- Security scanning and SBOM generation are active in CI.
+- SLOs and alerting are defined and documented.
+- Backup/restore is automated and periodically verified.
+- Security and isolation tests are automated and passing.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0`
