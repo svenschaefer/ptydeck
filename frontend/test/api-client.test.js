@@ -9,11 +9,11 @@ test("api client calls list sessions endpoint", async () => {
     return { ok: true, status: 200, json: async () => [] };
   };
 
-  const api = createApiClient("http://localhost:8080/api/v1");
+  const api = createApiClient("http://localhost:18080/api/v1");
   await api.listSessions();
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "http://localhost:8080/api/v1/sessions");
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions");
 });
 
 test("api client calls input endpoint", async () => {
@@ -23,11 +23,11 @@ test("api client calls input endpoint", async () => {
     return { ok: true, status: 204, json: async () => ({}) };
   };
 
-  const api = createApiClient("http://localhost:8080/api/v1");
+  const api = createApiClient("http://localhost:18080/api/v1");
   await api.sendInput("abc", "pwd\n");
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "http://localhost:8080/api/v1/sessions/abc/input");
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/input");
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[0].options.headers["content-type"], "application/json");
 });
@@ -39,7 +39,7 @@ test("api client surfaces backend ErrorResponse on non-2xx", async () => {
     json: async () => ({ error: "SessionNotFound", message: "Session 'abc' was not found." })
   });
 
-  const api = createApiClient("http://localhost:8080/api/v1");
+  const api = createApiClient("http://localhost:18080/api/v1");
 
   await assert.rejects(
     api.getSession("abc"),
@@ -60,7 +60,7 @@ test("api client throws fallback error when non-2xx body is not json", async () 
     }
   });
 
-  const api = createApiClient("http://localhost:8080/api/v1");
+  const api = createApiClient("http://localhost:18080/api/v1");
 
   await assert.rejects(
     api.listSessions(),
@@ -83,10 +83,10 @@ test("api client calls update session endpoint", async () => {
     };
   };
 
-  const api = createApiClient("http://localhost:8080/api/v1");
+  const api = createApiClient("http://localhost:18080/api/v1");
   await api.updateSession("abc", { name: "renamed" });
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "http://localhost:8080/api/v1/sessions/abc");
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc");
   assert.equal(calls[0].options.method, "PATCH");
 });

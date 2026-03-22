@@ -4,9 +4,9 @@ import { loadClientConfig } from "../src/config.js";
 
 test("loadClientConfig applies defaults", () => {
   const config = loadClientConfig({});
-  assert.equal(config.port, 5173);
-  assert.equal(config.apiBaseUrl, "http://localhost:8080/api/v1");
-  assert.equal(config.wsUrl, "ws://localhost:8080/ws");
+  assert.equal(config.port, 18081);
+  assert.equal(config.apiBaseUrl, "http://localhost:18080/api/v1");
+  assert.equal(config.wsUrl, "ws://localhost:18080/ws");
   assert.equal(config.debugLogs, false);
 });
 

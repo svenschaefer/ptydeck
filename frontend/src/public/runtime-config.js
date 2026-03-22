@@ -36,9 +36,9 @@ export function resolveRuntimeConfig(win = window) {
   }
 
   const apiHost = typeof injected.apiHost === "string" && injected.apiHost ? injected.apiHost : browserHost;
-  const apiPort = normalizePort(injected.apiPort, 8080);
+  const apiPort = normalizePort(injected.apiPort, 18080);
   const wsHost = typeof injected.wsHost === "string" && injected.wsHost ? injected.wsHost : browserHost;
-  const wsPort = normalizePort(injected.wsPort, 8080);
+  const wsPort = normalizePort(injected.wsPort, 18080);
 
   return {
     apiBaseUrl: `${protocolHttp}://${apiHost}:${apiPort}/api/v1`,

@@ -5,7 +5,7 @@ import { loadConfig } from "../src/config.js";
 test("loadConfig applies defaults", () => {
   const config = loadConfig({});
   assert.equal(config.nodeEnv, "development");
-  assert.equal(config.port, 8080);
+  assert.equal(config.port, 18080);
   assert.equal(config.shell, "bash");
   assert.equal(config.dataPath, "./data/sessions.json");
   assert.equal(config.corsOrigin, "*");

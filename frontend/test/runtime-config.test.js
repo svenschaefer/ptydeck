@@ -12,8 +12,8 @@ test("runtime config falls back to browser host and default ports", () => {
   });
 
   assert.deepEqual(config, {
-    apiBaseUrl: "http://example.local:8080/api/v1",
-    wsUrl: "ws://example.local:8080/ws",
+    apiBaseUrl: "http://example.local:18080/api/v1",
+    wsUrl: "ws://example.local:18080/ws",
     debugLogs: false
   });
 });

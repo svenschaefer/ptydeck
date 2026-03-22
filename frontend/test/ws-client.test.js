@@ -78,14 +78,14 @@ test("ws client reconnects and reports state transitions", (t) => {
   const { timers } = withMockedGlobals(t);
   const states = [];
   const messages = [];
-  createWsClient("ws://localhost:8080/ws", {
+  createWsClient("ws://localhost:18080/ws", {
     onState: (state) => states.push(state),
     onMessage: (message) => messages.push(message)
   });
 
   assert.equal(MockWebSocket.instances.length, 1);
   const first = MockWebSocket.instances[0];
-  assert.equal(first.url, "ws://localhost:8080/ws");
+  assert.equal(first.url, "ws://localhost:18080/ws");
   assert.deepEqual(states, ["connecting"]);
 
   first.emit("open");
@@ -111,7 +111,7 @@ test("ws client reconnects and reports state transitions", (t) => {
 test("ws client close stops reconnect and clears scheduled timer", (t) => {
   const { timers } = withMockedGlobals(t);
   const states = [];
-  const client = createWsClient("ws://localhost:8080/ws", {
+  const client = createWsClient("ws://localhost:18080/ws", {
     onState: (state) => states.push(state),
     onMessage: () => {}
   });
@@ -136,7 +136,7 @@ test("ws client emits error state and applies bounded reconnect backoff with jit
   setRandomSequence([0, 1, 1, 1, 1, 1, 1]);
 
   const states = [];
-  createWsClient("ws://localhost:8080/ws", {
+  createWsClient("ws://localhost:18080/ws", {
     onState: (state) => states.push(state),
     onMessage: () => {}
   });

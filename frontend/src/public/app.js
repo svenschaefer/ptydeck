@@ -1,4 +1,5 @@
 import { createApiClient } from "./api-client.js";
+import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
@@ -551,12 +552,29 @@ if (settingsRowsEl) {
 
 async function submitCommand() {
   const command = commandInput.value;
-  const activeSessionId = store.getState().activeSessionId;
-  if (!command.trim() || !activeSessionId) {
+  if (!command.trim()) {
     return;
   }
+
+  const interpreted = interpretComposerInput(command);
+  if (interpreted.kind === "control") {
+    const commandName = interpreted.command || "(empty)";
+    setError(`Control command is routed: /${commandName} (implementation pending).`);
+    debugLog("command.control.routed", {
+      command: interpreted.command,
+      argsCount: interpreted.args.length
+    });
+    commandInput.value = "";
+    return;
+  }
+
+  const activeSessionId = store.getState().activeSessionId;
+  if (!activeSessionId) {
+    return;
+  }
+
   try {
-    const payload = command.endsWith("\n") ? command : `${command}\n`;
+    const payload = interpreted.data.endsWith("\n") ? interpreted.data : `${interpreted.data}\n`;
     debugLog("command.send.start", { activeSessionId, length: payload.length });
     await api.sendInput(activeSessionId, payload);
     commandInput.value = "";

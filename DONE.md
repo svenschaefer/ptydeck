@@ -121,6 +121,12 @@ Completed and verified topics belong here.
 - [x] Deployment runbook and backend `.env` template updated with secure production CORS guidance (`NODE_ENV=production`, explicit comma-separated `CORS_ORIGIN`).
 - [x] Validation for `QLT-005`/`QLT-006`/`QLT-011`/`QLT-012` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and `./scripts/ci-smoke.sh`.
 - [x] Coverage after `QLT-005`/`QLT-006`/`QLT-011`/`QLT-012` cycle: backend `96.78%` lines, frontend `90.37%` lines.
+- [x] `QLT-022` completed: command composer now routes slash-prefixed input to control-plane command handling and forwards non-slash input unchanged to active terminal session.
+- [x] Added `frontend/src/public/command-interpreter.js` with dedicated unit tests in `frontend/test/command-interpreter.test.js`.
+- [x] Frontend app integration test now verifies slash command routing does not call terminal input endpoint.
+- [x] Validation for `QLT-022` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and `./scripts/ci-smoke.sh`.
+- [x] Coverage after `QLT-022` cycle: backend `96.67%` lines, frontend `90.64%` lines.
+- [x] Default runtime ports switched to low-conflict defaults: backend `18080`, frontend `18081` (including `.env.example`, runtime config defaults, tests, smoke script, and runbook links).
 
 ## Maintenance Rules
 

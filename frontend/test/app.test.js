@@ -307,6 +307,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const listeners = new Map();
   const localStorageData = new Map();
   const resizePayloads = [];
+  const inputPayloads = [];
   const win = {
     document: fixture.document,
     location: {
@@ -315,8 +316,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       search: ""
     },
     __PTYDECK_CONFIG__: {
-      apiBaseUrl: "http://127.0.0.1:8080/api/v1",
-      wsUrl: "ws://127.0.0.1:8080/ws",
+      apiBaseUrl: "http://127.0.0.1:18080/api/v1",
+      wsUrl: "ws://127.0.0.1:18080/ws",
       debugLogs: false
     },
     localStorage: {
@@ -364,6 +365,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(500, { error: "DeleteFailed", message: "boom" });
     }
     if (path === "/api/v1/sessions/s-1/input" && options.method === "POST") {
+      inputPayloads.push(JSON.parse(options.body || "{}"));
       return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
     }
     if (path.endsWith("/resize")) {
@@ -402,6 +404,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
+  assert.equal(inputPayloads.length, 1);
+
+  fixture.elements.commandInput.value = "/list";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.statusMessage.textContent, "Control command is routed: /list (implementation pending).");
+  assert.equal(inputPayloads.length, 1);
 
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";

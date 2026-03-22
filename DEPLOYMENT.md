@@ -66,20 +66,20 @@ npm --prefix frontend run dev
 Backend health:
 
 ```bash
-curl -s http://127.0.0.1:8080/health
-curl -s http://127.0.0.1:8080/ready
+curl -s http://127.0.0.1:18080/health
+curl -s http://127.0.0.1:18080/ready
 ```
 
 Session API:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/api/v1/sessions -H 'content-type: application/json' -d '{}'
-curl -s http://127.0.0.1:8080/api/v1/sessions
+curl -s -X POST http://127.0.0.1:18080/api/v1/sessions -H 'content-type: application/json' -d '{}'
+curl -s http://127.0.0.1:18080/api/v1/sessions
 ```
 
 Frontend:
 
-- Open `http://127.0.0.1:5173`
+- Open `http://127.0.0.1:18081`
 - Create session
 - Send command (for example `pwd`)
 - Confirm output appears in the corresponding terminal panel

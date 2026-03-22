@@ -47,7 +47,7 @@ BACKEND_DEBUG_LOGS=1 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log npm r
 2. Open frontend with debug query parameter:
 
 ```text
-http://127.0.0.1:5173/?debug=1
+http://127.0.0.1:18081/?debug=1
 ```
 
 Browser console will print `ptydeck` events for REST calls, WebSocket state/messages, render cycles, and terminal resize actions.
