@@ -19,6 +19,7 @@ const statusMessageEl = document.getElementById("status-message");
 const terminals = new Map();
 const terminalObservers = new Map();
 const resizeTimers = new Map();
+const terminalSizes = new Map();
 const uiState = {
   loading: true,
   error: ""
@@ -60,6 +61,7 @@ function render() {
         clearTimeout(timer);
       }
       resizeTimers.delete(sessionId);
+      terminalSizes.delete(sessionId);
     }
   }
 
@@ -146,8 +148,15 @@ function render() {
     });
 
     const observer = new ResizeObserver(() => {
-      const cols = Math.max(20, Math.floor(mount.clientWidth / 9));
-      const rows = Math.max(6, Math.floor(mount.clientHeight / 18));
+      const cols = Math.max(20, Math.floor(mount.clientWidth / 10));
+      const rows = Math.max(6, Math.floor(mount.clientHeight / 20));
+      const previous = terminalSizes.get(session.id);
+      if (previous && previous.cols === cols && previous.rows === rows) {
+        return;
+      }
+      terminalSizes.set(session.id, { cols, rows });
+      terminal.resize(cols, rows);
+
       const pendingTimer = resizeTimers.get(session.id);
       if (pendingTimer) {
         clearTimeout(pendingTimer);
