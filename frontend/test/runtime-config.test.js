@@ -6,13 +6,15 @@ test("runtime config falls back to browser host and default ports", () => {
   const config = resolveRuntimeConfig({
     location: {
       protocol: "http:",
-      hostname: "example.local"
+      hostname: "example.local",
+      search: ""
     }
   });
 
   assert.deepEqual(config, {
     apiBaseUrl: "http://example.local:8080/api/v1",
-    wsUrl: "ws://example.local:8080/ws"
+    wsUrl: "ws://example.local:8080/ws",
+    debugLogs: false
   });
 });
 
@@ -20,7 +22,8 @@ test("runtime config uses injected host/port overrides", () => {
   const config = resolveRuntimeConfig({
     location: {
       protocol: "https:",
-      hostname: "browser-host.local"
+      hostname: "browser-host.local",
+      search: ""
     },
     __PTYDECK_CONFIG__: {
       apiHost: "api-host.local",
@@ -32,7 +35,8 @@ test("runtime config uses injected host/port overrides", () => {
 
   assert.deepEqual(config, {
     apiBaseUrl: "https://api-host.local:8443/api/v1",
-    wsUrl: "wss://ws-host.local:9443/ws"
+    wsUrl: "wss://ws-host.local:9443/ws",
+    debugLogs: false
   });
 });
 
@@ -40,7 +44,8 @@ test("runtime config gives precedence to explicit apiBaseUrl/wsUrl", () => {
   const config = resolveRuntimeConfig({
     location: {
       protocol: "https:",
-      hostname: "browser-host.local"
+      hostname: "browser-host.local",
+      search: ""
     },
     __PTYDECK_CONFIG__: {
       apiBaseUrl: "https://api.explicit.local/api/v1",
@@ -54,6 +59,19 @@ test("runtime config gives precedence to explicit apiBaseUrl/wsUrl", () => {
 
   assert.deepEqual(config, {
     apiBaseUrl: "https://api.explicit.local/api/v1",
-    wsUrl: "wss://api.explicit.local/ws"
+    wsUrl: "wss://api.explicit.local/ws",
+    debugLogs: false
   });
+});
+
+test("runtime config enables debug logs via query string", () => {
+  const config = resolveRuntimeConfig({
+    location: {
+      protocol: "http:",
+      hostname: "example.local",
+      search: "?debug=1"
+    }
+  });
+
+  assert.equal(config.debugLogs, true);
 });

@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (command-interface planning expanded in TODO/OUTLOOK, context synchronized)
+Last updated: 2026-03-22 (frontend terminal-load hotfix applied, context synchronized)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -71,6 +71,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Dark-mode background gradient and terminal-grid minimum column width behavior were adjusted for predictable multi-column layout.
 - Sessions now support explicit naming via API/UI, and new sessions default cwd to user home when no prior history exists.
 - Command composer is bottom-docked, multiline by default (10 rows), and supports explicit submit via `Ctrl/Cmd+Enter`.
+- Frontend terminal initialization/resize path now guards against invalid pre-layout dimensions and duplicate resize calls to prevent session load stalls.
 - Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.

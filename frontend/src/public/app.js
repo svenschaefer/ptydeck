@@ -4,7 +4,15 @@ import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 
 const config = resolveRuntimeConfig(window);
-const api = createApiClient(config.apiBaseUrl);
+const debugLogs = config.debugLogs === true;
+const debugLog = (event, details = {}) => {
+  if (!debugLogs) {
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  console.debug(`[ptydeck][${timestamp}] ${event}`, details);
+};
+const api = createApiClient(config.apiBaseUrl, { debug: debugLogs, log: debugLog });
 const store = createStore();
 
 const stateEl = document.getElementById("connection-state");
@@ -25,13 +33,36 @@ const uiState = {
   error: ""
 };
 
+if (typeof window.Terminal !== "function") {
+  setError("Terminal library failed to load.");
+  throw new Error("window.Terminal is not available.");
+}
+
 function setError(message) {
+  debugLog("ui.error", { message });
   uiState.error = message;
   render();
 }
 
+function computeTerminalSize(mount) {
+  if (!mount || mount.clientWidth < 40 || mount.clientHeight < 40) {
+    return null;
+  }
+  return {
+    cols: Math.max(20, Math.floor(mount.clientWidth / 10)),
+    rows: Math.max(6, Math.floor(mount.clientHeight / 20))
+  };
+}
+
 function render() {
   const state = store.getState();
+  debugLog("ui.render", {
+    sessions: state.sessions.length,
+    activeSessionId: state.activeSessionId,
+    connectionState: state.connectionState,
+    loading: uiState.loading,
+    hasError: Boolean(uiState.error)
+  });
   stateEl.textContent = state.connectionState;
   emptyStateEl.style.display = state.sessions.length === 0 ? "block" : "none";
   if (uiState.loading) {
@@ -140,6 +171,7 @@ function render() {
         brightWhite: "#f5f7fa"
       }
     });
+    debugLog("terminal.created", { sessionId: session.id });
 
     terminal.open(mount);
     terminal.onData((data) => {
@@ -147,15 +179,21 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    const observer = new ResizeObserver(() => {
-      const cols = Math.max(20, Math.floor(mount.clientWidth / 10));
-      const rows = Math.max(6, Math.floor(mount.clientHeight / 20));
+    function applyResize() {
+      const size = computeTerminalSize(mount);
+      if (!size) {
+        return;
+      }
+
+      const { cols, rows } = size;
       const previous = terminalSizes.get(session.id);
       if (previous && previous.cols === cols && previous.rows === rows) {
         return;
       }
+
       terminalSizes.set(session.id, { cols, rows });
       terminal.resize(cols, rows);
+      debugLog("terminal.resize.local", { sessionId: session.id, cols, rows });
 
       const pendingTimer = resizeTimers.get(session.id);
       if (pendingTimer) {
@@ -163,15 +201,23 @@ function render() {
       }
 
       const timer = setTimeout(() => {
-        api.resizeSession(session.id, cols, rows).catch(() => setError("Failed to resize terminal."));
+        debugLog("terminal.resize.remote.start", { sessionId: session.id, cols, rows });
+        api.resizeSession(session.id, cols, rows).catch(() => {
+          debugLog("terminal.resize.remote.error", { sessionId: session.id, cols, rows });
+          // Ignore transient resize errors (for example session closed during debounce window).
+        });
       }, 120);
       resizeTimers.set(session.id, timer);
-    });
+    }
+
+    const observer = new ResizeObserver(applyResize);
     observer.observe(mount);
+
+    gridEl.appendChild(node);
+    applyResize();
 
     terminals.set(session.id, { terminal, element: node, focusBtn });
     terminalObservers.set(session.id, observer);
-    gridEl.appendChild(node);
   }
 }
 
@@ -180,6 +226,7 @@ render();
 
 const ws = createWsClient(config.wsUrl, {
   onState(status) {
+    debugLog("ws.state", { status });
     store.setConnectionState(status);
     if (status === "connected") {
       uiState.loading = false;
@@ -187,6 +234,7 @@ const ws = createWsClient(config.wsUrl, {
     }
   },
   onMessage(event) {
+    debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
     if (event.type === "snapshot") {
       store.setSessions(event.sessions || []);
       return;
@@ -203,18 +251,21 @@ const ws = createWsClient(config.wsUrl, {
         .then((sessions) => {
           store.setSessions(sessions);
           uiState.error = "";
+          debugLog("sessions.refresh.ok", { count: sessions.length });
         })
         .catch(() => setError("Failed to refresh sessions from server."));
     }
   }
-});
+}, { debug: debugLogs, log: debugLog });
 
 createBtn.addEventListener("click", async () => {
   try {
+    debugLog("sessions.create.start");
     await api.createSession();
     const sessions = await api.listSessions();
     store.setSessions(sessions);
     uiState.error = "";
+    debugLog("sessions.create.ok", { count: sessions.length });
   } catch {
     setError("Failed to create session.");
   }
@@ -228,9 +279,11 @@ async function submitCommand() {
   }
   try {
     const payload = command.endsWith("\n") ? command : `${command}\n`;
+    debugLog("command.send.start", { activeSessionId, length: payload.length });
     await api.sendInput(activeSessionId, payload);
     commandInput.value = "";
     uiState.error = "";
+    debugLog("command.send.ok", { activeSessionId });
   } catch {
     setError("Failed to send command.");
   }

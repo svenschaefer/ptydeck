@@ -20,6 +20,9 @@ process.on("SIGTERM", shutdown);
 runtime
   .start()
   .then(() => {
+    if (config.debugLogs) {
+      console.log("backend debug logs enabled (BACKEND_DEBUG_LOGS=1)");
+    }
     console.log(`backend listening on :${runtime.getAddress()?.port ?? config.port}`);
   })
   .catch((err) => {

@@ -83,6 +83,9 @@ Completed and verified topics belong here.
 - [x] `QLT-021` completed: command composer moved to page bottom and switched to 10-row multiline textarea.
 - [x] Command submit behavior now preserves line breaks; `Ctrl+Enter`/`Cmd+Enter` submits, plain `Enter` inserts newline.
 - [x] Coverage after `QLT-021` validation cycle: backend `96.81%` lines, frontend `97.71%` lines.
+- [x] Frontend hotfix: terminal card initialization/resize flow hardened to avoid repeated resize loops that delayed or blocked session rendering.
+- [x] Terminal resize behavior now skips invalid pre-layout dimensions, de-duplicates unchanged resize values, and ignores transient resize API failures.
+- [x] Smoke validation for this hotfix passed: `npm run dev` startup + `/health`, `/ready`, and frontend HTML reachability checks.
 
 ## Maintenance Rules
 

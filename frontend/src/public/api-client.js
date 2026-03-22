@@ -44,43 +44,66 @@ async function readResponse(response, { expectJson = true } = {}) {
   return response.json();
 }
 
-export function createApiClient(baseUrl) {
+export function createApiClient(baseUrl, options = {}) {
+  const debug = options.debug === true;
+  const log = typeof options.log === "function" ? options.log : () => {};
+
+  async function request(path, fetchOptions = {}, { expectJson = true } = {}) {
+    const method = fetchOptions.method || "GET";
+    const startedAt = Date.now();
+    if (debug) {
+      log("api.request.start", { method, path });
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}${path}`, fetchOptions);
+      const data = await readResponse(res, { expectJson });
+      if (debug) {
+        log("api.request.ok", { method, path, status: res.status, durationMs: Date.now() - startedAt });
+      }
+      return data;
+    } catch (err) {
+      if (debug) {
+        log("api.request.error", {
+          method,
+          path,
+          durationMs: Date.now() - startedAt,
+          message: err instanceof Error ? err.message : String(err)
+        });
+      }
+      throw err;
+    }
+  }
+
   return {
     /** @returns {Promise<Session[]>} */
     async listSessions() {
-      const res = await fetch(`${baseUrl}/sessions`);
-      return readResponse(res);
+      return request("/sessions");
     },
     /** @returns {Promise<Session>} */
     async createSession(payload = {}) {
-      const res = await fetch(`${baseUrl}/sessions`, withJson(payload));
-      return readResponse(res);
+      return request("/sessions", withJson(payload));
     },
     /** @returns {Promise<Session>} */
     async getSession(sessionId) {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
-      return readResponse(res);
+      return request(`/sessions/${sessionId}`);
     },
     /** @returns {Promise<Session>} */
     async updateSession(sessionId, payload) {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}`, {
+      return request(`/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      return readResponse(res);
     },
     async deleteSession(sessionId) {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}`, { method: "DELETE" });
-      await readResponse(res, { expectJson: false });
+      await request(`/sessions/${sessionId}`, { method: "DELETE" }, { expectJson: false });
     },
     async sendInput(sessionId, data) {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}/input`, withJson({ data }));
-      await readResponse(res, { expectJson: false });
+      await request(`/sessions/${sessionId}/input`, withJson({ data }), { expectJson: false });
     },
     async resizeSession(sessionId, cols, rows) {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}/resize`, withJson({ cols, rows }));
-      await readResponse(res, { expectJson: false });
+      await request(`/sessions/${sessionId}/resize`, withJson({ cols, rows }), { expectJson: false });
     }
   };
 }

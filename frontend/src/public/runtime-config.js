@@ -3,17 +3,35 @@ function normalizePort(port, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseDebugFlag(win, injected) {
+  if (typeof injected.debugLogs === "boolean") {
+    return injected.debugLogs;
+  }
+
+  const rawSearch = typeof win.location?.search === "string" ? win.location.search : "";
+  const params = new URLSearchParams(rawSearch);
+  const value = params.get("debug");
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
 export function resolveRuntimeConfig(win = window) {
   const isHttps = win.location?.protocol === "https:";
   const browserHost = win.location?.hostname || "127.0.0.1";
   const protocolHttp = isHttps ? "https" : "http";
   const protocolWs = isHttps ? "wss" : "ws";
   const injected = win.__PTYDECK_CONFIG__ && typeof win.__PTYDECK_CONFIG__ === "object" ? win.__PTYDECK_CONFIG__ : {};
+  const debugLogs = parseDebugFlag(win, injected);
 
   if (typeof injected.apiBaseUrl === "string" && typeof injected.wsUrl === "string") {
     return {
       apiBaseUrl: injected.apiBaseUrl,
-      wsUrl: injected.wsUrl
+      wsUrl: injected.wsUrl,
+      debugLogs
     };
   }
 
@@ -24,6 +42,7 @@ export function resolveRuntimeConfig(win = window) {
 
   return {
     apiBaseUrl: `${protocolHttp}://${apiHost}:${apiPort}/api/v1`,
-    wsUrl: `${protocolWs}://${wsHost}:${wsPort}/ws`
+    wsUrl: `${protocolWs}://${wsHost}:${wsPort}/ws`,
+    debugLogs
   };
 }

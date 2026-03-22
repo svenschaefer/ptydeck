@@ -9,6 +9,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.dataPath, "./data/sessions.json");
   assert.equal(config.corsOrigin, "*");
   assert.equal(config.maxBodyBytes, 1024 * 1024);
+  assert.equal(config.debugLogs, false);
 });
 
 test("loadConfig maps environment values", () => {
@@ -17,7 +18,8 @@ test("loadConfig maps environment values", () => {
     SHELL: "zsh",
     DATA_PATH: "/tmp/ptydeck.json",
     CORS_ORIGIN: "http://localhost:3000",
-    MAX_BODY_BYTES: "4096"
+    MAX_BODY_BYTES: "4096",
+    BACKEND_DEBUG_LOGS: "true"
   });
 
   assert.equal(config.port, 9090);
@@ -25,4 +27,5 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.dataPath, "/tmp/ptydeck.json");
   assert.equal(config.corsOrigin, "http://localhost:3000");
   assert.equal(config.maxBodyBytes, 4096);
+  assert.equal(config.debugLogs, true);
 });

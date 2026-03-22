@@ -101,6 +101,7 @@ function route(pathname, method) {
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
+  const debugLogs = config.debugLogs === true;
   const manager = new SessionManager({ defaultShell: config.shell });
   const persistence = new JsonPersistence(config.dataPath);
   const wsServer = new WebSocketServer({ noServer: true });
@@ -110,6 +111,14 @@ export function createRuntime(config) {
   let isStopped = false;
   let stopPromise = null;
   let persistTimer = null;
+
+  function logDebug(event, details = {}) {
+    if (!debugLogs) {
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    console.log(`[ptydeck-backend][${timestamp}] ${event}`, details);
+  }
 
   function writeJson(res, statusCode, body) {
     res.writeHead(statusCode, {
@@ -136,7 +145,9 @@ export function createRuntime(config) {
     }
     persistTimer = setTimeout(async () => {
       persistTimer = null;
+      logDebug("persist.save.start", { sessionCount: manager.list().length });
       await persistence.save(manager.list());
+      logDebug("persist.save.ok", { sessionCount: manager.list().length });
     }, 100);
   }
 
@@ -152,6 +163,9 @@ export function createRuntime(config) {
   const wsEventNames = ["session.created", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
+      if (eventName !== "session.data") {
+        logDebug("session.event", { type: eventName, sessionId: event.session?.id || event.sessionId || null });
+      }
       broadcast({ type: eventName, ...event });
       if (eventName !== "session.data") {
         persistSoon();
@@ -160,8 +174,22 @@ export function createRuntime(config) {
   }
 
   const server = http.createServer(async (req, res) => {
+    const startedAt = Date.now();
+    const methodForLog = req.method || "GET";
+    let pathnameForLog = req.url || "/";
+    res.on("finish", () => {
+      logDebug("http.request.done", {
+        method: methodForLog,
+        pathname: pathnameForLog,
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt
+      });
+    });
+
     try {
       const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      pathnameForLog = parsedUrl.pathname;
+      logDebug("http.request.start", { method: methodForLog, pathname: pathnameForLog });
 
       if (req.method === "OPTIONS") {
         writeJson(res, 204);
@@ -245,12 +273,20 @@ export function createRuntime(config) {
       const mapped = toErrorResponse(err);
       validateResponse({ statusCode: mapped.statusCode, body: mapped.body, expect: "error" });
       writeJson(res, mapped.statusCode, mapped.body);
+      logDebug("http.request.error", {
+        method: methodForLog,
+        pathname: pathnameForLog,
+        statusCode: mapped.statusCode,
+        error: mapped.body.error,
+        message: mapped.body.message
+      });
     }
   });
 
   server.on("upgrade", (request, socket, head) => {
     const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
     if (requestUrl.pathname !== "/ws") {
+      logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
       socket.destroy();
       return;
     }
@@ -258,6 +294,7 @@ export function createRuntime(config) {
     wsServer.handleUpgrade(request, socket, head, (ws) => {
       sockets.add(ws);
       ws.isAlive = true;
+      logDebug("ws.upgrade.accepted", { socketCount: sockets.size });
 
       ws.on("pong", () => {
         ws.isAlive = true;
@@ -265,9 +302,11 @@ export function createRuntime(config) {
 
       ws.on("close", () => {
         sockets.delete(ws);
+        logDebug("ws.client.closed", { socketCount: sockets.size });
       });
 
       ws.send(JSON.stringify({ type: "snapshot", sessions: manager.list() }));
+      logDebug("ws.snapshot.sent", { sessionCount: manager.list().length });
     });
   });
 
@@ -289,6 +328,7 @@ export function createRuntime(config) {
     isReady = false;
 
     const persisted = await persistence.load();
+    logDebug("runtime.restore.start", { persistedSessionCount: persisted.length });
     for (const session of persisted) {
       try {
         manager.create({
@@ -303,6 +343,7 @@ export function createRuntime(config) {
         console.error("failed to restore session", session.id, err);
       }
     }
+    logDebug("runtime.restore.done", { restoredSessionCount: manager.list().length });
 
     await new Promise((resolve) => {
       server.listen(config.port, resolve);
@@ -311,6 +352,7 @@ export function createRuntime(config) {
       await config.onBeforeReady();
     }
     isReady = true;
+    logDebug("runtime.ready", { port: config.port, sessionCount: manager.list().length });
   }
 
   async function stopInternal() {
@@ -329,6 +371,7 @@ export function createRuntime(config) {
     wsServer.close();
 
     const persistedSnapshot = manager.list().map((session) => ({ ...session }));
+    logDebug("runtime.stop.start", { sessionCount: persistedSnapshot.length, socketCount: sockets.size });
 
     for (const session of manager.list()) {
       try {
@@ -339,6 +382,7 @@ export function createRuntime(config) {
     }
 
     await persistence.save(persistedSnapshot);
+    logDebug("runtime.stop.persisted", { persistedSessionCount: persistedSnapshot.length });
 
     if (server.listening) {
       await new Promise((resolve) => server.close(resolve));
@@ -346,6 +390,7 @@ export function createRuntime(config) {
 
     isStopped = true;
     isStopping = false;
+    logDebug("runtime.stop.done", {});
   }
 
   async function stop() {

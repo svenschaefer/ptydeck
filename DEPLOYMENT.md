@@ -41,6 +41,11 @@ Set at least:
 - Backend: `PORT`, `SHELL`, `DATA_PATH`, `CORS_ORIGIN`, `MAX_BODY_BYTES`
 - Frontend: `FRONTEND_PORT`, `API_BASE_URL`, `WS_URL`
 
+Optional for troubleshooting:
+
+- Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
+- Frontend: add `?debug=1` to URL for browser-side REST/WS/render/resize logs
+
 ## 5. Start in Production Mode
 
 Terminal 1:

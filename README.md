@@ -34,6 +34,24 @@ See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, a
 
 When testing from a Windows browser against services running in WSL, frontend runtime uses the current browser host to reach backend REST and WebSocket endpoints.
 
+## Debug Logging (Troubleshooting)
+
+To trace session-loading problems end to end:
+
+1. Start backend with logs enabled:
+
+```bash
+BACKEND_DEBUG_LOGS=1 npm run dev
+```
+
+2. Open frontend with debug query parameter:
+
+```text
+http://127.0.0.1:5173/?debug=1
+```
+
+Browser console will print `ptydeck` events for REST calls, WebSocket state/messages, render cycles, and terminal resize actions.
+
 ## Overview
 
 `ptydeck` provides a browser UI for running and controlling multiple terminal sessions side by side.
