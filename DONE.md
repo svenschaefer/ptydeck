@@ -25,18 +25,18 @@ Completed and verified topics belong here.
 - [x] Added CWD marker extraction (`__CWD__...__`) from PTY output into session metadata.
 - [x] Added graceful shutdown flow with PTY cleanup and persistence flush.
 - [x] Backend coverage after `v0.3.0` changes: `93.89%` total lines.
-- [x] `v0.4.0` frontend progress delivered: `FE-002`, `FE-003`, `FE-004`, `FE-005`, `FE-006`, `FE-008`, `FE-009`, `FE-010`, `FE-011`, `FE-012`, `FE-014`.
+- [x] `v0.3.0` frontend progress delivered: `FE-002`, `FE-003`, `FE-004`, `FE-005`, `FE-006`, `FE-008`, `FE-009`, `FE-010`, `FE-011`, `FE-012`, `FE-014`.
 - [x] Added browser UI with xterm terminals, active-session control, and central command input.
 - [x] Added WS reconnect/status handling and per-session output routing.
 - [x] Added frontend tests for API client and state store (`INT-007`).
 - [x] `FE-007` completed with generated frontend API types from `backend/openapi/openapi.yaml`.
 - [x] `FE-013` completed with explicit loading, empty, error, and disconnected UI states.
-- [x] `v0.4.0` milestone completed.
-- [x] `v0.5.0` quality gate completed: `INT-004`, `INT-005`, `INT-006`, `INT-008`.
+- [x] `v0.3.0` milestone completed.
+- [x] `v0.3.0` quality gate completed: `INT-004`, `INT-005`, `INT-006`, `INT-008`.
 - [x] Added backend REST integration test covering session lifecycle endpoints.
 - [x] Added backend WS integration test covering event flow and reconnect snapshot behavior.
 - [x] Added runtime-based backend E2E core flow coverage in automated tests.
-- [x] `v1.0.0` production baseline completed with deployment runbook (`INT-010`).
+- [x] `v0.3.0` production baseline completed with deployment runbook (`INT-010`).
 - [x] Dev hotfix: frontend now resolves API/WS target from browser host to support WSL-IP access from Windows browsers.
 - [x] Dev hotfix: backend default CORS origin set to `*` to avoid local cross-origin blocks in WSL dev scenarios.
 

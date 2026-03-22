@@ -4,7 +4,7 @@ A lightweight web-based multi-terminal system for managing and interacting with 
 
 ## Repository Status
 
-Current state: backend `v0.3.0`, frontend `v0.4.0`, quality gate `v0.5.0`, and production baseline `v1.0.0` are complete.
+Current state: compressed roadmap complete: `v0.1.0` to `v0.3.0`.
 
 - Monorepo structure with `backend/` and `frontend/`
 - OpenAPI contract scaffold in `backend/openapi/openapi.yaml`
@@ -18,7 +18,7 @@ Current state: backend `v0.3.0`, frontend `v0.4.0`, quality gate `v0.5.0`, and p
 
 ## Quick Start
 
-Prerequisite: Node.js `22` (see `.nvmrc`).
+Prerequisite: Node.js `18` (see `.nvmrc`).
 
 ```bash
 npm run lint

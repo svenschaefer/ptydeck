@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v1.0.0 baseline + WSL dev connectivity hotfixes)
+Last updated: 2026-03-22 (compressed roadmap aligned to v0.3.0 max)
 Owner: `CODX`
 
 ## Project Purpose
@@ -51,9 +51,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now performs per-session debounced resize calls to backend.
 - Frontend resolves backend API/WS endpoints from the browser host at runtime (WSL IP friendly).
 - Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
-- `v0.4.0` status: completed.
-- `v0.5.0` status: completed with backend unit/integration/WS/E2E automation.
-- `v1.0.0` status: completed with deployment documentation (`DEPLOYMENT.md`).
+- `v0.3.0` status: completed.
+- Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 
 ## Session Behavior Notes
 

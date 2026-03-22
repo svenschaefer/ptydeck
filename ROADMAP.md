@@ -7,7 +7,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Roadmap owner: `CODX`
 - Release execution owners: `BE`, `FE`, `PLAT`, `QA`
-- Versioning scheme: `v0.x` pre-production milestones, `v1.0.0` first production-ready baseline
+- Versioning scheme: compressed pre-1.0 milestones up to `v0.3.0`
 
 ## Dependency Rules
 
@@ -15,7 +15,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 - `BE-011` is a hard dependency for `BE-004`, `BE-006`, `BE-012`, `BE-015`, and `INT-004`.
 - `BE-012` and `BE-013` are hard dependencies for `FE-009` and `FE-010`.
 - `FE-002` is a hard dependency for `FE-003`, `FE-006`, `FE-010`, and `FE-014`.
-- `INT-003` should run after `INT-002` and before any release tag.
+- `INT-003` should run after `INT-002` and before final milestone close.
 
 ## Version Plan
 
@@ -29,102 +29,38 @@ Exit criteria:
 - OpenAPI contract exists and is the single API source.
 - Local development and environment setup are documented.
 
-### v0.2.0 - Backend Core Runtime
+### v0.2.0 - Backend Runtime and Realtime
 
 - `BE-011`, `BE-003`, `BE-004`, `BE-005`, `BE-006`, `BE-007`, `BE-008`, `BE-009`, `BE-010`, `BE-019`
+- `BE-012`, `BE-013`, `BE-014`, `BE-015`, `BE-016`, `BE-017`, `BE-018`
 
 Exit criteria:
 
 - Core REST lifecycle for session creation/control works against PTY runtime.
 - API requests and responses are validated and errors are normalized.
-
-### v0.3.0 - Realtime and Persistence
-
-- `BE-012`, `BE-013`, `BE-014`, `BE-015`, `BE-016`, `BE-017`, `BE-018`
-
-Exit criteria:
-
 - WebSocket stream is stable and multiplexed by `sessionId`.
 - Session metadata persistence and restart restore work.
-- Health and readiness are available.
 
-### v0.4.0 - Frontend Functional UI
+### v0.3.0 - Frontend, Quality, and Production Baseline
 
 - `FE-007`, `FE-008`, `FE-002`, `FE-003`, `FE-004`, `FE-005`, `FE-006`, `FE-009`, `FE-010`, `FE-012`, `FE-013`, `FE-014`, `FE-011`
+- `INT-003`, `INT-004`, `INT-005`, `INT-006`, `INT-007`, `INT-008`, `INT-010`
 
 Exit criteria:
 
 - Multi-session terminal UI is usable end to end.
-- Active-session command input and realtime output routing are stable.
-
-### v0.5.0 - Quality Gate
-
-- `INT-003`, `INT-004`, `INT-005`, `INT-006`, `INT-007`, `INT-008`
-
-Exit criteria:
-
-- CI executes lint/build/tests for both apps.
 - Unit, integration, and E2E coverage exists for critical paths.
-
-### v1.0.0 - Production Baseline
-
-- `INT-010` plus all unresolved defects from prior milestones
-
-Exit criteria:
-
-- Repeatable production build and deployment instructions are complete.
-- The core use case is validated: create session, run command, read output, close session.
+- Repeatable deployment runbook and smoke checks are documented.
 
 ## Current Status
 
-- Latest completed milestone: `v1.0.0`
+- Latest completed milestone: `v0.3.0`
 - Next milestone in progress: none
 - Blockers: none recorded
 
-### Completed Items in Current Milestone
+### Completed Items
 
-- `DOC-001` completed on 2026-03-22.
-- `DOC-002` completed on 2026-03-22.
-- `BE-001` completed on 2026-03-22.
-- `BE-002` completed on 2026-03-22.
-- `FE-001` completed on 2026-03-22.
-- `INT-001` completed on 2026-03-22.
-- `INT-002` completed on 2026-03-22.
-- `INT-009` completed on 2026-03-22.
-- `INT-003` completed early on 2026-03-22 (originally planned for `v0.5.0`).
-- `BE-003` completed on 2026-03-22.
-- `BE-004` completed on 2026-03-22.
-- `BE-005` completed on 2026-03-22.
-- `BE-006` completed on 2026-03-22.
-- `BE-007` completed on 2026-03-22.
-- `BE-008` completed on 2026-03-22.
-- `BE-009` completed on 2026-03-22.
-- `BE-010` completed on 2026-03-22.
-- `BE-011` completed on 2026-03-22.
-- `BE-019` completed on 2026-03-22.
-- `BE-012` completed on 2026-03-22.
-- `BE-013` completed on 2026-03-22.
-- `BE-014` completed on 2026-03-22.
-- `BE-015` completed on 2026-03-22.
-- `BE-016` completed on 2026-03-22.
-- `BE-017` completed on 2026-03-22.
-- `BE-018` completed on 2026-03-22.
-- `FE-002` completed on 2026-03-22.
-- `FE-003` completed on 2026-03-22.
-- `FE-004` completed on 2026-03-22.
-- `FE-005` completed on 2026-03-22.
-- `FE-006` completed on 2026-03-22.
-- `FE-008` completed on 2026-03-22.
-- `FE-009` completed on 2026-03-22.
-- `FE-010` completed on 2026-03-22.
-- `FE-011` completed on 2026-03-22.
-- `FE-012` completed on 2026-03-22.
-- `FE-014` completed on 2026-03-22.
-- `FE-007` completed on 2026-03-22.
-- `FE-013` completed on 2026-03-22.
-- `INT-007` completed early on 2026-03-22 (originally planned for `v0.5.0`).
-- `INT-004` completed on 2026-03-22.
-- `INT-005` completed on 2026-03-22.
-- `INT-006` completed on 2026-03-22.
-- `INT-008` completed on 2026-03-22.
-- `INT-010` completed on 2026-03-22.
+- `DOC-001`, `DOC-002`
+- `BE-001` ... `BE-019`
+- `FE-001` ... `FE-014`
+- `INT-001` ... `INT-010`
