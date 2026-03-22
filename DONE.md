@@ -187,6 +187,11 @@ Completed and verified topics belong here.
 - [x] Added backend integration coverage for hardened header presence on `/health` and `/metrics`.
 - [x] Validation for `ENT-016` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-016` cycle: backend `96.47%` lines, frontend `88.36%` lines.
+- [x] `ENT-019` completed: added trusted-proxy runtime configuration (`TRUST_PROXY`) with safe `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` handling.
+- [x] Untrusted upstreams now have forwarded headers ignored; trusted upstreams use sanitized first-hop forwarded metadata.
+- [x] Added proxy utility unit coverage (`backend/test/proxy.test.js`) plus config validation coverage for invalid `TRUST_PROXY` values.
+- [x] Validation for `ENT-019` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-019` cycle: backend `96.29%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

@@ -13,6 +13,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.maxBodyBytes, 1024 * 1024);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
   assert.equal(config.authEnabled, false);
   assert.equal(config.authDevMode, false);
   assert.equal(config.authDevSecret, "ptydeck-dev-secret");
@@ -30,6 +31,7 @@ test("loadConfig maps environment values", () => {
     MAX_BODY_BYTES: "4096",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
+    TRUST_PROXY: "loopback",
     AUTH_ENABLED: "true",
     AUTH_DEV_MODE: "true",
     AUTH_DEV_SECRET: "custom-secret",
@@ -46,6 +48,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.maxBodyBytes, 4096);
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+  assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
   assert.equal(config.authEnabled, true);
   assert.equal(config.authDevMode, true);
   assert.equal(config.authDevSecret, "custom-secret");
@@ -91,4 +94,8 @@ test("loadConfig rejects unsupported auth mode without dev mode", () => {
     () => loadConfig({ AUTH_ENABLED: "true", AUTH_DEV_MODE: "false" }),
     /AUTH_ENABLED currently requires AUTH_DEV_MODE=1\./
   );
+});
+
+test("loadConfig rejects invalid trusted proxy configuration", () => {
+  assert.throws(() => loadConfig({ TRUST_PROXY: "invalid-ip" }), /TRUST_PROXY contains invalid IP address/);
 });

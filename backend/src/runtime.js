@@ -5,6 +5,7 @@ import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
+import { resolveRequestContext } from "./proxy.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
@@ -355,10 +356,17 @@ export function createRuntime(config) {
     });
 
     try {
-      const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      const requestContext = resolveRequestContext(req, config.trustedProxy);
+      const parsedUrl = new URL(req.url || "/", `${requestContext.protocol}://${requestContext.host}`);
       pathnameForLog = parsedUrl.pathname;
       normalizedMetricsPathForLog = normalizeMetricsPath(parsedUrl.pathname);
-      logDebug("http.request.start", { method: methodForLog, pathname: pathnameForLog });
+      logDebug("http.request.start", {
+        method: methodForLog,
+        pathname: pathnameForLog,
+        clientIp: requestContext.clientIp,
+        protocol: requestContext.protocol,
+        trustedProxy: requestContext.trustedProxy
+      });
 
       if (req.method === "OPTIONS") {
         writeJson(req, res, 204);
@@ -502,7 +510,8 @@ export function createRuntime(config) {
   });
 
   server.on("upgrade", (request, socket, head) => {
-    const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    const requestContext = resolveRequestContext(request, config.trustedProxy);
+    const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
     if (requestUrl.pathname !== "/ws") {
       logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
       socket.destroy();
@@ -536,7 +545,12 @@ export function createRuntime(config) {
       sockets.add(ws);
       metrics.wsConnectionsOpenedTotal += 1;
       ws.isAlive = true;
-      logDebug("ws.upgrade.accepted", { socketCount: sockets.size });
+      logDebug("ws.upgrade.accepted", {
+        socketCount: sockets.size,
+        clientIp: requestContext.clientIp,
+        protocol: requestContext.protocol,
+        trustedProxy: requestContext.trustedProxy
+      });
 
       ws.on("pong", () => {
         ws.isAlive = true;

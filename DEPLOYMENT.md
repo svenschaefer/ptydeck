@@ -284,6 +284,28 @@ HSTS policy (ingress/proxy responsibility):
   - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
   - Add `preload` only when domain ownership and rollout policy are validated for all subdomains.
 
+## 9.3 Trusted Proxy Handling Baseline (ENT-019)
+
+Backend runtime now supports explicit trusted-proxy configuration for safe `X-Forwarded-*` handling:
+
+- Environment variable: `TRUST_PROXY`
+- Allowed values:
+  - `off` (default): ignore `X-Forwarded-*`, use direct socket metadata only.
+  - `loopback`: trust forwarded headers only when request comes from loopback proxy (`127.0.0.1` / `::1`).
+  - `all`: trust forwarded headers from any upstream (not recommended except controlled environments).
+  - Comma-separated proxy IP allowlist (for example `10.0.0.2,10.0.0.3`).
+
+Security behavior:
+
+- If upstream is not trusted, backend ignores `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host`.
+- If upstream is trusted, backend accepts sanitized first-hop values from these headers.
+- Invalid `TRUST_PROXY` values fail fast at startup.
+
+Recommended production baseline:
+
+- Run with explicit proxy IP allowlist, not `all`.
+- Keep ingress and backend in a fixed network topology so trusted proxy source IPs are deterministic.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date

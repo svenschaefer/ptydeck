@@ -47,6 +47,7 @@ export function loadConfig(env = process.env) {
     origin === "*" ? origin : parseOrigin(origin, "CORS_ORIGIN")
   );
   const debugLogs = parseBoolean(env.BACKEND_DEBUG_LOGS);
+  const trustedProxy = parseTrustedProxy(env.TRUST_PROXY);
   const authEnabledRaw = parseBoolean(env.AUTH_ENABLED);
   const authDevMode = parseBoolean(env.AUTH_DEV_MODE);
   const authEnabled = authEnabledRaw || authDevMode;
@@ -90,6 +91,7 @@ export function loadConfig(env = process.env) {
     maxBodyBytes,
     debugLogs,
     debugLogFile,
+    trustedProxy,
     authEnabled,
     authDevMode,
     authDevSecret,
@@ -98,3 +100,4 @@ export function loadConfig(env = process.env) {
     authDevTokenTtlSeconds
   };
 }
+import { parseTrustedProxy } from "./proxy.js";
