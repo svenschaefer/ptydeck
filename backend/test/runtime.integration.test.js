@@ -162,6 +162,20 @@ test("REST rejects oversized request body with 413", async () => {
   }
 });
 
+test("OPTIONS advertises PATCH for CORS preflight", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+  try {
+    const res = await fetch(`${baseUrl}/sessions/test-id`, {
+      method: "OPTIONS"
+    });
+    assert.equal(res.status, 204);
+    const allowMethods = res.headers.get("access-control-allow-methods") || "";
+    assert.ok(allowMethods.includes("PATCH"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime restore keeps persisted createdAt and updatedAt timestamps", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
