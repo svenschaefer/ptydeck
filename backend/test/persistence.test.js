@@ -109,3 +109,32 @@ test("JsonPersistence supports key rotation via active key switch", async () => 
   const rotatedRaw = await persistenceB.readFileFn(file, "utf8");
   assert.ok(rotatedRaw.includes("\"keyId\": \"b\""));
 });
+
+test("JsonPersistence loads and saves runtime state with custom commands", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const persistence = new JsonPersistence(file);
+
+  const state = {
+    sessions: [{ id: "a", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 2 }],
+    customCommands: [{ name: "docu", content: "echo hi\n", createdAt: 3, updatedAt: 4 }]
+  };
+
+  await persistence.saveState(state);
+  const loadedState = await persistence.loadState();
+  assert.deepEqual(loadedState, state);
+
+  const loadedSessions = await persistence.load();
+  assert.deepEqual(loadedSessions, state.sessions);
+});
+
+test("JsonPersistence loadState supports legacy array payload format", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const persistence = new JsonPersistence(file);
+  const legacySessions = [{ id: "legacy", cwd: "/tmp", shell: "sh", createdAt: 1, updatedAt: 1 }];
+
+  await writeFile(file, JSON.stringify(legacySessions, null, 2), "utf8");
+  const loadedState = await persistence.loadState();
+  assert.deepEqual(loadedState, { sessions: legacySessions, customCommands: [] });
+});

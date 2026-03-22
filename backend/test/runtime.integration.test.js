@@ -91,6 +91,78 @@ test("REST lifecycle endpoints work end-to-end", async () => {
   }
 });
 
+test("custom command endpoints work end-to-end and persist across restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-custom-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+  await runtimeA.start();
+  const baseUrlA = `http://127.0.0.1:${runtimeA.getAddress().port}/api/v1`;
+
+  try {
+    const putRes = await fetch(`${baseUrlA}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo DOCU_A\n" })
+    });
+    assert.equal(putRes.status, 200);
+    const putPayload = await putRes.json();
+    assert.equal(putPayload.name, "docu");
+    assert.equal(putPayload.content, "echo DOCU_A\n");
+    assert.equal(Number.isInteger(putPayload.createdAt), true);
+    assert.equal(Number.isInteger(putPayload.updatedAt), true);
+
+    const listRes = await fetch(`${baseUrlA}/custom-commands`);
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0].name, "docu");
+
+    const overwriteRes = await fetch(`${baseUrlA}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo DOCU_B\n" })
+    });
+    assert.equal(overwriteRes.status, 200);
+    const overwritePayload = await overwriteRes.json();
+    assert.equal(overwritePayload.name, "docu");
+    assert.equal(overwritePayload.content, "echo DOCU_B\n");
+    assert.equal(overwritePayload.createdAt, putPayload.createdAt);
+    assert.ok(overwritePayload.updatedAt >= putPayload.updatedAt);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+  await runtimeB.start();
+  const baseUrlB = `http://127.0.0.1:${runtimeB.getAddress().port}/api/v1`;
+  try {
+    const getRes = await fetch(`${baseUrlB}/custom-commands/docu`);
+    assert.equal(getRes.status, 200);
+    const payload = await getRes.json();
+    assert.equal(payload.name, "docu");
+    assert.equal(payload.content, "echo DOCU_B\n");
+
+    const deleteRes = await fetch(`${baseUrlB}/custom-commands/docu`, { method: "DELETE" });
+    assert.equal(deleteRes.status, 204);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
@@ -158,6 +230,27 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(unknownRestartRes.status, 404);
     const unknownRestartBody = await unknownRestartRes.json();
     assert.equal(unknownRestartBody.error, "SessionNotFound");
+
+    const invalidCustomCommandPutRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: 123 })
+    });
+    assert.equal(invalidCustomCommandPutRes.status, 400);
+    const invalidCustomCommandPutBody = await invalidCustomCommandPutRes.json();
+    assert.equal(invalidCustomCommandPutBody.error, "ValidationError");
+
+    const unknownCustomCommandGetRes = await fetch(`${baseUrl}/custom-commands/missing`);
+    assert.equal(unknownCustomCommandGetRes.status, 404);
+    const unknownCustomCommandGetBody = await unknownCustomCommandGetRes.json();
+    assert.equal(unknownCustomCommandGetBody.error, "CustomCommandNotFound");
+
+    const unknownCustomCommandDeleteRes = await fetch(`${baseUrl}/custom-commands/missing`, {
+      method: "DELETE"
+    });
+    assert.equal(unknownCustomCommandDeleteRes.status, 404);
+    const unknownCustomCommandDeleteBody = await unknownCustomCommandDeleteRes.json();
+    assert.equal(unknownCustomCommandDeleteBody.error, "CustomCommandNotFound");
   } finally {
     await runtime.stop();
   }
@@ -489,8 +582,9 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
     await runtimeA.stop();
   }
 
-  const persisted = JSON.parse(await readFile(dataPath, "utf8"));
-  const persistedSession = persisted.find((session) => session.id === createdId);
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
+  const persistedSession = persistedSessions.find((session) => session.id === createdId);
   assert.ok(persistedSession);
   assert.equal(persistedSession.createdAt, createdAt);
   assert.equal(persistedSession.updatedAt, updatedAt);

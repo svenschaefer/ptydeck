@@ -37,6 +37,80 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /custom-commands:
+    get:
+      operationId: listCustomCommands
+      summary: List persisted custom commands.
+      responses:
+        '200':
+          description: Custom command list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomCommand'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /custom-commands/{commandName}:
+    parameters:
+      - $ref: '#/components/parameters/commandName'
+    get:
+      operationId: getCustomCommand
+      summary: Get custom command by name.
+      responses:
+        '200':
+          description: Custom command found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomCommand'
+        '404':
+          description: Custom command not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    put:
+      operationId: upsertCustomCommand
+      summary: Create or overwrite custom command by name.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertCustomCommandRequest'
+      responses:
+        '200':
+          description: Custom command upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomCommand'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    delete:
+      operationId: deleteCustomCommand
+      summary: Delete custom command by name.
+      responses:
+        '204':
+          description: Custom command deleted
+        '404':
+          description: Custom command not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -240,6 +314,12 @@ components:
       required: true
       schema:
         type: string
+    commandName:
+      name: commandName
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Session:
       type: object
@@ -264,6 +344,29 @@ components:
         updatedAt:
           type: integer
           format: int64
+    CustomCommand:
+      type: object
+      required:
+        - name
+        - content
+        - createdAt
+        - updatedAt
+      properties:
+        name:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+    UpsertCustomCommandRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
     CreateSessionRequest:
       type: object
       properties:

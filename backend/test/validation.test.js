@@ -113,3 +113,52 @@ test("validateResponse accepts auth token response", () => {
     });
   });
 });
+
+test("validateRequest accepts valid custom command upsert payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: { content: "echo hi\n" }
+    });
+  });
+});
+
+test("validateRequest rejects invalid custom command upsert payload", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: { content: 123 }
+    });
+  });
+});
+
+test("validateResponse accepts custom command payloads", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "customCommand",
+      body: {
+        name: "docu",
+        content: "echo hi\n",
+        createdAt: 1,
+        updatedAt: 2
+      }
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "customCommandList",
+      body: [
+        {
+          name: "docu",
+          content: "echo hi\n",
+          createdAt: 1,
+          updatedAt: 2
+        }
+      ]
+    });
+  });
+});

@@ -50,6 +50,10 @@ function parseOperations(yamlText) {
 function runtimeOperationKeys() {
   return new Set([
     "POST /auth/dev-token",
+    "GET /custom-commands",
+    "GET /custom-commands/{commandName}",
+    "PUT /custom-commands/{commandName}",
+    "DELETE /custom-commands/{commandName}",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -116,6 +120,29 @@ test("runtime routes and statuses conform to openapi contract", async () => {
 
     const listRes = await fetch(`${baseUrl}/sessions`, { headers: { authorization: `Bearer ${tokenPayload.accessToken}` } });
     assert.ok(operations.get("GET /sessions").has(listRes.status));
+
+    const listCustomCommandsRes = await fetch(`${baseUrl}/custom-commands`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /custom-commands").has(listCustomCommandsRes.status));
+
+    const putCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: authHeaders,
+      body: JSON.stringify({ content: "echo DOCU\\n" })
+    });
+    assert.ok(operations.get("PUT /custom-commands/{commandName}").has(putCustomCommandRes.status));
+
+    const getCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /custom-commands/{commandName}").has(getCustomCommandRes.status));
+
+    const deleteCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("DELETE /custom-commands/{commandName}").has(deleteCustomCommandRes.status));
 
     const getMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }

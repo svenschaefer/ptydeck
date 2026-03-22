@@ -62,11 +62,19 @@ export class JsonPersistence {
   }
 
   async load() {
+    const state = await this.loadState();
+    return state.sessions;
+  }
+
+  async loadState() {
     try {
       const raw = await this.readFileFn(this.filePath, "utf8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return { sessions: parsed, customCommands: [] };
+      }
+      if (parsed && Array.isArray(parsed.sessions) && Array.isArray(parsed.customCommands)) {
+        return { sessions: parsed.sessions, customCommands: parsed.customCommands };
       }
       if (
         parsed &&
@@ -79,23 +87,41 @@ export class JsonPersistence {
         const plainJson = decryptEnvelope(parsed, this.encryptionProvider);
         const decryptedParsed = JSON.parse(plainJson);
         if (Array.isArray(decryptedParsed)) {
-          return decryptedParsed;
+          return { sessions: decryptedParsed, customCommands: [] };
         }
-        return [];
+        if (
+          decryptedParsed &&
+          Array.isArray(decryptedParsed.sessions) &&
+          Array.isArray(decryptedParsed.customCommands)
+        ) {
+          return { sessions: decryptedParsed.sessions, customCommands: decryptedParsed.customCommands };
+        }
+        return { sessions: [], customCommands: [] };
       }
-      return [];
+      return { sessions: [], customCommands: [] };
     } catch (err) {
       if (err && typeof err === "object" && err.code === "ENOENT") {
-        return [];
+        return { sessions: [], customCommands: [] };
       }
       throw err;
     }
   }
 
   async save(sessions) {
+    await this.saveState({ sessions, customCommands: [] });
+  }
+
+  async saveState({ sessions, customCommands }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const payloadJson = JSON.stringify(sessions, null, 2);
+    const payloadJson = JSON.stringify(
+      {
+        sessions: Array.isArray(sessions) ? sessions : [],
+        customCommands: Array.isArray(customCommands) ? customCommands : []
+      },
+      null,
+      2
+    );
     const payload = this.encryptionProvider
       ? JSON.stringify(buildEncryptedEnvelope(payloadJson, this.encryptionProvider), null, 2)
       : payloadJson;

@@ -83,6 +83,30 @@ export function validateRequest({ method, pathname, params, body }) {
       }
     }
   }
+
+  if (method === "GET" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
+    if (!params.commandName || typeof params.commandName !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
+    }
+  }
+
+  if (method === "PUT" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
+    if (!params.commandName || typeof params.commandName !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.content !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'content' must be a string.");
+    }
+  }
+
+  if (method === "DELETE" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
+    if (!params.commandName || typeof params.commandName !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
+    }
+  }
 }
 
 function isSession(value) {
@@ -107,6 +131,16 @@ function isAuthToken(value) {
   );
 }
 
+function isCustomCommand(value) {
+  return (
+    isObject(value) &&
+    typeof value.name === "string" &&
+    typeof value.content === "string" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt)
+  );
+}
+
 export function validateResponse({ statusCode, body, expect }) {
   if (expect === "session" && !isSession(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match Session schema.");
@@ -126,5 +160,15 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "authToken" && !isAuthToken(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match AuthTokenResponse schema.");
+  }
+
+  if (expect === "customCommand" && !isCustomCommand(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match CustomCommand schema.");
+  }
+
+  if (expect === "customCommandList") {
+    if (!Array.isArray(body) || !body.every((item) => isCustomCommand(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match CustomCommand[] schema.");
+    }
   }
 }

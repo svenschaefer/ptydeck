@@ -10,6 +10,14 @@ import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
+function decodePathParam(value, name) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new ApiError(400, "ValidationError", `Invalid path parameter encoding for '${name}'.`);
+  }
+}
+
 function parseJsonBody(req, maxBodyBytes) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -83,6 +91,26 @@ function route(pathname, method) {
   if (pathname === "/api/v1/auth/dev-token" && method === "POST") {
     return { kind: "devToken" };
   }
+  if (pathname === "/api/v1/custom-commands" && method === "GET") {
+    return { kind: "listCustomCommands" };
+  }
+
+  const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
+  if (customCommandMatch && method === "GET") {
+    return { kind: "getCustomCommand", params: { commandName: decodePathParam(customCommandMatch[1], "commandName") } };
+  }
+  if (customCommandMatch && method === "PUT") {
+    return {
+      kind: "upsertCustomCommand",
+      params: { commandName: decodePathParam(customCommandMatch[1], "commandName") }
+    };
+  }
+  if (customCommandMatch && method === "DELETE") {
+    return {
+      kind: "deleteCustomCommand",
+      params: { commandName: decodePathParam(customCommandMatch[1], "commandName") }
+    };
+  }
 
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
   if (getSessionMatch && method === "GET") {
@@ -114,6 +142,9 @@ function route(pathname, method) {
 }
 
 function normalizeMetricsPath(pathname) {
+  if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
+    return "/api/v1/custom-commands/{commandName}";
+  }
   if (/^\/api\/v1\/sessions\/[^/]+\/input$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/input";
   }
@@ -153,6 +184,7 @@ export function createRuntime(config) {
   const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsServer = new WebSocketServer({ noServer: true });
   const sockets = new Set();
+  const customCommands = new Map();
   const metrics = {
     httpRequestsTotal: 0,
     httpErrorsTotal: 0,
@@ -281,6 +313,12 @@ export function createRuntime(config) {
   }
 
   function requiredScopeForRoute(kind) {
+    if (kind === "listCustomCommands" || kind === "getCustomCommand") {
+      return "sessions:read";
+    }
+    if (kind === "upsertCustomCommand" || kind === "deleteCustomCommand") {
+      return "sessions:write";
+    }
     if (kind === "listSessions" || kind === "getSession") {
       return "sessions:read";
     }
@@ -319,6 +357,45 @@ export function createRuntime(config) {
     }
   }
 
+  function listCustomCommands() {
+    return Array.from(customCommands.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function getCustomCommandOrThrow(name) {
+    const entry = customCommands.get(name);
+    if (!entry) {
+      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
+    }
+    return { ...entry };
+  }
+
+  function upsertCustomCommand(name, content) {
+    const current = customCommands.get(name);
+    const now = Date.now();
+    const next = {
+      name,
+      content,
+      createdAt: current ? current.createdAt : now,
+      updatedAt: now
+    };
+    customCommands.set(name, next);
+    return { ...next };
+  }
+
+  function deleteCustomCommand(name) {
+    if (!customCommands.has(name)) {
+      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
+    }
+    customCommands.delete(name);
+  }
+
+  function snapshotRuntimeState() {
+    return {
+      sessions: manager.list(),
+      customCommands: listCustomCommands()
+    };
+  }
+
   function persistSoon() {
     if (isStopping) {
       return;
@@ -328,9 +405,16 @@ export function createRuntime(config) {
     }
     persistTimer = setTimeout(async () => {
       persistTimer = null;
-      logDebug("persist.save.start", { sessionCount: manager.list().length });
-      await persistence.save(manager.list());
-      logDebug("persist.save.ok", { sessionCount: manager.list().length });
+      const state = snapshotRuntimeState();
+      logDebug("persist.save.start", {
+        sessionCount: state.sessions.length,
+        customCommandCount: state.customCommands.length
+      });
+      await persistence.saveState(state);
+      logDebug("persist.save.ok", {
+        sessionCount: state.sessions.length,
+        customCommandCount: state.customCommands.length
+      });
     }, 100);
   }
 
@@ -463,6 +547,35 @@ export function createRuntime(config) {
 
       if (match.kind !== "notFound") {
         authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
+      }
+
+      if (match.kind === "listCustomCommands") {
+        const payload = listCustomCommands();
+        validateResponse({ statusCode: 200, body: payload, expect: "customCommandList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "getCustomCommand") {
+        const payload = getCustomCommandOrThrow(match.params.commandName);
+        validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "upsertCustomCommand") {
+        const payload = upsertCustomCommand(match.params.commandName, body.content);
+        validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
+        persistSoon();
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "deleteCustomCommand") {
+        deleteCustomCommand(match.params.commandName);
+        persistSoon();
+        writeJson(req, res, 204);
+        return;
       }
 
       if (match.kind === "listSessions") {
@@ -655,9 +768,12 @@ export function createRuntime(config) {
     isStopping = false;
     isReady = false;
 
-    const persisted = await persistence.load();
-    logDebug("runtime.restore.start", { persistedSessionCount: persisted.length });
-    for (const session of persisted) {
+    const persistedState = await persistence.loadState();
+    logDebug("runtime.restore.start", {
+      persistedSessionCount: persistedState.sessions.length,
+      persistedCustomCommandCount: persistedState.customCommands.length
+    });
+    for (const session of persistedState.sessions) {
       try {
         manager.create({
           id: session.id,
@@ -671,7 +787,23 @@ export function createRuntime(config) {
         console.error("failed to restore session", session.id, err);
       }
     }
-    logDebug("runtime.restore.done", { restoredSessionCount: manager.list().length });
+    for (const customCommand of persistedState.customCommands) {
+      if (!customCommand || typeof customCommand.name !== "string" || typeof customCommand.content !== "string") {
+        continue;
+      }
+      customCommands.set(customCommand.name, {
+        name: customCommand.name,
+        content: customCommand.content,
+        createdAt:
+          Number.isInteger(customCommand.createdAt) && customCommand.createdAt > 0 ? customCommand.createdAt : Date.now(),
+        updatedAt:
+          Number.isInteger(customCommand.updatedAt) && customCommand.updatedAt > 0 ? customCommand.updatedAt : Date.now()
+      });
+    }
+    logDebug("runtime.restore.done", {
+      restoredSessionCount: manager.list().length,
+      restoredCustomCommandCount: customCommands.size
+    });
 
     await new Promise((resolve) => {
       server.listen(config.port, resolve);
@@ -699,8 +831,12 @@ export function createRuntime(config) {
     sockets.clear();
     wsServer.close();
 
-    const persistedSnapshot = manager.list().map((session) => ({ ...session }));
-    logDebug("runtime.stop.start", { sessionCount: persistedSnapshot.length, socketCount: sockets.size });
+    const persistedSnapshot = snapshotRuntimeState();
+    logDebug("runtime.stop.start", {
+      sessionCount: persistedSnapshot.sessions.length,
+      customCommandCount: persistedSnapshot.customCommands.length,
+      socketCount: sockets.size
+    });
 
     for (const session of manager.list()) {
       try {
@@ -710,8 +846,11 @@ export function createRuntime(config) {
       }
     }
 
-    await persistence.save(persistedSnapshot);
-    logDebug("runtime.stop.persisted", { persistedSessionCount: persistedSnapshot.length });
+    await persistence.saveState(persistedSnapshot);
+    logDebug("runtime.stop.persisted", {
+      persistedSessionCount: persistedSnapshot.sessions.length,
+      persistedCustomCommandCount: persistedSnapshot.customCommands.length
+    });
 
     if (server.listening) {
       await new Promise((resolve) => server.close(resolve));

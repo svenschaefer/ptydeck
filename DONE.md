@@ -235,6 +235,11 @@ Completed and verified topics belong here.
 - [x] Fixed fixed-size rendering consistency by enforcing per-terminal mount width/height in fixed mode and clearing inline sizing in non-fixed mode.
 - [x] Simplified settings UX by removing `Use fixed terminal size`; terminal sizing now always follows the configured `Cols/Rows` values.
 - [x] Validation for terminal-rendering fix cycle passed: `npm run lint`, `npm run test` (backend + frontend).
+- [x] `QLT-037` completed: backend now supports global custom-command persistence with OpenAPI REST CRUD (`GET/PUT/GET/DELETE /api/v1/custom-commands...`) and deterministic overwrite semantics (`createdAt` preserved, `updatedAt` refreshed).
+- [x] Runtime persistence payload upgraded to deterministic state object (`sessions` + `customCommands`) with backward-compatible load of legacy session-array payloads.
+- [x] Added backend contract/integration/validation/persistence coverage for custom-command CRUD paths and restart-persistence behavior.
+- [x] Validation for `QLT-037` cycle passed: `npm --prefix backend run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, `npm --prefix backend run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-037` cycle: backend `96.87%` lines, frontend `87.99%` lines.
 
 ## Maintenance Rules
 

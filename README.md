@@ -9,6 +9,7 @@ Current state: compressed roadmap complete: `v0.1.0` to `v0.3.0`.
 - Monorepo structure with `backend/` and `frontend/`
 - OpenAPI contract scaffold in `backend/openapi/openapi.yaml`
 - Backend session lifecycle endpoints implemented (`GET/POST /api/v1/sessions`, `GET/DELETE /api/v1/sessions/{sessionId}`, `POST /input`, `POST /resize`)
+- Backend custom-command REST endpoints implemented (`GET /api/v1/custom-commands`, `PUT/GET/DELETE /api/v1/custom-commands/{commandName}`)
 - WebSocket endpoint `/ws` implemented with `session.created`, `session.data`, `session.exit`, and `session.closed` events
 - Session metadata persistence and startup restore implemented (JSON adapter)
 - Frontend runtime UI implemented with `xterm.js`, multi-session cards, command input, and WS reconnect
