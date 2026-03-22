@@ -44,7 +44,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 
 - [ ] Add metrics for session lifecycle and connection quality.
 - [ ] Add distributed tracing across REST, WS, and PTY pathways.
-- [ ] Add SLO definitions and alert thresholds.
 
 ## Extensibility
 

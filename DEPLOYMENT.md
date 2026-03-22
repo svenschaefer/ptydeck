@@ -223,6 +223,47 @@ Recommended runtime env pattern:
 - `LOG_RETENTION_DAYS=30`
 - `LOG_REDACT_FIELDS=authorization,cookie,set-cookie,access_token,refresh_token,password,secret,token`
 
+## 9.1 SLO/SLI and Alerting Baseline (ENT-008)
+
+Baseline SLI signals:
+
+- API availability:
+  - Definition: ratio of successful API responses (`2xx`/`3xx`) over total API requests.
+  - Source: `ptydeck_http_requests_total`, `ptydeck_http_requests_by_status_total`.
+- API error rate:
+  - Definition: ratio of `5xx` responses over total API requests.
+  - Source: `ptydeck_http_requests_by_status_total`.
+- WS disconnect quality:
+  - Definition: disconnect/open ratio over rolling window.
+  - Source: `ptydeck_ws_connections_opened_total`, `ptydeck_ws_connections_closed_total`.
+- Request latency:
+  - Definition: average request latency from `duration_sum / duration_count`.
+  - Source: `ptydeck_http_request_duration_ms_sum`, `ptydeck_http_request_duration_ms_count`.
+
+Initial SLO targets (baseline, tune after real traffic):
+
+- API availability monthly target: `>= 99.5%`
+- API 5xx error ratio monthly target: `<= 1.0%`
+- WS disconnect/open ratio 15m target: `<= 10%`
+- Average API latency target: `<= 250ms` (rolling 15m)
+
+Initial alert thresholds:
+
+- Critical:
+  - API availability `< 99.0%` over 15 minutes.
+  - API 5xx ratio `> 5%` over 5 minutes.
+- Warning:
+  - API availability `< 99.5%` over 30 minutes.
+  - API 5xx ratio `> 2%` over 15 minutes.
+  - WS disconnect/open ratio `> 20%` over 15 minutes.
+  - Average API latency `> 500ms` over 15 minutes.
+
+Alert routing baseline:
+
+- Warning alerts to team channel/on-call dashboard.
+- Critical alerts to pager/on-call escalation path.
+- Every critical alert requires a post-incident note with timestamp, impact, root-cause hypothesis, and follow-up actions.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date
