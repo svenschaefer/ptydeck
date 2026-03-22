@@ -265,7 +265,7 @@ async function tick() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-test("app handles critical error paths and disconnected status rendering", async (t) => {
+test("app handles critical error paths, DOM lifecycle, and connection state rendering", async (t) => {
   const previousDocument = global.document;
   const previousWindow = global.window;
   const previousResizeObserver = global.ResizeObserver;
@@ -366,6 +366,38 @@ test("app handles critical error paths and disconnected status rendering", async
   assert.equal(MockWebSocket.instances.length, 1);
   const ws = MockWebSocket.instances[0];
   ws.emit("open", {});
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions: [
+        { id: "s-1", shell: "bash", cwd: "~", name: "one", createdAt: Date.now(), updatedAt: Date.now() },
+        { id: "s-2", shell: "bash", cwd: "~", name: "two", createdAt: Date.now(), updatedAt: Date.now() }
+      ],
+      outputs: []
+    })
+  });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 2);
+  assert.equal(fixture.elements.emptyState.style.display, "none");
+
+  const firstCard = fixture.elements.terminalGrid.children[0];
+  const secondCard = fixture.elements.terminalGrid.children[1];
+  const secondFocus = secondCard.querySelector(".session-focus");
+  secondFocus.click();
+  await tick();
+  assert.equal(firstCard.classList.contains("active"), false);
+  assert.equal(secondCard.classList.contains("active"), true);
+
+  ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 1);
+
+  ws.emit("message", { data: JSON.stringify({ type: "snapshot", sessions: [], outputs: [] }) });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 0);
+  assert.equal(fixture.elements.emptyState.style.display, "block");
+
   ws.emit("close", {});
   await tick();
 

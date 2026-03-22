@@ -101,6 +101,8 @@ Completed and verified topics belong here.
 - [x] Added `frontend/test/app.test.js` lightweight DOM/runtime harness to execute `frontend/src/public/app.js` behavior without browser dependencies.
 - [x] Validation for this cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage`.
 - [x] Coverage after `QLT-003` cycle: backend `96.64%` lines, frontend `85.21%` lines (`node --test --experimental-test-coverage` aggregate report).
+- [x] `QLT-010` completed: extended frontend app integration coverage for terminal card lifecycle updates, active-session switching, and empty-state rendering.
+- [x] Coverage after `QLT-010` cycle: frontend `89.23%` lines (`npm --prefix frontend run test:coverage` aggregate report).
 
 ## Maintenance Rules
 
