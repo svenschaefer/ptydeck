@@ -185,6 +185,7 @@ export function createRuntime(config) {
         : "";
 
     const headers = {
+      ...buildSecurityHeaders(),
       "content-type": "application/json",
       "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
       "access-control-allow-headers": "content-type"
@@ -198,6 +199,14 @@ export function createRuntime(config) {
     }
 
     return headers;
+  }
+
+  function buildSecurityHeaders() {
+    return {
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer",
+      "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    };
   }
 
   function writeJson(req, res, statusCode, body) {
@@ -380,6 +389,7 @@ export function createRuntime(config) {
       if (match.kind === "metrics") {
         const payload = renderMetrics();
         res.writeHead(200, {
+          ...buildSecurityHeaders(),
           "content-type": "text/plain; version=0.0.4; charset=utf-8",
           "cache-control": "no-store"
         });

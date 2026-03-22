@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (ENT-008 SLO/SLI + alerting baseline documented; ENT-005/ENT-021 retained)
+Last updated: 2026-03-22 (ENT-016 security response headers baseline implemented; ENT-008/ENT-005/ENT-021 retained)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -102,6 +102,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Backend now exposes `GET /metrics` with Prometheus-style baseline metrics for HTTP traffic, request durations, active sessions, and active WebSocket connections.
 - Deployment runbook now includes secrets-management baseline guidance (runtime injection, no plaintext in repo, and rotation procedure).
 - Deployment runbook now includes SLO/SLI definitions with initial alert thresholds and escalation baseline tied to runtime metrics.
+- Backend runtime now emits security response headers baseline (`Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`) across API and operational routes.
+- Deployment runbook now defines HSTS as an ingress/proxy concern with explicit baseline policy values.
 - Backend auth/authz middleware baseline now supports JWT validation in `AUTH_DEV_MODE=1`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
 - Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `OUTLOOK-TODO.md`.
@@ -112,8 +114,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
 - Active next cycle: `v0.3.0-H2` enterprise readiness backlog (current-scope subset in `TODO.md`; deferred auth/tenant items in `OUTLOOK-TODO.md`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
-  - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-008`, `ENT-018`, `ENT-021`, `ENT-023`.
-  - Planned next in cycle B: non-auth enterprise hardening tasks from `TODO.md` (for example `ENT-006`, `ENT-007`, `ENT-009`).
+  - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-008`, `ENT-016`, `ENT-018`, `ENT-021`, `ENT-023`.
+  - Planned next in cycle B: non-auth enterprise hardening tasks from `TODO.md` (for example `ENT-006`, `ENT-007`, `ENT-009`, `ENT-019`).
 
 ## Session Behavior Notes
 

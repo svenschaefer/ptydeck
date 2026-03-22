@@ -264,6 +264,26 @@ Alert routing baseline:
 - Critical alerts to pager/on-call escalation path.
 - Every critical alert requires a post-incident note with timestamp, impact, root-cause hypothesis, and follow-up actions.
 
+## 9.2 Security Response Headers Baseline (ENT-016)
+
+Backend runtime response hardening:
+
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`
+
+Scope:
+
+- Applied to API and operational endpoints (`/api/v1/*`, `/health`, `/ready`, `/metrics`).
+- This baseline is intentionally strict because backend serves API payloads and metrics, not browser-rendered documents.
+
+HSTS policy (ingress/proxy responsibility):
+
+- Set `Strict-Transport-Security` at TLS ingress/reverse proxy layer, not directly in backend runtime.
+- Recommended baseline:
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+  - Add `preload` only when domain ownership and rollout policy are validated for all subdomains.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date

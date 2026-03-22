@@ -215,6 +215,32 @@ test("CORS allowlist echoes allowed origin and omits disallowed origin", async (
   }
 });
 
+test("HTTP responses include hardened security headers", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const healthRes = await fetch(`http://${new URL(baseUrl).host}/health`);
+    assert.equal(healthRes.status, 200);
+    assert.equal(healthRes.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(healthRes.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(
+      healthRes.headers.get("content-security-policy"),
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    );
+
+    const metricsRes = await fetch(`http://${new URL(baseUrl).host}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    assert.equal(metricsRes.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(metricsRes.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(
+      metricsRes.headers.get("content-security-policy"),
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    );
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("auth dev mode issues token and protects session routes", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
     authEnabled: true,

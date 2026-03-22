@@ -124,7 +124,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `ENT-013` Owner: `PLAT` Task: Define and implement least-privilege runtime profile (container/user permissions, filesystem write scope, network egress policy).
 - [ ] `ENT-014` Owner: `PLAT` Task: Add disaster-recovery runbook with RTO/RPO targets and automate periodic restore drill verification in CI/non-prod.
 - [ ] `ENT-015` Owner: `PLAT` Task: Add release evidence bundle generation (test results, SBOM, vulnerability scan output, commit provenance) for audit/compliance.
-- [ ] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).
+- [x] `ENT-016` Owner: `BE` Task: Add security response headers and origin policy hardening for HTTP responses (CSP, X-Content-Type-Options, Referrer-Policy, HSTS via proxy docs).
 - [x] `ENT-018` Owner: `PLAT` Task: Add reverse-proxy reference setup for local HTTPS/WSS host routing (provider-agnostic) in `DEPLOYMENT.md`.
 - [ ] `ENT-019` Owner: `BE` Task: Add trusted-proxy configuration and safe `X-Forwarded-*` handling to avoid spoofed client/protocol metadata behind ingress.
 - [ ] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.

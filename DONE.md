@@ -182,6 +182,11 @@ Completed and verified topics belong here.
 - [x] Alerting baseline now defines warning/critical thresholds and escalation expectations tied to metrics from `GET /metrics`.
 - [x] Validation for `ENT-008` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after `ENT-008` cycle: backend `96.22%` lines, frontend `88.36%` lines.
+- [x] `ENT-016` completed: backend now emits hardened security headers (`Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`) on API and operational endpoints.
+- [x] Deployment runbook now documents HSTS as ingress/proxy responsibility with explicit baseline policy.
+- [x] Added backend integration coverage for hardened header presence on `/health` and `/metrics`.
+- [x] Validation for `ENT-016` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after `ENT-016` cycle: backend `96.47%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 
