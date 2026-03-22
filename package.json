@@ -22,6 +22,7 @@
     "security:sbom": "./scripts/generate-sbom.sh",
     "backup:create": "./scripts/backup-sessions.sh",
     "backup:restore": "./scripts/restore-sessions.sh",
-    "backup:verify": "./scripts/verify-backup-restore.sh"
+    "backup:verify": "./scripts/verify-backup-restore.sh",
+    "retention:purge": "./scripts/purge-retention.sh"
   }
 }

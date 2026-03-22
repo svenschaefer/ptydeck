@@ -221,6 +221,11 @@ Completed and verified topics belong here.
 - [x] Added deterministic backup/restore roundtrip verification script (`scripts/verify-backup-restore.sh`) and wired it into CI non-prod automation.
 - [x] Validation for `ENT-009` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, `npm run security:sbom`, and `npm run backup:verify`.
 - [x] Coverage after `ENT-009` cycle: backend `96.68%` lines, frontend `88.36%` lines.
+- [x] `ENT-024` completed: data retention/purge policy baseline defined for session backups, backend logs, and security artifacts.
+- [x] Added retention purge automation script (`scripts/purge-retention.sh`) with dry-run default and configurable retention windows/paths.
+- [x] CI non-prod validation now runs retention purge in dry-run mode to continuously verify cleanup cadence wiring.
+- [x] Validation for `ENT-024` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, `npm run tls:check`, `npm run security:sca`, `npm run security:sbom`, `npm run backup:verify`, and `PURGE_DRY_RUN=1 npm run retention:purge`.
+- [x] Coverage after `ENT-024` cycle: backend `96.68%` lines, frontend `88.36%` lines.
 
 ## Maintenance Rules
 

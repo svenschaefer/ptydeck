@@ -15,6 +15,7 @@ npm run test:coverage
 npm run security:sca
 npm run security:sbom
 npm run backup:verify
+PURGE_DRY_RUN=1 npm run retention:purge
 ```
 
 ## 3. Build
@@ -468,6 +469,40 @@ CI integration:
 
 - Security job runs `./scripts/verify-backup-restore.sh` after SBOM generation.
 - This provides periodic restore verification as part of non-production automation.
+
+## 9.10 Data Retention/Purge Baseline (ENT-024)
+
+Retention policy targets:
+
+- Session backup files (`./backups/sessions`): retain `14` days.
+- Backend operational logs (`./backend/logs`): retain `30` days.
+- Security artifacts (`./artifacts/security`): retain `30` days.
+
+Purge automation:
+
+- Script: `./scripts/purge-retention.sh`
+- Defaults:
+  - `PURGE_DRY_RUN=1` (safe mode; reports candidates without deleting)
+  - `SESSION_BACKUP_RETENTION_DAYS=14`
+  - `BACKEND_LOG_RETENTION_DAYS=30`
+  - `SECURITY_ARTIFACT_RETENTION_DAYS=30`
+
+Configurable paths:
+
+- `SESSION_BACKUP_DIR` (default `./backups/sessions`)
+- `BACKEND_LOG_DIR` (default `./backend/logs`)
+- `SECURITY_ARTIFACT_DIR` (default `./artifacts/security`)
+
+Operational cadence:
+
+- CI non-prod checks run the purge script in dry-run mode to continuously validate retention rules and path wiring.
+- Production/non-prod runtime cleanup should execute the same script on a daily scheduler with `PURGE_DRY_RUN=0`.
+
+Example (actual deletion run):
+
+```bash
+PURGE_DRY_RUN=0 npm run retention:purge
+```
 
 ## 10. Release Checklist
 

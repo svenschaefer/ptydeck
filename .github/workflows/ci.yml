@@ -63,6 +63,10 @@ jobs:
         run: ./scripts/generate-sbom.sh
       - name: Verify backup/restore roundtrip
         run: ./scripts/verify-backup-restore.sh
+      - name: Retention purge dry-run
+        env:
+          PURGE_DRY_RUN: "1"
+        run: ./scripts/purge-retention.sh
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
