@@ -56,6 +56,7 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.
 - [ ] Add scoped custom-command sets (global, project, session scopes) with deterministic precedence.
 - [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
+- [ ] Add import support for external terminal color-scheme catalogs (for example iTerm2-compatible palettes) with strict format validation and deterministic mapping.
 - [ ] Add remote execution adapters (SSH sessions and multi-host routing).
 - [ ] Add multi-client shared sessions with separate view/control permissions.
 - [ ] Add broadcast input modes for explicit session groups.

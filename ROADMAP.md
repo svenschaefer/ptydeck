@@ -137,6 +137,31 @@ Exit criteria:
 - Multi-client custom-command state synchronization works via WebSocket lifecycle events.
 - Integration/regression coverage exists for all listed custom-command and slash UX edge cases.
 
+### v0.3.0-H1D - Per-Terminal Settings and Theme Personalization
+
+- `QLT-060`, `QLT-061`
+- `QLT-058`, `QLT-062`, `QLT-059`
+- `QLT-063`
+- `QLT-064`
+
+Dependencies:
+
+- `QLT-060` should run first to establish backend contract/persistence for per-session startup settings used by FE forms.
+- `QLT-061` depends on `QLT-060` so startup settings are applied consistently during create/restart flows.
+- `QLT-058` should run before `QLT-062` and `QLT-059` to establish a stable per-terminal settings entry point (gear icon + panel shell).
+- `QLT-062` depends on `QLT-058` and `QLT-060` so FE forms map to finalized backend fields and validation semantics.
+- `QLT-059` depends on `QLT-058` and should complete after `QLT-062` to keep rename/close behavior discoverable inside the settings panel.
+- `QLT-063` depends on `QLT-058`; it should run after panel shell exists so per-session color settings stay scoped and deterministic.
+- `QLT-064` depends on `QLT-058` through `QLT-063`.
+
+Exit criteria:
+
+- Every terminal card exposes a dedicated settings icon that opens per-session settings.
+- `Rename` and `Close` actions are available in settings and removed from the direct card toolbar.
+- Per-session startup settings (`Working Directory`, `Start Command Line`, `Environment Variables`) are persisted and applied deterministically.
+- Per-session color sets are configurable and applied consistently after reload.
+- Integration/regression coverage exists for per-session settings lifecycle and startup-apply behavior.
+
 ### v0.3.0-H2 - Enterprise Readiness Backlog
 
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
@@ -184,7 +209,7 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0`
-- Next milestones in progress: `v0.3.0-H1C`, `v0.3.0-H2`
+- Next milestones in progress: `v0.3.0-H1C`, `v0.3.0-H1D`, `v0.3.0-H2`
 - Blockers: none recorded
 
 ### Completed Items
