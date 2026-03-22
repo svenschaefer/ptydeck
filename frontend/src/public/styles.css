@@ -21,6 +21,7 @@ body {
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
   background: linear-gradient(180deg, #101723 0%, #0a0d12 100%);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 .app-shell {
@@ -182,6 +183,11 @@ button:hover {
   flex: 1;
 }
 
+.terminal-grid.fixed-size {
+  grid-template-columns: repeat(auto-fill, minmax(var(--ptydeck-terminal-card-width, 520px), var(--ptydeck-terminal-card-width, 520px)));
+  justify-content: start;
+}
+
 .empty-state {
   margin: 0 18px 18px;
   color: var(--muted);
@@ -194,6 +200,7 @@ button:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .terminal-card.active {
@@ -208,10 +215,16 @@ button:hover {
   border-bottom: 1px solid var(--border);
   align-items: center;
   background: #0f151f;
+  min-width: 0;
 }
 
 .session-focus {
   font-weight: 700;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-quick-id {
@@ -227,19 +240,22 @@ button:hover {
 }
 
 .session-rename {
-  margin-left: auto;
+  flex: 0 0 auto;
+  margin-left: 0;
 }
 
 .session-close {
   border-color: #5f2c2c;
   color: #ff9f9f;
+  flex: 0 0 auto;
 }
 
 .terminal-mount {
-  height: 172px;
+  height: var(--ptydeck-terminal-mount-height, 172px);
   padding: 0;
   background: #0a0d12;
   overflow: hidden;
+  min-width: 0;
 }
 
 .terminal-mount .xterm {
@@ -262,10 +278,6 @@ button:hover {
 
   .terminal-grid {
     grid-template-columns: 1fr;
-  }
-
-  .terminal-mount {
-    height: 140px;
   }
 
   .command-row {

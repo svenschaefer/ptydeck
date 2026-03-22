@@ -41,6 +41,8 @@ let bootstrapPromise = null;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
+const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
+const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 let terminalSettings = loadTerminalSettings();
 let wsAuthToken = "";
@@ -131,6 +133,44 @@ function loadTerminalSettings() {
   };
 }
 
+function measureTerminalCellWidthPx() {
+  if (!document || typeof document.createElement !== "function") {
+    return 10;
+  }
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return 10;
+  }
+  context.font = `${TERMINAL_FONT_SIZE}px ${TERMINAL_FONT_FAMILY}`;
+  const metrics = context.measureText("W");
+  return Math.max(7, Math.ceil(metrics.width));
+}
+
+function computeFixedMountHeightPx(rows) {
+  const lineHeightPx = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT;
+  return Math.max(120, Math.round(rows * lineHeightPx + 18));
+}
+
+function computeFixedCardWidthPx(cols) {
+  const cellWidthPx = measureTerminalCellWidthPx();
+  return Math.max(260, Math.round(cols * cellWidthPx + TERMINAL_CARD_HORIZONTAL_CHROME_PX));
+}
+
+function syncTerminalGeometryCss() {
+  if (!document || !document.documentElement) {
+    return;
+  }
+  const root = document.documentElement;
+  const cardWidthPx = computeFixedCardWidthPx(terminalSettings.cols);
+  const mountHeightPx = computeFixedMountHeightPx(terminalSettings.rows);
+  root.style.setProperty("--ptydeck-terminal-card-width", `${cardWidthPx}px`);
+  root.style.setProperty("--ptydeck-terminal-mount-height", `${mountHeightPx}px`);
+  if (gridEl) {
+    gridEl.classList.toggle("fixed-size", terminalSettings.fixedSize);
+  }
+}
+
 function syncSettingsUi() {
   if (settingsFixedSizeEl) {
     settingsFixedSizeEl.checked = terminalSettings.fixedSize;
@@ -141,6 +181,7 @@ function syncSettingsUi() {
   if (settingsRowsEl) {
     settingsRowsEl.value = String(terminalSettings.rows);
   }
+  syncTerminalGeometryCss();
 }
 
 function readSettingsFromUi() {
@@ -157,10 +198,16 @@ function applyMountHeight(entry, rows) {
   }
   if (!terminalSettings.fixedSize) {
     entry.mount.style.height = "";
+    entry.mount.style.width = "";
+    entry.element.style.width = "";
     return;
   }
-  const targetPx = Math.max(160, Math.round(rows * TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT + 18));
-  entry.mount.style.height = `${targetPx}px`;
+  const mountHeightPx = computeFixedMountHeightPx(rows);
+  const cardWidthPx = computeFixedCardWidthPx(terminalSettings.cols);
+  const mountWidthPx = Math.max(220, cardWidthPx - TERMINAL_CARD_HORIZONTAL_CHROME_PX);
+  entry.mount.style.height = `${mountHeightPx}px`;
+  entry.mount.style.width = `${mountWidthPx}px`;
+  entry.element.style.width = `${cardWidthPx}px`;
 }
 
 function applySettingsToAllTerminals() {
@@ -417,7 +464,7 @@ function render() {
       convertEol: true,
       fontSize: TERMINAL_FONT_SIZE,
       lineHeight: TERMINAL_LINE_HEIGHT,
-      fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace',
+      fontFamily: TERMINAL_FONT_FAMILY,
       cursorBlink: true,
       theme: {
         background: "#0a0d12",
@@ -779,6 +826,7 @@ function startWs() {
 
 store.subscribe(render);
 syncSettingsUi();
+syncTerminalGeometryCss();
 render();
 
 async function initializeRuntime() {

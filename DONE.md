@@ -230,6 +230,10 @@ Completed and verified topics belong here.
 - [x] Added `scripts/generate-release-evidence.sh` and root script `npm run release:evidence` to produce `artifacts/release-evidence/release-evidence-<timestamp>.tar.gz` with manifest and checksums.
 - [x] CI security workflow now captures test/security logs, generates release evidence bundles, and uploads `release-evidence` artifact for audit/compliance traceability.
 - [x] Validation for `ENT-015` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run release:evidence`.
+- [x] Fixed terminal geometry drift between configured `cols/rows` and rendered card size by deriving fixed-mode card width and mount height from terminal settings and applying them uniformly across all terminal cards.
+- [x] Fixed horizontal overflow causes in terminal workspace by adding fixed-size grid column sizing, card shrink guards (`min-width: 0`), toolbar text truncation, and root `overflow-x: hidden`.
+- [x] Fixed fixed-size rendering consistency by enforcing per-terminal mount width/height in fixed mode and clearing inline sizing in non-fixed mode.
+- [x] Validation for terminal-rendering fix cycle passed: `npm run lint`, `npm run test` (backend + frontend).
 
 ## Maintenance Rules
 
