@@ -218,3 +218,27 @@ test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
     }
   }
 });
+
+test("SessionManager restart preserves identity and restarts PTY", () => {
+  const firstPty = createFakePty();
+  const secondPty = createFakePty();
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: () => {
+      spawnCount += 1;
+      return spawnCount === 1 ? firstPty : secondPty;
+    }
+  });
+
+  const created = manager.create({ cwd: "/tmp", shell: "bash", name: "ops-shell" });
+  const restarted = manager.restart(created.id);
+
+  assert.equal(firstPty.killed, true);
+  assert.equal(restarted.id, created.id);
+  assert.equal(restarted.cwd, "/tmp");
+  assert.equal(restarted.shell, "bash");
+  assert.equal(restarted.name, "ops-shell");
+  assert.equal(restarted.createdAt, created.createdAt);
+  assert.ok(restarted.updatedAt >= created.createdAt);
+  assert.equal(manager.get(created.id).ptyProcess, secondPty);
+});

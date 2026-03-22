@@ -138,6 +138,11 @@ Completed and verified topics belong here.
 - [x] Frontend app tests updated to verify command feedback is rendered in dedicated panel and status messages remain isolated.
 - [x] Validation for `QLT-024` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-024` cycle: backend `96.78%` lines, frontend `87.31%` lines.
+- [x] `QLT-025` completed: backend endpoint `POST /api/v1/sessions/{sessionId}/restart` implemented to restart a session process while preserving session identity and metadata.
+- [x] OpenAPI and contract validation updated for restart operation (`restartSession`), including runtime route/status conformance checks.
+- [x] Added backend tests for restart lifecycle behavior in REST integration and `SessionManager` unit tests.
+- [x] Validation for `QLT-025` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-025` cycle: backend `96.71%` lines, frontend `87.31%` lines.
 
 ## Maintenance Rules
 

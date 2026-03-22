@@ -154,6 +154,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /sessions/{sessionId}/restart:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: restartSession
+      summary: Restart session process while preserving session identity.
+      responses:
+        '200':
+          description: Session restarted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   parameters:
     sessionId:

@@ -96,6 +96,11 @@ function route(pathname, method) {
     return { kind: "resize", params: { sessionId: resizeMatch[1] } };
   }
 
+  const restartMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
+  if (restartMatch && method === "POST") {
+    return { kind: "restart", params: { sessionId: restartMatch[1] } };
+  }
+
   return { kind: "notFound" };
 }
 
@@ -293,6 +298,14 @@ export function createRuntime(config) {
       if (match.kind === "resize") {
         manager.resize(match.params.sessionId, body.cols, body.rows);
         writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "restart") {
+        const payload = manager.restart(match.params.sessionId);
+        validateResponse({ statusCode: 200, body: payload, expect: "session" });
+        persistSoon();
+        writeJson(req, res, 200, payload);
         return;
       }
 

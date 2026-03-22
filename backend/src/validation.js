@@ -57,6 +57,15 @@ export function validateRequest({ method, pathname, params, body }) {
       throw new ApiError(400, "ValidationError", "Field 'rows' must be an integer >= 1.");
     }
   }
+
+  if (method === "POST" && pathname.endsWith("/restart")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
 }
 
 function isSession(value) {

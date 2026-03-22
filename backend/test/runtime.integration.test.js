@@ -71,6 +71,13 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     });
     assert.equal(resizeRes.status, 204);
 
+    const restartRes = await fetch(`${baseUrl}/sessions/${created.id}/restart`, {
+      method: "POST"
+    });
+    assert.equal(restartRes.status, 200);
+    const restarted = await restartRes.json();
+    assert.equal(restarted.id, created.id);
+
     const deleteRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "DELETE"
     });
@@ -140,6 +147,13 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(invalidPatchRes.status, 400);
     const invalidPatchBody = await invalidPatchRes.json();
     assert.equal(invalidPatchBody.error, "ValidationError");
+
+    const unknownRestartRes = await fetch(`${baseUrl}/sessions/unknown/restart`, {
+      method: "POST"
+    });
+    assert.equal(unknownRestartRes.status, 404);
+    const unknownRestartBody = await unknownRestartRes.json();
+    assert.equal(unknownRestartBody.error, "SessionNotFound");
   } finally {
     await runtime.stop();
   }

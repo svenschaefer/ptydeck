@@ -55,7 +55,8 @@ function runtimeOperationKeys() {
     "PATCH /sessions/{sessionId}",
     "DELETE /sessions/{sessionId}",
     "POST /sessions/{sessionId}/input",
-    "POST /sessions/{sessionId}/resize"
+    "POST /sessions/{sessionId}/resize",
+    "POST /sessions/{sessionId}/restart"
   ]);
 }
 
@@ -126,6 +127,11 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       body: JSON.stringify({ cols: 80, rows: 24 })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/resize").has(resizeMissingRes.status));
+
+    const restartMissingRes = await fetch(`${baseUrl}/sessions/missing-id/restart`, {
+      method: "POST"
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
   } finally {
     await runtime.stop();
   }

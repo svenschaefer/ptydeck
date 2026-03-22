@@ -143,7 +143,10 @@ export class SessionManager {
         exitCode: exit.exitCode,
         signal: exit.signal
       });
-      this.sessions.delete(id);
+      const current = this.sessions.get(id);
+      if (current === session) {
+        this.sessions.delete(id);
+      }
     });
 
     this.sessions.set(id, session);
@@ -175,6 +178,20 @@ export class SessionManager {
     session.meta.name = name;
     session.meta.updatedAt = now();
     return session.meta;
+  }
+
+  restart(sessionId) {
+    const session = this.get(sessionId);
+    const snapshot = { ...session.meta };
+    this.delete(sessionId);
+    return this.create({
+      id: snapshot.id,
+      cwd: snapshot.cwd,
+      shell: snapshot.shell,
+      name: snapshot.name,
+      createdAt: snapshot.createdAt,
+      updatedAt: now()
+    });
   }
 
   on(eventName, listener) {
