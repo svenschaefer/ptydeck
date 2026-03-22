@@ -30,6 +30,10 @@ npm run test:coverage
 
 See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, and rollback steps.
 
+## WSL Local Testing Note
+
+When testing from a Windows browser against services running in WSL, frontend runtime uses the current browser host to reach backend REST and WebSocket endpoints.
+
 ## Overview
 
 `ptydeck` provides a browser UI for running and controlling multiple terminal sessions side by side.

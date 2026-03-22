@@ -1,9 +1,15 @@
-import { loadClientConfig } from "../config.js";
 import { createApiClient } from "./api-client.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 
-const config = loadClientConfig();
+const isHttps = window.location.protocol === "https:";
+const host = window.location.hostname || "127.0.0.1";
+const runtimeConfig = {
+  apiBaseUrl: `${isHttps ? "https" : "http"}://${host}:8080/api/v1`,
+  wsUrl: `${isHttps ? "wss" : "ws"}://${host}:8080/ws`
+};
+
+const config = runtimeConfig;
 const api = createApiClient(config.apiBaseUrl);
 const store = createStore();
 

@@ -37,6 +37,8 @@ Completed and verified topics belong here.
 - [x] Added backend WS integration test covering event flow and reconnect snapshot behavior.
 - [x] Added runtime-based backend E2E core flow coverage in automated tests.
 - [x] `v1.0.0` production baseline completed with deployment runbook (`INT-010`).
+- [x] Dev hotfix: frontend now resolves API/WS target from browser host to support WSL-IP access from Windows browsers.
+- [x] Dev hotfix: backend default CORS origin set to `*` to avoid local cross-origin blocks in WSL dev scenarios.
 
 ## Maintenance Rules
 

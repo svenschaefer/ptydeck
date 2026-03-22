@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (v1.0.0 baseline completed)
+Last updated: 2026-03-22 (v1.0.0 baseline + WSL dev connectivity hotfixes)
 Owner: `CODX`
 
 ## Project Purpose
@@ -49,6 +49,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now includes a real multi-session xterm UI, session actions, and central command input.
 - Frontend now consumes backend snapshots/events via WebSocket reconnect flow.
 - Frontend now performs per-session debounced resize calls to backend.
+- Frontend resolves backend API/WS endpoints from the browser host at runtime (WSL IP friendly).
+- Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
 - `v0.4.0` status: completed.
 - `v0.5.0` status: completed with backend unit/integration/WS/E2E automation.
 - `v1.0.0` status: completed with deployment documentation (`DEPLOYMENT.md`).
