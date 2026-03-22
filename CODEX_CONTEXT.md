@@ -15,6 +15,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `DONE.md`: completed and verified topics only.
 - `OUTLOOK-TODO.md`: mid/long-term items only.
 - `README.md`: architecture and product behavior reference.
+- `AGENTS.md`: agent roles, collaboration rules, and change control.
 
 ## Ownership Model
 
