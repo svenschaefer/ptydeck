@@ -45,12 +45,50 @@ let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
+const SESSION_THEME_STORAGE_KEY = "ptydeck.session-theme.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const COMMAND_PREVIEW_MAX_CHARS = 4000;
+const DEFAULT_TERMINAL_THEME = {
+  background: "#0a0d12",
+  foreground: "#d8dee9",
+  cursor: "#8ec07c",
+  black: "#0a0d12",
+  red: "#fb4934",
+  green: "#8ec07c",
+  yellow: "#fabd2f",
+  blue: "#83a598",
+  magenta: "#b48ead",
+  cyan: "#8fbcbb",
+  white: "#d8dee9",
+  brightBlack: "#4b5563",
+  brightRed: "#ff6b5a",
+  brightGreen: "#a5d68a",
+  brightYellow: "#ffd36a",
+  brightBlue: "#98b6cc",
+  brightMagenta: "#c8a7d8",
+  brightCyan: "#a9d9d6",
+  brightWhite: "#f5f7fa"
+};
+const TERMINAL_THEME_PRESETS = {
+  default: DEFAULT_TERMINAL_THEME,
+  "gruvbox-dark": {
+    ...DEFAULT_TERMINAL_THEME,
+    background: "#1d2021",
+    foreground: "#ebdbb2",
+    cursor: "#fabd2f"
+  },
+  "solarized-dark": {
+    ...DEFAULT_TERMINAL_THEME,
+    background: "#002b36",
+    foreground: "#93a1a1",
+    cursor: "#b58900"
+  }
+};
+const TERMINAL_THEME_MODE_SET = new Set(["custom", ...Object.keys(TERMINAL_THEME_PRESETS)]);
 const SYSTEM_SLASH_COMMANDS = [
   "new",
   "close",
@@ -64,6 +102,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "help"
 ];
 let terminalSettings = loadTerminalSettings();
+let sessionThemeSettings = loadSessionThemeSettings();
 let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteState = null;
@@ -553,6 +592,96 @@ function loadTerminalSettings() {
   };
 }
 
+function loadSessionThemeSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
+      return {};
+    }
+    const raw = window.localStorage.getItem(SESSION_THEME_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionThemeSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
+      return;
+    }
+    window.localStorage.setItem(SESSION_THEME_STORAGE_KEY, JSON.stringify(sessionThemeSettings));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function isValidHexColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
+}
+
+function getSessionThemeConfig(sessionId) {
+  const stored = sessionThemeSettings[sessionId];
+  const preset =
+    stored && typeof stored.preset === "string" && TERMINAL_THEME_MODE_SET.has(stored.preset)
+      ? stored.preset
+      : "default";
+  const custom = stored && typeof stored.custom === "object" ? stored.custom : {};
+  const background = isValidHexColor(custom.background) ? custom.background : DEFAULT_TERMINAL_THEME.background;
+  const foreground = isValidHexColor(custom.foreground) ? custom.foreground : DEFAULT_TERMINAL_THEME.foreground;
+  return {
+    preset,
+    custom: {
+      background,
+      foreground
+    }
+  };
+}
+
+function buildThemeFromConfig(config) {
+  const presetTheme = TERMINAL_THEME_PRESETS[config.preset] || TERMINAL_THEME_PRESETS.default;
+  if (config.preset !== "custom") {
+    return presetTheme;
+  }
+  return {
+    ...TERMINAL_THEME_PRESETS.default,
+    background: config.custom.background,
+    foreground: config.custom.foreground
+  };
+}
+
+function applyThemeForSession(sessionId) {
+  const entry = terminals.get(sessionId);
+  if (!entry) {
+    return;
+  }
+  const config = getSessionThemeConfig(sessionId);
+  const theme = buildThemeFromConfig(config);
+  if (typeof entry.terminal.setOption === "function") {
+    entry.terminal.setOption("theme", theme);
+    return;
+  }
+  if (entry.terminal.options && typeof entry.terminal.options === "object") {
+    entry.terminal.options.theme = theme;
+  }
+}
+
+function syncSessionThemeControls(entry, sessionId) {
+  if (!entry || !entry.themeSelect || !entry.themeBg || !entry.themeFg) {
+    return;
+  }
+  const config = getSessionThemeConfig(sessionId);
+  entry.themeSelect.value = config.preset;
+  entry.themeBg.value = config.custom.background;
+  entry.themeFg.value = config.custom.foreground;
+  const customSelected = config.preset === "custom";
+  entry.themeBg.disabled = !customSelected;
+  entry.themeFg.disabled = !customSelected;
+}
+
 function measureTerminalCellWidthPx() {
   if (!document || typeof document.createElement !== "function") {
     return 10;
@@ -825,6 +954,7 @@ function render() {
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       entry.settingsPanel.classList.toggle("open", openSessionSettingsPanels.has(session.id));
+      syncSessionThemeControls(entry, session.id);
       continue;
     }
 
@@ -835,6 +965,10 @@ function render() {
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
     const settingsPanel = node.querySelector(".session-settings-panel");
+    const themeSelect = node.querySelector(".session-theme-select");
+    const themeBg = node.querySelector(".session-theme-bg");
+    const themeFg = node.querySelector(".session-theme-fg");
+    const themeApplyBtn = node.querySelector(".session-theme-apply");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
 
@@ -877,36 +1011,52 @@ function render() {
         setError("Failed to delete session.");
       }
     });
+    themeSelect.addEventListener("change", () => {
+      const current = getSessionThemeConfig(session.id);
+      const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value)
+        ? themeSelect.value
+        : "default";
+      sessionThemeSettings[session.id] = {
+        ...current,
+        preset: nextPreset
+      };
+      saveSessionThemeSettings();
+      syncSessionThemeControls({ themeSelect, themeBg, themeFg }, session.id);
+      applyThemeForSession(session.id);
+    });
+    themeApplyBtn.addEventListener("click", () => {
+      const background = String(themeBg.value || "").trim();
+      const foreground = String(themeFg.value || "").trim();
+      if (!isValidHexColor(background) || !isValidHexColor(foreground)) {
+        setError("Custom theme colors must be valid hex values like #1d2021.");
+        return;
+      }
+      const current = getSessionThemeConfig(session.id);
+      sessionThemeSettings[session.id] = {
+        ...current,
+        preset: "custom",
+        custom: {
+          background,
+          foreground
+        }
+      };
+      saveSessionThemeSettings();
+      uiState.error = "";
+      syncSessionThemeControls({ themeSelect, themeBg, themeFg }, session.id);
+      applyThemeForSession(session.id);
+      render();
+    });
 
     node.classList.toggle("active", state.activeSessionId === session.id);
 
+    const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
     const terminal = new window.Terminal({
       convertEol: true,
       fontSize: TERMINAL_FONT_SIZE,
       lineHeight: TERMINAL_LINE_HEIGHT,
       fontFamily: TERMINAL_FONT_FAMILY,
       cursorBlink: true,
-      theme: {
-        background: "#0a0d12",
-        foreground: "#d8dee9",
-        cursor: "#8ec07c",
-        black: "#0a0d12",
-        red: "#fb4934",
-        green: "#8ec07c",
-        yellow: "#fabd2f",
-        blue: "#83a598",
-        magenta: "#b48ead",
-        cyan: "#8fbcbb",
-        white: "#d8dee9",
-        brightBlack: "#4b5563",
-        brightRed: "#ff6b5a",
-        brightGreen: "#a5d68a",
-        brightYellow: "#ffd36a",
-        brightBlue: "#98b6cc",
-        brightMagenta: "#c8a7d8",
-        brightCyan: "#a9d9d6",
-        brightWhite: "#f5f7fa"
-      }
+      theme: initialTheme
     });
     debugLog("terminal.created", { sessionId: session.id });
 
@@ -917,7 +1067,18 @@ function render() {
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
-    terminals.set(session.id, { terminal, element: node, focusBtn, quickIdEl, settingsPanel, mount });
+    terminals.set(session.id, {
+      terminal,
+      element: node,
+      focusBtn,
+      quickIdEl,
+      settingsPanel,
+      themeSelect,
+      themeBg,
+      themeFg,
+      mount
+    });
+    syncSessionThemeControls(terminals.get(session.id), session.id);
     if (startupPerf.firstTerminalMountedAtMs === null) {
       startupPerf.firstTerminalMountedAtMs = nowMs();
       maybeReportStartupPerf();

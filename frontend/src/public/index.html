@@ -55,6 +55,20 @@
         <section class="session-settings-panel">
           <p class="session-settings-title">Session Settings</p>
           <p class="session-settings-hint">Session-scoped settings controls are available here.</p>
+          <div class="session-theme-controls">
+            <label class="session-theme-label" for="">Color Set</label>
+            <select class="session-theme-select">
+              <option value="default">Default</option>
+              <option value="gruvbox-dark">Gruvbox Dark</option>
+              <option value="solarized-dark">Solarized Dark</option>
+              <option value="custom">Custom</option>
+            </select>
+            <label class="session-theme-label" for="">Custom Background</label>
+            <input class="session-theme-bg" type="text" value="#0a0d12" />
+            <label class="session-theme-label" for="">Custom Foreground</label>
+            <input class="session-theme-fg" type="text" value="#d8dee9" />
+            <button class="session-theme-apply" type="button">Apply Theme</button>
+          </div>
           <div class="session-settings-actions">
             <button class="session-rename" type="button">Rename</button>
             <button class="session-close" type="button">Close</button>

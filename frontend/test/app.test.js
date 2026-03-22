@@ -116,6 +116,7 @@ class MockTerminal {
     this.rows = 24;
     this.writes = [];
     this.refreshCalls = [];
+    this.options = {};
     MockTerminal.instances.push(this);
   }
 
@@ -141,6 +142,10 @@ class MockTerminal {
 
   refresh(start, end) {
     this.refreshCalls.push({ start, end });
+  }
+
+  setOption(name, value) {
+    this.options[name] = value;
   }
 
   resize(cols, rows) {
@@ -213,6 +218,17 @@ function createTerminalCardTemplateNode() {
   const settingsPanel = new FakeElement({ className: "session-settings-panel", tagName: "section" });
   const settingsTitle = new FakeElement({ className: "session-settings-title", tagName: "p" });
   const settingsHint = new FakeElement({ className: "session-settings-hint", tagName: "p" });
+  const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
+  const themeLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
+  const themeSelect = new FakeElement({ className: "session-theme-select", tagName: "select" });
+  themeSelect.value = "default";
+  const themeBgLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
+  const themeBg = new FakeElement({ className: "session-theme-bg", tagName: "input" });
+  themeBg.value = "#0a0d12";
+  const themeFgLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
+  const themeFg = new FakeElement({ className: "session-theme-fg", tagName: "input" });
+  themeFg.value = "#d8dee9";
+  const themeApply = new FakeElement({ className: "session-theme-apply", tagName: "button" });
   const settingsActions = new FakeElement({ className: "session-settings-actions", tagName: "div" });
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
   toolbar.appendChild(quickId);
@@ -222,6 +238,14 @@ function createTerminalCardTemplateNode() {
   settingsActions.appendChild(close);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
+  themeControls.appendChild(themeLabel);
+  themeControls.appendChild(themeSelect);
+  themeControls.appendChild(themeBgLabel);
+  themeControls.appendChild(themeBg);
+  themeControls.appendChild(themeFgLabel);
+  themeControls.appendChild(themeFg);
+  themeControls.appendChild(themeApply);
+  settingsPanel.appendChild(themeControls);
   settingsPanel.appendChild(settingsActions);
   card.appendChild(toolbar);
   card.appendChild(settingsPanel);
@@ -888,10 +912,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(secondToolbar.querySelector(".session-close"), null);
   assert.ok(secondSettingsPanel.querySelector(".session-rename"));
   assert.ok(secondSettingsPanel.querySelector(".session-close"));
+  const secondThemeSelect = secondSettingsPanel.querySelector(".session-theme-select");
+  const secondThemeBg = secondSettingsPanel.querySelector(".session-theme-bg");
+  const secondThemeFg = secondSettingsPanel.querySelector(".session-theme-fg");
+  const secondThemeApply = secondSettingsPanel.querySelector(".session-theme-apply");
   assert.equal(secondSettingsPanel.classList.contains("open"), false);
   secondSettings.click();
   await tick();
   assert.equal(secondSettingsPanel.classList.contains("open"), true);
+  secondThemeSelect.value = "custom";
+  secondThemeSelect.dispatchEvent({ type: "change" });
+  await tick();
+  secondThemeBg.value = "#101010";
+  secondThemeFg.value = "#e0e0e0";
+  secondThemeApply.click();
+  await tick();
+  assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
+  assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
   secondSettings.click();
   await tick();
   assert.equal(secondSettingsPanel.classList.contains("open"), false);

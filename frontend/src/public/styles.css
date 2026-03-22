@@ -319,6 +319,39 @@ button:hover {
   color: #a9d9d6;
 }
 
+.session-theme-controls {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.session-theme-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.session-theme-select,
+.session-theme-bg,
+.session-theme-fg {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f151f;
+  color: var(--text);
+  padding: 6px 8px;
+  font-family: inherit;
+}
+
+.session-theme-bg:disabled,
+.session-theme-fg:disabled {
+  opacity: 0.6;
+}
+
+.session-theme-apply {
+  justify-self: start;
+}
+
 .session-settings-actions {
   margin-top: 8px;
   display: flex;

@@ -135,7 +135,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-060` Owner: `BE` Task: Extend OpenAPI/runtime session model and REST payloads for per-session startup config (`startCwd`, `startCommand`, `env`) with persistence and validation guardrails.
 - [ ] `QLT-061` Owner: `BE` Task: Apply persisted per-session startup config deterministically on session (re)spawn (`startCwd` as initial working directory, `startCommand` execution after PTY ready, `env` injection).
 - [ ] `QLT-062` Owner: `FE` Task: Implement per-session settings form for startup config fields (`Working Directory`, `Start Command Line`, `Environment Variables`) with stable client-side validation and explicit save feedback.
-- [ ] `QLT-063` Owner: `FE` Task: Implement per-session terminal color-set selection and editing (custom palette fields applied to xterm theme) with deterministic persistence in frontend settings storage.
+- [x] `QLT-063` Owner: `FE` Task: Implement per-session terminal color-set selection and editing (custom palette fields applied to xterm theme) with deterministic persistence in frontend settings storage.
 - [ ] `QLT-064` Owner: `QA` Task: Add integration/regression tests for per-session settings lifecycle (icon/panel access, rename/close relocation, startup config persistence/apply behavior, env validation, color-set apply persistence).
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)

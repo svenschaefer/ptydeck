@@ -312,6 +312,11 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage verifying toolbar action removal and settings-panel ownership of `Rename`/`Close` controls.
 - [x] Validation for `QLT-059` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-059` cycle: backend `96.97%` lines, frontend `88.90%` lines.
+- [x] `QLT-063` completed: per-session terminal color-set controls were added to session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` palette values).
+- [x] Custom theme mode now persists deterministically in browser storage and applies immediately to the owning session terminal (`setOption("theme", ...)`) without affecting other sessions.
+- [x] Added frontend integration coverage validating preset selection, custom-color apply flow, and xterm theme option updates in `frontend/test/app.test.js`.
+- [x] Validation for `QLT-063` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-063` cycle: backend `96.97%` lines, frontend `89.00%` lines.
 
 ## Maintenance Rules
 
