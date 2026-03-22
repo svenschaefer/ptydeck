@@ -84,6 +84,47 @@ test("SessionManager updates cwd from marker output", () => {
   assert.equal(manager.get(created.id).meta.cwd, "/home/wsl/workspace");
 });
 
+test("SessionManager strips cwd markers from terminal output", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp" });
+  const chunks = [];
+  manager.on("session.data", (event) => {
+    if (event.sessionId === created.id) {
+      chunks.push(event.data);
+    }
+  });
+
+  fakePty.write("__CWD__/home/wsl__\r\n");
+  fakePty.write("pwd\r\n/home/wsl\r\n");
+
+  assert.equal(manager.get(created.id).meta.cwd, "/home/wsl");
+  assert.deepEqual(chunks, ["pwd\r\n/home/wsl\r\n"]);
+});
+
+test("SessionManager strips split cwd markers across chunks", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp" });
+  const chunks = [];
+  manager.on("session.data", (event) => {
+    if (event.sessionId === created.id) {
+      chunks.push(event.data);
+    }
+  });
+
+  fakePty.write("__CWD__/home/");
+  fakePty.write("wsl__\r\n");
+  fakePty.write("echo ok\r\nok\r\n");
+
+  assert.equal(manager.get(created.id).meta.cwd, "/home/wsl");
+  assert.deepEqual(chunks, ["echo ok\r\nok\r\n"]);
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()

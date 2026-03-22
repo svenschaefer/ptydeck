@@ -9,6 +9,37 @@ function now() {
   return Date.now();
 }
 
+function consumeCwdMarkers(session, chunk) {
+  const markerStart = "__CWD__";
+  const markerEnd = "__";
+  const combined = `${session.cwdMarkerBuffer || ""}${chunk}`;
+  let dataForScan = combined;
+  session.cwdMarkerBuffer = "";
+
+  const lastStart = dataForScan.lastIndexOf(markerStart);
+  if (lastStart >= 0) {
+    const endFromLast = dataForScan.indexOf(markerEnd, lastStart + markerStart.length);
+    if (endFromLast < 0) {
+      session.cwdMarkerBuffer = dataForScan.slice(lastStart);
+      dataForScan = dataForScan.slice(0, lastStart);
+    }
+  }
+
+  const markerRegex = /__CWD__(.*?)__/g;
+  let match = markerRegex.exec(dataForScan);
+  let lastCwdCandidate = "";
+  while (match) {
+    lastCwdCandidate = String(match[1] || "").trim();
+    match = markerRegex.exec(dataForScan);
+  }
+  if (lastCwdCandidate) {
+    session.meta.cwd = lastCwdCandidate;
+    session.meta.updatedAt = now();
+  }
+
+  return dataForScan.replace(/__CWD__(.*?)__\r?\n?/g, "");
+}
+
 function withCwdMarkerPromptCommand(shell, env) {
   const shellName = basename(shell || "").toLowerCase();
   if (!shellName.includes("bash")) {
@@ -69,6 +100,7 @@ export class SessionManager {
     const session = {
       id,
       ptyProcess,
+      cwdMarkerBuffer: "",
       meta: {
         id,
         cwd,
@@ -80,17 +112,10 @@ export class SessionManager {
     };
 
     ptyProcess.onData((data) => {
-      const markerMatches = data.match(/__CWD__(.*?)__/g);
-      if (markerMatches && markerMatches.length > 0) {
-        const last = markerMatches[markerMatches.length - 1];
-        const cwdCandidate = last.replace("__CWD__", "").replace("__", "").trim();
-        if (cwdCandidate) {
-          session.meta.cwd = cwdCandidate;
-          session.meta.updatedAt = now();
-        }
+      const cleaned = consumeCwdMarkers(session, data);
+      if (cleaned) {
+        this.events.emit("session.data", { sessionId: id, data: cleaned });
       }
-
-      this.events.emit("session.data", { sessionId: id, data });
     });
 
     ptyProcess.onExit((exit) => {
