@@ -70,10 +70,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Quality and Coverage Hardening (v0.3.0 continuation)
 
-- [ ] `QLT-001` Owner: `FE` Task: Handle non-2xx REST responses explicitly in `frontend/src/public/api-client.js` (check `response.ok`, parse and surface backend `ErrorResponse`).
-- [ ] `QLT-002` Owner: `FE` Task: Add unit tests for `frontend/src/public/ws-client.js` covering reconnect transitions and close behavior.
+- [x] `QLT-001` Owner: `FE` Task: Handle non-2xx REST responses explicitly in `frontend/src/public/api-client.js` (check `response.ok`, parse and surface backend `ErrorResponse`).
+- [x] `QLT-002` Owner: `FE` Task: Add unit tests for `frontend/src/public/ws-client.js` covering reconnect transitions and close behavior.
 - [ ] `QLT-003` Owner: `FE` Task: Add UI behavior tests for `frontend/src/public/app.js` critical paths (create/delete session errors, disconnected state rendering, command send failure).
-- [ ] `QLT-004` Owner: `BE` Task: Add backend tests for `runtime.js` negative/error routes (invalid JSON body, unknown route, invalid payload schema, unknown session on input/resize/delete).
+- [x] `QLT-004` Owner: `BE` Task: Add backend tests for `runtime.js` negative/error routes (invalid JSON body, unknown route, invalid payload schema, unknown session on input/resize/delete).
 - [ ] `QLT-005` Owner: `PLAT` Task: Enforce minimum coverage thresholds in CI for backend and frontend test runs (fail pipeline when below threshold).
 - [ ] `QLT-006` Owner: `PLAT` Task: Split CORS defaults by environment (dev wildcard, explicit production allowlist) and document secure production setup in `DEPLOYMENT.md`.
 - [ ] `QLT-007` Owner: `BE` Task: Add request body size guard in backend runtime (reject oversized JSON payloads with explicit 413 response).
@@ -82,7 +82,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-010` Owner: `FE` Task: Add frontend integration tests for DOM behavior in `app.js` (terminal card lifecycle, active state switching, empty/error status messaging).
 - [ ] `QLT-011` Owner: `FE` Task: Add WebSocket `error` event handling and bounded reconnect backoff with jitter in `ws-client.js`.
 - [ ] `QLT-012` Owner: `PLAT` Task: Add CI smoke step that boots backend+frontend and verifies `/health`, `/ready`, and initial frontend HTML response before merge.
-- [ ] `QLT-013` Owner: `FE` Task: Harden `frontend/src/dev-server.js` against path traversal (`..`) and add tests for safe static file resolution.
+- [x] `QLT-013` Owner: `FE` Task: Harden `frontend/src/dev-server.js` against path traversal (`..`) and add tests for safe static file resolution.
 - [ ] `QLT-014` Owner: `BE` Task: Add runtime tests for readiness state transitions (`starting` -> `ready`) and idempotent graceful shutdown behavior.
 - [ ] `QLT-015` Owner: `BE` Task: Add contract conformance test that verifies implemented runtime routes/status codes against `backend/openapi/openapi.yaml`.
 - [ ] `QLT-016` Owner: `FE` Task: Add runtime-config override support (API/WS ports/hosts via injected config object) and tests for fallback precedence.

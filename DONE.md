@@ -45,6 +45,14 @@ Completed and verified topics belong here.
 - [x] Enterprise readiness backlog extended with concrete tasks `ENT-017` ... `ENT-024` and linked roadmap dependencies.
 - [x] Repository docs normalized to provider-agnostic local reverse-proxy guidance; instance-specific local-domain references removed.
 - [x] Local configuration policy enforced via gitignored `local-config/` path for non-generic setup artifacts.
+- [x] `QLT-001` completed: frontend API client now handles non-2xx responses via `response.ok` checks and surfaces backend `ErrorResponse` details.
+- [x] `QLT-002` completed: added frontend unit tests for WebSocket reconnect transitions and client close behavior (`frontend/test/ws-client.test.js`).
+- [x] `QLT-004` completed: added backend integration tests for runtime negative/error routes (invalid JSON, unknown route, invalid payload, unknown session input/resize/delete).
+- [x] Local validation for this cycle completed: `npm run lint`, `npm run test`, `npm run test:coverage` passed.
+- [x] Coverage after this cycle: backend `94.71%` lines, frontend `96.75%` lines.
+- [x] `QLT-013` completed: frontend dev server static-path resolution hardened against traversal and malformed-encoding paths.
+- [x] Added static-path unit tests (`frontend/test/static-path.test.js`) for root mapping, traversal rejection, query/hash stripping, and malformed URI handling.
+- [x] Coverage after `QLT-013`: backend `94.71%` lines, frontend `97.12%` lines.
 
 ## Maintenance Rules
 

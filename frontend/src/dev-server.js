@@ -1,8 +1,9 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadClientConfig } from "./config.js";
+import { resolvePublicFilePath } from "./static-path.js";
 
 const config = loadClientConfig();
 const root = fileURLToPath(new URL("./public", import.meta.url));
@@ -13,16 +14,15 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8"
 };
 
-function toFilePath(urlPath) {
-  if (urlPath === "/") {
-    return join(root, "index.html");
-  }
-  return join(root, urlPath.replace(/^\//, ""));
-}
-
 const server = http.createServer(async (req, res) => {
   try {
-    const filePath = toFilePath(req.url || "/");
+    const filePath = resolvePublicFilePath(root, req.url || "/");
+    if (!filePath) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Not Found" }));
+      return;
+    }
+
     const body = await readFile(filePath);
     const contentType = mimeTypes[extname(filePath)] || "application/octet-stream";
 

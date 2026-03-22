@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (enterprise backlog expanded, local config policy clarified)
+Last updated: 2026-03-22 (QLT-001/002/004/013 delivered, coverage baseline updated)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
 
@@ -55,10 +55,15 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend resolves backend API/WS endpoints from the browser host at runtime (WSL IP friendly).
 - Backend default CORS origin is `*` for local development compatibility across WSL/Windows boundary.
 - Local reverse-proxy and local-domain configuration must remain provider-agnostic in repo docs and be stored only in ignored local configuration paths.
+- Frontend API client now enforces explicit non-2xx handling and surfaces backend error payload fields.
+- Frontend WebSocket client behavior now has dedicated unit test coverage for reconnect and close paths.
+- Backend runtime negative/error REST paths are covered by integration tests.
+- Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Active next cycle A: `v0.3.0-H1` quality/coverage hardening backlog (`QLT-001` ... `QLT-017`).
 - Active next cycle B: `v0.3.0-H2` enterprise readiness backlog (`ENT-001` ... `ENT-024`).
+  - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-004`, `QLT-013`.
 
 ## Session Behavior Notes
 

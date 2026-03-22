@@ -64,3 +64,59 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     await runtime.stop();
   }
 });
+
+test("REST negative routes return expected error responses", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const invalidJsonRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{"
+    });
+    assert.equal(invalidJsonRes.status, 400);
+    const invalidJsonBody = await invalidJsonRes.json();
+    assert.equal(invalidJsonBody.error, "InvalidJson");
+
+    const unknownRouteRes = await fetch(`${baseUrl}/missing-route`);
+    assert.equal(unknownRouteRes.status, 404);
+    const unknownRouteBody = await unknownRouteRes.json();
+    assert.equal(unknownRouteBody.error, "NotFound");
+
+    const invalidResizeRes = await fetch(`${baseUrl}/sessions/unknown/resize`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cols: 0, rows: -1 })
+    });
+    assert.equal(invalidResizeRes.status, 400);
+    const invalidResizeBody = await invalidResizeRes.json();
+    assert.equal(invalidResizeBody.error, "ValidationError");
+
+    const unknownInputRes = await fetch(`${baseUrl}/sessions/unknown/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "echo hi\n" })
+    });
+    assert.equal(unknownInputRes.status, 404);
+    const unknownInputBody = await unknownInputRes.json();
+    assert.equal(unknownInputBody.error, "SessionNotFound");
+
+    const unknownResizeRes = await fetch(`${baseUrl}/sessions/unknown/resize`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cols: 80, rows: 24 })
+    });
+    assert.equal(unknownResizeRes.status, 404);
+    const unknownResizeBody = await unknownResizeRes.json();
+    assert.equal(unknownResizeBody.error, "SessionNotFound");
+
+    const unknownDeleteRes = await fetch(`${baseUrl}/sessions/unknown`, {
+      method: "DELETE"
+    });
+    assert.equal(unknownDeleteRes.status, 404);
+    const unknownDeleteBody = await unknownDeleteRes.json();
+    assert.equal(unknownDeleteBody.error, "SessionNotFound");
+  } finally {
+    await runtime.stop();
+  }
+});
