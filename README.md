@@ -76,6 +76,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Non-blocking custom-command preview panel before execution (`/<customName>`): exact payload, target resolution, newline append indicator, and deterministic truncation feedback for very large payloads
 - Slash-command name autocomplete via `Tab`/`Shift+Tab` with deterministic cycling and system-command precedence
 - Context-sensitive slash-argument autocomplete via `Tab`/`Shift+Tab` for `/switch`, `/close`, `/custom show`, `/custom remove`, and `/<customName> <target>`
+- Non-blocking slash suggestion list with keyboard selection (`Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, `Enter`) and no implicit command execution
 - Slash-command history recall via `ArrowUp`/`ArrowDown` (slash mode only; non-slash multiline input remains unaffected)
 - Re-run recalled slash command via `Ctrl/Cmd+Enter` with guardrail feedback when recalled content was modified
 - Direct target routing for terminal-plane input via `@<target> <text>` without switching active session

@@ -29,6 +29,7 @@ const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
 const commandFeedbackEl = document.getElementById("command-feedback");
 const commandPreviewEl = document.getElementById("command-preview");
+const commandSuggestionsEl = document.getElementById("command-suggestions");
 
 const terminals = new Map();
 const terminalObservers = new Map();
@@ -40,6 +41,8 @@ let deferredResizeTimer = null;
 let bootstrapPromise = null;
 let commandPreviewTimer = null;
 let commandPreviewRequestId = 0;
+let commandSuggestionsTimer = null;
+let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
@@ -72,7 +75,9 @@ const uiState = {
   loading: true,
   error: "",
   commandFeedback: "",
-  commandPreview: ""
+  commandPreview: "",
+  commandSuggestions: "",
+  commandSuggestionSelectedIndex: -1
 };
 const nowMs =
   typeof window !== "undefined" &&
@@ -115,6 +120,82 @@ function setCommandPreview(message) {
 
 function resetCommandAutocompleteState() {
   commandAutocompleteState = null;
+}
+
+function setCommandSuggestions(replacePrefix, matches, index = 0) {
+  if (!Array.isArray(matches) || matches.length === 0) {
+    commandAutocompleteState = null;
+    uiState.commandSuggestions = "";
+    uiState.commandSuggestionSelectedIndex = -1;
+    render();
+    return;
+  }
+  const nextIndex = Math.min(Math.max(index, 0), matches.length - 1);
+  commandAutocompleteState = {
+    matches,
+    index: nextIndex,
+    replacePrefix
+  };
+  const lines = matches.map((entry, entryIndex) => {
+    const full = `${replacePrefix}${entry}`;
+    return `${entryIndex === nextIndex ? ">" : " "} ${full}`;
+  });
+  uiState.commandSuggestions = lines.join("\n");
+  uiState.commandSuggestionSelectedIndex = nextIndex;
+  render();
+}
+
+function clearCommandSuggestions() {
+  commandAutocompleteState = null;
+  uiState.commandSuggestions = "";
+  uiState.commandSuggestionSelectedIndex = -1;
+}
+
+function applyCommandSuggestionSelection(index) {
+  if (
+    !commandAutocompleteState ||
+    !Array.isArray(commandAutocompleteState.matches) ||
+    commandAutocompleteState.matches.length === 0
+  ) {
+    return false;
+  }
+  const nextIndex = Math.min(Math.max(index, 0), commandAutocompleteState.matches.length - 1);
+  commandAutocompleteState.index = nextIndex;
+  commandInput.value = `${commandAutocompleteState.replacePrefix}${commandAutocompleteState.matches[nextIndex]}`;
+  const lines = commandAutocompleteState.matches.map((entry, entryIndex) => {
+    const full = `${commandAutocompleteState.replacePrefix}${entry}`;
+    return `${entryIndex === nextIndex ? ">" : " "} ${full}`;
+  });
+  uiState.commandSuggestions = lines.join("\n");
+  uiState.commandSuggestionSelectedIndex = nextIndex;
+  render();
+  scheduleCommandPreview();
+  return true;
+}
+
+function moveCommandSuggestion(delta) {
+  if (
+    !commandAutocompleteState ||
+    !Array.isArray(commandAutocompleteState.matches) ||
+    commandAutocompleteState.matches.length === 0
+  ) {
+    return false;
+  }
+  const length = commandAutocompleteState.matches.length;
+  const current = Number.isInteger(commandAutocompleteState.index) ? commandAutocompleteState.index : 0;
+  const nextIndex = (current + delta + length) % length;
+  return applyCommandSuggestionSelection(nextIndex);
+}
+
+function acceptCommandSuggestion() {
+  if (
+    !commandAutocompleteState ||
+    !Array.isArray(commandAutocompleteState.matches) ||
+    commandAutocompleteState.matches.length === 0
+  ) {
+    return false;
+  }
+  return applyCommandSuggestionSelection(commandAutocompleteState.index);
 }
 
 function isSingleLineSlashModeInput(value) {
@@ -374,18 +455,59 @@ async function autocompleteSlashInput(reverse = false) {
   }
 
   if (matches.length === 0) {
-    resetCommandAutocompleteState();
+    clearCommandSuggestions();
+    render();
     return true;
   }
 
-  commandAutocompleteState = {
-    matches,
-    index: nextIndex,
-    replacePrefix
-  };
-  commandInput.value = `${replacePrefix}${matches[nextIndex]}`;
-  scheduleCommandPreview();
-  return true;
+  setCommandSuggestions(replacePrefix, matches, nextIndex);
+  return applyCommandSuggestionSelection(nextIndex);
+}
+
+async function refreshCommandSuggestions() {
+  const parsed = parseSlashInputForAutocomplete(commandInput.value || "");
+  if (!parsed) {
+    clearCommandSuggestions();
+    render();
+    return;
+  }
+  const requestId = ++commandSuggestionsRequestId;
+  let customCommands = [];
+  try {
+    customCommands = await api.listCustomCommands();
+  } catch {
+    customCommands = [];
+  }
+  if (requestId !== commandSuggestionsRequestId) {
+    return;
+  }
+  const context = resolveSlashAutocompleteContext(commandInput.value || "", customCommands);
+  if (!context || !Array.isArray(context.matches) || context.matches.length === 0) {
+    clearCommandSuggestions();
+    render();
+    return;
+  }
+  let index = 0;
+  if (
+    commandAutocompleteState &&
+    commandAutocompleteState.replacePrefix === context.replacePrefix &&
+    Array.isArray(commandAutocompleteState.matches) &&
+    commandAutocompleteState.matches.length === context.matches.length &&
+    commandAutocompleteState.matches.every((entry, entryIndex) => entry === context.matches[entryIndex])
+  ) {
+    index = Math.min(Math.max(commandAutocompleteState.index, 0), context.matches.length - 1);
+  }
+  setCommandSuggestions(context.replacePrefix, context.matches, index);
+}
+
+function scheduleCommandSuggestions() {
+  if (commandSuggestionsTimer) {
+    clearTimeout(commandSuggestionsTimer);
+  }
+  commandSuggestionsTimer = setTimeout(() => {
+    commandSuggestionsTimer = null;
+    refreshCommandSuggestions();
+  }, 120);
 }
 
 function clampInt(value, fallback, min, max) {
@@ -666,6 +788,9 @@ function render() {
   }
   if (commandPreviewEl) {
     commandPreviewEl.textContent = uiState.commandPreview || "";
+  }
+  if (commandSuggestionsEl) {
+    commandSuggestionsEl.textContent = uiState.commandSuggestions || "";
   }
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
@@ -1350,7 +1475,9 @@ async function submitCommand() {
       debugLog("command.control.ok", { command: interpreted.command });
       commandInput.value = "";
       setCommandPreview("");
+      clearCommandSuggestions();
       resetSlashHistoryNavigationState();
+      render();
     } catch {
       setCommandFeedback("Failed to execute control command.");
     }
@@ -1386,12 +1513,14 @@ async function submitCommand() {
     await api.sendInput(targetSessionId, payload);
     commandInput.value = "";
     setCommandPreview("");
+    clearCommandSuggestions();
     uiState.error = "";
     if (routeFeedback) {
       setCommandFeedback(routeFeedback);
     }
     resetSlashHistoryNavigationState();
     debugLog("command.send.ok", { activeSessionId: targetSessionId, directRoute: directRouting.matched });
+    render();
   } catch {
     setError("Failed to send command.");
   }
@@ -1498,10 +1627,23 @@ function scheduleCommandPreview() {
 
 sendBtn.addEventListener("click", submitCommand);
 commandInput.addEventListener("input", () => {
-  resetCommandAutocompleteState();
+  clearCommandSuggestions();
   scheduleCommandPreview();
+  scheduleCommandSuggestions();
 });
 commandInput.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowUp") {
+    if (moveCommandSuggestion(-1)) {
+      event.preventDefault();
+      return;
+    }
+  }
+  if (event.key === "ArrowDown") {
+    if (moveCommandSuggestion(1)) {
+      event.preventDefault();
+      return;
+    }
+  }
   if (event.key === "ArrowUp") {
     if (navigateSlashHistory("up")) {
       event.preventDefault();
@@ -1520,6 +1662,12 @@ commandInput.addEventListener("keydown", (event) => {
       autocompleteSlashInput(event.shiftKey).catch(() => {});
     }
     return;
+  }
+  if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
+    if (acceptCommandSuggestion()) {
+      event.preventDefault();
+      return;
+    }
   }
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
@@ -1547,6 +1695,9 @@ window.addEventListener("beforeunload", () => {
   }
   if (commandPreviewTimer) {
     clearTimeout(commandPreviewTimer);
+  }
+  if (commandSuggestionsTimer) {
+    clearTimeout(commandSuggestionsTimer);
   }
   for (const timer of resizeTimers.values()) {
     clearTimeout(timer);

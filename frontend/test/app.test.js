@@ -238,6 +238,7 @@ function createDocumentFixture() {
   const statusMessage = new FakeElement({ id: "status-message" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
   const commandPreview = new FakeElement({ id: "command-preview", tagName: "pre" });
+  const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
   const template = {
     id: "terminal-card-template",
     content: {
@@ -262,7 +263,8 @@ function createDocumentFixture() {
     emptyState,
     statusMessage,
     commandFeedback,
-    commandPreview
+    commandPreview,
+    commandSuggestions
   ]) {
     byId.set(element.id, element);
   }
@@ -282,7 +284,8 @@ function createDocumentFixture() {
       emptyState,
       statusMessage,
       commandFeedback,
-      commandPreview
+      commandPreview,
+      commandSuggestions
     },
     document: {
       getElementById(id) {
@@ -613,6 +616,38 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(fixture.elements.commandPreview.textContent, /^Preview \/longpreview/);
   assert.match(fixture.elements.commandPreview.textContent, /Payload truncated: omitted 1000 chars\./);
   assert.match(fixture.elements.commandPreview.textContent, /Payload:\n/);
+
+  fixture.elements.commandInput.value = "/cl";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.match(fixture.elements.commandSuggestions.textContent, /^> \/close/m);
+  const inputCountBeforeSuggestionEnter = inputPayloads.length;
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "ArrowDown",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, "/closeit");
+  assert.match(fixture.elements.commandSuggestions.textContent, /^> \/closeit/m);
+  const suggestionEnterEvent = {
+    type: "keydown",
+    key: "Enter",
+    ctrlKey: false,
+    metaKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(suggestionEnterEvent);
+  await tick();
+  assert.equal(suggestionEnterEvent.defaultPrevented, true);
+  assert.equal(fixture.elements.commandInput.value, "/closeit");
+  assert.equal(inputPayloads.length, inputCountBeforeSuggestionEnter);
 
   fixture.elements.commandInput.value = "/c";
   const tabForward = {

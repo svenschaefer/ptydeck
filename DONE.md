@@ -298,6 +298,11 @@ Completed and verified topics belong here.
 - [x] Added regression coverage ensuring non-active session output still triggers terminal write+refresh immediately.
 - [x] Validation for repaint bugfix passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after repaint bugfix: backend `96.70%` lines, frontend `89.02%` lines.
+- [x] `QLT-053` completed: slash-mode suggestion list UI is now rendered as non-blocking command suggestions below the command preview.
+- [x] Keyboard selection is supported via `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter`; `Enter` applies the selected suggestion without executing the command.
+- [x] Added frontend integration coverage for suggestion-list rendering and keyboard selection/no-auto-execute behavior.
+- [x] Validation for `QLT-053` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `QLT-053` cycle: backend `96.70%` lines, frontend `88.79%` lines.
 
 ## Maintenance Rules
 

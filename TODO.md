@@ -125,7 +125,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-050` Owner: `FE` Task: Add slash-command repeat shortcut (`Ctrl/Cmd+Enter` on recalled slash command) with guardrails preventing accidental repeat when composer content differs from recalled history item.
 - [ ] `QLT-051` Owner: `QA` Task: Add integration tests for `/custom` management commands, multi-client custom-command sync events, `@<target>` routing ambiguity handling, and repeat-shortcut guardrail behavior.
 - [ ] `QLT-052` Owner: `BE` Task: Define deterministic custom-command naming normalization and listing order (case policy, duplicate-name conflict rules, stable sort in REST responses) and enforce it in validation/storage.
-- [ ] `QLT-053` Owner: `FE` Task: Add slash-mode suggestion list UI (non-blocking) with keyboard selection (`TAB`, `Shift+TAB`, arrow keys, `Enter`) and explicit no-auto-execute behavior.
+- [x] `QLT-053` Owner: `FE` Task: Add slash-mode suggestion list UI (non-blocking) with keyboard selection (`TAB`, `Shift+TAB`, arrow keys, `Enter`) and explicit no-auto-execute behavior.
 - [x] `QLT-054` Owner: `FE` Task: Define and implement block-delimiter edge-case behavior for `/custom` multiline definitions when payload contains standalone `---` lines (deterministic escape or explicit validation error with guidance).
 - [ ] `QLT-055` Owner: `QA` Task: Add regression tests for custom-command normalization/sort order, suggestion-list keyboard behavior, and multiline delimiter edge-case handling.
 - [x] `QLT-056` Owner: `FE` Task: Render custom-command preview as strict text-only output (escaped/no HTML interpretation) with deterministic truncation rules for very large payloads.

@@ -179,6 +179,25 @@ body {
   display: none;
 }
 
+.command-suggestions {
+  margin: 8px 18px 0;
+  min-height: 0;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #101924;
+  color: #d8dee9;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.command-suggestions:empty {
+  display: none;
+}
+
 button {
   border: 1px solid var(--border);
   border-radius: 6px;
