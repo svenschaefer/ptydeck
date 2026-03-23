@@ -988,6 +988,95 @@ function syncSessionStartupControls(entry, session) {
   entry.startEnvInput.value = formatSessionEnv(session.env);
 }
 
+function normalizeSessionStartupFromSession(session) {
+  const startCwd = typeof session?.startCwd === "string" && session.startCwd.trim() ? session.startCwd.trim() : String(session?.cwd || "");
+  const startCommand = typeof session?.startCommand === "string" ? session.startCommand : "";
+  const env = session?.env && typeof session.env === "object" ? session.env : {};
+  return { startCwd, startCommand, env };
+}
+
+function readSessionStartupFromControls(entry) {
+  const startCwd = String(entry?.startCwdInput?.value || "").trim();
+  const startCommand = String(entry?.startCommandInput?.value || "");
+  const envResult = parseSessionEnv(String(entry?.startEnvInput?.value || ""));
+  return {
+    startCwd,
+    startCommand,
+    envResult
+  };
+}
+
+function areStringMapsEqual(left, right) {
+  const leftEntries = Object.entries(left || {}).sort((a, b) => a[0].localeCompare(b[0]));
+  const rightEntries = Object.entries(right || {}).sort((a, b) => a[0].localeCompare(b[0]));
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+  for (let index = 0; index < leftEntries.length; index += 1) {
+    const [leftKey, leftValue] = leftEntries[index];
+    const [rightKey, rightValue] = rightEntries[index];
+    if (leftKey !== rightKey || String(leftValue) !== String(rightValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areThemeProfilesEqual(left, right) {
+  const normalizedLeft = normalizeThemeProfile(left);
+  const normalizedRight = normalizeThemeProfile(right);
+  return THEME_PROFILE_KEYS.every((key) => normalizedLeft[key] === normalizedRight[key]);
+}
+
+function setSettingsStatus(entry, text, kind = "") {
+  if (!entry?.settingsStatus) {
+    return;
+  }
+  entry.settingsStatus.textContent = String(text || "");
+  entry.settingsStatus.classList.toggle("dirty", kind === "dirty");
+  entry.settingsStatus.classList.toggle("saved", kind === "saved");
+}
+
+function setSettingsDirty(entry, dirty) {
+  if (!entry) {
+    return;
+  }
+  entry.settingsDirty = Boolean(dirty);
+  if (entry.settingsApplyBtn) {
+    entry.settingsApplyBtn.disabled = !entry.settingsDirty;
+  }
+  if (entry.settingsDirty) {
+    setSettingsStatus(entry, "Unsaved changes", "dirty");
+  } else {
+    setSettingsStatus(entry, "Saved", "saved");
+  }
+}
+
+function isSessionSettingsDirty(entry, session) {
+  if (!entry || !session) {
+    return false;
+  }
+  const currentStartup = normalizeSessionStartupFromSession(session);
+  const draftStartup = readSessionStartupFromControls(entry);
+  const draftTheme = readThemeProfileFromControls(entry);
+  if (!draftStartup.startCwd || !draftStartup.envResult.ok) {
+    return true;
+  }
+  if (currentStartup.startCwd !== draftStartup.startCwd) {
+    return true;
+  }
+  if (currentStartup.startCommand !== draftStartup.startCommand) {
+    return true;
+  }
+  if (!areStringMapsEqual(currentStartup.env, draftStartup.envResult.env)) {
+    return true;
+  }
+  if (!areThemeProfilesEqual(session.themeProfile, draftTheme)) {
+    return true;
+  }
+  return false;
+}
+
 function measureTerminalCellWidthPx() {
   if (!document || typeof document.createElement !== "function") {
     return 10;
@@ -1310,8 +1399,11 @@ function render() {
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
-      syncSessionStartupControls(entry, session);
-      syncSessionThemeControls(entry, session.id);
+      if (!entry.settingsDirty) {
+        syncSessionStartupControls(entry, session);
+        syncSessionThemeControls(entry, session.id);
+        setSettingsDirty(entry, false);
+      }
       continue;
     }
 
@@ -1326,7 +1418,6 @@ function render() {
     const startCwdInput = node.querySelector(".session-start-cwd");
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
-    const startSaveBtn = node.querySelector(".session-start-save");
     const startFeedback = node.querySelector(".session-start-feedback");
     const themeCategory = node.querySelector(".session-theme-category");
     const themeSearch = node.querySelector(".session-theme-search");
@@ -1347,7 +1438,9 @@ function render() {
         themeInputs[key] = input;
       }
     }
-    const themeApplyBtn = node.querySelector(".session-theme-apply");
+    const settingsApplyBtn = node.querySelector(".session-settings-apply");
+    const settingsCancelBtn = node.querySelector(".session-settings-cancel");
+    const settingsStatus = node.querySelector(".session-settings-status");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
 
@@ -1393,35 +1486,13 @@ function render() {
         setError("Failed to delete session.");
       }
     });
-    startSaveBtn.addEventListener("click", async () => {
-      const startCwd = String(startCwdInput.value || "").trim();
-      if (!startCwd) {
-        setStartupSettingsFeedback(
-          { startFeedback },
-          "Working Directory cannot be empty.",
-          true
-        );
-        return;
-      }
-      const envResult = parseSessionEnv(startEnvInput.value);
-      if (!envResult.ok) {
-        setStartupSettingsFeedback({ startFeedback }, envResult.error, true);
-        return;
-      }
-
-      try {
-        const updated = await api.updateSession(session.id, {
-          startCwd,
-          startCommand: String(startCommandInput.value || ""),
-          env: envResult.env
-        });
-        upsertSession(updated);
-        setStartupSettingsFeedback({ startFeedback }, "Startup settings saved.");
-        uiState.error = "";
-      } catch {
-        setStartupSettingsFeedback({ startFeedback }, "Failed to save startup settings.", true);
-      }
-    });
+    const markDirtyFromControls = () => {
+      const nextDirty = isSessionSettingsDirty({ startCwdInput, startCommandInput, startEnvInput, themeInputs }, getSessionById(session.id));
+      setSettingsDirty(terminals.get(session.id), nextDirty);
+    };
+    startCwdInput.addEventListener("input", markDirtyFromControls);
+    startCommandInput.addEventListener("input", markDirtyFromControls);
+    startEnvInput.addEventListener("input", markDirtyFromControls);
     themeSelect.addEventListener("change", () => {
       const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
       const currentProfile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
@@ -1435,6 +1506,7 @@ function render() {
       });
       syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       applyThemeForSession(session.id);
+      markDirtyFromControls();
       uiState.error = "";
       render();
     });
@@ -1448,6 +1520,7 @@ function render() {
           search: String(themeSearch?.value || "")
         });
         syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
+        markDirtyFromControls();
       });
     }
     if (themeSearch) {
@@ -1459,9 +1532,35 @@ function render() {
           search: String(themeSearch.value || "")
         });
         syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
+        markDirtyFromControls();
       });
     }
-    themeApplyBtn.addEventListener("click", async () => {
+    for (const key of THEME_PROFILE_KEYS) {
+      const input = themeInputs[key];
+      if (!input) {
+        continue;
+      }
+      input.addEventListener("input", () => {
+        const draft = getSessionThemeConfig(session.id);
+        sessionThemeDrafts.set(session.id, {
+          ...draft,
+          preset: "custom",
+          profile: readThemeProfileFromControls({ themeInputs, themeBg, themeFg })
+        });
+        applyThemeForSession(session.id);
+        markDirtyFromControls();
+      });
+    }
+    settingsApplyBtn.addEventListener("click", async () => {
+      const startupDraft = readSessionStartupFromControls({ startCwdInput, startCommandInput, startEnvInput });
+      if (!startupDraft.startCwd) {
+        setStartupSettingsFeedback({ startFeedback }, "Working Directory cannot be empty.", true);
+        return;
+      }
+      if (!startupDraft.envResult.ok) {
+        setStartupSettingsFeedback({ startFeedback }, startupDraft.envResult.error, true);
+        return;
+      }
       const profile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
       const invalidKey = THEME_PROFILE_KEYS.find((key) => !isValidHexColor(profile[key]));
       if (invalidKey) {
@@ -1481,12 +1580,31 @@ function render() {
       syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       uiState.error = "";
       try {
-        const updated = await api.updateSession(session.id, { themeProfile: profile });
+        const updated = await api.updateSession(session.id, {
+          startCwd: startupDraft.startCwd,
+          startCommand: startupDraft.startCommand,
+          env: startupDraft.envResult.env,
+          themeProfile: profile
+        });
         upsertSession(updated);
         sessionThemeDrafts.delete(session.id);
+        setStartupSettingsFeedback({ startFeedback }, "Settings saved.");
+        setSettingsDirty(terminals.get(session.id), false);
       } catch {
         setError("Failed to save theme settings.");
+        setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
       }
+    });
+    settingsCancelBtn.addEventListener("click", () => {
+      const freshSession = getSessionById(session.id);
+      sessionThemeDrafts.delete(session.id);
+      if (freshSession) {
+        syncSessionStartupControls({ startCwdInput, startCommandInput, startEnvInput }, freshSession);
+        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
+      }
+      applyThemeForSession(session.id);
+      setStartupSettingsFeedback({ startFeedback }, "");
+      setSettingsDirty(terminals.get(session.id), false);
     });
 
     node.classList.toggle("active", state.activeSessionId === session.id);
@@ -1519,16 +1637,20 @@ function render() {
       startCommandInput,
       startEnvInput,
       startFeedback,
+      settingsApplyBtn,
+      settingsStatus,
       themeCategory,
       themeSearch,
       themeSelect,
       themeBg,
       themeFg,
       themeInputs,
-      mount
+      mount,
+      settingsDirty: false
     });
     syncSessionStartupControls(terminals.get(session.id), session);
     syncSessionThemeControls(terminals.get(session.id), session.id);
+    setSettingsDirty(terminals.get(session.id), false);
     if (startupPerf.firstTerminalMountedAtMs === null) {
       startupPerf.firstTerminalMountedAtMs = nowMs();
       maybeReportStartupPerf();

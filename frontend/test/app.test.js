@@ -238,7 +238,6 @@ function createTerminalCardTemplateNode() {
   const startEnvLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startEnv = new FakeElement({ className: "session-start-env", tagName: "textarea" });
   startEnv.value = "";
-  const startSave = new FakeElement({ className: "session-start-save", tagName: "button" });
   const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
   const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
   const themeCategoryLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
@@ -256,14 +255,14 @@ function createTerminalCardTemplateNode() {
   const themeFgLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
   const themeFg = new FakeElement({ className: "session-theme-fg", tagName: "input" });
   themeFg.value = "#d8dee9";
-  const themeApply = new FakeElement({ className: "session-theme-apply", tagName: "button" });
-  const settingsActions = new FakeElement({ className: "session-settings-actions", tagName: "div" });
+  const settingsFooter = new FakeElement({ className: "session-settings-footer", tagName: "div" });
+  const settingsStatus = new FakeElement({ className: "session-settings-status", tagName: "p" });
+  const settingsCancel = new FakeElement({ className: "session-settings-cancel", tagName: "button" });
+  const settingsApply = new FakeElement({ className: "session-settings-apply", tagName: "button" });
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
   toolbar.appendChild(quickId);
   toolbar.appendChild(focus);
   toolbar.appendChild(settings);
-  settingsActions.appendChild(rename);
-  settingsActions.appendChild(close);
   settingsPanel.appendChild(settingsDismiss);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
@@ -273,7 +272,6 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startCommand);
   startControls.appendChild(startEnvLabel);
   startControls.appendChild(startEnv);
-  startControls.appendChild(startSave);
   startControls.appendChild(startFeedback);
   settingsPanel.appendChild(startControls);
   themeControls.appendChild(themeCategoryLabel);
@@ -286,9 +284,13 @@ function createTerminalCardTemplateNode() {
   themeControls.appendChild(themeBg);
   themeControls.appendChild(themeFgLabel);
   themeControls.appendChild(themeFg);
-  themeControls.appendChild(themeApply);
+  settingsFooter.appendChild(settingsStatus);
+  settingsFooter.appendChild(settingsCancel);
+  settingsFooter.appendChild(settingsApply);
   settingsPanel.appendChild(themeControls);
-  settingsPanel.appendChild(settingsActions);
+  settingsPanel.appendChild(rename);
+  settingsPanel.appendChild(close);
+  settingsPanel.appendChild(settingsFooter);
   card.appendChild(toolbar);
   card.appendChild(settingsPanel);
   card.appendChild(mount);
@@ -992,11 +994,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondThemeSelect = secondSettingsPanel.querySelector(".session-theme-select");
   const secondThemeBg = secondSettingsPanel.querySelector(".session-theme-bg");
   const secondThemeFg = secondSettingsPanel.querySelector(".session-theme-fg");
-  const secondThemeApply = secondSettingsPanel.querySelector(".session-theme-apply");
   const secondStartCwd = secondSettingsPanel.querySelector(".session-start-cwd");
   const secondStartCommand = secondSettingsPanel.querySelector(".session-start-command");
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
-  const secondStartSave = secondSettingsPanel.querySelector(".session-start-save");
+  const secondSettingsApply = secondSettingsPanel.querySelector(".session-settings-apply");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   assert.equal(secondSettingsPanel.open, false);
   secondSettings.click();
@@ -1006,22 +1007,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   secondThemeSelect.dispatchEvent({ type: "change" });
   await tick();
   secondThemeBg.value = "#101010";
+  secondThemeBg.dispatchEvent({ type: "input" });
   secondThemeFg.value = "#e0e0e0";
-  secondThemeApply.click();
-  await tick();
-  assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
-  assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
-  const themeUpdateCall = updateSessionCalls.find((entry) => entry.sessionId === "s-2" && entry.payload.themeProfile);
-  assert.ok(themeUpdateCall);
-  assert.equal(themeUpdateCall.payload.themeProfile.background, "#101010");
-  assert.equal(themeUpdateCall.payload.themeProfile.foreground, "#e0e0e0");
+  secondThemeFg.dispatchEvent({ type: "input" });
   secondStartCwd.value = "/var/tmp";
+  secondStartCwd.dispatchEvent({ type: "input" });
   secondStartCommand.value = "echo start";
+  secondStartCommand.dispatchEvent({ type: "input" });
   secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
-  secondStartSave.click();
+  secondStartEnv.dispatchEvent({ type: "input" });
+  secondSettingsApply.click();
   await tick();
   assert.equal(updateSessionCalls.length > 0, true);
-  assert.deepEqual(updateSessionCalls[updateSessionCalls.length - 1], {
+  const latestSettingsCall = updateSessionCalls[updateSessionCalls.length - 1];
+  assert.deepEqual(latestSettingsCall, {
     sessionId: "s-2",
     payload: {
       startCwd: "/var/tmp",
@@ -1029,13 +1028,37 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       env: {
         APP_MODE: "dev",
         FEATURE_X: "1"
+      },
+      themeProfile: {
+        background: "#101010",
+        foreground: "#e0e0e0",
+        cursor: "#8ec07c",
+        black: "#0a0d12",
+        red: "#fb4934",
+        green: "#8ec07c",
+        yellow: "#fabd2f",
+        blue: "#83a598",
+        magenta: "#b48ead",
+        cyan: "#8fbcbb",
+        white: "#d8dee9",
+        brightBlack: "#4b5563",
+        brightRed: "#ff6b5a",
+        brightGreen: "#a5d68a",
+        brightYellow: "#ffd36a",
+        brightBlue: "#98b6cc",
+        brightMagenta: "#c8a7d8",
+        brightCyan: "#a9d9d6",
+        brightWhite: "#f5f7fa"
       }
     }
   });
-  assert.equal(secondStartFeedback.textContent, "Startup settings saved.");
+  assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
+  assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
+  assert.equal(secondStartFeedback.textContent, "Settings saved.");
   secondStartEnv.value = "1INVALID=value";
+  secondStartEnv.dispatchEvent({ type: "input" });
   const callsBeforeInvalidEnv = updateSessionCalls.length;
-  secondStartSave.click();
+  secondSettingsApply.click();
   await tick();
   assert.equal(updateSessionCalls.length, callsBeforeInvalidEnv);
   assert.equal(secondStartFeedback.textContent, "Invalid env variable name '1INVALID'.");
@@ -1083,7 +1106,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         shell: "bash",
         cwd: "~",
         name: "two",
-        themeProfile: themeUpdateCall.payload.themeProfile,
+        themeProfile: latestSettingsCall.payload.themeProfile,
         createdAt: Date.now(),
         updatedAt: Date.now()
       }

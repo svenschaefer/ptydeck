@@ -74,14 +74,14 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Close` actions are available inside each session settings dialog (removed from direct toolbar)
-- Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save feedback
+- Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with unified dialog-level `Apply Changes`/`Cancel`, dirty-state indicator, and explicit save feedback
 - Per-session terminal theme editor in session settings with complete iTerm2 dark/light theme catalog integration (from `mbadolato/iTerm2-Color-Schemes`), category/search filtering, and full custom palette editing (`background`, `foreground`, `cursor`, ANSI 16 colors) persisted via backend session `themeProfile`
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Backend per-session theme profile contract via REST (`themeProfile`) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/close [id]`, `/switch <id>`, `/next`, `/prev`, `/list`, `/rename <name>`, `/restart [id]`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - `/custom` block mode supports escaped delimiter payload lines (`\---`) for literal `---` content and returns explicit guidance for unescaped delimiter edge cases
-- Non-blocking custom-command preview panel before execution (`/<customName>`): exact payload, target resolution, newline append indicator, and deterministic truncation feedback for very large payloads
+- Non-blocking custom-command inline preview before execution (`/<customName>`): exact payload text only, semi-transparent helper rendering, and deterministic truncation feedback for very large payloads
 - Slash-command name autocomplete via `Tab`/`Shift+Tab` with deterministic cycling and system-command precedence
 - Context-sensitive slash-argument autocomplete via `Tab`/`Shift+Tab` for `/switch`, `/close`, `/custom show`, `/custom remove`, and `/<customName> <target>`
 - Non-blocking slash suggestion list with keyboard selection (`Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, `Enter`) and no implicit command execution

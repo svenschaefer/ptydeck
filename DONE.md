@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Frontend settings-dialog UX hardened for interaction consistency: fragmented per-section save buttons were replaced by one dialog-level `Apply Changes` action plus `Cancel`.
+- [x] Frontend settings dialog now exposes explicit dirty/saved status and prevents accidental overwrite by keeping in-dialog drafts until apply/cancel.
+- [x] Frontend settings layout rebalanced for modern usability: startup + theme remain primary content sections while session actions moved into dialog header actions.
 - [x] Frontend hotfix: command-composer inline slash hint now uses the exact same font family, size, line-height, and spacing as the textarea input text.
 - [x] Documentation sync pass completed for `CODEX_CONTEXT.md` (current state/wording/date alignment).
 - [x] Repository markdown governance check completed: `TODO.md` (what), `ROADMAP.md` (order/version/dependencies), `DONE.md`, and `CODEX_CONTEXT.md` are aligned; open-task ownership is explicit.

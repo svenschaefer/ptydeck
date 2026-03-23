@@ -71,7 +71,11 @@
         <dialog class="session-settings-dialog">
           <div class="session-settings-head">
             <p class="session-settings-title">Session Settings</p>
-            <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
+            <div class="session-settings-head-actions">
+              <button class="session-rename" type="button">Rename</button>
+              <button class="session-close" type="button">Close</button>
+              <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
+            </div>
           </div>
           <p class="session-settings-hint">Configure startup behavior, terminal theme, and session actions.</p>
           <div class="session-settings-layout">
@@ -83,9 +87,6 @@
               <textarea class="session-start-command" rows="2"></textarea>
               <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
               <textarea class="session-start-env" rows="4"></textarea>
-              <div class="session-settings-inline-actions">
-                <button class="session-start-save" type="button">Save Startup Settings</button>
-              </div>
               <p class="session-start-feedback"></p>
             </section>
             <section class="session-settings-section session-theme-controls">
@@ -145,15 +146,14 @@
                 <label class="session-theme-label" for="">Bright White</label>
                 <input class="session-theme-bright-white" type="color" value="#f5f7fa" />
               </div>
-              <div class="session-settings-inline-actions">
-                <button class="session-theme-apply" type="button">Save Theme</button>
-              </div>
             </section>
-            <section class="session-settings-section session-settings-actions">
-              <p class="session-settings-section-title">Session Actions</p>
-              <button class="session-rename" type="button">Rename</button>
-              <button class="session-close" type="button">Close</button>
-            </section>
+          </div>
+          <div class="session-settings-footer">
+            <p class="session-settings-status"></p>
+            <div class="session-settings-footer-actions">
+              <button class="session-settings-cancel" type="button">Cancel</button>
+              <button class="session-settings-apply" type="button">Apply Changes</button>
+            </div>
           </div>
         </dialog>
         <div class="terminal-mount"></div>
