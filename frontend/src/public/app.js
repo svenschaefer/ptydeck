@@ -58,7 +58,7 @@ const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberati
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 6;
 const TERMINAL_MOUNT_VERTICAL_CHROME_PX = 18;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr"]);
+const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr", "cr2"]);
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -210,7 +210,8 @@ function withSingleTrailingNewline(value, mode = "auto") {
     .replace(/\r/g, "\n")
     .replace(/\n+$/g, "");
   const lineSeparator = mode === "lf" ? "\n" : "\r";
-  const suffix = mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : "\r";
+  const suffix =
+    mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : mode === "cr2" ? "\r\r" : "\r";
   const body = normalizedLines.replace(/\n/g, lineSeparator);
   return `${body}${suffix}`;
 }
@@ -2742,7 +2743,7 @@ async function executeControlCommand(interpreted) {
       const requested = String(payload.sendTerminator || "").trim().toLowerCase();
       sendTerminatorMode = normalizeSendTerminatorMode(requested);
       if (requested && requested !== sendTerminatorMode) {
-        return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr.";
+        return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2.";
       }
     }
 
