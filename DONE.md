@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-101` completed: composer now supports `>selector` quick-switch input for direct single-session activation with automatic deck switching when the resolved session lives outside the active deck.
+- [x] `QLT-104` completed: `>...` quick-switching now supports direct deck targets in addition to session targets, including deterministic deck activation semantics.
+- [x] `QLT-105` completed: autocomplete coverage was broadened across `/...` and `>...` navigation flows, including session quick IDs, names/IDs, deck IDs/names, and explicit `deck:` suggestions where deterministic completion is possible.
+- [x] `QLT-106` completed: `>...` quick-switching now reuses the same selector grammar family as `/switch`, including explicit `deckSelector::sessionSelector` cross-deck routing and deterministic ambiguity handling.
+- [x] `QLT-107` completed: quick-switch input now exposes inline preview/feedback for resolved targets, ambiguity/no-match states, and no-op activation cases before submit.
+- [x] Frontend regression coverage now verifies `>...` session switching, deck switching, cross-deck targeting, autocomplete for `deck::session`, and explicit ambiguity feedback when a token matches both a session and a deck.
+- [x] Validation for the quick-switch/autocomplete cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-095` completed: frontend now handles backend `session.exit` events as explicit local `exited` session state instead of silently ignoring process termination.
 - [x] Exited sessions now show visible `EXITED` state UI with status-aware hint text and guarded post-exit interaction behavior (input, resize, rename, restart, and settings apply are blocked).
 - [x] Exited sessions can now be removed locally without backend roundtrip, and reconnect snapshots deterministically clear exited tombstones that no longer exist server-side.

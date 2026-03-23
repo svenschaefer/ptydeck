@@ -17,6 +17,15 @@ test("interpretComposerInput routes slash input to control plane", () => {
   assert.deepEqual(result.args, ["abc"]);
 });
 
+test("interpretComposerInput routes quick-switch input to quick-switch plane", () => {
+  const result = interpretComposerInput(">abc");
+  assert.deepEqual(result, {
+    kind: "quick-switch",
+    selector: "abc",
+    raw: ">abc"
+  });
+});
+
 test("interpretComposerInput keeps empty slash command as control input", () => {
   const result = interpretComposerInput("/");
   assert.equal(result.kind, "control");
@@ -37,5 +46,13 @@ test("interpretComposerInput keeps later-line slash input in terminal plane", ()
   assert.deepEqual(result, {
     kind: "terminal",
     data: "echo hi\n/switch abc"
+  });
+});
+
+test("interpretComposerInput keeps later-line quick-switch input in terminal plane", () => {
+  const result = interpretComposerInput("echo hi\n>abc");
+  assert.deepEqual(result, {
+    kind: "terminal",
+    data: "echo hi\n>abc"
   });
 });

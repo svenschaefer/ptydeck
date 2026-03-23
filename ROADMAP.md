@@ -371,14 +371,16 @@ Exit criteria:
 - `QLT-105`
 - `QLT-106`
 - `QLT-107`
+- `QLT-108`
+- `QLT-109`
 
 Completed in this milestone:
 
-- `QLT-095`, `QLT-096`
+- `QLT-095`, `QLT-096`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`
 
 Remaining in this milestone:
 
-- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`
+- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`, `QLT-108`, `QLT-109`
 
 Dependencies:
 
@@ -393,6 +395,8 @@ Dependencies:
 - `QLT-105` depends on `QLT-101` and `QLT-104` so autocomplete breadth is designed against the final `>...` grammar and can stay aligned with existing `/...` completion behavior.
 - `QLT-106` depends on `QLT-101` and `QLT-104` so `>...` selector semantics remain aligned with the final quick-switch grammar for both direct terminal and deck-scoped targets.
 - `QLT-107` depends on `QLT-101`, `QLT-104`, `QLT-105`, and `QLT-106` so inline quick-switch preview/feedback is built on top of the finalized `>...` selector grammar, target types, and autocomplete behavior instead of duplicating early resolution logic.
+- `QLT-108` depends on the existing hidden-deck viewport-recovery baseline from H6/H7 and should complete before related render-architecture cleanup so scroll-state repair is validated against current runtime behavior first.
+- `QLT-109` depends on `QLT-108` so regression coverage targets the finalized hidden-session scroll-recovery behavior instead of current stale-viewport semantics.
 
 Exit criteria:
 
@@ -406,6 +410,7 @@ Exit criteria:
 - Autocomplete coverage is consistent across `/...` and `>...` navigation-related flows where deterministic suggestions are possible.
 - `>...` quick-switching reuses `/switch` selector semantics instead of introducing a second incompatible navigation grammar.
 - `>...` quick-switching exposes inline resolved-target preview and explicit ambiguity/no-match/no-op feedback before activation.
+- Hidden sessions that receive output while invisible recover a correct scrollable viewport when shown again, including bottom-content reachability after background growth.
 
 ## Current Status
 
@@ -422,10 +427,8 @@ Exit criteria:
 - `QLT-101`
 - `QLT-102`
 - `QLT-103`
-- `QLT-104`
-- `QLT-105`
-- `QLT-106`
-- `QLT-107`
+- `QLT-108`
+- `QLT-109`
 
 ### Completed Items
 

@@ -508,6 +508,20 @@ function parseSlashInputForAutocomplete(rawInput) {
   };
 }
 
+function parseQuickSwitchInputForAutocomplete(rawInput) {
+  const value = typeof rawInput === "string" ? rawInput : "";
+  if (!value.startsWith(">")) {
+    return null;
+  }
+  if (value.includes("\n")) {
+    return null;
+  }
+  return {
+    value,
+    afterMarker: value.slice(1)
+  };
+}
+
 function buildCommandAutocompleteCandidates(customCommands) {
   const ordered = [];
   const seen = new Set();
@@ -547,39 +561,54 @@ function buildCustomCommandNameList(customCommands) {
   return ordered;
 }
 
-function buildSessionAutocompleteCandidates(prefix = "") {
+function pushUniqueCandidate(candidates, seen, value, prefix = "") {
+  const token = String(value || "").trim();
+  if (!token) {
+    return;
+  }
+  const normalizedToken = token.toLowerCase();
   const normalizedPrefix = String(prefix || "").toLowerCase();
-  const state = store.getState();
+  if (normalizedPrefix && !normalizedToken.startsWith(normalizedPrefix)) {
+    return;
+  }
+  if (seen.has(normalizedToken)) {
+    return;
+  }
+  seen.add(normalizedToken);
+  candidates.push(token);
+}
+
+function buildSessionAutocompleteCandidates(prefix = "", options = {}) {
+  const sessions = Array.isArray(options.sessions) ? options.sessions : store.getState().sessions;
+  const includeNamesWithWhitespace = options.includeNamesWithWhitespace === true;
   const candidates = [];
-  for (const session of state.sessions) {
-    const token = formatSessionToken(session.id);
-    if (!token) {
-      continue;
+  const seen = new Set();
+  for (const session of sessions) {
+    pushUniqueCandidate(candidates, seen, formatSessionToken(session.id), prefix);
+    const sessionName = String(session?.name || "").trim();
+    if (sessionName && (includeNamesWithWhitespace || !/\s/.test(sessionName))) {
+      pushUniqueCandidate(candidates, seen, sessionName, prefix);
     }
-    const normalizedToken = token.toLowerCase();
-    if (!normalizedToken.startsWith(normalizedPrefix)) {
-      continue;
-    }
-    if (!candidates.includes(token)) {
-      candidates.push(token);
-    }
+    pushUniqueCandidate(candidates, seen, session?.id, prefix);
   }
   return candidates;
 }
 
-function buildDeckAutocompleteCandidates(prefix = "") {
-  const normalizedPrefix = String(prefix || "").toLowerCase();
+function buildDeckAutocompleteCandidates(prefix = "", options = {}) {
   const candidates = [];
+  const seen = new Set();
+  const includeExplicitPrefix = options.includeExplicitPrefix === true;
   for (const deck of deckState.decks) {
     const id = String(deck?.id || "").trim();
+    const name = String(deck?.name || "").trim();
     if (!id) {
       continue;
     }
-    if (!id.toLowerCase().startsWith(normalizedPrefix)) {
-      continue;
-    }
-    if (!candidates.includes(id)) {
-      candidates.push(id);
+    pushUniqueCandidate(candidates, seen, id, prefix);
+    pushUniqueCandidate(candidates, seen, name, prefix);
+    if (includeExplicitPrefix) {
+      pushUniqueCandidate(candidates, seen, `deck:${id}`, prefix);
+      pushUniqueCandidate(candidates, seen, `deck:${name}`, prefix);
     }
   }
   return candidates;
@@ -680,9 +709,80 @@ function resolveSlashAutocompleteContext(rawInput, customCommands) {
   return null;
 }
 
-async function autocompleteSlashInput(reverse = false) {
-  const parsed = parseSlashInputForAutocomplete(commandInput.value || "");
+function resolveQuickSwitchAutocompleteContext(rawInput) {
+  const parsed = parseQuickSwitchInputForAutocomplete(rawInput);
   if (!parsed) {
+    return null;
+  }
+
+  const rawSelector = parsed.afterMarker;
+  const selector = rawSelector.trim();
+  if (!selector) {
+    return {
+      replacePrefix: ">",
+      matches: [
+        ...buildSessionAutocompleteCandidates("", { includeNamesWithWhitespace: true }),
+        ...buildDeckAutocompleteCandidates("")
+      ]
+    };
+  }
+
+  const crossDeckIndex = selector.indexOf("::");
+  if (crossDeckIndex >= 0) {
+    const deckPrefix = selector.slice(0, crossDeckIndex).trim();
+    const nestedPrefix = selector.slice(crossDeckIndex + 2).trim();
+    if (!deckPrefix) {
+      return {
+        replacePrefix: ">",
+        matches: buildDeckAutocompleteCandidates("")
+      };
+    }
+    const resolvedDeck = resolveDeckToken(deckPrefix, deckState.decks);
+    if (!resolvedDeck.deck) {
+      return {
+        replacePrefix: ">",
+        matches: buildDeckAutocompleteCandidates(deckPrefix)
+      };
+    }
+    const deckSessions = store
+      .getState()
+      .sessions.filter((session) => resolveSessionDeckId(session) === resolvedDeck.deck.id);
+    return {
+      replacePrefix: `>${selector.slice(0, crossDeckIndex + 2)}`,
+      matches: buildSessionAutocompleteCandidates(nestedPrefix, {
+        sessions: deckSessions,
+        includeNamesWithWhitespace: true
+      })
+    };
+  }
+
+  if (selector.toLowerCase().startsWith("deck:")) {
+    const deckPrefix = selector.slice("deck:".length);
+    return {
+      replacePrefix: ">deck:",
+      matches: buildDeckAutocompleteCandidates(deckPrefix)
+    };
+  }
+
+  const matches = [
+    ...buildSessionAutocompleteCandidates(selector, { includeNamesWithWhitespace: true }),
+    ...buildDeckAutocompleteCandidates(selector, { includeExplicitPrefix: true })
+  ];
+  return {
+    replacePrefix: ">",
+    matches
+  };
+}
+
+function parseAutocompleteContext(rawInput, customCommands) {
+  return resolveSlashAutocompleteContext(rawInput, customCommands) || resolveQuickSwitchAutocompleteContext(rawInput);
+}
+
+async function autocompleteComposerInput(reverse = false) {
+  const rawInput = commandInput.value || "";
+  const parsedSlash = parseSlashInputForAutocomplete(rawInput);
+  const parsedQuickSwitch = parseQuickSwitchInputForAutocomplete(rawInput);
+  if (!parsedSlash && !parsedQuickSwitch) {
     resetCommandAutocompleteState();
     return false;
   }
@@ -718,7 +818,7 @@ async function autocompleteSlashInput(reverse = false) {
     if (requestId !== commandAutocompleteRequestId) {
       return true;
     }
-    const context = resolveSlashAutocompleteContext(commandInput.value || "", customCommands);
+    const context = parseAutocompleteContext(rawInput, customCommands);
     if (!context) {
       resetCommandAutocompleteState();
       return true;
@@ -743,8 +843,10 @@ async function autocompleteSlashInput(reverse = false) {
 }
 
 async function refreshCommandSuggestions() {
-  const parsed = parseSlashInputForAutocomplete(commandInput.value || "");
-  if (!parsed) {
+  const rawInput = commandInput.value || "";
+  const parsedSlash = parseSlashInputForAutocomplete(rawInput);
+  const parsedQuickSwitch = parseQuickSwitchInputForAutocomplete(rawInput);
+  if (!parsedSlash && !parsedQuickSwitch) {
     clearCommandSuggestions();
     render();
     return;
@@ -759,7 +861,7 @@ async function refreshCommandSuggestions() {
   if (requestId !== commandSuggestionsRequestId) {
     return;
   }
-  const context = resolveSlashAutocompleteContext(commandInput.value || "", customCommands);
+  const context = parseAutocompleteContext(rawInput, customCommands);
   if (!context || !Array.isArray(context.matches) || context.matches.length === 0) {
     clearCommandSuggestions();
     render();
@@ -2798,6 +2900,140 @@ function resolveDeckToken(token, decks) {
   return { deck: null, error: `Unknown deck identifier: ${normalized}` };
 }
 
+function resolveSingleSessionSwitchTarget(selector, sessions) {
+  const resolved = resolveSelectorMatches(selector, sessions, { source: "quick-switch" });
+  if (resolved.error) {
+    return { session: null, error: resolved.error, kind: "unknown" };
+  }
+  if (resolved.sessions.length === 1) {
+    return { session: resolved.sessions[0], error: "", kind: "ok" };
+  }
+  if (resolved.sessions.length > 1) {
+    return {
+      session: null,
+      error: "Quick-switch selector must resolve to exactly one session.",
+      kind: "ambiguous"
+    };
+  }
+  return { session: null, error: "Unknown session identifier.", kind: "unknown" };
+}
+
+function resolveQuickSwitchTarget(selectorText, sessions) {
+  const selector = String(selectorText || "").trim();
+  if (!selector) {
+    return { kind: "", target: null, error: "Usage: >selector" };
+  }
+
+  if (selector.includes("::")) {
+    const sessionResolved = resolveSingleSessionSwitchTarget(selector, sessions);
+    if (sessionResolved.error) {
+      return { kind: "", target: null, error: sessionResolved.error };
+    }
+    return { kind: "session", target: sessionResolved.session, error: "" };
+  }
+
+  if (selector.toLowerCase().startsWith("deck:")) {
+    const deckResolved = resolveDeckToken(selector.slice("deck:".length), deckState.decks);
+    if (!deckResolved.deck) {
+      return { kind: "", target: null, error: deckResolved.error };
+    }
+    return { kind: "deck", target: deckResolved.deck, error: "" };
+  }
+
+  const sessionResolved = resolveSingleSessionSwitchTarget(selector, sessions);
+  const deckResolved = resolveDeckToken(selector, deckState.decks);
+  const hasSession = Boolean(sessionResolved.session);
+  const hasDeck = Boolean(deckResolved.deck);
+
+  if (hasSession && hasDeck) {
+    return {
+      kind: "",
+      target: null,
+      error: `Ambiguous quick-switch target: '${selector}' matches both a session and a deck. Use 'deck:${selector}' for the deck target.`
+    };
+  }
+  if (hasSession) {
+    return { kind: "session", target: sessionResolved.session, error: "" };
+  }
+  if (sessionResolved.kind === "ambiguous") {
+    return { kind: "", target: null, error: sessionResolved.error };
+  }
+  if (hasDeck) {
+    return { kind: "deck", target: deckResolved.deck, error: "" };
+  }
+  if (deckResolved.error && !deckResolved.error.startsWith("Unknown deck identifier")) {
+    return { kind: "", target: null, error: deckResolved.error };
+  }
+  return { kind: "", target: null, error: sessionResolved.error || deckResolved.error || "Unknown navigation target." };
+}
+
+function activateSessionTarget(session) {
+  if (!session || !session.id) {
+    return { ok: false, message: "Unknown session target." };
+  }
+  const beforeState = store.getState();
+  const previousActiveSessionId = beforeState.activeSessionId;
+  const previousActiveDeckId = deckState.activeDeckId;
+  const targetDeckId = resolveSessionDeckId(session);
+  if (targetDeckId) {
+    setActiveDeck(targetDeckId);
+  }
+  const state = store.getState();
+  if (state.activeSessionId === session.id && previousActiveSessionId === session.id && previousActiveDeckId === targetDeckId) {
+    return {
+      ok: true,
+      message: `Session already active: [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`,
+      noop: true
+    };
+  }
+  store.setActiveSession(session.id);
+  return {
+    ok: true,
+    message: `Active session: [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`,
+    noop: false
+  };
+}
+
+function activateDeckTarget(deck) {
+  if (!deck || !deck.id) {
+    return { ok: false, message: "Unknown deck target." };
+  }
+  if (deckState.activeDeckId === deck.id) {
+    return {
+      ok: true,
+      message: `Deck already active: [${deck.id}] ${deck.name}.`,
+      noop: true
+    };
+  }
+  const changed = setActiveDeck(deck.id);
+  if (!changed) {
+    return { ok: false, message: `Failed to switch deck: ${deck.id}` };
+  }
+  return {
+    ok: true,
+    message: `Active deck: [${deck.id}] ${deck.name}.`,
+    noop: false
+  };
+}
+
+function formatQuickSwitchPreview(selectorText, sessions) {
+  const resolved = resolveQuickSwitchTarget(selectorText, sessions);
+  if (resolved.error) {
+    return resolved.error;
+  }
+  if (resolved.kind === "session" && resolved.target) {
+    const targetDeck = getDeckById(resolveSessionDeckId(resolved.target));
+    const activation = store.getState().activeSessionId === resolved.target.id ? "Already active" : "Target session";
+    const deckLabel = targetDeck ? ` deck [${targetDeck.id}] ${targetDeck.name}` : "";
+    return `${activation}: [${formatSessionToken(resolved.target.id)}] ${formatSessionDisplayName(resolved.target)}${deckLabel}`;
+  }
+  if (resolved.kind === "deck" && resolved.target) {
+    const activation = deckState.activeDeckId === resolved.target.id ? "Already active" : "Target deck";
+    return `${activation}: [${resolved.target.id}] ${resolved.target.name}`;
+  }
+  return "";
+}
+
 function normalizeSessionTagToken(token) {
   return String(token || "")
     .trim()
@@ -3241,7 +3477,7 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /deck list|new|rename|switch|delete, /move <sessionSelector> <deckSelector>, /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /deck list|new|rename|switch|delete, /move <sessionSelector> <deckSelector>, /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, >selector, >deckSelector::sessionSelector, /help";
   }
 
   if (command === "deck") {
@@ -4057,6 +4293,23 @@ async function submitCommand() {
   }
 
   const interpreted = interpretComposerInput(command);
+  if (interpreted.kind === "quick-switch") {
+    const state = store.getState();
+    const resolved = resolveQuickSwitchTarget(interpreted.selector, state.sessions);
+    if (resolved.error) {
+      setCommandFeedback(resolved.error);
+      return;
+    }
+    const result =
+      resolved.kind === "session" ? activateSessionTarget(resolved.target) : activateDeckTarget(resolved.target);
+    setCommandFeedback(result.message);
+    commandInput.value = "";
+    setCommandPreview("");
+    clearCommandSuggestions();
+    render();
+    return;
+  }
+
   if (interpreted.kind === "control") {
     debugLog("command.control.start", {
       command: interpreted.command,
@@ -4163,6 +4416,11 @@ async function submitCommand() {
 async function refreshCommandPreview() {
   const rawInput = commandInput.value || "";
   const interpreted = interpretComposerInput(rawInput);
+  if (interpreted.kind === "quick-switch") {
+    const preview = formatQuickSwitchPreview(interpreted.selector, store.getState().sessions);
+    setCommandPreview(preview);
+    return;
+  }
   if (interpreted.kind !== "control") {
     setCommandPreview("");
     return;
@@ -4242,9 +4500,9 @@ commandInput.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "Tab") {
-    if (parseSlashInputForAutocomplete(commandInput.value || "")) {
+    if (parseSlashInputForAutocomplete(commandInput.value || "") || parseQuickSwitchInputForAutocomplete(commandInput.value || "")) {
       event.preventDefault();
-      autocompleteSlashInput(event.shiftKey).catch(() => {});
+      autocompleteComposerInput(event.shiftKey).catch(() => {});
     }
     return;
   }

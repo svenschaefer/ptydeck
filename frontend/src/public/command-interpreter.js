@@ -1,6 +1,14 @@
 export function interpretComposerInput(rawInput) {
   const input = typeof rawInput === "string" ? rawInput : "";
 
+  if (input.startsWith(">") && !input.includes("\n")) {
+    return {
+      kind: "quick-switch",
+      selector: input.slice(1).trim(),
+      raw: input
+    };
+  }
+
   if (!input.startsWith("/")) {
     return {
       kind: "terminal",

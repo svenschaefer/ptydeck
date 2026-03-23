@@ -1301,6 +1301,61 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
   assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "deck-new", sessionId: "s-2" });
 
+  fixture.elements.commandInput.value = ">2";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.match(fixture.elements.commandPreview.textContent, /^Target session: \[2\] two deck \[deck-new\] Ops$/);
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [2] two.");
+
+  fixture.elements.commandInput.value = ">deck-new";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandPreview.textContent, "Already active: [deck-new] Ops");
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Deck already active: [deck-new] Ops.");
+
+  fixture.elements.commandInput.value = ">ops";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(
+    fixture.elements.commandPreview.textContent,
+    "Ambiguous quick-switch target: 'ops' matches both a session and a deck. Use 'deck:ops' for the deck target."
+  );
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Ambiguous quick-switch target: 'ops' matches both a session and a deck. Use 'deck:ops' for the deck target."
+  );
+
+  fixture.elements.commandInput.value = ">deck-new::";
+  fixture.elements.commandInput.dispatchEvent({
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    preventDefault() {}
+  });
+  await tick();
+  assert.equal(fixture.elements.commandInput.value, ">deck-new::2");
+
+  fixture.elements.commandInput.value = ">default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
+
+  fixture.elements.commandInput.value = ">deck-new::2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [2] two.");
+
+  fixture.elements.commandInput.value = ">default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
+
   fixture.elements.commandInput.value = "/filter s-2";
   fixture.elements.sendCommand.click();
   await tick();
