@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Frontend terminal geometry hotfix: fixed-size card width chrome reduced by 20px to match expected card packing and visual width.
+- [x] Frontend terminal viewport hotfix: mount-height calibration now uses runtime xterm cell-height feedback to prevent bottom-row clipping in TUI apps (for example Codex-like prompts).
 - [x] Backend persistence hotfix: mutating REST operations now persist synchronously (`session.create`, `session.update`, `session.delete`, `session.restart`, custom-command upsert/delete) so newly created sessions are on disk before API success responses.
 - [x] Added backend regression coverage for immediate persistence durability after session create response.
 - [x] Backend restore hardening: restore now applies multi-step shell/cwd fallbacks (`saved shell/cwd`, fallback shell + saved cwd, saved shell + home, fallback shell + home) instead of dropping sessions on first spawn failure.

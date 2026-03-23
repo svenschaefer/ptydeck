@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (H4 completed with `QLT-078`/`QLT-079`; backend durability hardening added for synchronous persistence on mutating REST paths, restore shell/cwd fallback chain, and retention of unrestorable persisted sessions across save cycles; local-only CI policy baseline applied by disabling remote-runner jobs in `.github/workflows/ci.yml`; new active planning cycle `v0.3.0-H5` opened for unrestored-session API/FE visibility and local quality-gate documentation)
+Last updated: 2026-03-23 (H4 completed with `QLT-078`/`QLT-079`; backend durability hardening added for synchronous persistence on mutating REST paths, restore shell/cwd fallback chain, and retention of unrestorable persisted sessions across save cycles; local-only CI policy baseline applied by disabling remote-runner jobs in `.github/workflows/ci.yml`; frontend fixed-size card width chrome reduced by 20px; frontend mount-height runtime cell calibration added to prevent bottom-row clipping in TUI workloads; new active planning cycle `v0.3.0-H5` opened for unrestored-session API/FE visibility and local quality-gate documentation)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H5 planning sync).
 
@@ -42,8 +42,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Node version policy defined in `.nvmrc` and package `engines`.
 - Backend bootstrap includes config loader, minimal HTTP server, and OpenAPI contract at `backend/openapi/openapi.yaml`.
 - Frontend bootstrap includes config loader and minimal development HTTP page.
-- CI workflow exists in `.github/workflows/ci.yml` for backend/frontend lint, test, and build.
-- Repository CI workflow is intentionally remote-disabled (`if: false`) to avoid GitHub-hosted runner usage; quality gates are expected via local execution.
+- CI workflow file exists in `.github/workflows/ci.yml` as an intentionally disabled stub (`if: false`) to avoid GitHub-hosted runner usage.
+- Quality gates are expected via local execution (`npm run lint`, `npm run test`, `npm run test:coverage:check`, and selected smoke/security scripts).
 - Environment templates exist in `backend/.env.example` and `frontend/.env.example`.
 - Backend core REST lifecycle is implemented for session list/create/get/delete/input/resize.
 - Backend includes centralized API errors (`ApiError` + mapper) and runtime request/response validation.
@@ -67,7 +67,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Runtime stop path is idempotent and safe for repeated shutdown calls.
 - Backend now includes OpenAPI contract conformance testing for route/method surface and status-code compatibility.
 - Frontend now supports injected runtime config override object with deterministic precedence for host/port and explicit URL values.
-- CI quality workflow now executes on Node `18` and latest LTS matrix to catch runtime drift.
+- Historical CI matrix logic exists in repository history, but active remote execution is currently disabled in favor of local-only validation flow.
 - Frontend default visual baseline is now dark console/tmux-like, with increased terminal readability and larger default terminal viewport.
 - Dark-mode background gradient and terminal-grid minimum column width behavior were adjusted for predictable multi-column layout.
 - Sessions now support explicit naming via API/UI, and new sessions default cwd to user home when no prior history exists.
