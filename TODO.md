@@ -11,6 +11,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - `PLAT`: Tooling, CI/CD, and runtime owner
 - `QA`: Test automation owner
 
+## Active Open Tasks (Current)
+
+- [ ] `QLT-080` Owner: `BE` Task: Expose unrestored persisted sessions explicitly in REST (`GET /api/v1/sessions`/`GET /api/v1/sessions/{sessionId}`) with deterministic `state` metadata (`active` or `unrestored`) so they are never silently hidden after restart.
+- [ ] `QLT-081` Owner: `FE` Task: Render unrestored sessions in terminal list/grid with explicit non-active state badge and recovery guidance, while preventing input/resize/restart actions until restored.
+- [ ] `QLT-082` Owner: `QA` Task: Add regression coverage for unrestored-session durability across repeated start/stop cycles and visibility semantics in REST + FE rendering.
+- [ ] `PLAT-011` Owner: `PLAT` Task: Replace remote GitHub-runner CI gates with a documented local-only quality gate flow (`npm run lint`, `npm run test`, `npm run test:coverage:check`, smoke/security scripts) and remove obsolete remote-runner assumptions from docs.
+
 ## Backend Tasks (OpenAPI-based REST)
 
 - [x] `BE-001` Owner: `BE` Task: Create backend workspace in `backend/` with TypeScript build, lint, and test scripts.

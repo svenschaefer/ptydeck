@@ -4,6 +4,14 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Backend persistence hotfix: mutating REST operations now persist synchronously (`session.create`, `session.update`, `session.delete`, `session.restart`, custom-command upsert/delete) so newly created sessions are on disk before API success responses.
+- [x] Added backend regression coverage for immediate persistence durability after session create response.
+- [x] Backend restore hardening: restore now applies multi-step shell/cwd fallbacks (`saved shell/cwd`, fallback shell + saved cwd, saved shell + home, fallback shell + home) instead of dropping sessions on first spawn failure.
+- [x] Added backend regression coverage for restore fallback behavior (`invalid startCwd` and `invalid shell` persisted states).
+- [x] Backend durability guard: unrestorable persisted sessions are now retained in runtime persistence snapshots (`unrestoredSessions`) so they are never silently removed from persisted state during subsequent save cycles.
+- [x] Added backend regression coverage proving unrestorable sessions survive repeated start/stop persistence cycles.
+- [x] CI workflow changed to local-only policy baseline: remote GitHub runner jobs were removed from `.github/workflows/ci.yml` and replaced with a disabled stub job (`if: false`) to avoid remote-runner credit consumption.
+
 - [x] `QLT-078` completed: slash rename now supports selector targeting with `/rename <selector> <name>` while preserving `/rename <name>` for active-session shorthand.
 - [x] Rename selector execution reuses deterministic target resolution and enforces exactly one resolved target session for rename operations.
 - [x] Slash help text and autocomplete were aligned with rename-target parity semantics.

@@ -282,10 +282,30 @@ Exit criteria:
 - Help text and autocomplete paths remain consistent with the updated rename syntax.
 - Regression coverage exists for active/session-target rename behavior and deterministic command feedback.
 
+### v0.3.0-H5 - Restart Durability and Local-Only Delivery Flow
+
+- `QLT-080`
+- `QLT-081`
+- `QLT-082`
+- `PLAT-011`
+
+Dependencies:
+
+- `QLT-081` depends on `QLT-080` so FE can render backend-provided unrestored-session state deterministically.
+- `QLT-082` depends on `QLT-080` and `QLT-081` to validate runtime durability and FE visibility/behavior for unrestored sessions.
+- `PLAT-011` is independent of `QLT-080` ... `QLT-082` and can run in parallel, but must complete before enforcing local-only delivery policy in docs/process gates.
+
+Exit criteria:
+
+- Unrestored persisted sessions are visible via API and are not silently dropped from operator view.
+- FE communicates unrestored state explicitly and prevents invalid interactive operations on unrestored sessions.
+- Regression tests cover repeated restart durability for unrestored sessions and FE rendering semantics.
+- Local-only quality gate flow is documented and aligns with disabled remote-runner CI configuration.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H4`
-- Next milestones in progress: none
+- Next milestones in progress: `v0.3.0-H5`
 - Blockers: none recorded
 
 ### Completed Items
