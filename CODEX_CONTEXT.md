@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (deck-size isolation fix: session resize now follows owning deck geometry)
+Last updated: 2026-03-24 (docs review consolidated; H7 frontend-state/architecture backlog opened)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, H6 active-open backlog cleanup, and explicit confirmation that TODO/ROADMAP currently have no active open tasks).
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, and promotion of review-derived current-scope tasks into the active H7 backlog.
 
 ## Project Purpose
 
@@ -18,6 +18,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `README.md`: architecture and product behavior reference.
 - `AGENTS.md`: agent roles, collaboration rules, and change control.
 - `LOCAL_QUALITY_GATE.md`: required local validation workflow (authoritative quality-gate commands).
+- `docs/README.md`: index for imported architecture-review notes in `docs/`; useful for backlog derivation but not authoritative implementation status.
 
 ## Ownership Model
 
@@ -36,9 +37,9 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend is a classic Node.js stack with `xterm.js`.
 - Session persistence currently targets metadata restoration (`cwd`, shell, timestamps), not running process restoration.
 
-## Deck Domain Contract (Planned, Authoritative for H6)
+## Deck Domain Contract (Implemented, Authoritative)
 
-The upcoming deck model is a strict isolation boundary above sessions.
+The deck model is a strict isolation boundary above sessions.
 
 - Deck identity:
   - Every session belongs to exactly one deck (`deckId`).
@@ -131,6 +132,10 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend regression coverage now includes hidden-deck background-output recovery so deck-switch viewport drift is exercised explicitly in app-level tests.
 - Frontend terminal resize/mount geometry is now session-deck-derived rather than active-deck-derived, so hidden sessions keep their own deck `cols/rows` even while another deck is active.
 - Deferred resize passes caused by deck switching are now active-deck-scoped, preventing delayed cross-deck terminal width/height bleed.
+- Imported architecture review notes in `docs/` are now indexed in `docs/README.md`, with explicit separation between current-scope action items and deferred themes.
+- Current docs-review-confirmed frontend gaps are now explicitly tracked in active backlog: missing explicit `session.exit` handling, mixed REST/WS custom-command state flow, direct xterm private-internal access, and `frontend/src/public/app.js` monolith/refactor pressure.
+- Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `OUTLOOK-TODO.md` (`ENT-026`, `ENT-027`).
+- Stream/plugin architecture and broader WebSocket-first state architecture from imported review notes are tracked as deferred items in `OUTLOOK-TODO.md` (`ARC-001`, `ARC-002`).
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.
@@ -228,7 +233,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycles: none (all currently planned milestones completed).
+- Active next cycles: `v0.3.0-H7` frontend state correctness and architecture consolidation.
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: none (current-scope enterprise tasks complete).
@@ -243,6 +248,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
   - Planned next in cycle G (`v0.3.0-H5`): none.
   - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
   - Planned next in cycle H (`v0.3.0-H6`): none.
+  - Planned next in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`.
 
 ## Session Behavior Notes
 

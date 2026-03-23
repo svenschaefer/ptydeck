@@ -13,7 +13,12 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- None currently.
+- [ ] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
+- [ ] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
+- [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
+- [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
+- [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
+- [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -66,6 +71,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `INT-008` Owner: `QA` Task: Add E2E tests for core flow (create session, run command, see output, close session).
 - [x] `INT-009` Owner: `PLAT` Task: Add `.env.example` files for backend and frontend runtime configuration.
 - [x] `INT-010` Owner: `PLAT` Task: Document production build and deployment steps for both apps.
+- [x] `PLAT-011` Owner: `PLAT` Task: Align local-only quality-gate workflow across repo docs and disable remote GitHub-runner execution assumptions in the active CI baseline.
 
 ## Documentation Tasks (Codex Ownership)
 
@@ -156,6 +162,27 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-077` Owner: `QA` Task: Add parity regression coverage proving dialog settings and slash-command settings stay functionally equivalent (same validation, persistence, and rendered/runtime effects).
 - [x] `QLT-078` Owner: `FE` Task: Extend slash rename parity to support explicit target selector syntax (`/rename <selector> <name>`) while preserving active-session shorthand (`/rename <name>`).
 - [x] `QLT-079` Owner: `QA` Task: Add regression coverage for rename selector behavior (active shorthand, selector-based rename, help text/autocomplete compatibility, and deterministic feedback).
+- [x] `QLT-080` Owner: `BE` Task: Expose deterministic session `state` metadata (`active` or `unrestored`) in REST session responses and keep OpenAPI/runtime schemas aligned.
+- [x] `QLT-081` Owner: `FE` Task: Render unrestored sessions with explicit UI state and recovery guidance while blocking invalid interactive actions against unrestored sessions.
+- [x] `QLT-082` Owner: `QA` Task: Add regression coverage for unrestored-session durability and REST visibility across repeated restart cycles.
+- [x] `QLT-083` Owner: `CODY` Task: Record the deck domain contract as the authoritative planning baseline for isolation rules, active-deck semantics, and conflict handling.
+- [x] `QLT-084` Owner: `BE` Task: Extend persistence/runtime model with deck entities and per-session `deckId`, including deterministic legacy migration to the default deck.
+- [x] `QLT-085` Owner: `BE` Task: Implement backend deck lifecycle and move APIs (`GET/POST/PATCH/DELETE /decks`, `POST /decks/{deckId}/sessions/{sessionId}:move`) with deterministic validation and error semantics.
+- [x] `QLT-086` Owner: `BE` Task: Make session APIs deck-aware by exposing `deckId` in `Session` payloads and supporting optional deck-scoped session listing.
+- [x] `QLT-087` Owner: `BE` Task: Harden deck conflict behavior so non-empty deck deletion requires explicit force semantics and same-source moves are idempotent no-ops.
+- [x] `QLT-088` Owner: `FE` Task: Implement frontend deck create/rename/switch/delete flows with persisted active-deck selection and deck-scoped session creation behavior.
+- [x] `QLT-089` Owner: `FE` Task: Scope terminal-grid rendering strictly to the active deck while keeping background-deck sessions running and active-session fallback deterministic.
+- [x] `QLT-090` Owner: `FE` Task: Add deck control-plane slash commands (`/deck ...`) and explicit session move command (`/move <sessionSelector> <deckSelector>`) with deterministic feedback and autocomplete support.
+- [x] `QLT-091` Owner: `FE` Task: Enforce deck-aware selector isolation for `/switch`, `/next`, `/prev`, `/filter`, and `@target`, with explicit cross-deck addressing syntax when needed.
+- [x] `QLT-092` Owner: `FE` Task: Extend selector resolution with deck selectors and wildcard support while guaranteeing overlap dedupe by session ID.
+- [x] `QLT-093` Owner: `QA` Task: Add frontend regression matrix for deck migration, conflict handling, deck-scoped rendering, selector isolation, and overlap-dedupe behavior.
+- [x] `QLT-094` Owner: `QA` Task: Stabilize restore-fallback integration coverage with deterministic PTY/runtime injection so restart-durability tests are environment-independent.
+- [ ] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
+- [ ] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
+- [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
+- [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
+- [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
+- [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

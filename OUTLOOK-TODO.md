@@ -25,6 +25,8 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] `ENT-010` Owner `QA`: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).
 - [ ] `ENT-017` Owner `BE`: Enforce WebSocket `Origin` allowlist checks on upgrade requests and return explicit unauthorized-origin errors.
 - [ ] `ENT-025` Owner `BE`: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_DEV_MODE` as local-only fallback.
+- [ ] `ENT-026` Owner `BE`: Replace WebSocket query-string token transport with header-based or one-time handshake token auth and ensure token-bearing URLs are never logged.
+- [ ] `ENT-027` Owner `BE`: Split auth behavior into explicit `AUTH_MODE=dev|prod`, disable `/api/v1/auth/dev-token` outside local/dev mode, and fail fast on insecure production auth configuration.
 
 ## Scale and Runtime Isolation
 
@@ -51,6 +53,8 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add optional controlled mouse forwarding.
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
+- [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
+- [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond custom commands to additional frontend domains (session lifecycle, derived state, future plugin artifacts).
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
 - [ ] Add parameterized custom commands (for example `/deploy <env>`) with explicit placeholder rules.
 - [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.

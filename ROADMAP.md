@@ -356,15 +356,51 @@ Exit criteria:
 - Deck and move slash commands behave consistently with UI actions.
 - Regression coverage validates migration, isolation semantics, and multi-selector dedupe guarantees.
 
+### v0.3.0-H7 - Frontend State Correctness and Architecture Consolidation
+
+- `QLT-095`
+- `QLT-096`
+- `QLT-097`
+- `QLT-098`
+- `QLT-099`
+- `QLT-100`
+
+Completed in this milestone:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`
+
+Dependencies:
+
+- `QLT-096` depends on `QLT-095` so exit-state lifecycle assertions target finalized FE state behavior.
+- `QLT-098` depends on `QLT-097` so regression coverage targets the WebSocket-first custom-command state model instead of the mixed REST/WS path.
+- `QLT-099` should complete before `QLT-100` so xterm compatibility boundaries are defined before broader FE modularization.
+- `QLT-100` depends on `QLT-095`, `QLT-097`, and `QLT-099` so module extraction lands on top of corrected lifecycle handling, corrected command-state flow, and isolated xterm internals.
+
+Exit criteria:
+
+- Frontend handles `session.exit` deterministically with explicit exited-session UX and post-exit guardrails.
+- Custom-command runtime state is WebSocket-first in steady-state frontend flows.
+- xterm private/internal access is isolated behind one compatibility boundary.
+- `frontend/src/public/app.js` is decomposed into layered modules without behavior regression.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H6`
-- Next milestones in progress: none
+- Next milestones in progress: `v0.3.0-H7`
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- none
+- `QLT-095`
+- `QLT-096`
+- `QLT-097`
+- `QLT-098`
+- `QLT-099`
+- `QLT-100`
 
 ### Completed Items
 
@@ -437,6 +473,10 @@ Exit criteria:
 - `QLT-077`
 - `QLT-078`
 - `QLT-079`
+- `QLT-080`
+- `QLT-081`
+- `QLT-082`
+- `QLT-094`
 - `QLT-083`
 - `QLT-084`
 - `QLT-085`
@@ -448,4 +488,5 @@ Exit criteria:
 - `QLT-091`
 - `QLT-092`
 - `QLT-093`
+- `PLAT-011`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`

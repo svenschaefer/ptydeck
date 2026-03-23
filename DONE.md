@@ -2,6 +2,14 @@
 
 Completed and verified topics belong here.
 
+## 2026-03-24
+
+- [x] Imported `docs/` architecture-review notes are now consolidated by `docs/README.md` so strategy papers are indexed without pretending to be implementation-status documents.
+- [x] Review-derived current-scope tasks were extracted into explicit near-term backlog items `QLT-095` ... `QLT-100` in `TODO.md`.
+- [x] Review-derived deferred security and architecture themes were added to `OUTLOOK-TODO.md` as explicit backlog items (`ENT-026`, `ENT-027`, `ARC-001`, `ARC-002`).
+- [x] `ROADMAP.md` was extended with `v0.3.0-H7` so the new FE state/architecture tasks have explicit ordering and dependency semantics.
+- [x] `CODEX_CONTEXT.md` was synchronized with the `docs/` review outcome and now records the active H7 backlog plus the non-authoritative role of `docs/README.md`.
+
 ## 2026-03-23
 
 - [x] Frontend hotfix for hidden-deck rendering drift: terminal cards now mark pending viewport sync while hidden and run forced resize/refresh passes when shown again.
