@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-23 (deck-switch geometry hotfix: active-deck-scoped resize on deck change)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H6 active-open backlog cleanup).
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, H6 active-open backlog cleanup, and explicit confirmation that TODO/ROADMAP currently have no active open tasks).
 
 ## Project Purpose
 
