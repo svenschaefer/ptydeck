@@ -124,6 +124,7 @@ const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => 
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
 const SYSTEM_SLASH_COMMANDS = [
   "new",
+  "filter",
   "close",
   "switch",
   "next",
@@ -149,6 +150,7 @@ let recalledSlashCommand = "";
 const uiState = {
   loading: true,
   error: "",
+  sessionFilterText: "",
   commandFeedback: "",
   commandInlineHint: "",
   commandInlineHintPrefixPx: 0,
@@ -553,7 +555,7 @@ function resolveSlashAutocompleteContext(rawInput, customCommands) {
     };
   }
 
-  if ((command === "switch" || command === "close" || command === "restart" || command === "rename") && parts.length <= 2) {
+  if ((command === "switch" || command === "close" || command === "restart" || command === "rename" || command === "filter") && parts.length <= 2) {
     const targetPrefix = parts.length === 2 ? parts[1] : "";
     return {
       replacePrefix: `/${commandRaw} `,
@@ -1544,6 +1546,17 @@ function maybeReportStartupPerf() {
 
 function render() {
   const state = store.getState();
+  const filtered = resolveFilterSelectors(uiState.sessionFilterText, state.sessions);
+  const visibleSessionIds = new Set(
+    filtered.sessions.map((session) => session.id)
+  );
+  const filterActive = Boolean(String(uiState.sessionFilterText || "").trim());
+  if (!filterActive) {
+    visibleSessionIds.clear();
+    for (const session of state.sessions) {
+      visibleSessionIds.add(session.id);
+    }
+  }
   pruneQuickIds(state.sessions.map((session) => session.id));
   if (state.sessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
     startupPerf.firstNonEmptyRenderAtMs = nowMs();
@@ -1551,13 +1564,23 @@ function render() {
   }
   debugLog("ui.render", {
     sessions: state.sessions.length,
+    visibleSessions: visibleSessionIds.size,
     activeSessionId: state.activeSessionId,
     connectionState: state.connectionState,
     loading: uiState.loading,
     hasError: Boolean(uiState.error)
   });
   stateEl.textContent = state.connectionState;
-  emptyStateEl.style.display = state.sessions.length === 0 ? "block" : "none";
+  if (state.sessions.length === 0) {
+    emptyStateEl.textContent = "No sessions yet. Create one to start.";
+    emptyStateEl.style.display = "block";
+  } else if (visibleSessionIds.size === 0) {
+    emptyStateEl.textContent = "No sessions match current filter.";
+    emptyStateEl.style.display = "block";
+  } else {
+    emptyStateEl.textContent = "No sessions yet. Create one to start.";
+    emptyStateEl.style.display = "none";
+  }
   if (uiState.loading) {
     statusMessageEl.textContent = "Loading sessions...";
   } else if (uiState.error) {
@@ -1610,6 +1633,7 @@ function render() {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
+      entry.element.hidden = !visibleSessionIds.has(session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       renderSessionTagList(entry, session);
@@ -1853,6 +1877,7 @@ function render() {
     });
 
     node.classList.toggle("active", state.activeSessionId === session.id);
+    node.hidden = !visibleSessionIds.has(session.id);
 
     const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
     const terminal = new window.Terminal({
@@ -2093,6 +2118,45 @@ function resolveTargetSelectors(selectorText, sessions, options = {}) {
   return { sessions: Array.from(dedupe.values()), error: "" };
 }
 
+function resolveFilterSelectors(selectorText, sessions) {
+  const selectorList = parseSelectorList(selectorText, { source: "slash" });
+  if (selectorList.length === 0) {
+    return { sessions: [], error: "" };
+  }
+  const dedupe = new Map();
+  for (const selector of selectorList) {
+    const normalized = String(selector || "").trim();
+    if (!normalized) {
+      continue;
+    }
+    const exactIdMatch = sessions.find((session) => session.id === normalized) || null;
+    let idMatches = [];
+    if (exactIdMatch) {
+      idMatches = [exactIdMatch];
+    } else {
+      const prefixMatches = sessions.filter((session) => session.id.startsWith(normalized));
+      if (prefixMatches.length > 1) {
+        return { sessions: [], error: `Ambiguous session id prefix: ${normalized}` };
+      }
+      idMatches = prefixMatches;
+    }
+    const tagToken = normalizeSessionTagToken(normalized);
+    const tagMatches = sessions.filter((session) =>
+      Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
+    );
+    if (idMatches.length === 0 && tagMatches.length === 0) {
+      return { sessions: [], error: `Unknown session id/tag: ${normalized}` };
+    }
+    for (const session of idMatches) {
+      dedupe.set(session.id, session);
+    }
+    for (const session of tagMatches) {
+      dedupe.set(session.id, session);
+    }
+  }
+  return { sessions: Array.from(dedupe.values()), error: "" };
+}
+
 function resolveSettingsTargets(selectorText, sessions, activeSessionId) {
   const normalized = String(selectorText || "").trim().toLowerCase();
   if (!normalized || normalized === "active") {
@@ -2243,7 +2307,23 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+  }
+
+  if (command === "filter") {
+    const selectorText = args.join(" ").trim();
+    if (!selectorText) {
+      uiState.sessionFilterText = "";
+      render();
+      return "Display filter cleared.";
+    }
+    const resolved = resolveFilterSelectors(selectorText, sessions);
+    if (resolved.error) {
+      return resolved.error;
+    }
+    uiState.sessionFilterText = selectorText;
+    render();
+    return `Display filter active (${resolved.sessions.length}/${sessions.length}): ${selectorText}`;
   }
 
   if (command === "list") {

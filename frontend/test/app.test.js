@@ -629,6 +629,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/filter \[id\/tag/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/rename <selector> <name>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/settings apply <selector\|active> <json>/);
@@ -1068,6 +1069,28 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   const firstCard = fixture.elements.terminalGrid.children[0];
   const secondCard = fixture.elements.terminalGrid.children[1];
+  fixture.elements.commandInput.value = "/filter alpha";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^Display filter active \(1\/2\): alpha$/);
+  assert.equal(firstCard.hidden, false);
+  assert.equal(secondCard.hidden, true);
+  assert.equal(fixture.elements.emptyState.style.display, "none");
+
+  fixture.elements.commandInput.value = "/filter s-2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^Display filter active \(1\/2\): s-2$/);
+  assert.equal(firstCard.hidden, true);
+  assert.equal(secondCard.hidden, false);
+
+  fixture.elements.commandInput.value = "/filter";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Display filter cleared.");
+  assert.equal(firstCard.hidden, false);
+  assert.equal(secondCard.hidden, false);
+
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");
   assert.equal(firstQuickId.textContent, "1");
