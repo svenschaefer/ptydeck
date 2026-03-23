@@ -367,11 +367,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- none
+- `QLT-095`, `QLT-096`
 
 Remaining in this milestone:
 
-- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`
+- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`
 
 Dependencies:
 
@@ -395,8 +395,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-095`
-- `QLT-096`
 - `QLT-097`
 - `QLT-098`
 - `QLT-099`
@@ -488,5 +486,7 @@ Exit criteria:
 - `QLT-091`
 - `QLT-092`
 - `QLT-093`
+- `QLT-095`
+- `QLT-096`
 - `PLAT-011`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`

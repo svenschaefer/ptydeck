@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (docs review consolidated; H7 frontend-state/architecture backlog opened)
+Last updated: 2026-03-24 (session.exit frontend lifecycle handling completed; H7 reduced to QLT-097...QLT-100)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, and promotion of review-derived current-scope tasks into the active H7 backlog.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, and completion sync for `QLT-095`/`QLT-096`.
 
 ## Project Purpose
 
@@ -133,7 +133,8 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend terminal resize/mount geometry is now session-deck-derived rather than active-deck-derived, so hidden sessions keep their own deck `cols/rows` even while another deck is active.
 - Deferred resize passes caused by deck switching are now active-deck-scoped, preventing delayed cross-deck terminal width/height bleed.
 - Imported architecture review notes in `docs/` are now indexed in `docs/README.md`, with explicit separation between current-scope action items and deferred themes.
-- Current docs-review-confirmed frontend gaps are now explicitly tracked in active backlog: missing explicit `session.exit` handling, mixed REST/WS custom-command state flow, direct xterm private-internal access, and `frontend/src/public/app.js` monolith/refactor pressure.
+- Current docs-review-confirmed frontend gaps still tracked in active backlog are mixed REST/WS custom-command state flow, direct xterm private-internal access, and `frontend/src/public/app.js` monolith/refactor pressure.
+- Frontend now handles backend `session.exit` as an explicit local `exited` session tombstone state with visible badge/hint UI, guarded post-exit interactions, local delete semantics, and reconnect snapshot cleanup.
 - Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `OUTLOOK-TODO.md` (`ENT-026`, `ENT-027`).
 - Stream/plugin architecture and broader WebSocket-first state architecture from imported review notes are tracked as deferred items in `OUTLOOK-TODO.md` (`ARC-001`, `ARC-002`).
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
@@ -248,7 +249,8 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle G (`v0.3.0-H5`): none.
   - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
   - Planned next in cycle H (`v0.3.0-H6`): none.
-  - Planned next in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`.
+  - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`.
+  - Planned next in cycle I (`v0.3.0-H7`): `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`.
 
 ## Session Behavior Notes
 

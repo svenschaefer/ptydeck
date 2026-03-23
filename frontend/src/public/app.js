@@ -1160,8 +1160,56 @@ function resolveSessionDeckId(session) {
   return deckId || DEFAULT_DECK_ID;
 }
 
+function getSessionRuntimeState(session) {
+  const state = String(session?.state || "").trim().toLowerCase();
+  if (state === "unrestored" || state === "exited") {
+    return state;
+  }
+  return "active";
+}
+
 function isSessionUnrestored(session) {
-  return String(session?.state || "").toLowerCase() === "unrestored";
+  return getSessionRuntimeState(session) === "unrestored";
+}
+
+function isSessionExited(session) {
+  return getSessionRuntimeState(session) === "exited";
+}
+
+function isSessionActionBlocked(session) {
+  return isSessionUnrestored(session) || isSessionExited(session);
+}
+
+function getSessionStateBadgeText(session) {
+  if (isSessionUnrestored(session)) {
+    return "UNRESTORED";
+  }
+  if (isSessionExited(session)) {
+    return "EXITED";
+  }
+  return "";
+}
+
+function getExitedSessionStatusSuffix(session) {
+  const details = [];
+  if (Number.isInteger(session?.exitCode)) {
+    details.push(`exit code ${session.exitCode}`);
+  }
+  const signal = String(session?.exitSignal || "").trim();
+  if (signal) {
+    details.push(`signal ${signal}`);
+  }
+  return details.length > 0 ? ` (${details.join(", ")})` : "";
+}
+
+function getSessionStateHintText(session) {
+  if (isSessionUnrestored(session)) {
+    return "Session could not be restored after backend restart. Update settings or delete this session.";
+  }
+  if (isSessionExited(session)) {
+    return `Session process exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
+  }
+  return "";
 }
 
 function getUnrestoredSessionMessage(session) {
@@ -1169,12 +1217,20 @@ function getUnrestoredSessionMessage(session) {
   return `Session ${label} is unrestored after backend restart. Input, resize, and restart are disabled.`;
 }
 
-function getBlockedUnrestoredMessage(sessions, actionLabel) {
+function getExitedSessionMessage(session) {
+  const label = `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
+  return `Session ${label} has exited${getExitedSessionStatusSuffix(session)}. Rename, restart, input, resize, and settings changes are disabled. Delete this session to remove the card.`;
+}
+
+function getBlockedSessionActionMessage(sessions, actionLabel) {
   const labels = sessions.map((session) => `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`);
   if (labels.length === 1) {
-    return `${actionLabel} blocked for unrestored session ${labels[0]}.`;
+    return `${actionLabel} blocked for ${getSessionRuntimeState(sessions[0])} session ${labels[0]}.`;
   }
-  return `${actionLabel} blocked for unrestored sessions: ${labels.join(", ")}.`;
+  const annotatedLabels = sessions.map(
+    (session) => `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} [${getSessionRuntimeState(session)}]`
+  );
+  return `${actionLabel} blocked for non-interactive sessions: ${annotatedLabels.join(", ")}.`;
 }
 
 function getSessionThemeConfig(sessionId) {
@@ -1747,7 +1803,7 @@ function applyResizeForSession(sessionId, options = {}) {
     return;
   }
   const session = getSessionById(sessionId);
-  if (isSessionUnrestored(session)) {
+  if (isSessionActionBlocked(session)) {
     const pendingTimer = resizeTimers.get(sessionId);
     if (pendingTimer) {
       clearTimeout(pendingTimer);
@@ -2192,11 +2248,13 @@ function render() {
   for (const session of state.sessions) {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
-      const unrestored = isSessionUnrestored(session);
+      const stateBadgeText = getSessionStateBadgeText(session);
+      const stateHintText = getSessionStateHintText(session);
       const nextVisible = visibleSessionIds.has(session.id);
       const wasVisible = entry.isVisible !== false;
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
-      entry.element.classList.toggle("unrestored", unrestored);
+      entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
+      entry.element.classList.toggle("exited", isSessionExited(session));
       if (wasVisible && !nextVisible) {
         entry.followOnShow = isTerminalAtBottom(entry.terminal);
       }
@@ -2208,14 +2266,12 @@ function render() {
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       if (entry.stateBadgeEl) {
-        entry.stateBadgeEl.hidden = !unrestored;
-        entry.stateBadgeEl.textContent = unrestored ? "UNRESTORED" : "";
+        entry.stateBadgeEl.hidden = !stateBadgeText;
+        entry.stateBadgeEl.textContent = stateBadgeText;
       }
       if (entry.unrestoredHintEl) {
-        entry.unrestoredHintEl.hidden = !unrestored;
-        entry.unrestoredHintEl.textContent = unrestored
-          ? "Session could not be restored after backend restart. Update settings or delete this session."
-          : "";
+        entry.unrestoredHintEl.hidden = !stateHintText;
+        entry.unrestoredHintEl.textContent = stateHintText;
       }
       renderSessionTagList(entry, session);
       if (!entry.settingsDirty) {
@@ -2267,20 +2323,20 @@ function render() {
     const settingsStatus = node.querySelector(".session-settings-status");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
-    const unrestored = isSessionUnrestored(session);
+    const stateBadgeText = getSessionStateBadgeText(session);
+    const stateHintText = getSessionStateHintText(session);
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
     quickIdEl.textContent = quickId;
-    node.classList.toggle("unrestored", unrestored);
+    node.classList.toggle("unrestored", isSessionUnrestored(session));
+    node.classList.toggle("exited", isSessionExited(session));
     if (stateBadgeEl) {
-      stateBadgeEl.hidden = !unrestored;
-      stateBadgeEl.textContent = unrestored ? "UNRESTORED" : "";
+      stateBadgeEl.hidden = !stateBadgeText;
+      stateBadgeEl.textContent = stateBadgeText;
     }
     if (unrestoredHintEl) {
-      unrestoredHintEl.hidden = !unrestored;
-      unrestoredHintEl.textContent = unrestored
-        ? "Session could not be restored after backend restart. Update settings or delete this session."
-        : "";
+      unrestoredHintEl.hidden = !stateHintText;
+      unrestoredHintEl.textContent = stateHintText;
     }
     renderSessionTagList({ tagListEl }, session);
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
@@ -2297,7 +2353,12 @@ function render() {
       });
     }
     renameBtn.addEventListener("click", async () => {
-      const nextName = window.prompt("Session name", session.name || session.id.slice(0, 8));
+      const currentSession = getSessionById(session.id) || session;
+      if (isSessionExited(currentSession)) {
+        setError(getBlockedSessionActionMessage([currentSession], "Rename"));
+        return;
+      }
+      const nextName = window.prompt("Session name", currentSession.name || session.id.slice(0, 8));
       if (nextName === null) {
         return;
       }
@@ -2315,7 +2376,17 @@ function render() {
       }
     });
     closeBtn.addEventListener("click", async () => {
+      const currentSession = getSessionById(session.id) || session;
       if (!confirmSessionDelete(session)) {
+        return;
+      }
+      if (isSessionExited(currentSession)) {
+        removeSession(currentSession.id);
+        closeSettingsDialog(settingsDialog);
+        uiState.error = "";
+        setCommandFeedback(
+          `Removed exited session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
+        );
         return;
       }
       try {
@@ -2401,6 +2472,13 @@ function render() {
       });
     }
     settingsApplyBtn.addEventListener("click", async () => {
+      const currentSession = getSessionById(session.id) || session;
+      if (isSessionExited(currentSession)) {
+        const blockedMessage = getBlockedSessionActionMessage([currentSession], "Settings apply");
+        setError(blockedMessage);
+        setStartupSettingsFeedback({ startFeedback }, blockedMessage, true);
+        return;
+      }
       const startupDraft = readSessionStartupFromControls({
         startCwdInput,
         startCommandInput,
@@ -2493,6 +2571,10 @@ function render() {
       const latestSession = getSessionById(session.id);
       if (isSessionUnrestored(latestSession)) {
         setError(getUnrestoredSessionMessage(latestSession));
+        return;
+      }
+      if (isSessionExited(latestSession)) {
+        setError(getExitedSessionMessage(latestSession));
         return;
       }
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
@@ -2599,11 +2681,36 @@ function upsertSession(nextSession) {
   const nextSessions = currentSessions.slice();
   const index = nextSessions.findIndex((entry) => entry.id === nextSession.id);
   if (index >= 0) {
-    nextSessions[index] = { ...nextSessions[index], ...nextSession };
+    const merged = { ...nextSessions[index], ...nextSession };
+    if (getSessionRuntimeState(nextSession) === "active") {
+      delete merged.exitCode;
+      delete merged.exitSignal;
+      delete merged.exitedAt;
+    }
+    nextSessions[index] = merged;
   } else {
     nextSessions.push(nextSession);
   }
   store.setSessions(nextSessions);
+}
+
+function markSessionExited(sessionId, exitDetails = {}) {
+  const session = getSessionById(sessionId);
+  if (!session) {
+    return;
+  }
+  const nextSession = {
+    ...session,
+    state: "exited",
+    exitCode: Number.isInteger(exitDetails.exitCode) ? exitDetails.exitCode : null,
+    exitSignal: typeof exitDetails.signal === "string" ? exitDetails.signal : "",
+    exitedAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  upsertSession(nextSession);
+  if (store.getState().activeSessionId === sessionId) {
+    setCommandFeedback(getExitedSessionMessage(nextSession));
+  }
 }
 
 function removeSession(sessionId) {
@@ -3353,7 +3460,8 @@ async function executeControlCommand(interpreted) {
     const lines = sessions.map((session) => {
       const marker = session.id === activeSessionId ? "*" : " ";
       const token = formatSessionToken(session.id);
-      const stateSuffix = isSessionUnrestored(session) ? " [unrestored]" : "";
+      const state = getSessionRuntimeState(session);
+      const stateSuffix = state === "active" ? "" : ` [${state}]`;
       return `${marker} [${token}] ${formatSessionDisplayName(session)} (${session.id.slice(0, 8)})${stateSuffix}`;
     });
     return lines.join("\n");
@@ -3394,9 +3502,16 @@ async function executeControlCommand(interpreted) {
     if (targetSessions.length === 0) {
       return "No active session to close.";
     }
-    await Promise.all(targetSessions.map((session) => api.deleteSession(session.id)));
+    const exitedTargets = targetSessions.filter((session) => isSessionExited(session));
+    const liveTargets = targetSessions.filter((session) => !isSessionExited(session));
+    await Promise.all(liveTargets.map((session) => api.deleteSession(session.id)));
     for (const session of targetSessions) {
       removeSession(session.id);
+    }
+    if (exitedTargets.length > 0 && liveTargets.length === 0) {
+      return exitedTargets.length === 1
+        ? `Removed exited session [${formatSessionToken(exitedTargets[0].id)}] ${formatSessionDisplayName(exitedTargets[0])}.`
+        : `Removed ${exitedTargets.length} exited sessions.`;
     }
     if (targetSessions.length === 1) {
       return `Closed session ${targetSessions[0].id.slice(0, 8)}.`;
@@ -3461,6 +3576,10 @@ async function executeControlCommand(interpreted) {
       if (!name) {
         return "Usage: /rename <name> | /rename <selector> <name>";
       }
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (isSessionExited(activeSession)) {
+        return getBlockedSessionActionMessage([activeSession], "Rename");
+      }
       const updated = await api.updateSession(activeSessionId, { name });
       upsertSession(updated);
       return `Renamed active session to ${updated.name}.`;
@@ -3477,6 +3596,9 @@ async function executeControlCommand(interpreted) {
     }
     if (resolvedTargets.sessions.length !== 1) {
       return "Rename selector must resolve to exactly one session.";
+    }
+    if (isSessionExited(resolvedTargets.sessions[0])) {
+      return getBlockedSessionActionMessage(resolvedTargets.sessions, "Rename");
     }
     const updated = await api.updateSession(resolvedTargets.sessions[0].id, { name });
     upsertSession(updated);
@@ -3507,9 +3629,9 @@ async function executeControlCommand(interpreted) {
     if (targetSessions.length === 0) {
       return "No active session to restart.";
     }
-    const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
     if (blockedSessions.length > 0) {
-      return getBlockedUnrestoredMessage(blockedSessions, "Restart");
+      return getBlockedSessionActionMessage(blockedSessions, "Restart");
     }
     const restartedSessions = await Promise.all(targetSessions.map((session) => api.restartSession(session.id)));
     for (const restarted of restartedSessions) {
@@ -3603,6 +3725,10 @@ async function executeControlCommand(interpreted) {
     if (targets.length === 0) {
       return "No target sessions resolved for /settings apply.";
     }
+    const blockedTargets = targets.filter((session) => isSessionExited(session));
+    if (blockedTargets.length > 0) {
+      return getBlockedSessionActionMessage(blockedTargets, "Settings apply");
+    }
 
     const payload = parsedPayload.payload;
     const allowedKeys = new Set(["startCwd", "startCommand", "env", "tags", "themeProfile", "sendTerminator"]);
@@ -3683,9 +3809,9 @@ async function executeControlCommand(interpreted) {
     if (targetSessions.length === 0) {
       return "No active session for custom command execution.";
     }
-    const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
     if (blockedSessions.length > 0) {
-      return getBlockedUnrestoredMessage(blockedSessions, "Custom command execution");
+      return getBlockedSessionActionMessage(blockedSessions, "Custom command execution");
     }
     await Promise.all(
       targetSessions.map((session) => {
@@ -3812,6 +3938,12 @@ function startWs() {
 
       if (event.type === "session.created" && event.session) {
         upsertSession(event.session);
+        uiState.error = "";
+        return;
+      }
+
+      if (event.type === "session.exit" && event.sessionId) {
+        markSessionExited(event.sessionId, event);
         uiState.error = "";
         return;
       }
@@ -3980,17 +4112,17 @@ async function submitCommand() {
   }
   if (!directRouting.matched) {
     const activeSession = sessions.find((session) => session.id === targetSessionId) || null;
-    if (isSessionUnrestored(activeSession)) {
-      setCommandFeedback(getBlockedUnrestoredMessage([activeSession], "Command send"));
+    if (isSessionActionBlocked(activeSession)) {
+      setCommandFeedback(getBlockedSessionActionMessage([activeSession], "Command send"));
       return;
     }
   }
 
   try {
     if (directRouting.matched && targetSessions.length > 0) {
-      const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+      const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
       if (blockedSessions.length > 0) {
-        setCommandFeedback(getBlockedUnrestoredMessage(blockedSessions, "Command send"));
+        setCommandFeedback(getBlockedSessionActionMessage(blockedSessions, "Command send"));
         return;
       }
       await Promise.all(

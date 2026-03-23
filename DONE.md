@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-095` completed: frontend now handles backend `session.exit` events as explicit local `exited` session state instead of silently ignoring process termination.
+- [x] Exited sessions now show visible `EXITED` state UI with status-aware hint text and guarded post-exit interaction behavior (input, resize, rename, restart, and settings apply are blocked).
+- [x] Exited sessions can now be removed locally without backend roundtrip, and reconnect snapshots deterministically clear exited tombstones that no longer exist server-side.
+- [x] `QLT-096` completed: frontend regression coverage now exercises exited-session badge/hint rendering, blocked command/settings flows, local delete semantics, and reconnect snapshot cleanup.
+- [x] Validation for `QLT-095`/`QLT-096` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Imported `docs/` architecture-review notes are now consolidated by `docs/README.md` so strategy papers are indexed without pretending to be implementation-status documents.
 - [x] Review-derived current-scope tasks were extracted into explicit near-term backlog items `QLT-095` ... `QLT-100` in `TODO.md`.
 - [x] Review-derived deferred security and architecture themes were added to `OUTLOOK-TODO.md` as explicit backlog items (`ENT-026`, `ENT-027`, `ARC-001`, `ARC-002`).

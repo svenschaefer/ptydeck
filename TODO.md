@@ -13,8 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
-- [ ] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
 - [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
 - [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
@@ -177,8 +175,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-092` Owner: `FE` Task: Extend selector resolution with deck selectors and wildcard support while guaranteeing overlap dedupe by session ID.
 - [x] `QLT-093` Owner: `QA` Task: Add frontend regression matrix for deck migration, conflict handling, deck-scoped rendering, selector isolation, and overlap-dedupe behavior.
 - [x] `QLT-094` Owner: `QA` Task: Stabilize restore-fallback integration coverage with deterministic PTY/runtime injection so restart-durability tests are environment-independent.
-- [ ] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
-- [ ] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
+- [x] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
+- [x] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
 - [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
 - [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.

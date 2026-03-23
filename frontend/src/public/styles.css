@@ -527,6 +527,26 @@ button:hover {
   opacity: 0.8;
 }
 
+.terminal-card.exited {
+  border-color: #6b3f7f;
+}
+
+.terminal-card.exited .terminal-mount {
+  opacity: 0.7;
+}
+
+.terminal-card.exited .session-state-badge {
+  border-color: #5d3f73;
+  color: #d3b3f4;
+  background: #241b30;
+}
+
+.terminal-card.exited .session-unrestored-hint {
+  border-bottom-color: #4a315d;
+  background: #1f1728;
+  color: #d8c1f0;
+}
+
 .session-settings-dialog {
   width: min(980px, calc(100vw - 48px));
   max-height: calc(100vh - 40px);

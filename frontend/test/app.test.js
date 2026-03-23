@@ -1811,6 +1811,102 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(reopenedSecondTerminal.options.theme.background, "#101010");
   assert.equal(reopenedSecondTerminal.options.theme.foreground, "#e0e0e0");
 
+  const updateCallsBeforeExit = updateSessionCalls.length;
+  const inputPayloadsBeforeExit = inputPayloads.length;
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.exit", sessionId: "s-2", exitCode: 17, signal: "SIGTERM" })
+  });
+  await tick();
+  const exitedSecondCard = fixture.elements.terminalGrid.children.find(
+    (entry) => entry.querySelector(".session-focus")?.textContent === "two"
+  );
+  assert.ok(exitedSecondCard.classList.contains("exited"));
+  assert.equal(exitedSecondCard.querySelector(".session-state-badge").textContent, "EXITED");
+  assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /process exited/i);
+  assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /exit code 17/i);
+  assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /SIGTERM/i);
+
+  fixture.elements.commandInput.value = "/rename 2 renamed-exited";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Rename blocked for exited session [2] two.");
+
+  fixture.elements.commandInput.value = "/restart 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Restart blocked for exited session [2] two.");
+
+  fixture.elements.commandInput.value = '/settings apply 2 {"sendTerminator":"lf"}';
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Settings apply blocked for exited session [2] two.");
+  assert.equal(updateSessionCalls.length, updateCallsBeforeExit);
+
+  fixture.elements.commandInput.value = "@2 echo blocked-exit";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for exited session [2] two.");
+  assert.equal(inputPayloads.length, inputPayloadsBeforeExit);
+
+  reopenedSecondTerminal.dataHandler("echo blocked-terminal");
+  await tick();
+  assert.match(fixture.elements.statusMessage.textContent, /Session \[2\] two has exited/i);
+
+  fixture.elements.commandInput.value = "/close 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Removed exited session [2] two.");
+  assert.equal(
+    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "two"),
+    false
+  );
+
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.exit", sessionId: "ops", exitCode: 0, signal: "" })
+  });
+  await tick();
+  assert.equal(
+    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
+    true
+  );
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions: [
+        {
+          id: "s-1",
+          deckId: "default",
+          state: "active",
+          shell: "bash",
+          cwd: "~",
+          name: "one",
+          tags: ["alpha"],
+          themeProfile: latestSettingsCall.payload.themeProfile,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        {
+          id: "s-u",
+          deckId: "default",
+          state: "unrestored",
+          shell: "bash",
+          cwd: "~",
+          name: "unrestored",
+          tags: ["broken"],
+          themeProfile: latestSettingsCall.payload.themeProfile,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      ],
+      outputs: []
+    })
+  });
+  await tick();
+  assert.equal(
+    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
+    false
+  );
+
   ws.emit("message", { data: JSON.stringify({ type: "snapshot", sessions: [], outputs: [] }) });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 0);
