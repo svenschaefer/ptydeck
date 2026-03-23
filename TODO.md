@@ -22,6 +22,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 - [ ] `QLT-104` Owner: `FE` Task: Extend `>...` quick-switching so deck selectors are supported as direct targets as well, including autocomplete for deck names/IDs and deterministic deck activation when the `>` target resolves to a deck instead of a terminal.
 - [ ] `QLT-105` Owner: `FE` Task: Broaden autocomplete coverage across both `/...` and `>...` input flows so terminal selectors, deck selectors, and related navigation targets are suggested consistently wherever deterministic completion is possible.
+- [ ] `QLT-106` Owner: `FE` Task: Make `>...` quick-switching reuse the same selector grammar as `/switch`, including explicit `deckSelector::sessionSelector` cross-deck targeting, deterministic single-target ambiguity handling, and consistent resolution across ID, quick ID, name, and unique ID-prefix selectors.
+- [ ] `QLT-107` Owner: `FE` Task: Add inline `>...` target preview and pre-submit resolution feedback so quick-switch input shows the resolved deck/session target, clear ambiguity or no-match states, and deterministic no-op behavior when the requested target is already active.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -191,6 +193,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 - [ ] `QLT-104` Owner: `FE` Task: Extend `>...` quick-switching so deck selectors are supported as direct targets as well, including autocomplete for deck names/IDs and deterministic deck activation when the `>` target resolves to a deck instead of a terminal.
 - [ ] `QLT-105` Owner: `FE` Task: Broaden autocomplete coverage across both `/...` and `>...` input flows so terminal selectors, deck selectors, and related navigation targets are suggested consistently wherever deterministic completion is possible.
+- [ ] `QLT-106` Owner: `FE` Task: Make `>...` quick-switching reuse the same selector grammar as `/switch`, including explicit `deckSelector::sessionSelector` cross-deck targeting, deterministic single-target ambiguity handling, and consistent resolution across ID, quick ID, name, and unique ID-prefix selectors.
+- [ ] `QLT-107` Owner: `FE` Task: Add inline `>...` target preview and pre-submit resolution feedback so quick-switch input shows the resolved deck/session target, clear ambiguity or no-match states, and deterministic no-op behavior when the requested target is already active.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

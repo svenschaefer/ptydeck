@@ -369,6 +369,8 @@ Exit criteria:
 - `QLT-103`
 - `QLT-104`
 - `QLT-105`
+- `QLT-106`
+- `QLT-107`
 
 Completed in this milestone:
 
@@ -376,7 +378,7 @@ Completed in this milestone:
 
 Remaining in this milestone:
 
-- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`
+- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`
 
 Dependencies:
 
@@ -389,6 +391,8 @@ Dependencies:
 - `QLT-103` depends on `QLT-101` and `QLT-102` and validates that quick-switch commands and sidebar terminal buttons stay behaviorally aligned.
 - `QLT-104` depends on `QLT-101` so deck-targeted `>...` semantics build on the same quick-switch parser and target-resolution path instead of forking a separate implementation.
 - `QLT-105` depends on `QLT-101` and `QLT-104` so autocomplete breadth is designed against the final `>...` grammar and can stay aligned with existing `/...` completion behavior.
+- `QLT-106` depends on `QLT-101` and `QLT-104` so `>...` selector semantics remain aligned with the final quick-switch grammar for both direct terminal and deck-scoped targets.
+- `QLT-107` depends on `QLT-101`, `QLT-104`, `QLT-105`, and `QLT-106` so inline quick-switch preview/feedback is built on top of the finalized `>...` selector grammar, target types, and autocomplete behavior instead of duplicating early resolution logic.
 
 Exit criteria:
 
@@ -400,6 +404,8 @@ Exit criteria:
 - Sidebar deck sections expose clickable terminal entries with visible quick IDs and deterministic active-terminal focus behavior.
 - `>...` quick-switching can resolve both terminals and decks, with deterministic deck-name autocomplete.
 - Autocomplete coverage is consistent across `/...` and `>...` navigation-related flows where deterministic suggestions are possible.
+- `>...` quick-switching reuses `/switch` selector semantics instead of introducing a second incompatible navigation grammar.
+- `>...` quick-switching exposes inline resolved-target preview and explicit ambiguity/no-match/no-op feedback before activation.
 
 ## Current Status
 
@@ -418,6 +424,8 @@ Exit criteria:
 - `QLT-103`
 - `QLT-104`
 - `QLT-105`
+- `QLT-106`
+- `QLT-107`
 
 ### Completed Items
 
