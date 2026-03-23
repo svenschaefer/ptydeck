@@ -425,8 +425,8 @@ export function createRuntime(config) {
     const headers = {
       ...buildSecurityHeaders(),
       "content-type": "application/json",
-      "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
-      "access-control-allow-headers": "content-type"
+      "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+      "access-control-allow-headers": "content-type,authorization"
     };
 
     if (allowedOrigin) {

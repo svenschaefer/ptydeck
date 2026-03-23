@@ -586,7 +586,7 @@ test("idle-timeout and max-lifetime guardrails close sessions automatically", as
   }
 });
 
-test("OPTIONS advertises PATCH for CORS preflight", async () => {
+test("OPTIONS advertises PATCH/PUT and authorization header for CORS preflight", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
   try {
     const res = await fetch(`${baseUrl}/sessions/test-id`, {
@@ -595,6 +595,9 @@ test("OPTIONS advertises PATCH for CORS preflight", async () => {
     assert.equal(res.status, 204);
     const allowMethods = res.headers.get("access-control-allow-methods") || "";
     assert.ok(allowMethods.includes("PATCH"));
+    assert.ok(allowMethods.includes("PUT"));
+    const allowHeaders = res.headers.get("access-control-allow-headers") || "";
+    assert.ok(allowHeaders.includes("authorization"));
   } finally {
     await runtime.stop();
   }
