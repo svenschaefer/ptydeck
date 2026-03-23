@@ -944,6 +944,49 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
   }
 });
 
+test("runtime restore falls back to configured shell when persisted shell is invalid", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "restore-invalid-shell";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: sessionId,
+            cwd: homedir(),
+            shell: "/definitely/not/a/real/shell",
+            name: "invalid-shell",
+            startCwd: homedir(),
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "sh" });
+  try {
+    const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
+    assert.equal(res.status, 200);
+    const restored = await res.json();
+    assert.equal(restored.id, sessionId);
+    assert.equal(restored.shell, "sh");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("ready endpoint returns starting before startup gate and ready after release", async () => {
   let releaseReadyGate = null;
   const readyGate = new Promise((resolve) => {

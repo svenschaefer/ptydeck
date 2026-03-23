@@ -691,6 +691,31 @@ export function createRuntime(config) {
     };
   }
 
+  function tryCreateRestoredSession({
+    session,
+    shell,
+    cwd,
+    startCwd,
+    startCommand,
+    env,
+    tags,
+    themeProfile
+  }) {
+    return manager.create({
+      id: session.id,
+      cwd,
+      shell,
+      name: session.name,
+      startCwd,
+      startCommand,
+      env,
+      tags,
+      themeProfile,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt
+    });
+  }
+
   function saveStateQueued(state, reason = "unknown") {
     const executeSave = async () => {
       logDebug("persist.save.start", {
@@ -1175,42 +1200,55 @@ export function createRuntime(config) {
         );
         const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
-        try {
-          manager.create({
-            id: session.id,
-            cwd: startupConfig.startCwd,
-            shell: session.shell || config.shell,
-            name: session.name,
-            startCwd: startupConfig.startCwd,
-            startCommand: startupConfig.startCommand,
-            env: startupConfig.env,
-            tags,
-            themeProfile,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt
-          });
-        } catch (err) {
-          // Keep persisted sessions recoverable when a saved working directory is no longer valid.
-          const fallbackCwd = homedir();
-          logDebug("runtime.restore.session_fallback_home", {
-            sessionId: session.id,
-            requestedStartCwd: startupConfig.startCwd,
-            fallbackCwd,
-            error: err?.message || String(err)
-          });
-          manager.create({
-            id: session.id,
-            cwd: fallbackCwd,
-            shell: session.shell || config.shell,
-            name: session.name,
-            startCwd: fallbackCwd,
-            startCommand: startupConfig.startCommand,
-            env: startupConfig.env,
-            tags,
-            themeProfile,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt
-          });
+        const requestedShell = typeof session.shell === "string" && session.shell.trim() ? session.shell : config.shell;
+        const requestedCwd = startupConfig.startCwd;
+        const fallbackCwd = homedir();
+        const fallbackShell = config.shell;
+        const restoreAttempts = [
+          { shell: requestedShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "saved-shell+saved-cwd" },
+          { shell: fallbackShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "fallback-shell+saved-cwd" },
+          { shell: requestedShell, cwd: fallbackCwd, startCwd: fallbackCwd, reason: "saved-shell+home-cwd" },
+          { shell: fallbackShell, cwd: fallbackCwd, startCwd: fallbackCwd, reason: "fallback-shell+home-cwd" }
+        ];
+
+        let restored = false;
+        for (const attempt of restoreAttempts) {
+          try {
+            tryCreateRestoredSession({
+              session,
+              shell: attempt.shell,
+              cwd: attempt.cwd,
+              startCwd: attempt.startCwd,
+              startCommand: startupConfig.startCommand,
+              env: startupConfig.env,
+              tags,
+              themeProfile
+            });
+            restored = true;
+            if (attempt.reason !== "saved-shell+saved-cwd") {
+              logDebug("runtime.restore.session_fallback_applied", {
+                sessionId: session.id,
+                reason: attempt.reason,
+                requestedShell,
+                requestedStartCwd: requestedCwd,
+                appliedShell: attempt.shell,
+                appliedStartCwd: attempt.startCwd
+              });
+            }
+            break;
+          } catch (err) {
+            logDebug("runtime.restore.session_attempt_failed", {
+              sessionId: session.id,
+              reason: attempt.reason,
+              shell: attempt.shell,
+              startCwd: attempt.startCwd,
+              error: err?.message || String(err)
+            });
+          }
+        }
+
+        if (!restored) {
+          throw new Error("all restore attempts failed");
         }
       } catch (err) {
         console.error("failed to restore session", session.id, err);
