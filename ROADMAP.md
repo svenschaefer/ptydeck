@@ -234,11 +234,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-072`, `QLT-073`, `QLT-074`, `QLT-075`
+- `QLT-072`, `QLT-073`, `QLT-074`, `QLT-075`, `QLT-076`, `QLT-077`
 
 Remaining in this milestone:
 
-- `QLT-076`, `QLT-077`
+- none
 
 Dependencies:
 
@@ -259,8 +259,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H2`
-- Next milestones in progress: `v0.3.0-H3`
+- Latest completed milestone: `v0.3.0-H3`
+- Next milestones in progress: none
 - Blockers: none recorded
 
 ### Completed Items
@@ -330,6 +330,8 @@ Exit criteria:
 - `QLT-073`
 - `QLT-074`
 - `QLT-075`
+- `QLT-076`
+- `QLT-077`
 - `ENT-023`
 - `ENT-018`
 - `ENT-011`

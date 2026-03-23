@@ -629,7 +629,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[id\]/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/settings apply <selector\|active> <json>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/custom <name> <text>/);
 
   fixture.elements.commandInput.value = "/custom docu echo verify";
@@ -1173,6 +1174,53 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
   assert.equal(secondStartFeedback.textContent, "Settings saved.");
   assert.equal(secondTagList.textContent, "#ops #prod");
+  const slashSettingsPayload = {
+    startCwd: "/srv/slash",
+    startCommand: "echo slash",
+    env: { APP_MODE: "slash" },
+    tags: ["ops", "slash"],
+    themeProfile: {
+      ...latestSettingsCall.payload.themeProfile,
+      background: "#202020",
+      foreground: "#f0f0f0"
+    },
+    sendTerminator: "lf"
+  };
+  fixture.elements.commandInput.value = `/settings apply 2 ${JSON.stringify(slashSettingsPayload)}`;
+  fixture.elements.sendCommand.click();
+  await tick();
+  const latestSlashSettingsCall = updateSessionCalls[updateSessionCalls.length - 1];
+  assert.deepEqual(latestSlashSettingsCall, {
+    sessionId: "s-2",
+    payload: {
+      startCwd: "/srv/slash",
+      startCommand: "echo slash",
+      env: { APP_MODE: "slash" },
+      tags: ["ops", "slash"],
+      themeProfile: {
+        ...latestSettingsCall.payload.themeProfile,
+        background: "#202020",
+        foreground: "#f0f0f0"
+      }
+    }
+  });
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Applied settings to 1 session(s): startCwd, startCommand, env, tags, themeProfile, sendTerminator."
+  );
+  fixture.elements.commandInput.value = "/settings show 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /sendTerminator=lf/);
+  assert.match(fixture.elements.commandFeedback.textContent, /"slash"/);
+  fixture.elements.commandInput.value = '/settings apply 2 {"unknown":1}';
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown settings key(s): unknown");
+  fixture.elements.commandInput.value = "@2 slash-line1\nslash-line2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "slash-line1\nslash-line2\n" });
   secondStartEnv.value = "1INVALID=value";
   secondStartEnv.dispatchEvent({ type: "input" });
   const callsBeforeInvalidEnv = updateSessionCalls.length;

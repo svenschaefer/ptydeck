@@ -148,8 +148,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-073` Owner: `FE` Task: Add terminal-tag management in per-session settings dialog (add/remove/list tags) with explicit save feedback and deterministic rendering on terminal cards.
 - [x] `QLT-074` Owner: `FE` Task: Extend target resolution for multi-session control actions to include tags and multi-target selectors (IDs, quick IDs, names, tags simultaneously), executing each matched session at most once (dedupe by session ID) even when selectors overlap.
 - [x] `QLT-075` Owner: `QA` Task: Add regression/integration coverage for tag-based targeting semantics including overlap dedupe (`tag` and `id` both matching same session), no tag-vs-ID conflict rejection, and deterministic multi-target execution results.
-- [ ] `QLT-076` Owner: `FE` Task: Add slash-command settings parity so every per-terminal setting available in the settings dialog can be managed via slash commands as well (startup fields, environment variables, tags, theme profile, submit mode).
-- [ ] `QLT-077` Owner: `QA` Task: Add parity regression coverage proving dialog settings and slash-command settings stay functionally equivalent (same validation, persistence, and rendered/runtime effects).
+- [x] `QLT-076` Owner: `FE` Task: Add slash-command settings parity so every per-terminal setting available in the settings dialog can be managed via slash commands as well (startup fields, environment variables, tags, theme profile, submit mode).
+- [x] `QLT-077` Owner: `QA` Task: Add parity regression coverage proving dialog settings and slash-command settings stay functionally equivalent (same validation, persistence, and rendered/runtime effects).
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

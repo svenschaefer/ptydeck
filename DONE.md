@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-076` completed: slash-command settings parity added via `/settings show [selector]` and `/settings apply <selector|active> <json>`.
+- [x] Slash settings now support startup fields (`startCwd`, `startCommand`), environment map (`env`), tags (`tags`), full theme profile (`themeProfile`), and submit mode (`sendTerminator`) with multi-target selector support.
+- [x] Multi-target slash settings reuse selector resolution/dedupe semantics from H3 (`ID`, quick-ID, name, tags; one execution per session ID).
+- [x] `QLT-077` completed: parity regression coverage added for slash settings apply/show behavior and runtime effects (including submit-mode parity with dialog behavior).
+- [x] Frontend integration tests now verify slash-applied settings persist through API patch payloads and immediately affect routed command execution semantics.
+- [x] Validation for `QLT-076`/`QLT-077` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-074` completed: frontend control-plane target resolution now supports multi-target selectors with tag inclusion for direct routing (`@...`) and slash-driven actions (`/close`, `/restart`, `/<custom>`).
 - [x] Multi-target selection now deduplicates by session ID, so overlap selectors (for example shared tag plus quick-ID/ID) execute each session exactly once.
 - [x] Selector resolution keeps deterministic coexistence semantics for tag-vs-ID/name/quick-ID collisions without conflict rejection.

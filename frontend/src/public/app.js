@@ -127,6 +127,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "list",
   "rename",
   "restart",
+  "settings",
   "custom",
   "help"
 ];
@@ -2053,6 +2054,58 @@ function resolveTargetSelectors(selectorText, sessions, options = {}) {
   return { sessions: Array.from(dedupe.values()), error: "" };
 }
 
+function resolveSettingsTargets(selectorText, sessions, activeSessionId) {
+  const normalized = String(selectorText || "").trim().toLowerCase();
+  if (!normalized || normalized === "active") {
+    if (!activeSessionId) {
+      return { sessions: [], error: "No active session for settings command." };
+    }
+    const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+    if (!activeSession) {
+      return { sessions: [], error: "No active session for settings command." };
+    }
+    return { sessions: [activeSession], error: "" };
+  }
+  return resolveTargetSelectors(selectorText, sessions, { source: "slash" });
+}
+
+function parseSettingsPayload(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return { ok: false, error: "Missing JSON payload for /settings apply." };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: "Invalid JSON payload for /settings apply." };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "Settings payload must be a JSON object." };
+  }
+  return { ok: true, payload: parsed };
+}
+
+function formatSessionSettingsReport(session) {
+  const token = formatSessionToken(session.id);
+  const name = formatSessionDisplayName(session);
+  const startCwd = typeof session.startCwd === "string" && session.startCwd.trim() ? session.startCwd : session.cwd || "";
+  const startCommand = typeof session.startCommand === "string" ? session.startCommand : "";
+  const env = session?.env && typeof session.env === "object" ? session.env : {};
+  const tags = normalizeSessionTags(session.tags);
+  const themeProfile = normalizeThemeProfile(session.themeProfile);
+  const sendTerminator = getSessionSendTerminator(session.id);
+  return [
+    `[${token}] ${name}`,
+    `startCwd=${JSON.stringify(startCwd)}`,
+    `startCommand=${JSON.stringify(startCommand)}`,
+    `env=${JSON.stringify(env)}`,
+    `tags=${JSON.stringify(tags)}`,
+    `sendTerminator=${sendTerminator}`,
+    `themeProfile=${JSON.stringify(themeProfile)}`
+  ].join("\n");
+}
+
 function parseDirectTargetRoutingInput(rawInput) {
   const input = String(rawInput || "");
   const match = /^@([^\s]+)\s+([\s\S]+)$/.exec(input);
@@ -2151,7 +2204,7 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /close [id], /switch <id>, /next, /prev, /list, /rename <name>, /restart [id], /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
   }
 
   if (command === "list") {
@@ -2339,6 +2392,93 @@ async function executeControlCommand(interpreted) {
     }
     const saved = await api.upsertCustomCommand(parsed.name, parsed.content);
     return `Saved custom command /${saved.name} (${parsed.mode}).`;
+  }
+
+  if (command === "settings") {
+    const showMatch = /^\/settings\s+show(?:\s+([^\s]+))?\s*$/i.exec(interpreted.raw || "");
+    if (showMatch) {
+      const selectorText = showMatch[1] || "active";
+      const resolvedTargets = resolveSettingsTargets(selectorText, sessions, activeSessionId);
+      if (resolvedTargets.error) {
+        return resolvedTargets.error;
+      }
+      return resolvedTargets.sessions.map((session) => formatSessionSettingsReport(session)).join("\n\n");
+    }
+
+    const applyMatch = /^\/settings\s+apply\s+([^\s]+)\s+([\s\S]+)$/i.exec(interpreted.raw || "");
+    if (!applyMatch) {
+      return "Usage: /settings show [selector] | /settings apply <selector|active> <json>";
+    }
+    const selectorText = applyMatch[1];
+    const parsedPayload = parseSettingsPayload(applyMatch[2]);
+    if (!parsedPayload.ok) {
+      return parsedPayload.error;
+    }
+
+    const resolvedTargets = resolveSettingsTargets(selectorText, sessions, activeSessionId);
+    if (resolvedTargets.error) {
+      return resolvedTargets.error;
+    }
+    const targets = resolvedTargets.sessions;
+    if (targets.length === 0) {
+      return "No target sessions resolved for /settings apply.";
+    }
+
+    const payload = parsedPayload.payload;
+    const allowedKeys = new Set(["startCwd", "startCommand", "env", "tags", "themeProfile", "sendTerminator"]);
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+      return `Unknown settings key(s): ${unknownKeys.join(", ")}`;
+    }
+
+    const patch = {};
+    if (Object.prototype.hasOwnProperty.call(payload, "startCwd")) {
+      patch.startCwd = payload.startCwd;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "startCommand")) {
+      patch.startCommand = payload.startCommand;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "env")) {
+      patch.env = payload.env;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "tags")) {
+      patch.tags = payload.tags;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "themeProfile")) {
+      patch.themeProfile = payload.themeProfile;
+    }
+
+    let sendTerminatorMode = null;
+    if (Object.prototype.hasOwnProperty.call(payload, "sendTerminator")) {
+      const requested = String(payload.sendTerminator || "").trim().toLowerCase();
+      sendTerminatorMode = normalizeSendTerminatorMode(requested);
+      if (requested && requested !== sendTerminatorMode) {
+        return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr.";
+      }
+    }
+
+    const hasPatch = Object.keys(patch).length > 0;
+    const hasTerminator = typeof sendTerminatorMode === "string";
+    if (!hasPatch && !hasTerminator) {
+      return "No applicable settings keys in payload.";
+    }
+
+    if (hasPatch) {
+      const updatedSessions = await Promise.all(targets.map((session) => api.updateSession(session.id, patch)));
+      for (const updated of updatedSessions) {
+        upsertSession(updated);
+      }
+    }
+    if (hasTerminator) {
+      for (const session of targets) {
+        setSessionSendTerminator(session.id, sendTerminatorMode);
+      }
+    }
+    const appliedKeys = [
+      ...Object.keys(patch),
+      ...(hasTerminator ? ["sendTerminator"] : [])
+    ];
+    return `Applied settings to ${targets.length} session(s): ${appliedKeys.join(", ")}.`;
   }
 
   try {
