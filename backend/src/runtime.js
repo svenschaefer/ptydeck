@@ -536,6 +536,19 @@ function slugifyDeckId(name) {
   return root.slice(0, maxLength).replace(/-+$/g, "") || "deck";
 }
 
+function parseBooleanQueryParam(value, fieldName) {
+  if (value === null || value === undefined || value === "") {
+    return false;
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  throw new ApiError(400, "ValidationError", `Query parameter '${fieldName}' must be 'true' or 'false'.`);
+}
+
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
@@ -908,13 +921,30 @@ export function createRuntime(config) {
     return count;
   }
 
-  function deleteDeck(deckId) {
+  function reassignDeckSessions(deckId, targetDeckId) {
+    for (const session of manager.list()) {
+      if (resolveSessionDeckId(session.id) === deckId) {
+        sessionDeckAssignments.set(session.id, targetDeckId);
+      }
+    }
+    for (const [sessionId] of unrestoredSessions.entries()) {
+      if (resolveSessionDeckId(sessionId) === deckId) {
+        sessionDeckAssignments.set(sessionId, targetDeckId);
+      }
+    }
+  }
+
+  function deleteDeck(deckId, { force = false } = {}) {
     if (deckId === DEFAULT_DECK_ID) {
       throw new ApiError(409, "DeckDeleteForbidden", "Default deck cannot be deleted.");
     }
     getDeckOrThrow(deckId);
-    if (countSessionsInDeck(deckId) > 0) {
-      throw new ApiError(409, "DeckNotEmpty", "Deck is not empty.");
+    if (countSessionsInDeck(deckId) > 0 && !force) {
+      throw new ApiError(409, "DeckNotEmpty", "Deck is not empty. Use force=true to delete and reassign sessions.");
+    }
+    if (countSessionsInDeck(deckId) > 0 && force) {
+      ensureDefaultDeck();
+      reassignDeckSessions(deckId, DEFAULT_DECK_ID);
     }
     decks.delete(deckId);
   }
@@ -1307,7 +1337,8 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "deleteDeck") {
-        deleteDeck(match.params.deckId);
+        const force = parseBooleanQueryParam(parsedUrl.searchParams.get("force"), "force");
+        deleteDeck(match.params.deckId, { force });
         await persistNow("deck.delete");
         writeJson(req, res, 204);
         return;

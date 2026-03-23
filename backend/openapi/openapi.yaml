@@ -216,9 +216,22 @@ paths:
     delete:
       operationId: deleteDeck
       summary: Delete deck by id.
+      parameters:
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '204':
           description: Deck deleted
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Deck not found
           content:

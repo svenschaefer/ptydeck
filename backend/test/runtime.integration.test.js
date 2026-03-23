@@ -535,15 +535,25 @@ test("deck lifecycle and session move endpoints work end-to-end", async () => {
     const deleteNonEmptyDeckBody = await deleteNonEmptyDeckRes.json();
     assert.equal(deleteNonEmptyDeckBody.error, "DeckNotEmpty");
 
-    const moveBackRes = await fetch(`${baseUrl}/decks/default/sessions/${createdSession.id}:move`, {
+    const idempotentMoveRes = await fetch(`${baseUrl}/decks/${createdDeck.id}/sessions/${createdSession.id}:move`, {
       method: "POST"
     });
-    assert.equal(moveBackRes.status, 204);
+    assert.equal(idempotentMoveRes.status, 204);
+
+    const forceDeleteDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}?force=true`, {
+      method: "DELETE"
+    });
+    assert.equal(forceDeleteDeckRes.status, 204);
+
+    const movedBackToDefaultRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`);
+    assert.equal(movedBackToDefaultRes.status, 200);
+    const movedBackToDefault = await movedBackToDefaultRes.json();
+    assert.equal(movedBackToDefault.deckId, "default");
 
     const deleteDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
       method: "DELETE"
     });
-    assert.equal(deleteDeckRes.status, 204);
+    assert.equal(deleteDeckRes.status, 404);
   } finally {
     await runtime.stop();
   }
@@ -681,6 +691,13 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(unknownCustomCommandDeleteRes.status, 404);
     const unknownCustomCommandDeleteBody = await unknownCustomCommandDeleteRes.json();
     assert.equal(unknownCustomCommandDeleteBody.error, "CustomCommandNotFound");
+
+    const invalidForceDeleteDeckRes = await fetch(`${baseUrl}/decks/default?force=maybe`, {
+      method: "DELETE"
+    });
+    assert.equal(invalidForceDeleteDeckRes.status, 400);
+    const invalidForceDeleteDeckBody = await invalidForceDeleteDeckRes.json();
+    assert.equal(invalidForceDeleteDeckBody.error, "ValidationError");
   } finally {
     await runtime.stop();
   }

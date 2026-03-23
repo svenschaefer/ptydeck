@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-087` completed: deck delete is now conflict-safe with explicit `force=true` semantics (non-empty deck delete is rejected by default; forced delete reassigns affected sessions to `default` deck before removal).
+- [x] Move semantics hardened: unknown target deck returns deterministic not-found, and same source/target deck move is idempotent (no-op with successful response).
+- [x] Added regression coverage for `force=true` deletion path, idempotent move behavior, and invalid `force` query validation.
 - [x] `QLT-086` completed: session APIs are now deck-aware (`Session.deckId` in responses), and `GET /api/v1/sessions` supports optional `deckId` filtering.
 - [x] OpenAPI + runtime validation were updated so `Session` requires `deckId` and deck-filtered listing is contract-covered.
 - [x] Added integration coverage for deck-aware list/get behavior after session moves (`/sessions?deckId=...` and `GET /sessions/{sessionId}` deck assignment visibility).
