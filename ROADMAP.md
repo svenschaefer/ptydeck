@@ -367,6 +367,8 @@ Exit criteria:
 - `QLT-101`
 - `QLT-102`
 - `QLT-103`
+- `QLT-104`
+- `QLT-105`
 
 Completed in this milestone:
 
@@ -374,7 +376,7 @@ Completed in this milestone:
 
 Remaining in this milestone:
 
-- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`
+- `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`
 
 Dependencies:
 
@@ -385,6 +387,8 @@ Dependencies:
 - `QLT-101` depends on existing selector resolution semantics from H6 so `>selector` uses the same single-session token rules as active-session switching and can auto-switch decks deterministically.
 - `QLT-102` depends on deck/sidebar navigation baseline from H6 and should reuse the same active-session/deck switching path as `QLT-101` rather than inventing a second focus model.
 - `QLT-103` depends on `QLT-101` and `QLT-102` and validates that quick-switch commands and sidebar terminal buttons stay behaviorally aligned.
+- `QLT-104` depends on `QLT-101` so deck-targeted `>...` semantics build on the same quick-switch parser and target-resolution path instead of forking a separate implementation.
+- `QLT-105` depends on `QLT-101` and `QLT-104` so autocomplete breadth is designed against the final `>...` grammar and can stay aligned with existing `/...` completion behavior.
 
 Exit criteria:
 
@@ -394,6 +398,8 @@ Exit criteria:
 - `frontend/src/public/app.js` is decomposed into layered modules without behavior regression.
 - Quick terminal switching supports `>selector` command syntax with deck auto-switch when needed.
 - Sidebar deck sections expose clickable terminal entries with visible quick IDs and deterministic active-terminal focus behavior.
+- `>...` quick-switching can resolve both terminals and decks, with deterministic deck-name autocomplete.
+- Autocomplete coverage is consistent across `/...` and `>...` navigation-related flows where deterministic suggestions are possible.
 
 ## Current Status
 
@@ -410,6 +416,8 @@ Exit criteria:
 - `QLT-101`
 - `QLT-102`
 - `QLT-103`
+- `QLT-104`
+- `QLT-105`
 
 ### Completed Items
 
