@@ -20,8 +20,7 @@ const store = createStore();
 const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
 const stateEl = document.getElementById("connection-state");
 const gridEl = document.getElementById("terminal-grid");
-const sidebarHideBtn = document.getElementById("sidebar-hide");
-const sidebarShowBtn = document.getElementById("sidebar-show");
+const sidebarToggleBtn = document.getElementById("sidebar-toggle");
 const createBtn = document.getElementById("create-session");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
@@ -1302,11 +1301,9 @@ function syncSettingsUi() {
   if (appShellEl && appShellEl.classList) {
     appShellEl.classList.toggle("sidebar-collapsed", !sidebarVisible);
   }
-  if (sidebarHideBtn) {
-    sidebarHideBtn.hidden = !sidebarVisible;
-  }
-  if (sidebarShowBtn) {
-    sidebarShowBtn.hidden = sidebarVisible;
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.textContent = sidebarVisible ? "Hide Sidebar" : "Show Sidebar";
+    sidebarToggleBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
   }
   syncTerminalGeometryCss();
 }
@@ -2691,12 +2688,10 @@ createBtn.addEventListener("click", async () => {
   }
 });
 
-if (sidebarHideBtn) {
-  sidebarHideBtn.addEventListener("click", () => setSidebarVisible(false));
-}
-
-if (sidebarShowBtn) {
-  sidebarShowBtn.addEventListener("click", () => setSidebarVisible(true));
+if (sidebarToggleBtn) {
+  sidebarToggleBtn.addEventListener("click", () => {
+    setSidebarVisible(terminalSettings.sidebarVisible === false);
+  });
 }
 
 if (settingsApplyBtn) {

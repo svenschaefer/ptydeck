@@ -111,15 +111,11 @@ body {
   position: relative;
 }
 
-.sidebar-show {
+.sidebar-toggle {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 25;
-  display: none;
-}
-
-.app-shell.sidebar-collapsed .sidebar-show {
   display: inline-flex;
   align-items: center;
 }
@@ -665,7 +661,7 @@ button:hover {
     border-bottom: 1px solid var(--border);
   }
 
-  .app-shell.sidebar-collapsed .sidebar-show {
+  .sidebar-toggle {
     top: 6px;
     left: 6px;
   }
