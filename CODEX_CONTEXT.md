@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (`QLT-087` completed: conflict-safe deck operations now support explicit `force=true` deletion with deterministic reassignment semantics, plus idempotent move and unknown-target safeguards)
+Last updated: 2026-03-23 (documentation sync for active deck backlog, explicit open-task ownership, and local quality-gate runtime diagnostics)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H5 planning sync).
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H6 active-open backlog cleanup).
 
 ## Project Purpose
 
@@ -69,6 +69,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend bootstrap includes config loader and minimal development HTTP page.
 - CI workflow file exists in `.github/workflows/ci.yml` as an intentionally disabled stub (`if: false`) to avoid GitHub-hosted runner usage.
 - Quality gates are expected via local execution (`npm run lint`, `npm run test`, `npm run test:coverage:check`, and selected smoke/security scripts).
+- Local quality-gate latency can be heavily skewed by orphaned background `node --test`/`npm run test*` processes from interrupted runs; clean process state before timing/perf conclusions.
 - Environment templates exist in `backend/.env.example` and `frontend/.env.example`.
 - Backend core REST lifecycle is implemented for session list/create/get/delete/input/resize.
 - Backend includes centralized API errors (`ApiError` + mapper) and runtime request/response validation.

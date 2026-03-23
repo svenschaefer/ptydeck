@@ -362,6 +362,15 @@ Exit criteria:
 - Next milestones in progress: `v0.3.0-H6`
 - Blockers: none recorded
 
+### Active Open Tasks (Execution Queue)
+
+- `QLT-088` Owner: `FE` - Top tab bar deck navigation with deterministic create/rename/switch/delete flows and per-deck geometry settings.
+- `QLT-089` Owner: `FE` - Active-deck-only terminal grid rendering with deterministic active-session fallback when visibility/deck changes invalidate current focus.
+- `QLT-090` Owner: `FE` - Slash command deck control surface (`/deck ...`, `/move ...`) with explicit success/error feedback.
+- `QLT-091` Owner: `FE` - Deck-aware selector/routing isolation for `/switch`, `/next`, `/prev`, `/filter`, and `@target` (active-deck default, explicit cross-deck selectors).
+- `QLT-092` Owner: `FE` - Conflict-safe dedupe for overlapping selectors (ID, quick ID, tag, deck selector) to guarantee exactly-once execution per session.
+- `QLT-093` Owner: `QA` - End-to-end regression matrix for deck migration, CRUD/move/delete conflicts, isolation semantics, per-deck settings persistence, slash routing, and dedupe guarantees.
+
 ### Completed Items
 
 - `DOC-001`, `DOC-002`

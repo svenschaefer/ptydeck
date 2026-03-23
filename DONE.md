@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Documentation synchronization pass completed: `TODO.md` active-open block now contains only real open tasks (`QLT-088` ... `QLT-093`) with explicit ownership.
+- [x] `CODEX_CONTEXT.md` synchronized with current active roadmap state (`v0.3.0-H6` in progress) and persistent quality-gate runtime diagnostics.
+- [x] Local quality-gate runtime diagnosis completed: slow `lint/test/coverage` cycles were caused by orphaned background `npm run test*` and `node --test` processes from interrupted runs, not by baseline command cost.
+- [x] Revalidated baseline quality-gate runtime after cleanup: `npm run lint` (~2s), `npm run test` (~6s), `npm run test:coverage:check` (~7s).
 - [x] `QLT-087` completed: deck delete is now conflict-safe with explicit `force=true` semantics (non-empty deck delete is rejected by default; forced delete reassigns affected sessions to `default` deck before removal).
 - [x] Move semantics hardened: unknown target deck returns deterministic not-found, and same source/target deck move is idempotent (no-op with successful response).
 - [x] Added regression coverage for `force=true` deletion path, idempotent move behavior, and invalid `force` query validation.
