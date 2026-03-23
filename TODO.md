@@ -13,7 +13,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-093` Owner: `QA` Task: Add full deck regression matrix (legacy migration, deck CRUD, move semantics, delete conflicts, active-session fallback, per-deck settings persistence, slash-command deck routing, dedupe guarantees).
+- None currently.
 
 ## Backend Tasks (OpenAPI-based REST)
 

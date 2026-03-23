@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-093` completed: frontend regression matrix now covers deck migration/CRUD conflict paths, active-deck isolation fallback behavior, slash deck routing, selector dedupe, and per-deck settings persistence with deterministic assertions.
+- [x] Frontend deck regression tests were stabilized against selector/terminator edge cases by switching brittle last-payload assertions to deterministic target/count assertions and explicit selector scopes where needed.
+- [x] Validation for `QLT-093` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-092` completed: selector resolution now supports deck selectors (`deck:<deckSelector>`) and wildcard (`*`) in multi-selector command paths.
 - [x] Overlap-dedupe semantics are enforced by session ID across mixed selector sets (ID, quick ID, tag, and deck selector) so each session executes at most once.
 - [x] Frontend integration coverage added for dedupe behavior using overlapping selector input (`/restart deck:default,1` resolves to unique targets only).
@@ -28,7 +31,7 @@ Completed and verified topics belong here.
 - [x] New session flow is now deck-aware at UI level: sessions created while a non-default deck is active are moved to the active deck immediately.
 - [x] Frontend API client now includes deck CRUD and move endpoints with dedicated unit coverage (`frontend/test/api-client.test.js`).
 - [x] Validation for `QLT-088` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
-- [x] Documentation synchronization pass completed: `TODO.md` active-open block now contains only real open tasks with explicit ownership (currently `QLT-090` ... `QLT-093`).
+- [x] Documentation synchronization pass completed: `TODO.md` active-open block is maintained with explicit ownership and without abstract placeholders.
 - [x] `CODEX_CONTEXT.md` synchronized with current active roadmap state (`v0.3.0-H6` in progress) and persistent quality-gate runtime diagnostics.
 - [x] Local quality-gate runtime diagnosis completed: slow `lint/test/coverage` cycles were caused by orphaned background `npm run test*` and `node --test` processes from interrupted runs, not by baseline command cost.
 - [x] Revalidated baseline quality-gate runtime after cleanup: `npm run lint` (~2s), `npm run test` (~6s), `npm run test:coverage:check` (~7s).

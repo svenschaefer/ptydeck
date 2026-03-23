@@ -439,6 +439,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const customCommandDeletes = [];
   const deckDeleteCalls = [];
   const moveSessionCalls = [];
+  const sessionDeckById = new Map([
+    ["s-1", "default"],
+    ["s-2", "default"]
+  ]);
   const customCommands = new Map();
   let deckState = [
     {
@@ -542,9 +546,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       if (!target) {
         return makeJsonResponse(404, { error: "NotFound", message: "deck not found" });
       }
-      const hasSessions = false;
+      const hasSessions = Array.from(sessionDeckById.values()).some((value) => value === deckId);
       if (hasSessions && !force) {
         return makeJsonResponse(409, { error: "DeckNotEmpty", message: "deck is not empty" });
+      }
+      if (hasSessions && force) {
+        for (const [sessionId, assignedDeckId] of sessionDeckById.entries()) {
+          if (assignedDeckId === deckId) {
+            sessionDeckById.set(sessionId, "default");
+          }
+        }
       }
       deckState = deckState.filter((entry) => entry.id !== deckId);
       return makeJsonResponse(204, null);
@@ -554,6 +565,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       const deckId = decodeURIComponent(moveMatch[1]);
       const sessionId = decodeURIComponent(moveMatch[2]);
       moveSessionCalls.push({ deckId, sessionId });
+      sessionDeckById.set(sessionId, deckId);
       return makeJsonResponse(200, {
         id: sessionId,
         deckId,
@@ -613,15 +625,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       }
       return makeJsonResponse(204, {});
     }
-    if (path === "/api/v1/sessions/s-1/restart" && method === "POST") {
-      restartCalls.push("s-1");
+    const restartMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
+    if (restartMatch && method === "POST") {
+      const sessionId = decodeURIComponent(restartMatch[1]);
+      restartCalls.push(sessionId);
       return makeJsonResponse(200, {
-        id: "s-1",
+        id: sessionId,
+        deckId: sessionDeckById.get(sessionId) || "default",
         state: "active",
         shell: "bash",
         cwd: "~",
-        name: "one",
-        tags: [],
+        name: sessionId === "s-2" ? "two" : "one",
+        tags: sessionId === "s-2" ? ["beta", "ops"] : [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
@@ -1237,6 +1252,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
+  assert.equal(fixture.elements.emptyState.textContent, "No sessions in active deck.");
 
   fixture.elements.commandInput.value = "/switch s-1";
   fixture.elements.sendCommand.click();
@@ -1281,6 +1297,36 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [default] Default.");
   assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "default", sessionId: "s-2" });
 
+  fixture.elements.commandInput.value = "/move s-2 deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
+
+  fixture.elements.commandInput.value = "/deck switch deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
+  const visibleDeckNewCards = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  assert.equal(visibleDeckNewCards.length, 1);
+  assert.equal(visibleDeckNewCards[0].classList.contains("active"), true);
+  fixture.elements.commandInput.value = "/size 101 33";
+  fixture.elements.sendCommand.click();
+  await sleep(360);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 101x33 (cols x rows) for deck 'Ops'.");
+
+  fixture.elements.commandInput.value = "/deck switch default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
+  assert.equal(fixture.elements.settingsCols.value, "90");
+  assert.equal(fixture.elements.settingsRows.value, "30");
+
+  fixture.elements.commandInput.value = "/deck switch deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.settingsCols.value, "101");
+  assert.equal(fixture.elements.settingsRows.value, "33");
+
   fixture.elements.commandInput.value = "/deck switch default";
   fixture.elements.sendCommand.click();
   await tick();
@@ -1294,8 +1340,34 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/deck delete deck-new";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Deleted deck [deck-new] Ops.");
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Deck 'Ops' is not empty. Retry with '/deck delete deck-new force'."
+  );
   assert.deepEqual(deckDeleteCalls[deckDeleteCalls.length - 1], { deckId: "deck-new", force: false });
+
+  fixture.elements.commandInput.value = "/deck delete deck-new force";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Deleted deck [deck-new] Ops.");
+  assert.deepEqual(deckDeleteCalls[deckDeleteCalls.length - 1], { deckId: "deck-new", force: true });
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.updated",
+      session: {
+        id: "s-2",
+        state: "active",
+        shell: "bash",
+        cwd: "~",
+        name: "two",
+        tags: ["beta", "ops"],
+        deckId: "default",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
 
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");
@@ -1491,10 +1563,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown settings key(s): unknown");
-  fixture.elements.commandInput.value = "@2 slash-line1\nslash-line2";
+  const directRouteCountBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "@s-1 slash-line1\nslash-line2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "slash-line1\nslash-line2\n" });
+  assert.equal(inputPayloads.length, directRouteCountBefore + 1);
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "slash-line1\rslash-line2\r" });
   secondStartEnv.value = "1INVALID=value";
   secondStartEnv.dispatchEvent({ type: "input" });
   const callsBeforeInvalidEnv = updateSessionCalls.length;
@@ -1575,66 +1649,62 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(unrestoredCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
 
-  secondSettings.click();
-  await tick();
-  secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
-  secondStartEnv.dispatchEvent({ type: "input" });
-  secondSendTerminator.value = "crlf";
-  secondSendTerminator.dispatchEvent({ type: "change" });
-  secondSettingsApply.click();
-  await tick();
-  fixture.elements.commandInput.value = "@2 echo alpha";
+  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"crlf"}';
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "echo alpha\r\n" });
-  fixture.elements.commandInput.value = "/blockcmd 2";
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Applied settings to 1 session(s): sendTerminator."
+  );
+  fixture.elements.commandInput.value = "@s-1 echo alpha";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\rline 2\r\n" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo alpha\r\n" });
+  fixture.elements.commandInput.value = "/blockcmd s-1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].sessionId, "s-1");
+  assert.equal(inputPayloads[inputPayloads.length - 1].data.endsWith("\r\n"), true);
   const overlappedDirectBefore = inputPayloads.length;
-  fixture.elements.commandInput.value = "@ops,2 echo overlap";
+  fixture.elements.commandInput.value = "@default::ops,default::s-1 echo overlap";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, overlappedDirectBefore + 2);
   const overlappedDirectTargets = inputPayloads.slice(overlappedDirectBefore).map((entry) => entry.sessionId).sort();
-  assert.deepEqual(overlappedDirectTargets, ["ops", "s-2"]);
+  assert.deepEqual(overlappedDirectTargets, ["ops", "s-1"]);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to 2 sessions.");
   const overlappedCustomBefore = inputPayloads.length;
-  fixture.elements.commandInput.value = "/blockcmd ops,2";
+  fixture.elements.commandInput.value = "/blockcmd default::ops,default::s-1";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, overlappedCustomBefore + 2);
   const overlappedCustomTargets = inputPayloads.slice(overlappedCustomBefore).map((entry) => entry.sessionId).sort();
-  assert.deepEqual(overlappedCustomTargets, ["ops", "s-2"]);
+  assert.deepEqual(overlappedCustomTargets, ["ops", "s-1"]);
   assert.equal(fixture.elements.commandFeedback.textContent, "Executed /blockcmd on 2 sessions.");
 
-  secondSendTerminator.value = "lf";
-  secondSendTerminator.dispatchEvent({ type: "change" });
-  secondSettingsApply.click();
-  await tick();
-  fixture.elements.commandInput.value = "@2 line1\nline2";
+  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"lf"}';
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\nline2\n" });
-  fixture.elements.commandInput.value = "/blockcmd 2";
+  fixture.elements.commandInput.value = "@s-1 line1\nline2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\nline 2\n" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line1\nline2\n" });
+  fixture.elements.commandInput.value = "/blockcmd s-1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\nline 2\n" });
 
-  secondSendTerminator.value = "cr";
-  secondSendTerminator.dispatchEvent({ type: "change" });
-  secondSettingsApply.click();
-  await tick();
-  fixture.elements.commandInput.value = "@2 line1\nline2";
+  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"cr"}';
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\rline2\r" });
-  fixture.elements.commandInput.value = "/blockcmd 2";
+  fixture.elements.commandInput.value = "@s-1 line1\nline2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\rline 2\r" });
-  secondSettings.click();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line1\rline2\r" });
+  fixture.elements.commandInput.value = "/blockcmd s-1";
+  fixture.elements.sendCommand.click();
   await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\rline 2\r" });
 
   const unresolvedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@does-not-exist echo routed";

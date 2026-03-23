@@ -328,11 +328,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`
+- `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`
 
 Remaining in this milestone:
 
-- `QLT-093`
+- none
 
 Dependencies:
 
@@ -358,13 +358,13 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H5`
-- Next milestones in progress: `v0.3.0-H6`
+- Latest completed milestone: `v0.3.0-H6`
+- Next milestones in progress: none
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-093` Owner: `QA` - End-to-end regression matrix for deck migration, CRUD/move/delete conflicts, isolation semantics, per-deck settings persistence, slash routing, and dedupe guarantees.
+- none
 
 ### Completed Items
 
@@ -437,9 +437,15 @@ Exit criteria:
 - `QLT-077`
 - `QLT-078`
 - `QLT-079`
+- `QLT-083`
+- `QLT-084`
+- `QLT-085`
+- `QLT-086`
+- `QLT-087`
 - `QLT-088`
 - `QLT-089`
 - `QLT-090`
 - `QLT-091`
 - `QLT-092`
+- `QLT-093`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
