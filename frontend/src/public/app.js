@@ -17,8 +17,11 @@ const debugLog = (event, details = {}) => {
 const api = createApiClient(config.apiBaseUrl, { debug: debugLogs, log: debugLog });
 const store = createStore();
 
+const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
 const stateEl = document.getElementById("connection-state");
 const gridEl = document.getElementById("terminal-grid");
+const sidebarHideBtn = document.getElementById("sidebar-hide");
+const sidebarShowBtn = document.getElementById("sidebar-show");
 const createBtn = document.getElementById("create-session");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
@@ -734,7 +737,8 @@ function loadTerminalSettings() {
   const stored = readStoredSettings();
   return {
     cols: clampInt(stored?.cols, 80, 20, 400),
-    rows: clampInt(stored?.rows, 20, 5, 120)
+    rows: clampInt(stored?.rows, 20, 5, 120),
+    sidebarVisible: stored?.sidebarVisible !== false
   };
 }
 
@@ -1294,13 +1298,24 @@ function syncSettingsUi() {
   if (settingsRowsEl) {
     settingsRowsEl.value = String(terminalSettings.rows);
   }
+  const sidebarVisible = terminalSettings.sidebarVisible !== false;
+  if (appShellEl && appShellEl.classList) {
+    appShellEl.classList.toggle("sidebar-collapsed", !sidebarVisible);
+  }
+  if (sidebarHideBtn) {
+    sidebarHideBtn.hidden = !sidebarVisible;
+  }
+  if (sidebarShowBtn) {
+    sidebarShowBtn.hidden = sidebarVisible;
+  }
   syncTerminalGeometryCss();
 }
 
 function readSettingsFromUi() {
   return {
     cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
-    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120)
+    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
+    sidebarVisible: terminalSettings.sidebarVisible !== false
   };
 }
 
@@ -1402,6 +1417,20 @@ function onApplySettings() {
   syncSettingsUi();
   uiState.error = "";
   applySettingsToAllTerminals();
+  scheduleGlobalResize();
+}
+
+function setSidebarVisible(visible) {
+  const nextVisible = Boolean(visible);
+  if ((terminalSettings.sidebarVisible !== false) === nextVisible) {
+    return;
+  }
+  terminalSettings = {
+    ...terminalSettings,
+    sidebarVisible: nextVisible
+  };
+  saveTerminalSettings();
+  syncSettingsUi();
   scheduleGlobalResize();
 }
 
@@ -2661,6 +2690,14 @@ createBtn.addEventListener("click", async () => {
     setError("Failed to create session.");
   }
 });
+
+if (sidebarHideBtn) {
+  sidebarHideBtn.addEventListener("click", () => setSidebarVisible(false));
+}
+
+if (sidebarShowBtn) {
+  sidebarShowBtn.addEventListener("click", () => setSidebarVisible(true));
+}
 
 if (settingsApplyBtn) {
   settingsApplyBtn.addEventListener("click", onApplySettings);
