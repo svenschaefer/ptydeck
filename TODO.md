@@ -140,7 +140,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-065` Owner: `FE` Task: Replace inline session settings panel with a proper per-terminal settings dialog (modal semantics, focus trap, Escape close, explicit save/cancel) opened via the terminal settings icon.
 - [x] `QLT-066` Owner: `BE` Task: Extend per-session settings contract/persistence for full terminal theme profiles (background, foreground, cursor, and ANSI 16-color palette) with validation and deterministic storage shape.
 - [x] `QLT-067` Owner: `FE` Task: Implement advanced per-terminal theme editor with full palette fields, deterministic preset selection beyond the current minimal set, and per-session apply/preview behavior.
-- [ ] `QLT-068` Owner: `QA` Task: Add integration/regression coverage for settings-dialog UX and full-palette theme lifecycle (open/close semantics, validation, persistence, reload consistency, and rendering apply behavior).
+- [x] `QLT-068` Owner: `QA` Task: Add integration/regression coverage for settings-dialog UX and full-palette theme lifecycle (open/close semantics, validation, persistence, reload consistency, and rendering apply behavior).
 - [x] `QLT-069` Owner: `FE` Task: Rework command submit terminator handling so regular input and multiline custom-command payloads execute deterministically across shell and TUI apps (including Codex-like prompts) without requiring an extra manual Enter.
 - [x] `QLT-070` Owner: `QA` Task: Add regression coverage for command submit semantics (`LF`/`CR`/`CRLF` modes, multiline payloads, routed targets) to ensure exactly one final submit signal is emitted and no duplicate/omitted execution occurs.
 - [x] `QLT-071` Owner: `FE` Task: Move command submit terminator configuration from global sidebar settings into per-terminal session settings so each terminal can use its own deterministic submit mode (`auto`/`CRLF`/`LF`/`CR`), including target-resolved routing behavior.
@@ -164,6 +164,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `ENT-019` Owner: `BE` Task: Add trusted-proxy configuration and safe `X-Forwarded-*` handling to avoid spoofed client/protocol metadata behind ingress.
 - [x] `ENT-020` Owner: `BE` Task: Add session lifecycle guardrails (max concurrent sessions, idle timeout, max session lifetime) with configurable limits and explicit API errors.
 - [x] `ENT-021` Owner: `PLAT` Task: Add metrics baseline (request latency/error counters, active session gauge, WS connection gauge) and expose scrape endpoint for monitoring.
-- [ ] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
+- [x] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
 - [x] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.
 - [x] `ENT-024` Owner: `PLAT` Task: Define and document data retention/purge policy for persisted session metadata and audit/security logs, including automated cleanup cadence.

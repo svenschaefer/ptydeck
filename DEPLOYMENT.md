@@ -535,6 +535,40 @@ CI integration:
 - Security workflow captures test/security logs, generates SBOM, and invokes release evidence generation.
 - CI uploads the `release-evidence` artifact for audit/compliance traceability.
 
+## 9.12 Non-Functional Load and Fanout Baseline (ENT-022)
+
+Load/fanout verification command:
+
+```bash
+npm run test:load
+```
+
+Current automated scenario (`backend/test/nonfunctional.load.test.js`):
+
+- Creates a concurrent session batch and validates REST `POST /api/v1/sessions` latency.
+- Sends concurrent `POST /api/v1/sessions/{sessionId}/input` requests and validates latency.
+- Deletes sessions concurrently and validates `DELETE /api/v1/sessions/{sessionId}` latency.
+- Opens multiple WebSocket clients and verifies that `session.created` / `session.closed` events fan out to every client without instability.
+
+Default pass/fail thresholds (overridable with env vars):
+
+- `LOAD_CREATE_P95_MAX_MS=400`
+- `LOAD_INPUT_P95_MAX_MS=250`
+- `LOAD_DELETE_P95_MAX_MS=300`
+- `LOAD_WAIT_TIMEOUT_MS=5000` for fanout completion checks
+
+Scenario size controls (optional):
+
+- `LOAD_SESSION_BATCH_SIZE` (default `12`)
+- `LOAD_INPUT_BATCH_SIZE` (default `4` per session)
+- `LOAD_WS_CLIENT_COUNT` (default `8`)
+- `LOAD_FANOUT_SESSION_COUNT` (default `6`)
+
+Operational guidance:
+
+- Run this suite in non-prod CI or dedicated perf environments; keep thresholds stable and adjust only with documented baseline updates.
+- Re-tune thresholds only after measuring repeated baseline runs on target hardware profile.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date

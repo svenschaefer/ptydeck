@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `ENT-022` completed: added non-functional load/fanout regression test baseline in `backend/test/nonfunctional.load.test.js`.
+- [x] Added deterministic threshold-based checks for concurrent session create/input/delete latency (p95) and multi-client WebSocket fanout stability.
+- [x] Added executable load-test entrypoints: `npm run test:load` (root) and `npm --prefix backend run test:load`.
+- [x] Deployment runbook updated with explicit non-functional pass/fail thresholds and environment overrides for scenario sizing.
 - [x] `QLT-071` completed: command submit terminator configuration moved from global sidebar controls into per-session terminal settings.
 - [x] Per-session submit modes (`auto`, `crlf`, `lf`, `cr`) now apply deterministically to direct input, routed `@target` input, and custom-command execution based on the resolved target session.
 - [x] Frontend integration coverage extended to verify per-session terminator behavior after settings updates.
@@ -395,6 +399,10 @@ Completed and verified topics belong here.
 - [x] Frontend integration coverage now explicitly validates `@<target>` ambiguity handling (`Ambiguous session identifier`) in routed-input command flow.
 - [x] `/custom` management command coverage and slash-repeat guardrail coverage are now represented in one consolidated QA baseline together with multi-client sync and ambiguous direct-routing checks.
 - [x] Validation for `QLT-051` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `QLT-068` completed: settings-dialog integration coverage now validates open/close semantics for dismiss button and native dialog `cancel` event handling (Escape-path equivalent with prevented default close behavior).
+- [x] Added regression coverage for full-palette theme draft lifecycle: unsaved theme edits apply immediately for preview and are deterministically reverted by `Cancel` to persisted values in both controls and live terminal rendering.
+- [x] Existing persistence/reload/apply assertions remain active in the same integration path (saved profile survives session close/recreate and re-applies to reopened terminal render state).
+- [x] Validation for `QLT-068` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 
 ## Maintenance Rules
 

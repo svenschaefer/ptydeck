@@ -1049,6 +1049,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(secondQuickId.textContent, "2");
   const secondSettings = secondCard.querySelector(".session-settings");
   const secondSettingsPanel = secondCard.querySelector(".session-settings-dialog");
+  const secondSettingsDismiss = secondCard.querySelector(".session-settings-dismiss");
   const secondToolbar = secondCard.querySelector(".terminal-toolbar");
   assert.equal(secondToolbar.querySelector(".session-rename"), null);
   assert.equal(secondToolbar.querySelector(".session-close"), null);
@@ -1062,14 +1063,50 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
   const secondSendTerminator = secondSettingsPanel.querySelector(".session-send-terminator");
   const secondSettingsApply = secondSettingsPanel.querySelector(".session-settings-apply");
+  const secondSettingsCancel = secondSettingsPanel.querySelector(".session-settings-cancel");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   assert.equal(secondSettingsPanel.open, false);
   secondSettings.click();
   await tick();
   assert.equal(secondSettingsPanel.open, true);
+  secondSettingsDismiss.click();
+  await tick();
+  assert.equal(secondSettingsPanel.open, false);
+  secondSettings.click();
+  await tick();
+  assert.equal(secondSettingsPanel.open, true);
+  const cancelDialogEvent = {
+    type: "cancel",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  secondSettingsPanel.dispatchEvent(cancelDialogEvent);
+  await tick();
+  assert.equal(cancelDialogEvent.defaultPrevented, true);
+  assert.equal(secondSettingsPanel.open, false);
+  secondSettings.click();
+  await tick();
+  assert.equal(secondSettingsPanel.open, true);
+  const persistedBgBeforeDraft = secondThemeBg.value;
+  const persistedFgBeforeDraft = secondThemeFg.value;
   secondThemeSelect.value = "custom";
   secondThemeSelect.dispatchEvent({ type: "change" });
   await tick();
+  secondThemeBg.value = "#111111";
+  secondThemeBg.dispatchEvent({ type: "input" });
+  secondThemeFg.value = "#eeeeee";
+  secondThemeFg.dispatchEvent({ type: "input" });
+  await tick();
+  assert.equal(MockTerminal.instances[1].options.theme.background, "#111111");
+  assert.equal(MockTerminal.instances[1].options.theme.foreground, "#eeeeee");
+  secondSettingsCancel.click();
+  await tick();
+  assert.equal(secondThemeBg.value, persistedBgBeforeDraft);
+  assert.equal(secondThemeFg.value, persistedFgBeforeDraft);
+  assert.equal(MockTerminal.instances[1].options.theme.background, persistedBgBeforeDraft);
+  assert.equal(MockTerminal.instances[1].options.theme.foreground, persistedFgBeforeDraft);
   secondThemeBg.value = "#101010";
   secondThemeBg.dispatchEvent({ type: "input" });
   secondThemeFg.value = "#e0e0e0";
