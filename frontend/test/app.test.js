@@ -560,7 +560,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         state: "active",
         shell: "bash",
         cwd: "~",
-        tags: [],
+        name: sessionId === "s-2" ? "two" : "one",
+        tags: sessionId === "s-2" ? ["beta", "ops"] : [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
@@ -1226,11 +1227,58 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
 
-  fixture.elements.commandInput.value = "/move s-1 default";
+  fixture.elements.commandInput.value = "/switch s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [1] to deck [default] Default.");
-  assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "default", sessionId: "s-1" });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: s-1");
+
+  fixture.elements.commandInput.value = "/switch default::s-1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [1] one.");
+
+  fixture.elements.commandInput.value = "/move s-2 deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
+  assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "deck-new", sessionId: "s-2" });
+
+  fixture.elements.commandInput.value = "/filter s-2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session id/tag: s-2");
+
+  fixture.elements.commandInput.value = "/filter deck-new::s-2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Display filter active (1/1): deck-new::s-2");
+
+  fixture.elements.commandInput.value = "@s-1 echo local-scope";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: s-1");
+
+  fixture.elements.commandInput.value = "@default::s-1 echo cross-deck";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].sessionId, "s-1");
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "echo cross-deck\r");
+
+  fixture.elements.commandInput.value = "/move s-2 default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [default] Default.");
+  assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "default", sessionId: "s-2" });
+
+  fixture.elements.commandInput.value = "/deck switch default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
+
+  fixture.elements.commandInput.value = "/filter";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Display filter cleared.");
 
   fixture.elements.commandInput.value = "/deck delete deck-new";
   fixture.elements.sendCommand.click();

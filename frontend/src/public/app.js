@@ -2619,20 +2619,80 @@ function normalizeSessionTagToken(token) {
     .toLowerCase();
 }
 
-function resolveSelectorMatches(selector, sessions) {
+function resolveCrossDeckSelector(selectorToken, sessions) {
+  const normalizedSelector = String(selectorToken || "").trim();
+  const splitIndex = normalizedSelector.indexOf("::");
+  if (splitIndex <= 0) {
+    return {
+      ok: false,
+      explicit: false,
+      sessions,
+      token: normalizedSelector,
+      error: ""
+    };
+  }
+  const deckToken = normalizedSelector.slice(0, splitIndex).trim();
+  const nestedToken = normalizedSelector.slice(splitIndex + 2).trim();
+  if (!deckToken || !nestedToken) {
+    return {
+      ok: true,
+      explicit: true,
+      sessions: [],
+      token: "",
+      error: "Cross-deck selector must be '<deckSelector>::<sessionSelector>'."
+    };
+  }
+  const resolvedDeck = resolveDeckToken(deckToken, deckState.decks);
+  if (!resolvedDeck.deck) {
+    return {
+      ok: true,
+      explicit: true,
+      sessions: [],
+      token: "",
+      error: resolvedDeck.error
+    };
+  }
+  return {
+    ok: true,
+    explicit: true,
+    sessions: sessions.filter((session) => resolveSessionDeckId(session) === resolvedDeck.deck.id),
+    token: nestedToken,
+    deckId: resolvedDeck.deck.id,
+    error: ""
+  };
+}
+
+function resolveSelectorMatches(selector, sessions, options = {}) {
   const normalized = String(selector || "").trim();
   if (!normalized) {
     return { sessions: [], error: "Missing session identifier." };
   }
 
+  const allSessions = Array.isArray(sessions) ? sessions : [];
+  let candidateSessions = allSessions;
+  const scopeMode = options.scopeMode === "active-deck" ? "active-deck" : "all";
+  const activeDeckId = String(options.activeDeckId || "").trim();
+  if (scopeMode === "active-deck" && activeDeckId) {
+    candidateSessions = allSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId);
+  }
+
+  const crossDeck = resolveCrossDeckSelector(normalized, allSessions);
+  if (crossDeck.error) {
+    return { sessions: [], error: crossDeck.error };
+  }
+  if (crossDeck.explicit) {
+    candidateSessions = crossDeck.sessions;
+  }
+  const token = crossDeck.explicit ? crossDeck.token : normalized;
+
   const dedupe = new Map();
-  const resolved = resolveSessionToken(normalized, sessions);
+  const resolved = resolveSessionToken(token, candidateSessions);
   if (resolved.session) {
     dedupe.set(resolved.session.id, resolved.session);
   }
 
-  const tagToken = normalizeSessionTagToken(normalized);
-  const tagMatches = sessions.filter((session) =>
+  const tagToken = normalizeSessionTagToken(token);
+  const tagMatches = candidateSessions.filter((session) =>
     Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
   );
   for (const session of tagMatches) {
@@ -2669,7 +2729,7 @@ function resolveTargetSelectors(selectorText, sessions, options = {}) {
   }
   const dedupe = new Map();
   for (const selector of selectorList) {
-    const matched = resolveSelectorMatches(selector, sessions);
+    const matched = resolveSelectorMatches(selector, sessions, options);
     if (matched.error) {
       return { sessions: [], error: matched.error };
     }
@@ -2680,34 +2740,46 @@ function resolveTargetSelectors(selectorText, sessions, options = {}) {
   return { sessions: Array.from(dedupe.values()), error: "" };
 }
 
-function resolveFilterSelectors(selectorText, sessions) {
+function resolveFilterSelectors(selectorText, sessions, options = {}) {
   const selectorList = parseSelectorList(selectorText, { source: "slash" });
   if (selectorList.length === 0) {
     return { sessions: [], error: "" };
   }
+  const scopeMode = options.scopeMode === "active-deck" ? "active-deck" : "all";
+  const activeDeckId = String(options.activeDeckId || "").trim();
+  const allSessions = Array.isArray(sessions) ? sessions : [];
+  let candidateSessions = allSessions;
+  if (scopeMode === "active-deck" && activeDeckId) {
+    candidateSessions = allSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId);
+  }
   const dedupe = new Map();
   for (const selector of selectorList) {
-    const normalized = String(selector || "").trim();
-    if (!normalized) {
+    const crossDeck = resolveCrossDeckSelector(selector, allSessions);
+    if (crossDeck.error) {
+      return { sessions: [], error: crossDeck.error };
+    }
+    const selectorSessions = crossDeck.explicit ? crossDeck.sessions : candidateSessions;
+    const token = crossDeck.explicit ? crossDeck.token : String(selector || "").trim();
+    if (!token) {
       continue;
     }
-    const exactIdMatch = sessions.find((session) => session.id === normalized) || null;
+    const exactIdMatch = selectorSessions.find((session) => session.id === token) || null;
     let idMatches = [];
     if (exactIdMatch) {
       idMatches = [exactIdMatch];
     } else {
-      const prefixMatches = sessions.filter((session) => session.id.startsWith(normalized));
+      const prefixMatches = selectorSessions.filter((session) => session.id.startsWith(token));
       if (prefixMatches.length > 1) {
-        return { sessions: [], error: `Ambiguous session id prefix: ${normalized}` };
+        return { sessions: [], error: `Ambiguous session id prefix: ${token}` };
       }
       idMatches = prefixMatches;
     }
-    const tagToken = normalizeSessionTagToken(normalized);
-    const tagMatches = sessions.filter((session) =>
+    const tagToken = normalizeSessionTagToken(token);
+    const tagMatches = selectorSessions.filter((session) =>
       Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
     );
     if (idMatches.length === 0 && tagMatches.length === 0) {
-      return { sessions: [], error: `Unknown session id/tag: ${normalized}` };
+      return { sessions: [], error: `Unknown session id/tag: ${token}` };
     }
     for (const session of idMatches) {
       dedupe.set(session.id, session);
@@ -3122,17 +3194,32 @@ async function executeControlCommand(interpreted) {
       render();
       return "Display filter cleared.";
     }
-    const resolved = resolveFilterSelectors(selectorText, sessions);
+    const activeDeck = getActiveDeck();
+    let activeDeckId = activeDeck ? activeDeck.id : "";
+    const resolved = resolveFilterSelectors(selectorText, sessions, {
+      scopeMode: "active-deck",
+      activeDeckId
+    });
     if (resolved.error) {
       return resolved.error;
     }
     uiState.sessionFilterText = selectorText;
     saveStoredSessionFilterText(selectorText);
+    if (selectorText.includes("::") && resolved.sessions.length > 0) {
+      const targetDeckId = resolveSessionDeckId(resolved.sessions[0]);
+      if (targetDeckId && targetDeckId !== activeDeckId) {
+        setActiveDeck(targetDeckId);
+        activeDeckId = targetDeckId;
+      }
+    }
     if (resolved.sessions.length > 0 && !resolved.sessions.some((session) => session.id === activeSessionId)) {
       store.setActiveSession(resolved.sessions[0].id);
     }
     render();
-    return `Display filter active (${resolved.sessions.length}/${sessions.length}): ${selectorText}`;
+    const scopedCount = activeDeckId
+      ? store.getState().sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId).length
+      : store.getState().sessions.length;
+    return `Display filter active (${resolved.sessions.length}/${scopedCount}): ${selectorText}`;
   }
 
   if (command === "list") {
@@ -3197,25 +3284,42 @@ async function executeControlCommand(interpreted) {
     if (args.length === 0) {
       return "Usage: /switch <id>";
     }
-    const resolved = resolveSessionToken(args[0], sessions);
-    if (!resolved.session) {
-      return resolved.error;
+    const activeDeckId = getActiveDeck()?.id || "";
+    const resolvedTargets = resolveTargetSelectors(args[0], sessions, {
+      source: "slash",
+      scopeMode: "active-deck",
+      activeDeckId
+    });
+    if (resolvedTargets.error) {
+      return resolvedTargets.error;
     }
-    store.setActiveSession(resolved.session.id);
-    return `Active session: [${formatSessionToken(resolved.session.id)}] ${formatSessionDisplayName(resolved.session)}.`;
+    if (resolvedTargets.sessions.length !== 1) {
+      return "Switch selector must resolve to exactly one session.";
+    }
+    const target = resolvedTargets.sessions[0];
+    const targetDeckId = resolveSessionDeckId(target);
+    if (targetDeckId && targetDeckId !== activeDeckId) {
+      setActiveDeck(targetDeckId);
+    }
+    store.setActiveSession(target.id);
+    return `Active session: [${formatSessionToken(target.id)}] ${formatSessionDisplayName(target)}.`;
   }
 
   if (command === "next" || command === "prev") {
-    if (sessions.length === 0) {
+    const activeDeckId = getActiveDeck()?.id || "";
+    const scopedSessions = activeDeckId
+      ? sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
+      : sessions.slice();
+    if (scopedSessions.length === 0) {
       return "No sessions available.";
     }
     const currentIndex = Math.max(
       0,
-      sessions.findIndex((session) => session.id === activeSessionId)
+      scopedSessions.findIndex((session) => session.id === activeSessionId)
     );
     const delta = command === "next" ? 1 : -1;
-    const nextIndex = (currentIndex + delta + sessions.length) % sessions.length;
-    const nextSession = sessions[nextIndex];
+    const nextIndex = (currentIndex + delta + scopedSessions.length) % scopedSessions.length;
+    const nextSession = scopedSessions[nextIndex];
     store.setActiveSession(nextSession.id);
     return `Active session: [${formatSessionToken(nextSession.id)}] ${formatSessionDisplayName(nextSession)}.`;
   }
@@ -3728,7 +3832,11 @@ async function submitCommand() {
   let routeFeedback = "";
 
   if (directRouting.matched) {
-    const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, { source: "direct-route" });
+    const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, {
+      source: "direct-route",
+      scopeMode: "active-deck",
+      activeDeckId: getActiveDeck()?.id || ""
+    });
     if (resolvedTargets.error) {
       setCommandFeedback(resolvedTargets.error);
       return;

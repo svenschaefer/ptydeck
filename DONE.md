@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-091` completed: deck-aware selector isolation is now enforced for `/switch`, `/next`, `/prev`, `/filter`, and direct routing `@target` with active-deck-first resolution.
+- [x] Explicit cross-deck selectors are now supported via `deckSelector::sessionSelector` for deck-isolated command paths (`/switch`, `/filter`, and `@target`).
+- [x] `/next` and `/prev` navigation are now active-deck scoped, preventing implicit cross-deck focus jumps.
+- [x] Frontend integration coverage expanded for deck-isolated selector behavior and explicit cross-deck routing (`/switch`, `/filter`, `@...`) under mixed deck assignments.
+- [x] Validation for `QLT-091` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-090` completed: slash command deck control surface implemented with `/deck list|new|rename|switch|delete` plus `/move <sessionSelector> <deckSelector>`.
 - [x] Deck command handling now resolves decks deterministically by ID, exact name, or unique ID prefix, with explicit usage/help and conflict feedback (`/deck delete ... force`).
 - [x] Slash autocomplete extended for deck/move command contexts (deck subcommands, deck selectors, and move session/deck arguments).
