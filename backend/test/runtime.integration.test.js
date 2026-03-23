@@ -941,6 +941,77 @@ test("session create persists immediately before response completes", async () =
   }
 });
 
+test("session persistence stores default deck catalog and default deckId assignment", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "deck-default-check" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
+    const persistedDecks = Array.isArray(persistedRaw.decks) ? persistedRaw.decks : [];
+    assert.ok(Array.isArray(persistedSessions));
+    assert.ok(Array.isArray(persistedDecks));
+    assert.ok(persistedDecks.some((deck) => deck.id === "default"));
+
+    const persistedSession = persistedSessions.find((session) => session.id === created.id);
+    assert.ok(persistedSession);
+    assert.equal(persistedSession.deckId, "default");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime migrates legacy persistence to default deck catalog and deckId assignment", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "legacy-no-deck";
+
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [{ id: sessionId, cwd: homedir(), shell: "sh", startCwd: homedir(), createdAt: 1, updatedAt: 1 }],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory()
+  });
+  try {
+    await runtime.start();
+  } finally {
+    await runtime.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw.sessions) ? persistedRaw.sessions : [];
+  const persistedDecks = Array.isArray(persistedRaw.decks) ? persistedRaw.decks : [];
+  assert.ok(persistedDecks.some((deck) => deck.id === "default"));
+  const migratedSession = persistedSessions.find((session) => session.id === sessionId);
+  assert.ok(migratedSession);
+  assert.equal(migratedSession.deckId, "default");
+});
+
 test("runtime restore falls back to home when persisted startCwd is invalid", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

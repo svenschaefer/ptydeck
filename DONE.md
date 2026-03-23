@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-084` completed: backend persistence model now includes deck entities and per-session `deckId` storage with backward-compatible loading.
+- [x] Legacy persistence migration now assigns restored sessions deterministically to `default` deck and persists default deck catalog metadata.
+- [x] Added backend regression coverage for deck persistence/migration behavior (`backend/test/persistence.test.js`, `backend/test/runtime.integration.test.js`).
+- [x] Validation for `QLT-084` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-082` completed: backend regression coverage now verifies unrestored-session durability and REST visibility semantics across repeated restart cycles.
 - [x] Backend restore path hardening: unrestored persisted sessions are now normalized to full `Session` schema shape before exposure/persistence, preventing schema-validation `500` responses on `GET /api/v1/sessions` and `GET /api/v1/sessions/{sessionId}`.
 - [x] Added integration assertions proving unrestored sessions remain visible with `state: unrestored` after restart cycle A and restart cycle B.

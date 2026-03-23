@@ -117,7 +117,8 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
 
   const state = {
     sessions: [{ id: "a", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 2 }],
-    customCommands: [{ name: "docu", content: "echo hi\n", createdAt: 3, updatedAt: 4 }]
+    customCommands: [{ name: "docu", content: "echo hi\n", createdAt: 3, updatedAt: 4 }],
+    decks: [{ id: "default", name: "Default", createdAt: 5, updatedAt: 5, settings: {} }]
   };
 
   await persistence.saveState(state);
@@ -136,5 +137,5 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
 
   await writeFile(file, JSON.stringify(legacySessions, null, 2), "utf8");
   const loadedState = await persistence.loadState();
-  assert.deepEqual(loadedState, { sessions: legacySessions, customCommands: [] });
+  assert.deepEqual(loadedState, { sessions: legacySessions, customCommands: [], decks: [] });
 });

@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (H4 completed with `QLT-078`/`QLT-079`; backend durability hardening added for synchronous persistence on mutating REST paths, restore shell/cwd fallback chain, and retention of unrestorable persisted sessions across save cycles; local-only CI policy baseline applied by disabling remote-runner jobs in `.github/workflows/ci.yml`; frontend fixed-size card width chrome reduced by 20px plus additional 2px fine-tuning; frontend mount-height runtime cell calibration added to prevent bottom-row clipping in TUI workloads; `/filter` persists across hard reload and auto-switches active focus to the first visible filtered session; per-session submit modes extended with `CR2` and `CR_DELAY` for TUI prompt workloads; `QLT-080` completed with deterministic `Session.state` (`active|unrestored`) in REST session responses; `QLT-081` completed with FE unrestored-state rendering and action guardrails; `QLT-082` completed with restart-cycle regression coverage for unrestored visibility/durability and backend normalization of unrestored session metadata; `QLT-094` completed with deterministic restore-fallback regression coverage via runtime PTY test injection; `PLAT-011` completed with a repository-level local-only quality-gate document; `QLT-083` completed with the authoritative deck-domain contract for H6)
+Last updated: 2026-03-23 (`QLT-084` completed: backend persistence model now stores deck entities and per-session `deckId` with legacy migration to `default`; prior H4/H5 deliveries and `QLT-083` deck-domain contract remain active baseline)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H5 planning sync).
 
@@ -107,6 +107,8 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Backend now strips CWD marker control output from terminal streams and keeps marker parsing only for metadata updates.
 - Backend no longer flushes persistence on every `input`/`resize`, reducing interactive I/O overhead during typing and resize activity.
 - Backend WebSocket snapshots now include buffered session output; frontend replays snapshot output after reconnect to restore prompt context.
+- Backend persistence now stores deck entities (`decks`) alongside sessions/custom commands and persists per-session `deckId` (internal at runtime, API exposure planned in `QLT-086`).
+- Backend restore path now migrates legacy persisted sessions into the `default` deck deterministically and keeps a persisted default deck catalog baseline.
 - Frontend dev static file resolution now blocks traversal paths and malformed encoded paths.
 - Frontend app behavior tests now cover create-session failure, delete-session failure, command-send failure, and reconnecting/disconnected status rendering.
 - Frontend app integration tests now cover terminal card lifecycle updates, active-session focus switching, and empty-state rendering.
@@ -204,7 +206,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycles: `v0.3.0-H6` (remaining: `QLT-084` ... `QLT-093`).
+- Active next cycles: `v0.3.0-H6` (remaining: `QLT-085` ... `QLT-093`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: none (current-scope enterprise tasks complete).
@@ -217,8 +219,8 @@ The upcoming deck model is a strict isolation boundary above sessions.
   - Planned next in cycle F (`v0.3.0-H4`): none.
   - Completed in cycle G: `QLT-080`, `QLT-081`, `QLT-082`, `QLT-094`, `PLAT-011`.
   - Planned next in cycle G (`v0.3.0-H5`): none.
-  - Completed in cycle H (`v0.3.0-H6`): `QLT-083`.
-  - Planned next in cycle H (`v0.3.0-H6`): `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
+  - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`.
+  - Planned next in cycle H (`v0.3.0-H6`): `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
 
 ## Session Behavior Notes
 

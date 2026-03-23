@@ -38,6 +38,8 @@ const SESSION_TAG_MAX_COUNT = 32;
 const SESSION_TAG_MAX_LENGTH = 32;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const DEFAULT_DECK_ID = "default";
+const DEFAULT_DECK_NAME = "Default";
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -408,6 +410,36 @@ function normalizeSessionTags(input, { strict = true } = {}) {
   return normalized;
 }
 
+function buildDefaultDeck(now = Date.now()) {
+  return {
+    id: DEFAULT_DECK_ID,
+    name: DEFAULT_DECK_NAME,
+    createdAt: now,
+    updatedAt: now,
+    settings: {}
+  };
+}
+
+function normalizeDeckEntity(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return null;
+  }
+  const id = typeof input.id === "string" ? input.id.trim() : "";
+  if (!id) {
+    return null;
+  }
+  const now = Date.now();
+  const createdAt = Number.isInteger(input.createdAt) ? input.createdAt : now;
+  const updatedAt = Number.isInteger(input.updatedAt) ? input.updatedAt : createdAt;
+  return {
+    id,
+    name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : id,
+    createdAt,
+    updatedAt,
+    settings: input.settings && typeof input.settings === "object" && !Array.isArray(input.settings) ? input.settings : {}
+  };
+}
+
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
@@ -428,6 +460,8 @@ export function createRuntime(config) {
   const sockets = new Set();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
+  const decks = new Map();
+  const sessionDeckAssignments = new Map();
   const metrics = {
     httpRequestsTotal: 0,
     httpErrorsTotal: 0,
@@ -686,25 +720,54 @@ export function createRuntime(config) {
     return customCommands.has(normalizeCustomCommandName(name));
   }
 
+  function ensureDefaultDeck() {
+    if (decks.has(DEFAULT_DECK_ID)) {
+      return decks.get(DEFAULT_DECK_ID);
+    }
+    const defaultDeck = buildDefaultDeck();
+    decks.set(defaultDeck.id, defaultDeck);
+    return defaultDeck;
+  }
+
+  function resolveSessionDeckId(sessionId) {
+    const assigned = sessionDeckAssignments.get(sessionId);
+    if (assigned && decks.has(assigned)) {
+      return assigned;
+    }
+    ensureDefaultDeck();
+    sessionDeckAssignments.set(sessionId, DEFAULT_DECK_ID);
+    return DEFAULT_DECK_ID;
+  }
+
+  function withDeckId(session) {
+    return {
+      ...session,
+      deckId: resolveSessionDeckId(session.id)
+    };
+  }
+
   function snapshotRuntimeState() {
     const sessionMap = new Map();
     for (const session of manager.list()) {
-      sessionMap.set(session.id, session);
+      sessionMap.set(session.id, withDeckId(session));
     }
     for (const [sessionId, session] of unrestoredSessions.entries()) {
       if (!sessionMap.has(sessionId)) {
-        sessionMap.set(sessionId, session);
+        sessionMap.set(sessionId, withDeckId(session));
       }
     }
+    ensureDefaultDeck();
     return {
       sessions: Array.from(sessionMap.values()),
-      customCommands: listCustomCommands()
+      customCommands: listCustomCommands(),
+      decks: Array.from(decks.values())
     };
   }
 
   function toApiSession(session, state) {
+    const { deckId: _ignoredDeckId, ...apiSession } = session;
     return {
-      ...session,
+      ...apiSession,
       state
     };
   }
@@ -771,13 +834,15 @@ export function createRuntime(config) {
       logDebug("persist.save.start", {
         reason,
         sessionCount: state.sessions.length,
-        customCommandCount: state.customCommands.length
+        customCommandCount: state.customCommands.length,
+        deckCount: state.decks.length
       });
       await persistence.saveState(state);
       logDebug("persist.save.ok", {
         reason,
         sessionCount: state.sessions.length,
-        customCommandCount: state.customCommands.length
+        customCommandCount: state.customCommands.length,
+        deckCount: state.decks.length
       });
     };
 
@@ -1017,6 +1082,7 @@ export function createRuntime(config) {
           tags,
           themeProfile
         });
+        sessionDeckAssignments.set(payload.id, DEFAULT_DECK_ID);
         const apiPayload = toApiSession(payload, "active");
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
@@ -1033,6 +1099,8 @@ export function createRuntime(config) {
 
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
+        sessionDeckAssignments.delete(match.params.sessionId);
+        unrestoredSessions.delete(match.params.sessionId);
         await persistNow("session.delete");
         writeJson(req, res, 204);
         return;
@@ -1236,12 +1304,28 @@ export function createRuntime(config) {
     isReady = false;
 
     const persistedState = await persistence.loadState();
+    decks.clear();
+    sessionDeckAssignments.clear();
+    for (const persistedDeck of persistedState.decks) {
+      const normalizedDeck = normalizeDeckEntity(persistedDeck);
+      if (!normalizedDeck) {
+        continue;
+      }
+      decks.set(normalizedDeck.id, normalizedDeck);
+    }
+    ensureDefaultDeck();
     logDebug("runtime.restore.start", {
       persistedSessionCount: persistedState.sessions.length,
-      persistedCustomCommandCount: persistedState.customCommands.length
+      persistedCustomCommandCount: persistedState.customCommands.length,
+      persistedDeckCount: persistedState.decks.length
     });
     for (const session of persistedState.sessions) {
       try {
+        const persistedDeckId =
+          typeof session.deckId === "string" && session.deckId && decks.has(session.deckId)
+            ? session.deckId
+            : DEFAULT_DECK_ID;
+        sessionDeckAssignments.set(session.id, persistedDeckId);
         const startupConfig = normalizeSessionStartupConfig(
           {
             startCwd: session.startCwd !== undefined ? session.startCwd : session.cwd,
@@ -1269,6 +1353,7 @@ export function createRuntime(config) {
           env: startupConfig.env,
           tags,
           themeProfile,
+          deckId: persistedDeckId,
           createdAt: restoredCreatedAt,
           updatedAt: restoredUpdatedAt
         };
@@ -1367,7 +1452,8 @@ export function createRuntime(config) {
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,
       unrestoredSessionCount: unrestoredSessions.size,
-      restoredCustomCommandCount: customCommands.size
+      restoredCustomCommandCount: customCommands.size,
+      restoredDeckCount: decks.size
     });
 
     await new Promise((resolve) => {
@@ -1400,6 +1486,7 @@ export function createRuntime(config) {
     logDebug("runtime.stop.start", {
       sessionCount: persistedSnapshot.sessions.length,
       customCommandCount: persistedSnapshot.customCommands.length,
+      deckCount: persistedSnapshot.decks.length,
       socketCount: sockets.size
     });
 
@@ -1414,7 +1501,8 @@ export function createRuntime(config) {
     await persistence.saveState(persistedSnapshot);
     logDebug("runtime.stop.persisted", {
       persistedSessionCount: persistedSnapshot.sessions.length,
-      persistedCustomCommandCount: persistedSnapshot.customCommands.length
+      persistedCustomCommandCount: persistedSnapshot.customCommands.length,
+      persistedDeckCount: persistedSnapshot.decks.length
     });
 
     if (server.listening) {

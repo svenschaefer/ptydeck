@@ -71,10 +71,14 @@ export class JsonPersistence {
       const raw = await this.readFileFn(this.filePath, "utf8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return { sessions: parsed, customCommands: [] };
+        return { sessions: parsed, customCommands: [], decks: [] };
       }
       if (parsed && Array.isArray(parsed.sessions) && Array.isArray(parsed.customCommands)) {
-        return { sessions: parsed.sessions, customCommands: parsed.customCommands };
+        return {
+          sessions: parsed.sessions,
+          customCommands: parsed.customCommands,
+          decks: Array.isArray(parsed.decks) ? parsed.decks : []
+        };
       }
       if (
         parsed &&
@@ -87,37 +91,42 @@ export class JsonPersistence {
         const plainJson = decryptEnvelope(parsed, this.encryptionProvider);
         const decryptedParsed = JSON.parse(plainJson);
         if (Array.isArray(decryptedParsed)) {
-          return { sessions: decryptedParsed, customCommands: [] };
+          return { sessions: decryptedParsed, customCommands: [], decks: [] };
         }
         if (
           decryptedParsed &&
           Array.isArray(decryptedParsed.sessions) &&
           Array.isArray(decryptedParsed.customCommands)
         ) {
-          return { sessions: decryptedParsed.sessions, customCommands: decryptedParsed.customCommands };
+          return {
+            sessions: decryptedParsed.sessions,
+            customCommands: decryptedParsed.customCommands,
+            decks: Array.isArray(decryptedParsed.decks) ? decryptedParsed.decks : []
+          };
         }
-        return { sessions: [], customCommands: [] };
+        return { sessions: [], customCommands: [], decks: [] };
       }
-      return { sessions: [], customCommands: [] };
+      return { sessions: [], customCommands: [], decks: [] };
     } catch (err) {
       if (err && typeof err === "object" && err.code === "ENOENT") {
-        return { sessions: [], customCommands: [] };
+        return { sessions: [], customCommands: [], decks: [] };
       }
       throw err;
     }
   }
 
   async save(sessions) {
-    await this.saveState({ sessions, customCommands: [] });
+    await this.saveState({ sessions, customCommands: [], decks: [] });
   }
 
-  async saveState({ sessions, customCommands }) {
+  async saveState({ sessions, customCommands, decks }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const payloadJson = JSON.stringify(
       {
         sessions: Array.isArray(sessions) ? sessions : [],
-        customCommands: Array.isArray(customCommands) ? customCommands : []
+        customCommands: Array.isArray(customCommands) ? customCommands : [],
+        decks: Array.isArray(decks) ? decks : []
       },
       null,
       2

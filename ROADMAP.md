@@ -328,11 +328,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-083`
+- `QLT-083`, `QLT-084`
 
 Remaining in this milestone:
 
-- `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`
+- `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`
 
 Dependencies:
 
