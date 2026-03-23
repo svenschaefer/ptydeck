@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-23 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply and full theme-profile contract/persistence completed in `QLT-060`, `QLT-061`, and `QLT-066`; slash autocomplete rendering stabilized in the composer with inline hint metrics aligned to input font settings; remaining per-terminal settings/theme backlog `QLT-067`, `QLT-068`)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation and explicit open-task ownership review).
 
 ## Project Purpose
 

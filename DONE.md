@@ -6,6 +6,7 @@ Completed and verified topics belong here.
 
 - [x] Frontend hotfix: command-composer inline slash hint now uses the exact same font family, size, line-height, and spacing as the textarea input text.
 - [x] Documentation sync pass completed for `CODEX_CONTEXT.md` (current state/wording/date alignment).
+- [x] Repository markdown governance check completed: `TODO.md` (what), `ROADMAP.md` (order/version/dependencies), `DONE.md`, and `CODEX_CONTEXT.md` are aligned; open-task ownership is explicit.
 
 ## 2026-03-22
 
