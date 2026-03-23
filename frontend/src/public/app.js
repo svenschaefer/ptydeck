@@ -168,6 +168,63 @@ function withSingleTrailingNewline(value) {
   return `${normalized}\n`;
 }
 
+function countUnescapedSingleQuotes(line) {
+  let count = 0;
+  let escaped = false;
+  const text = String(line || "");
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "'") {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function escapeUnescapedSingleQuotes(line) {
+  let escaped = false;
+  let result = "";
+  const text = String(line || "");
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      result += char;
+      escaped = true;
+      continue;
+    }
+    if (char === "'") {
+      result += "\\'";
+      continue;
+    }
+    result += char;
+  }
+  return result;
+}
+
+function normalizeCustomCommandPayloadForShell(value) {
+  const lines = String(value || "").replace(/\r\n/g, "\n").split("\n");
+  const normalized = lines.map((line) => {
+    if (countUnescapedSingleQuotes(line) % 2 !== 0) {
+      return escapeUnescapedSingleQuotes(line);
+    }
+    return line;
+  });
+  return normalized.join("\n");
+}
+
 function setCommandPreview(message) {
   uiState.commandPreview = message;
   render();
@@ -1676,7 +1733,7 @@ async function executeControlCommand(interpreted) {
     if (!targetSessionId) {
       return "No active session for custom command execution.";
     }
-    const payload = withSingleTrailingNewline(custom.content);
+    const payload = withSingleTrailingNewline(normalizeCustomCommandPayloadForShell(custom.content));
     await api.sendInput(targetSessionId, payload);
     return `Executed /${custom.name} on [${formatSessionToken(targetSessionId)}].`;
   } catch (err) {

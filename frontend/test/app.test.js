@@ -665,6 +665,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^\/docu\n---\necho verify\n---$/);
 
+  fixture.elements.commandInput.value = "/custom go\n---\nTake care of md's and quotes.\n---";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 6);
+  assert.deepEqual(customCommandUpserts[5], {
+    commandName: "go",
+    content: "Take care of md's and quotes."
+  });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /go (block).");
+
   fixture.elements.commandInput.value = "/docu";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
@@ -675,6 +685,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(inputPayloads[1].data, "echo verify\n");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
   assert.equal(fixture.elements.commandPreview.textContent, "");
+
+  fixture.elements.commandInput.value = "/go";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, 3);
+  assert.equal(inputPayloads[2].data, "Take care of md\\'s and quotes.\n");
+  assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/go on \[1\]\./);
 
   fixture.elements.commandInput.value = "/custom remove docu";
   fixture.elements.sendCommand.click();
@@ -688,7 +705,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await sleep(160);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 2);
+  assert.equal(inputPayloads.length, 3);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
 
   fixture.elements.commandInput.value = "/longpreview";
@@ -807,7 +824,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.equal(fixture.elements.commandInput.value, "/custom show escdelim");
+  assert.match(fixture.elements.commandInput.value, /^\/custom show (escdelim|go)$/);
 
   fixture.elements.commandInput.value = "/closeit ";
   fixture.elements.commandInput.dispatchEvent({
