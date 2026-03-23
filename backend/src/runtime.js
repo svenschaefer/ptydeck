@@ -426,6 +426,7 @@ export function createRuntime(config) {
   const wsServer = new WebSocketServer({ noServer: true });
   const sockets = new Set();
   const customCommands = new Map();
+  const unrestoredSessions = new Map();
   const metrics = {
     httpRequestsTotal: 0,
     httpErrorsTotal: 0,
@@ -685,8 +686,17 @@ export function createRuntime(config) {
   }
 
   function snapshotRuntimeState() {
+    const sessionMap = new Map();
+    for (const session of manager.list()) {
+      sessionMap.set(session.id, session);
+    }
+    for (const [sessionId, session] of unrestoredSessions.entries()) {
+      if (!sessionMap.has(sessionId)) {
+        sessionMap.set(sessionId, session);
+      }
+    }
     return {
-      sessions: manager.list(),
+      sessions: Array.from(sessionMap.values()),
       customCommands: listCustomCommands()
     };
   }
@@ -1248,8 +1258,13 @@ export function createRuntime(config) {
         }
 
         if (!restored) {
+          unrestoredSessions.set(session.id, { ...session });
+          logDebug("runtime.restore.session_marked_unrestored", {
+            sessionId: session.id
+          });
           throw new Error("all restore attempts failed");
         }
+        unrestoredSessions.delete(session.id);
       } catch (err) {
         console.error("failed to restore session", session.id, err);
       }
@@ -1290,6 +1305,7 @@ export function createRuntime(config) {
     }
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,
+      unrestoredSessionCount: unrestoredSessions.size,
       restoredCustomCommandCount: customCommands.size
     });
 

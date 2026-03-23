@@ -987,6 +987,59 @@ test("runtime restore falls back to configured shell when persisted shell is inv
   }
 });
 
+test("runtime keeps unrestorable persisted sessions across restart cycles", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "restore-unrestorable";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: sessionId,
+            cwd: "/definitely/not/a/real/path",
+            shell: "/definitely/not/a/real/shell",
+            name: "unrestorable",
+            startCwd: "/definitely/not/a/real/path",
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "/definitely/not/a/fallback/shell",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+
+  try {
+    await runtime.start();
+    await runtime.stop();
+  } finally {
+    await runtime.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
+  assert.ok(Array.isArray(persistedSessions));
+  assert.ok(persistedSessions.some((session) => session.id === sessionId));
+});
+
 test("ready endpoint returns starting before startup gate and ready after release", async () => {
   let releaseReadyGate = null;
   const readyGate = new Promise((resolve) => {
