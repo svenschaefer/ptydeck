@@ -1111,6 +1111,14 @@ function setStartupSettingsFeedback(entry, message, isError = false) {
   entry.startFeedback.classList.toggle("error", Boolean(isError));
 }
 
+function setSessionCardVisibility(node, visible) {
+  if (!node) {
+    return;
+  }
+  node.hidden = !visible;
+  node.style.display = visible ? "" : "none";
+}
+
 function syncSessionStartupControls(entry, session) {
   if (!entry || !entry.startCwdInput || !entry.startCommandInput || !entry.startEnvInput) {
     return;
@@ -1633,7 +1641,7 @@ function render() {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
-      entry.element.hidden = !visibleSessionIds.has(session.id);
+      setSessionCardVisibility(entry.element, visibleSessionIds.has(session.id));
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       renderSessionTagList(entry, session);
@@ -1877,7 +1885,7 @@ function render() {
     });
 
     node.classList.toggle("active", state.activeSessionId === session.id);
-    node.hidden = !visibleSessionIds.has(session.id);
+    setSessionCardVisibility(node, visibleSessionIds.has(session.id));
 
     const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
     const terminal = new window.Terminal({
