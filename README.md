@@ -71,7 +71,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 
 - Multiple terminal sessions displayed side by side
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
-- Sidebar settings include configurable command submit terminator with deterministic modes: `auto` (default, `CR`), `crlf`, `lf`, `cr`
+- Per-session settings include configurable command submit terminator with deterministic modes: `auto` (default, `CR`), `crlf`, `lf`, `cr`
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Delete` actions are available inside each session settings dialog (removed from direct toolbar); delete requires explicit user confirmation

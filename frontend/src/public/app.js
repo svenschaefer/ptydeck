@@ -22,7 +22,6 @@ const gridEl = document.getElementById("terminal-grid");
 const createBtn = document.getElementById("create-session");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
-const settingsSendTerminatorEl = document.getElementById("settings-send-terminator");
 const settingsApplyBtn = document.getElementById("settings-apply");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
@@ -47,6 +46,7 @@ let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
+const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
@@ -128,6 +128,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "help"
 ];
 let terminalSettings = loadTerminalSettings();
+let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
 let wsAuthToken = "";
 let wsClient = null;
@@ -188,12 +189,11 @@ function getErrorMessage(err, fallback) {
   return fallback;
 }
 
-function withSingleTrailingNewline(value) {
+function withSingleTrailingNewline(value, mode = "auto") {
   const normalizedLines = String(value || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/\n+$/g, "");
-  const mode = terminalSettings?.sendTerminator;
   const lineSeparator = mode === "lf" ? "\n" : "\r";
   const suffix = mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : "\r";
   const body = normalizedLines.replace(/\n/g, lineSeparator);
@@ -728,12 +728,69 @@ function saveTerminalSettings() {
 
 function loadTerminalSettings() {
   const stored = readStoredSettings();
-  const sendTerminator = SEND_TERMINATOR_MODE_SET.has(stored?.sendTerminator) ? stored.sendTerminator : "auto";
   return {
     cols: clampInt(stored?.cols, 80, 20, 400),
-    rows: clampInt(stored?.rows, 20, 5, 120),
-    sendTerminator
+    rows: clampInt(stored?.rows, 20, 5, 120)
   };
+}
+
+function normalizeSendTerminatorMode(value) {
+  return SEND_TERMINATOR_MODE_SET.has(value) ? value : "auto";
+}
+
+function loadSessionInputSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
+      return {};
+    }
+    const raw = window.localStorage.getItem(SESSION_INPUT_SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    const next = {};
+    for (const [sessionId, value] of Object.entries(parsed)) {
+      const mode = normalizeSendTerminatorMode(String(value?.sendTerminator || "").toLowerCase());
+      next[sessionId] = { sendTerminator: mode };
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionInputSettings() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
+      return;
+    }
+    window.localStorage.setItem(SESSION_INPUT_SETTINGS_STORAGE_KEY, JSON.stringify(sessionInputSettings));
+  } catch {
+    // ignore storage failures (private mode / quota)
+  }
+}
+
+function getSessionSendTerminator(sessionId) {
+  if (!sessionId || typeof sessionId !== "string") {
+    return "auto";
+  }
+  const mode = sessionInputSettings?.[sessionId]?.sendTerminator;
+  return normalizeSendTerminatorMode(String(mode || "").toLowerCase());
+}
+
+function setSessionSendTerminator(sessionId, mode) {
+  if (!sessionId || typeof sessionId !== "string") {
+    return;
+  }
+  const nextMode = normalizeSendTerminatorMode(String(mode || "").toLowerCase());
+  sessionInputSettings = {
+    ...sessionInputSettings,
+    [sessionId]: { sendTerminator: nextMode }
+  };
+  saveSessionInputSettings();
 }
 
 function isValidHexColor(value) {
@@ -991,6 +1048,9 @@ function syncSessionStartupControls(entry, session) {
   entry.startCwdInput.value = startCwd;
   entry.startCommandInput.value = startCommand;
   entry.startEnvInput.value = formatSessionEnv(session.env);
+  if (entry.sessionSendTerminatorSelect) {
+    entry.sessionSendTerminatorSelect.value = getSessionSendTerminator(session.id);
+  }
 }
 
 function normalizeSessionStartupFromSession(session) {
@@ -1004,10 +1064,14 @@ function readSessionStartupFromControls(entry) {
   const startCwd = String(entry?.startCwdInput?.value || "").trim();
   const startCommand = String(entry?.startCommandInput?.value || "");
   const envResult = parseSessionEnv(String(entry?.startEnvInput?.value || ""));
+  const sendTerminator = normalizeSendTerminatorMode(
+    String(entry?.sessionSendTerminatorSelect?.value || "").toLowerCase()
+  );
   return {
     startCwd,
     startCommand,
-    envResult
+    envResult,
+    sendTerminator
   };
 }
 
@@ -1079,6 +1143,9 @@ function isSessionSettingsDirty(entry, session) {
   if (!areThemeProfilesEqual(session.themeProfile, draftTheme)) {
     return true;
   }
+  if (getSessionSendTerminator(session.id) !== draftStartup.sendTerminator) {
+    return true;
+  }
   return false;
 }
 
@@ -1127,20 +1194,13 @@ function syncSettingsUi() {
   if (settingsRowsEl) {
     settingsRowsEl.value = String(terminalSettings.rows);
   }
-  if (settingsSendTerminatorEl) {
-    settingsSendTerminatorEl.value = terminalSettings.sendTerminator;
-  }
   syncTerminalGeometryCss();
 }
 
 function readSettingsFromUi() {
-  const selectedSendTerminator = String(settingsSendTerminatorEl?.value || "").toLowerCase();
   return {
     cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
-    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
-    sendTerminator: SEND_TERMINATOR_MODE_SET.has(selectedSendTerminator)
-      ? selectedSendTerminator
-      : terminalSettings.sendTerminator
+    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120)
   };
 }
 
@@ -1432,6 +1492,7 @@ function render() {
     const startCwdInput = node.querySelector(".session-start-cwd");
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
+    const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
     const startFeedback = node.querySelector(".session-start-feedback");
     const themeCategory = node.querySelector(".session-theme-category");
     const themeSearch = node.querySelector(".session-theme-search");
@@ -1504,12 +1565,18 @@ function render() {
       }
     });
     const markDirtyFromControls = () => {
-      const nextDirty = isSessionSettingsDirty({ startCwdInput, startCommandInput, startEnvInput, themeInputs }, getSessionById(session.id));
+      const nextDirty = isSessionSettingsDirty(
+        { startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect, themeInputs },
+        getSessionById(session.id)
+      );
       setSettingsDirty(terminals.get(session.id), nextDirty);
     };
     startCwdInput.addEventListener("input", markDirtyFromControls);
     startCommandInput.addEventListener("input", markDirtyFromControls);
     startEnvInput.addEventListener("input", markDirtyFromControls);
+    if (sessionSendTerminatorSelect) {
+      sessionSendTerminatorSelect.addEventListener("change", markDirtyFromControls);
+    }
     themeSelect.addEventListener("change", () => {
       const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
       const currentProfile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
@@ -1569,7 +1636,12 @@ function render() {
       });
     }
     settingsApplyBtn.addEventListener("click", async () => {
-      const startupDraft = readSessionStartupFromControls({ startCwdInput, startCommandInput, startEnvInput });
+      const startupDraft = readSessionStartupFromControls({
+        startCwdInput,
+        startCommandInput,
+        startEnvInput,
+        sessionSendTerminatorSelect
+      });
       if (!startupDraft.startCwd) {
         setStartupSettingsFeedback({ startFeedback }, "Working Directory cannot be empty.", true);
         return;
@@ -1605,6 +1677,7 @@ function render() {
         });
         upsertSession(updated);
         sessionThemeDrafts.delete(session.id);
+        setSessionSendTerminator(session.id, startupDraft.sendTerminator);
         setStartupSettingsFeedback({ startFeedback }, "Settings saved.");
         setSettingsDirty(terminals.get(session.id), false);
       } catch {
@@ -1616,7 +1689,7 @@ function render() {
       const freshSession = getSessionById(session.id);
       sessionThemeDrafts.delete(session.id);
       if (freshSession) {
-        syncSessionStartupControls({ startCwdInput, startCommandInput, startEnvInput }, freshSession);
+        syncSessionStartupControls({ startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect }, freshSession);
         syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       }
       applyThemeForSession(session.id);
@@ -1653,6 +1726,7 @@ function render() {
       startCwdInput,
       startCommandInput,
       startEnvInput,
+      sessionSendTerminatorSelect,
       startFeedback,
       settingsApplyBtn,
       settingsStatus,
@@ -2069,7 +2143,10 @@ async function executeControlCommand(interpreted) {
     if (!targetSessionId) {
       return "No active session for custom command execution.";
     }
-    const payload = withSingleTrailingNewline(normalizeCustomCommandPayloadForShell(custom.content));
+    const payload = withSingleTrailingNewline(
+      normalizeCustomCommandPayloadForShell(custom.content),
+      getSessionSendTerminator(targetSessionId)
+    );
     await api.sendInput(targetSessionId, payload);
     return `Executed /${custom.name} on [${formatSessionToken(targetSessionId)}].`;
   } catch (err) {
@@ -2218,15 +2295,6 @@ if (settingsRowsEl) {
     }
   });
 }
-if (settingsSendTerminatorEl) {
-  settingsSendTerminatorEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onApplySettings();
-    }
-  });
-}
-
 async function submitCommand() {
   resetCommandAutocompleteState();
   const command = commandInput.value;
@@ -2280,7 +2348,7 @@ async function submitCommand() {
   }
 
   try {
-    const payload = withSingleTrailingNewline(targetPayload);
+    const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(targetSessionId));
     debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
     await api.sendInput(targetSessionId, payload);
     commandInput.value = "";

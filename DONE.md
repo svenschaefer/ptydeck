@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-071` completed: command submit terminator configuration moved from global sidebar controls into per-session terminal settings.
+- [x] Per-session submit modes (`auto`, `crlf`, `lf`, `cr`) now apply deterministically to direct input, routed `@target` input, and custom-command execution based on the resolved target session.
+- [x] Frontend integration coverage extended to verify per-session terminator behavior after settings updates.
 - [x] `QLT-069` completed: command submit terminator handling was reworked for deterministic shell/TUI execution with one final submit signal and no extra manual Enter requirement.
 - [x] Frontend send-terminator settings now include `Auto (CR/Enter)` as default and normalize multiline payload submission across regular input, routed `@target` input, and custom-command execution.
 - [x] Added/updated frontend integration coverage for submit semantics across `auto`, `crlf`, `lf`, and `cr` modes, including multiline custom-command payload execution behavior.

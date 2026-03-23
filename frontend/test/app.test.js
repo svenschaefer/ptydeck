@@ -238,6 +238,9 @@ function createTerminalCardTemplateNode() {
   const startEnvLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startEnv = new FakeElement({ className: "session-start-env", tagName: "textarea" });
   startEnv.value = "";
+  const startSendTerminatorLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const startSendTerminator = new FakeElement({ className: "session-send-terminator", tagName: "select" });
+  startSendTerminator.value = "auto";
   const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
   const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
   const themeCategoryLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
@@ -272,6 +275,8 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startCommand);
   startControls.appendChild(startEnvLabel);
   startControls.appendChild(startEnv);
+  startControls.appendChild(startSendTerminatorLabel);
+  startControls.appendChild(startSendTerminator);
   startControls.appendChild(startFeedback);
   settingsPanel.appendChild(startControls);
   themeControls.appendChild(themeCategoryLabel);
@@ -1004,6 +1009,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondStartCwd = secondSettingsPanel.querySelector(".session-start-cwd");
   const secondStartCommand = secondSettingsPanel.querySelector(".session-start-command");
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
+  const secondSendTerminator = secondSettingsPanel.querySelector(".session-send-terminator");
   const secondSettingsApply = secondSettingsPanel.querySelector(".session-settings-apply");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   assert.equal(secondSettingsPanel.open, false);
@@ -1094,29 +1100,38 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(secondCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
 
-  fixture.elements.settingsSendTerminator.value = "crlf";
-  fixture.elements.settingsApply.click();
+  secondSettings.click();
   await tick();
-  fixture.elements.commandInput.value = "echo alpha";
+  secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
+  secondStartEnv.dispatchEvent({ type: "input" });
+  secondSendTerminator.value = "crlf";
+  secondSendTerminator.dispatchEvent({ type: "change" });
+  secondSettingsApply.click();
+  await tick();
+  fixture.elements.commandInput.value = "@2 echo alpha";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads[inputPayloads.length - 1].data, "echo alpha\r\n");
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "echo alpha\r\n" });
 
-  fixture.elements.settingsSendTerminator.value = "lf";
-  fixture.elements.settingsApply.click();
+  secondSendTerminator.value = "lf";
+  secondSendTerminator.dispatchEvent({ type: "change" });
+  secondSettingsApply.click();
   await tick();
-  fixture.elements.commandInput.value = "line1\nline2";
+  fixture.elements.commandInput.value = "@2 line1\nline2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads[inputPayloads.length - 1].data, "line1\nline2\n");
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\nline2\n" });
 
-  fixture.elements.settingsSendTerminator.value = "cr";
-  fixture.elements.settingsApply.click();
+  secondSendTerminator.value = "cr";
+  secondSendTerminator.dispatchEvent({ type: "change" });
+  secondSettingsApply.click();
   await tick();
-  fixture.elements.commandInput.value = "line1\nline2";
+  fixture.elements.commandInput.value = "@2 line1\nline2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads[inputPayloads.length - 1].data, "line1\rline2\r");
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\rline2\r" });
+  secondSettings.click();
+  await tick();
 
   const unresolvedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@does-not-exist echo routed";
