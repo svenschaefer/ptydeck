@@ -268,6 +268,7 @@ Completed and verified topics belong here.
 - [x] Runtime now normalizes and validates `themeProfile` on session create/update/restore, rejects invalid keys/values, and applies defaults for missing palette fields.
 - [x] OpenAPI updated with `SessionThemeProfile` schema and request/response references; backend integration/unit/validation coverage extended for theme-profile lifecycle behavior.
 - [x] Frontend hotfix: slash-command suggestion/preview blocks moved into the command input area so `/` autocomplete renders at the composer (not at the top of the workspace).
+- [x] Frontend hotfix: slash autocomplete now provides inline hinting at the input caret area (ghost suffix), while the separate suggestion menu remains hidden.
 - [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
 - [x] `QLT-042` completed: frontend now shows a non-blocking custom-command preview panel for `/<customName>` (payload, resolved target, newline append indicator) before execution.

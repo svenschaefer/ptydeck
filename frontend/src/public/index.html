@@ -34,11 +34,14 @@
 
         <section class="command-row">
           <div class="command-input-column">
-            <textarea
-              id="command-input"
-              rows="10"
-              placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
-            ></textarea>
+            <div class="command-input-wrap">
+              <textarea
+                id="command-input"
+                rows="10"
+                placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+              ></textarea>
+              <div id="command-inline-hint" class="command-inline-hint"></div>
+            </div>
             <pre id="command-preview" class="command-preview"></pre>
             <pre id="command-suggestions" class="command-suggestions" hidden></pre>
           </div>

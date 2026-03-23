@@ -128,6 +128,11 @@ body {
   min-width: 0;
 }
 
+.command-input-wrap {
+  position: relative;
+  min-width: 0;
+}
+
 .command-row textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -138,6 +143,23 @@ body {
   min-height: 10.5rem;
   line-height: 1.35;
   font-family: inherit;
+}
+
+.command-inline-hint {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  pointer-events: none;
+  color: rgba(146, 164, 187, 0.65);
+  transform: translateX(calc(var(--hint-prefix-chars, 0) * 1ch));
+  font: inherit;
+  line-height: 1.35;
+  white-space: pre;
+  z-index: 3;
+}
+
+.command-inline-hint:empty {
+  display: none;
 }
 
 .command-row textarea::placeholder {

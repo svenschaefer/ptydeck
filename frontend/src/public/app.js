@@ -28,6 +28,7 @@ const template = document.getElementById("terminal-card-template");
 const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
 const commandFeedbackEl = document.getElementById("command-feedback");
+const commandInlineHintEl = document.getElementById("command-inline-hint");
 const commandPreviewEl = document.getElementById("command-preview");
 const commandSuggestionsEl = document.getElementById("command-suggestions");
 
@@ -116,6 +117,8 @@ const uiState = {
   loading: true,
   error: "",
   commandFeedback: "",
+  commandInlineHint: "",
+  commandInlineHintPrefixChars: 0,
   commandPreview: "",
   commandSuggestions: "",
   commandSuggestionSelectedIndex: -1
@@ -190,6 +193,8 @@ function clearCommandSuggestions() {
   commandAutocompleteState = null;
   uiState.commandSuggestions = "";
   uiState.commandSuggestionSelectedIndex = -1;
+  uiState.commandInlineHint = "";
+  uiState.commandInlineHintPrefixChars = 0;
 }
 
 function applyCommandSuggestionSelection(index) {
@@ -537,6 +542,17 @@ async function refreshCommandSuggestions() {
     commandAutocompleteState.matches.every((entry, entryIndex) => entry === context.matches[entryIndex])
   ) {
     index = Math.min(Math.max(commandAutocompleteState.index, 0), context.matches.length - 1);
+  }
+  const selected = context.matches[index] || "";
+  const inputValue = commandInput.value || "";
+  const prefix = context.replacePrefix || "";
+  const tokenPrefix = inputValue.startsWith(prefix) ? inputValue.slice(prefix.length) : "";
+  if (selected && tokenPrefix.length <= selected.length && selected.startsWith(tokenPrefix)) {
+    uiState.commandInlineHint = selected.slice(tokenPrefix.length);
+    uiState.commandInlineHintPrefixChars = inputValue.length;
+  } else {
+    uiState.commandInlineHint = "";
+    uiState.commandInlineHintPrefixChars = 0;
   }
   setCommandSuggestions(context.replacePrefix, context.matches, index);
 }
@@ -1012,6 +1028,10 @@ function render() {
   }
   if (commandFeedbackEl) {
     commandFeedbackEl.textContent = uiState.commandFeedback || "";
+  }
+  if (commandInlineHintEl) {
+    commandInlineHintEl.textContent = uiState.commandInlineHint || "";
+    commandInlineHintEl.style.setProperty("--hint-prefix-chars", String(uiState.commandInlineHintPrefixChars || 0));
   }
   if (commandPreviewEl) {
     commandPreviewEl.textContent = uiState.commandPreview || "";

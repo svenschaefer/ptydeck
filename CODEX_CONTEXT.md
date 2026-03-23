@@ -143,6 +143,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend now supports slash-repeat shortcut for recalled commands (`Ctrl/Cmd+Enter`) with guardrail feedback when recalled content was modified.
 - Frontend now renders a non-blocking slash suggestion list with keyboard selection (`Tab`, `Shift+Tab`, arrows, `Enter`) and no implicit command execution.
 - Slash-command preview/suggestion rendering is now anchored in the command-composer area, so `/` autocomplete appears adjacent to the input field instead of at the workspace header.
+- Slash autocomplete now uses inline hinting (ghost suffix at the composer input) instead of a visible suggestion menu.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
