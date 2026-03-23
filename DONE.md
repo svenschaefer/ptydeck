@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Hotfix: `/move` no longer fails with `JSON.parse: unexpected end of data` when backend returns `204 No Content` for `POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`.
+- [x] Frontend API client now treats deck move as `204` operation and then reloads moved session via `GET /api/v1/sessions/{sessionId}` to keep FE state deterministic.
+- [x] Regression coverage updated in frontend API and app integration tests for the move flow with follow-up session read.
+- [x] Deck navigation UI moved from workspace top header into the left sidebar to preserve vertical terminal space.
+- [x] Sidebar deck section now uses a vertical deck list with full-width deck action buttons (`New/Rename/Delete`) and keeps active-deck switching in the sidebar.
 - [x] `QLT-093` completed: frontend regression matrix now covers deck migration/CRUD conflict paths, active-deck isolation fallback behavior, slash deck routing, selector dedupe, and per-deck settings persistence with deterministic assertions.
 - [x] Frontend deck regression tests were stabilized against selector/terminator edge cases by switching brittle last-payload assertions to deterministic target/count assertions and explicit selector scopes where needed.
 - [x] Validation for `QLT-093` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.

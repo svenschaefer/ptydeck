@@ -134,32 +134,30 @@ body {
 
 .deck-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: center;
-  padding: 12px 18px 8px;
-  border-bottom: 1px solid var(--border);
-  background: #0d141e;
+  margin-top: 2px;
 }
 
 .deck-tabs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 6px;
   min-width: 0;
-  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .deck-tab {
   border: 1px solid #304055;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #0f1926;
   color: #9db8d2;
-  padding: 6px 12px;
+  padding: 7px 10px;
   font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
+  width: 100%;
+  text-align: left;
 }
 
 .deck-tab:hover {
@@ -182,13 +180,13 @@ body {
 }
 
 .deck-actions {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
 .deck-actions button {
-  white-space: nowrap;
+  width: 100%;
 }
 
 .sidebar-launcher {
@@ -782,15 +780,6 @@ button:hover {
 
   .terminal-grid {
     grid-template-columns: 1fr;
-  }
-
-  .deck-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .deck-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
   }
 
   .command-row {

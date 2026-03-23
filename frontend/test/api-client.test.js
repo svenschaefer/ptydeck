@@ -24,6 +24,32 @@ test("api client calls deck lifecycle and move endpoints", async () => {
     if (method === "DELETE") {
       return { ok: true, status: 204, json: async () => ({}) };
     }
+    if (method === "POST" && String(url).includes(":move")) {
+      return {
+        ok: true,
+        status: 204,
+        json: async () => {
+          throw new Error("move 204 response must not be parsed as JSON");
+        }
+      };
+    }
+    if (method === "GET" && String(url).endsWith("/sessions/abc")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "abc",
+          deckId: "ops",
+          state: "active",
+          shell: "bash",
+          cwd: "~",
+          name: "abc",
+          tags: [],
+          createdAt: 1,
+          updatedAt: 2
+        })
+      };
+    }
     return {
       ok: true,
       status: method === "POST" ? 201 : 200,
@@ -38,7 +64,7 @@ test("api client calls deck lifecycle and move endpoints", async () => {
   await api.moveSessionToDeck("ops", "abc");
   await api.deleteDeck("ops", { force: true });
 
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 6);
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/decks");
   assert.equal(calls[1].url, "http://localhost:18080/api/v1/decks");
   assert.equal(calls[1].options.method, "POST");
@@ -46,8 +72,10 @@ test("api client calls deck lifecycle and move endpoints", async () => {
   assert.equal(calls[2].options.method, "PATCH");
   assert.equal(calls[3].url, "http://localhost:18080/api/v1/decks/ops/sessions/abc:move");
   assert.equal(calls[3].options.method, "POST");
-  assert.equal(calls[4].url, "http://localhost:18080/api/v1/decks/ops?force=true");
-  assert.equal(calls[4].options.method, "DELETE");
+  assert.equal(calls[4].url, "http://localhost:18080/api/v1/sessions/abc");
+  assert.equal((calls[4].options.method || "GET"), "GET");
+  assert.equal(calls[5].url, "http://localhost:18080/api/v1/decks/ops?force=true");
+  assert.equal(calls[5].options.method, "DELETE");
 });
 
 test("api client includes bearer auth header when token is set", async () => {

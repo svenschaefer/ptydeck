@@ -593,6 +593,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(500, { error: "CreateFailed", message: "boom" });
     }
     const patchMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)$/);
+    if (patchMatch && method === "GET") {
+      const sessionId = decodeURIComponent(patchMatch[1]);
+      return makeJsonResponse(200, {
+        id: sessionId,
+        deckId: sessionDeckById.get(sessionId) || "default",
+        state: "active",
+        shell: "bash",
+        cwd: "~",
+        name: sessionId === "s-2" ? "two" : sessionId === "ops" ? "ops-node" : "one",
+        tags: sessionId === "s-2" ? ["beta", "ops"] : sessionId === "ops" ? ["ops"] : [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
     if (patchMatch && method === "PATCH") {
       const sessionId = decodeURIComponent(patchMatch[1]);
       const payload = JSON.parse(options.body || "{}");

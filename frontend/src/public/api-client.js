@@ -111,11 +111,16 @@ export function createApiClient(baseUrl, options = {}) {
       await request(`/decks/${encodeURIComponent(deckId)}?force=${force}`, { method: "DELETE" }, { expectJson: false });
     },
     async moveSessionToDeck(deckId, sessionId) {
-      return request(`/decks/${encodeURIComponent(deckId)}/sessions/${encodeURIComponent(sessionId)}:move`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}"
-      });
+      await request(
+        `/decks/${encodeURIComponent(deckId)}/sessions/${encodeURIComponent(sessionId)}:move`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}"
+        },
+        { expectJson: false }
+      );
+      return request(`/sessions/${encodeURIComponent(sessionId)}`);
     },
     /** @returns {Promise<Session>} */
     async createSession(payload = {}) {

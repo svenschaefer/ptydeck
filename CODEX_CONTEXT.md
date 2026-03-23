@@ -122,7 +122,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend fixed-size terminal rendering width chrome was fine-tuned by an additional 2px reduction after initial geometry correction.
 - Frontend terminal workspace now hardens horizontal overflow behavior via fixed-size grid column constraints, card shrink guards, toolbar text truncation, and root `overflow-x` containment.
 - Frontend terminal cards now display compact quick IDs (`1..9`, `A..Z`) next to session names for concise reference and future command alias support.
-- Frontend workspace now includes a top deck-tab bar with deterministic deck create/rename/switch/delete flows and persisted active-deck selection.
+- Frontend deck navigation now lives in the left sidebar (no dedicated top header row), with deterministic deck create/rename/switch/delete flows and persisted active-deck selection.
 - Frontend terminal geometry controls now map to active deck settings (`settings.terminal.cols/rows`) so `/size` and sidebar apply are deck-scoped (not global).
 - Frontend new-session flow now moves newly created sessions into the active deck when the active deck is not default.
 - Frontend terminal-grid visibility is now scoped strictly to the active deck, while non-active-deck sessions remain running and unchanged in runtime state.
@@ -195,6 +195,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Custom-command preview now renders inline as payload-only helper text inside the composer input area, without target/newline metadata.
 - Custom-command execution now escapes unbalanced apostrophes per line before send to avoid open-quote shell states on multiline payload text.
 - Frontend command send path now appends exactly one final terminator selected in settings (`CRLF`, `LF`, `CR`, `CR2`, `CR_DELAY`) across direct input, routed input, and custom-command execution.
+- Frontend API client now treats deck move (`POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`) as `204 No Content` and follows with `GET /api/v1/sessions/{sessionId}` to avoid empty-body JSON parse failures.
 - Backend CORS preflight headers now include `PUT` in allowed methods and `authorization` in allowed headers so `/api/v1/custom-commands/{name}` updates work cross-origin in browser clients.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
