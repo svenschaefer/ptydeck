@@ -31,20 +31,24 @@
 
         <section class="command-row">
           <div class="command-input-column">
-            <p id="status-message" class="status-message"></p>
-            <p id="command-feedback" class="command-feedback"></p>
-            <div class="command-input-wrap">
-              <textarea
-                id="command-input"
-                rows="10"
-                placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
-              ></textarea>
-              <div id="command-inline-hint" class="command-inline-hint"></div>
+            <div class="command-meta">
+              <p id="status-message" class="status-message"></p>
+              <p id="command-feedback" class="command-feedback"></p>
+            </div>
+            <div class="command-entry-row">
+              <div class="command-input-wrap">
+                <textarea
+                  id="command-input"
+                  rows="10"
+                  placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+                ></textarea>
+                <div id="command-inline-hint" class="command-inline-hint"></div>
+              </div>
+              <button id="send-command" type="button">Send</button>
             </div>
             <pre id="command-preview" class="command-preview"></pre>
             <pre id="command-suggestions" class="command-suggestions" hidden></pre>
           </div>
-          <button id="send-command" type="button">Send</button>
         </section>
       </section>
     </div>

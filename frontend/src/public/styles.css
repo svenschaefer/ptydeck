@@ -112,9 +112,6 @@ body {
 }
 
 .command-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
   padding: 12px 18px;
   border-top: 1px solid var(--border);
   background: #0f151f;
@@ -124,8 +121,21 @@ body {
 
 .command-input-column {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+}
+
+.command-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.command-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
 }
 
 .command-input-wrap {
@@ -184,15 +194,17 @@ body {
   color: var(--muted);
 }
 
-.command-row button {
+.command-entry-row button {
   justify-self: end;
   align-self: stretch;
   min-width: 96px;
+  height: 100%;
+  min-height: 10.5rem;
 }
 
 .status-message {
   margin: 0;
-  min-height: 18px;
+  min-height: 0;
   color: #ff8f8f;
   font-size: 12px;
   line-height: 1.35;
@@ -201,11 +213,16 @@ body {
 
 .command-feedback {
   margin: 0;
-  min-height: 18px;
+  min-height: 0;
   color: #8ec07c;
   font-size: 12px;
   line-height: 1.35;
   white-space: pre-wrap;
+}
+
+.status-message:empty,
+.command-feedback:empty {
+  display: none;
 }
 
 .command-preview {
