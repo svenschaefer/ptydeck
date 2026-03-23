@@ -2,6 +2,11 @@
 
 Completed and verified topics belong here.
 
+## 2026-03-23
+
+- [x] Frontend hotfix: command-composer inline slash hint now uses the exact same font family, size, line-height, and spacing as the textarea input text.
+- [x] Documentation sync pass completed for `CODEX_CONTEXT.md` (current state/wording/date alignment).
+
 ## 2026-03-22
 
 - [x] Initial `README.md` drafted with architecture, protocol, and operational concepts.

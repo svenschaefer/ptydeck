@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-22 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply and full theme-profile contract/persistence completed in `QLT-060`, `QLT-061`, and `QLT-066`; remaining per-terminal settings/theme backlog `QLT-067`, `QLT-068`)
+Last updated: 2026-03-23 (custom-command persistence/CRUD + guardrails + deterministic backend name normalization/sort policy + WS custom-command sync events + `/custom` management/execution + strict slash-mode boundary + preview panel + command-name/argument autocomplete + suggestion list + slash history/repeat + direct target routing + block-delimiter edge-case handling + preview-safety hardening completed in `QLT-037` ... `QLT-045`, `QLT-047`, `QLT-048`, `QLT-049`, `QLT-050`, `QLT-052`, `QLT-053`, `QLT-054`, and `QLT-056`; per-terminal settings icon/dialog migration, action relocation, startup-settings form, and lifecycle QA coverage completed in `QLT-058`, `QLT-059`, `QLT-062`, `QLT-064`, and `QLT-065`; per-session color-set personalization completed in `QLT-063`; backend startup-settings contract/apply and full theme-profile contract/persistence completed in `QLT-060`, `QLT-061`, and `QLT-066`; slash autocomplete rendering stabilized in the composer with inline hint metrics aligned to input font settings; remaining per-terminal settings/theme backlog `QLT-067`, `QLT-068`)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-22.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23.
 
 ## Project Purpose
 
@@ -141,9 +141,9 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend slash-command argument autocomplete now supports context-sensitive candidate cycling for `/switch`, `/close`, `/custom show`, `/custom remove`, and `/<customName> <target>`.
 - Frontend now supports slash-command history recall (`ArrowUp`/`ArrowDown`) in slash-mode input while leaving non-slash multiline composer behavior unchanged.
 - Frontend now supports slash-repeat shortcut for recalled commands (`Ctrl/Cmd+Enter`) with guardrail feedback when recalled content was modified.
-- Frontend now renders a non-blocking slash suggestion list with keyboard selection (`Tab`, `Shift+Tab`, arrows, `Enter`) and no implicit command execution.
-- Slash-command preview/suggestion rendering is now anchored in the command-composer area, so `/` autocomplete appears adjacent to the input field instead of at the workspace header.
+- Frontend now renders slash autocomplete directly in the command-composer area, with deterministic keyboard cycling (`Tab`, `Shift+Tab`, arrows, `Enter`) and no implicit command execution.
 - Slash autocomplete now uses inline hinting (ghost suffix at the composer input) instead of a visible suggestion menu.
+- Inline hint positioning is now measured using composer font metrics so hinting remains visually aligned with the typed text.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.

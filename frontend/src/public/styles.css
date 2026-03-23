@@ -131,9 +131,14 @@ body {
 .command-input-wrap {
   position: relative;
   min-width: 0;
-  font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 14px;
-  line-height: 1.35;
+  --command-composer-font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  --command-composer-font-size: 14px;
+  --command-composer-line-height: 1.35;
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .command-row textarea {
@@ -146,8 +151,11 @@ body {
   color: var(--text);
   resize: vertical;
   min-height: 10.5rem;
-  line-height: 1.35;
-  font-family: inherit;
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .command-inline-hint {
@@ -157,9 +165,11 @@ body {
   pointer-events: none;
   color: rgba(146, 164, 187, 0.65);
   transform: translateX(var(--hint-prefix-px, 0px));
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
   white-space: pre;
   z-index: 3;
 }
