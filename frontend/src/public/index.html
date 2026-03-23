@@ -10,7 +10,20 @@
   <body>
     <div class="app-shell">
       <aside id="app-sidebar" class="sidebar">
-        <h1>ptydeck</h1>
+        <div class="sidebar-head">
+          <h1>ptydeck</h1>
+          <button
+            id="sidebar-toggle"
+            class="sidebar-toggle-btn"
+            type="button"
+            aria-controls="app-sidebar"
+            aria-expanded="true"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <span id="sidebar-toggle-icon" aria-hidden="true">⮜</span>
+          </button>
+        </div>
         <div id="connection-state" class="pill">connecting</div>
         <button id="create-session" type="button">New Session</button>
         <section class="settings-panel">
@@ -27,13 +40,15 @@
 
       <section class="workspace">
         <button
-          id="sidebar-toggle"
-          class="sidebar-toggle"
+          id="sidebar-launcher"
+          class="sidebar-launcher"
           type="button"
           aria-controls="app-sidebar"
-          aria-expanded="true"
+          aria-expanded="false"
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
         >
-          Hide Sidebar
+          <span aria-hidden="true">☰</span>
         </button>
         <main id="terminal-grid" class="terminal-grid"></main>
         <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>

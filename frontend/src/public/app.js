@@ -21,6 +21,8 @@ const appShellEl = typeof document.querySelector === "function" ? document.query
 const stateEl = document.getElementById("connection-state");
 const gridEl = document.getElementById("terminal-grid");
 const sidebarToggleBtn = document.getElementById("sidebar-toggle");
+const sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
+const sidebarLauncherBtn = document.getElementById("sidebar-launcher");
 const createBtn = document.getElementById("create-session");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
@@ -1302,8 +1304,19 @@ function syncSettingsUi() {
     appShellEl.classList.toggle("sidebar-collapsed", !sidebarVisible);
   }
   if (sidebarToggleBtn) {
-    sidebarToggleBtn.textContent = sidebarVisible ? "Hide Sidebar" : "Show Sidebar";
+    sidebarToggleBtn.setAttribute("aria-label", "Collapse sidebar");
+    sidebarToggleBtn.setAttribute("title", "Collapse sidebar");
     sidebarToggleBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
+    sidebarToggleBtn.hidden = !sidebarVisible;
+  }
+  if (sidebarToggleIcon) {
+    sidebarToggleIcon.textContent = "⮜";
+  }
+  if (sidebarLauncherBtn) {
+    sidebarLauncherBtn.setAttribute("aria-label", "Expand sidebar");
+    sidebarLauncherBtn.setAttribute("title", "Expand sidebar");
+    sidebarLauncherBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
+    sidebarLauncherBtn.hidden = sidebarVisible;
   }
   syncTerminalGeometryCss();
 }
@@ -2689,9 +2702,11 @@ createBtn.addEventListener("click", async () => {
 });
 
 if (sidebarToggleBtn) {
-  sidebarToggleBtn.addEventListener("click", () => {
-    setSidebarVisible(terminalSettings.sidebarVisible === false);
-  });
+  sidebarToggleBtn.addEventListener("click", () => setSidebarVisible(false));
+}
+
+if (sidebarLauncherBtn) {
+  sidebarLauncherBtn.addEventListener("click", () => setSidebarVisible(true));
 }
 
 if (settingsApplyBtn) {

@@ -47,6 +47,13 @@ body {
   background: #0f151f;
 }
 
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sidebar h1 {
   margin: 0;
   font-size: 18px;
@@ -54,6 +61,20 @@ body {
   letter-spacing: 0.06em;
   color: var(--active);
   text-transform: uppercase;
+}
+
+.sidebar-toggle-btn,
+.sidebar-launcher {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1;
+  color: #a9d9d6;
 }
 
 .settings-panel {
@@ -111,13 +132,16 @@ body {
   position: relative;
 }
 
-.sidebar-toggle {
+.sidebar-launcher {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 25;
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-launcher {
   display: inline-flex;
-  align-items: center;
 }
 
 .pill {
@@ -661,7 +685,7 @@ button:hover {
     border-bottom: 1px solid var(--border);
   }
 
-  .sidebar-toggle {
+  .sidebar-launcher {
     top: 6px;
     left: 6px;
   }
