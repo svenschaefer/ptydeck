@@ -234,8 +234,11 @@ body {
   padding: 6px 10px;
   background: #101924;
   color: #d8dee9;
-  font-size: 12px;
-  line-height: 1.35;
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
   white-space: pre-wrap;
 }
 
