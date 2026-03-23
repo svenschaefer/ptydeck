@@ -88,9 +88,9 @@ Exit criteria:
 - Backend persistence and restart behavior are resilient under partial-write risk.
 - Dev static-file serving is path-safe.
 - Route behavior is continuously checked against OpenAPI contract.
-- CI enforces coverage minimums.
-- CI performs runtime smoke checks before merge.
-- CI validates runtime across supported Node versions.
+- Local quality gate enforces coverage minimums.
+- Local quality gate runs runtime smoke checks before merge/release.
+- Local quality gate validates runtime compatibility expectations for supported Node versions.
 - Deployment docs include secure production CORS guidance.
 - Frontend default visual baseline is dark console style with improved terminal readability.
 - Session rename flow and home-directory default behavior are available in baseline runtime.
@@ -291,11 +291,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-080`, `QLT-081`
+- `QLT-080`, `QLT-081`, `PLAT-011`
 
 Remaining in this milestone:
 
-- `QLT-082`, `PLAT-011`
+- `QLT-082`
 
 Dependencies:
 

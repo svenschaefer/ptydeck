@@ -6,12 +6,16 @@
 - `npm` available in PATH
 - Linux host with shell support for backend PTY sessions
 
-## 2. Quality Gate (must pass before release)
+## 2. Quality Gate (must pass before release, local-only)
+
+Remote GitHub-hosted runner execution is intentionally disabled.
+Use the local gate defined in `LOCAL_QUALITY_GATE.md`.
 
 ```bash
 npm run lint
 npm run test
-npm run test:coverage
+npm run test:coverage:check
+./scripts/ci-smoke.sh
 npm run security:sca
 npm run security:sbom
 npm run backup:verify

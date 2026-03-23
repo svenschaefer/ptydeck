@@ -19,7 +19,7 @@ Current state: compressed roadmap complete: `v0.1.0` to `v0.3.0`.
 - Session metadata persistence and startup restore implemented (JSON adapter)
 - Frontend runtime UI implemented with `xterm.js`, multi-session cards, command input, and WS reconnect
 - Root scripts for local dev, lint, test, and coverage
-- CI workflow for backend/frontend lint, test, and build
+- Local-only quality gate (remote CI runner execution is disabled)
 - Environment templates for backend and frontend
 
 ## Quick Start
@@ -35,6 +35,7 @@ npm run test:coverage
 ## Deployment
 
 See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, and rollback steps.
+See `LOCAL_QUALITY_GATE.md` for the required local validation workflow.
 
 ## WSL Local Testing Note
 
