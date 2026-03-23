@@ -43,6 +43,17 @@ function isThemeProfile(value) {
   return keys.every((key) => THEME_PROFILE_KEYS.includes(key));
 }
 
+function isDeck(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt) &&
+    isObject(value.settings)
+  );
+}
+
 export function validateRequest({ method, pathname, params, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -194,6 +205,63 @@ export function validateRequest({ method, pathname, params, body }) {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
     }
   }
+
+  if (method === "GET" && pathname.match(/^\/api\/v1\/decks\/[^/]+$/)) {
+    if (!params.deckId || typeof params.deckId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing deckId path parameter.");
+    }
+  }
+
+  if (method === "POST" && pathname === "/api/v1/decks") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.id !== undefined && typeof body.id !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'id' must be a string.");
+    }
+    if (body.settings !== undefined && !isObject(body.settings)) {
+      throw new ApiError(400, "ValidationError", "Field 'settings' must be an object.");
+    }
+  }
+
+  if (method === "PATCH" && pathname.match(/^\/api\/v1\/decks\/[^/]+$/)) {
+    if (!params.deckId || typeof params.deckId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing deckId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.name === undefined && body.settings === undefined) {
+      throw new ApiError(400, "ValidationError", "At least one updatable deck field is required.");
+    }
+    if (body.name !== undefined && (typeof body.name !== "string" || !body.name.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.settings !== undefined && !isObject(body.settings)) {
+      throw new ApiError(400, "ValidationError", "Field 'settings' must be an object.");
+    }
+  }
+
+  if (method === "DELETE" && pathname.match(/^\/api\/v1\/decks\/[^/]+$/)) {
+    if (!params.deckId || typeof params.deckId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing deckId path parameter.");
+    }
+  }
+
+  if (method === "POST" && pathname.match(/^\/api\/v1\/decks\/[^/]+\/sessions\/[^/]+:move$/)) {
+    if (!params.deckId || typeof params.deckId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing deckId path parameter.");
+    }
+    if (!params.sessionId || typeof params.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
 }
 
 function isSession(value) {
@@ -264,6 +332,16 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "customCommandList") {
     if (!Array.isArray(body) || !body.every((item) => isCustomCommand(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match CustomCommand[] schema.");
+    }
+  }
+
+  if (expect === "deck" && !isDeck(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match Deck schema.");
+  }
+
+  if (expect === "deckList") {
+    if (!Array.isArray(body) || !body.every((item) => isDeck(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match Deck[] schema.");
     }
   }
 }

@@ -466,6 +466,89 @@ test("custom command guardrails reject reserved names, invalid names, oversized 
   }
 });
 
+test("deck lifecycle and session move endpoints work end-to-end", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Operations", settings: { terminal: { cols: 80, rows: 24 } } })
+    });
+    assert.equal(createDeckRes.status, 201);
+    const createdDeck = await createDeckRes.json();
+    assert.equal(createdDeck.name, "Operations");
+    assert.ok(typeof createdDeck.id === "string" && createdDeck.id.length > 0);
+    assert.deepEqual(createdDeck.settings, { terminal: { cols: 80, rows: 24 } });
+
+    const listDeckRes = await fetch(`${baseUrl}/decks`);
+    assert.equal(listDeckRes.status, 200);
+    const listedDecks = await listDeckRes.json();
+    assert.ok(Array.isArray(listedDecks));
+    assert.ok(listedDecks.some((deck) => deck.id === "default"));
+    assert.ok(listedDecks.some((deck) => deck.id === createdDeck.id));
+
+    const getDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`);
+    assert.equal(getDeckRes.status, 200);
+
+    const patchDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ops", settings: { terminal: { cols: 100, rows: 30 } } })
+    });
+    assert.equal(patchDeckRes.status, 200);
+    const patchedDeck = await patchDeckRes.json();
+    assert.equal(patchedDeck.name, "Ops");
+    assert.deepEqual(patchedDeck.settings, { terminal: { cols: 100, rows: 30 } });
+
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "deck-move-target" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    const moveRes = await fetch(`${baseUrl}/decks/${createdDeck.id}/sessions/${createdSession.id}:move`, {
+      method: "POST"
+    });
+    assert.equal(moveRes.status, 204);
+
+    const moveUnknownDeckRes = await fetch(`${baseUrl}/decks/missing/sessions/${createdSession.id}:move`, {
+      method: "POST"
+    });
+    assert.equal(moveUnknownDeckRes.status, 404);
+    const moveUnknownDeckBody = await moveUnknownDeckRes.json();
+    assert.equal(moveUnknownDeckBody.error, "DeckNotFound");
+
+    const moveUnknownSessionRes = await fetch(`${baseUrl}/decks/${createdDeck.id}/sessions/missing:move`, {
+      method: "POST"
+    });
+    assert.equal(moveUnknownSessionRes.status, 404);
+    const moveUnknownSessionBody = await moveUnknownSessionRes.json();
+    assert.equal(moveUnknownSessionBody.error, "SessionNotFound");
+
+    const deleteNonEmptyDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteNonEmptyDeckRes.status, 409);
+    const deleteNonEmptyDeckBody = await deleteNonEmptyDeckRes.json();
+    assert.equal(deleteNonEmptyDeckBody.error, "DeckNotEmpty");
+
+    const moveBackRes = await fetch(`${baseUrl}/decks/default/sessions/${createdSession.id}:move`, {
+      method: "POST"
+    });
+    assert.equal(moveBackRes.status, 204);
+
+    const deleteDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteDeckRes.status, 204);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 

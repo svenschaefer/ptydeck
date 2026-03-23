@@ -197,3 +197,55 @@ test("validateResponse accepts custom command payloads", () => {
     });
   });
 });
+
+test("validateRequest accepts valid deck create/patch and move payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/decks",
+      params: {},
+      body: { id: "ops", name: "Operations", settings: { terminal: { cols: 80, rows: 24 } } }
+    });
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/decks/ops",
+      params: { deckId: "ops" },
+      body: { name: "Ops" }
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/decks/ops/sessions/abc:move",
+      params: { deckId: "ops", sessionId: "abc" },
+      body: {}
+    });
+  });
+});
+
+test("validateResponse accepts deck payloads", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "deck",
+      body: {
+        id: "ops",
+        name: "Operations",
+        settings: {},
+        createdAt: 1,
+        updatedAt: 2
+      }
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "deckList",
+      body: [
+        {
+          id: "ops",
+          name: "Operations",
+          settings: {},
+          createdAt: 1,
+          updatedAt: 2
+        }
+      ]
+    });
+  });
+});

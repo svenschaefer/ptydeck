@@ -117,6 +117,140 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /decks:
+    get:
+      operationId: listDecks
+      summary: List decks.
+      responses:
+        '200':
+          description: Deck list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deck'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createDeck
+      summary: Create deck.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeckRequest'
+      responses:
+        '201':
+          description: Deck created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deck'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Deck id already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /decks/{deckId}:
+    parameters:
+      - $ref: '#/components/parameters/deckId'
+    get:
+      operationId: getDeck
+      summary: Get deck by id.
+      responses:
+        '200':
+          description: Deck found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deck'
+        '404':
+          description: Deck not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    patch:
+      operationId: updateDeck
+      summary: Update deck metadata/settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeckRequest'
+      responses:
+        '200':
+          description: Deck updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deck'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Deck not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    delete:
+      operationId: deleteDeck
+      summary: Delete deck by id.
+      responses:
+        '204':
+          description: Deck deleted
+        '404':
+          description: Deck not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Deck delete conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /decks/{deckId}/sessions/{sessionId}:move:
+    parameters:
+      - $ref: '#/components/parameters/deckId'
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: moveSessionToDeck
+      summary: Move session to deck.
+      responses:
+        '204':
+          description: Move accepted
+        '404':
+          description: Deck or session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -326,7 +460,55 @@ components:
       required: true
       schema:
         type: string
+    deckId:
+      name: deckId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
+    Deck:
+      type: object
+      required:
+        - id
+        - name
+        - settings
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        settings:
+          $ref: '#/components/schemas/DeckSettings'
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+    DeckSettings:
+      type: object
+      additionalProperties: true
+    CreateDeckRequest:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        settings:
+          $ref: '#/components/schemas/DeckSettings'
+    UpdateDeckRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        settings:
+          $ref: '#/components/schemas/DeckSettings'
     Session:
       type: object
       required:

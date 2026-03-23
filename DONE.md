@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-085` completed: backend now exposes deck lifecycle and assignment endpoints (`GET/POST /api/v1/decks`, `GET/PATCH/DELETE /api/v1/decks/{deckId}`, `POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`) with deterministic validation/error handling.
+- [x] OpenAPI contract, runtime request/response validation, and route-contract conformance tests were updated for deck APIs and move semantics.
+- [x] Backend integration coverage now includes end-to-end deck lifecycle and session move scenarios (create/list/get/update/delete, move routing, unknown deck/session errors).
+- [x] Validation for `QLT-085` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-084` completed: backend persistence model now includes deck entities and per-session `deckId` storage with backward-compatible loading.
 - [x] Legacy persistence migration now assigns restored sessions deterministically to `default` deck and persists default deck catalog metadata.
 - [x] Added backend regression coverage for deck persistence/migration behavior (`backend/test/persistence.test.js`, `backend/test/runtime.integration.test.js`).

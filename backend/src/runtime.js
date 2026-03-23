@@ -40,6 +40,8 @@ const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_DECK_ID = "default";
 const DEFAULT_DECK_NAME = "Default";
+const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const DECK_NAME_MAX_LENGTH = 64;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -146,6 +148,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/custom-commands" && method === "GET") {
     return { kind: "listCustomCommands" };
   }
+  if (pathname === "/api/v1/decks" && method === "GET") {
+    return { kind: "listDecks" };
+  }
+  if (pathname === "/api/v1/decks" && method === "POST") {
+    return { kind: "createDeck" };
+  }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
   if (customCommandMatch && method === "GET") {
@@ -161,6 +169,28 @@ function route(pathname, method) {
     return {
       kind: "deleteCustomCommand",
       params: { commandName: decodePathParam(customCommandMatch[1], "commandName") }
+    };
+  }
+
+  const deckMatch = pathname.match(/^\/api\/v1\/decks\/([^/]+)$/);
+  if (deckMatch && method === "GET") {
+    return { kind: "getDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
+  }
+  if (deckMatch && method === "PATCH") {
+    return { kind: "updateDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
+  }
+  if (deckMatch && method === "DELETE") {
+    return { kind: "deleteDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
+  }
+
+  const moveSessionMatch = pathname.match(/^\/api\/v1\/decks\/([^/]+)\/sessions\/([^/]+):move$/);
+  if (moveSessionMatch && method === "POST") {
+    return {
+      kind: "moveSessionToDeck",
+      params: {
+        deckId: decodePathParam(moveSessionMatch[1], "deckId"),
+        sessionId: decodePathParam(moveSessionMatch[2], "sessionId")
+      }
     };
   }
 
@@ -194,6 +224,12 @@ function route(pathname, method) {
 }
 
 function normalizeMetricsPath(pathname) {
+  if (/^\/api\/v1\/decks\/[^/]+\/sessions\/[^/]+:move$/.test(pathname)) {
+    return "/api/v1/decks/{deckId}/sessions/{sessionId}:move";
+  }
+  if (/^\/api\/v1\/decks\/[^/]+$/.test(pathname)) {
+    return "/api/v1/decks/{deckId}";
+  }
   if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
     return "/api/v1/custom-commands/{commandName}";
   }
@@ -440,6 +476,66 @@ function normalizeDeckEntity(input) {
   };
 }
 
+function compareDeckEntries(a, b) {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
+}
+
+function normalizeDeckName(name) {
+  if (typeof name !== "string") {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+  }
+  if (trimmed.length > DECK_NAME_MAX_LENGTH) {
+    throw new ApiError(400, "ValidationError", `Field 'name' exceeds maximum length (${DECK_NAME_MAX_LENGTH}).`);
+  }
+  return trimmed;
+}
+
+function normalizeDeckSettings(settings, { strict = true } = {}) {
+  if (settings === undefined) {
+    return {};
+  }
+  if (!isPlainObject(settings)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'settings' must be an object.");
+    }
+    return {};
+  }
+  return JSON.parse(JSON.stringify(settings));
+}
+
+function normalizeDeckIdInput(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !DECK_ID_PATTERN.test(normalized)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'id' must match pattern ^[a-z0-9][a-z0-9-]{0,31}$."
+    );
+  }
+  return normalized;
+}
+
+function slugifyDeckId(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const root = base || "deck";
+  const maxLength = 32;
+  return root.slice(0, maxLength).replace(/-+$/g, "") || "deck";
+}
+
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
@@ -603,6 +699,12 @@ export function createRuntime(config) {
   }
 
   function requiredScopeForRoute(kind) {
+    if (kind === "listDecks" || kind === "getDeck") {
+      return "sessions:read";
+    }
+    if (kind === "createDeck" || kind === "updateDeck" || kind === "deleteDeck" || kind === "moveSessionToDeck") {
+      return "sessions:write";
+    }
     if (kind === "listCustomCommands" || kind === "getCustomCommand") {
       return "sessions:read";
     }
@@ -718,6 +820,129 @@ export function createRuntime(config) {
 
   function hasCustomCommand(name) {
     return customCommands.has(normalizeCustomCommandName(name));
+  }
+
+  function toApiDeck(deck) {
+    return {
+      id: deck.id,
+      name: deck.name,
+      createdAt: deck.createdAt,
+      updatedAt: deck.updatedAt,
+      settings: deck.settings
+    };
+  }
+
+  function listDecks() {
+    ensureDefaultDeck();
+    return Array.from(decks.values()).sort(compareDeckEntries).map(toApiDeck);
+  }
+
+  function getDeckOrThrow(deckId) {
+    const deck = decks.get(deckId);
+    if (!deck) {
+      throw new ApiError(404, "DeckNotFound", `Deck '${deckId}' was not found.`);
+    }
+    return deck;
+  }
+
+  function createDeck(body) {
+    const name = normalizeDeckName(body?.name);
+    const requestedId = normalizeDeckIdInput(body?.id);
+    let deckId = requestedId;
+    if (!deckId) {
+      const slug = slugifyDeckId(name);
+      deckId = slug;
+      let suffix = 2;
+      while (decks.has(deckId)) {
+        const suffixText = `-${suffix}`;
+        const rootMaxLength = 32 - suffixText.length;
+        const rooted = slug.slice(0, rootMaxLength).replace(/-+$/g, "") || "deck";
+        deckId = `${rooted}${suffixText}`;
+        suffix += 1;
+      }
+    }
+    if (decks.has(deckId)) {
+      throw new ApiError(409, "DeckAlreadyExists", `Deck '${deckId}' already exists.`);
+    }
+    const now = Date.now();
+    const deck = {
+      id: deckId,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      settings: normalizeDeckSettings(body?.settings, { strict: true })
+    };
+    decks.set(deck.id, deck);
+    return toApiDeck(deck);
+  }
+
+  function updateDeck(deckId, body) {
+    const existing = getDeckOrThrow(deckId);
+    const hasName = body?.name !== undefined;
+    const hasSettings = body?.settings !== undefined;
+    if (!hasName && !hasSettings) {
+      throw new ApiError(400, "ValidationError", "At least one updatable deck field is required.");
+    }
+    const next = {
+      ...existing,
+      name: hasName ? normalizeDeckName(body.name) : existing.name,
+      settings: hasSettings ? normalizeDeckSettings(body.settings, { strict: true }) : existing.settings,
+      updatedAt: Date.now()
+    };
+    decks.set(deckId, next);
+    return toApiDeck(next);
+  }
+
+  function countSessionsInDeck(deckId) {
+    let count = 0;
+    for (const session of manager.list()) {
+      if (resolveSessionDeckId(session.id) === deckId) {
+        count += 1;
+      }
+    }
+    for (const [sessionId] of unrestoredSessions.entries()) {
+      if (resolveSessionDeckId(sessionId) === deckId) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function deleteDeck(deckId) {
+    if (deckId === DEFAULT_DECK_ID) {
+      throw new ApiError(409, "DeckDeleteForbidden", "Default deck cannot be deleted.");
+    }
+    getDeckOrThrow(deckId);
+    if (countSessionsInDeck(deckId) > 0) {
+      throw new ApiError(409, "DeckNotEmpty", "Deck is not empty.");
+    }
+    decks.delete(deckId);
+  }
+
+  function ensureSessionExistsOrThrow(sessionId) {
+    try {
+      manager.get(sessionId);
+      return;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    if (unrestoredSessions.has(sessionId)) {
+      return;
+    }
+    throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+  }
+
+  function moveSessionToDeck(sessionId, deckId) {
+    getDeckOrThrow(deckId);
+    ensureSessionExistsOrThrow(sessionId);
+    const sourceDeckId = resolveSessionDeckId(sessionId);
+    if (sourceDeckId === deckId) {
+      return false;
+    }
+    sessionDeckAssignments.set(sessionId, deckId);
+    return true;
   }
 
   function ensureDefaultDeck() {
@@ -1041,6 +1266,50 @@ export function createRuntime(config) {
           command: deletedCommand
         });
         await persistNow("custom-command.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "listDecks") {
+        const payload = listDecks();
+        validateResponse({ statusCode: 200, body: payload, expect: "deckList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createDeck") {
+        const payload = createDeck(body);
+        validateResponse({ statusCode: 201, body: payload, expect: "deck" });
+        await persistNow("deck.create");
+        writeJson(req, res, 201, payload);
+        return;
+      }
+
+      if (match.kind === "getDeck") {
+        const payload = toApiDeck(getDeckOrThrow(match.params.deckId));
+        validateResponse({ statusCode: 200, body: payload, expect: "deck" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "updateDeck") {
+        const payload = updateDeck(match.params.deckId, body);
+        validateResponse({ statusCode: 200, body: payload, expect: "deck" });
+        await persistNow("deck.update");
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "deleteDeck") {
+        deleteDeck(match.params.deckId);
+        await persistNow("deck.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "moveSessionToDeck") {
+        moveSessionToDeck(match.params.sessionId, match.params.deckId);
+        await persistNow("deck.move-session");
         writeJson(req, res, 204);
         return;
       }

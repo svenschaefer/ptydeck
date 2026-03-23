@@ -24,7 +24,7 @@ function parseOperations(yamlText) {
       break;
     }
 
-    const pathMatch = line.match(/^  (\/[^:]+):\s*$/);
+    const pathMatch = line.match(/^  (\/.+):\s*$/);
     if (pathMatch) {
       currentPath = pathMatch[1];
       currentMethod = "";
@@ -54,6 +54,12 @@ function runtimeOperationKeys() {
     "GET /custom-commands/{commandName}",
     "PUT /custom-commands/{commandName}",
     "DELETE /custom-commands/{commandName}",
+    "GET /decks",
+    "POST /decks",
+    "GET /decks/{deckId}",
+    "PATCH /decks/{deckId}",
+    "DELETE /decks/{deckId}",
+    "POST /decks/{deckId}/sessions/{sessionId}:move",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -126,6 +132,30 @@ test("runtime routes and statuses conform to openapi contract", async () => {
     });
     assert.ok(operations.get("GET /custom-commands").has(listCustomCommandsRes.status));
 
+    const listDecksRes = await fetch(`${baseUrl}/decks`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /decks").has(listDecksRes.status));
+
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ id: "ops", name: "Ops" })
+    });
+    assert.ok(operations.get("POST /decks").has(createDeckRes.status));
+
+    const getDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /decks/{deckId}").has(getDeckRes.status));
+
+    const patchDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+      method: "PATCH",
+      headers: authHeaders,
+      body: JSON.stringify({ name: "Operations" })
+    });
+    assert.ok(operations.get("PATCH /decks/{deckId}").has(patchDeckRes.status));
+
     const putCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
       method: "PUT",
       headers: authHeaders,
@@ -181,6 +211,18 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
+
+    const moveMissingSessionRes = await fetch(`${baseUrl}/decks/ops/sessions/missing-id:move`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /decks/{deckId}/sessions/{sessionId}:move").has(moveMissingSessionRes.status));
+
+    const deleteDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("DELETE /decks/{deckId}").has(deleteDeckRes.status));
   } finally {
     await runtime.stop();
   }
