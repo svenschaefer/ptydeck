@@ -267,6 +267,7 @@ Completed and verified topics belong here.
 - [x] `QLT-066` completed: backend session contract and persistence now include full `themeProfile` data (background, foreground, cursor, ANSI 16-color palette) with deterministic storage shape.
 - [x] Runtime now normalizes and validates `themeProfile` on session create/update/restore, rejects invalid keys/values, and applies defaults for missing palette fields.
 - [x] OpenAPI updated with `SessionThemeProfile` schema and request/response references; backend integration/unit/validation coverage extended for theme-profile lifecycle behavior.
+- [x] Frontend hotfix: slash-command suggestion/preview blocks moved into the command input area so `/` autocomplete renders at the composer (not at the top of the workspace).
 - [x] Validation for `QLT-041` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-041` cycle: backend `96.97%` lines, frontend `87.57%` lines.
 - [x] `QLT-042` completed: frontend now shows a non-blocking custom-command preview panel for `/<customName>` (payload, resolved target, newline append indicator) before execution.

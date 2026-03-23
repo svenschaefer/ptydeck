@@ -28,18 +28,20 @@
       <section class="workspace">
         <p id="status-message" class="status-message"></p>
         <p id="command-feedback" class="command-feedback"></p>
-        <pre id="command-preview" class="command-preview"></pre>
-        <pre id="command-suggestions" class="command-suggestions"></pre>
 
         <main id="terminal-grid" class="terminal-grid"></main>
         <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
 
         <section class="command-row">
-          <textarea
-            id="command-input"
-            rows="10"
-            placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
-          ></textarea>
+          <div class="command-input-column">
+            <textarea
+              id="command-input"
+              rows="10"
+              placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+            ></textarea>
+            <pre id="command-preview" class="command-preview"></pre>
+            <pre id="command-suggestions" class="command-suggestions"></pre>
+          </div>
           <button id="send-command" type="button">Send</button>
         </section>
       </section>
