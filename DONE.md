@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `ENT-014` completed: added disaster-recovery runbook baseline with explicit `RTO`/`RPO` targets in `DEPLOYMENT.md`.
+- [x] Added automated DR restore drill script `scripts/dr-restore-drill.sh` with threshold enforcement (`DR_RTO_TARGET_SECONDS`, `DR_RPO_TARGET_SECONDS`) and JSON report output.
+- [x] CI security job now executes the DR drill and stores evidence log (`artifacts/security/dr-drill.log`) as part of periodic non-prod verification.
+- [x] Release evidence bundling now includes DR drill logs for compliance traceability.
 - [x] `ENT-022` completed: added non-functional load/fanout regression test baseline in `backend/test/nonfunctional.load.test.js`.
 - [x] Added deterministic threshold-based checks for concurrent session create/input/delete latency (p95) and multi-client WebSocket fanout stability.
 - [x] Added executable load-test entrypoints: `npm run test:load` (root) and `npm --prefix backend run test:load`.

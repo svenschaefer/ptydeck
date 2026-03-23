@@ -569,6 +569,42 @@ Operational guidance:
 - Run this suite in non-prod CI or dedicated perf environments; keep thresholds stable and adjust only with documented baseline updates.
 - Re-tune thresholds only after measuring repeated baseline runs on target hardware profile.
 
+## 9.13 Disaster Recovery Runbook and Drill Baseline (ENT-014)
+
+Recovery objectives (baseline):
+
+- `RTO` target: `120` seconds for backup-restore drill completion.
+- `RPO` target: `60` seconds maximum tolerated data-loss window.
+
+Runbook (non-prod and production-aligned):
+
+1. Trigger incident mode and stop write traffic to the affected runtime.
+2. Identify recovery source (latest valid backup artifact).
+3. Execute restore into target data path.
+4. Validate restored payload integrity and service readiness (`/health`, `/ready`).
+5. Re-enable traffic and monitor metrics/error rates.
+6. Record drill/incident evidence (timestamps, RTO/RPO result, operator notes).
+
+Automated periodic drill:
+
+- Script: `./scripts/dr-restore-drill.sh`
+- Root shortcut: `npm run dr:drill`
+- Behavior:
+  - Executes deterministic backup/restore roundtrip verification.
+  - Measures elapsed restore drill duration (`measuredRtoSeconds`).
+  - Enforces configurable targets:
+    - `DR_RTO_TARGET_SECONDS` (default `120`)
+    - `DR_RPO_TARGET_SECONDS` (default `60`)
+  - Emits drill report: `artifacts/security/dr-drill.json`
+
+CI/non-prod automation:
+
+- CI `security` job executes the restore drill and stores `artifacts/security/dr-drill.log`.
+- Suggested repository variables:
+  - `DR_RTO_TARGET_SECONDS`
+  - `DR_RPO_TARGET_SECONDS`
+- On threshold breach, CI fails fast and blocks merge/release.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date

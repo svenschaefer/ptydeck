@@ -42,6 +42,7 @@ copy_if_exists "$QUALITY_DIR/coverage-check.log" "quality/coverage-check.log"
 copy_if_exists "$SECURITY_DIR/sca.log" "security/sca.log"
 copy_if_exists "$SECURITY_DIR/sbom.log" "security/sbom.log"
 copy_if_exists "$SECURITY_DIR/backup-verify.log" "security/backup-verify.log"
+copy_if_exists "$SECURITY_DIR/dr-drill.log" "security/dr-drill.log"
 copy_if_exists "$SECURITY_DIR/retention-purge.log" "security/retention-purge.log"
 copy_dir_if_exists "$SBOM_DIR" "security/sbom"
 

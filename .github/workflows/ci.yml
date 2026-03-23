@@ -78,6 +78,13 @@ jobs:
         run: |
           set -o pipefail
           ./scripts/verify-backup-restore.sh 2>&1 | tee artifacts/security/backup-verify.log
+      - name: Disaster recovery restore drill
+        env:
+          DR_RTO_TARGET_SECONDS: ${{ vars.DR_RTO_TARGET_SECONDS }}
+          DR_RPO_TARGET_SECONDS: ${{ vars.DR_RPO_TARGET_SECONDS }}
+        run: |
+          set -o pipefail
+          ./scripts/dr-restore-drill.sh 2>&1 | tee artifacts/security/dr-drill.log
       - name: Retention purge dry-run
         env:
           PURGE_DRY_RUN: "1"
