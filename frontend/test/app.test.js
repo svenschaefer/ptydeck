@@ -630,6 +630,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/rename <selector> <name>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/settings apply <selector\|active> <json>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/custom <name> <text>/);
 
@@ -932,6 +933,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /Active session:/);
 
+  fixture.elements.commandInput.value = "/rename renamed-active";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^Renamed active session to renamed-active\.$/);
+
+  fixture.elements.commandInput.value = "/rename 1 renamed-target";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^Renamed session \[1\] to renamed-target\.$/);
+
   fixture.elements.commandInput.value = "/restart 1";
   fixture.elements.sendCommand.click();
   await tick();
@@ -1009,7 +1020,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.equal(fixture.elements.commandInput.value, "/switch 1");
+  assert.match(
+    fixture.elements.commandInput.value,
+    /^\/(switch 1|rename renamed-active|rename 1 renamed-target)$/
+  );
   fixture.elements.commandInput.dispatchEvent({
     type: "keydown",
     key: "ArrowDown",

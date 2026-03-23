@@ -549,7 +549,7 @@ function resolveSlashAutocompleteContext(rawInput, customCommands) {
     };
   }
 
-  if ((command === "switch" || command === "close") && parts.length <= 2) {
+  if ((command === "switch" || command === "close" || command === "restart" || command === "rename") && parts.length <= 2) {
     const targetPrefix = parts.length === 2 ? parts[1] : "";
     return {
       replacePrefix: `/${commandRaw} `,
@@ -2204,7 +2204,7 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
   }
 
   if (command === "list") {
@@ -2293,18 +2293,37 @@ async function executeControlCommand(interpreted) {
 
   if (command === "rename") {
     if (args.length === 0) {
-      return "Usage: /rename <name>";
+      return "Usage: /rename <name> | /rename <selector> <name>";
     }
-    if (!activeSessionId) {
-      return "No active session to rename.";
+
+    if (args.length === 1) {
+      if (!activeSessionId) {
+        return "No active session to rename.";
+      }
+      const name = args[0].trim();
+      if (!name) {
+        return "Usage: /rename <name> | /rename <selector> <name>";
+      }
+      const updated = await api.updateSession(activeSessionId, { name });
+      upsertSession(updated);
+      return `Renamed active session to ${updated.name}.`;
     }
-    const name = args.join(" ").trim();
+
+    const selectorText = args[0];
+    const name = args.slice(1).join(" ").trim();
     if (!name) {
-      return "Usage: /rename <name>";
+      return "Usage: /rename <name> | /rename <selector> <name>";
     }
-    const updated = await api.updateSession(activeSessionId, { name });
+    const resolvedTargets = resolveTargetSelectors(selectorText, sessions, { source: "slash" });
+    if (resolvedTargets.error) {
+      return resolvedTargets.error;
+    }
+    if (resolvedTargets.sessions.length !== 1) {
+      return "Rename selector must resolve to exactly one session.";
+    }
+    const updated = await api.updateSession(resolvedTargets.sessions[0].id, { name });
     upsertSession(updated);
-    return `Renamed active session to ${updated.name}.`;
+    return `Renamed session [${formatSessionToken(updated.id)}] to ${updated.name}.`;
   }
 
   if (command === "restart") {

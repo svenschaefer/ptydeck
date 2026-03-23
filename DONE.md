@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-078` completed: slash rename now supports selector targeting with `/rename <selector> <name>` while preserving `/rename <name>` for active-session shorthand.
+- [x] Rename selector execution reuses deterministic target resolution and enforces exactly one resolved target session for rename operations.
+- [x] Slash help text and autocomplete were aligned with rename-target parity semantics.
+- [x] `QLT-079` completed: frontend regression coverage now validates active rename and selector-based rename behavior end to end.
+- [x] Validation for `QLT-078`/`QLT-079` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-076` completed: slash-command settings parity added via `/settings show [selector]` and `/settings apply <selector|active> <json>`.
 - [x] Slash settings now support startup fields (`startCwd`, `startCommand`), environment map (`env`), tags (`tags`), full theme profile (`themeProfile`), and submit mode (`sendTerminator`) with multi-target selector support.
 - [x] Multi-target slash settings reuse selector resolution/dedupe semantics from H3 (`ID`, quick-ID, name, tags; one execution per session ID).

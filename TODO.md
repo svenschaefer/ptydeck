@@ -150,6 +150,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-075` Owner: `QA` Task: Add regression/integration coverage for tag-based targeting semantics including overlap dedupe (`tag` and `id` both matching same session), no tag-vs-ID conflict rejection, and deterministic multi-target execution results.
 - [x] `QLT-076` Owner: `FE` Task: Add slash-command settings parity so every per-terminal setting available in the settings dialog can be managed via slash commands as well (startup fields, environment variables, tags, theme profile, submit mode).
 - [x] `QLT-077` Owner: `QA` Task: Add parity regression coverage proving dialog settings and slash-command settings stay functionally equivalent (same validation, persistence, and rendered/runtime effects).
+- [x] `QLT-078` Owner: `FE` Task: Extend slash rename parity to support explicit target selector syntax (`/rename <selector> <name>`) while preserving active-session shorthand (`/rename <name>`).
+- [x] `QLT-079` Owner: `QA` Task: Add regression coverage for rename selector behavior (active shorthand, selector-based rename, help text/autocomplete compatibility, and deterministic feedback).
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

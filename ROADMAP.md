@@ -257,9 +257,34 @@ Exit criteria:
 - All per-terminal settings from the settings dialog are also available via slash commands with matching validation and persistence behavior.
 - Regression coverage exists for dedupe and deterministic multi-target execution semantics.
 
+### v0.3.0-H4 - Rename Targeting Parity
+
+- `QLT-078`
+- `QLT-079`
+
+Completed in this milestone:
+
+- `QLT-078`, `QLT-079`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `QLT-078` depends on existing selector resolution semantics from `QLT-074` and slash settings parity baseline from `QLT-076`.
+- `QLT-079` depends on `QLT-078` and validates active shorthand compatibility plus selector-based rename execution behavior.
+
+Exit criteria:
+
+- Slash rename supports both `/rename <name>` (active session) and `/rename <selector> <name>` (explicit target).
+- Rename selector semantics align with existing target resolution behavior and require exactly one resolved target session.
+- Help text and autocomplete paths remain consistent with the updated rename syntax.
+- Regression coverage exists for active/session-target rename behavior and deterministic command feedback.
+
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H3`
+- Latest completed milestone: `v0.3.0-H4`
 - Next milestones in progress: none
 - Blockers: none recorded
 
@@ -332,23 +357,6 @@ Exit criteria:
 - `QLT-075`
 - `QLT-076`
 - `QLT-077`
-- `ENT-023`
-- `ENT-018`
-- `ENT-011`
-- `ENT-007`
-- `ENT-009`
-- `ENT-024`
-- `ENT-015`
-- `ENT-001`
-- `ENT-004`
-- `ENT-021`
-- `ENT-005`
-- `ENT-008`
-- `ENT-016`
-- `ENT-019`
-- `ENT-006`
-- `ENT-020`
-- `ENT-012`
-- `ENT-022`
-- `ENT-014`
-- `ENT-013`
+- `QLT-078`
+- `QLT-079`
+- `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
