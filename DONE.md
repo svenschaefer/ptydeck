@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-081` completed: frontend now renders unrestored sessions with explicit `UNRESTORED` state badge and an in-card recovery hint.
+- [x] Frontend runtime guards now block `input`, `resize`, and `restart` actions for unrestored sessions, with deterministic user feedback in command/terminal flows.
+- [x] Frontend regression coverage extended for unrestored-session UX/guardrails (badge/hint rendering, resize suppression, routed/active input blocking, restart blocking).
 - [x] `QLT-080` completed: backend REST session responses now expose deterministic `state` metadata (`active` or `unrestored`) for `GET /api/v1/sessions` and `GET /api/v1/sessions/{sessionId}`.
 - [x] Backend OpenAPI + response validation updated so `Session.state` is part of the contract, and session create/update/restart responses now consistently return `state: active`.
 - [x] Backend validation coverage updated for the `Session.state` schema requirement; runtime integration assertions now verify `state: active` on core lifecycle responses.

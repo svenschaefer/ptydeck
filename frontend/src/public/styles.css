@@ -394,6 +394,19 @@ button:hover {
   padding: 3px 6px;
 }
 
+.session-state-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #5f4e2b;
+  color: #ffd36a;
+  background: #2b2418;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .session-rename {
   flex: 0 0 auto;
   margin-left: 0;
@@ -437,6 +450,24 @@ button:hover {
 
 .session-tag-list.empty {
   display: none;
+}
+
+.session-unrestored-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid #3d2d2d;
+  background: #23181b;
+  color: #f2b8b8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.terminal-card.unrestored {
+  border-color: #7a4a4a;
+}
+
+.terminal-card.unrestored .terminal-mount {
+  opacity: 0.8;
 }
 
 .session-settings-dialog {

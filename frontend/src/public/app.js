@@ -971,6 +971,23 @@ function getSessionById(sessionId) {
   return store.getState().sessions.find((session) => session.id === sessionId) || null;
 }
 
+function isSessionUnrestored(session) {
+  return String(session?.state || "").toLowerCase() === "unrestored";
+}
+
+function getUnrestoredSessionMessage(session) {
+  const label = `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
+  return `Session ${label} is unrestored after backend restart. Input, resize, and restart are disabled.`;
+}
+
+function getBlockedUnrestoredMessage(sessions, actionLabel) {
+  const labels = sessions.map((session) => `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`);
+  if (labels.length === 1) {
+    return `${actionLabel} blocked for unrestored session ${labels[0]}.`;
+  }
+  return `${actionLabel} blocked for unrestored sessions: ${labels.join(", ")}.`;
+}
+
 function getSessionThemeConfig(sessionId) {
   const draft = sessionThemeDrafts.get(sessionId);
   if (draft) {
@@ -1480,6 +1497,15 @@ function applyResizeForSession(sessionId, options = {}) {
   if (!entry) {
     return;
   }
+  const session = getSessionById(sessionId);
+  if (isSessionUnrestored(session)) {
+    const pendingTimer = resizeTimers.get(sessionId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      resizeTimers.delete(sessionId);
+    }
+    return;
+  }
   const size = computeTerminalSize(entry);
   if (!size) {
     return;
@@ -1726,10 +1752,22 @@ function render() {
   for (const session of state.sessions) {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
+      const unrestored = isSessionUnrestored(session);
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
+      entry.element.classList.toggle("unrestored", unrestored);
       setSessionCardVisibility(entry.element, visibleSessionIds.has(session.id));
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
+      if (entry.stateBadgeEl) {
+        entry.stateBadgeEl.hidden = !unrestored;
+        entry.stateBadgeEl.textContent = unrestored ? "UNRESTORED" : "";
+      }
+      if (entry.unrestoredHintEl) {
+        entry.unrestoredHintEl.hidden = !unrestored;
+        entry.unrestoredHintEl.textContent = unrestored
+          ? "Session could not be restored after backend restart. Update settings or delete this session."
+          : "";
+      }
       renderSessionTagList(entry, session);
       if (!entry.settingsDirty) {
         syncSessionStartupControls(entry, session);
@@ -1742,6 +1780,8 @@ function render() {
     const node = template.content.firstElementChild.cloneNode(true);
     const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
+    const stateBadgeEl = node.querySelector(".session-state-badge");
+    const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -1778,9 +1818,21 @@ function render() {
     const settingsStatus = node.querySelector(".session-settings-status");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
+    const unrestored = isSessionUnrestored(session);
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
     quickIdEl.textContent = quickId;
+    node.classList.toggle("unrestored", unrestored);
+    if (stateBadgeEl) {
+      stateBadgeEl.hidden = !unrestored;
+      stateBadgeEl.textContent = unrestored ? "UNRESTORED" : "";
+    }
+    if (unrestoredHintEl) {
+      unrestoredHintEl.hidden = !unrestored;
+      unrestoredHintEl.textContent = unrestored
+        ? "Session could not be restored after backend restart. Update settings or delete this session."
+        : "";
+    }
     renderSessionTagList({ tagListEl }, session);
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
     settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
@@ -1988,6 +2040,11 @@ function render() {
     terminal.open(mount);
     terminal.onData((data) => {
       store.setActiveSession(session.id);
+      const latestSession = getSessionById(session.id);
+      if (isSessionUnrestored(latestSession)) {
+        setError(getUnrestoredSessionMessage(latestSession));
+        return;
+      }
       api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
     });
 
@@ -1996,6 +2053,8 @@ function render() {
       element: node,
       focusBtn,
       quickIdEl,
+      stateBadgeEl,
+      unrestoredHintEl,
       settingsDialog,
       startCwdInput,
       startCommandInput,
@@ -2510,7 +2569,8 @@ async function executeControlCommand(interpreted) {
     const lines = sessions.map((session) => {
       const marker = session.id === activeSessionId ? "*" : " ";
       const token = formatSessionToken(session.id);
-      return `${marker} [${token}] ${formatSessionDisplayName(session)} (${session.id.slice(0, 8)})`;
+      const stateSuffix = isSessionUnrestored(session) ? " [unrestored]" : "";
+      return `${marker} [${token}] ${formatSessionDisplayName(session)} (${session.id.slice(0, 8)})${stateSuffix}`;
     });
     return lines.join("\n");
   }
@@ -2645,6 +2705,10 @@ async function executeControlCommand(interpreted) {
     }
     if (targetSessions.length === 0) {
       return "No active session to restart.";
+    }
+    const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+    if (blockedSessions.length > 0) {
+      return getBlockedUnrestoredMessage(blockedSessions, "Restart");
     }
     const restartedSessions = await Promise.all(targetSessions.map((session) => api.restartSession(session.id)));
     for (const restarted of restartedSessions) {
@@ -2817,6 +2881,10 @@ async function executeControlCommand(interpreted) {
     }
     if (targetSessions.length === 0) {
       return "No active session for custom command execution.";
+    }
+    const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+    if (blockedSessions.length > 0) {
+      return getBlockedUnrestoredMessage(blockedSessions, "Custom command execution");
     }
     await Promise.all(
       targetSessions.map((session) => {
@@ -3039,9 +3107,21 @@ async function submitCommand() {
   if (!targetSessionId) {
     return;
   }
+  if (!directRouting.matched) {
+    const activeSession = sessions.find((session) => session.id === targetSessionId) || null;
+    if (isSessionUnrestored(activeSession)) {
+      setCommandFeedback(getBlockedUnrestoredMessage([activeSession], "Command send"));
+      return;
+    }
+  }
 
   try {
     if (directRouting.matched && targetSessions.length > 0) {
+      const blockedSessions = targetSessions.filter((session) => isSessionUnrestored(session));
+      if (blockedSessions.length > 0) {
+        setCommandFeedback(getBlockedUnrestoredMessage(blockedSessions, "Command send"));
+        return;
+      }
       await Promise.all(
         targetSessions.map((session) => {
           const terminatorMode = getSessionSendTerminator(session.id);

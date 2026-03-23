@@ -221,9 +221,13 @@ function createTerminalCardTemplateNode() {
   const toolbar = new FakeElement({ className: "terminal-toolbar" });
   const quickId = new FakeElement({ className: "session-quick-id", tagName: "span" });
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
+  const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
+  stateBadge.hidden = true;
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
   tagList.classList.add("empty");
+  const unrestoredHint = new FakeElement({ className: "session-unrestored-hint", tagName: "p" });
+  unrestoredHint.hidden = true;
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
@@ -270,6 +274,8 @@ function createTerminalCardTemplateNode() {
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
   toolbar.appendChild(quickId);
   toolbar.appendChild(focus);
+  toolbar.appendChild(stateBadge);
+  toolbar.appendChild(tagList);
   toolbar.appendChild(settings);
   settingsPanel.appendChild(settingsDismiss);
   settingsPanel.appendChild(settingsTitle);
@@ -304,7 +310,7 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(close);
   settingsPanel.appendChild(settingsFooter);
   card.appendChild(toolbar);
-  card.appendChild(tagList);
+  card.appendChild(unrestoredHint);
   card.appendChild(settingsPanel);
   card.appendChild(mount);
   return card;
@@ -485,7 +491,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(
-            makeJsonResponse(200, [{ id: "s-1", shell: "bash", cwd: "~", tags: [], createdAt: Date.now(), updatedAt: Date.now() }])
+            makeJsonResponse(200, [{ id: "s-1", state: "active", shell: "bash", cwd: "~", tags: [], createdAt: Date.now(), updatedAt: Date.now() }])
           );
         }, 60);
       });
@@ -500,6 +506,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       updateSessionCalls.push({ sessionId, payload });
       return makeJsonResponse(200, {
         id: sessionId,
+        state: "active",
         shell: "bash",
         cwd: "~",
         name: payload.name || "one",
@@ -529,6 +536,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       restartCalls.push("s-1");
       return makeJsonResponse(200, {
         id: "s-1",
+        state: "active",
         shell: "bash",
         cwd: "~",
         name: "one",
@@ -569,8 +577,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       customCommandDeletes.push(commandName);
       return makeJsonResponse(204, {});
     }
-    if (path.endsWith("/resize")) {
-      resizePayloads.push(JSON.parse(options.body || "{}"));
+    const resizeMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
+    if (resizeMatch && options.method === "POST") {
+      const sessionId = decodeURIComponent(resizeMatch[1]);
+      resizePayloads.push({ sessionId, ...JSON.parse(options.body || "{}") });
       return makeJsonResponse(204, {});
     }
     return makeJsonResponse(200, {});
@@ -1058,8 +1068,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     data: JSON.stringify({
       type: "snapshot",
       sessions: [
-        { id: "s-1", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
-        { id: "s-2", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
+        { id: "s-1", state: "active", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
+        { id: "s-2", state: "active", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
       ],
       outputs: []
     })
@@ -1123,6 +1133,37 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondQuickId = secondCard.querySelector(".session-quick-id");
   assert.equal(firstQuickId.textContent, "1");
   assert.equal(secondQuickId.textContent, "2");
+  const resizeCountBeforeUnrestored = resizePayloads.length;
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.created",
+      session: {
+        id: "s-u",
+        state: "unrestored",
+        shell: "bash",
+        cwd: "~",
+        name: "unrestored",
+        tags: ["broken"],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  await sleep(250);
+  const unrestoredCard = fixture.elements.terminalGrid.children[2];
+  assert.ok(unrestoredCard.classList.contains("unrestored"));
+  const unrestoredBadge = unrestoredCard.querySelector(".session-state-badge");
+  const unrestoredHint = unrestoredCard.querySelector(".session-unrestored-hint");
+  assert.equal(unrestoredBadge.textContent, "UNRESTORED");
+  assert.equal(unrestoredBadge.hidden, false);
+  assert.equal(unrestoredHint.hidden, false);
+  assert.match(unrestoredHint.textContent, /could not be restored/i);
+  assert.equal(
+    resizePayloads.slice(resizeCountBeforeUnrestored).some((entry) => entry.sessionId === "s-u"),
+    false
+  );
+
   const secondSettings = secondCard.querySelector(".session-settings");
   const secondSettingsPanel = secondCard.querySelector(".session-settings-dialog");
   const secondSettingsDismiss = secondCard.querySelector(".session-settings-dismiss");
@@ -1313,6 +1354,24 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(firstCard.classList.contains("active"), false);
   assert.equal(secondCard.classList.contains("active"), true);
 
+  fixture.elements.commandInput.value = "@s-u echo blocked";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for unrestored session [3] unrestored.");
+
+  fixture.elements.commandInput.value = "/restart s-u";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Restart blocked for unrestored session [3] unrestored.");
+
+  fixture.elements.commandInput.value = "/switch s-u";
+  fixture.elements.sendCommand.click();
+  await tick();
+  fixture.elements.commandInput.value = "echo blocked-active";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for unrestored session [3] unrestored.");
+
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-1", data: "\u001b[2J\u001b[H" })
   });
@@ -1325,6 +1384,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       type: "session.created",
       session: {
         id: "ops",
+        state: "active",
         shell: "bash",
         cwd: "~",
         name: "ops-node",
@@ -1335,7 +1395,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 3);
+  assert.equal(fixture.elements.terminalGrid.children.length, 4);
 
   const routedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@1 echo routed";
@@ -1343,7 +1403,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(inputPayloads.length, routedBefore + 1);
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\r" });
-  assert.equal(secondCard.classList.contains("active"), true);
+  assert.equal(secondCard.classList.contains("active"), false);
+  assert.equal(unrestoredCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
 
   secondSettings.click();
@@ -1413,7 +1474,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(inputPayloads.length, unresolvedBefore);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
-  assert.equal(secondCard.classList.contains("active"), true);
+  assert.equal(secondCard.classList.contains("active"), false);
+  assert.equal(unrestoredCard.classList.contains("active"), true);
 
   const ambiguousRoutingBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@s- echo routed";
@@ -1431,12 +1493,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 2);
+  assert.equal(fixture.elements.terminalGrid.children.length, 3);
   ws.emit("message", {
     data: JSON.stringify({
       type: "session.created",
       session: {
         id: "s-2",
+        state: "active",
         shell: "bash",
         cwd: "~",
         name: "two",
@@ -1448,8 +1511,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 3);
-  const reopenedSecondTerminal = MockTerminal.instances[3];
+  assert.equal(fixture.elements.terminalGrid.children.length, 4);
+  const reopenedSecondTerminal = MockTerminal.instances[MockTerminal.instances.length - 1];
   assert.equal(reopenedSecondTerminal.options.theme.background, "#101010");
   assert.equal(reopenedSecondTerminal.options.theme.foreground, "#e0e0e0");
 

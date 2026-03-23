@@ -291,11 +291,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-080`
+- `QLT-080`, `QLT-081`
 
 Remaining in this milestone:
 
-- `QLT-081`, `QLT-082`, `PLAT-011`
+- `QLT-082`, `PLAT-011`
 
 Dependencies:
 
