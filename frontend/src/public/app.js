@@ -58,7 +58,8 @@ const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberati
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 6;
 const TERMINAL_MOUNT_VERTICAL_CHROME_PX = 18;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr", "cr2"]);
+const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr", "cr2", "cr_delay"]);
+const DELAYED_SUBMIT_MS = 90;
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -214,6 +215,30 @@ function withSingleTrailingNewline(value, mode = "auto") {
     mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : mode === "cr2" ? "\r\r" : "\r";
   const body = normalizedLines.replace(/\n/g, lineSeparator);
   return `${body}${suffix}`;
+}
+
+function normalizePayloadWithoutTrailingNewline(value, mode = "auto") {
+  const normalizedLines = String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n+$/g, "");
+  const lineSeparator = mode === "lf" ? "\n" : "\r";
+  return normalizedLines.replace(/\n/g, lineSeparator);
+}
+
+async function sendInputWithConfiguredTerminator(sessionId, value, mode) {
+  const normalizedMode = normalizeSendTerminatorMode(String(mode || "").toLowerCase());
+  if (normalizedMode === "cr_delay") {
+    const body = normalizePayloadWithoutTrailingNewline(value, "cr");
+    if (body) {
+      await api.sendInput(sessionId, body);
+    }
+    await new Promise((resolve) => setTimeout(resolve, DELAYED_SUBMIT_MS));
+    await api.sendInput(sessionId, "\r");
+    return;
+  }
+  const payload = withSingleTrailingNewline(value, normalizedMode);
+  await api.sendInput(sessionId, payload);
 }
 
 function countUnescapedSingleQuotes(line) {
@@ -2743,7 +2768,7 @@ async function executeControlCommand(interpreted) {
       const requested = String(payload.sendTerminator || "").trim().toLowerCase();
       sendTerminatorMode = normalizeSendTerminatorMode(requested);
       if (requested && requested !== sendTerminatorMode) {
-        return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2.";
+        return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2, cr_delay.";
       }
     }
 
@@ -2795,11 +2820,8 @@ async function executeControlCommand(interpreted) {
     }
     await Promise.all(
       targetSessions.map((session) => {
-        const payload = withSingleTrailingNewline(
-          normalizeCustomCommandPayloadForShell(custom.content),
-          getSessionSendTerminator(session.id)
-        );
-        return api.sendInput(session.id, payload);
+        const normalizedPayload = normalizeCustomCommandPayloadForShell(custom.content);
+        return sendInputWithConfiguredTerminator(session.id, normalizedPayload, getSessionSendTerminator(session.id));
       })
     );
     if (targetSessions.length === 1) {
@@ -3022,19 +3044,23 @@ async function submitCommand() {
     if (directRouting.matched && targetSessions.length > 0) {
       await Promise.all(
         targetSessions.map((session) => {
-          const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(session.id));
+          const terminatorMode = getSessionSendTerminator(session.id);
           debugLog("command.send.start", {
             activeSessionId: session.id,
-            length: payload.length,
+            mode: terminatorMode,
             directRoute: directRouting.matched
           });
-          return api.sendInput(session.id, payload);
+          return sendInputWithConfiguredTerminator(session.id, targetPayload, terminatorMode);
         })
       );
     } else {
-      const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(targetSessionId));
-      debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
-      await api.sendInput(targetSessionId, payload);
+      const terminatorMode = getSessionSendTerminator(targetSessionId);
+      debugLog("command.send.start", {
+        activeSessionId: targetSessionId,
+        mode: terminatorMode,
+        directRoute: directRouting.matched
+      });
+      await sendInputWithConfiguredTerminator(targetSessionId, targetPayload, terminatorMode);
     }
     commandInput.value = "";
     setCommandPreview("");
