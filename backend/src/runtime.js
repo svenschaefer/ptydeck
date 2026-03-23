@@ -990,25 +990,31 @@ export function createRuntime(config) {
   }
 
   function toApiSession(session, state) {
-    const { deckId: _ignoredDeckId, ...apiSession } = session;
     return {
-      ...apiSession,
+      ...session,
+      deckId: resolveSessionDeckId(session.id),
       state
     };
   }
 
-  function listApiSessions() {
+  function listApiSessions({ deckId } = {}) {
     const payload = [];
     const seen = new Set();
     for (const session of manager.list()) {
-      payload.push(toApiSession(session, "active"));
+      const apiSession = toApiSession(session, "active");
+      if (!deckId || apiSession.deckId === deckId) {
+        payload.push(apiSession);
+      }
       seen.add(session.id);
     }
     for (const [sessionId, session] of unrestoredSessions.entries()) {
       if (seen.has(sessionId)) {
         continue;
       }
-      payload.push(toApiSession(session, "unrestored"));
+      const apiSession = toApiSession(session, "unrestored");
+      if (!deckId || apiSession.deckId === deckId) {
+        payload.push(apiSession);
+      }
     }
     return payload;
   }
@@ -1315,7 +1321,9 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "listSessions") {
-        const payload = listApiSessions();
+        const requestedDeckId = parsedUrl.searchParams.get("deckId");
+        const deckIdFilter = typeof requestedDeckId === "string" && requestedDeckId.trim() ? requestedDeckId.trim() : "";
+        const payload = listApiSessions({ deckId: deckIdFilter || undefined });
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
         writeJson(req, res, 200, payload);
         return;

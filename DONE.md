@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-086` completed: session APIs are now deck-aware (`Session.deckId` in responses), and `GET /api/v1/sessions` supports optional `deckId` filtering.
+- [x] OpenAPI + runtime validation were updated so `Session` requires `deckId` and deck-filtered listing is contract-covered.
+- [x] Added integration coverage for deck-aware list/get behavior after session moves (`/sessions?deckId=...` and `GET /sessions/{sessionId}` deck assignment visibility).
+- [x] Validation for `QLT-086` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-085` completed: backend now exposes deck lifecycle and assignment endpoints (`GET/POST /api/v1/decks`, `GET/PATCH/DELETE /api/v1/decks/{deckId}`, `POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`) with deterministic validation/error handling.
 - [x] OpenAPI contract, runtime request/response validation, and route-contract conformance tests were updated for deck APIs and move semantics.
 - [x] Backend integration coverage now includes end-to-end deck lifecycle and session move scenarios (create/list/get/update/delete, move routing, unknown deck/session errors).

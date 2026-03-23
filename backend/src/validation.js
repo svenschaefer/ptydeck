@@ -268,6 +268,7 @@ function isSession(value) {
   return (
     isObject(value) &&
     typeof value.id === "string" &&
+    typeof value.deckId === "string" &&
     (value.state === "active" || value.state === "unrestored") &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&

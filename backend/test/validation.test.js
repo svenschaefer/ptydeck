@@ -54,6 +54,7 @@ test("validateResponse checks session list schema", () => {
       body: [
         {
           id: "a",
+          deckId: "default",
           state: "active",
           cwd: "/tmp",
           shell: "bash",

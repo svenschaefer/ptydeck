@@ -549,6 +549,50 @@ test("deck lifecycle and session move endpoints work end-to-end", async () => {
   }
 });
 
+test("session list/get are deck-aware with optional deckId query filter", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Operations" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "deck-aware-session" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+    assert.equal(createdSession.deckId, "default");
+
+    const moveRes = await fetch(`${baseUrl}/decks/ops/sessions/${createdSession.id}:move`, {
+      method: "POST"
+    });
+    assert.equal(moveRes.status, 204);
+
+    const getSessionRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`);
+    assert.equal(getSessionRes.status, 200);
+    const movedSession = await getSessionRes.json();
+    assert.equal(movedSession.deckId, "ops");
+
+    const listOpsRes = await fetch(`${baseUrl}/sessions?deckId=ops`);
+    assert.equal(listOpsRes.status, 200);
+    const listOps = await listOpsRes.json();
+    assert.ok(listOps.some((session) => session.id === createdSession.id));
+
+    const listDefaultRes = await fetch(`${baseUrl}/sessions?deckId=default`);
+    assert.equal(listDefaultRes.status, 200);
+    const listDefault = await listDefaultRes.json();
+    assert.ok(!listDefault.some((session) => session.id === createdSession.id));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 

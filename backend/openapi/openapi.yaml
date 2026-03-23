@@ -255,6 +255,12 @@ paths:
     get:
       operationId: listSessions
       summary: List sessions
+      parameters:
+        - name: deckId
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Session list
@@ -513,6 +519,7 @@ components:
       type: object
       required:
         - id
+        - deckId
         - state
         - cwd
         - shell
@@ -521,6 +528,8 @@ components:
         - updatedAt
       properties:
         id:
+          type: string
+        deckId:
           type: string
         state:
           type: string
