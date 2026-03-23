@@ -55,6 +55,11 @@ jobs:
           node-version: 18
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Runtime profile least-privilege check
+        run: |
+          mkdir -p artifacts/security
+          set -o pipefail
+          ./scripts/check-runtime-profile.sh 2>&1 | tee artifacts/security/runtime-profile.log
       - name: Collect test evidence logs
         run: |
           mkdir -p artifacts/quality

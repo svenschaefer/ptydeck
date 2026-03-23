@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `ENT-013` completed: least-privilege runtime profile baseline added (`security/runtime-profile.json`) with explicit non-root, filesystem write-scope, and deny-by-default egress policy constraints.
+- [x] Added automated profile validation script `scripts/check-runtime-profile.sh` and root command `npm run runtime:profile:check`.
+- [x] CI security job now enforces runtime profile checks and stores evidence in `artifacts/security/runtime-profile.log`.
+- [x] Release evidence bundling now includes runtime-profile verification logs.
 - [x] `ENT-014` completed: added disaster-recovery runbook baseline with explicit `RTO`/`RPO` targets in `DEPLOYMENT.md`.
 - [x] Added automated DR restore drill script `scripts/dr-restore-drill.sh` with threshold enforcement (`DR_RTO_TARGET_SECONDS`, `DR_RPO_TARGET_SECONDS`) and JSON report output.
 - [x] CI security job now executes the DR drill and stores evidence log (`artifacts/security/dr-drill.log`) as part of periodic non-prod verification.

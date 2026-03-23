@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ptydeck-least-privilege-v1",
+  "identity": {
+    "requireNonRoot": true,
+    "recommendedUser": "ptydeck",
+    "recommendedUid": 10001,
+    "recommendedGid": 10001
+  },
+  "filesystem": {
+    "readOnlyRoots": [
+      "./backend/src",
+      "./frontend/src",
+      "./backend/openapi",
+      "./frontend/src/public"
+    ],
+    "allowedWriteRoots": [
+      "./backend/data",
+      "./backend/logs",
+      "./backups",
+      "./artifacts"
+    ],
+    "defaultDataPath": "./backend/data/sessions.json"
+  },
+  "network": {
+    "ingress": {
+      "backendPort": 18080,
+      "frontendPort": 18081
+    },
+    "egress": {
+      "mode": "deny-by-default",
+      "notes": [
+        "Allow only required package/security endpoints in CI.",
+        "Allow only explicit upstream APIs/proxies in runtime environments."
+      ]
+    }
+  }
+}

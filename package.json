@@ -17,6 +17,7 @@
     "test": "npm --prefix backend run test && npm --prefix frontend run test",
     "test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage",
     "test:load": "npm --prefix backend run test:load",
+    "runtime:profile:check": "./scripts/check-runtime-profile.sh",
     "test:coverage:check": "./scripts/check-coverage.sh",
     "tls:check": "./scripts/check-cert-expiry.sh",
     "security:sca": "./scripts/security-scan.sh",

@@ -225,8 +225,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0`
-- Next milestones in progress: `v0.3.0-H2`
+- Latest completed milestone: `v0.3.0-H2`
+- Next milestones in progress: none
 - Blockers: none recorded
 
 ### Completed Items
@@ -311,3 +311,4 @@ Exit criteria:
 - `ENT-012`
 - `ENT-022`
 - `ENT-014`
+- `ENT-013`

@@ -605,6 +605,33 @@ CI/non-prod automation:
   - `DR_RPO_TARGET_SECONDS`
 - On threshold breach, CI fails fast and blocks merge/release.
 
+## 9.14 Least-Privilege Runtime Profile Baseline (ENT-013)
+
+Baseline profile artifact:
+
+- `security/runtime-profile.json`
+- Defines:
+  - non-root runtime requirement
+  - allowed writable filesystem roots
+  - read-only source/config roots
+  - non-privileged ingress ports
+  - deny-by-default egress policy baseline
+
+Automated profile check:
+
+- Script: `./scripts/check-runtime-profile.sh`
+- Root shortcut: `npm run runtime:profile:check`
+- Validates:
+  - runtime process is not root
+  - backend/frontend ports are non-privileged (`1024..65535`)
+  - `DATA_PATH` stays within configured write roots
+  - egress policy mode stays `deny-by-default`
+
+CI/non-prod enforcement:
+
+- CI `security` job executes runtime profile check and stores `artifacts/security/runtime-profile.log`.
+- Profile violations fail CI and block merge/release.
+
 ## 10. Release Checklist
 
 - [ ] `main` branch is up to date
