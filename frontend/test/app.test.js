@@ -1204,6 +1204,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
   assert.equal(secondCard.classList.contains("active"), true);
 
+  const ambiguousRoutingBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "@s- echo routed";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, ambiguousRoutingBefore);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Ambiguous session identifier: s-");
+
   const ambiguousBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "/blockcmd s-";
   fixture.elements.sendCommand.click();

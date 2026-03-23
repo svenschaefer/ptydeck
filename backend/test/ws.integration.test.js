@@ -168,6 +168,96 @@ test("WS emits session events and reconnect receives snapshot", async () => {
   }
 });
 
+test("WS custom-command lifecycle events are broadcast to multiple connected clients", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
+  const firstEvents = [];
+  const secondEvents = [];
+
+  try {
+    const firstWs = new WebSocket(wsUrl);
+    firstWs.on("message", (buffer) => {
+      firstEvents.push(JSON.parse(buffer.toString()));
+    });
+    const secondWs = new WebSocket(wsUrl);
+    secondWs.on("message", (buffer) => {
+      secondEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() => firstEvents.some((event) => event.type === "snapshot"));
+    await waitFor(() => secondEvents.some((event) => event.type === "snapshot"));
+
+    const createRes = await fetch(`${baseUrl}/custom-commands/SyncCmd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo SYNC_A\n" })
+    });
+    assert.equal(createRes.status, 200);
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "custom-command.created" &&
+          event.command &&
+          event.command.name === "synccmd" &&
+          event.command.content === "echo SYNC_A\n"
+      )
+    );
+    await waitFor(() =>
+      secondEvents.some(
+        (event) =>
+          event.type === "custom-command.created" &&
+          event.command &&
+          event.command.name === "synccmd" &&
+          event.command.content === "echo SYNC_A\n"
+      )
+    );
+
+    const updateRes = await fetch(`${baseUrl}/custom-commands/synccmd`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo SYNC_B\n" })
+    });
+    assert.equal(updateRes.status, 200);
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "custom-command.updated" &&
+          event.command &&
+          event.command.name === "synccmd" &&
+          event.command.content === "echo SYNC_B\n"
+      )
+    );
+    await waitFor(() =>
+      secondEvents.some(
+        (event) =>
+          event.type === "custom-command.updated" &&
+          event.command &&
+          event.command.name === "synccmd" &&
+          event.command.content === "echo SYNC_B\n"
+      )
+    );
+
+    const deleteRes = await fetch(`${baseUrl}/custom-commands/SYNCCMD`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteRes.status, 204);
+    await waitFor(() =>
+      firstEvents.some(
+        (event) => event.type === "custom-command.deleted" && event.command && event.command.name === "synccmd"
+      )
+    );
+    await waitFor(() =>
+      secondEvents.some(
+        (event) => event.type === "custom-command.deleted" && event.command && event.command.name === "synccmd"
+      )
+    );
+
+    firstWs.close();
+    secondWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("WS auth rejects missing token and accepts valid dev token", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-ws-auth-"));
   const runtime = createRuntime({

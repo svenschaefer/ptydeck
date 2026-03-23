@@ -391,6 +391,10 @@ Completed and verified topics belong here.
 - [x] `QLT-046` completed: frontend integration coverage now includes custom-command target-resolution edge cases for ambiguous token errors and no-active-session execution guardrails.
 - [x] Combined QA baseline now covers the custom-command lifecycle/edge-case scope: reserved-name and payload-size guardrails (backend integration), malformed/missing delimiters (frontend parser integration), multiline payload fidelity, autocomplete cycle stability, and slash-history behavior.
 - [x] Validation for `QLT-046` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `QLT-051` completed: backend WebSocket integration coverage now validates custom-command lifecycle events are broadcast to multiple concurrently connected clients.
+- [x] Frontend integration coverage now explicitly validates `@<target>` ambiguity handling (`Ambiguous session identifier`) in routed-input command flow.
+- [x] `/custom` management command coverage and slash-repeat guardrail coverage are now represented in one consolidated QA baseline together with multi-client sync and ambiguous direct-routing checks.
+- [x] Validation for `QLT-051` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 
 ## Maintenance Rules
 

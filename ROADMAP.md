@@ -226,7 +226,7 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0`
-- Next milestones in progress: `v0.3.0-H1C`, `v0.3.0-H1D`, `v0.3.0-H2`
+- Next milestones in progress: `v0.3.0-H1D`, `v0.3.0-H2`
 - Blockers: none recorded
 
 ### Completed Items
@@ -282,6 +282,15 @@ Exit criteria:
 - `QLT-066`
 - `QLT-067`
 - `QLT-071`
+- `QLT-046`
+- `QLT-049`
+- `QLT-051`
+- `QLT-053`
+- `QLT-054`
+- `QLT-055`
+- `QLT-056`
+- `QLT-057`
+- `QLT-070`
 - `ENT-023`
 - `ENT-018`
 - `ENT-011`
