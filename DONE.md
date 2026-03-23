@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Frontend deck-switch hotfix: geometry/resize updates are now scoped to the active deck during deck changes, preventing cross-deck resize side effects when decks use different `cols`/`rows`.
+- [x] Deck switching now applies visibility first and then triggers deck-scoped forced resize passes, reducing transient render artifacts while switching between decks.
+- [x] Frontend regression timing updated to keep resize assertions deterministic under deck-scoped resize scheduling.
 - [x] Hotfix: `/move` no longer fails with `JSON.parse: unexpected end of data` when backend returns `204 No Content` for `POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`.
 - [x] Frontend API client now treats deck move as `204` operation and then reloads moved session via `GET /api/v1/sessions/{sessionId}` to keep FE state deterministic.
 - [x] Regression coverage updated in frontend API and app integration tests for the move flow with follow-up session read.

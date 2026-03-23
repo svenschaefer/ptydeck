@@ -923,8 +923,8 @@ function syncActiveDeckGeometryFromState() {
   saveTerminalSettings();
   syncSettingsUi();
   if (changed) {
-    applySettingsToAllTerminals();
-    scheduleGlobalResize();
+    applySettingsToAllTerminals({ deckId: activeDeck.id, force: true });
+    scheduleGlobalResize({ deckId: activeDeck.id, force: true });
   }
 }
 
@@ -1625,8 +1625,8 @@ async function applyTerminalSizeSettings(nextCols, nextRows) {
   saveTerminalSettings();
   syncSettingsUi();
   uiState.error = "";
-  applySettingsToAllTerminals();
-  scheduleGlobalResize();
+  applySettingsToAllTerminals({ deckId: activeDeck.id, force: true });
+  scheduleGlobalResize({ deckId: activeDeck.id, force: true });
   render();
 }
 
@@ -1649,9 +1649,17 @@ function applyMountHeight(entry, rows) {
   entry.element.style.width = `${cardWidthPx}px`;
 }
 
-function applySettingsToAllTerminals() {
+function applySettingsToAllTerminals(options = {}) {
+  const deckIdFilter = String(options.deckId || "").trim();
+  const force = options.force !== false;
   for (const sessionId of terminals.keys()) {
-    applyResizeForSession(sessionId, { force: true });
+    if (deckIdFilter) {
+      const session = getSessionById(sessionId);
+      if (session && resolveSessionDeckId(session) !== deckIdFilter) {
+        continue;
+      }
+    }
+    applyResizeForSession(sessionId, { force });
   }
 }
 
@@ -1762,14 +1770,22 @@ function setSidebarVisible(visible) {
   scheduleGlobalResize();
 }
 
-function scheduleGlobalResize() {
+function scheduleGlobalResize(options = {}) {
+  const deckIdFilter = String(options.deckId || "").trim();
+  const force = options.force === true;
   if (globalResizeTimer) {
     clearTimeout(globalResizeTimer);
   }
   globalResizeTimer = setTimeout(() => {
     globalResizeTimer = null;
     for (const sessionId of terminals.keys()) {
-      applyResizeForSession(sessionId);
+      if (deckIdFilter) {
+        const session = getSessionById(sessionId);
+        if (session && resolveSessionDeckId(session) !== deckIdFilter) {
+          continue;
+        }
+      }
+      applyResizeForSession(sessionId, force ? { force: true } : undefined);
     }
   }, 120);
 }
@@ -1917,7 +1933,6 @@ function setActiveDeck(deckId) {
     activeDeckId: normalized
   };
   saveStoredActiveDeckId(normalized);
-  syncActiveDeckGeometryFromState();
   const state = store.getState();
   const activeInDeck =
     state.activeSessionId &&
@@ -1927,6 +1942,9 @@ function setActiveDeck(deckId) {
     store.setActiveSession(firstInDeck ? firstInDeck.id : null);
   }
   render();
+  syncActiveDeckGeometryFromState();
+  scheduleGlobalResize({ deckId: normalized, force: true });
+  scheduleDeferredResizePasses();
   return true;
 }
 

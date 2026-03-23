@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (`QLT-093` completed: deck regression matrix finalized and H6 closed)
+Last updated: 2026-03-23 (deck-switch geometry hotfix: active-deck-scoped resize on deck change)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H6 active-open backlog cleanup).
 
@@ -126,6 +126,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend terminal geometry controls now map to active deck settings (`settings.terminal.cols/rows`) so `/size` and sidebar apply are deck-scoped (not global).
 - Frontend new-session flow now moves newly created sessions into the active deck when the active deck is not default.
 - Frontend terminal-grid visibility is now scoped strictly to the active deck, while non-active-deck sessions remain running and unchanged in runtime state.
+- Frontend deck switching now applies render visibility before forced geometry updates and scopes resize propagation to the active deck, preventing transient cross-deck resize artifacts when deck terminal sizes differ.
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.

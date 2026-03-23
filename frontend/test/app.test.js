@@ -1166,7 +1166,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.settingsCols.value = "90";
   fixture.elements.settingsRows.value = "30";
   fixture.elements.settingsApply.click();
-  await sleep(260);
+  await sleep(360);
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
     "expected resize request with updated settings"
