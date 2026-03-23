@@ -1152,7 +1152,15 @@ export function createRuntime(config) {
       if (eventName !== "session.data") {
         logDebug("session.event", { type: eventName, sessionId: event.session?.id || event.sessionId || null });
       }
-      broadcast({ type: eventName, ...event });
+      if (eventName === "session.created" && event && event.session) {
+        broadcast({
+          type: eventName,
+          ...event,
+          session: toApiSession(event.session, "active")
+        });
+      } else {
+        broadcast({ type: eventName, ...event });
+      }
       if (eventName !== "session.data") {
         persistSoon();
       }
@@ -1577,17 +1585,18 @@ export function createRuntime(config) {
       });
 
       const snapshot = manager.getSnapshot();
+      const snapshotSessions = listApiSessions();
       const customCommandSnapshot = listCustomCommands();
       ws.send(
         JSON.stringify({
           type: "snapshot",
-          sessions: snapshot.sessions,
+          sessions: snapshotSessions,
           outputs: snapshot.outputs,
           customCommands: customCommandSnapshot
         })
       );
       logDebug("ws.snapshot.sent", {
-        sessionCount: snapshot.sessions.length,
+        sessionCount: snapshotSessions.length,
         outputCount: snapshot.outputs.length,
         customCommandCount: customCommandSnapshot.length
       });

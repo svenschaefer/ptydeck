@@ -92,6 +92,8 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     await waitFor(() =>
       events.some((event) => event.type === "session.created" && event.session.id === created.id)
     );
+    const createdEvent = events.find((event) => event.type === "session.created" && event.session.id === created.id);
+    assert.equal(createdEvent.session.deckId, "default");
 
     await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
@@ -148,6 +150,9 @@ test("WS emits session events and reconnect receives snapshot", async () => {
 
     await waitFor(() => reconnectEvents.some((event) => event.type === "snapshot"));
     const reconnectSnapshot = reconnectEvents.find((event) => event.type === "snapshot");
+    const reconnectSession = reconnectSnapshot.sessions.find((session) => session.id === created.id);
+    assert.ok(reconnectSession);
+    assert.equal(reconnectSession.deckId, "default");
     assert.ok(Array.isArray(reconnectSnapshot.customCommands));
     assert.equal(reconnectSnapshot.customCommands.length, 1);
     assert.equal(reconnectSnapshot.customCommands[0].name, "docu");

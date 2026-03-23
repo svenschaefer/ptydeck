@@ -9,6 +9,8 @@ Completed and verified topics belong here.
 - [x] Regression coverage updated in frontend API and app integration tests for the move flow with follow-up session read.
 - [x] Deck navigation UI moved from workspace top header into the left sidebar to preserve vertical terminal space.
 - [x] Sidebar deck section now uses a vertical deck list with full-width deck action buttons (`New/Rename/Delete`) and keeps active-deck switching in the sidebar.
+- [x] Backend WS payload hardening: `snapshot.sessions` and `session.created.session` are now emitted in API-session shape (including `deckId`) to prevent FE reload from reverting deck assignment to default.
+- [x] Added WS regression assertions for `deckId` presence in `session.created` and reconnect snapshot session payloads.
 - [x] `QLT-093` completed: frontend regression matrix now covers deck migration/CRUD conflict paths, active-deck isolation fallback behavior, slash deck routing, selector dedupe, and per-deck settings persistence with deterministic assertions.
 - [x] Frontend deck regression tests were stabilized against selector/terminator edge cases by switching brittle last-payload assertions to deterministic target/count assertions and explicit selector scopes where needed.
 - [x] Validation for `QLT-093` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.

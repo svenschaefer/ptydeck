@@ -196,6 +196,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Custom-command execution now escapes unbalanced apostrophes per line before send to avoid open-quote shell states on multiline payload text.
 - Frontend command send path now appends exactly one final terminator selected in settings (`CRLF`, `LF`, `CR`, `CR2`, `CR_DELAY`) across direct input, routed input, and custom-command execution.
 - Frontend API client now treats deck move (`POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`) as `204 No Content` and follows with `GET /api/v1/sessions/{sessionId}` to avoid empty-body JSON parse failures.
+- Backend WebSocket payloads now normalize session objects to API shape with `deckId` for both `snapshot.sessions` and `session.created`, preventing FE reload/deck-view drift caused by deck-less WS session payloads.
 - Backend CORS preflight headers now include `PUT` in allowed methods and `authorization` in allowed headers so `/api/v1/custom-commands/{name}` updates work cross-origin in browser clients.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
