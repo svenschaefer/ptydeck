@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Session destructive action wording aligned: per-session settings now use `Delete` (instead of `Close`) with explicit user confirmation before terminal/session removal.
 - [x] Frontend settings-dialog UX hardened for interaction consistency: fragmented per-section save buttons were replaced by one dialog-level `Apply Changes` action plus `Cancel`.
 - [x] Frontend settings dialog now exposes explicit dirty/saved status and prevents accidental overwrite by keeping in-dialog drafts until apply/cancel.
 - [x] Frontend settings layout rebalanced for modern usability: startup + theme remain primary content sections while session actions moved into dialog header actions.
@@ -107,7 +108,7 @@ Completed and verified topics belong here.
 - [x] Coverage after `QLT-021` validation cycle: backend `96.81%` lines, frontend `97.71%` lines.
 - [x] Troubleshooting instrumentation added: frontend debug logs (`?debug=1`) now cover REST, WS, render lifecycle, and resize flow.
 - [x] Backend debug logging extended with optional file sink (`BACKEND_DEBUG_LOG_FILE`) for reproducible request/session/ws traces independent of terminal output.
-- [x] Frontend latency hotfix: removed redundant `listSessions` roundtrips during create/rename/close and WS `session.created`/`session.closed` handling; switched to local store upsert/remove updates.
+- [x] Frontend latency hotfix: removed redundant `listSessions` roundtrips during create/rename/delete and WS `session.created`/`session.closed` handling; switched to local store upsert/remove updates.
 - [x] Frontend dev server now injects runtime config (`API_BASE_URL`, `WS_URL`, `FRONTEND_DEBUG_LOGS`) into `window.__PTYDECK_CONFIG__` to keep browser runtime wiring deterministic.
 - [x] Frontend hotfix: terminal card initialization/resize flow hardened to avoid repeated resize loops that delayed or blocked session rendering.
 - [x] Terminal resize behavior now skips invalid pre-layout dimensions, de-duplicates unchanged resize values, and ignores transient resize API failures.
@@ -281,7 +282,7 @@ Completed and verified topics belong here.
 - [x] `QLT-041` completed: slash-command mode is now strict (`/` must be the first character of the full input); leading whitespace or later-line slashes remain terminal-plane input.
 - [x] Added command-interpreter regression coverage for strict slash boundary semantics (leading-space and later-line slash cases).
 - [x] `QLT-064` completed: added frontend settings-lifecycle regression coverage in `frontend/test/app.test.js`.
-- [x] Settings lifecycle tests now verify icon/panel access, rename/close placement in settings, startup-settings save payload + env validation guardrails, and per-session theme persistence across session close/recreate.
+- [x] Settings lifecycle tests now verify icon/panel access, rename/delete placement in settings, startup-settings save payload + env validation guardrails, and per-session theme persistence across session delete/recreate.
 - [x] Validation for `QLT-064` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] `QLT-065` completed: per-terminal settings UI switched from inline panel to a true modal dialog (`<dialog>`) opened from a settings icon button.
 - [x] Settings dialog now supports explicit close action and native Escape cancel handling while keeping session-scoped settings behavior unchanged.
@@ -341,8 +342,8 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage for settings-entry visibility and panel open/close toggle behavior on terminal cards.
 - [x] Validation for `QLT-058` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-058` cycle: backend `96.97%` lines, frontend `88.88%` lines.
-- [x] `QLT-059` completed: terminal-card `Rename` and `Close` actions were moved into the per-session settings panel; direct toolbar buttons were removed.
-- [x] Added frontend integration coverage verifying toolbar action removal and settings-panel ownership of `Rename`/`Close` controls.
+- [x] `QLT-059` completed: terminal-card `Rename` and `Delete` actions were moved into the per-session settings panel; direct toolbar buttons were removed.
+- [x] Added frontend integration coverage verifying toolbar action removal and settings-panel ownership of `Rename`/`Delete` controls.
 - [x] Validation for `QLT-059` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-059` cycle: backend `96.97%` lines, frontend `88.90%` lines.
 - [x] `QLT-063` completed: per-session terminal color-set controls were added to session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` palette values).

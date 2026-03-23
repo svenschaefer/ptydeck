@@ -158,7 +158,7 @@ Dependencies:
 - `QLT-061` depends on `QLT-060` so startup settings are applied consistently during create/restart flows.
 - `QLT-058` should run before `QLT-062` and `QLT-059` to establish a stable per-terminal settings entry point (gear icon + panel shell).
 - `QLT-062` depends on `QLT-058` and `QLT-060` so FE forms map to finalized backend fields and validation semantics.
-- `QLT-059` depends on `QLT-058` and should complete after `QLT-062` to keep rename/close behavior discoverable inside the settings panel.
+- `QLT-059` depends on `QLT-058` and should complete after `QLT-062` to keep rename/delete behavior discoverable inside the settings panel.
 - `QLT-063` depends on `QLT-058`; it should run after panel shell exists so per-session color settings stay scoped and deterministic.
 - `QLT-065` depends on `QLT-058` and should run before final QA hardening so settings UX behavior is stabilized behind a proper dialog contract.
 - `QLT-066` depends on `QLT-060` so full theme profile persistence aligns with finalized per-session backend settings schema.
@@ -169,7 +169,7 @@ Dependencies:
 Exit criteria:
 
 - Every terminal card exposes a dedicated settings icon that opens per-session settings.
-- `Rename` and `Close` actions are available in settings and removed from the direct card toolbar.
+- `Rename` and `Delete` actions are available in settings and removed from the direct card toolbar.
 - Per-session startup settings (`Working Directory`, `Start Command Line`, `Environment Variables`) are persisted and applied deterministically.
 - Per-session color sets are configurable and applied consistently after reload.
 - Per-terminal settings use a proper dialog UX with deterministic open/close/save/cancel behavior.
