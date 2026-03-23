@@ -157,6 +157,13 @@ function setCommandFeedback(message) {
   render();
 }
 
+function getErrorMessage(err, fallback) {
+  if (err && typeof err.message === "string" && err.message.trim()) {
+    return err.message.trim();
+  }
+  return fallback;
+}
+
 function setCommandPreview(message) {
   uiState.commandPreview = message;
   render();
@@ -1838,8 +1845,8 @@ async function submitCommand() {
       clearCommandSuggestions();
       resetSlashHistoryNavigationState();
       render();
-    } catch {
-      setCommandFeedback("Failed to execute control command.");
+    } catch (err) {
+      setCommandFeedback(getErrorMessage(err, "Failed to execute control command."));
     }
     return;
   }
