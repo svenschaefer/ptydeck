@@ -7,6 +7,9 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix: command-composer inline slash hint now uses the exact same font family, size, line-height, and spacing as the textarea input text.
 - [x] Documentation sync pass completed for `CODEX_CONTEXT.md` (current state/wording/date alignment).
 - [x] Repository markdown governance check completed: `TODO.md` (what), `ROADMAP.md` (order/version/dependencies), `DONE.md`, and `CODEX_CONTEXT.md` are aligned; open-task ownership is explicit.
+- [x] Frontend hotfix: slash-suggestion typography and inline-hint offset were aligned with composer text metrics to remove visual font/position drift.
+- [x] Frontend hotfix: command status/feedback block was moved from workspace top into the composer area, then compacted to avoid vertical bloat.
+- [x] Frontend hotfix: composer layout split into meta + entry rows so the `Send` button is height-bound to the textarea row only.
 
 ## 2026-03-22
 
