@@ -51,10 +51,11 @@ let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
+const SESSION_FILTER_STORAGE_KEY = "ptydeck.session-filter.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
-const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 8;
+const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 6;
 const TERMINAL_MOUNT_VERTICAL_CHROME_PX = 18;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr"]);
@@ -177,6 +178,8 @@ const startupPerf = {
 if (typeof window !== "undefined") {
   window.__PTYDECK_PERF__ = startupPerf;
 }
+
+uiState.sessionFilterText = loadStoredSessionFilterText();
 
 if (typeof window.Terminal !== "function") {
   setError("Terminal library failed to load.");
@@ -772,6 +775,37 @@ function loadSessionInputSettings() {
     return next;
   } catch {
     return {};
+  }
+}
+
+function loadStoredSessionFilterText() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
+      return "";
+    }
+    const raw = window.localStorage.getItem(SESSION_FILTER_STORAGE_KEY);
+    if (typeof raw !== "string") {
+      return "";
+    }
+    return raw.trim();
+  } catch {
+    return "";
+  }
+}
+
+function saveStoredSessionFilterText(value) {
+  try {
+    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
+      return;
+    }
+    const normalized = String(value || "").trim();
+    if (!normalized && typeof window.localStorage.removeItem === "function") {
+      window.localStorage.removeItem(SESSION_FILTER_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(SESSION_FILTER_STORAGE_KEY, normalized);
+  } catch {
+    // ignore storage failures (private mode / quota)
   }
 }
 
@@ -1577,6 +1611,14 @@ function render() {
     filtered.sessions.map((session) => session.id)
   );
   const filterActive = Boolean(String(uiState.sessionFilterText || "").trim());
+  if (filterActive && filtered.sessions.length > 0) {
+    const firstVisibleId = filtered.sessions[0].id;
+    const activeVisible = state.activeSessionId && visibleSessionIds.has(state.activeSessionId);
+    if (!activeVisible) {
+      store.setActiveSession(firstVisibleId);
+      return;
+    }
+  }
   if (!filterActive) {
     visibleSessionIds.clear();
     for (const session of state.sessions) {
@@ -2418,6 +2460,7 @@ async function executeControlCommand(interpreted) {
     const selectorText = args.join(" ").trim();
     if (!selectorText) {
       uiState.sessionFilterText = "";
+      saveStoredSessionFilterText("");
       render();
       return "Display filter cleared.";
     }
@@ -2426,6 +2469,10 @@ async function executeControlCommand(interpreted) {
       return resolved.error;
     }
     uiState.sessionFilterText = selectorText;
+    saveStoredSessionFilterText(selectorText);
+    if (resolved.sessions.length > 0 && !resolved.sessions.some((session) => session.id === activeSessionId)) {
+      store.setActiveSession(resolved.sessions[0].id);
+    }
     render();
     return `Display filter active (${resolved.sessions.length}/${sessions.length}): ${selectorText}`;
   }
