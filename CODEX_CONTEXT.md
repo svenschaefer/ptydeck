@@ -128,6 +128,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend terminal-grid visibility is now scoped strictly to the active deck, while non-active-deck sessions remain running and unchanged in runtime state.
 - Frontend deck switching now applies render visibility before forced geometry updates and scopes resize propagation to the active deck, preventing transient cross-deck resize artifacts when deck terminal sizes differ.
 - Frontend now tracks hidden-session viewport sync state: output received while hidden triggers forced resize/refresh recovery passes on re-show, with follow-to-bottom behavior restored when appropriate.
+- Frontend regression coverage now includes hidden-deck background-output recovery so deck-switch viewport drift is exercised explicitly in app-level tests.
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.

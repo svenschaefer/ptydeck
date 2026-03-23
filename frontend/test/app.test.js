@@ -125,7 +125,14 @@ class MockTerminal {
     this.rows = 24;
     this.writes = [];
     this.refreshCalls = [];
+    this.scrollToBottomCalls = 0;
     this.options = { ...options };
+    this.buffer = {
+      active: {
+        baseY: 0,
+        ydisp: 0
+      }
+    };
     MockTerminal.instances.push(this);
   }
 
@@ -144,6 +151,11 @@ class MockTerminal {
 
   write(data, callback) {
     this.writes.push(data);
+    const lineBreaks = String(data).split(/\r\n|\r|\n/).length - 1;
+    if (lineBreaks > 0) {
+      this.buffer.active.baseY += lineBreaks;
+      this.buffer.active.ydisp = this.buffer.active.baseY;
+    }
     if (typeof callback === "function") {
       callback();
     }
@@ -160,6 +172,11 @@ class MockTerminal {
   resize(cols, rows) {
     this.cols = cols;
     this.rows = rows;
+  }
+
+  scrollToBottom() {
+    this.scrollToBottomCalls += 1;
+    this.buffer.active.ydisp = this.buffer.active.baseY;
   }
 
   dispose() {}
@@ -1345,6 +1362,29 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
+
+  const hiddenDeckTerminal = MockTerminal.instances[1];
+  const hiddenRefreshCountBefore = hiddenDeckTerminal.refreshCalls.length;
+  const hiddenScrollCountBefore = hiddenDeckTerminal.scrollToBottomCalls;
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "background-1\nbackground-2\n" })
+  });
+  await tick();
+  assert.ok(hiddenDeckTerminal.writes.includes("background-1\nbackground-2\n"));
+
+  fixture.elements.commandInput.value = "/deck switch deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  await sleep(320);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
+  assert.ok(
+    hiddenDeckTerminal.refreshCalls.length > hiddenRefreshCountBefore,
+    "expected hidden deck terminal refresh recovery after deck switch"
+  );
+  assert.ok(
+    hiddenDeckTerminal.scrollToBottomCalls > hiddenScrollCountBefore,
+    "expected hidden deck terminal scroll recovery after deck switch"
+  );
 
   fixture.elements.commandInput.value = "/filter";
   fixture.elements.sendCommand.click();

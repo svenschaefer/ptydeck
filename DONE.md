@@ -7,6 +7,7 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix for hidden-deck rendering drift: terminal cards now mark pending viewport sync while hidden and run forced resize/refresh passes when shown again.
 - [x] Deck-switch visibility path now preserves and reapplies follow-to-bottom behavior (`scrollToBottom`) for sessions that were at the buffer end before being hidden.
 - [x] Background-output deck switch regression hardening: hidden sessions with incoming output now recover full scrollability/content reachability after returning to the deck.
+- [x] Frontend regression coverage now simulates hidden-deck background output and verifies viewport recovery (`refresh` + `scrollToBottom`) after switching back.
 - [x] Frontend deck-switch hotfix: geometry/resize updates are now scoped to the active deck during deck changes, preventing cross-deck resize side effects when decks use different `cols`/`rows`.
 - [x] Deck switching now applies visibility first and then triggers deck-scoped forced resize passes, reducing transient render artifacts while switching between decks.
 - [x] Frontend regression timing updated to keep resize assertions deterministic under deck-scoped resize scheduling.
