@@ -1204,6 +1204,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
   assert.equal(secondCard.classList.contains("active"), true);
 
+  const ambiguousBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "/blockcmd s-";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, ambiguousBefore);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Ambiguous session identifier: s-");
+
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 1);
@@ -1231,6 +1238,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 0);
   assert.equal(fixture.elements.emptyState.style.display, "block");
+  const noActiveBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "/blockcmd";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, noActiveBefore);
+  assert.equal(fixture.elements.commandFeedback.textContent, "No active session for custom command execution.");
 
   ws.emit("close", {});
   await tick();
