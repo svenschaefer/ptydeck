@@ -1365,7 +1365,7 @@ function applyMountHeight(entry, rows) {
   if (runtimeCellHeightPx > 0) {
     const currentlyVisibleRows = Math.floor(mountHeightPx / runtimeCellHeightPx);
     if (currentlyVisibleRows < rows) {
-      mountHeightPx += Math.ceil((rows - currentlyVisibleRows) * runtimeCellHeightPx) + 4;
+      mountHeightPx += Math.ceil((rows - currentlyVisibleRows) * runtimeCellHeightPx) + 2;
     }
   }
   entry.mount.style.height = `${mountHeightPx}px`;
