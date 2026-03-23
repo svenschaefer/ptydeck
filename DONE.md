@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] Frontend terminal geometry fine-tuning: fixed-size card width chrome reduced by additional 2px for tighter row packing without layout regressions.
+- [x] Frontend filter UX hardening: `/filter` state is now persisted across hard reload (`Ctrl+F5`) and restored on startup from local storage.
+- [x] Frontend filter behavior hardening: when active terminal is outside the current display filter, active focus now switches deterministically to the first visible filtered terminal.
+- [x] Frontend submit-mode extension: added per-session `CR_DELAY` terminator mode (payload first, delayed `\r`) for TUI prompt workflows that require delayed submit semantics (for example Codex-like sessions).
 - [x] Frontend terminal geometry hotfix: fixed-size card width chrome reduced by 20px to match expected card packing and visual width.
 - [x] Frontend terminal viewport hotfix: mount-height calibration now uses runtime xterm cell-height feedback to prevent bottom-row clipping in TUI apps (for example Codex-like prompts).
 - [x] Backend persistence hotfix: mutating REST operations now persist synchronously (`session.create`, `session.update`, `session.delete`, `session.restart`, custom-command upsert/delete) so newly created sessions are on disk before API success responses.

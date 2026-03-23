@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (H4 completed with `QLT-078`/`QLT-079`; backend durability hardening added for synchronous persistence on mutating REST paths, restore shell/cwd fallback chain, and retention of unrestorable persisted sessions across save cycles; local-only CI policy baseline applied by disabling remote-runner jobs in `.github/workflows/ci.yml`; frontend fixed-size card width chrome reduced by 20px; frontend mount-height runtime cell calibration added to prevent bottom-row clipping in TUI workloads; new active planning cycle `v0.3.0-H5` opened for unrestored-session API/FE visibility and local quality-gate documentation)
+Last updated: 2026-03-23 (H4 completed with `QLT-078`/`QLT-079`; backend durability hardening added for synchronous persistence on mutating REST paths, restore shell/cwd fallback chain, and retention of unrestorable persisted sessions across save cycles; local-only CI policy baseline applied by disabling remote-runner jobs in `.github/workflows/ci.yml`; frontend fixed-size card width chrome reduced by 20px plus additional 2px fine-tuning; frontend mount-height runtime cell calibration added to prevent bottom-row clipping in TUI workloads; `/filter` persists across hard reload and auto-switches active focus to the first visible filtered session; per-session submit modes extended with `CR2` and `CR_DELAY` for TUI prompt workloads; new active planning cycle `v0.3.0-H5` opened for unrestored-session API/FE visibility and local quality-gate documentation)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H5 planning sync).
 
@@ -87,6 +87,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Frontend app integration tests now cover terminal card lifecycle updates, active-session focus switching, and empty-state rendering.
 - Frontend sidebar now includes terminal geometry settings via user-configurable `cols`/`rows` (default `80x20`) persisted via `localStorage`; the previous fixed-size toggle was removed and geometry now consistently follows configured values.
 - Frontend fixed-size terminal rendering now derives card width and mount height deterministically from configured `cols`/`rows`, with uniform per-card sizing so row packing depends only on viewport width.
+- Frontend fixed-size terminal rendering width chrome was fine-tuned by an additional 2px reduction after initial geometry correction.
 - Frontend terminal workspace now hardens horizontal overflow behavior via fixed-size grid column constraints, card shrink guards, toolbar text truncation, and root `overflow-x` containment.
 - Frontend terminal cards now display compact quick IDs (`1..9`, `A..Z`) next to session names for concise reference and future command alias support.
 - Frontend WebSocket client now reports explicit `error` connection state and reconnects with bounded exponential backoff plus jitter.
@@ -151,7 +152,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - Composer layout now separates metadata and entry rows so the send button height follows the textarea row only.
 - Custom-command preview now renders inline as payload-only helper text inside the composer input area, without target/newline metadata.
 - Custom-command execution now escapes unbalanced apostrophes per line before send to avoid open-quote shell states on multiline payload text.
-- Frontend command send path now appends exactly one final terminator selected in settings (`CRLF`, `LF`, or `CR`) across direct input, routed input, and custom-command execution.
+- Frontend command send path now appends exactly one final terminator selected in settings (`CRLF`, `LF`, `CR`, `CR2`, `CR_DELAY`) across direct input, routed input, and custom-command execution.
 - Backend CORS preflight headers now include `PUT` in allowed methods and `authorization` in allowed headers so `/api/v1/custom-commands/{name}` updates work cross-origin in browser clients.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
@@ -166,7 +167,8 @@ The system separates backend execution concerns from frontend rendering concerns
 - Session settings dialog now uses a structured multi-section layout (`Startup`, `Theme`, `Session Actions`) with theme-category selection and text filtering for large preset catalogs.
 - Session settings persistence UX now uses one dialog-level `Apply Changes` action with explicit `Cancel` and dirty/saved status feedback instead of fragmented per-section save buttons.
 - Session settings form synchronization now preserves unsaved drafts while dirty and only resyncs controls automatically when no local draft is active.
-- Session settings now include per-session submit terminator configuration (`auto`/`CRLF`/`LF`/`CR`), and terminal input/custom-command submission uses the target session mode instead of a global setting.
+- Session settings now include per-session submit terminator configuration (`auto`/`CRLF`/`LF`/`CR`/`CR2`/`CR_DELAY`), and terminal input/custom-command submission uses the target session mode instead of a global setting.
+- Frontend `/filter` selector text is persisted in local storage and restored on startup; when active session is outside current filter, focus switches deterministically to the first visible filtered session.
 - Backend session contract now includes per-session `tags` with deterministic validation/normalization and persistence across create/patch/list/get/restore flows.
 - Frontend session settings now include tag management with validation and deterministic terminal-card tag rendering.
 - Frontend command routing now supports multi-target selectors including tags for `@...`, `/close`, `/restart`, and custom-command execution with dedupe-by-session-ID semantics.
