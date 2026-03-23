@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { createRuntime } from "../src/runtime.js";
 
 async function createStartedRuntime(overrides = {}) {
@@ -896,6 +896,49 @@ test("session create persists immediately before response completes", async () =
     const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
     assert.ok(Array.isArray(persistedSessions));
     assert.ok(persistedSessions.some((session) => session.id === created.id));
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime restore falls back to home when persisted startCwd is invalid", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "restore-invalid-cwd";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: sessionId,
+            cwd: "/definitely/not/a/real/path",
+            shell: "sh",
+            name: "invalid-cwd",
+            startCwd: "/definitely/not/a/real/path",
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath });
+  try {
+    const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
+    assert.equal(res.status, 200);
+    const restored = await res.json();
+    assert.equal(restored.id, sessionId);
+    assert.equal(restored.startCwd, homedir());
   } finally {
     await runtime.stop();
   }

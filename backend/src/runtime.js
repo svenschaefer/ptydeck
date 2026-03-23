@@ -257,7 +257,11 @@ function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
         `Field 'startCwd' exceeds maximum length (${SESSION_START_CWD_MAX_LENGTH}).`
       );
     }
-    return null;
+    return {
+      startCwd: fallbackCwd,
+      startCommand: "",
+      env: {}
+    };
   }
 
   const startCommand = typeof input.startCommand === "string" ? input.startCommand : "";
@@ -269,7 +273,11 @@ function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
         `Field 'startCommand' exceeds maximum length (${SESSION_START_COMMAND_MAX_LENGTH}).`
       );
     }
-    return null;
+    return {
+      startCwd,
+      startCommand: "",
+      env: {}
+    };
   }
 
   const envInput = input.env === undefined ? {} : input.env;
@@ -277,29 +285,35 @@ function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
     if (strict) {
       throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string key/value pairs.");
     }
-    return null;
+    return {
+      startCwd,
+      startCommand,
+      env: {}
+    };
   }
   const envEntries = Object.entries(envInput);
   if (envEntries.length > SESSION_ENV_MAX_ENTRIES) {
     if (strict) {
       throw new ApiError(400, "ValidationError", `Field 'env' exceeds maximum entries (${SESSION_ENV_MAX_ENTRIES}).`);
     }
-    return null;
   }
 
   const env = {};
   for (const [rawKey, rawValue] of envEntries) {
+    if (Object.keys(env).length >= SESSION_ENV_MAX_ENTRIES) {
+      break;
+    }
     if (typeof rawKey !== "string" || !SESSION_ENV_KEY_PATTERN.test(rawKey) || rawKey.length > SESSION_ENV_KEY_MAX_LENGTH) {
       if (strict) {
         throw new ApiError(400, "ValidationError", "Field 'env' contains an invalid variable name.");
       }
-      return null;
+      continue;
     }
     if (typeof rawValue !== "string" || rawValue.length > SESSION_ENV_VALUE_MAX_LENGTH) {
       if (strict) {
         throw new ApiError(400, "ValidationError", "Field 'env' contains an invalid variable value.");
       }
-      return null;
+      continue;
     }
     env[rawKey] = rawValue;
   }
@@ -319,7 +333,7 @@ function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
     if (strict) {
       throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
     }
-    return null;
+    return { ...DEFAULT_SESSION_THEME_PROFILE };
   }
 
   const normalized = {};
@@ -329,13 +343,13 @@ function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
       if (strict) {
         throw new ApiError(400, "ValidationError", `Field 'themeProfile.${key}' is not supported.`);
       }
-      return null;
+      continue;
     }
     if (typeof value !== "string" || !SESSION_THEME_COLOR_PATTERN.test(value)) {
       if (strict) {
         throw new ApiError(400, "ValidationError", `Field 'themeProfile.${key}' must be a hex color like '#1d2021'.`);
       }
-      return null;
+      continue;
     }
   }
 
@@ -1159,27 +1173,45 @@ export function createRuntime(config) {
           },
           { strict: false }
         );
-        if (!startupConfig) {
-          continue;
-        }
         const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
-        if (!themeProfile) {
-          continue;
-        }
         const tags = normalizeSessionTags(session.tags, { strict: false });
-        manager.create({
-          id: session.id,
-          cwd: startupConfig.startCwd,
-          shell: session.shell || config.shell,
-          name: session.name,
-          startCwd: startupConfig.startCwd,
-          startCommand: startupConfig.startCommand,
-          env: startupConfig.env,
-          tags,
-          themeProfile,
-          createdAt: session.createdAt,
-          updatedAt: session.updatedAt
-        });
+        try {
+          manager.create({
+            id: session.id,
+            cwd: startupConfig.startCwd,
+            shell: session.shell || config.shell,
+            name: session.name,
+            startCwd: startupConfig.startCwd,
+            startCommand: startupConfig.startCommand,
+            env: startupConfig.env,
+            tags,
+            themeProfile,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt
+          });
+        } catch (err) {
+          // Keep persisted sessions recoverable when a saved working directory is no longer valid.
+          const fallbackCwd = homedir();
+          logDebug("runtime.restore.session_fallback_home", {
+            sessionId: session.id,
+            requestedStartCwd: startupConfig.startCwd,
+            fallbackCwd,
+            error: err?.message || String(err)
+          });
+          manager.create({
+            id: session.id,
+            cwd: fallbackCwd,
+            shell: session.shell || config.shell,
+            name: session.name,
+            startCwd: fallbackCwd,
+            startCommand: startupConfig.startCommand,
+            env: startupConfig.env,
+            tags,
+            themeProfile,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt
+          });
+        }
       } catch (err) {
         console.error("failed to restore session", session.id, err);
       }
