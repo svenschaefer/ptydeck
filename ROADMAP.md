@@ -108,6 +108,7 @@ Exit criteria:
 - `QLT-047`, `QLT-040`, `QLT-042`, `QLT-056`
 - `QLT-043`, `QLT-053`, `QLT-044`, `QLT-045`, `QLT-050`, `QLT-049`
 - `QLT-046`, `QLT-051`, `QLT-055`, `QLT-057`
+- `QLT-069`, `QLT-070`
 
 Dependencies:
 
@@ -126,6 +127,8 @@ Dependencies:
 - `QLT-049` should run after `QLT-040` and `QLT-044` so target resolution behavior is reused consistently.
 - `QLT-046` depends on `QLT-037` through `QLT-045`; `QLT-051` depends on `QLT-047`, `QLT-048`, `QLT-049`, and `QLT-050`.
 - `QLT-055` depends on `QLT-052`, `QLT-053`, and `QLT-054`; `QLT-057` depends on `QLT-041` and `QLT-053`.
+- `QLT-069` depends on `QLT-040`, `QLT-049`, and existing command-submit normalization paths so direct input and custom-command execution share one deterministic terminator contract.
+- `QLT-070` depends on `QLT-069` and extends regression coverage to submit-mode matrix behavior (`LF`/`CR`/`CRLF`) for shell and TUI command targets.
 
 Exit criteria:
 
@@ -135,6 +138,7 @@ Exit criteria:
 - Slash mode boundaries are explicit and keyboard behavior is deterministic (`TAB`, `Shift+TAB`, arrows, `Enter`, repeat shortcut).
 - Suggestion list and preview are non-blocking, text-safe, and do not auto-execute commands.
 - Multi-client custom-command state synchronization works via WebSocket lifecycle events.
+- Command submit semantics are deterministic across supported newline modes and do not require extra manual confirmation keystrokes in TUI workloads.
 - Integration/regression coverage exists for all listed custom-command and slash UX edge cases.
 
 ### v0.3.0-H1D - Per-Terminal Settings and Theme Personalization

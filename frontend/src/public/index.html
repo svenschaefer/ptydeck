@@ -20,6 +20,12 @@
             <input id="settings-cols" type="number" min="20" max="400" step="1" value="80" />
             <label for="settings-rows">Rows</label>
             <input id="settings-rows" type="number" min="5" max="120" step="1" value="20" />
+            <label for="settings-send-terminator">Send Terminator</label>
+            <select id="settings-send-terminator">
+              <option value="crlf">CRLF (\\r\\n)</option>
+              <option value="lf">LF (\\n)</option>
+              <option value="cr">CR (\\r)</option>
+            </select>
           </div>
           <button id="settings-apply" type="button">Apply</button>
         </section>

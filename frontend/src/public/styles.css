@@ -85,7 +85,8 @@ body {
   color: var(--muted);
 }
 
-.settings-grid input {
+.settings-grid input,
+.settings-grid select {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;

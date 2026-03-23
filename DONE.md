@@ -15,6 +15,7 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix: custom-command preview now renders inline in the composer as payload-only, semi-transparent helper text (no target/newline metadata block).
 - [x] Frontend hotfix: custom-command multiline payload execution now handles apostrophes robustly by escaping unbalanced single quotes before send.
 - [x] Frontend behavior change: command submission now normalizes final line terminator to exactly one `\r\n` (CRLF) for regular input, routed input, and custom-command execution.
+- [x] Frontend settings extended with configurable command send terminator (`CRLF`, `LF`, `CR`) that is applied consistently to direct input, routed input, and custom-command execution paths.
 
 ## 2026-03-22
 

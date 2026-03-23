@@ -141,6 +141,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-066` Owner: `BE` Task: Extend per-session settings contract/persistence for full terminal theme profiles (background, foreground, cursor, and ANSI 16-color palette) with validation and deterministic storage shape.
 - [ ] `QLT-067` Owner: `FE` Task: Implement advanced per-terminal theme editor with full palette fields, deterministic preset selection beyond the current minimal set, and per-session apply/preview behavior.
 - [ ] `QLT-068` Owner: `QA` Task: Add integration/regression coverage for settings-dialog UX and full-palette theme lifecycle (open/close semantics, validation, persistence, reload consistency, and rendering apply behavior).
+- [ ] `QLT-069` Owner: `FE` Task: Rework command submit terminator handling so regular input and multiline custom-command payloads execute deterministically across shell and TUI apps (including Codex-like prompts) without requiring an extra manual Enter.
+- [ ] `QLT-070` Owner: `QA` Task: Add regression coverage for command submit semantics (`LF`/`CR`/`CRLF` modes, multiline payloads, routed targets) to ensure exactly one final submit signal is emitted and no duplicate/omitted execution occurs.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

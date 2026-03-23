@@ -297,6 +297,8 @@ function createDocumentFixture() {
   settingsCols.value = "80";
   const settingsRows = new FakeElement({ id: "settings-rows", tagName: "input" });
   settingsRows.value = "20";
+  const settingsSendTerminator = new FakeElement({ id: "settings-send-terminator", tagName: "select" });
+  settingsSendTerminator.value = "crlf";
   const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
@@ -323,6 +325,7 @@ function createDocumentFixture() {
     settingsFixedSize,
     settingsCols,
     settingsRows,
+    settingsSendTerminator,
     settingsApply,
     commandInput,
     sendCommand,
@@ -344,6 +347,7 @@ function createDocumentFixture() {
       settingsFixedSize,
       settingsCols,
       settingsRows,
+      settingsSendTerminator,
       settingsApply,
       commandInput,
       sendCommand,
