@@ -165,7 +165,7 @@ function getErrorMessage(err, fallback) {
 
 function withSingleTrailingNewline(value) {
   const normalized = String(value || "").replace(/\r\n/g, "\n").replace(/[\n\r]+$/g, "");
-  return `${normalized}\n`;
+  return `${normalized}\r\n`;
 }
 
 function countUnescapedSingleQuotes(line) {

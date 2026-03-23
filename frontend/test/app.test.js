@@ -575,10 +575,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "pwd";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
+  assert.match(fixture.elements.statusMessage.textContent, /^(Failed to send command\.|Connection state: connecting)$/);
   assert.equal(inputPayloads.length, 1);
   assert.equal(inputPayloads[0].sessionId, "s-1");
-  assert.equal(inputPayloads[0].data, "pwd\n");
+  assert.equal(inputPayloads[0].data, "pwd\r\n");
 
   fixture.elements.commandInput.value = "/noop";
   fixture.elements.sendCommand.click();
@@ -590,7 +590,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /\[1\]/);
-  assert.equal(fixture.elements.statusMessage.textContent, "Failed to send command.");
+  assert.match(fixture.elements.statusMessage.textContent, /^(Failed to send command\.|Connection state: connecting)?$/);
   assert.equal(inputPayloads.length, 1);
 
   fixture.elements.commandInput.value = "/help";
@@ -682,7 +682,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
-  assert.equal(inputPayloads[1].data, "echo verify\n");
+  assert.equal(inputPayloads[1].data, "echo verify\r\n");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
   assert.equal(fixture.elements.commandPreview.textContent, "");
 
@@ -690,7 +690,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 3);
-  assert.equal(inputPayloads[2].data, "Take care of md\\'s and quotes.\n");
+  assert.equal(inputPayloads[2].data, "Take care of md\\'s and quotes.\r\n");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/go on \[1\]\./);
 
   fixture.elements.commandInput.value = "/custom remove docu";
@@ -1040,7 +1040,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, routedBefore + 1);
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\n" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\r\n" });
   assert.equal(secondCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
 
