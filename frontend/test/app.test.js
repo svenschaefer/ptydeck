@@ -826,6 +826,44 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandInput.value, "/zzzz");
 
+  fixture.elements.commandInput.value = "echo /switch";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandSuggestions.textContent, "");
+  assert.equal(fixture.elements.commandPreview.textContent, "");
+  const nonSlashTabEvent = {
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(nonSlashTabEvent);
+  await tick();
+  assert.equal(nonSlashTabEvent.defaultPrevented, false);
+  assert.equal(fixture.elements.commandInput.value, "echo /switch");
+
+  fixture.elements.commandInput.value = "echo alpha\n/switch 2";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandSuggestions.textContent, "");
+  assert.equal(fixture.elements.commandPreview.textContent, "");
+  const multilineNonSlashTabEvent = {
+    type: "keydown",
+    key: "Tab",
+    shiftKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(multilineNonSlashTabEvent);
+  await tick();
+  assert.equal(multilineNonSlashTabEvent.defaultPrevented, false);
+  assert.equal(fixture.elements.commandInput.value, "echo alpha\n/switch 2");
+
   fixture.elements.commandInput.value = "/switch ";
   fixture.elements.commandInput.dispatchEvent({
     type: "keydown",

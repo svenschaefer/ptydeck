@@ -382,6 +382,9 @@ Completed and verified topics belong here.
 - [x] `QLT-070` completed: regression coverage now verifies per-session submit terminator matrix (`CRLF`/`LF`/`CR`) for both routed direct input (`@<target> ...`) and custom-command execution (`/<custom> <target>`).
 - [x] Added frontend integration assertions that multiline payloads preserve line content and emit exactly one final submit terminator for each mode on target-routed sends.
 - [x] Validation for `QLT-070` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `QLT-057` completed: frontend app integration coverage now verifies slash autocomplete/suggestions remain disabled for non-slash input and multiline input where slash appears only on later lines.
+- [x] Added keyboard guardrail assertions that `Tab` is not captured in these non-slash scenarios (`preventDefault` stays false) and composer content is not mutated by autocomplete.
+- [x] Validation for `QLT-057` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 
 ## Maintenance Rules
 
