@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-090` Owner: `FE` Task: Add slash commands for deck control and session move (`/deck list|new|rename|switch|delete`, `/move <sessionSelector> <deckSelector>`) with explicit success/error feedback.
 - [ ] `QLT-091` Owner: `FE` Task: Apply deck isolation to command/target resolution (`/switch`, `/next`, `/prev`, `/filter`, `@target`): default selectors resolve inside active deck, with explicit cross-deck selectors supported when requested.
 - [ ] `QLT-092` Owner: `FE` Task: Implement conflict-safe dedupe for multi-selector operations across IDs/quick IDs/tags/deck selectors so each target session executes at most once even under overlapping matches.
 - [ ] `QLT-093` Owner: `QA` Task: Add full deck regression matrix (legacy migration, deck CRUD, move semantics, delete conflicts, active-session fallback, per-deck settings persistence, slash-command deck routing, dedupe guarantees).

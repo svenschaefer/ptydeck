@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-090` completed: slash command deck control surface implemented with `/deck list|new|rename|switch|delete` plus `/move <sessionSelector> <deckSelector>`.
+- [x] Deck command handling now resolves decks deterministically by ID, exact name, or unique ID prefix, with explicit usage/help and conflict feedback (`/deck delete ... force`).
+- [x] Slash autocomplete extended for deck/move command contexts (deck subcommands, deck selectors, and move session/deck arguments).
+- [x] Frontend integration coverage expanded for deck command help visibility and command execution flows (`/deck list/new/switch/delete`, `/move ...`).
+- [x] Validation for `QLT-090` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-089` completed: terminal rendering is now strictly scoped to the active deck while non-active deck sessions remain running in background state.
 - [x] Active-session fallback is now deterministic on deck switch: if the current active session is outside the selected deck, focus moves to the first session in that deck (or `null` when the deck is empty).
 - [x] Filtering now applies within the active deck scope only, with explicit empty-state messaging for `No sessions in active deck.`.

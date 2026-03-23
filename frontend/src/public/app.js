@@ -135,6 +135,8 @@ const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => 
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
 const SYSTEM_SLASH_COMMANDS = [
   "new",
+  "deck",
+  "move",
   "size",
   "filter",
   "close",
@@ -565,6 +567,24 @@ function buildSessionAutocompleteCandidates(prefix = "") {
   return candidates;
 }
 
+function buildDeckAutocompleteCandidates(prefix = "") {
+  const normalizedPrefix = String(prefix || "").toLowerCase();
+  const candidates = [];
+  for (const deck of deckState.decks) {
+    const id = String(deck?.id || "").trim();
+    if (!id) {
+      continue;
+    }
+    if (!id.toLowerCase().startsWith(normalizedPrefix)) {
+      continue;
+    }
+    if (!candidates.includes(id)) {
+      candidates.push(id);
+    }
+  }
+  return candidates;
+}
+
 function resolveSlashAutocompleteContext(rawInput, customCommands) {
   const parsed = parseSlashInputForAutocomplete(rawInput);
   if (!parsed) {
@@ -621,6 +641,40 @@ function resolveSlashAutocompleteContext(rawInput, customCommands) {
       replacePrefix: `/${commandRaw} `,
       matches: buildSessionAutocompleteCandidates(targetPrefix)
     };
+  }
+
+  if (command === "deck" && parts.length <= 2) {
+    const subcommands = ["list", "new", "rename", "switch", "delete"];
+    const subPrefix = parts.length === 2 ? String(parts[1] || "").toLowerCase() : "";
+    return {
+      replacePrefix: "/deck ",
+      matches: subcommands.filter((entry) => entry.startsWith(subPrefix))
+    };
+  }
+
+  if (command === "deck" && (parts[1] === "switch" || parts[1] === "delete") && parts.length <= 3) {
+    const deckPrefix = parts.length === 3 ? parts[2] : "";
+    return {
+      replacePrefix: `/deck ${parts[1]} `,
+      matches: buildDeckAutocompleteCandidates(deckPrefix)
+    };
+  }
+
+  if (command === "move") {
+    if (parts.length <= 2) {
+      const sessionPrefix = parts.length === 2 ? parts[1] : "";
+      return {
+        replacePrefix: "/move ",
+        matches: buildSessionAutocompleteCandidates(sessionPrefix)
+      };
+    }
+    if (parts.length === 3) {
+      const deckPrefix = parts[2];
+      return {
+        replacePrefix: `/move ${parts[1]} `,
+        matches: buildDeckAutocompleteCandidates(deckPrefix)
+      };
+    }
   }
 
   return null;
@@ -2528,6 +2582,37 @@ function resolveSessionToken(token, sessions) {
   return { session: null, error: `Unknown session identifier: ${normalized}` };
 }
 
+function resolveDeckToken(token, decks) {
+  const normalized = String(token || "").trim();
+  if (!normalized) {
+    return { deck: null, error: "Missing deck identifier." };
+  }
+
+  const exactId = decks.find((deck) => deck.id === normalized) || null;
+  if (exactId) {
+    return { deck: exactId, error: "" };
+  }
+
+  const lower = normalized.toLowerCase();
+  const exactNameMatches = decks.filter((deck) => String(deck?.name || "").toLowerCase() === lower);
+  if (exactNameMatches.length === 1) {
+    return { deck: exactNameMatches[0], error: "" };
+  }
+  if (exactNameMatches.length > 1) {
+    return { deck: null, error: `Ambiguous deck identifier: ${normalized}` };
+  }
+
+  const prefixMatches = decks.filter((deck) => String(deck?.id || "").startsWith(normalized));
+  if (prefixMatches.length === 1) {
+    return { deck: prefixMatches[0], error: "" };
+  }
+  if (prefixMatches.length > 1) {
+    return { deck: null, error: `Ambiguous deck identifier: ${normalized}` };
+  }
+
+  return { deck: null, error: `Unknown deck identifier: ${normalized}` };
+}
+
 function normalizeSessionTagToken(token) {
   return String(token || "")
     .trim()
@@ -2853,7 +2938,170 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /deck list|new|rename|switch|delete, /move <sessionSelector> <deckSelector>, /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+  }
+
+  if (command === "deck") {
+    const subcommand = String(args[0] || "").toLowerCase();
+    const rest = args.slice(1);
+    const decks = deckState.decks.slice();
+    const activeDeck = getActiveDeck();
+
+    if (!subcommand || subcommand === "list") {
+      if (decks.length === 0) {
+        return "No decks available.";
+      }
+      const lines = decks.map((deck) => {
+        const marker = activeDeck && deck.id === activeDeck.id ? "*" : " ";
+        const count = getSessionCountForDeck(deck.id, sessions);
+        return `${marker} [${deck.id}] ${deck.name} (${count} sessions)`;
+      });
+      return lines.join("\n");
+    }
+
+    if (subcommand === "new") {
+      const name = rest.join(" ").trim();
+      if (!name) {
+        return "Usage: /deck new <name>";
+      }
+      const created = await api.createDeck({
+        name,
+        settings: {
+          terminal: {
+            cols: terminalSettings.cols,
+            rows: terminalSettings.rows
+          }
+        }
+      });
+      await reloadDecks({ preferredActiveDeckId: created.id });
+      return `Created deck [${created.id}] ${created.name}.`;
+    }
+
+    if (subcommand === "rename") {
+      if (!activeDeck) {
+        return "No active deck to rename.";
+      }
+      if (rest.length === 0) {
+        return "Usage: /deck rename <name> | /deck rename <deckSelector> <name>";
+      }
+
+      let targetDeck = activeDeck;
+      let name = "";
+      if (rest.length === 1) {
+        name = rest[0].trim();
+      } else {
+        const resolvedDeck = resolveDeckToken(rest[0], decks);
+        if (!resolvedDeck.deck) {
+          return resolvedDeck.error;
+        }
+        targetDeck = resolvedDeck.deck;
+        name = rest.slice(1).join(" ").trim();
+      }
+
+      if (!name) {
+        return "Usage: /deck rename <name> | /deck rename <deckSelector> <name>";
+      }
+      const updated = await api.updateDeck(targetDeck.id, { name });
+      await reloadDecks({ preferredActiveDeckId: updated.id });
+      return `Renamed deck [${updated.id}] to ${updated.name}.`;
+    }
+
+    if (subcommand === "switch") {
+      if (rest.length !== 1) {
+        return "Usage: /deck switch <deckSelector>";
+      }
+      const resolved = resolveDeckToken(rest[0], decks);
+      if (!resolved.deck) {
+        return resolved.error;
+      }
+      const changed = setActiveDeck(resolved.deck.id);
+      if (!changed) {
+        return `Failed to switch deck: ${resolved.deck.id}`;
+      }
+      return `Active deck: [${resolved.deck.id}] ${resolved.deck.name}.`;
+    }
+
+    if (subcommand === "delete") {
+      if (!activeDeck) {
+        return "No active deck to delete.";
+      }
+      if (rest.length > 2) {
+        return "Usage: /deck delete [deckSelector] [force]";
+      }
+      let force = false;
+      let selector = "";
+      if (rest.length === 1) {
+        if (String(rest[0]).toLowerCase() === "force") {
+          force = true;
+        } else {
+          selector = rest[0];
+        }
+      } else if (rest.length === 2) {
+        selector = rest[0];
+        if (String(rest[1]).toLowerCase() !== "force") {
+          return "Usage: /deck delete [deckSelector] [force]";
+        }
+        force = true;
+      }
+
+      let targetDeck = activeDeck;
+      if (selector) {
+        const resolved = resolveDeckToken(selector, decks);
+        if (!resolved.deck) {
+          return resolved.error;
+        }
+        targetDeck = resolved.deck;
+      }
+
+      if (targetDeck.id === DEFAULT_DECK_ID) {
+        return "Default deck cannot be deleted.";
+      }
+
+      try {
+        await api.deleteDeck(targetDeck.id, { force });
+      } catch (err) {
+        if (err && err.status === 409 && !force) {
+          return `Deck '${targetDeck.name}' is not empty. Retry with '/deck delete ${targetDeck.id} force'.`;
+        }
+        throw err;
+      }
+
+      const fallbackId = decks.find((deck) => deck.id !== targetDeck.id)?.id || DEFAULT_DECK_ID;
+      await reloadDecks({ preferredActiveDeckId: fallbackId });
+      return `Deleted deck [${targetDeck.id}] ${targetDeck.name}.`;
+    }
+
+    return "Usage: /deck list | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]";
+  }
+
+  if (command === "move") {
+    if (args.length !== 2) {
+      return "Usage: /move <sessionSelector> <deckSelector>";
+    }
+    const sessionSelector = args[0];
+    const deckSelector = args[1];
+    const resolvedTargets = resolveTargetSelectors(sessionSelector, sessions, { source: "slash" });
+    if (resolvedTargets.error) {
+      return resolvedTargets.error;
+    }
+    if (resolvedTargets.sessions.length === 0) {
+      return "No sessions resolved for /move.";
+    }
+    const resolvedDeck = resolveDeckToken(deckSelector, deckState.decks);
+    if (!resolvedDeck.deck) {
+      return resolvedDeck.error;
+    }
+
+    const moved = await Promise.all(
+      resolvedTargets.sessions.map((session) => api.moveSessionToDeck(resolvedDeck.deck.id, session.id))
+    );
+    for (const session of moved) {
+      upsertSession(session);
+    }
+    if (moved.length === 1) {
+      return `Moved session [${formatSessionToken(moved[0].id)}] to deck [${resolvedDeck.deck.id}] ${resolvedDeck.deck.name}.`;
+    }
+    return `Moved ${moved.length} sessions to deck [${resolvedDeck.deck.id}] ${resolvedDeck.deck.name}.`;
   }
 
   if (command === "size") {

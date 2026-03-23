@@ -437,6 +437,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const updateSessionCalls = [];
   const customCommandUpserts = [];
   const customCommandDeletes = [];
+  const deckDeleteCalls = [];
+  const moveSessionCalls = [];
   const customCommands = new Map();
   let deckState = [
     {
@@ -493,7 +495,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   global.ResizeObserver = MockResizeObserver;
   global.WebSocket = MockWebSocket;
   global.fetch = async (url, options = {}) => {
-    const path = parsePath(url);
+    const requestUrl = new URL(url);
+    const path = requestUrl.pathname;
     const method = options.method || "GET";
 
     if (path === "/api/v1/decks" && method === "GET") {
@@ -530,10 +533,27 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       deckState = deckState.map((entry) => (entry.id === deckId ? nextDeck : entry));
       return makeJsonResponse(200, nextDeck);
     }
+    if (deckPatchMatch && method === "DELETE") {
+      const deckId = decodeURIComponent(deckPatchMatch[1]);
+      const forceValue = requestUrl.searchParams.get("force");
+      const force = forceValue === "true";
+      deckDeleteCalls.push({ deckId, force });
+      const target = deckState.find((entry) => entry.id === deckId);
+      if (!target) {
+        return makeJsonResponse(404, { error: "NotFound", message: "deck not found" });
+      }
+      const hasSessions = false;
+      if (hasSessions && !force) {
+        return makeJsonResponse(409, { error: "DeckNotEmpty", message: "deck is not empty" });
+      }
+      deckState = deckState.filter((entry) => entry.id !== deckId);
+      return makeJsonResponse(204, null);
+    }
     const moveMatch = path.match(/^\/api\/v1\/decks\/([^/]+)\/sessions\/([^/]+):move$/);
     if (moveMatch && method === "POST") {
       const deckId = decodeURIComponent(moveMatch[1]);
       const sessionId = decodeURIComponent(moveMatch[2]);
+      moveSessionCalls.push({ deckId, sessionId });
       return makeJsonResponse(200, {
         id: sessionId,
         deckId,
@@ -703,6 +723,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(fixture.elements.commandFeedback.textContent, /\/filter \[id\/tag/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/rename <selector> <name>/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/deck list\|new\|rename\|switch\|delete/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/move <sessionSelector> <deckSelector>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/settings apply <selector\|active> <json>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/custom <name> <text>/);
 
@@ -1188,6 +1210,33 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
     "expected resize request for /size r30"
   );
+
+  fixture.elements.commandInput.value = "/deck list";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.match(fixture.elements.commandFeedback.textContent, /^\* \[default\] Default \(2 sessions\)$/);
+
+  fixture.elements.commandInput.value = "/deck new Ops";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Created deck [deck-new] Ops.");
+
+  fixture.elements.commandInput.value = "/deck switch deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
+
+  fixture.elements.commandInput.value = "/move s-1 default";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [1] to deck [default] Default.");
+  assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "default", sessionId: "s-1" });
+
+  fixture.elements.commandInput.value = "/deck delete deck-new";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Deleted deck [deck-new] Ops.");
+  assert.deepEqual(deckDeleteCalls[deckDeleteCalls.length - 1], { deckId: "deck-new", force: false });
 
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");
