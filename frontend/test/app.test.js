@@ -481,6 +481,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         startCwd: payload.startCwd || "~",
         startCommand: payload.startCommand || "",
         env: payload.env || {},
+        themeProfile: payload.themeProfile || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
@@ -1000,6 +1001,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
   assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
+  const themeUpdateCall = updateSessionCalls.find((entry) => entry.sessionId === "s-2" && entry.payload.themeProfile);
+  assert.ok(themeUpdateCall);
+  assert.equal(themeUpdateCall.payload.themeProfile.background, "#101010");
+  assert.equal(themeUpdateCall.payload.themeProfile.foreground, "#e0e0e0");
   secondStartCwd.value = "/var/tmp";
   secondStartCommand.value = "echo start";
   secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
@@ -1019,9 +1024,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   assert.equal(secondStartFeedback.textContent, "Startup settings saved.");
   secondStartEnv.value = "1INVALID=value";
+  const callsBeforeInvalidEnv = updateSessionCalls.length;
   secondStartSave.click();
   await tick();
-  assert.equal(updateSessionCalls.length, 1);
+  assert.equal(updateSessionCalls.length, callsBeforeInvalidEnv);
   assert.equal(secondStartFeedback.textContent, "Invalid env variable name '1INVALID'.");
   secondSettings.click();
   await tick();
@@ -1056,22 +1062,21 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown session identifier: does-not-exist");
   assert.equal(secondCard.classList.contains("active"), true);
 
-  const persistedThemes = JSON.parse(localStorageData.get("ptydeck.session-theme.v1") || "{}");
-  assert.deepEqual(persistedThemes["s-2"], {
-    preset: "custom",
-    custom: {
-      background: "#101010",
-      foreground: "#e0e0e0"
-    }
-  });
-
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 1);
   ws.emit("message", {
     data: JSON.stringify({
       type: "session.created",
-      session: { id: "s-2", shell: "bash", cwd: "~", name: "two", createdAt: Date.now(), updatedAt: Date.now() }
+      session: {
+        id: "s-2",
+        shell: "bash",
+        cwd: "~",
+        name: "two",
+        themeProfile: themeUpdateCall.payload.themeProfile,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
     })
   });
   await tick();

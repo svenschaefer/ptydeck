@@ -432,6 +432,16 @@ button:hover {
   gap: 6px;
 }
 
+.session-theme-palette {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .session-startup-controls {
   margin-top: 10px;
   display: grid;
@@ -493,9 +503,19 @@ button:hover {
   font-family: inherit;
 }
 
+.session-theme-palette input:disabled,
 .session-theme-bg:disabled,
 .session-theme-fg:disabled {
   opacity: 0.6;
+}
+
+.session-theme-palette input[type="color"] {
+  width: 42px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f151f;
+  padding: 1px;
 }
 
 .session-theme-apply {

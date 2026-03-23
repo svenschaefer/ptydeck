@@ -75,7 +75,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Close` actions are available inside each session settings dialog (removed from direct toolbar)
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with explicit save feedback
-- Per-session terminal color sets in session settings (`Default`, `Gruvbox Dark`, `Solarized Dark`, and custom `background`/`foreground` values persisted in browser storage)
+- Per-session terminal theme editor in session settings with extended presets (`Default`, `Gruvbox Dark`, `Solarized Dark`, `One Dark`, `Dracula`) plus full custom palette (`background`, `foreground`, `cursor`, ANSI 16 colors) persisted via backend session `themeProfile`
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Backend per-session theme profile contract via REST (`themeProfile`) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
 - Central command input targeting the active session

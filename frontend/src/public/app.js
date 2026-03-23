@@ -46,7 +46,6 @@ let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
-const SESSION_THEME_STORAGE_KEY = "ptydeck.session-theme.v1";
 const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
@@ -76,6 +75,27 @@ const DEFAULT_TERMINAL_THEME = {
   brightCyan: "#a9d9d6",
   brightWhite: "#f5f7fa"
 };
+const THEME_PROFILE_KEYS = [
+  "background",
+  "foreground",
+  "cursor",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite"
+];
 const TERMINAL_THEME_PRESETS = {
   default: DEFAULT_TERMINAL_THEME,
   "gruvbox-dark": {
@@ -88,7 +108,67 @@ const TERMINAL_THEME_PRESETS = {
     ...DEFAULT_TERMINAL_THEME,
     background: "#002b36",
     foreground: "#93a1a1",
-    cursor: "#b58900"
+    cursor: "#b58900",
+    black: "#073642",
+    red: "#dc322f",
+    green: "#859900",
+    yellow: "#b58900",
+    blue: "#268bd2",
+    magenta: "#d33682",
+    cyan: "#2aa198",
+    white: "#eee8d5",
+    brightBlack: "#586e75",
+    brightRed: "#cb4b16",
+    brightGreen: "#586e75",
+    brightYellow: "#657b83",
+    brightBlue: "#839496",
+    brightMagenta: "#6c71c4",
+    brightCyan: "#93a1a1",
+    brightWhite: "#fdf6e3"
+  },
+  "one-dark": {
+    ...DEFAULT_TERMINAL_THEME,
+    background: "#1e2127",
+    foreground: "#abb2bf",
+    cursor: "#61afef",
+    black: "#1e2127",
+    red: "#e06c75",
+    green: "#98c379",
+    yellow: "#e5c07b",
+    blue: "#61afef",
+    magenta: "#c678dd",
+    cyan: "#56b6c2",
+    white: "#abb2bf",
+    brightBlack: "#5c6370",
+    brightRed: "#ff7a85",
+    brightGreen: "#a6d57f",
+    brightYellow: "#f2cc8f",
+    brightBlue: "#7ab8ff",
+    brightMagenta: "#d38ef0",
+    brightCyan: "#73cdd9",
+    brightWhite: "#d7dae0"
+  },
+  dracula: {
+    ...DEFAULT_TERMINAL_THEME,
+    background: "#282a36",
+    foreground: "#f8f8f2",
+    cursor: "#f8f8f2",
+    black: "#21222c",
+    red: "#ff5555",
+    green: "#50fa7b",
+    yellow: "#f1fa8c",
+    blue: "#bd93f9",
+    magenta: "#ff79c6",
+    cyan: "#8be9fd",
+    white: "#f8f8f2",
+    brightBlack: "#6272a4",
+    brightRed: "#ff6e6e",
+    brightGreen: "#69ff94",
+    brightYellow: "#ffffa5",
+    brightBlue: "#d6acff",
+    brightMagenta: "#ff92df",
+    brightCyan: "#a4ffff",
+    brightWhite: "#ffffff"
   }
 };
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...Object.keys(TERMINAL_THEME_PRESETS)]);
@@ -105,7 +185,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "help"
 ];
 let terminalSettings = loadTerminalSettings();
-let sessionThemeSettings = loadSessionThemeSettings();
+const sessionThemeDrafts = new Map();
 let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteState = null;
@@ -708,65 +788,57 @@ function loadTerminalSettings() {
   };
 }
 
-function loadSessionThemeSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
-      return {};
-    }
-    const raw = window.localStorage.getItem(SESSION_THEME_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSessionThemeSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
-      return;
-    }
-    window.localStorage.setItem(SESSION_THEME_STORAGE_KEY, JSON.stringify(sessionThemeSettings));
-  } catch {
-    // ignore storage failures
-  }
-}
-
 function isValidHexColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
 }
 
-function getSessionThemeConfig(sessionId) {
-  const stored = sessionThemeSettings[sessionId];
-  const preset =
-    stored && typeof stored.preset === "string" && TERMINAL_THEME_MODE_SET.has(stored.preset)
-      ? stored.preset
-      : "default";
-  const custom = stored && typeof stored.custom === "object" ? stored.custom : {};
-  const background = isValidHexColor(custom.background) ? custom.background : DEFAULT_TERMINAL_THEME.background;
-  const foreground = isValidHexColor(custom.foreground) ? custom.foreground : DEFAULT_TERMINAL_THEME.foreground;
-  return {
-    preset,
-    custom: {
-      background,
-      foreground
+function normalizeThemeProfile(themeProfile) {
+  const source = themeProfile && typeof themeProfile === "object" ? themeProfile : {};
+  const normalized = {};
+  for (const key of THEME_PROFILE_KEYS) {
+    const value = source[key];
+    normalized[key] = isValidHexColor(value) ? String(value).trim() : DEFAULT_TERMINAL_THEME[key];
+  }
+  return normalized;
+}
+
+function detectThemePreset(themeProfile) {
+  const normalized = normalizeThemeProfile(themeProfile);
+  for (const [presetName, presetProfile] of Object.entries(TERMINAL_THEME_PRESETS)) {
+    let matches = true;
+    for (const key of THEME_PROFILE_KEYS) {
+      if (normalized[key] !== presetProfile[key]) {
+        matches = false;
+        break;
+      }
     }
-  };
+    if (matches) {
+      return presetName;
+    }
+  }
+  return "custom";
+}
+
+function getSessionById(sessionId) {
+  return store.getState().sessions.find((session) => session.id === sessionId) || null;
+}
+
+function getSessionThemeConfig(sessionId) {
+  const draft = sessionThemeDrafts.get(sessionId);
+  if (draft) {
+    return {
+      preset: TERMINAL_THEME_MODE_SET.has(draft.preset) ? draft.preset : "custom",
+      profile: normalizeThemeProfile(draft.profile)
+    };
+  }
+  const session = getSessionById(sessionId);
+  const profile = normalizeThemeProfile(session?.themeProfile);
+  const preset = detectThemePreset(profile);
+  return { preset, profile };
 }
 
 function buildThemeFromConfig(config) {
-  const presetTheme = TERMINAL_THEME_PRESETS[config.preset] || TERMINAL_THEME_PRESETS.default;
-  if (config.preset !== "custom") {
-    return presetTheme;
-  }
-  return {
-    ...TERMINAL_THEME_PRESETS.default,
-    background: config.custom.background,
-    foreground: config.custom.foreground
-  };
+  return normalizeThemeProfile(config?.profile);
 }
 
 function applyThemeForSession(sessionId) {
@@ -785,17 +857,57 @@ function applyThemeForSession(sessionId) {
   }
 }
 
+function getThemeInput(entry, key) {
+  if (!entry) {
+    return null;
+  }
+  if (entry.themeInputs && entry.themeInputs[key]) {
+    return entry.themeInputs[key];
+  }
+  if (key === "background") {
+    return entry.themeBg || null;
+  }
+  if (key === "foreground") {
+    return entry.themeFg || null;
+  }
+  return null;
+}
+
+function readThemeProfileFromControls(entry) {
+  const profile = {};
+  for (const key of THEME_PROFILE_KEYS) {
+    const input = getThemeInput(entry, key);
+    const value = input ? String(input.value || "").trim() : "";
+    profile[key] = isValidHexColor(value) ? value : DEFAULT_TERMINAL_THEME[key];
+  }
+  return profile;
+}
+
+function setThemeProfileOnControls(entry, profile) {
+  for (const key of THEME_PROFILE_KEYS) {
+    const input = getThemeInput(entry, key);
+    if (!input) {
+      continue;
+    }
+    input.value = profile[key];
+  }
+}
+
 function syncSessionThemeControls(entry, sessionId) {
-  if (!entry || !entry.themeSelect || !entry.themeBg || !entry.themeFg) {
+  if (!entry || !entry.themeSelect) {
     return;
   }
   const config = getSessionThemeConfig(sessionId);
   entry.themeSelect.value = config.preset;
-  entry.themeBg.value = config.custom.background;
-  entry.themeFg.value = config.custom.foreground;
+  setThemeProfileOnControls(entry, config.profile);
   const customSelected = config.preset === "custom";
-  entry.themeBg.disabled = !customSelected;
-  entry.themeFg.disabled = !customSelected;
+  for (const key of THEME_PROFILE_KEYS) {
+    const input = getThemeInput(entry, key);
+    if (!input) {
+      continue;
+    }
+    input.disabled = !customSelected;
+  }
 }
 
 function formatSessionEnv(env) {
@@ -1166,6 +1278,7 @@ function render() {
       }
       resizeTimers.delete(sessionId);
       terminalSizes.delete(sessionId);
+      sessionThemeDrafts.delete(sessionId);
       shouldRunResizePass = true;
     }
   }
@@ -1197,6 +1310,20 @@ function render() {
     const themeSelect = node.querySelector(".session-theme-select");
     const themeBg = node.querySelector(".session-theme-bg");
     const themeFg = node.querySelector(".session-theme-fg");
+    const themeInputs = {
+      background: themeBg,
+      foreground: themeFg
+    };
+    for (const key of THEME_PROFILE_KEYS) {
+      if (themeInputs[key]) {
+        continue;
+      }
+      const classSuffix = key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+      const input = node.querySelector(`.session-theme-${classSuffix}`);
+      if (input) {
+        themeInputs[key] = input;
+      }
+    }
     const themeApplyBtn = node.querySelector(".session-theme-apply");
     const mount = node.querySelector(".terminal-mount");
     const quickId = ensureQuickId(session.id);
@@ -1273,39 +1400,44 @@ function render() {
       }
     });
     themeSelect.addEventListener("change", () => {
-      const current = getSessionThemeConfig(session.id);
       const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value)
         ? themeSelect.value
         : "default";
-      sessionThemeSettings[session.id] = {
-        ...current,
-        preset: nextPreset
-      };
-      saveSessionThemeSettings();
-      syncSessionThemeControls({ themeSelect, themeBg, themeFg }, session.id);
+      const currentProfile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
+      const nextProfile =
+        nextPreset === "custom"
+          ? currentProfile
+          : normalizeThemeProfile(TERMINAL_THEME_PRESETS[nextPreset] || TERMINAL_THEME_PRESETS.default);
+      sessionThemeDrafts.set(session.id, {
+        preset: nextPreset,
+        profile: nextProfile
+      });
+      syncSessionThemeControls({ themeSelect, themeInputs, themeBg, themeFg }, session.id);
       applyThemeForSession(session.id);
+      uiState.error = "";
+      render();
     });
-    themeApplyBtn.addEventListener("click", () => {
-      const background = String(themeBg.value || "").trim();
-      const foreground = String(themeFg.value || "").trim();
-      if (!isValidHexColor(background) || !isValidHexColor(foreground)) {
+    themeApplyBtn.addEventListener("click", async () => {
+      const profile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
+      const invalidKey = THEME_PROFILE_KEYS.find((key) => !isValidHexColor(profile[key]));
+      if (invalidKey) {
         setError("Custom theme colors must be valid hex values like #1d2021.");
         return;
       }
-      const current = getSessionThemeConfig(session.id);
-      sessionThemeSettings[session.id] = {
-        ...current,
-        preset: "custom",
-        custom: {
-          background,
-          foreground
-        }
-      };
-      saveSessionThemeSettings();
-      uiState.error = "";
-      syncSessionThemeControls({ themeSelect, themeBg, themeFg }, session.id);
+      const detectedPreset = detectThemePreset(profile);
+      const requestedPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
+      const nextPreset = requestedPreset === "custom" ? "custom" : detectedPreset === requestedPreset ? requestedPreset : "custom";
+      sessionThemeDrafts.set(session.id, { preset: nextPreset, profile });
       applyThemeForSession(session.id);
-      render();
+      syncSessionThemeControls({ themeSelect, themeInputs, themeBg, themeFg }, session.id);
+      uiState.error = "";
+      try {
+        const updated = await api.updateSession(session.id, { themeProfile: profile });
+        upsertSession(updated);
+        sessionThemeDrafts.delete(session.id);
+      } catch {
+        setError("Failed to save theme settings.");
+      }
     });
 
     node.classList.toggle("active", state.activeSessionId === session.id);
@@ -1341,6 +1473,7 @@ function render() {
       themeSelect,
       themeBg,
       themeFg,
+      themeInputs,
       mount
     });
     syncSessionStartupControls(terminals.get(session.id), session);

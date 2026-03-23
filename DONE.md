@@ -16,6 +16,8 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix: custom-command multiline payload execution now handles apostrophes robustly by escaping unbalanced single quotes before send.
 - [x] Frontend behavior change: command submission now normalizes final line terminator to exactly one `\r\n` (CRLF) for regular input, routed input, and custom-command execution.
 - [x] Frontend settings extended with configurable command send terminator (`CRLF`, `LF`, `CR`) that is applied consistently to direct input, routed input, and custom-command execution paths.
+- [x] `QLT-067` completed: per-terminal theme editor now supports full session theme profiles (cursor + ANSI 16 colors) with deterministic preset detection and per-session apply behavior.
+- [x] Frontend theme personalization now persists via backend `themeProfile` session updates instead of browser-local theme-only storage, keeping reopen/reconnect behavior consistent with session metadata.
 
 ## 2026-03-22
 
