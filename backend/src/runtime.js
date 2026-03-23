@@ -439,6 +439,7 @@ export function createRuntime(config) {
   let isStopped = false;
   let stopPromise = null;
   let persistTimer = null;
+  let persistQueue = Promise.resolve();
   const guardrailSweepMs =
     Number.isInteger(config.sessionGuardrailSweepMs) && config.sessionGuardrailSweepMs > 0
       ? config.sessionGuardrailSweepMs
@@ -676,6 +677,36 @@ export function createRuntime(config) {
     };
   }
 
+  function saveStateQueued(state, reason = "unknown") {
+    const executeSave = async () => {
+      logDebug("persist.save.start", {
+        reason,
+        sessionCount: state.sessions.length,
+        customCommandCount: state.customCommands.length
+      });
+      await persistence.saveState(state);
+      logDebug("persist.save.ok", {
+        reason,
+        sessionCount: state.sessions.length,
+        customCommandCount: state.customCommands.length
+      });
+    };
+
+    persistQueue = persistQueue.then(executeSave, executeSave);
+    return persistQueue;
+  }
+
+  async function persistNow(reason = "manual") {
+    if (isStopping) {
+      return;
+    }
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+    await saveStateQueued(snapshotRuntimeState(), reason);
+  }
+
   function persistSoon() {
     if (isStopping) {
       return;
@@ -683,17 +714,10 @@ export function createRuntime(config) {
     if (persistTimer) {
       clearTimeout(persistTimer);
     }
-    persistTimer = setTimeout(async () => {
+    persistTimer = setTimeout(() => {
       persistTimer = null;
-      const state = snapshotRuntimeState();
-      logDebug("persist.save.start", {
-        sessionCount: state.sessions.length,
-        customCommandCount: state.customCommands.length
-      });
-      await persistence.saveState(state);
-      logDebug("persist.save.ok", {
-        sessionCount: state.sessions.length,
-        customCommandCount: state.customCommands.length
+      saveStateQueued(snapshotRuntimeState(), "debounced").catch((err) => {
+        console.error("failed to persist runtime state", err);
       });
     }, 100);
   }
@@ -851,7 +875,7 @@ export function createRuntime(config) {
           type: existed ? "custom-command.updated" : "custom-command.created",
           command: payload
         });
-        persistSoon();
+        await persistNow("custom-command.upsert");
         writeJson(req, res, 200, payload);
         return;
       }
@@ -862,7 +886,7 @@ export function createRuntime(config) {
           type: "custom-command.deleted",
           command: deletedCommand
         });
-        persistSoon();
+        await persistNow("custom-command.delete");
         writeJson(req, res, 204);
         return;
       }
@@ -905,7 +929,7 @@ export function createRuntime(config) {
           themeProfile
         });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
-        persistSoon();
+        await persistNow("session.create");
         writeJson(req, res, 201, payload);
         return;
       }
@@ -919,7 +943,7 @@ export function createRuntime(config) {
 
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
-        persistSoon();
+        await persistNow("session.delete");
         writeJson(req, res, 204);
         return;
       }
@@ -957,7 +981,7 @@ export function createRuntime(config) {
         }
         const payload = manager.updateSession(match.params.sessionId, patch);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
-        persistSoon();
+        await persistNow("session.update");
         writeJson(req, res, 200, payload);
         return;
       }
@@ -977,7 +1001,7 @@ export function createRuntime(config) {
       if (match.kind === "restart") {
         const payload = manager.restart(match.params.sessionId);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
-        persistSoon();
+        await persistNow("session.restart");
         writeJson(req, res, 200, payload);
         return;
       }

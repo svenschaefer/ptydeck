@@ -878,6 +878,29 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
   }
 });
 
+test("session create persists immediately before response completes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "persist-now-check" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
+    assert.ok(Array.isArray(persistedSessions));
+    assert.ok(persistedSessions.some((session) => session.id === created.id));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("ready endpoint returns starting before startup gate and ready after release", async () => {
   let releaseReadyGate = null;
   const readyGate = new Promise((resolve) => {
