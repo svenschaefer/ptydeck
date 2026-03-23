@@ -875,8 +875,8 @@ function saveStoredActiveDeckId(deckId) {
 function normalizeDeckTerminalSettings(rawSettings) {
   const terminal = rawSettings && typeof rawSettings === "object" ? rawSettings.terminal : null;
   return {
-    cols: clampInt(terminal?.cols, terminalSettings.cols || DEFAULT_TERMINAL_COLS, 20, 400),
-    rows: clampInt(terminal?.rows, terminalSettings.rows || DEFAULT_TERMINAL_ROWS, 5, 120)
+    cols: clampInt(terminal?.cols, DEFAULT_TERMINAL_COLS, 20, 400),
+    rows: clampInt(terminal?.rows, DEFAULT_TERMINAL_ROWS, 5, 120)
   };
 }
 
@@ -906,6 +906,18 @@ function getActiveDeck() {
     return deckState.decks[0];
   }
   return null;
+}
+
+function getDeckTerminalGeometry(deckId) {
+  const deck = getDeckById(deckId);
+  return normalizeDeckTerminalSettings(deck?.settings);
+}
+
+function getSessionTerminalGeometry(sessionOrId) {
+  const session =
+    typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId && typeof sessionOrId === "object" ? sessionOrId : null;
+  const deckId = resolveSessionDeckId(session);
+  return getDeckTerminalGeometry(deckId);
 }
 
 function syncActiveDeckGeometryFromState() {
@@ -1659,12 +1671,12 @@ async function applyTerminalSizeSettings(nextCols, nextRows) {
   render();
 }
 
-function applyMountHeight(entry, rows) {
+function applyMountHeight(entry, cols, rows) {
   if (!entry || !entry.mount) {
     return;
   }
   let mountHeightPx = computeFixedMountHeightPx(rows);
-  const cardWidthPx = computeFixedCardWidthPx(terminalSettings.cols);
+  const cardWidthPx = computeFixedCardWidthPx(cols);
   const mountWidthPx = Math.max(220, cardWidthPx - TERMINAL_CARD_HORIZONTAL_CHROME_PX);
   const runtimeCellHeightPx = Number(entry?.terminal?._core?._renderService?.dimensions?.css?.cell?.height) || 0;
   if (runtimeCellHeightPx > 0) {
@@ -1718,13 +1730,14 @@ function pruneQuickIds(activeSessionIds) {
   }
 }
 
-function computeTerminalSize(entry) {
+function computeTerminalSize(entry, session) {
   if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
     return null;
   }
+  const geometry = getSessionTerminalGeometry(session);
   return {
-    cols: terminalSettings.cols,
-    rows: terminalSettings.rows
+    cols: geometry.cols,
+    rows: geometry.rows
   };
 }
 
@@ -1742,7 +1755,7 @@ function applyResizeForSession(sessionId, options = {}) {
     }
     return;
   }
-  const size = computeTerminalSize(entry);
+  const size = computeTerminalSize(entry, session);
   if (!size) {
     return;
   }
@@ -1757,7 +1770,7 @@ function applyResizeForSession(sessionId, options = {}) {
   }
 
   terminalSizes.set(sessionId, { cols, rows });
-  applyMountHeight(entry, rows);
+  applyMountHeight(entry, cols, rows);
   entry.terminal.resize(cols, rows);
   debugLog("terminal.resize.local", { sessionId, cols, rows });
 
@@ -1867,14 +1880,16 @@ function toggleSettingsDialog(dialog) {
   openSettingsDialog(dialog);
 }
 
-function scheduleDeferredResizePasses() {
+function scheduleDeferredResizePasses(options = {}) {
+  const deckIdFilter = String(options.deckId || "").trim();
+  const force = options.force === true;
   if (deferredResizeTimer) {
     clearTimeout(deferredResizeTimer);
   }
   const delays = [250, 700, 1400];
   let index = 0;
   function runNext() {
-    scheduleGlobalResize();
+    scheduleGlobalResize(deckIdFilter ? { deckId: deckIdFilter, force } : force ? { force: true } : {});
     index += 1;
     if (index < delays.length) {
       deferredResizeTimer = setTimeout(runNext, delays[index]);
@@ -1973,7 +1988,7 @@ function setActiveDeck(deckId) {
   render();
   syncActiveDeckGeometryFromState();
   scheduleGlobalResize({ deckId: normalized, force: true });
-  scheduleDeferredResizePasses();
+  scheduleDeferredResizePasses({ deckId: normalized, force: true });
   return true;
 }
 

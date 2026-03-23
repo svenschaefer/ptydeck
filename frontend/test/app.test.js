@@ -1351,6 +1351,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
   assert.equal(fixture.elements.settingsCols.value, "90");
   assert.equal(fixture.elements.settingsRows.value, "30");
+  await sleep(320);
+  assert.equal(MockTerminal.instances[1].cols, 101);
+  assert.equal(MockTerminal.instances[1].rows, 33);
 
   fixture.elements.commandInput.value = "/deck switch deck-new";
   fixture.elements.sendCommand.click();
