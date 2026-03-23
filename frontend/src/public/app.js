@@ -163,6 +163,11 @@ function getErrorMessage(err, fallback) {
   return fallback;
 }
 
+function withSingleTrailingNewline(value) {
+  const normalized = String(value || "").replace(/\r\n/g, "\n").replace(/[\n\r]+$/g, "");
+  return `${normalized}\n`;
+}
+
 function setCommandPreview(message) {
   uiState.commandPreview = message;
   render();
@@ -1671,7 +1676,7 @@ async function executeControlCommand(interpreted) {
     if (!targetSessionId) {
       return "No active session for custom command execution.";
     }
-    const payload = custom.content.endsWith("\n") ? custom.content : `${custom.content}\n`;
+    const payload = withSingleTrailingNewline(custom.content);
     await api.sendInput(targetSessionId, payload);
     return `Executed /${custom.name} on [${formatSessionToken(targetSessionId)}].`;
   } catch (err) {
@@ -1874,7 +1879,7 @@ async function submitCommand() {
   }
 
   try {
-    const payload = targetPayload.endsWith("\n") ? targetPayload : `${targetPayload}\n`;
+    const payload = withSingleTrailingNewline(targetPayload);
     debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
     await api.sendInput(targetSessionId, payload);
     commandInput.value = "";
