@@ -151,6 +151,7 @@ Exit criteria:
 - `QLT-066`
 - `QLT-067`
 - `QLT-068`
+- `QLT-071`
 
 Dependencies:
 
@@ -165,6 +166,7 @@ Dependencies:
 - `QLT-067` depends on `QLT-063`, `QLT-065`, and `QLT-066` so advanced theme editing lands on top of final dialog UX and persisted theme-profile contract.
 - `QLT-064` depends on `QLT-058` through `QLT-063`.
 - `QLT-068` depends on `QLT-065` through `QLT-067`.
+- `QLT-071` depends on `QLT-069` and `QLT-060` so per-terminal submit-mode controls can reuse deterministic submit behavior and persist within session settings scope.
 
 Exit criteria:
 
@@ -174,6 +176,7 @@ Exit criteria:
 - Per-session color sets are configurable and applied consistently after reload.
 - Per-terminal settings use a proper dialog UX with deterministic open/close/save/cancel behavior.
 - Full terminal theme profiles (cursor + ANSI palette) are configurable and persisted per session.
+- Command submit terminator configuration can be scoped per terminal/session instead of globally.
 - Integration/regression coverage exists for per-session settings lifecycle and startup/theme apply behavior.
 
 ### v0.3.0-H2 - Enterprise Readiness Backlog
@@ -267,6 +270,7 @@ Exit criteria:
 - `QLT-044`
 - `QLT-045`
 - `QLT-050`
+- `QLT-069`
 - `QLT-047`
 - `QLT-052`
 - `QLT-048`

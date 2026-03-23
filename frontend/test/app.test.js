@@ -310,7 +310,7 @@ function createDocumentFixture() {
   const settingsRows = new FakeElement({ id: "settings-rows", tagName: "input" });
   settingsRows.value = "20";
   const settingsSendTerminator = new FakeElement({ id: "settings-send-terminator", tagName: "select" });
-  settingsSendTerminator.value = "crlf";
+  settingsSendTerminator.value = "auto";
   const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
@@ -506,7 +506,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       const sessionId = decodeURIComponent(inputMatch[1]);
       const payload = JSON.parse(options.body || "{}");
       inputPayloads.push({ sessionId, ...payload });
-      if (payload.data === "pwd\n" && sessionId === "s-1") {
+      if ((payload.data === "pwd\r" || payload.data === "pwd\r\n" || payload.data === "pwd\n") && sessionId === "s-1") {
         return makeJsonResponse(500, { error: "InputFailed", message: "boom" });
       }
       return makeJsonResponse(204, {});
@@ -595,7 +595,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(fixture.elements.statusMessage.textContent, /^(Failed to send command\.|Connection state: connecting)$/);
   assert.equal(inputPayloads.length, 1);
   assert.equal(inputPayloads[0].sessionId, "s-1");
-  assert.equal(inputPayloads[0].data, "pwd\r\n");
+  assert.equal(inputPayloads[0].data, "pwd\r");
 
   fixture.elements.commandInput.value = "/noop";
   fixture.elements.sendCommand.click();
@@ -699,15 +699,22 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
-  assert.equal(inputPayloads[1].data, "echo verify\r\n");
+  assert.equal(inputPayloads[1].data, "echo verify\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/docu on \[1\]\./);
   assert.equal(fixture.elements.commandPreview.textContent, "");
+
+  fixture.elements.commandInput.value = "/blockcmd";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, 3);
+  assert.equal(inputPayloads[2].data, "line 1\rline 2\r");
+  assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/blockcmd on \[1\]\./);
 
   fixture.elements.commandInput.value = "/go";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 3);
-  assert.equal(inputPayloads[2].data, "Take care of md\\'s and quotes.\r\n");
+  assert.equal(inputPayloads.length, 4);
+  assert.equal(inputPayloads[3].data, "Take care of md\\'s and quotes.\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/go on \[1\]\./);
 
   fixture.elements.commandInput.value = "/custom remove docu";
@@ -722,7 +729,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await sleep(160);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 3);
+  assert.equal(inputPayloads.length, 4);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
 
   fixture.elements.commandInput.value = "/longpreview";
@@ -1083,9 +1090,33 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, routedBefore + 1);
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\r\n" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\r" });
   assert.equal(secondCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
+
+  fixture.elements.settingsSendTerminator.value = "crlf";
+  fixture.elements.settingsApply.click();
+  await tick();
+  fixture.elements.commandInput.value = "echo alpha";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "echo alpha\r\n");
+
+  fixture.elements.settingsSendTerminator.value = "lf";
+  fixture.elements.settingsApply.click();
+  await tick();
+  fixture.elements.commandInput.value = "line1\nline2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "line1\nline2\n");
+
+  fixture.elements.settingsSendTerminator.value = "cr";
+  fixture.elements.settingsApply.click();
+  await tick();
+  fixture.elements.commandInput.value = "line1\nline2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "line1\rline2\r");
 
   const unresolvedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@does-not-exist echo routed";

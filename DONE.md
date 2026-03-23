@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-069` completed: command submit terminator handling was reworked for deterministic shell/TUI execution with one final submit signal and no extra manual Enter requirement.
+- [x] Frontend send-terminator settings now include `Auto (CR/Enter)` as default and normalize multiline payload submission across regular input, routed `@target` input, and custom-command execution.
+- [x] Added/updated frontend integration coverage for submit semantics across `auto`, `crlf`, `lf`, and `cr` modes, including multiline custom-command payload execution behavior.
 - [x] Session destructive action wording aligned: per-session settings now use `Delete` (instead of `Close`) with explicit user confirmation before terminal/session removal.
 - [x] Frontend settings-dialog UX hardened for interaction consistency: fragmented per-section save buttons were replaced by one dialog-level `Apply Changes` action plus `Cancel`.
 - [x] Frontend settings dialog now exposes explicit dirty/saved status and prevents accidental overwrite by keeping in-dialog drafts until apply/cancel.

@@ -52,7 +52,7 @@ const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-const SEND_TERMINATOR_MODE_SET = new Set(["crlf", "lf", "cr"]);
+const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr"]);
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const DEFAULT_TERMINAL_THEME = {
@@ -189,10 +189,15 @@ function getErrorMessage(err, fallback) {
 }
 
 function withSingleTrailingNewline(value) {
-  const normalized = String(value || "").replace(/\r\n/g, "\n").replace(/[\n\r]+$/g, "");
+  const normalizedLines = String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n+$/g, "");
   const mode = terminalSettings?.sendTerminator;
-  const suffix = mode === "lf" ? "\n" : mode === "cr" ? "\r" : "\r\n";
-  return `${normalized}${suffix}`;
+  const lineSeparator = mode === "lf" ? "\n" : "\r";
+  const suffix = mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : "\r";
+  const body = normalizedLines.replace(/\n/g, lineSeparator);
+  return `${body}${suffix}`;
 }
 
 function countUnescapedSingleQuotes(line) {
@@ -723,7 +728,7 @@ function saveTerminalSettings() {
 
 function loadTerminalSettings() {
   const stored = readStoredSettings();
-  const sendTerminator = SEND_TERMINATOR_MODE_SET.has(stored?.sendTerminator) ? stored.sendTerminator : "crlf";
+  const sendTerminator = SEND_TERMINATOR_MODE_SET.has(stored?.sendTerminator) ? stored.sendTerminator : "auto";
   return {
     cols: clampInt(stored?.cols, 80, 20, 400),
     rows: clampInt(stored?.rows, 20, 5, 120),
