@@ -629,6 +629,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
+  assert.match(fixture.elements.commandFeedback.textContent, /\/size <cols> <rows>/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/filter \[id\/tag/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/rename <selector> <name>/);
@@ -1090,6 +1091,33 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Display filter cleared.");
   assert.equal(firstCard.hidden, false);
   assert.equal(secondCard.hidden, false);
+
+  fixture.elements.commandInput.value = "/size 80 50";
+  fixture.elements.sendCommand.click();
+  await sleep(360);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 80x50 (cols x rows).");
+  assert.ok(
+    resizePayloads.some((entry) => entry.cols === 80 && entry.rows === 50),
+    "expected resize request for /size 80 50"
+  );
+
+  fixture.elements.commandInput.value = "/size c90";
+  fixture.elements.sendCommand.click();
+  await sleep(360);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x50 (cols x rows).");
+  assert.ok(
+    resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 50),
+    "expected resize request for /size c90"
+  );
+
+  fixture.elements.commandInput.value = "/size r30";
+  fixture.elements.sendCommand.click();
+  await sleep(360);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x30 (cols x rows).");
+  assert.ok(
+    resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
+    "expected resize request for /size r30"
+  );
 
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");

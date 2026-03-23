@@ -124,6 +124,7 @@ const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => 
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
 const SYSTEM_SLASH_COMMANDS = [
   "new",
+  "size",
   "filter",
   "close",
   "switch",
@@ -1339,6 +1340,19 @@ function readSettingsFromUi() {
   };
 }
 
+function applyTerminalSizeSettings(nextCols, nextRows) {
+  terminalSettings = {
+    ...terminalSettings,
+    cols: nextCols,
+    rows: nextRows
+  };
+  saveTerminalSettings();
+  syncSettingsUi();
+  uiState.error = "";
+  applySettingsToAllTerminals();
+  scheduleGlobalResize();
+}
+
 function applyMountHeight(entry, rows) {
   if (!entry || !entry.mount) {
     return;
@@ -1432,12 +1446,8 @@ function applyResizeForSession(sessionId, options = {}) {
 }
 
 function onApplySettings() {
-  terminalSettings = readSettingsFromUi();
-  saveTerminalSettings();
-  syncSettingsUi();
-  uiState.error = "";
-  applySettingsToAllTerminals();
-  scheduleGlobalResize();
+  const next = readSettingsFromUi();
+  applyTerminalSizeSettings(next.cols, next.rows);
 }
 
 function setSidebarVisible(visible) {
@@ -2197,6 +2207,75 @@ function parseSettingsPayload(raw) {
   return { ok: true, payload: parsed };
 }
 
+function parseSizeCommandArgs(args, currentCols, currentRows) {
+  const COLS_MIN = 20;
+  const COLS_MAX = 400;
+  const ROWS_MIN = 5;
+  const ROWS_MAX = 120;
+  const rawArgs = Array.isArray(args) ? args.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
+  if (rawArgs.length === 0) {
+    return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+  }
+
+  let cols = currentCols;
+  let rows = currentRows;
+  let updatedCols = false;
+  let updatedRows = false;
+
+  const parseBoundedInt = (raw, min, max, label) => {
+    if (!/^\d+$/.test(raw)) {
+      return { ok: false, error: `${label} must be an integer.` };
+    }
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isInteger(value) || value < min || value > max) {
+      return { ok: false, error: `${label} must be between ${min} and ${max}.` };
+    }
+    return { ok: true, value };
+  };
+
+  if (rawArgs.length === 2 && /^\d+$/.test(rawArgs[0]) && /^\d+$/.test(rawArgs[1])) {
+    const nextCols = parseBoundedInt(rawArgs[0], COLS_MIN, COLS_MAX, "Columns");
+    if (!nextCols.ok) {
+      return nextCols;
+    }
+    const nextRows = parseBoundedInt(rawArgs[1], ROWS_MIN, ROWS_MAX, "Rows");
+    if (!nextRows.ok) {
+      return nextRows;
+    }
+    return { ok: true, cols: nextCols.value, rows: nextRows.value };
+  }
+
+  for (const tokenRaw of rawArgs) {
+    const token = tokenRaw.toLowerCase();
+    const colsMatch = /^c(\d+)$/.exec(token);
+    if (colsMatch) {
+      const parsed = parseBoundedInt(colsMatch[1], COLS_MIN, COLS_MAX, "Columns");
+      if (!parsed.ok) {
+        return parsed;
+      }
+      cols = parsed.value;
+      updatedCols = true;
+      continue;
+    }
+    const rowsMatch = /^r(\d+)$/.exec(token);
+    if (rowsMatch) {
+      const parsed = parseBoundedInt(rowsMatch[1], ROWS_MIN, ROWS_MAX, "Rows");
+      if (!parsed.ok) {
+        return parsed;
+      }
+      rows = parsed.value;
+      updatedRows = true;
+      continue;
+    }
+    return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+  }
+
+  if (!updatedCols && !updatedRows) {
+    return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+  }
+  return { ok: true, cols, rows };
+}
+
 function formatSessionSettingsReport(session) {
   const token = formatSessionToken(session.id);
   const name = formatSessionDisplayName(session);
@@ -2315,7 +2394,16 @@ async function executeControlCommand(interpreted) {
   const activeSessionId = state.activeSessionId;
 
   if (command === "help" || command === "") {
-    return "Commands: /new [shell], /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+    return "Commands: /new [shell], /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, /help";
+  }
+
+  if (command === "size") {
+    const parsed = parseSizeCommandArgs(args, terminalSettings.cols, terminalSettings.rows);
+    if (!parsed.ok) {
+      return parsed.error;
+    }
+    applyTerminalSizeSettings(parsed.cols, parsed.rows);
+    return `Terminal size set to ${parsed.cols}x${parsed.rows} (cols x rows).`;
   }
 
   if (command === "filter") {
