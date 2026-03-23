@@ -4,7 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
-- [x] Documentation synchronization pass completed: `TODO.md` active-open block now contains only real open tasks (`QLT-088` ... `QLT-093`) with explicit ownership.
+- [x] `QLT-088` completed: frontend now provides a top deck-tab bar with deterministic deck create/rename/switch/delete flows.
+- [x] Active-deck state is persisted locally and restored on reload; deck-tab rendering includes per-deck session counts and explicit active highlighting.
+- [x] Deck-level terminal geometry baseline is now wired through deck settings (`settings.terminal.cols/rows`): sidebar geometry apply and `/size` update the active deck instead of a global geometry object.
+- [x] New session flow is now deck-aware at UI level: sessions created while a non-default deck is active are moved to the active deck immediately.
+- [x] Frontend API client now includes deck CRUD and move endpoints with dedicated unit coverage (`frontend/test/api-client.test.js`).
+- [x] Validation for `QLT-088` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Documentation synchronization pass completed: `TODO.md` active-open block now contains only real open tasks with explicit ownership (currently `QLT-089` ... `QLT-093`).
 - [x] `CODEX_CONTEXT.md` synchronized with current active roadmap state (`v0.3.0-H6` in progress) and persistent quality-gate runtime diagnostics.
 - [x] Local quality-gate runtime diagnosis completed: slow `lint/test/coverage` cycles were caused by orphaned background `npm run test*` and `node --test` processes from interrupted runs, not by baseline command cost.
 - [x] Revalidated baseline quality-gate runtime after cleanup: `npm run lint` (~2s), `npm run test` (~6s), `npm run test:coverage:check` (~7s).

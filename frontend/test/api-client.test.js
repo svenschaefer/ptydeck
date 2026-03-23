@@ -16,6 +16,40 @@ test("api client calls list sessions endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions");
 });
 
+test("api client calls deck lifecycle and move endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    if (method === "DELETE") {
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: method === "POST" ? 201 : 200,
+      json: async () => ({ id: "default", name: "Default", settings: {}, createdAt: 1, updatedAt: 2 })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listDecks();
+  await api.createDeck({ name: "Ops" });
+  await api.updateDeck("ops", { name: "Ops Team" });
+  await api.moveSessionToDeck("ops", "abc");
+  await api.deleteDeck("ops", { force: true });
+
+  assert.equal(calls.length, 5);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/decks");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/decks");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/decks/ops");
+  assert.equal(calls[2].options.method, "PATCH");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/decks/ops/sessions/abc:move");
+  assert.equal(calls[3].options.method, "POST");
+  assert.equal(calls[4].url, "http://localhost:18080/api/v1/decks/ops?force=true");
+  assert.equal(calls[4].options.method, "DELETE");
+});
+
 test("api client includes bearer auth header when token is set", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

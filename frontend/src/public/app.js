@@ -24,6 +24,10 @@ const sidebarToggleBtn = document.getElementById("sidebar-toggle");
 const sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
 const sidebarLauncherBtn = document.getElementById("sidebar-launcher");
 const createBtn = document.getElementById("create-session");
+const deckTabsEl = document.getElementById("deck-tabs");
+const deckCreateBtn = document.getElementById("deck-create");
+const deckRenameBtn = document.getElementById("deck-rename");
+const deckDeleteBtn = document.getElementById("deck-delete");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
 const settingsApplyBtn = document.getElementById("settings-apply");
@@ -50,6 +54,7 @@ let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
+const ACTIVE_DECK_STORAGE_KEY = "ptydeck.active-deck.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
 const SESSION_FILTER_STORAGE_KEY = "ptydeck.session-filter.v1";
 const TERMINAL_FONT_SIZE = 16;
@@ -65,6 +70,9 @@ const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_TAG_MAX_ENTRIES = 32;
 const SESSION_TAG_MAX_LENGTH = 32;
+const DEFAULT_TERMINAL_COLS = 80;
+const DEFAULT_TERMINAL_ROWS = 20;
+const DEFAULT_DECK_ID = "default";
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -141,6 +149,10 @@ const SYSTEM_SLASH_COMMANDS = [
   "help"
 ];
 let terminalSettings = loadTerminalSettings();
+let deckState = {
+  decks: [],
+  activeDeckId: loadStoredActiveDeckId()
+};
 let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
 let wsAuthToken = "";
@@ -770,10 +782,116 @@ function saveTerminalSettings() {
 function loadTerminalSettings() {
   const stored = readStoredSettings();
   return {
-    cols: clampInt(stored?.cols, 80, 20, 400),
-    rows: clampInt(stored?.rows, 20, 5, 120),
+    cols: clampInt(stored?.cols, DEFAULT_TERMINAL_COLS, 20, 400),
+    rows: clampInt(stored?.rows, DEFAULT_TERMINAL_ROWS, 5, 120),
     sidebarVisible: stored?.sidebarVisible !== false
   };
+}
+
+function loadStoredActiveDeckId() {
+  try {
+    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
+      return "";
+    }
+    return String(window.localStorage.getItem(ACTIVE_DECK_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function saveStoredActiveDeckId(deckId) {
+  try {
+    if (!window.localStorage) {
+      return;
+    }
+    if (!deckId) {
+      if (typeof window.localStorage.removeItem === "function") {
+        window.localStorage.removeItem(ACTIVE_DECK_STORAGE_KEY);
+      }
+      return;
+    }
+    if (typeof window.localStorage.setItem === "function") {
+      window.localStorage.setItem(ACTIVE_DECK_STORAGE_KEY, String(deckId));
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function normalizeDeckTerminalSettings(rawSettings) {
+  const terminal = rawSettings && typeof rawSettings === "object" ? rawSettings.terminal : null;
+  return {
+    cols: clampInt(terminal?.cols, terminalSettings.cols || DEFAULT_TERMINAL_COLS, 20, 400),
+    rows: clampInt(terminal?.rows, terminalSettings.rows || DEFAULT_TERMINAL_ROWS, 5, 120)
+  };
+}
+
+function normalizeDeckEntry(deck) {
+  const id = String(deck?.id || "").trim();
+  const fallbackName = id || "Deck";
+  const name = String(deck?.name || fallbackName).trim() || fallbackName;
+  return {
+    id,
+    name,
+    settings: deck && typeof deck.settings === "object" && !Array.isArray(deck.settings) ? deck.settings : {},
+    createdAt: Number(deck?.createdAt || 0),
+    updatedAt: Number(deck?.updatedAt || 0)
+  };
+}
+
+function getDeckById(deckId) {
+  return deckState.decks.find((deck) => deck.id === deckId) || null;
+}
+
+function getActiveDeck() {
+  const preferred = getDeckById(deckState.activeDeckId);
+  if (preferred) {
+    return preferred;
+  }
+  if (deckState.decks.length > 0) {
+    return deckState.decks[0];
+  }
+  return null;
+}
+
+function syncActiveDeckGeometryFromState() {
+  const activeDeck = getActiveDeck();
+  if (!activeDeck) {
+    return;
+  }
+  const nextSize = normalizeDeckTerminalSettings(activeDeck.settings);
+  const changed = terminalSettings.cols !== nextSize.cols || terminalSettings.rows !== nextSize.rows;
+  terminalSettings = {
+    ...terminalSettings,
+    cols: nextSize.cols,
+    rows: nextSize.rows
+  };
+  saveTerminalSettings();
+  syncSettingsUi();
+  if (changed) {
+    applySettingsToAllTerminals();
+    scheduleGlobalResize();
+  }
+}
+
+function setDecks(nextDecks, options = {}) {
+  const normalizedDecks = Array.isArray(nextDecks)
+    ? nextDecks.map(normalizeDeckEntry).filter((deck) => Boolean(deck.id))
+    : [];
+  const sortedDecks = normalizedDecks.slice().sort((left, right) => left.name.localeCompare(right.name, "en-US"));
+  const preferredActiveDeckId = String(options.preferredActiveDeckId || deckState.activeDeckId || "").trim();
+  const nextActiveDeck =
+    sortedDecks.find((deck) => deck.id === preferredActiveDeckId) ||
+    sortedDecks.find((deck) => deck.id === DEFAULT_DECK_ID) ||
+    sortedDecks[0] ||
+    null;
+  deckState = {
+    decks: sortedDecks,
+    activeDeckId: nextActiveDeck ? nextActiveDeck.id : ""
+  };
+  saveStoredActiveDeckId(deckState.activeDeckId);
+  syncActiveDeckGeometryFromState();
+  render();
 }
 
 function normalizeSendTerminatorMode(value) {
@@ -1418,7 +1536,28 @@ function readSettingsFromUi() {
   };
 }
 
-function applyTerminalSizeSettings(nextCols, nextRows) {
+async function applyTerminalSizeSettings(nextCols, nextRows) {
+  const activeDeck = getActiveDeck();
+  if (!activeDeck) {
+    throw new Error("No active deck available.");
+  }
+  const currentSettings =
+    activeDeck.settings && typeof activeDeck.settings === "object" && !Array.isArray(activeDeck.settings)
+      ? activeDeck.settings
+      : {};
+  const updatedDeck = await api.updateDeck(activeDeck.id, {
+    settings: {
+      ...currentSettings,
+      terminal: {
+        cols: nextCols,
+        rows: nextRows
+      }
+    }
+  });
+  deckState = {
+    ...deckState,
+    decks: deckState.decks.map((deck) => (deck.id === updatedDeck.id ? normalizeDeckEntry(updatedDeck) : deck))
+  };
   terminalSettings = {
     ...terminalSettings,
     cols: nextCols,
@@ -1429,6 +1568,7 @@ function applyTerminalSizeSettings(nextCols, nextRows) {
   uiState.error = "";
   applySettingsToAllTerminals();
   scheduleGlobalResize();
+  render();
 }
 
 function applyMountHeight(entry, rows) {
@@ -1539,9 +1679,14 @@ function applyResizeForSession(sessionId, options = {}) {
   resizeTimers.set(sessionId, timer);
 }
 
-function onApplySettings() {
+async function onApplySettings() {
   const next = readSettingsFromUi();
-  applyTerminalSizeSettings(next.cols, next.rows);
+  try {
+    await applyTerminalSizeSettings(next.cols, next.rows);
+    setCommandFeedback(`Deck size set to ${next.cols}x${next.rows} for '${getActiveDeck()?.name || "deck"}'.`);
+  } catch (err) {
+    setError(getErrorMessage(err, "Failed to save deck settings."));
+  }
 }
 
 function setSidebarVisible(visible) {
@@ -1656,8 +1801,166 @@ function maybeReportStartupPerf() {
   });
 }
 
+function getSessionCountForDeck(deckId, sessions) {
+  return sessions.reduce((count, session) => (session.deckId === deckId ? count + 1 : count), 0);
+}
+
+function renderDeckTabs(sessions) {
+  if (!deckTabsEl || typeof document.createElement !== "function") {
+    return;
+  }
+  while (deckTabsEl.firstChild) {
+    deckTabsEl.removeChild(deckTabsEl.firstChild);
+  }
+  if (!Array.isArray(deckState.decks) || deckState.decks.length === 0) {
+    const hint = document.createElement("span");
+    hint.className = "deck-tab deck-tab-empty";
+    hint.textContent = "No decks";
+    deckTabsEl.appendChild(hint);
+    return;
+  }
+  for (const deck of deckState.decks) {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "deck-tab";
+    if (deck.id === deckState.activeDeckId) {
+      tab.classList.add("active");
+    }
+    tab.setAttribute("data-deck-id", deck.id);
+    const count = getSessionCountForDeck(deck.id, sessions);
+    const nameEl = document.createElement("span");
+    nameEl.className = "deck-tab-name";
+    nameEl.textContent = deck.name;
+    const countEl = document.createElement("span");
+    countEl.className = "deck-tab-count";
+    countEl.textContent = String(count);
+    tab.appendChild(nameEl);
+    tab.appendChild(countEl);
+    tab.addEventListener("click", () => setActiveDeck(deck.id));
+    deckTabsEl.appendChild(tab);
+  }
+}
+
+function setActiveDeck(deckId) {
+  const normalized = String(deckId || "").trim();
+  if (!normalized) {
+    return false;
+  }
+  const target = getDeckById(normalized);
+  if (!target) {
+    return false;
+  }
+  if (deckState.activeDeckId === normalized) {
+    return true;
+  }
+  deckState = {
+    ...deckState,
+    activeDeckId: normalized
+  };
+  saveStoredActiveDeckId(normalized);
+  syncActiveDeckGeometryFromState();
+  render();
+  return true;
+}
+
+async function reloadDecks(options = {}) {
+  const decks = await api.listDecks();
+  setDecks(decks, options);
+}
+
+async function createDeckFlow() {
+  if (!window || typeof window.prompt !== "function") {
+    return;
+  }
+  const input = window.prompt("Deck name", "New Deck");
+  if (input === null) {
+    return;
+  }
+  const name = input.trim();
+  if (!name) {
+    setError("Deck name cannot be empty.");
+    return;
+  }
+  const created = await api.createDeck({
+    name,
+    settings: {
+      terminal: {
+        cols: terminalSettings.cols,
+        rows: terminalSettings.rows
+      }
+    }
+  });
+  await reloadDecks({ preferredActiveDeckId: created.id });
+  setCommandFeedback(`Created deck '${created.name}'.`);
+}
+
+async function renameDeckFlow() {
+  const activeDeck = getActiveDeck();
+  if (!activeDeck) {
+    setError("No active deck to rename.");
+    return;
+  }
+  if (!window || typeof window.prompt !== "function") {
+    return;
+  }
+  const input = window.prompt("Deck name", activeDeck.name || activeDeck.id);
+  if (input === null) {
+    return;
+  }
+  const name = input.trim();
+  if (!name) {
+    setError("Deck name cannot be empty.");
+    return;
+  }
+  const updated = await api.updateDeck(activeDeck.id, { name });
+  await reloadDecks({ preferredActiveDeckId: updated.id });
+  setCommandFeedback(`Renamed deck to '${updated.name}'.`);
+}
+
+async function deleteDeckFlow() {
+  const activeDeck = getActiveDeck();
+  if (!activeDeck) {
+    setError("No active deck to delete.");
+    return;
+  }
+  if (!window || typeof window.confirm !== "function") {
+    return;
+  }
+  const confirmed = window.confirm(`Delete deck '${activeDeck.name}'?`);
+  if (!confirmed) {
+    return;
+  }
+  try {
+    await api.deleteDeck(activeDeck.id, { force: false });
+  } catch (err) {
+    if (err && err.status === 409) {
+      const forceConfirmed = window.confirm(
+        `Deck '${activeDeck.name}' still contains sessions. Force delete and move sessions to default deck?`
+      );
+      if (!forceConfirmed) {
+        return;
+      }
+      await api.deleteDeck(activeDeck.id, { force: true });
+    } else {
+      throw err;
+    }
+  }
+  const fallbackId = deckState.decks.find((deck) => deck.id !== activeDeck.id)?.id || DEFAULT_DECK_ID;
+  await reloadDecks({ preferredActiveDeckId: fallbackId });
+  setCommandFeedback(`Deleted deck '${activeDeck.name}'.`);
+}
+
 function render() {
   const state = store.getState();
+  renderDeckTabs(state.sessions);
+  const hasDecks = deckState.decks.length > 0;
+  const activeDeck = getActiveDeck();
+  if (deckRenameBtn) {
+    deckRenameBtn.disabled = !hasDecks;
+  }
+  if (deckDeleteBtn) {
+    deckDeleteBtn.disabled = !activeDeck || activeDeck.id === DEFAULT_DECK_ID;
+  }
   const filtered = resolveFilterSelectors(uiState.sessionFilterText, state.sessions);
   const visibleSessionIds = new Set(
     filtered.sessions.map((session) => session.id)
@@ -2537,8 +2840,9 @@ async function executeControlCommand(interpreted) {
     if (!parsed.ok) {
       return parsed.error;
     }
-    applyTerminalSizeSettings(parsed.cols, parsed.rows);
-    return `Terminal size set to ${parsed.cols}x${parsed.rows} (cols x rows).`;
+    await applyTerminalSizeSettings(parsed.cols, parsed.rows);
+    const activeDeck = getActiveDeck();
+    return `Terminal size set to ${parsed.cols}x${parsed.rows} (cols x rows) for deck '${activeDeck?.name || "unknown"}'.`;
   }
 
   if (command === "filter") {
@@ -2933,6 +3237,33 @@ async function bootstrapSessions() {
   return bootstrapPromise;
 }
 
+async function bootstrapDecks() {
+  try {
+    debugLog("decks.bootstrap.start");
+    const decks = await api.listDecks();
+    setDecks(decks, { preferredActiveDeckId: deckState.activeDeckId });
+    debugLog("decks.bootstrap.ok", { count: Array.isArray(decks) ? decks.length : 0, activeDeckId: deckState.activeDeckId });
+  } catch (err) {
+    debugLog("decks.bootstrap.error", { message: err instanceof Error ? err.message : String(err) });
+    setDecks(
+      [
+        {
+          id: DEFAULT_DECK_ID,
+          name: "Default",
+          settings: {
+            terminal: {
+              cols: terminalSettings.cols,
+              rows: terminalSettings.rows
+            }
+          }
+        }
+      ],
+      { preferredActiveDeckId: DEFAULT_DECK_ID }
+    );
+    setError("Failed to load decks.");
+  }
+}
+
 async function bootstrapDevAuthToken() {
   try {
     const payload = await api.createDevToken();
@@ -3003,6 +3334,7 @@ render();
 
 async function initializeRuntime() {
   await bootstrapDevAuthToken();
+  await bootstrapDecks();
   await bootstrapSessions();
   startWs();
 }
@@ -3014,14 +3346,52 @@ initializeRuntime().catch(() => {
 createBtn.addEventListener("click", async () => {
   try {
     debugLog("sessions.create.start");
-    const session = await api.createSession();
+    const createdSession = await api.createSession();
+    let session = createdSession;
+    const activeDeck = getActiveDeck();
+    if (activeDeck && createdSession.deckId !== activeDeck.id) {
+      session = await api.moveSessionToDeck(activeDeck.id, createdSession.id);
+    }
     upsertSession(session);
     uiState.error = "";
-    debugLog("sessions.create.ok", { sessionId: session.id });
+    debugLog("sessions.create.ok", { sessionId: session.id, deckId: session.deckId || null });
   } catch {
     setError("Failed to create session.");
   }
 });
+
+if (deckCreateBtn) {
+  deckCreateBtn.addEventListener("click", async () => {
+    try {
+      await createDeckFlow();
+      uiState.error = "";
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create deck."));
+    }
+  });
+}
+
+if (deckRenameBtn) {
+  deckRenameBtn.addEventListener("click", async () => {
+    try {
+      await renameDeckFlow();
+      uiState.error = "";
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to rename deck."));
+    }
+  });
+}
+
+if (deckDeleteBtn) {
+  deckDeleteBtn.addEventListener("click", async () => {
+    try {
+      await deleteDeckFlow();
+      uiState.error = "";
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to delete deck."));
+    }
+  });
+}
 
 if (sidebarToggleBtn) {
   sidebarToggleBtn.addEventListener("click", () => setSidebarVisible(false));

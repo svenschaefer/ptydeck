@@ -93,6 +93,30 @@ export function createApiClient(baseUrl, options = {}) {
     async listSessions() {
       return request("/sessions");
     },
+    async listDecks() {
+      return request("/decks");
+    },
+    async createDeck(payload) {
+      return request("/decks", withJson(payload || {}));
+    },
+    async updateDeck(deckId, payload) {
+      return request(`/decks/${encodeURIComponent(deckId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    },
+    async deleteDeck(deckId, options = {}) {
+      const force = options && options.force === true ? "true" : "false";
+      await request(`/decks/${encodeURIComponent(deckId)}?force=${force}`, { method: "DELETE" }, { expectJson: false });
+    },
+    async moveSessionToDeck(deckId, sessionId) {
+      return request(`/decks/${encodeURIComponent(deckId)}/sessions/${encodeURIComponent(sessionId)}:move`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
     /** @returns {Promise<Session>} */
     async createSession(payload = {}) {
       return request("/sessions", withJson(payload));

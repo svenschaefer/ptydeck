@@ -132,6 +132,65 @@ body {
   position: relative;
 }
 
+.deck-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 18px 8px;
+  border-bottom: 1px solid var(--border);
+  background: #0d141e;
+}
+
+.deck-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.deck-tab {
+  border: 1px solid #304055;
+  border-radius: 999px;
+  background: #0f1926;
+  color: #9db8d2;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.deck-tab:hover {
+  border-color: #4f6a88;
+}
+
+.deck-tab.active {
+  border-color: var(--active);
+  color: #d7f2ce;
+  background: #152116;
+}
+
+.deck-tab-name {
+  margin-right: 6px;
+}
+
+.deck-tab-count {
+  opacity: 0.75;
+  font-size: 11px;
+}
+
+.deck-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deck-actions button {
+  white-space: nowrap;
+}
+
 .sidebar-launcher {
   position: absolute;
   top: 10px;
@@ -329,7 +388,7 @@ button:hover {
 }
 
 .terminal-grid {
-  padding: 12px 18px 18px;
+  padding: 10px 18px 18px;
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
@@ -723,6 +782,15 @@ button:hover {
 
   .terminal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .deck-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .command-row {

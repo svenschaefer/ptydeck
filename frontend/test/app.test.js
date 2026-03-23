@@ -438,6 +438,15 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const customCommandUpserts = [];
   const customCommandDeletes = [];
   const customCommands = new Map();
+  let deckState = [
+    {
+      id: "default",
+      name: "Default",
+      settings: { terminal: { cols: 80, rows: 20 } },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+  ];
   let listSessionsCalls = 0;
   const win = {
     document: fixture.document,
@@ -485,8 +494,59 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   global.WebSocket = MockWebSocket;
   global.fetch = async (url, options = {}) => {
     const path = parsePath(url);
+    const method = options.method || "GET";
 
-    if (path === "/api/v1/sessions" && (!options.method || options.method === "GET")) {
+    if (path === "/api/v1/decks" && method === "GET") {
+      return makeJsonResponse(200, deckState);
+    }
+    if (path === "/api/v1/decks" && method === "POST") {
+      const payload = JSON.parse(options.body || "{}");
+      const created = {
+        id: String(payload.id || "deck-new"),
+        name: String(payload.name || "Deck"),
+        settings: payload.settings || {},
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      deckState = [...deckState, created];
+      return makeJsonResponse(201, created);
+    }
+    const deckPatchMatch = path.match(/^\/api\/v1\/decks\/([^/]+)$/);
+    if (deckPatchMatch && method === "PATCH") {
+      const deckId = decodeURIComponent(deckPatchMatch[1]);
+      const payload = JSON.parse(options.body || "{}");
+      const existing = deckState.find((entry) => entry.id === deckId) || {
+        id: deckId,
+        name: deckId,
+        settings: {},
+        createdAt: Date.now()
+      };
+      const nextDeck = {
+        ...existing,
+        name: typeof payload.name === "string" ? payload.name : existing.name,
+        settings: payload.settings && typeof payload.settings === "object" ? payload.settings : existing.settings,
+        updatedAt: Date.now()
+      };
+      deckState = deckState.map((entry) => (entry.id === deckId ? nextDeck : entry));
+      return makeJsonResponse(200, nextDeck);
+    }
+    const moveMatch = path.match(/^\/api\/v1\/decks\/([^/]+)\/sessions\/([^/]+):move$/);
+    if (moveMatch && method === "POST") {
+      const deckId = decodeURIComponent(moveMatch[1]);
+      const sessionId = decodeURIComponent(moveMatch[2]);
+      return makeJsonResponse(200, {
+        id: sessionId,
+        deckId,
+        state: "active",
+        shell: "bash",
+        cwd: "~",
+        tags: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+
+    if (path === "/api/v1/sessions" && method === "GET") {
       listSessionsCalls += 1;
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -496,11 +556,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         }, 60);
       });
     }
-    if (path === "/api/v1/sessions" && options.method === "POST") {
+    if (path === "/api/v1/sessions" && method === "POST") {
       return makeJsonResponse(500, { error: "CreateFailed", message: "boom" });
     }
     const patchMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)$/);
-    if (patchMatch && options.method === "PATCH") {
+    if (patchMatch && method === "PATCH") {
       const sessionId = decodeURIComponent(patchMatch[1]);
       const payload = JSON.parse(options.body || "{}");
       updateSessionCalls.push({ sessionId, payload });
@@ -519,11 +579,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         updatedAt: Date.now()
       });
     }
-    if (path === "/api/v1/sessions/s-1" && options.method === "DELETE") {
+    if (path === "/api/v1/sessions/s-1" && method === "DELETE") {
       return makeJsonResponse(500, { error: "DeleteFailed", message: "boom" });
     }
     const inputMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/input$/);
-    if (inputMatch && options.method === "POST") {
+    if (inputMatch && method === "POST") {
       const sessionId = decodeURIComponent(inputMatch[1]);
       const payload = JSON.parse(options.body || "{}");
       inputPayloads.push({ sessionId, ...payload });
@@ -532,7 +592,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       }
       return makeJsonResponse(204, {});
     }
-    if (path === "/api/v1/sessions/s-1/restart" && options.method === "POST") {
+    if (path === "/api/v1/sessions/s-1/restart" && method === "POST") {
       restartCalls.push("s-1");
       return makeJsonResponse(200, {
         id: "s-1",
@@ -545,7 +605,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         updatedAt: Date.now()
       });
     }
-    if (path.startsWith("/api/v1/custom-commands/") && options.method === "PUT") {
+    if (path.startsWith("/api/v1/custom-commands/") && method === "PUT") {
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       const body = JSON.parse(options.body || "{}");
       customCommandUpserts.push({ commandName, content: body.content });
@@ -558,17 +618,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       customCommands.set(commandName, next);
       return makeJsonResponse(200, next);
     }
-    if (path === "/api/v1/custom-commands" && (!options.method || options.method === "GET")) {
+    if (path === "/api/v1/custom-commands" && method === "GET") {
       return makeJsonResponse(200, Array.from(customCommands.values()));
     }
-    if (path.startsWith("/api/v1/custom-commands/") && (!options.method || options.method === "GET")) {
+    if (path.startsWith("/api/v1/custom-commands/") && method === "GET") {
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       if (!customCommands.has(commandName)) {
         return makeJsonResponse(404, { error: "CustomCommandNotFound", message: "missing" });
       }
       return makeJsonResponse(200, customCommands.get(commandName));
     }
-    if (path.startsWith("/api/v1/custom-commands/") && options.method === "DELETE") {
+    if (path.startsWith("/api/v1/custom-commands/") && method === "DELETE") {
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       if (!customCommands.has(commandName)) {
         return makeJsonResponse(404, { error: "CustomCommandNotFound", message: "missing" });
@@ -578,7 +638,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(204, {});
     }
     const resizeMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
-    if (resizeMatch && options.method === "POST") {
+    if (resizeMatch && method === "POST") {
       const sessionId = decodeURIComponent(resizeMatch[1]);
       resizePayloads.push({ sessionId, ...JSON.parse(options.body || "{}") });
       return makeJsonResponse(204, {});
@@ -1105,7 +1165,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/size 80 50";
   fixture.elements.sendCommand.click();
   await sleep(360);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 80x50 (cols x rows).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 80x50 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 80 && entry.rows === 50),
     "expected resize request for /size 80 50"
@@ -1114,7 +1174,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/size c90";
   fixture.elements.sendCommand.click();
   await sleep(360);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x50 (cols x rows).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x50 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 50),
     "expected resize request for /size c90"
@@ -1123,7 +1183,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/size r30";
   fixture.elements.sendCommand.click();
   await sleep(360);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x30 (cols x rows).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Terminal size set to 90x30 (cols x rows) for deck 'Default'.");
   assert.ok(
     resizePayloads.some((entry) => entry.cols === 90 && entry.rows === 30),
     "expected resize request for /size r30"
