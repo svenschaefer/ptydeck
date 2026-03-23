@@ -668,7 +668,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/docu";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
-  assert.match(fixture.elements.commandPreview.textContent, /^Preview: \/docu -> \[1\] (one|s-1) \+newline$/);
+  assert.equal(fixture.elements.commandPreview.textContent, "echo verify");
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
@@ -694,7 +694,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/longpreview";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
-  assert.match(fixture.elements.commandPreview.textContent, /^Preview: \/longpreview -> \[1\] (one|s-1) \+newline$/);
+  assert.equal(fixture.elements.commandPreview.textContent, longPreviewPayload);
 
   fixture.elements.commandInput.value = "/cl";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });

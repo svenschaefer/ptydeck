@@ -1892,10 +1892,6 @@ async function submitCommand() {
   }
 }
 
-function formatPreviewTarget(session) {
-  return `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
-}
-
 async function refreshCommandPreview() {
   const rawInput = commandInput.value || "";
   const interpreted = interpretComposerInput(rawInput);
@@ -1912,7 +1908,7 @@ async function refreshCommandPreview() {
   }
 
   if (interpreted.args.length > 1) {
-    setCommandPreview(`Preview: /${commandRaw} usage -> /${commandRaw} [target]`);
+    setCommandPreview("");
     return;
   }
 
@@ -1923,25 +1919,7 @@ async function refreshCommandPreview() {
       return;
     }
 
-    const state = store.getState();
-    const sessions = state.sessions;
-    let targetDescription = "";
-
-    if (interpreted.args.length === 1) {
-      const resolved = resolveSessionToken(interpreted.args[0], sessions);
-      targetDescription = resolved.session
-        ? formatPreviewTarget(resolved.session)
-        : `unresolved (${resolved.error})`;
-    } else if (state.activeSessionId) {
-      const active = sessions.find((session) => session.id === state.activeSessionId);
-      targetDescription = active ? formatPreviewTarget(active) : "unresolved (active session not found)";
-    } else {
-      targetDescription = "unresolved (no active session)";
-    }
-
-    const appendNewline = custom.content.endsWith("\n") ? "" : " +newline";
-    const preview = `Preview: /${custom.name} -> ${targetDescription}${appendNewline}`;
-    setCommandPreview(preview);
+    setCommandPreview(custom.content || "");
   } catch (err) {
     if (requestId !== commandPreviewRequestId) {
       return;
@@ -1950,7 +1928,7 @@ async function refreshCommandPreview() {
       setCommandPreview("");
       return;
     }
-    setCommandPreview(`Preview unavailable: /${commandRaw}`);
+    setCommandPreview("");
   }
 }
 

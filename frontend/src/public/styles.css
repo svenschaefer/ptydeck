@@ -226,12 +226,23 @@ body {
 }
 
 .command-preview {
+  position: absolute;
+  top: calc(
+    var(--command-composer-border-width) + var(--command-composer-padding) +
+      (var(--command-composer-line-height) * 1em) + 2px
+  );
+  left: calc(var(--command-composer-border-width) + var(--command-composer-padding));
+  right: calc(var(--command-composer-border-width) + var(--command-composer-padding));
   margin: 0;
-  min-height: 0;
-  color: #a9d9d6;
-  font-size: 12px;
-  line-height: 1.35;
+  color: rgba(169, 217, 214, 0.62);
+  font-family: var(--command-composer-font-family);
+  font-size: var(--command-composer-font-size);
+  line-height: var(--command-composer-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
   white-space: pre-wrap;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .command-preview:empty {
