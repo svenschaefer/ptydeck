@@ -379,6 +379,9 @@ Completed and verified topics belong here.
 - [x] Added frontend integration coverage validating startup-settings save flow in terminal settings panel (`frontend/test/app.test.js`).
 - [x] Validation for `QLT-062` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 - [x] Coverage after `QLT-062` cycle: backend `96.03%` lines, frontend `88.79%` lines.
+- [x] `QLT-070` completed: regression coverage now verifies per-session submit terminator matrix (`CRLF`/`LF`/`CR`) for both routed direct input (`@<target> ...`) and custom-command execution (`/<custom> <target>`).
+- [x] Added frontend integration assertions that multiline payloads preserve line content and emit exactly one final submit terminator for each mode on target-routed sends.
+- [x] Validation for `QLT-070` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 
 ## Maintenance Rules
 

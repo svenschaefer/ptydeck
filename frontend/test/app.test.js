@@ -1112,6 +1112,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "echo alpha\r\n" });
+  fixture.elements.commandInput.value = "/blockcmd 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\rline 2\r\n" });
 
   secondSendTerminator.value = "lf";
   secondSendTerminator.dispatchEvent({ type: "change" });
@@ -1121,6 +1125,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\nline2\n" });
+  fixture.elements.commandInput.value = "/blockcmd 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\nline 2\n" });
 
   secondSendTerminator.value = "cr";
   secondSendTerminator.dispatchEvent({ type: "change" });
@@ -1130,6 +1138,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line1\rline2\r" });
+  fixture.elements.commandInput.value = "/blockcmd 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\rline 2\r" });
   secondSettings.click();
   await tick();
 
