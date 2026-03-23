@@ -381,14 +381,16 @@ button:hover {
 
 .session-tag-list {
   margin: 0;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: #0f151f;
+  padding: 0 6px;
   color: #89aac8;
   font-size: 11px;
-  line-height: 1.35;
-  min-height: 28px;
-  white-space: pre-wrap;
+  line-height: 1;
+  flex: 0 1 38%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .session-tag-list.empty {
