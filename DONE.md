@@ -18,6 +18,8 @@ Completed and verified topics belong here.
 - [x] Frontend settings extended with configurable command send terminator (`CRLF`, `LF`, `CR`) that is applied consistently to direct input, routed input, and custom-command execution paths.
 - [x] `QLT-067` completed: per-terminal theme editor now supports full session theme profiles (cursor + ANSI 16 colors) with deterministic preset detection and per-session apply behavior.
 - [x] Frontend theme personalization now persists via backend `themeProfile` session updates instead of browser-local theme-only storage, keeping reopen/reconnect behavior consistent with session metadata.
+- [x] Frontend theme integration expanded to complete iTerm2 dark/light catalog ingestion (generated `theme-library.js` from `mbadolato/iTerm2-Color-Schemes`) with 484 presets and deterministic ID/name mapping.
+- [x] Settings dialog UI overhauled into structured sections (Startup, Theme, Session Actions) with professional layout, category/search filtering for presets, and improved palette editing ergonomics.
 
 ## 2026-03-22
 

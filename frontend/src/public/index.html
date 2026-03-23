@@ -73,72 +73,87 @@
             <p class="session-settings-title">Session Settings</p>
             <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
           </div>
-          <p class="session-settings-hint">Session-scoped settings controls are available here.</p>
-          <div class="session-startup-controls">
-            <label class="session-startup-label">Working Directory</label>
-            <input class="session-start-cwd" type="text" value="" />
-            <label class="session-startup-label">Start Command Line</label>
-            <textarea class="session-start-command" rows="2"></textarea>
-            <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
-            <textarea class="session-start-env" rows="4"></textarea>
-            <button class="session-start-save" type="button">Save Startup Settings</button>
-            <p class="session-start-feedback"></p>
-          </div>
-          <div class="session-theme-controls">
-            <label class="session-theme-label" for="">Color Set</label>
-            <select class="session-theme-select">
-              <option value="default">Default</option>
-              <option value="gruvbox-dark">Gruvbox Dark</option>
-              <option value="solarized-dark">Solarized Dark</option>
-              <option value="one-dark">One Dark</option>
-              <option value="dracula">Dracula</option>
-              <option value="custom">Custom</option>
-            </select>
-            <div class="session-theme-palette">
-              <label class="session-theme-label" for="">Background</label>
-              <input class="session-theme-bg session-theme-background" type="color" value="#0a0d12" />
-              <label class="session-theme-label" for="">Foreground</label>
-              <input class="session-theme-fg session-theme-foreground" type="color" value="#d8dee9" />
-              <label class="session-theme-label" for="">Cursor</label>
-              <input class="session-theme-cursor" type="color" value="#8ec07c" />
-              <label class="session-theme-label" for="">Black</label>
-              <input class="session-theme-black" type="color" value="#0a0d12" />
-              <label class="session-theme-label" for="">Red</label>
-              <input class="session-theme-red" type="color" value="#fb4934" />
-              <label class="session-theme-label" for="">Green</label>
-              <input class="session-theme-green" type="color" value="#8ec07c" />
-              <label class="session-theme-label" for="">Yellow</label>
-              <input class="session-theme-yellow" type="color" value="#fabd2f" />
-              <label class="session-theme-label" for="">Blue</label>
-              <input class="session-theme-blue" type="color" value="#83a598" />
-              <label class="session-theme-label" for="">Magenta</label>
-              <input class="session-theme-magenta" type="color" value="#b48ead" />
-              <label class="session-theme-label" for="">Cyan</label>
-              <input class="session-theme-cyan" type="color" value="#8fbcbb" />
-              <label class="session-theme-label" for="">White</label>
-              <input class="session-theme-white" type="color" value="#d8dee9" />
-              <label class="session-theme-label" for="">Bright Black</label>
-              <input class="session-theme-bright-black" type="color" value="#4b5563" />
-              <label class="session-theme-label" for="">Bright Red</label>
-              <input class="session-theme-bright-red" type="color" value="#ff6b5a" />
-              <label class="session-theme-label" for="">Bright Green</label>
-              <input class="session-theme-bright-green" type="color" value="#a5d68a" />
-              <label class="session-theme-label" for="">Bright Yellow</label>
-              <input class="session-theme-bright-yellow" type="color" value="#ffd36a" />
-              <label class="session-theme-label" for="">Bright Blue</label>
-              <input class="session-theme-bright-blue" type="color" value="#98b6cc" />
-              <label class="session-theme-label" for="">Bright Magenta</label>
-              <input class="session-theme-bright-magenta" type="color" value="#c8a7d8" />
-              <label class="session-theme-label" for="">Bright Cyan</label>
-              <input class="session-theme-bright-cyan" type="color" value="#a9d9d6" />
-              <label class="session-theme-label" for="">Bright White</label>
-              <input class="session-theme-bright-white" type="color" value="#f5f7fa" />
-            </div>
-            <button class="session-theme-apply" type="button">Save Theme</button>
-          </div>
-          <div class="session-settings-actions">
-            <button class="session-rename" type="button">Rename</button>
-            <button class="session-close" type="button">Close</button>
+          <p class="session-settings-hint">Configure startup behavior, terminal theme, and session actions.</p>
+          <div class="session-settings-layout">
+            <section class="session-settings-section session-startup-controls">
+              <p class="session-settings-section-title">Startup</p>
+              <label class="session-startup-label">Working Directory</label>
+              <input class="session-start-cwd" type="text" value="" />
+              <label class="session-startup-label">Start Command Line</label>
+              <textarea class="session-start-command" rows="2"></textarea>
+              <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
+              <textarea class="session-start-env" rows="4"></textarea>
+              <div class="session-settings-inline-actions">
+                <button class="session-start-save" type="button">Save Startup Settings</button>
+              </div>
+              <p class="session-start-feedback"></p>
+            </section>
+            <section class="session-settings-section session-theme-controls">
+              <p class="session-settings-section-title">Theme</p>
+              <div class="session-theme-filter-grid">
+                <label class="session-theme-label" for="">Theme Category</label>
+                <select class="session-theme-category">
+                  <option value="all">All</option>
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                </select>
+                <label class="session-theme-label" for="">Theme Search</label>
+                <input class="session-theme-search" type="text" value="" placeholder="Search themes..." />
+                <label class="session-theme-label" for="">Theme Preset</label>
+                <select class="session-theme-select">
+                  <option value="ptydeck-default">Ptydeck Default</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="session-theme-palette">
+                <label class="session-theme-label" for="">Background</label>
+                <input class="session-theme-bg session-theme-background" type="color" value="#0a0d12" />
+                <label class="session-theme-label" for="">Foreground</label>
+                <input class="session-theme-fg session-theme-foreground" type="color" value="#d8dee9" />
+                <label class="session-theme-label" for="">Cursor</label>
+                <input class="session-theme-cursor" type="color" value="#8ec07c" />
+                <label class="session-theme-label" for="">Black</label>
+                <input class="session-theme-black" type="color" value="#0a0d12" />
+                <label class="session-theme-label" for="">Red</label>
+                <input class="session-theme-red" type="color" value="#fb4934" />
+                <label class="session-theme-label" for="">Green</label>
+                <input class="session-theme-green" type="color" value="#8ec07c" />
+                <label class="session-theme-label" for="">Yellow</label>
+                <input class="session-theme-yellow" type="color" value="#fabd2f" />
+                <label class="session-theme-label" for="">Blue</label>
+                <input class="session-theme-blue" type="color" value="#83a598" />
+                <label class="session-theme-label" for="">Magenta</label>
+                <input class="session-theme-magenta" type="color" value="#b48ead" />
+                <label class="session-theme-label" for="">Cyan</label>
+                <input class="session-theme-cyan" type="color" value="#8fbcbb" />
+                <label class="session-theme-label" for="">White</label>
+                <input class="session-theme-white" type="color" value="#d8dee9" />
+                <label class="session-theme-label" for="">Bright Black</label>
+                <input class="session-theme-bright-black" type="color" value="#4b5563" />
+                <label class="session-theme-label" for="">Bright Red</label>
+                <input class="session-theme-bright-red" type="color" value="#ff6b5a" />
+                <label class="session-theme-label" for="">Bright Green</label>
+                <input class="session-theme-bright-green" type="color" value="#a5d68a" />
+                <label class="session-theme-label" for="">Bright Yellow</label>
+                <input class="session-theme-bright-yellow" type="color" value="#ffd36a" />
+                <label class="session-theme-label" for="">Bright Blue</label>
+                <input class="session-theme-bright-blue" type="color" value="#98b6cc" />
+                <label class="session-theme-label" for="">Bright Magenta</label>
+                <input class="session-theme-bright-magenta" type="color" value="#c8a7d8" />
+                <label class="session-theme-label" for="">Bright Cyan</label>
+                <input class="session-theme-bright-cyan" type="color" value="#a9d9d6" />
+                <label class="session-theme-label" for="">Bright White</label>
+                <input class="session-theme-bright-white" type="color" value="#f5f7fa" />
+              </div>
+              <div class="session-settings-inline-actions">
+                <button class="session-theme-apply" type="button">Save Theme</button>
+              </div>
+            </section>
+            <section class="session-settings-section session-settings-actions">
+              <p class="session-settings-section-title">Session Actions</p>
+              <button class="session-rename" type="button">Rename</button>
+              <button class="session-close" type="button">Close</button>
+            </section>
           </div>
         </dialog>
         <div class="terminal-mount"></div>

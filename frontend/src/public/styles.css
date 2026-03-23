@@ -380,12 +380,14 @@ button:hover {
 }
 
 .session-settings-dialog {
-  width: min(560px, calc(100vw - 64px));
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 40px);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px;
   background: #0f151f;
   color: var(--text);
+  overflow: hidden;
 }
 
 .session-settings-dialog::backdrop {
@@ -397,6 +399,8 @@ button:hover {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #223041;
 }
 
 .session-settings-dismiss {
@@ -420,15 +424,53 @@ button:hover {
 }
 
 .session-settings-hint {
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   font-size: 12px;
-  color: #a9d9d6;
+  color: #9db8d2;
+}
+
+.session-settings-layout {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(340px, 1.3fr) minmax(170px, 0.7fr);
+  gap: 10px;
+  align-items: start;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.session-settings-section {
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: #111a26;
+  padding: 10px;
+}
+
+.session-settings-section-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #89aac8;
+}
+
+.session-settings-inline-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
 }
 
 .session-theme-controls {
-  margin-top: 10px;
   display: grid;
   grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.session-theme-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 
@@ -437,13 +479,12 @@ button:hover {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px 10px;
   align-items: center;
-  max-height: 280px;
+  max-height: 360px;
   overflow: auto;
   padding-right: 4px;
 }
 
 .session-startup-controls {
-  margin-top: 10px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
@@ -472,7 +513,7 @@ button:hover {
 }
 
 .session-start-save {
-  justify-self: start;
+  justify-self: auto;
 }
 
 .session-start-feedback {
@@ -519,22 +560,37 @@ button:hover {
 }
 
 .session-theme-apply {
-  justify-self: start;
+  justify-self: auto;
 }
 
 .session-settings-actions {
-  margin-top: 8px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .session-settings-actions .session-rename {
-  flex: 0 0 auto;
-  margin-left: 0;
+  width: 100%;
 }
 
 .session-settings-actions .session-close {
-  flex: 0 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 1000px) {
+  .session-settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .session-settings-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .session-settings-actions .session-rename,
+  .session-settings-actions .session-close {
+    width: auto;
+  }
 }
 
 .terminal-mount {

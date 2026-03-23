@@ -241,9 +241,15 @@ function createTerminalCardTemplateNode() {
   const startSave = new FakeElement({ className: "session-start-save", tagName: "button" });
   const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
   const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
+  const themeCategoryLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
+  const themeCategory = new FakeElement({ className: "session-theme-category", tagName: "select" });
+  themeCategory.value = "all";
+  const themeSearchLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
+  const themeSearch = new FakeElement({ className: "session-theme-search", tagName: "input" });
+  themeSearch.value = "";
   const themeLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
   const themeSelect = new FakeElement({ className: "session-theme-select", tagName: "select" });
-  themeSelect.value = "default";
+  themeSelect.value = "ptydeck-default";
   const themeBgLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
   const themeBg = new FakeElement({ className: "session-theme-bg", tagName: "input" });
   themeBg.value = "#0a0d12";
@@ -270,6 +276,10 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startSave);
   startControls.appendChild(startFeedback);
   settingsPanel.appendChild(startControls);
+  themeControls.appendChild(themeCategoryLabel);
+  themeControls.appendChild(themeCategory);
+  themeControls.appendChild(themeSearchLabel);
+  themeControls.appendChild(themeSearch);
   themeControls.appendChild(themeLabel);
   themeControls.appendChild(themeSelect);
   themeControls.appendChild(themeBgLabel);

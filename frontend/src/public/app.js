@@ -3,6 +3,7 @@ import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
+import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -96,82 +97,24 @@ const THEME_PROFILE_KEYS = [
   "brightCyan",
   "brightWhite"
 ];
-const TERMINAL_THEME_PRESETS = {
-  default: DEFAULT_TERMINAL_THEME,
-  "gruvbox-dark": {
-    ...DEFAULT_TERMINAL_THEME,
-    background: "#1d2021",
-    foreground: "#ebdbb2",
-    cursor: "#fabd2f"
-  },
-  "solarized-dark": {
-    ...DEFAULT_TERMINAL_THEME,
-    background: "#002b36",
-    foreground: "#93a1a1",
-    cursor: "#b58900",
-    black: "#073642",
-    red: "#dc322f",
-    green: "#859900",
-    yellow: "#b58900",
-    blue: "#268bd2",
-    magenta: "#d33682",
-    cyan: "#2aa198",
-    white: "#eee8d5",
-    brightBlack: "#586e75",
-    brightRed: "#cb4b16",
-    brightGreen: "#586e75",
-    brightYellow: "#657b83",
-    brightBlue: "#839496",
-    brightMagenta: "#6c71c4",
-    brightCyan: "#93a1a1",
-    brightWhite: "#fdf6e3"
-  },
-  "one-dark": {
-    ...DEFAULT_TERMINAL_THEME,
-    background: "#1e2127",
-    foreground: "#abb2bf",
-    cursor: "#61afef",
-    black: "#1e2127",
-    red: "#e06c75",
-    green: "#98c379",
-    yellow: "#e5c07b",
-    blue: "#61afef",
-    magenta: "#c678dd",
-    cyan: "#56b6c2",
-    white: "#abb2bf",
-    brightBlack: "#5c6370",
-    brightRed: "#ff7a85",
-    brightGreen: "#a6d57f",
-    brightYellow: "#f2cc8f",
-    brightBlue: "#7ab8ff",
-    brightMagenta: "#d38ef0",
-    brightCyan: "#73cdd9",
-    brightWhite: "#d7dae0"
-  },
-  dracula: {
-    ...DEFAULT_TERMINAL_THEME,
-    background: "#282a36",
-    foreground: "#f8f8f2",
-    cursor: "#f8f8f2",
-    black: "#21222c",
-    red: "#ff5555",
-    green: "#50fa7b",
-    yellow: "#f1fa8c",
-    blue: "#bd93f9",
-    magenta: "#ff79c6",
-    cyan: "#8be9fd",
-    white: "#f8f8f2",
-    brightBlack: "#6272a4",
-    brightRed: "#ff6e6e",
-    brightGreen: "#69ff94",
-    brightYellow: "#ffffa5",
-    brightBlue: "#d6acff",
-    brightMagenta: "#ff92df",
-    brightCyan: "#a4ffff",
-    brightWhite: "#ffffff"
-  }
+const THEME_FILTER_CATEGORY_SET = new Set(["all", "dark", "light"]);
+const DEFAULT_THEME_PRESET = {
+  id: "ptydeck-default",
+  name: "Ptydeck Default",
+  category: "dark",
+  profile: DEFAULT_TERMINAL_THEME
 };
-const TERMINAL_THEME_MODE_SET = new Set(["custom", ...Object.keys(TERMINAL_THEME_PRESETS)]);
+const TERMINAL_THEME_PRESETS = [
+  DEFAULT_THEME_PRESET,
+  ...ITERM2_THEME_LIBRARY.map((entry) => ({
+    id: String(entry?.id || "").trim(),
+    name: String(entry?.name || "").trim(),
+    category: entry?.category === "light" ? "light" : "dark",
+    profile: entry?.profile
+  })).filter((entry) => entry.id && entry.name)
+];
+const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => [entry.id, entry]));
+const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
 const SYSTEM_SLASH_COMMANDS = [
   "new",
   "close",
@@ -802,18 +745,88 @@ function normalizeThemeProfile(themeProfile) {
   return normalized;
 }
 
+function normalizeThemeFilterCategory(value) {
+  return THEME_FILTER_CATEGORY_SET.has(value) ? value : "all";
+}
+
+function getThemePresetById(presetId) {
+  if (!presetId || typeof presetId !== "string") {
+    return null;
+  }
+  return TERMINAL_THEME_PRESET_MAP.get(presetId) || null;
+}
+
+function getFilteredThemePresets(category, searchText) {
+  const normalizedCategory = normalizeThemeFilterCategory(String(category || "").toLowerCase());
+  const normalizedSearch = String(searchText || "").trim().toLowerCase();
+  return TERMINAL_THEME_PRESETS.filter((entry) => {
+    if (normalizedCategory !== "all" && entry.category !== normalizedCategory) {
+      return false;
+    }
+    if (!normalizedSearch) {
+      return true;
+    }
+    return entry.name.toLowerCase().includes(normalizedSearch) || entry.id.toLowerCase().includes(normalizedSearch);
+  });
+}
+
+function setSelectOptions(selectEl, options, selectedValue) {
+  if (!selectEl) {
+    return;
+  }
+  if (typeof document.createElement !== "function" || typeof selectEl.appendChild !== "function") {
+    selectEl.value = selectedValue;
+    return;
+  }
+  while (selectEl.firstChild) {
+    selectEl.removeChild(selectEl.firstChild);
+  }
+  for (const optionDef of options) {
+    const optionEl = document.createElement("option");
+    optionEl.value = optionDef.value;
+    optionEl.textContent = optionDef.label;
+    selectEl.appendChild(optionEl);
+  }
+  selectEl.value = selectedValue;
+}
+
+function syncThemePresetOptions(entry, config) {
+  if (!entry?.themeSelect) {
+    return;
+  }
+  const category = normalizeThemeFilterCategory(config?.category);
+  const search = String(config?.search || "");
+  const filtered = getFilteredThemePresets(category, search);
+  const selectedPresetId = TERMINAL_THEME_MODE_SET.has(config?.preset) ? config.preset : "custom";
+  const options = filtered.map((preset) => ({
+    value: preset.id,
+    label: `[${preset.category}] ${preset.name}`
+  }));
+  if (!options.some((option) => option.value === selectedPresetId) && selectedPresetId !== "custom") {
+    const selectedPreset = getThemePresetById(selectedPresetId);
+    if (selectedPreset) {
+      options.unshift({
+        value: selectedPreset.id,
+        label: `[${selectedPreset.category}] ${selectedPreset.name}`
+      });
+    }
+  }
+  options.push({ value: "custom", label: "Custom Palette" });
+  setSelectOptions(entry.themeSelect, options, selectedPresetId);
+}
+
 function detectThemePreset(themeProfile) {
   const normalized = normalizeThemeProfile(themeProfile);
-  for (const [presetName, presetProfile] of Object.entries(TERMINAL_THEME_PRESETS)) {
+  for (const preset of TERMINAL_THEME_PRESETS) {
     let matches = true;
     for (const key of THEME_PROFILE_KEYS) {
-      if (normalized[key] !== presetProfile[key]) {
+      if (normalized[key] !== normalizeThemeProfile(preset.profile)[key]) {
         matches = false;
         break;
       }
     }
     if (matches) {
-      return presetName;
+      return preset.id;
     }
   }
   return "custom";
@@ -828,13 +841,15 @@ function getSessionThemeConfig(sessionId) {
   if (draft) {
     return {
       preset: TERMINAL_THEME_MODE_SET.has(draft.preset) ? draft.preset : "custom",
-      profile: normalizeThemeProfile(draft.profile)
+      profile: normalizeThemeProfile(draft.profile),
+      category: normalizeThemeFilterCategory(draft.category),
+      search: String(draft.search || "")
     };
   }
   const session = getSessionById(sessionId);
   const profile = normalizeThemeProfile(session?.themeProfile);
   const preset = detectThemePreset(profile);
-  return { preset, profile };
+  return { preset, profile, category: "all", search: "" };
 }
 
 function buildThemeFromConfig(config) {
@@ -898,7 +913,13 @@ function syncSessionThemeControls(entry, sessionId) {
     return;
   }
   const config = getSessionThemeConfig(sessionId);
-  entry.themeSelect.value = config.preset;
+  if (entry.themeCategory) {
+    entry.themeCategory.value = normalizeThemeFilterCategory(config.category);
+  }
+  if (entry.themeSearch) {
+    entry.themeSearch.value = config.search || "";
+  }
+  syncThemePresetOptions(entry, config);
   setThemeProfileOnControls(entry, config.profile);
   const customSelected = config.preset === "custom";
   for (const key of THEME_PROFILE_KEYS) {
@@ -1307,6 +1328,8 @@ function render() {
     const startEnvInput = node.querySelector(".session-start-env");
     const startSaveBtn = node.querySelector(".session-start-save");
     const startFeedback = node.querySelector(".session-start-feedback");
+    const themeCategory = node.querySelector(".session-theme-category");
+    const themeSearch = node.querySelector(".session-theme-search");
     const themeSelect = node.querySelector(".session-theme-select");
     const themeBg = node.querySelector(".session-theme-bg");
     const themeFg = node.querySelector(".session-theme-fg");
@@ -1400,23 +1423,44 @@ function render() {
       }
     });
     themeSelect.addEventListener("change", () => {
-      const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value)
-        ? themeSelect.value
-        : "default";
+      const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
       const currentProfile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
-      const nextProfile =
-        nextPreset === "custom"
-          ? currentProfile
-          : normalizeThemeProfile(TERMINAL_THEME_PRESETS[nextPreset] || TERMINAL_THEME_PRESETS.default);
+      const preset = getThemePresetById(nextPreset);
+      const nextProfile = nextPreset === "custom" || !preset ? currentProfile : normalizeThemeProfile(preset.profile);
       sessionThemeDrafts.set(session.id, {
         preset: nextPreset,
-        profile: nextProfile
+        profile: nextProfile,
+        category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
+        search: String(themeSearch?.value || "")
       });
-      syncSessionThemeControls({ themeSelect, themeInputs, themeBg, themeFg }, session.id);
+      syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       applyThemeForSession(session.id);
       uiState.error = "";
       render();
     });
+    if (themeCategory) {
+      themeCategory.addEventListener("change", () => {
+        const current = getSessionThemeConfig(session.id);
+        const category = normalizeThemeFilterCategory(String(themeCategory.value || "all").toLowerCase());
+        sessionThemeDrafts.set(session.id, {
+          ...current,
+          category,
+          search: String(themeSearch?.value || "")
+        });
+        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
+      });
+    }
+    if (themeSearch) {
+      themeSearch.addEventListener("input", () => {
+        const current = getSessionThemeConfig(session.id);
+        sessionThemeDrafts.set(session.id, {
+          ...current,
+          category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
+          search: String(themeSearch.value || "")
+        });
+        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
+      });
+    }
     themeApplyBtn.addEventListener("click", async () => {
       const profile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
       const invalidKey = THEME_PROFILE_KEYS.find((key) => !isValidHexColor(profile[key]));
@@ -1427,9 +1471,14 @@ function render() {
       const detectedPreset = detectThemePreset(profile);
       const requestedPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
       const nextPreset = requestedPreset === "custom" ? "custom" : detectedPreset === requestedPreset ? requestedPreset : "custom";
-      sessionThemeDrafts.set(session.id, { preset: nextPreset, profile });
+      sessionThemeDrafts.set(session.id, {
+        preset: nextPreset,
+        profile,
+        category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
+        search: String(themeSearch?.value || "")
+      });
       applyThemeForSession(session.id);
-      syncSessionThemeControls({ themeSelect, themeInputs, themeBg, themeFg }, session.id);
+      syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       uiState.error = "";
       try {
         const updated = await api.updateSession(session.id, { themeProfile: profile });
@@ -1470,6 +1519,8 @@ function render() {
       startCommandInput,
       startEnvInput,
       startFeedback,
+      themeCategory,
+      themeSearch,
       themeSelect,
       themeBg,
       themeFg,
