@@ -10,6 +10,11 @@ Completed and verified topics belong here.
 - [x] Frontend hotfix: slash-suggestion typography and inline-hint offset were aligned with composer text metrics to remove visual font/position drift.
 - [x] Frontend hotfix: command status/feedback block was moved from workspace top into the composer area, then compacted to avoid vertical bloat.
 - [x] Frontend hotfix: composer layout split into meta + entry rows so the `Send` button is height-bound to the textarea row only.
+- [x] Frontend hotfix: control-command API failures now surface concrete backend error text instead of generic failure feedback.
+- [x] Backend hotfix: CORS preflight now allows `PUT` and `authorization` headers, fixing browser `NetworkError` on `/custom` create/update (`PUT /api/v1/custom-commands/{name}`).
+- [x] Frontend hotfix: custom-command preview now renders inline in the composer as payload-only, semi-transparent helper text (no target/newline metadata block).
+- [x] Frontend hotfix: custom-command multiline payload execution now handles apostrophes robustly by escaping unbalanced single quotes before send.
+- [x] Frontend behavior change: command submission now normalizes final line terminator to exactly one `\r\n` (CRLF) for regular input, routed input, and custom-command execution.
 
 ## 2026-03-22
 
