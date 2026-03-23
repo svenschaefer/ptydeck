@@ -1375,6 +1375,35 @@ function setSessionCardVisibility(node, visible) {
   node.style.display = visible ? "" : "none";
 }
 
+function isTerminalAtBottom(terminal) {
+  if (!terminal || !terminal.buffer || !terminal.buffer.active) {
+    return true;
+  }
+  const active = terminal.buffer.active;
+  return Number(active.baseY) === Number(active.ydisp);
+}
+
+function syncTerminalViewportAfterShow(sessionId, entry) {
+  if (!entry || !entry.terminal) {
+    return;
+  }
+  const shouldFollow = entry.followOnShow !== false;
+  const runPass = () => {
+    applyResizeForSession(sessionId, { force: true });
+    if (typeof entry.terminal.refresh === "function") {
+      const lastRow = Math.max(0, entry.terminal.rows - 1);
+      entry.terminal.refresh(0, lastRow);
+    }
+    if (shouldFollow && typeof entry.terminal.scrollToBottom === "function") {
+      entry.terminal.scrollToBottom();
+    }
+  };
+  runPass();
+  setTimeout(runPass, 80);
+  setTimeout(runPass, 220);
+  entry.pendingViewportSync = false;
+}
+
 function syncSessionStartupControls(entry, session) {
   if (!entry || !entry.startCwdInput || !entry.startCommandInput || !entry.startEnvInput) {
     return;
@@ -2149,9 +2178,18 @@ function render() {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
       const unrestored = isSessionUnrestored(session);
+      const nextVisible = visibleSessionIds.has(session.id);
+      const wasVisible = entry.isVisible !== false;
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.element.classList.toggle("unrestored", unrestored);
-      setSessionCardVisibility(entry.element, visibleSessionIds.has(session.id));
+      if (wasVisible && !nextVisible) {
+        entry.followOnShow = isTerminalAtBottom(entry.terminal);
+      }
+      setSessionCardVisibility(entry.element, nextVisible);
+      entry.isVisible = nextVisible;
+      if (nextVisible && (!wasVisible || entry.pendingViewportSync)) {
+        syncTerminalViewportAfterShow(session.id, entry);
+      }
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
       if (entry.stateBadgeEl) {
@@ -2420,6 +2458,7 @@ function render() {
 
     node.classList.toggle("active", state.activeSessionId === session.id);
     setSessionCardVisibility(node, visibleSessionIds.has(session.id));
+    const initialVisible = visibleSessionIds.has(session.id);
 
     const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
     const terminal = new window.Terminal({
@@ -2468,7 +2507,10 @@ function render() {
       themeFg,
       themeInputs,
       mount,
-      settingsDirty: false
+      settingsDirty: false,
+      isVisible: initialVisible,
+      pendingViewportSync: !initialVisible,
+      followOnShow: true
     });
     syncSessionStartupControls(terminals.get(session.id), session);
     syncSessionThemeControls(terminals.get(session.id), session.id);
@@ -2501,6 +2543,9 @@ function appendTerminalData(sessionId, data) {
   const entry = terminals.get(sessionId);
   if (!entry || typeof data !== "string" || data.length === 0) {
     return false;
+  }
+  if (entry.isVisible === false) {
+    entry.pendingViewportSync = true;
   }
   const terminal = entry.terminal;
   terminal.write(data, () => {
