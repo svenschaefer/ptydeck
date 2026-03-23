@@ -234,11 +234,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-072`, `QLT-073`
+- `QLT-072`, `QLT-073`, `QLT-074`, `QLT-075`
 
 Remaining in this milestone:
 
-- `QLT-074`, `QLT-075`, `QLT-076`, `QLT-077`
+- `QLT-076`, `QLT-077`
 
 Dependencies:
 
@@ -328,6 +328,8 @@ Exit criteria:
 - `QLT-070`
 - `QLT-072`
 - `QLT-073`
+- `QLT-074`
+- `QLT-075`
 - `ENT-023`
 - `ENT-018`
 - `ENT-011`

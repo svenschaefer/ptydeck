@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-074` completed: frontend control-plane target resolution now supports multi-target selectors with tag inclusion for direct routing (`@...`) and slash-driven actions (`/close`, `/restart`, `/<custom>`).
+- [x] Multi-target selection now deduplicates by session ID, so overlap selectors (for example shared tag plus quick-ID/ID) execute each session exactly once.
+- [x] Selector resolution keeps deterministic coexistence semantics for tag-vs-ID/name/quick-ID collisions without conflict rejection.
+- [x] `QLT-075` completed: frontend integration regression coverage now validates tag-based multi-target execution and overlap dedupe behavior end to end.
+- [x] Added regression assertions for multi-target direct routing and custom-command execution using mixed selectors (`tag` + `quick-ID`) with deterministic feedback/output cardinality.
+- [x] Validation for `QLT-074`/`QLT-075` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-072` completed: backend session contract now includes deterministic per-session `tags` support across create/patch/list/get/restore paths.
 - [x] Backend tag validation/normalization added with explicit guardrails (pattern, max length/count, dedupe, stable sort) and persisted restore sanitization.
 - [x] OpenAPI + runtime/session-manager + validation layers were aligned for `tags` payloads and response schema coverage.

@@ -1986,6 +1986,73 @@ function resolveSessionToken(token, sessions) {
   return { session: null, error: `Unknown session identifier: ${normalized}` };
 }
 
+function normalizeSessionTagToken(token) {
+  return String(token || "")
+    .trim()
+    .toLowerCase();
+}
+
+function resolveSelectorMatches(selector, sessions) {
+  const normalized = String(selector || "").trim();
+  if (!normalized) {
+    return { sessions: [], error: "Missing session identifier." };
+  }
+
+  const dedupe = new Map();
+  const resolved = resolveSessionToken(normalized, sessions);
+  if (resolved.session) {
+    dedupe.set(resolved.session.id, resolved.session);
+  }
+
+  const tagToken = normalizeSessionTagToken(normalized);
+  const tagMatches = sessions.filter((session) =>
+    Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
+  );
+  for (const session of tagMatches) {
+    dedupe.set(session.id, session);
+  }
+
+  if (dedupe.size === 0) {
+    return { sessions: [], error: resolved.error || `Unknown session/tag identifier: ${normalized}` };
+  }
+  return { sessions: Array.from(dedupe.values()), error: "" };
+}
+
+function parseSelectorList(text, { source = "slash" } = {}) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return [];
+  }
+  if (source === "direct-route") {
+    return raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return raw
+    .split(/[,\s]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function resolveTargetSelectors(selectorText, sessions, options = {}) {
+  const selectorList = parseSelectorList(selectorText, { source: options.source || "slash" });
+  if (selectorList.length === 0) {
+    return { sessions: [], error: "Missing session identifier." };
+  }
+  const dedupe = new Map();
+  for (const selector of selectorList) {
+    const matched = resolveSelectorMatches(selector, sessions);
+    if (matched.error) {
+      return { sessions: [], error: matched.error };
+    }
+    for (const session of matched.sessions) {
+      dedupe.set(session.id, session);
+    }
+  }
+  return { sessions: Array.from(dedupe.values()), error: "" };
+}
+
 function parseDirectTargetRoutingInput(rawInput) {
   const input = String(rawInput || "");
   const match = /^@([^\s]+)\s+([\s\S]+)$/.exec(input);
@@ -2114,20 +2181,34 @@ async function executeControlCommand(interpreted) {
     if (sessions.length === 0) {
       return "No sessions available.";
     }
-    let targetSessionId = activeSessionId;
-    if (args.length > 0) {
-      const resolved = resolveSessionToken(args[0], sessions);
-      if (!resolved.session) {
-        return resolved.error;
+    let targetSessions = [];
+    if (args.length === 0) {
+      if (!activeSessionId) {
+        return "No active session to close.";
       }
-      targetSessionId = resolved.session.id;
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return "No active session to close.";
+      }
+      targetSessions = [activeSession];
+    } else {
+      const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
+      if (resolvedTargets.error) {
+        return resolvedTargets.error;
+      }
+      targetSessions = resolvedTargets.sessions;
     }
-    if (!targetSessionId) {
+    if (targetSessions.length === 0) {
       return "No active session to close.";
     }
-    await api.deleteSession(targetSessionId);
-    removeSession(targetSessionId);
-    return `Closed session ${targetSessionId.slice(0, 8)}.`;
+    await Promise.all(targetSessions.map((session) => api.deleteSession(session.id)));
+    for (const session of targetSessions) {
+      removeSession(session.id);
+    }
+    if (targetSessions.length === 1) {
+      return `Closed session ${targetSessions[0].id.slice(0, 8)}.`;
+    }
+    return `Closed ${targetSessions.length} sessions.`;
   }
 
   if (command === "switch") {
@@ -2177,21 +2258,38 @@ async function executeControlCommand(interpreted) {
     if (sessions.length === 0) {
       return "No sessions available.";
     }
-    let targetSessionId = activeSessionId;
-    if (args.length > 0) {
-      const resolved = resolveSessionToken(args[0], sessions);
-      if (!resolved.session) {
-        return resolved.error;
+    let targetSessions = [];
+    if (args.length === 0) {
+      if (!activeSessionId) {
+        return "No active session to restart.";
       }
-      targetSessionId = resolved.session.id;
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return "No active session to restart.";
+      }
+      targetSessions = [activeSession];
+    } else {
+      const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
+      if (resolvedTargets.error) {
+        return resolvedTargets.error;
+      }
+      targetSessions = resolvedTargets.sessions;
     }
-    if (!targetSessionId) {
+    if (targetSessions.length === 0) {
       return "No active session to restart.";
     }
-    const restarted = await api.restartSession(targetSessionId);
-    upsertSession(restarted);
-    store.setActiveSession(restarted.id);
-    return `Restarted session [${formatSessionToken(restarted.id)}] ${formatSessionDisplayName(restarted)}.`;
+    const restartedSessions = await Promise.all(targetSessions.map((session) => api.restartSession(session.id)));
+    for (const restarted of restartedSessions) {
+      upsertSession(restarted);
+    }
+    if (restartedSessions.length > 0) {
+      store.setActiveSession(restartedSessions[0].id);
+    }
+    if (restartedSessions.length === 1) {
+      const restarted = restartedSessions[0];
+      return `Restarted session [${formatSessionToken(restarted.id)}] ${formatSessionDisplayName(restarted)}.`;
+    }
+    return `Restarted ${restartedSessions.length} sessions.`;
   }
 
   if (command === "custom") {
@@ -2243,29 +2341,41 @@ async function executeControlCommand(interpreted) {
     return `Saved custom command /${saved.name} (${parsed.mode}).`;
   }
 
-  if (args.length > 1) {
-    return `Usage: /${commandRaw} [target]`;
-  }
-
   try {
     const custom = await api.getCustomCommand(commandRaw);
-    let targetSessionId = activeSessionId;
-    if (args.length === 1) {
-      const resolved = resolveSessionToken(args[0], sessions);
-      if (!resolved.session) {
-        return resolved.error;
+    let targetSessions = [];
+    if (args.length === 0) {
+      if (!activeSessionId) {
+        return "No active session for custom command execution.";
       }
-      targetSessionId = resolved.session.id;
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return "No active session for custom command execution.";
+      }
+      targetSessions = [activeSession];
+    } else {
+      const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
+      if (resolvedTargets.error) {
+        return resolvedTargets.error;
+      }
+      targetSessions = resolvedTargets.sessions;
     }
-    if (!targetSessionId) {
+    if (targetSessions.length === 0) {
       return "No active session for custom command execution.";
     }
-    const payload = withSingleTrailingNewline(
-      normalizeCustomCommandPayloadForShell(custom.content),
-      getSessionSendTerminator(targetSessionId)
+    await Promise.all(
+      targetSessions.map((session) => {
+        const payload = withSingleTrailingNewline(
+          normalizeCustomCommandPayloadForShell(custom.content),
+          getSessionSendTerminator(session.id)
+        );
+        return api.sendInput(session.id, payload);
+      })
     );
-    await api.sendInput(targetSessionId, payload);
-    return `Executed /${custom.name} on [${formatSessionToken(targetSessionId)}].`;
+    if (targetSessions.length === 1) {
+      return `Executed /${custom.name} on [${formatSessionToken(targetSessions[0].id)}].`;
+    }
+    return `Executed /${custom.name} on ${targetSessions.length} sessions.`;
   } catch (err) {
     if (err && err.status === 404) {
       return `Unknown command: /${commandRaw}`;
@@ -2446,18 +2556,24 @@ async function submitCommand() {
   const directRouting = parseDirectTargetRoutingInput(interpreted.data);
 
   let targetSessionId = state.activeSessionId;
+  let targetSessions = [];
   let targetPayload = interpreted.data;
   let routeFeedback = "";
 
   if (directRouting.matched) {
-    const resolved = resolveSessionToken(directRouting.targetToken, sessions);
-    if (!resolved.session) {
-      setCommandFeedback(resolved.error);
+    const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, { source: "direct-route" });
+    if (resolvedTargets.error) {
+      setCommandFeedback(resolvedTargets.error);
       return;
     }
-    targetSessionId = resolved.session.id;
+    targetSessions = resolvedTargets.sessions;
+    targetSessionId = targetSessions[0]?.id || "";
     targetPayload = directRouting.payload;
-    routeFeedback = `Sent to [${formatSessionToken(resolved.session.id)}] ${formatSessionDisplayName(resolved.session)}.`;
+    if (targetSessions.length === 1) {
+      routeFeedback = `Sent to [${formatSessionToken(targetSessions[0].id)}] ${formatSessionDisplayName(targetSessions[0])}.`;
+    } else {
+      routeFeedback = `Sent to ${targetSessions.length} sessions.`;
+    }
   }
 
   if (!targetSessionId) {
@@ -2465,9 +2581,23 @@ async function submitCommand() {
   }
 
   try {
-    const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(targetSessionId));
-    debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
-    await api.sendInput(targetSessionId, payload);
+    if (directRouting.matched && targetSessions.length > 0) {
+      await Promise.all(
+        targetSessions.map((session) => {
+          const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(session.id));
+          debugLog("command.send.start", {
+            activeSessionId: session.id,
+            length: payload.length,
+            directRoute: directRouting.matched
+          });
+          return api.sendInput(session.id, payload);
+        })
+      );
+    } else {
+      const payload = withSingleTrailingNewline(targetPayload, getSessionSendTerminator(targetSessionId));
+      debugLog("command.send.start", { activeSessionId: targetSessionId, length: payload.length, directRoute: directRouting.matched });
+      await api.sendInput(targetSessionId, payload);
+    }
     commandInput.value = "";
     setCommandPreview("");
     clearCommandSuggestions();

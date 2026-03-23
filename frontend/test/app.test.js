@@ -1207,6 +1207,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.ok(MockTerminal.instances[0].writes.includes("\u001b[2J\u001b[H"));
   assert.ok(MockTerminal.instances[0].refreshCalls.length > 0);
 
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.created",
+      session: {
+        id: "ops",
+        shell: "bash",
+        cwd: "~",
+        name: "ops-node",
+        tags: ["ops"],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 3);
+
   const routedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@1 echo routed";
   fixture.elements.sendCommand.click();
@@ -1232,6 +1249,22 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-2", data: "line 1\rline 2\r\n" });
+  const overlappedDirectBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "@ops,2 echo overlap";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, overlappedDirectBefore + 2);
+  const overlappedDirectTargets = inputPayloads.slice(overlappedDirectBefore).map((entry) => entry.sessionId).sort();
+  assert.deepEqual(overlappedDirectTargets, ["ops", "s-2"]);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to 2 sessions.");
+  const overlappedCustomBefore = inputPayloads.length;
+  fixture.elements.commandInput.value = "/blockcmd ops,2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, overlappedCustomBefore + 2);
+  const overlappedCustomTargets = inputPayloads.slice(overlappedCustomBefore).map((entry) => entry.sessionId).sort();
+  assert.deepEqual(overlappedCustomTargets, ["ops", "s-2"]);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Executed /blockcmd on 2 sessions.");
 
   secondSendTerminator.value = "lf";
   secondSendTerminator.dispatchEvent({ type: "change" });
@@ -1285,7 +1318,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 1);
+  assert.equal(fixture.elements.terminalGrid.children.length, 2);
   ws.emit("message", {
     data: JSON.stringify({
       type: "session.created",
@@ -1302,8 +1335,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 2);
-  const reopenedSecondTerminal = MockTerminal.instances[2];
+  assert.equal(fixture.elements.terminalGrid.children.length, 3);
+  const reopenedSecondTerminal = MockTerminal.instances[3];
   assert.equal(reopenedSecondTerminal.options.theme.background, "#101010");
   assert.equal(reopenedSecondTerminal.options.theme.foreground, "#e0e0e0");
 
