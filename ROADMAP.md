@@ -289,6 +289,14 @@ Exit criteria:
 - `QLT-082`
 - `PLAT-011`
 
+Completed in this milestone:
+
+- `QLT-080`
+
+Remaining in this milestone:
+
+- `QLT-081`, `QLT-082`, `PLAT-011`
+
 Dependencies:
 
 - `QLT-081` depends on `QLT-080` so FE can render backend-provided unrestored-session state deterministically.
@@ -302,10 +310,46 @@ Exit criteria:
 - Regression tests cover repeated restart durability for unrestored sessions and FE rendering semantics.
 - Local-only quality gate flow is documented and aligns with disabled remote-runner CI configuration.
 
+### v0.3.0-H6 - Deck Isolation and Multi-Deck Control Plane
+
+- `QLT-083`
+- `QLT-084`
+- `QLT-085`
+- `QLT-086`
+- `QLT-087`
+- `QLT-088`
+- `QLT-089`
+- `QLT-090`
+- `QLT-091`
+- `QLT-092`
+- `QLT-093`
+
+Dependencies:
+
+- `QLT-084` depends on `QLT-083` (deck domain contract).
+- `QLT-085` depends on `QLT-083` and `QLT-084` (OpenAPI/REST must align with persisted deck model).
+- `QLT-086` depends on `QLT-084` and `QLT-085` (deck-aware list/get semantics on top of deck model + routes).
+- `QLT-087` depends on `QLT-085` (conflict-safe deck lifecycle and move semantics in backend routes).
+- `QLT-088` depends on `QLT-085` (frontend tab/navigation against deck CRUD APIs).
+- `QLT-089` depends on `QLT-086` and `QLT-088` (active-deck-scoped rendering and active-session fallback behavior).
+- `QLT-090` depends on `QLT-085` and `QLT-088` (slash command control surface for deck operations).
+- `QLT-091` depends on `QLT-089` and `QLT-090` (deck-aware selector/routing semantics).
+- `QLT-092` depends on `QLT-091` (dedupe guarantees across overlapping selectors).
+- `QLT-093` depends on `QLT-087`, `QLT-089`, `QLT-091`, and `QLT-092` (end-to-end regression matrix).
+
+Exit criteria:
+
+- Decks exist as isolated terminal groups with deterministic active-deck behavior.
+- Session operations are deck-aware and do not perform implicit cross-deck mutations.
+- Deck-level conflicts (delete/move/selector overlap) produce deterministic behavior and explicit errors.
+- Per-deck settings baseline (terminal geometry) persists and applies independently.
+- Deck and move slash commands behave consistently with UI actions.
+- Regression coverage validates migration, isolation semantics, and multi-selector dedupe guarantees.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H4`
-- Next milestones in progress: `v0.3.0-H5`
+- Next milestones in progress: `v0.3.0-H5`, `v0.3.0-H6`
 - Blockers: none recorded
 
 ### Completed Items

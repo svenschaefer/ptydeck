@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-080` completed: backend REST session responses now expose deterministic `state` metadata (`active` or `unrestored`) for `GET /api/v1/sessions` and `GET /api/v1/sessions/{sessionId}`.
+- [x] Backend OpenAPI + response validation updated so `Session.state` is part of the contract, and session create/update/restart responses now consistently return `state: active`.
+- [x] Backend validation coverage updated for the `Session.state` schema requirement; runtime integration assertions now verify `state: active` on core lifecycle responses.
 - [x] Frontend terminal geometry fine-tuning: fixed-size card width chrome reduced by additional 2px for tighter row packing without layout regressions.
 - [x] Frontend filter UX hardening: `/filter` state is now persisted across hard reload (`Ctrl+F5`) and restored on startup from local storage.
 - [x] Frontend filter behavior hardening: when active terminal is outside the current display filter, active focus now switches deterministically to the first visible filtered terminal.

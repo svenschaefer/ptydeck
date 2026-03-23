@@ -40,17 +40,20 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
     assert.equal(typeof created.id, "string");
+    assert.equal(created.state, "active");
 
     const listRes = await fetch(`${baseUrl}/sessions`);
     assert.equal(listRes.status, 200);
     const listed = await listRes.json();
     assert.ok(listed.some((session) => session.id === created.id));
+    assert.ok(listed.some((session) => session.id === created.id && session.state === "active"));
 
     const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
     assert.equal(getRes.status, 200);
     const getPayload = await getRes.json();
     assert.equal(typeof getPayload.cwd, "string");
     assert.ok(getPayload.cwd.length > 0);
+    assert.equal(getPayload.state, "active");
 
     const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "PATCH",
@@ -81,6 +84,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(restartRes.status, 200);
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
+    assert.equal(restarted.state, "active");
 
     const deleteRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "DELETE"
@@ -130,6 +134,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     });
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
+    assert.equal(created.state, "active");
     assert.equal(created.startCwd, "/tmp");
     assert.equal(created.startCommand, "echo BOOT");
     assert.deepEqual(created.env, { APP_MODE: "dev" });
@@ -170,6 +175,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     });
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
+    assert.equal(patched.state, "active");
     assert.equal(patched.startCwd, "/var/tmp");
     assert.equal(patched.startCommand, "echo RESTART");
     assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
@@ -183,6 +189,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restartRes.status, 200);
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
+    assert.equal(restarted.state, "active");
     assert.equal(restarted.cwd, "/var/tmp");
     assert.equal(restarted.startCwd, "/var/tmp");
     assert.equal(restarted.startCommand, "echo RESTART");
@@ -939,6 +946,7 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
     const restored = await res.json();
     assert.equal(restored.id, sessionId);
     assert.equal(restored.startCwd, homedir());
+    assert.equal(restored.state, "active");
   } finally {
     await runtime.stop();
   }
@@ -982,6 +990,7 @@ test("runtime restore falls back to configured shell when persisted shell is inv
     const restored = await res.json();
     assert.equal(restored.id, sessionId);
     assert.equal(restored.shell, "sh");
+    assert.equal(restored.state, "active");
   } finally {
     await runtime.stop();
   }

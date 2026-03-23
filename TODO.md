@@ -13,10 +13,21 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-080` Owner: `BE` Task: Expose unrestored persisted sessions explicitly in REST (`GET /api/v1/sessions`/`GET /api/v1/sessions/{sessionId}`) with deterministic `state` metadata (`active` or `unrestored`) so they are never silently hidden after restart.
+- [x] `QLT-080` Owner: `BE` Task: Expose unrestored persisted sessions explicitly in REST (`GET /api/v1/sessions`/`GET /api/v1/sessions/{sessionId}`) with deterministic `state` metadata (`active` or `unrestored`) so they are never silently hidden after restart.
 - [ ] `QLT-081` Owner: `FE` Task: Render unrestored sessions in terminal list/grid with explicit non-active state badge and recovery guidance, while preventing input/resize/restart actions until restored.
 - [ ] `QLT-082` Owner: `QA` Task: Add regression coverage for unrestored-session durability across repeated start/stop cycles and visibility semantics in REST + FE rendering.
 - [ ] `PLAT-011` Owner: `PLAT` Task: Replace remote GitHub-runner CI gates with a documented local-only quality gate flow (`npm run lint`, `npm run test`, `npm run test:coverage:check`, smoke/security scripts) and remove obsolete remote-runner assumptions from docs.
+- [ ] `QLT-083` Owner: `CODY` Task: Define the `Deck` domain contract in docs (`CODEX_CONTEXT.md` + `TODO.md` references): deck isolation rules, active-deck semantics, default-deck migration behavior, and command/UI behavior boundaries.
+- [ ] `QLT-084` Owner: `BE` Task: Extend session persistence model with `deckId` and add persisted deck entities (`id`, `name`, `createdAt`, `updatedAt`, per-deck settings object), including legacy migration that assigns existing sessions to `default` deck.
+- [ ] `QLT-085` Owner: `BE` Task: Add OpenAPI + REST endpoints for deck lifecycle and assignment (`GET/POST/PATCH/DELETE /api/v1/decks`, `POST /api/v1/decks/{deckId}/sessions/{sessionId}:move`) with deterministic validation/errors.
+- [ ] `QLT-086` Owner: `BE` Task: Enforce deck-aware session listing/getting/query (`GET /api/v1/sessions` supports optional `deckId` filter; responses include `deckId`) and guarantee no implicit cross-deck mutations.
+- [ ] `QLT-087` Owner: `BE` Task: Add conflict-safe deck operations: reject delete of non-empty deck unless explicit `force=true`, prevent moving to unknown deck, and ensure idempotent move when source/target deck are equal.
+- [ ] `QLT-088` Owner: `FE` Task: Implement top tab bar deck navigation (create/rename/switch/delete flows) with deterministic active-deck state and per-deck UI settings (initially terminal cols/rows).
+- [ ] `QLT-089` Owner: `FE` Task: Scope terminal grid rendering strictly to active deck while keeping non-visible deck sessions alive, and auto-resolve active session when current active session is moved out or hidden by deck switch.
+- [ ] `QLT-090` Owner: `FE` Task: Add slash commands for deck control and session move (`/deck list|new|rename|switch|delete`, `/move <sessionSelector> <deckSelector>`) with explicit success/error feedback.
+- [ ] `QLT-091` Owner: `FE` Task: Apply deck isolation to command/target resolution (`/switch`, `/next`, `/prev`, `/filter`, `@target`): default selectors resolve inside active deck, with explicit cross-deck selectors supported when requested.
+- [ ] `QLT-092` Owner: `FE` Task: Implement conflict-safe dedupe for multi-selector operations across IDs/quick IDs/tags/deck selectors so each target session executes at most once even under overlapping matches.
+- [ ] `QLT-093` Owner: `QA` Task: Add full deck regression matrix (legacy migration, deck CRUD, move semantics, delete conflicts, active-session fallback, per-deck settings persistence, slash-command deck routing, dedupe guarantees).
 
 ## Backend Tasks (OpenAPI-based REST)
 

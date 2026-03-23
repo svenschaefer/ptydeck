@@ -701,6 +701,45 @@ export function createRuntime(config) {
     };
   }
 
+  function toApiSession(session, state) {
+    return {
+      ...session,
+      state
+    };
+  }
+
+  function listApiSessions() {
+    const payload = [];
+    const seen = new Set();
+    for (const session of manager.list()) {
+      payload.push(toApiSession(session, "active"));
+      seen.add(session.id);
+    }
+    for (const [sessionId, session] of unrestoredSessions.entries()) {
+      if (seen.has(sessionId)) {
+        continue;
+      }
+      payload.push(toApiSession(session, "unrestored"));
+    }
+    return payload;
+  }
+
+  function getApiSessionOrThrow(sessionId) {
+    try {
+      const active = manager.get(sessionId).meta;
+      return toApiSession(active, "active");
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const unrestored = unrestoredSessions.get(sessionId);
+    if (unrestored) {
+      return toApiSession(unrestored, "unrestored");
+    }
+    throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+  }
+
   function tryCreateRestoredSession({
     session,
     shell,
@@ -941,7 +980,7 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "listSessions") {
-        const payload = manager.list();
+        const payload = listApiSessions();
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
         writeJson(req, res, 200, payload);
         return;
@@ -977,14 +1016,15 @@ export function createRuntime(config) {
           tags,
           themeProfile
         });
-        validateResponse({ statusCode: 201, body: payload, expect: "session" });
+        const apiPayload = toApiSession(payload, "active");
+        validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
-        writeJson(req, res, 201, payload);
+        writeJson(req, res, 201, apiPayload);
         return;
       }
 
       if (match.kind === "getSession") {
-        const payload = manager.get(match.params.sessionId).meta;
+        const payload = getApiSessionOrThrow(match.params.sessionId);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
         writeJson(req, res, 200, payload);
         return;
@@ -1029,9 +1069,10 @@ export function createRuntime(config) {
           throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
         }
         const payload = manager.updateSession(match.params.sessionId, patch);
-        validateResponse({ statusCode: 200, body: payload, expect: "session" });
+        const apiPayload = toApiSession(payload, "active");
+        validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.update");
-        writeJson(req, res, 200, payload);
+        writeJson(req, res, 200, apiPayload);
         return;
       }
 
@@ -1049,9 +1090,10 @@ export function createRuntime(config) {
 
       if (match.kind === "restart") {
         const payload = manager.restart(match.params.sessionId);
-        validateResponse({ statusCode: 200, body: payload, expect: "session" });
+        const apiPayload = toApiSession(payload, "active");
+        validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.restart");
-        writeJson(req, res, 200, payload);
+        writeJson(req, res, 200, apiPayload);
         return;
       }
 

@@ -331,6 +331,7 @@ components:
       type: object
       required:
         - id
+        - state
         - cwd
         - shell
         - tags
@@ -339,6 +340,11 @@ components:
       properties:
         id:
           type: string
+        state:
+          type: string
+          enum:
+            - active
+            - unrestored
         cwd:
           type: string
         shell:

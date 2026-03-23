@@ -200,6 +200,7 @@ function isSession(value) {
   return (
     isObject(value) &&
     typeof value.id === "string" &&
+    (value.state === "active" || value.state === "unrestored") &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&
