@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-092` completed: selector resolution now supports deck selectors (`deck:<deckSelector>`) and wildcard (`*`) in multi-selector command paths.
+- [x] Overlap-dedupe semantics are enforced by session ID across mixed selector sets (ID, quick ID, tag, and deck selector) so each session executes at most once.
+- [x] Frontend integration coverage added for dedupe behavior using overlapping selector input (`/restart deck:default,1` resolves to unique targets only).
+- [x] Validation for `QLT-092` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-091` completed: deck-aware selector isolation is now enforced for `/switch`, `/next`, `/prev`, `/filter`, and direct routing `@target` with active-deck-first resolution.
 - [x] Explicit cross-deck selectors are now supported via `deckSelector::sessionSelector` for deck-isolated command paths (`/switch`, `/filter`, and `@target`).
 - [x] `/next` and `/prev` navigation are now active-deck scoped, preventing implicit cross-deck focus jumps.

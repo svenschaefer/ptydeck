@@ -2684,6 +2684,27 @@ function resolveSelectorMatches(selector, sessions, options = {}) {
     candidateSessions = crossDeck.sessions;
   }
   const token = crossDeck.explicit ? crossDeck.token : normalized;
+  const normalizedToken = token.toLowerCase();
+
+  if (token === "*") {
+    return { sessions: candidateSessions.slice(), error: "" };
+  }
+
+  if (normalizedToken.startsWith("deck:")) {
+    const deckToken = token.slice("deck:".length).trim();
+    if (!deckToken) {
+      return { sessions: [], error: "Deck selector must be 'deck:<deckSelector>'." };
+    }
+    const resolvedDeck = resolveDeckToken(deckToken, deckState.decks);
+    if (!resolvedDeck.deck) {
+      return { sessions: [], error: resolvedDeck.error };
+    }
+    const deckMatches = allSessions.filter((session) => resolveSessionDeckId(session) === resolvedDeck.deck.id);
+    if (deckMatches.length === 0) {
+      return { sessions: [], error: `No sessions found for deck '${resolvedDeck.deck.id}'.` };
+    }
+    return { sessions: deckMatches, error: "" };
+  }
 
   const dedupe = new Map();
   const resolved = resolveSessionToken(token, candidateSessions);
@@ -2761,6 +2782,31 @@ function resolveFilterSelectors(selectorText, sessions, options = {}) {
     const selectorSessions = crossDeck.explicit ? crossDeck.sessions : candidateSessions;
     const token = crossDeck.explicit ? crossDeck.token : String(selector || "").trim();
     if (!token) {
+      continue;
+    }
+    if (token === "*") {
+      for (const session of selectorSessions) {
+        dedupe.set(session.id, session);
+      }
+      continue;
+    }
+    const normalizedToken = token.toLowerCase();
+    if (normalizedToken.startsWith("deck:")) {
+      const deckToken = token.slice("deck:".length).trim();
+      if (!deckToken) {
+        return { sessions: [], error: "Deck selector must be 'deck:<deckSelector>'." };
+      }
+      const resolvedDeck = resolveDeckToken(deckToken, deckState.decks);
+      if (!resolvedDeck.deck) {
+        return { sessions: [], error: resolvedDeck.error };
+      }
+      const deckMatches = allSessions.filter((session) => resolveSessionDeckId(session) === resolvedDeck.deck.id);
+      if (deckMatches.length === 0) {
+        return { sessions: [], error: `No sessions found for deck '${resolvedDeck.deck.id}'.` };
+      }
+      for (const session of deckMatches) {
+        dedupe.set(session.id, session);
+      }
       continue;
     }
     const exactIdMatch = selectorSessions.find((session) => session.id === token) || null;

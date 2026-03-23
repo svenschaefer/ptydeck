@@ -1217,6 +1217,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^\* \[default\] Default \(2 sessions\)$/);
 
+  const restartCountBeforeDedupe = restartCalls.length;
+  fixture.elements.commandInput.value = "/restart deck:default,1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Restarted 2 sessions.");
+  const restartSlice = restartCalls.slice(restartCountBeforeDedupe);
+  assert.equal(restartSlice.length, 2);
+  assert.equal(new Set(restartSlice).size, 2);
+  assert.ok(restartSlice.includes("s-1"));
+  assert.ok(restartSlice.includes("s-2"));
+
   fixture.elements.commandInput.value = "/deck new Ops";
   fixture.elements.sendCommand.click();
   await tick();
