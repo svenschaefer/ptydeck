@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-082` completed: backend regression coverage now verifies unrestored-session durability and REST visibility semantics across repeated restart cycles.
+- [x] Backend restore path hardening: unrestored persisted sessions are now normalized to full `Session` schema shape before exposure/persistence, preventing schema-validation `500` responses on `GET /api/v1/sessions` and `GET /api/v1/sessions/{sessionId}`.
+- [x] Added integration assertions proving unrestored sessions remain visible with `state: unrestored` after restart cycle A and restart cycle B.
 - [x] `QLT-081` completed: frontend now renders unrestored sessions with explicit `UNRESTORED` state badge and an in-card recovery hint.
 - [x] Frontend runtime guards now block `input`, `resize`, and `restart` actions for unrestored sessions, with deterministic user feedback in command/terminal flows.
 - [x] Frontend regression coverage extended for unrestored-session UX/guardrails (badge/hint rendering, resize suppression, routed/active input blocking, restart blocking).

@@ -920,7 +920,7 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
           {
             id: sessionId,
             cwd: "/definitely/not/a/real/path",
-            shell: "sh",
+            shell: "bash",
             name: "invalid-cwd",
             startCwd: "/definitely/not/a/real/path",
             startCommand: "",
@@ -939,7 +939,7 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
     "utf8"
   );
 
-  const { runtime, baseUrl } = await createStartedRuntime({ dataPath });
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "bash" });
   try {
     const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
     assert.equal(res.status, 200);
@@ -983,34 +983,48 @@ test("runtime restore falls back to configured shell when persisted shell is inv
     "utf8"
   );
 
-  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "sh" });
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "bash" });
   try {
     const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
     assert.equal(res.status, 200);
     const restored = await res.json();
     assert.equal(restored.id, sessionId);
-    assert.equal(restored.shell, "sh");
+    assert.equal(restored.shell, "bash");
     assert.equal(restored.state, "active");
   } finally {
     await runtime.stop();
   }
 });
 
-test("runtime keeps unrestorable persisted sessions across restart cycles", async () => {
+test("runtime keeps unrestored persisted sessions visible across restart cycles", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
-  const sessionId = "restore-unrestorable";
+  const activeSessionId = "restore-active";
+  const unrestoredSessionId = "restore-unrestored";
   await writeFile(
     dataPath,
     JSON.stringify(
       {
         sessions: [
           {
-            id: sessionId,
-            cwd: "/definitely/not/a/real/path",
-            shell: "/definitely/not/a/real/shell",
-            name: "unrestorable",
-            startCwd: "/definitely/not/a/real/path",
+            id: activeSessionId,
+            cwd: homedir(),
+            shell: "sh",
+            name: "active",
+            startCwd: homedir(),
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          },
+          {
+            id: unrestoredSessionId,
+            cwd: homedir(),
+            shell: "sh",
+            name: "unrestored",
+            startCwd: homedir(),
             startCommand: "",
             env: {},
             tags: [],
@@ -1027,26 +1041,64 @@ test("runtime keeps unrestorable persisted sessions across restart cycles", asyn
     "utf8"
   );
 
-  const runtime = createRuntime({
+  const runtimeA = createRuntime({
     port: 0,
-    shell: "/definitely/not/a/fallback/shell",
+    shell: "sh",
     dataPath,
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
-    maxBodyBytes: 1024 * 1024
+    maxBodyBytes: 1024 * 1024,
+    sessionMaxConcurrent: 1
   });
 
   try {
-    await runtime.start();
-    await runtime.stop();
+    await runtimeA.start();
+    const baseUrlA = `http://127.0.0.1:${runtimeA.getAddress().port}/api/v1`;
+    const listResA = await fetch(`${baseUrlA}/sessions`);
+    assert.equal(listResA.status, 200);
+    const sessionsA = await listResA.json();
+    const activeA = sessionsA.find((session) => session.id === activeSessionId);
+    assert.ok(activeA);
+    assert.equal(activeA.state, "active");
+    const unrestoredA = sessionsA.find((session) => session.id === unrestoredSessionId);
+    assert.ok(unrestoredA);
+    assert.equal(unrestoredA.state, "unrestored");
+
+    const getResA = await fetch(`${baseUrlA}/sessions/${unrestoredSessionId}`);
+    assert.equal(getResA.status, 200);
+    const getPayloadA = await getResA.json();
+    assert.equal(getPayloadA.id, unrestoredSessionId);
+    assert.equal(getPayloadA.state, "unrestored");
+    await runtimeA.stop();
   } finally {
-    await runtime.stop();
+    await runtimeA.stop();
   }
 
   const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
   const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
   assert.ok(Array.isArray(persistedSessions));
-  assert.ok(persistedSessions.some((session) => session.id === sessionId));
+  assert.ok(persistedSessions.some((session) => session.id === unrestoredSessionId));
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    sessionMaxConcurrent: 1
+  });
+  try {
+    await runtimeB.start();
+    const baseUrlB = `http://127.0.0.1:${runtimeB.getAddress().port}/api/v1`;
+    const getResB = await fetch(`${baseUrlB}/sessions/${unrestoredSessionId}`);
+    assert.equal(getResB.status, 200);
+    const getPayloadB = await getResB.json();
+    assert.equal(getPayloadB.id, unrestoredSessionId);
+    assert.equal(getPayloadB.state, "unrestored");
+  } finally {
+    await runtimeB.stop();
+  }
 });
 
 test("ready endpoint returns starting before startup gate and ready after release", async () => {

@@ -15,7 +15,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 - [x] `QLT-080` Owner: `BE` Task: Expose unrestored persisted sessions explicitly in REST (`GET /api/v1/sessions`/`GET /api/v1/sessions/{sessionId}`) with deterministic `state` metadata (`active` or `unrestored`) so they are never silently hidden after restart.
 - [x] `QLT-081` Owner: `FE` Task: Render unrestored sessions in terminal list/grid with explicit non-active state badge and recovery guidance, while preventing input/resize/restart actions until restored.
-- [ ] `QLT-082` Owner: `QA` Task: Add regression coverage for unrestored-session durability across repeated start/stop cycles and visibility semantics in REST + FE rendering.
+- [x] `QLT-082` Owner: `QA` Task: Add regression coverage for unrestored-session durability across repeated start/stop cycles and visibility semantics in REST + FE rendering.
+- [ ] `QLT-094` Owner: `QA` Task: Stabilize restore-fallback regression behavior for short-lived restored shells so `runtime restore falls back to home/shell` tests are deterministic across environments (no transient `404` race after successful restore).
 - [x] `PLAT-011` Owner: `PLAT` Task: Replace remote GitHub-runner CI gates with a documented local-only quality gate flow (`npm run lint`, `npm run test`, `npm run test:coverage:check`, smoke/security scripts) and remove obsolete remote-runner assumptions from docs.
 - [x] `QLT-083` Owner: `CODY` Task: Define the `Deck` domain contract in docs (`CODEX_CONTEXT.md` + `TODO.md` references): deck isolation rules, active-deck semantics, default-deck migration behavior, and command/UI behavior boundaries.
 - [ ] `QLT-084` Owner: `BE` Task: Extend session persistence model with `deckId` and add persisted deck entities (`id`, `name`, `createdAt`, `updatedAt`, per-deck settings object), including legacy migration that assigns existing sessions to `default` deck.

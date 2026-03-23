@@ -1253,6 +1253,24 @@ export function createRuntime(config) {
         const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
         const requestedShell = typeof session.shell === "string" && session.shell.trim() ? session.shell : config.shell;
+        const restoredCreatedAt = Number.isInteger(session.createdAt) ? session.createdAt : Date.now();
+        const restoredUpdatedAt = Number.isInteger(session.updatedAt) ? session.updatedAt : restoredCreatedAt;
+        const normalizedUnrestoredSession = {
+          id: typeof session.id === "string" && session.id ? session.id : "",
+          cwd:
+            typeof session.cwd === "string" && session.cwd.trim()
+              ? session.cwd
+              : startupConfig.startCwd,
+          shell: requestedShell,
+          ...(typeof session.name === "string" ? { name: session.name } : {}),
+          startCwd: startupConfig.startCwd,
+          startCommand: startupConfig.startCommand,
+          env: startupConfig.env,
+          tags,
+          themeProfile,
+          createdAt: restoredCreatedAt,
+          updatedAt: restoredUpdatedAt
+        };
         const requestedCwd = startupConfig.startCwd;
         const fallbackCwd = homedir();
         const fallbackShell = config.shell;
@@ -1300,13 +1318,13 @@ export function createRuntime(config) {
         }
 
         if (!restored) {
-          unrestoredSessions.set(session.id, { ...session });
+          unrestoredSessions.set(normalizedUnrestoredSession.id, normalizedUnrestoredSession);
           logDebug("runtime.restore.session_marked_unrestored", {
-            sessionId: session.id
+            sessionId: normalizedUnrestoredSession.id
           });
           throw new Error("all restore attempts failed");
         }
-        unrestoredSessions.delete(session.id);
+        unrestoredSessions.delete(normalizedUnrestoredSession.id);
       } catch (err) {
         console.error("failed to restore session", session.id, err);
       }

@@ -291,16 +291,17 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-080`, `QLT-081`, `PLAT-011`
+- `QLT-080`, `QLT-081`, `QLT-082`, `PLAT-011`
 
 Remaining in this milestone:
 
-- `QLT-082`
+- `QLT-094`
 
 Dependencies:
 
 - `QLT-081` depends on `QLT-080` so FE can render backend-provided unrestored-session state deterministically.
 - `QLT-082` depends on `QLT-080` and `QLT-081` to validate runtime durability and FE visibility/behavior for unrestored sessions.
+- `QLT-094` depends on `QLT-082` and stabilizes environment-dependent restore-fallback race behavior in backend integration tests.
 - `PLAT-011` is independent of `QLT-080` ... `QLT-082` and can run in parallel, but must complete before enforcing local-only delivery policy in docs/process gates.
 
 Exit criteria:
@@ -308,6 +309,7 @@ Exit criteria:
 - Unrestored persisted sessions are visible via API and are not silently dropped from operator view.
 - FE communicates unrestored state explicitly and prevents invalid interactive operations on unrestored sessions.
 - Regression tests cover repeated restart durability for unrestored sessions and FE rendering semantics.
+- Restore-fallback regression tests are deterministic across environments (no short-lived restored-session `404` race in integration assertions).
 - Local-only quality gate flow is documented and aligns with disabled remote-runner CI configuration.
 
 ### v0.3.0-H6 - Deck Isolation and Multi-Deck Control Plane
