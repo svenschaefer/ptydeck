@@ -34,6 +34,9 @@ const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
 const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SESSION_TAG_MAX_COUNT = 32;
+const SESSION_TAG_MAX_LENGTH = 32;
+const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
@@ -340,6 +343,54 @@ function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
     normalized[key] = typeof input[key] === "string" ? input[key] : defaultValue;
   }
 
+  return normalized;
+}
+
+function normalizeSessionTags(input, { strict = true } = {}) {
+  if (input === undefined || input === null) {
+    return [];
+  }
+  if (!Array.isArray(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'tags' must be an array of strings.");
+    }
+    return [];
+  }
+
+  const normalized = [];
+  const seen = new Set();
+  for (const entry of input) {
+    if (typeof entry !== "string") {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'tags' must contain only strings.");
+      }
+      continue;
+    }
+    const candidate = entry.trim().toLowerCase();
+    if (!candidate || candidate.length > SESSION_TAG_MAX_LENGTH || !SESSION_TAG_PATTERN.test(candidate)) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "ValidationError",
+          `Each tag must match ${SESSION_TAG_PATTERN} and be at most ${SESSION_TAG_MAX_LENGTH} chars.`
+        );
+      }
+      continue;
+    }
+    if (seen.has(candidate)) {
+      continue;
+    }
+    seen.add(candidate);
+    normalized.push(candidate);
+    if (normalized.length >= SESSION_TAG_MAX_COUNT) {
+      if (strict && input.length > SESSION_TAG_MAX_COUNT) {
+        throw new ApiError(400, "ValidationError", `Field 'tags' exceeds maximum entries (${SESSION_TAG_MAX_COUNT}).`);
+      }
+      break;
+    }
+  }
+
+  normalized.sort((a, b) => a.localeCompare(b, "en-US", { sensitivity: "base" }));
   return normalized;
 }
 
@@ -842,6 +893,7 @@ export function createRuntime(config) {
           { strict: true }
         );
         const themeProfile = normalizeSessionThemeProfile(body?.themeProfile, { strict: true });
+        const tags = normalizeSessionTags(body?.tags, { strict: true });
         const payload = manager.create({
           cwd: startupConfig.startCwd,
           shell: body?.shell,
@@ -849,6 +901,7 @@ export function createRuntime(config) {
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
+          tags,
           themeProfile
         });
         validateResponse({ statusCode: 201, body: payload, expect: "session" });
@@ -895,6 +948,9 @@ export function createRuntime(config) {
         }
         if (body?.themeProfile !== undefined) {
           patch.themeProfile = normalizeSessionThemeProfile(body.themeProfile, { strict: true });
+        }
+        if (body?.tags !== undefined) {
+          patch.tags = normalizeSessionTags(body.tags, { strict: true });
         }
         if (!Object.keys(patch).length) {
           throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
@@ -1086,6 +1142,7 @@ export function createRuntime(config) {
         if (!themeProfile) {
           continue;
         }
+        const tags = normalizeSessionTags(session.tags, { strict: false });
         manager.create({
           id: session.id,
           cwd: startupConfig.startCwd,
@@ -1094,6 +1151,7 @@ export function createRuntime(config) {
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
+          tags,
           themeProfile,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt

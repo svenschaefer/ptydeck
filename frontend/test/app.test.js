@@ -222,6 +222,8 @@ function createTerminalCardTemplateNode() {
   const quickId = new FakeElement({ className: "session-quick-id", tagName: "span" });
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
+  const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
+  tagList.classList.add("empty");
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
@@ -238,6 +240,9 @@ function createTerminalCardTemplateNode() {
   const startEnvLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startEnv = new FakeElement({ className: "session-start-env", tagName: "textarea" });
   startEnv.value = "";
+  const startTagsLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const startTags = new FakeElement({ className: "session-tags-input", tagName: "input" });
+  startTags.value = "";
   const startSendTerminatorLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startSendTerminator = new FakeElement({ className: "session-send-terminator", tagName: "select" });
   startSendTerminator.value = "auto";
@@ -275,6 +280,8 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startCommand);
   startControls.appendChild(startEnvLabel);
   startControls.appendChild(startEnv);
+  startControls.appendChild(startTagsLabel);
+  startControls.appendChild(startTags);
   startControls.appendChild(startSendTerminatorLabel);
   startControls.appendChild(startSendTerminator);
   startControls.appendChild(startFeedback);
@@ -297,6 +304,7 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(close);
   settingsPanel.appendChild(settingsFooter);
   card.appendChild(toolbar);
+  card.appendChild(tagList);
   card.appendChild(settingsPanel);
   card.appendChild(mount);
   return card;
@@ -477,7 +485,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(
-            makeJsonResponse(200, [{ id: "s-1", shell: "bash", cwd: "~", createdAt: Date.now(), updatedAt: Date.now() }])
+            makeJsonResponse(200, [{ id: "s-1", shell: "bash", cwd: "~", tags: [], createdAt: Date.now(), updatedAt: Date.now() }])
           );
         }, 60);
       });
@@ -498,6 +506,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         startCwd: payload.startCwd || "~",
         startCommand: payload.startCommand || "",
         env: payload.env || {},
+        tags: Array.isArray(payload.tags) ? payload.tags : [],
         themeProfile: payload.themeProfile || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -523,6 +532,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         shell: "bash",
         cwd: "~",
         name: "one",
+        tags: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       });
@@ -1031,8 +1041,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     data: JSON.stringify({
       type: "snapshot",
       sessions: [
-        { id: "s-1", shell: "bash", cwd: "~", name: "one", createdAt: Date.now(), updatedAt: Date.now() },
-        { id: "s-2", shell: "bash", cwd: "~", name: "two", createdAt: Date.now(), updatedAt: Date.now() }
+        { id: "s-1", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
+        { id: "s-2", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
       ],
       outputs: []
     })
@@ -1061,10 +1071,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondStartCwd = secondSettingsPanel.querySelector(".session-start-cwd");
   const secondStartCommand = secondSettingsPanel.querySelector(".session-start-command");
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
+  const secondTags = secondSettingsPanel.querySelector(".session-tags-input");
   const secondSendTerminator = secondSettingsPanel.querySelector(".session-send-terminator");
   const secondSettingsApply = secondSettingsPanel.querySelector(".session-settings-apply");
   const secondSettingsCancel = secondSettingsPanel.querySelector(".session-settings-cancel");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
+  const secondTagList = secondCard.querySelector(".session-tag-list");
+  assert.equal(secondTagList.textContent, "#beta #ops");
   assert.equal(secondSettingsPanel.open, false);
   secondSettings.click();
   await tick();
@@ -1117,6 +1130,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   secondStartCommand.dispatchEvent({ type: "input" });
   secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
   secondStartEnv.dispatchEvent({ type: "input" });
+  secondTags.value = "ops prod";
+  secondTags.dispatchEvent({ type: "input" });
   secondSettingsApply.click();
   await tick();
   assert.equal(updateSessionCalls.length > 0, true);
@@ -1130,6 +1145,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         APP_MODE: "dev",
         FEATURE_X: "1"
       },
+      tags: ["ops", "prod"],
       themeProfile: {
         background: "#101010",
         foreground: "#e0e0e0",
@@ -1156,6 +1172,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
   assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
   assert.equal(secondStartFeedback.textContent, "Settings saved.");
+  assert.equal(secondTagList.textContent, "#ops #prod");
   secondStartEnv.value = "1INVALID=value";
   secondStartEnv.dispatchEvent({ type: "input" });
   const callsBeforeInvalidEnv = updateSessionCalls.length;
@@ -1163,6 +1180,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(updateSessionCalls.length, callsBeforeInvalidEnv);
   assert.equal(secondStartFeedback.textContent, "Invalid env variable name '1INVALID'.");
+  secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
+  secondStartEnv.dispatchEvent({ type: "input" });
+  secondTags.value = "invalid*tag";
+  secondTags.dispatchEvent({ type: "input" });
+  const callsBeforeInvalidTags = updateSessionCalls.length;
+  secondSettingsApply.click();
+  await tick();
+  assert.equal(updateSessionCalls.length, callsBeforeInvalidTags);
+  assert.match(secondStartFeedback.textContent, /Invalid tag 'invalid\*tag'/);
+  secondTags.value = "ops prod";
+  secondTags.dispatchEvent({ type: "input" });
   secondSettings.click();
   await tick();
   assert.equal(secondSettingsPanel.open, false);
@@ -1266,6 +1294,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         shell: "bash",
         cwd: "~",
         name: "two",
+        tags: ["ops", "prod"],
         themeProfile: latestSettingsCall.payload.themeProfile,
         createdAt: Date.now(),
         updatedAt: Date.now()

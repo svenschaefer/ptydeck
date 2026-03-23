@@ -11,6 +11,7 @@ function now() {
 
 const MAX_OUTPUT_BUFFER_CHARS = 16 * 1024;
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -101,6 +102,27 @@ function normalizeSessionThemeProfile(themeProfile) {
   return normalized;
 }
 
+function normalizeSessionTags(tags) {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+  const seen = new Set();
+  const normalized = [];
+  for (const entry of tags) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const candidate = entry.trim().toLowerCase();
+    if (!candidate || !SESSION_TAG_PATTERN.test(candidate) || seen.has(candidate)) {
+      continue;
+    }
+    seen.add(candidate);
+    normalized.push(candidate);
+  }
+  normalized.sort((a, b) => a.localeCompare(b, "en-US", { sensitivity: "base" }));
+  return normalized;
+}
+
 export class SessionManager {
   constructor({
     defaultShell = "bash",
@@ -163,6 +185,7 @@ export class SessionManager {
     startCwd,
     startCommand = "",
     env = {},
+    tags = [],
     themeProfile = {},
     createdAt,
     updatedAt
@@ -186,6 +209,7 @@ export class SessionManager {
           : homedir();
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
+    const normalizedTags = normalizeSessionTags(tags);
     const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
 
@@ -209,6 +233,7 @@ export class SessionManager {
         startCwd: normalizedStartCwd,
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
+        tags: normalizedTags,
         themeProfile: normalizedThemeProfile,
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
@@ -283,6 +308,9 @@ export class SessionManager {
     if (patch.env !== undefined) {
       session.meta.env = normalizeSessionEnv(patch.env);
     }
+    if (patch.tags !== undefined) {
+      session.meta.tags = normalizeSessionTags(patch.tags);
+    }
     if (patch.themeProfile !== undefined) {
       session.meta.themeProfile = normalizeSessionThemeProfile(patch.themeProfile);
     }
@@ -306,6 +334,7 @@ export class SessionManager {
       startCwd: snapshot.startCwd || snapshot.cwd,
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
+      tags: snapshot.tags || [],
       themeProfile: snapshot.themeProfile || {},
       createdAt: snapshot.createdAt,
       updatedAt: this.nowFn()

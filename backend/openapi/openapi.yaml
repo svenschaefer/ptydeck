@@ -333,6 +333,7 @@ components:
         - id
         - cwd
         - shell
+        - tags
         - createdAt
         - updatedAt
       properties:
@@ -351,6 +352,10 @@ components:
         env:
           type: object
           additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
             type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
@@ -400,6 +405,10 @@ components:
           type: object
           additionalProperties:
             type: string
+        tags:
+          type: array
+          items:
+            type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
     UpdateSessionRequest:
@@ -414,6 +423,10 @@ components:
         env:
           type: object
           additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
             type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'

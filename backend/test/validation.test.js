@@ -59,6 +59,7 @@ test("validateResponse checks session list schema", () => {
           startCwd: "/tmp",
           startCommand: "",
           env: {},
+          tags: [],
           themeProfile: THEME_PROFILE,
           createdAt: 1,
           updatedAt: 1
@@ -109,7 +110,14 @@ test("validateRequest accepts valid session patch payload", () => {
       method: "PATCH",
       pathname: "/api/v1/sessions/abc",
       params: { sessionId: "abc" },
-      body: { name: "renamed", startCwd: "/tmp", startCommand: "echo hi", env: { FOO: "BAR" }, themeProfile: THEME_PROFILE }
+      body: {
+        name: "renamed",
+        startCwd: "/tmp",
+        startCommand: "echo hi",
+        env: { FOO: "BAR" },
+        tags: ["ops", "prod"],
+        themeProfile: THEME_PROFILE
+      }
     });
   });
 });

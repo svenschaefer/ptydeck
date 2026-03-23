@@ -68,6 +68,11 @@ export function validateRequest({ method, pathname, params, body }) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
       }
     }
+    if (body?.tags !== undefined) {
+      if (!Array.isArray(body.tags) || !body.tags.every((value) => typeof value === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'tags' must be an array of strings.");
+      }
+    }
     if (body?.themeProfile !== undefined && !isObject(body.themeProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
     }
@@ -85,6 +90,7 @@ export function validateRequest({ method, pathname, params, body }) {
       body.startCwd === undefined &&
       body.startCommand === undefined &&
       body.env === undefined &&
+      body.tags === undefined &&
       body.themeProfile === undefined
     ) {
       throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
@@ -101,6 +107,11 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
+      }
+    }
+    if (body.tags !== undefined) {
+      if (!Array.isArray(body.tags) || !body.tags.every((value) => typeof value === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'tags' must be an array of strings.");
       }
     }
     if (body.themeProfile !== undefined && !isObject(body.themeProfile)) {
@@ -196,6 +207,8 @@ function isSession(value) {
     typeof value.startCommand === "string" &&
     isObject(value.env) &&
     Object.values(value.env).every((entry) => typeof entry === "string") &&
+    Array.isArray(value.tags) &&
+    value.tags.every((entry) => typeof entry === "string") &&
     isThemeProfile(value.themeProfile) &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)

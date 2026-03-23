@@ -4,6 +4,14 @@ Completed and verified topics belong here.
 
 ## 2026-03-23
 
+- [x] `QLT-072` completed: backend session contract now includes deterministic per-session `tags` support across create/patch/list/get/restore paths.
+- [x] Backend tag validation/normalization added with explicit guardrails (pattern, max length/count, dedupe, stable sort) and persisted restore sanitization.
+- [x] OpenAPI + runtime/session-manager + validation layers were aligned for `tags` payloads and response schema coverage.
+- [x] Backend regression coverage added for tag normalization and invalid tag payload rejection paths.
+- [x] `QLT-073` completed: frontend per-session settings dialog now supports session-tag management (comma/space/newline input) with explicit validation feedback.
+- [x] Frontend terminal cards now render deterministic session tag chips (`#tag`) and keep settings/tag display synchronized after apply/cancel/reload paths.
+- [x] Frontend integration coverage now verifies tag rendering, tag save payloads, and invalid-tag guardrail behavior in settings lifecycle flows.
+- [x] Validation for `QLT-072`/`QLT-073` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `ENT-013` completed: least-privilege runtime profile baseline added (`security/runtime-profile.json`) with explicit non-root, filesystem write-scope, and deny-by-default egress policy constraints.
 - [x] Added automated profile validation script `scripts/check-runtime-profile.sh` and root command `npm run runtime:profile:check`.
 - [x] CI security job now enforces runtime profile checks and stores evidence in `artifacts/security/runtime-profile.log`.

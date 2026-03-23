@@ -379,6 +379,22 @@ button:hover {
   line-height: 1;
 }
 
+.session-tag-list {
+  margin: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: #0f151f;
+  color: #89aac8;
+  font-size: 11px;
+  line-height: 1.35;
+  min-height: 28px;
+  white-space: pre-wrap;
+}
+
+.session-tag-list.empty {
+  display: none;
+}
+
 .session-settings-dialog {
   width: min(980px, calc(100vw - 48px));
   max-height: calc(100vh - 40px);
@@ -496,7 +512,8 @@ button:hover {
 
 .session-start-cwd,
 .session-start-command,
-.session-start-env {
+.session-start-env,
+.session-tags-input {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;

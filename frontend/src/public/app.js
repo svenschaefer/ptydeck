@@ -55,6 +55,9 @@ const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr"]);
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
+const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const SESSION_TAG_MAX_ENTRIES = 32;
+const SESSION_TAG_MAX_LENGTH = 32;
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -1004,6 +1007,67 @@ function formatSessionEnv(env) {
     .join("\n");
 }
 
+function normalizeSessionTags(tags) {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+  const dedupe = new Set();
+  for (const rawTag of tags) {
+    if (typeof rawTag !== "string") {
+      continue;
+    }
+    const normalized = rawTag.trim().toLowerCase();
+    if (!normalized || normalized.length > SESSION_TAG_MAX_LENGTH || !SESSION_TAG_PATTERN.test(normalized)) {
+      continue;
+    }
+    dedupe.add(normalized);
+    if (dedupe.size >= SESSION_TAG_MAX_ENTRIES) {
+      break;
+    }
+  }
+  return Array.from(dedupe).sort((left, right) => left.localeCompare(right, "en-US", { sensitivity: "base" }));
+}
+
+function formatSessionTags(tags) {
+  return normalizeSessionTags(tags).join(", ");
+}
+
+function parseSessionTags(rawText) {
+  const raw = String(rawText || "").trim();
+  if (!raw) {
+    return { ok: true, tags: [] };
+  }
+  const parts = raw
+    .split(/[\s,\n]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (parts.length > SESSION_TAG_MAX_ENTRIES) {
+    return {
+      ok: false,
+      error: `Tag list exceeds maximum entries (${SESSION_TAG_MAX_ENTRIES}).`
+    };
+  }
+  const dedupe = new Set();
+  for (const rawTag of parts) {
+    const normalized = rawTag.toLowerCase();
+    if (
+      !normalized ||
+      normalized.length > SESSION_TAG_MAX_LENGTH ||
+      !SESSION_TAG_PATTERN.test(normalized)
+    ) {
+      return {
+        ok: false,
+        error: `Invalid tag '${rawTag}'. Tags must match ${SESSION_TAG_PATTERN} and be <= ${SESSION_TAG_MAX_LENGTH} chars.`
+      };
+    }
+    dedupe.add(normalized);
+  }
+  return {
+    ok: true,
+    tags: Array.from(dedupe).sort((left, right) => left.localeCompare(right, "en-US", { sensitivity: "base" }))
+  };
+}
+
 function parseSessionEnv(rawText) {
   const lines = String(rawText || "")
     .split(/\r?\n/)
@@ -1048,6 +1112,9 @@ function syncSessionStartupControls(entry, session) {
   entry.startCwdInput.value = startCwd;
   entry.startCommandInput.value = startCommand;
   entry.startEnvInput.value = formatSessionEnv(session.env);
+  if (entry.sessionTagsInput) {
+    entry.sessionTagsInput.value = formatSessionTags(session.tags);
+  }
   if (entry.sessionSendTerminatorSelect) {
     entry.sessionSendTerminatorSelect.value = getSessionSendTerminator(session.id);
   }
@@ -1057,7 +1124,8 @@ function normalizeSessionStartupFromSession(session) {
   const startCwd = typeof session?.startCwd === "string" && session.startCwd.trim() ? session.startCwd.trim() : String(session?.cwd || "");
   const startCommand = typeof session?.startCommand === "string" ? session.startCommand : "";
   const env = session?.env && typeof session.env === "object" ? session.env : {};
-  return { startCwd, startCommand, env };
+  const tags = normalizeSessionTags(session?.tags);
+  return { startCwd, startCommand, env, tags };
 }
 
 function readSessionStartupFromControls(entry) {
@@ -1067,11 +1135,13 @@ function readSessionStartupFromControls(entry) {
   const sendTerminator = normalizeSendTerminatorMode(
     String(entry?.sessionSendTerminatorSelect?.value || "").toLowerCase()
   );
+  const tagResult = parseSessionTags(String(entry?.sessionTagsInput?.value || ""));
   return {
     startCwd,
     startCommand,
     envResult,
-    sendTerminator
+    sendTerminator,
+    tagResult
   };
 }
 
@@ -1095,6 +1165,20 @@ function areThemeProfilesEqual(left, right) {
   const normalizedLeft = normalizeThemeProfile(left);
   const normalizedRight = normalizeThemeProfile(right);
   return THEME_PROFILE_KEYS.every((key) => normalizedLeft[key] === normalizedRight[key]);
+}
+
+function areStringArraysEqual(left, right) {
+  const normalizedLeft = Array.isArray(left) ? left.map((value) => String(value)) : [];
+  const normalizedRight = Array.isArray(right) ? right.map((value) => String(value)) : [];
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+  for (let index = 0; index < normalizedLeft.length; index += 1) {
+    if (normalizedLeft[index] !== normalizedRight[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function setSettingsStatus(entry, text, kind = "") {
@@ -1131,6 +1215,9 @@ function isSessionSettingsDirty(entry, session) {
   if (!draftStartup.startCwd || !draftStartup.envResult.ok) {
     return true;
   }
+  if (!draftStartup.tagResult.ok) {
+    return true;
+  }
   if (currentStartup.startCwd !== draftStartup.startCwd) {
     return true;
   }
@@ -1140,6 +1227,9 @@ function isSessionSettingsDirty(entry, session) {
   if (!areStringMapsEqual(currentStartup.env, draftStartup.envResult.env)) {
     return true;
   }
+  if (!areStringArraysEqual(currentStartup.tags, draftStartup.tagResult.tags)) {
+    return true;
+  }
   if (!areThemeProfilesEqual(session.themeProfile, draftTheme)) {
     return true;
   }
@@ -1147,6 +1237,15 @@ function isSessionSettingsDirty(entry, session) {
     return true;
   }
   return false;
+}
+
+function renderSessionTagList(entry, session) {
+  if (!entry?.tagListEl) {
+    return;
+  }
+  const tags = normalizeSessionTags(session?.tags);
+  entry.tagListEl.textContent = tags.map((tag) => `#${tag}`).join(" ");
+  entry.tagListEl.classList.toggle("empty", tags.length === 0);
 }
 
 function measureTerminalCellWidthPx() {
@@ -1473,6 +1572,7 @@ function render() {
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
       entry.quickIdEl.textContent = ensureQuickId(session.id);
+      renderSessionTagList(entry, session);
       if (!entry.settingsDirty) {
         syncSessionStartupControls(entry, session);
         syncSessionThemeControls(entry, session.id);
@@ -1493,7 +1593,9 @@ function render() {
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
+    const sessionTagsInput = node.querySelector(".session-tags-input");
     const startFeedback = node.querySelector(".session-start-feedback");
+    const tagListEl = node.querySelector(".session-tag-list");
     const themeCategory = node.querySelector(".session-theme-category");
     const themeSearch = node.querySelector(".session-theme-search");
     const themeSelect = node.querySelector(".session-theme-select");
@@ -1521,6 +1623,7 @@ function render() {
 
     focusBtn.textContent = session.name || session.id.slice(0, 8);
     quickIdEl.textContent = quickId;
+    renderSessionTagList({ tagListEl }, session);
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
     settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
     if (settingsDismissBtn) {
@@ -1566,7 +1669,7 @@ function render() {
     });
     const markDirtyFromControls = () => {
       const nextDirty = isSessionSettingsDirty(
-        { startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect, themeInputs },
+        { startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect, sessionTagsInput, themeInputs },
         getSessionById(session.id)
       );
       setSettingsDirty(terminals.get(session.id), nextDirty);
@@ -1574,6 +1677,9 @@ function render() {
     startCwdInput.addEventListener("input", markDirtyFromControls);
     startCommandInput.addEventListener("input", markDirtyFromControls);
     startEnvInput.addEventListener("input", markDirtyFromControls);
+    if (sessionTagsInput) {
+      sessionTagsInput.addEventListener("input", markDirtyFromControls);
+    }
     if (sessionSendTerminatorSelect) {
       sessionSendTerminatorSelect.addEventListener("change", markDirtyFromControls);
     }
@@ -1640,6 +1746,7 @@ function render() {
         startCwdInput,
         startCommandInput,
         startEnvInput,
+        sessionTagsInput,
         sessionSendTerminatorSelect
       });
       if (!startupDraft.startCwd) {
@@ -1648,6 +1755,10 @@ function render() {
       }
       if (!startupDraft.envResult.ok) {
         setStartupSettingsFeedback({ startFeedback }, startupDraft.envResult.error, true);
+        return;
+      }
+      if (!startupDraft.tagResult.ok) {
+        setStartupSettingsFeedback({ startFeedback }, startupDraft.tagResult.error, true);
         return;
       }
       const profile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
@@ -1673,6 +1784,7 @@ function render() {
           startCwd: startupDraft.startCwd,
           startCommand: startupDraft.startCommand,
           env: startupDraft.envResult.env,
+          tags: startupDraft.tagResult.tags,
           themeProfile: profile
         });
         upsertSession(updated);
@@ -1689,7 +1801,10 @@ function render() {
       const freshSession = getSessionById(session.id);
       sessionThemeDrafts.delete(session.id);
       if (freshSession) {
-        syncSessionStartupControls({ startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect }, freshSession);
+        syncSessionStartupControls(
+          { startCwdInput, startCommandInput, startEnvInput, sessionTagsInput, sessionSendTerminatorSelect },
+          freshSession
+        );
         syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
       }
       applyThemeForSession(session.id);
@@ -1727,7 +1842,9 @@ function render() {
       startCommandInput,
       startEnvInput,
       sessionSendTerminatorSelect,
+      sessionTagsInput,
       startFeedback,
+      tagListEl,
       settingsApplyBtn,
       settingsStatus,
       themeCategory,

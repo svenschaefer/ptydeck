@@ -223,10 +223,44 @@ Exit criteria:
 - Runtime configuration fails fast on invalid critical env values.
 - Data retention and purge policies are automated and documented.
 
+### v0.3.0-H3 - Tag-Based Multi-Target Control
+
+- `QLT-072`
+- `QLT-073`
+- `QLT-074`
+- `QLT-075`
+- `QLT-076`
+- `QLT-077`
+
+Completed in this milestone:
+
+- `QLT-072`, `QLT-073`
+
+Remaining in this milestone:
+
+- `QLT-074`, `QLT-075`, `QLT-076`, `QLT-077`
+
+Dependencies:
+
+- `QLT-073` depends on `QLT-072` so frontend tag editing maps to finalized backend session-tag contract and persistence behavior.
+- `QLT-074` depends on `QLT-072` and `QLT-073` so multi-target command resolution can use persisted tags from backend and visible FE state.
+- `QLT-076` depends on `QLT-072` and existing per-session settings contract so slash-command setting updates can reuse one canonical settings schema.
+- `QLT-075` depends on `QLT-072` through `QLT-074` and validates overlap-dedupe plus tag/ID coexistence semantics end to end.
+- `QLT-077` depends on `QLT-073`, `QLT-074`, and `QLT-076` to verify settings-dialog/slash parity and multi-target semantics together.
+
+Exit criteria:
+
+- Sessions support persisted tags via API/runtime model and frontend settings.
+- Multi-target control actions can address sessions via IDs, quick IDs, names, and tags in one command flow.
+- Overlapping selectors (for example tag + ID hitting the same session) execute once per session ID (no duplicate execution).
+- No conflict rejection is performed for tag-vs-ID token collisions; both selector types remain valid identifiers.
+- All per-terminal settings from the settings dialog are also available via slash commands with matching validation and persistence behavior.
+- Regression coverage exists for dedupe and deterministic multi-target execution semantics.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H2`
-- Next milestones in progress: none
+- Next milestones in progress: `v0.3.0-H3`
 - Blockers: none recorded
 
 ### Completed Items
@@ -292,6 +326,8 @@ Exit criteria:
 - `QLT-056`
 - `QLT-057`
 - `QLT-070`
+- `QLT-072`
+- `QLT-073`
 - `ENT-023`
 - `ENT-018`
 - `ENT-011`

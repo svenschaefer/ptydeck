@@ -62,6 +62,7 @@
             <span class="session-settings-icon" aria-hidden="true">&#9881;</span>
           </button>
         </div>
+        <p class="session-tag-list empty"></p>
         <dialog class="session-settings-dialog">
           <div class="session-settings-head">
             <p class="session-settings-title">Session Settings</p>
@@ -81,6 +82,8 @@
               <textarea class="session-start-command" rows="2"></textarea>
               <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
               <textarea class="session-start-env" rows="4"></textarea>
+              <label class="session-startup-label">Tags (comma/space/newline separated)</label>
+              <input class="session-tags-input" type="text" value="" placeholder="backend ops prod" />
               <label class="session-startup-label">Send Terminator</label>
               <select class="session-send-terminator">
                 <option value="auto">Auto (CR / Enter)</option>

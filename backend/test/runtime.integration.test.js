@@ -104,6 +104,7 @@ test("session startup settings persist through patch and apply on restart", asyn
         startCwd: "/tmp",
         startCommand: "echo BOOT",
         env: { APP_MODE: "dev" },
+        tags: ["ops", "Prod", "ops"],
         themeProfile: {
           background: "#111111",
           foreground: "#eeeeee",
@@ -132,6 +133,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(created.startCwd, "/tmp");
     assert.equal(created.startCommand, "echo BOOT");
     assert.deepEqual(created.env, { APP_MODE: "dev" });
+    assert.deepEqual(created.tags, ["ops", "prod"]);
     assert.equal(created.themeProfile.background, "#111111");
     assert.equal(created.themeProfile.brightWhite, "#fefefe");
 
@@ -142,6 +144,7 @@ test("session startup settings persist through patch and apply on restart", asyn
         startCwd: "/var/tmp",
         startCommand: "echo RESTART",
         env: { APP_MODE: "prod", FEATURE_X: "1" },
+        tags: ["critical", "ops", "critical"],
         themeProfile: {
           background: "#202020",
           foreground: "#dddddd",
@@ -170,6 +173,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(patched.startCwd, "/var/tmp");
     assert.equal(patched.startCommand, "echo RESTART");
     assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
+    assert.deepEqual(patched.tags, ["critical", "ops"]);
     assert.equal(patched.themeProfile.background, "#202020");
     assert.equal(patched.themeProfile.brightWhite, "#ffffff");
 
@@ -183,8 +187,43 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restarted.startCwd, "/var/tmp");
     assert.equal(restarted.startCommand, "echo RESTART");
     assert.deepEqual(restarted.env, { APP_MODE: "prod", FEATURE_X: "1" });
+    assert.deepEqual(restarted.tags, ["critical", "ops"]);
     assert.equal(restarted.themeProfile.background, "#202020");
     assert.equal(restarted.themeProfile.cursor, "#aaffaa");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session tag validation rejects invalid payloads", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createInvalidRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tags: ["ok", "invalid tag"] })
+    });
+    assert.equal(createInvalidRes.status, 400);
+    const createInvalidBody = await createInvalidRes.json();
+    assert.equal(createInvalidBody.error, "ValidationError");
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const patchInvalidRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tags: "not-array" })
+    });
+    assert.equal(patchInvalidRes.status, 400);
+    const patchInvalidBody = await patchInvalidRes.json();
+    assert.equal(patchInvalidBody.error, "ValidationError");
   } finally {
     await runtime.stop();
   }

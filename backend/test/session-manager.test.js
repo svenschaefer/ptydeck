@@ -48,6 +48,7 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(created.startCwd, "/tmp");
   assert.equal(created.startCommand, "");
   assert.deepEqual(created.env, {});
+  assert.deepEqual(created.tags, []);
   assert.equal(typeof created.themeProfile, "object");
   assert.equal(created.themeProfile.background, "#0a0d12");
 
@@ -253,6 +254,7 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.startCwd, "/var/tmp");
   assert.equal(restarted.startCommand, "echo START");
   assert.deepEqual(restarted.env, { FOO: "BAR" });
+  assert.deepEqual(restarted.tags, []);
   assert.equal(restarted.themeProfile.cursor, "#8ec07c");
   assert.equal(restarted.createdAt, created.createdAt);
   assert.ok(restarted.updatedAt >= created.createdAt);
@@ -281,6 +283,23 @@ test("SessionManager passes startup env overrides to PTY spawn", () => {
   assert.equal(spawnOptions.cwd, "/opt/work");
   assert.equal(spawnOptions.env.FOO, "BAR");
   assert.equal(spawnOptions.env.HELLO, "WORLD");
+});
+
+test("SessionManager normalizes tags deterministically", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({
+    tags: [" Ops ", "ops", "prod", "Dev", "invalid tag"]
+  });
+  assert.deepEqual(created.tags, ["dev", "ops", "prod"]);
+
+  const updated = manager.updateSession(created.id, {
+    tags: ["prod", "Zebra", "alpha", "alpha", " "]
+  });
+  assert.deepEqual(updated.tags, ["alpha", "prod", "zebra"]);
 });
 
 test("SessionManager stores and updates full theme profile deterministically", () => {
