@@ -134,6 +134,8 @@ body {
   --command-composer-font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
   --command-composer-font-size: 14px;
   --command-composer-line-height: 1.35;
+  --command-composer-border-width: 1px;
+  --command-composer-padding: 10px;
   font-family: var(--command-composer-font-family);
   font-size: var(--command-composer-font-size);
   line-height: var(--command-composer-line-height);
@@ -144,9 +146,9 @@ body {
 .command-row textarea {
   display: block;
   width: 100%;
-  border: 1px solid var(--border);
+  border: var(--command-composer-border-width) solid var(--border);
   border-radius: 6px;
-  padding: 10px;
+  padding: var(--command-composer-padding);
   background: #0f151f;
   color: var(--text);
   resize: vertical;
@@ -160,8 +162,8 @@ body {
 
 .command-inline-hint {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: calc(var(--command-composer-border-width) + var(--command-composer-padding));
+  left: calc(var(--command-composer-border-width) + var(--command-composer-padding));
   pointer-events: none;
   color: rgba(146, 164, 187, 0.65);
   transform: translateX(var(--hint-prefix-px, 0px));
