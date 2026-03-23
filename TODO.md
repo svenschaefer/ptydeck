@@ -17,6 +17,9 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
+- [ ] `QLT-101` Owner: `FE` Task: Add `>selector` quick-switch commands to the composer so `>4`, `>A`, `>name`, or other existing single-session selectors activate that session directly and switch decks automatically when the target lives outside the active deck.
+- [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
+- [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -181,6 +184,9 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
+- [ ] `QLT-101` Owner: `FE` Task: Add `>selector` quick-switch commands to the composer so `>4`, `>A`, `>name`, or other existing single-session selectors activate that session directly and switch decks automatically when the target lives outside the active deck.
+- [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
+- [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
