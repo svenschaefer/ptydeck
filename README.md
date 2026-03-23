@@ -73,7 +73,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
-- Terminal `Rename` and `Close` actions are available inside each session settings dialog (removed from direct toolbar)
+- Terminal `Rename` and `Delete` actions are available inside each session settings dialog (removed from direct toolbar); delete requires explicit user confirmation
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with unified dialog-level `Apply Changes`/`Cancel`, dirty-state indicator, and explicit save feedback
 - Per-session terminal theme editor in session settings with complete iTerm2 dark/light theme catalog integration (from `mbadolato/iTerm2-Color-Schemes`), category/search filtering, and full custom palette editing (`background`, `foreground`, `cursor`, ANSI 16 colors) persisted via backend session `themeProfile`
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart

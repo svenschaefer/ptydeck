@@ -1280,6 +1280,15 @@ function closeSettingsDialog(dialog) {
   dialog.classList.remove("open");
 }
 
+function confirmSessionDelete(session) {
+  const sessionLabel = String(session?.name || session?.id || "").trim() || "this session";
+  const message = `Delete session '${sessionLabel}' permanently?`;
+  if (!window || typeof window.confirm !== "function") {
+    return true;
+  }
+  return window.confirm(message);
+}
+
 function toggleSettingsDialog(dialog) {
   if (!dialog) {
     return;
@@ -1478,6 +1487,9 @@ function render() {
       }
     });
     closeBtn.addEventListener("click", async () => {
+      if (!confirmSessionDelete(session)) {
+        return;
+      }
       try {
         await api.deleteSession(session.id);
         removeSession(session.id);
