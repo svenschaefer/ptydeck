@@ -26,17 +26,12 @@
       </aside>
 
       <section class="workspace">
-        <p id="status-message" class="status-message"></p>
-
         <main id="terminal-grid" class="terminal-grid"></main>
         <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
 
         <section class="command-row">
           <div class="command-input-column">
-            <p class="command-help">
-              Commands: /new [shell], /close [id], /switch &lt;id&gt;, /next, /prev, /list, /rename &lt;name&gt;,
-              /restart [id], /custom &lt;name&gt; &lt;text&gt;, /custom &lt;name&gt; + block, /help
-            </p>
+            <p id="status-message" class="status-message"></p>
             <p id="command-feedback" class="command-feedback"></p>
             <div class="command-input-wrap">
               <textarea
