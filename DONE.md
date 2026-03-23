@@ -385,6 +385,9 @@ Completed and verified topics belong here.
 - [x] `QLT-057` completed: frontend app integration coverage now verifies slash autocomplete/suggestions remain disabled for non-slash input and multiline input where slash appears only on later lines.
 - [x] Added keyboard guardrail assertions that `Tab` is not captured in these non-slash scenarios (`preventDefault` stays false) and composer content is not mutated by autocomplete.
 - [x] Validation for `QLT-057` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `QLT-055` completed: regression coverage now explicitly includes suggestion-list reverse-keyboard traversal (`ArrowUp`) and no-auto-execute behavior in slash mode.
+- [x] Regression coverage for custom-command normalization/sort order (`backend/test/runtime.integration.test.js`) and multiline delimiter edge cases (`frontend/test/app.test.js`) is now part of the validated QA baseline for command UX.
+- [x] Validation for `QLT-055` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
 
 ## Maintenance Rules
 

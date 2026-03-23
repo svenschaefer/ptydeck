@@ -758,6 +758,19 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandInput.value, "/closeit");
   assert.match(fixture.elements.commandSuggestions.textContent, /^> \/closeit/m);
+  const suggestionArrowUpEvent = {
+    type: "keydown",
+    key: "ArrowUp",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  fixture.elements.commandInput.dispatchEvent(suggestionArrowUpEvent);
+  await tick();
+  assert.equal(suggestionArrowUpEvent.defaultPrevented, true);
+  assert.equal(fixture.elements.commandInput.value, "/close");
+  assert.match(fixture.elements.commandSuggestions.textContent, /^> \/close/m);
   const suggestionEnterEvent = {
     type: "keydown",
     key: "Enter",
@@ -771,7 +784,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.dispatchEvent(suggestionEnterEvent);
   await tick();
   assert.equal(suggestionEnterEvent.defaultPrevented, true);
-  assert.equal(fixture.elements.commandInput.value, "/closeit");
+  assert.equal(fixture.elements.commandInput.value, "/close");
   assert.equal(inputPayloads.length, inputCountBeforeSuggestionEnter);
 
   fixture.elements.commandInput.value = "/c";
