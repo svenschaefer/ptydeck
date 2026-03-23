@@ -228,12 +228,6 @@ body {
 .command-preview {
   margin: 0;
   min-height: 0;
-  max-height: 180px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #0f151f;
   color: #a9d9d6;
   font-size: 12px;
   line-height: 1.35;

@@ -51,7 +51,6 @@ const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 28;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-const COMMAND_PREVIEW_MAX_CHARS = 4000;
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const DEFAULT_TERMINAL_THEME = {
@@ -1897,23 +1896,6 @@ function formatPreviewTarget(session) {
   return `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
 }
 
-function truncateCommandPreviewPayload(content) {
-  const text = String(content || "");
-  if (text.length <= COMMAND_PREVIEW_MAX_CHARS) {
-    return {
-      payload: text,
-      truncated: false,
-      omittedChars: 0
-    };
-  }
-  const omittedChars = text.length - COMMAND_PREVIEW_MAX_CHARS;
-  return {
-    payload: text.slice(0, COMMAND_PREVIEW_MAX_CHARS),
-    truncated: true,
-    omittedChars
-  };
-}
-
 async function refreshCommandPreview() {
   const rawInput = commandInput.value || "";
   const interpreted = interpretComposerInput(rawInput);
@@ -1930,7 +1912,7 @@ async function refreshCommandPreview() {
   }
 
   if (interpreted.args.length > 1) {
-    setCommandPreview(`Preview unavailable for /${commandRaw}: usage /${commandRaw} [target]`);
+    setCommandPreview(`Preview: /${commandRaw} usage -> /${commandRaw} [target]`);
     return;
   }
 
@@ -1957,18 +1939,8 @@ async function refreshCommandPreview() {
       targetDescription = "unresolved (no active session)";
     }
 
-    const appendNewline = custom.content.endsWith("\n") ? "no" : "yes";
-    const truncatedPayload = truncateCommandPreviewPayload(custom.content);
-    const preview = [
-      `Preview /${custom.name}`,
-      `Target: ${targetDescription}`,
-      `Append newline on send: ${appendNewline}`,
-      truncatedPayload.truncated ? `Payload truncated: omitted ${truncatedPayload.omittedChars} chars.` : "",
-      "Payload:",
-      truncatedPayload.payload
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const appendNewline = custom.content.endsWith("\n") ? "" : " +newline";
+    const preview = `Preview: /${custom.name} -> ${targetDescription}${appendNewline}`;
     setCommandPreview(preview);
   } catch (err) {
     if (requestId !== commandPreviewRequestId) {
@@ -1978,7 +1950,7 @@ async function refreshCommandPreview() {
       setCommandPreview("");
       return;
     }
-    setCommandPreview(`Preview unavailable for /${commandRaw}.`);
+    setCommandPreview(`Preview unavailable: /${commandRaw}`);
   }
 }
 

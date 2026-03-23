@@ -303,7 +303,7 @@ function createDocumentFixture() {
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
-  const commandPreview = new FakeElement({ id: "command-preview", tagName: "pre" });
+  const commandPreview = new FakeElement({ id: "command-preview", tagName: "p" });
   const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
   const template = {
     id: "terminal-card-template",
@@ -668,10 +668,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/docu";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
-  assert.match(fixture.elements.commandPreview.textContent, /^Preview \/docu/);
-  assert.match(fixture.elements.commandPreview.textContent, /Target: \[1\] (one|s-1)/);
-  assert.match(fixture.elements.commandPreview.textContent, /Append newline on send: yes/);
-  assert.match(fixture.elements.commandPreview.textContent, /Payload:\necho verify$/);
+  assert.match(fixture.elements.commandPreview.textContent, /^Preview: \/docu -> \[1\] (one|s-1) \+newline$/);
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
@@ -697,9 +694,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/longpreview";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
-  assert.match(fixture.elements.commandPreview.textContent, /^Preview \/longpreview/);
-  assert.match(fixture.elements.commandPreview.textContent, /Payload truncated: omitted 1000 chars\./);
-  assert.match(fixture.elements.commandPreview.textContent, /Payload:\n/);
+  assert.match(fixture.elements.commandPreview.textContent, /^Preview: \/longpreview -> \[1\] (one|s-1) \+newline$/);
 
   fixture.elements.commandInput.value = "/cl";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
