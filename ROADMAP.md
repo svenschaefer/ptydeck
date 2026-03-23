@@ -291,11 +291,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-080`, `QLT-081`, `QLT-082`, `PLAT-011`
+- `QLT-080`, `QLT-081`, `QLT-082`, `QLT-094`, `PLAT-011`
 
 Remaining in this milestone:
 
-- `QLT-094`
+- none
 
 Dependencies:
 
@@ -358,8 +358,8 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H4`
-- Next milestones in progress: `v0.3.0-H5`, `v0.3.0-H6`
+- Latest completed milestone: `v0.3.0-H5`
+- Next milestones in progress: `v0.3.0-H6`
 - Blockers: none recorded
 
 ### Completed Items

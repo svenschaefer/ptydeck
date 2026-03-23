@@ -5,6 +5,39 @@ import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { createRuntime } from "../src/runtime.js";
 
+function createFallbackAwarePtyFactory() {
+  return ({ shell, cwd }) => {
+    if (typeof shell === "string" && shell.startsWith("/definitely/not/")) {
+      throw new Error(`ENOENT: shell ${shell}`);
+    }
+    if (typeof cwd === "string" && cwd.startsWith("/definitely/not/")) {
+      throw new Error(`ENOENT: cwd ${cwd}`);
+    }
+
+    let exitHandler = null;
+    let dataHandler = null;
+    return {
+      onExit(handler) {
+        exitHandler = handler;
+      },
+      onData(handler) {
+        dataHandler = handler;
+      },
+      write(data) {
+        if (dataHandler) {
+          dataHandler(String(data));
+        }
+      },
+      resize() {},
+      kill() {
+        if (exitHandler) {
+          exitHandler({ exitCode: 0, signal: 0 });
+        }
+      }
+    };
+  };
+}
+
 async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const runtime = createRuntime({
@@ -939,7 +972,11 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
     "utf8"
   );
 
-  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "bash" });
+  const { runtime, baseUrl } = await createStartedRuntime({
+    dataPath,
+    shell: "bash",
+    createPty: createFallbackAwarePtyFactory()
+  });
   try {
     const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
     assert.equal(res.status, 200);
@@ -983,7 +1020,11 @@ test("runtime restore falls back to configured shell when persisted shell is inv
     "utf8"
   );
 
-  const { runtime, baseUrl } = await createStartedRuntime({ dataPath, shell: "bash" });
+  const { runtime, baseUrl } = await createStartedRuntime({
+    dataPath,
+    shell: "bash",
+    createPty: createFallbackAwarePtyFactory()
+  });
   try {
     const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
     assert.equal(res.status, 200);

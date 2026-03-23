@@ -414,6 +414,7 @@ export function createRuntime(config) {
   const debugLogs = config.debugLogs === true;
   const manager = new SessionManager({
     defaultShell: config.shell,
+    createPty: typeof config.createPty === "function" ? config.createPty : undefined,
     sessionMaxConcurrent: config.sessionMaxConcurrent,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     sessionMaxLifetimeMs: config.sessionMaxLifetimeMs
