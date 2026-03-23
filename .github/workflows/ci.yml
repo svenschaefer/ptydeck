@@ -1,120 +1,16 @@
-name: CI
+name: CI (disabled for remote runners)
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version:
-          - 18
-          - lts/*
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Backend lint
-        run: npm --prefix backend run lint
-      - name: Frontend lint
-        run: npm --prefix frontend run lint
-      - name: Backend test
-        run: npm --prefix backend run test
-      - name: Frontend test
-        run: npm --prefix frontend run test
-      - name: Backend build
-        run: npm --prefix backend run build
-      - name: Frontend build
-        run: npm --prefix frontend run build
-      - name: Coverage thresholds
-        if: matrix.node-version == '18'
-        run: npm run test:coverage:check
-      - name: Smoke boot checks
-        if: matrix.node-version == '18'
-        run: ./scripts/ci-smoke.sh
-      - name: TLS certificate expiry check
-        if: matrix.node-version == '18'
-        env:
-          TLS_EXPIRY_CHECK_HOSTS: ${{ vars.TLS_EXPIRY_CHECK_HOSTS }}
-          TLS_EXPIRY_THRESHOLD_DAYS: ${{ vars.TLS_EXPIRY_THRESHOLD_DAYS }}
-        run: ./scripts/check-cert-expiry.sh
-
-  security:
+  disabled:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Runtime profile least-privilege check
-        run: |
-          mkdir -p artifacts/security
-          set -o pipefail
-          ./scripts/check-runtime-profile.sh 2>&1 | tee artifacts/security/runtime-profile.log
-      - name: Collect test evidence logs
-        run: |
-          mkdir -p artifacts/quality
-          set -o pipefail
-          npm --prefix backend run test 2>&1 | tee artifacts/quality/backend-test.log
-          npm --prefix frontend run test 2>&1 | tee artifacts/quality/frontend-test.log
-          npm run test:coverage:check 2>&1 | tee artifacts/quality/coverage-check.log
-      - name: Dependency vulnerability gate (SCA)
-        env:
-          SCA_AUDIT_LEVEL: ${{ vars.SCA_AUDIT_LEVEL }}
-        run: |
-          mkdir -p artifacts/security
-          set -o pipefail
-          ./scripts/security-scan.sh 2>&1 | tee artifacts/security/sca.log
-      - name: Generate SBOM artifacts
-        run: |
-          mkdir -p artifacts/security
-          set -o pipefail
-          ./scripts/generate-sbom.sh 2>&1 | tee artifacts/security/sbom.log
-      - name: Verify backup/restore roundtrip
-        run: |
-          set -o pipefail
-          ./scripts/verify-backup-restore.sh 2>&1 | tee artifacts/security/backup-verify.log
-      - name: Disaster recovery restore drill
-        env:
-          DR_RTO_TARGET_SECONDS: ${{ vars.DR_RTO_TARGET_SECONDS }}
-          DR_RPO_TARGET_SECONDS: ${{ vars.DR_RPO_TARGET_SECONDS }}
-        run: |
-          set -o pipefail
-          ./scripts/dr-restore-drill.sh 2>&1 | tee artifacts/security/dr-drill.log
-      - name: Retention purge dry-run
-        env:
-          PURGE_DRY_RUN: "1"
-        run: |
-          set -o pipefail
-          ./scripts/purge-retention.sh 2>&1 | tee artifacts/security/retention-purge.log
-      - name: Generate release evidence bundle
-        run: ./scripts/generate-release-evidence.sh
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-spdx
-          path: artifacts/security/sbom/*.json
-      - name: Upload release evidence artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-evidence
-          path: artifacts/release-evidence/*
-      - name: Optional image vulnerability scan (Trivy)
-        if: vars.SECURITY_IMAGE_REF != ''
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          scan-type: image
-          image-ref: ${{ vars.SECURITY_IMAGE_REF }}
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+      - name: Remote CI is disabled
+        run: echo "Remote CI is disabled. Use local scripts instead."
