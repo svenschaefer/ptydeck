@@ -131,9 +131,14 @@ body {
 .command-input-wrap {
   position: relative;
   min-width: 0;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .command-row textarea {
+  display: block;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
@@ -151,9 +156,10 @@ body {
   left: 10px;
   pointer-events: none;
   color: rgba(146, 164, 187, 0.65);
-  transform: translateX(calc(var(--hint-prefix-chars, 0) * 1ch));
-  font: inherit;
-  line-height: 1.35;
+  transform: translateX(var(--hint-prefix-px, 0px));
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   white-space: pre;
   z-index: 3;
 }

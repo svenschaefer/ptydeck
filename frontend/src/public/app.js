@@ -118,7 +118,7 @@ const uiState = {
   error: "",
   commandFeedback: "",
   commandInlineHint: "",
-  commandInlineHintPrefixChars: 0,
+  commandInlineHintPrefixPx: 0,
   commandPreview: "",
   commandSuggestions: "",
   commandSuggestionSelectedIndex: -1
@@ -194,7 +194,32 @@ function clearCommandSuggestions() {
   uiState.commandSuggestions = "";
   uiState.commandSuggestionSelectedIndex = -1;
   uiState.commandInlineHint = "";
-  uiState.commandInlineHintPrefixChars = 0;
+  uiState.commandInlineHintPrefixPx = 0;
+}
+
+let composerMeasureCanvas = null;
+
+function measureComposerPrefixWidthPx(text) {
+  if (!commandInput || typeof window.getComputedStyle !== "function") {
+    return 0;
+  }
+  if (!composerMeasureCanvas && typeof document.createElement === "function") {
+    composerMeasureCanvas = document.createElement("canvas");
+  }
+  if (!composerMeasureCanvas) {
+    return 0;
+  }
+  const context = composerMeasureCanvas.getContext("2d");
+  if (!context) {
+    return 0;
+  }
+  const styles = window.getComputedStyle(commandInput);
+  const fontStyle = styles.fontStyle || "normal";
+  const fontWeight = styles.fontWeight || "400";
+  const fontSize = styles.fontSize || "14px";
+  const fontFamily = styles.fontFamily || "monospace";
+  context.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
+  return Math.max(0, Math.round(context.measureText(String(text || "")).width));
 }
 
 function applyCommandSuggestionSelection(index) {
@@ -549,10 +574,10 @@ async function refreshCommandSuggestions() {
   const tokenPrefix = inputValue.startsWith(prefix) ? inputValue.slice(prefix.length) : "";
   if (selected && tokenPrefix.length <= selected.length && selected.startsWith(tokenPrefix)) {
     uiState.commandInlineHint = selected.slice(tokenPrefix.length);
-    uiState.commandInlineHintPrefixChars = inputValue.length;
+    uiState.commandInlineHintPrefixPx = measureComposerPrefixWidthPx(inputValue);
   } else {
     uiState.commandInlineHint = "";
-    uiState.commandInlineHintPrefixChars = 0;
+    uiState.commandInlineHintPrefixPx = 0;
   }
   setCommandSuggestions(context.replacePrefix, context.matches, index);
 }
@@ -1031,7 +1056,7 @@ function render() {
   }
   if (commandInlineHintEl) {
     commandInlineHintEl.textContent = uiState.commandInlineHint || "";
-    commandInlineHintEl.style.setProperty("--hint-prefix-chars", String(uiState.commandInlineHintPrefixChars || 0));
+    commandInlineHintEl.style.setProperty("--hint-prefix-px", `${uiState.commandInlineHintPrefixPx || 0}px`);
   }
   if (commandPreviewEl) {
     commandPreviewEl.textContent = uiState.commandPreview || "";
