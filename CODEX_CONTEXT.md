@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-23 (`QLT-088` completed: deck tab bar and active deck settings baseline implemented in frontend)
+Last updated: 2026-03-23 (`QLT-089` completed: active-deck-only rendering and active-session fallback baseline implemented in frontend)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-23 (including TODO/ROADMAP separation, explicit open-task ownership review, and H6 active-open backlog cleanup).
 
@@ -125,6 +125,8 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - Frontend workspace now includes a top deck-tab bar with deterministic deck create/rename/switch/delete flows and persisted active-deck selection.
 - Frontend terminal geometry controls now map to active deck settings (`settings.terminal.cols/rows`) so `/size` and sidebar apply are deck-scoped (not global).
 - Frontend new-session flow now moves newly created sessions into the active deck when the active deck is not default.
+- Frontend terminal-grid visibility is now scoped strictly to the active deck, while non-active-deck sessions remain running and unchanged in runtime state.
+- Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend WebSocket client now reports explicit `error` connection state and reconnects with bounded exponential backoff plus jitter.
 - CI quality workflow now installs workspace dependencies and runs smoke boot validation (`scripts/ci-smoke.sh`) for backend and frontend startup readiness.
 - CI now enforces backend/frontend line-coverage thresholds (`scripts/check-coverage.sh`) before merge on Node `18`.
@@ -214,7 +216,7 @@ The upcoming deck model is a strict isolation boundary above sessions.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycles: `v0.3.0-H6` (remaining: `QLT-089` ... `QLT-093`).
+- Active next cycles: `v0.3.0-H6` (remaining: `QLT-090` ... `QLT-093`).
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: none (current-scope enterprise tasks complete).
@@ -227,8 +229,8 @@ The upcoming deck model is a strict isolation boundary above sessions.
   - Planned next in cycle F (`v0.3.0-H4`): none.
   - Completed in cycle G: `QLT-080`, `QLT-081`, `QLT-082`, `QLT-094`, `PLAT-011`.
   - Planned next in cycle G (`v0.3.0-H5`): none.
-  - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`.
-  - Planned next in cycle H (`v0.3.0-H6`): `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
+  - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`.
+  - Planned next in cycle H (`v0.3.0-H6`): `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
 
 ## Session Behavior Notes
 

@@ -1089,6 +1089,11 @@ function getSessionById(sessionId) {
   return store.getState().sessions.find((session) => session.id === sessionId) || null;
 }
 
+function resolveSessionDeckId(session) {
+  const deckId = String(session?.deckId || "").trim();
+  return deckId || DEFAULT_DECK_ID;
+}
+
 function isSessionUnrestored(session) {
   return String(session?.state || "").toLowerCase() === "unrestored";
 }
@@ -1802,7 +1807,7 @@ function maybeReportStartupPerf() {
 }
 
 function getSessionCountForDeck(deckId, sessions) {
-  return sessions.reduce((count, session) => (session.deckId === deckId ? count + 1 : count), 0);
+  return sessions.reduce((count, session) => (resolveSessionDeckId(session) === deckId ? count + 1 : count), 0);
 }
 
 function renderDeckTabs(sessions) {
@@ -1859,6 +1864,14 @@ function setActiveDeck(deckId) {
   };
   saveStoredActiveDeckId(normalized);
   syncActiveDeckGeometryFromState();
+  const state = store.getState();
+  const activeInDeck =
+    state.activeSessionId &&
+    state.sessions.some((session) => session.id === state.activeSessionId && resolveSessionDeckId(session) === normalized);
+  if (!activeInDeck) {
+    const firstInDeck = state.sessions.find((session) => resolveSessionDeckId(session) === normalized) || null;
+    store.setActiveSession(firstInDeck ? firstInDeck.id : null);
+  }
   render();
   return true;
 }
@@ -1952,16 +1965,20 @@ async function deleteDeckFlow() {
 
 function render() {
   const state = store.getState();
+  const activeDeck = getActiveDeck();
+  const activeDeckId = activeDeck ? activeDeck.id : "";
+  const deckSessions = activeDeckId
+    ? state.sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
+    : state.sessions.slice();
   renderDeckTabs(state.sessions);
   const hasDecks = deckState.decks.length > 0;
-  const activeDeck = getActiveDeck();
   if (deckRenameBtn) {
     deckRenameBtn.disabled = !hasDecks;
   }
   if (deckDeleteBtn) {
     deckDeleteBtn.disabled = !activeDeck || activeDeck.id === DEFAULT_DECK_ID;
   }
-  const filtered = resolveFilterSelectors(uiState.sessionFilterText, state.sessions);
+  const filtered = resolveFilterSelectors(uiState.sessionFilterText, deckSessions);
   const visibleSessionIds = new Set(
     filtered.sessions.map((session) => session.id)
   );
@@ -1976,7 +1993,7 @@ function render() {
   }
   if (!filterActive) {
     visibleSessionIds.clear();
-    for (const session of state.sessions) {
+    for (const session of deckSessions) {
       visibleSessionIds.add(session.id);
     }
   }
@@ -1987,6 +2004,7 @@ function render() {
   }
   debugLog("ui.render", {
     sessions: state.sessions.length,
+    deckSessions: deckSessions.length,
     visibleSessions: visibleSessionIds.size,
     activeSessionId: state.activeSessionId,
     connectionState: state.connectionState,
@@ -1996,6 +2014,9 @@ function render() {
   stateEl.textContent = state.connectionState;
   if (state.sessions.length === 0) {
     emptyStateEl.textContent = "No sessions yet. Create one to start.";
+    emptyStateEl.style.display = "block";
+  } else if (deckSessions.length === 0) {
+    emptyStateEl.textContent = "No sessions in active deck.";
     emptyStateEl.style.display = "block";
   } else if (visibleSessionIds.size === 0) {
     emptyStateEl.textContent = "No sessions match current filter.";
@@ -3349,7 +3370,7 @@ createBtn.addEventListener("click", async () => {
     const createdSession = await api.createSession();
     let session = createdSession;
     const activeDeck = getActiveDeck();
-    if (activeDeck && createdSession.deckId !== activeDeck.id) {
+    if (activeDeck && resolveSessionDeckId(createdSession) !== activeDeck.id) {
       session = await api.moveSessionToDeck(activeDeck.id, createdSession.id);
     }
     upsertSession(session);

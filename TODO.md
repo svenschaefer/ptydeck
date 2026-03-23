@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-089` Owner: `FE` Task: Scope terminal grid rendering strictly to active deck while keeping non-visible deck sessions alive, and auto-resolve active session when current active session is moved out or hidden by deck switch.
 - [ ] `QLT-090` Owner: `FE` Task: Add slash commands for deck control and session move (`/deck list|new|rename|switch|delete`, `/move <sessionSelector> <deckSelector>`) with explicit success/error feedback.
 - [ ] `QLT-091` Owner: `FE` Task: Apply deck isolation to command/target resolution (`/switch`, `/next`, `/prev`, `/filter`, `@target`): default selectors resolve inside active deck, with explicit cross-deck selectors supported when requested.
 - [ ] `QLT-092` Owner: `FE` Task: Implement conflict-safe dedupe for multi-selector operations across IDs/quick IDs/tags/deck selectors so each target session executes at most once even under overlapping matches.

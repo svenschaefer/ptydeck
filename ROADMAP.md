@@ -328,11 +328,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`
+- `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`
 
 Remaining in this milestone:
 
-- `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`
+- `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`
 
 Dependencies:
 
@@ -364,7 +364,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-089` Owner: `FE` - Active-deck-only terminal grid rendering with deterministic active-session fallback when visibility/deck changes invalidate current focus.
 - `QLT-090` Owner: `FE` - Slash command deck control surface (`/deck ...`, `/move ...`) with explicit success/error feedback.
 - `QLT-091` Owner: `FE` - Deck-aware selector/routing isolation for `/switch`, `/next`, `/prev`, `/filter`, and `@target` (active-deck default, explicit cross-deck selectors).
 - `QLT-092` Owner: `FE` - Conflict-safe dedupe for overlapping selectors (ID, quick ID, tag, deck selector) to guarantee exactly-once execution per session.
@@ -442,4 +441,5 @@ Exit criteria:
 - `QLT-078`
 - `QLT-079`
 - `QLT-088`
+- `QLT-089`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`
