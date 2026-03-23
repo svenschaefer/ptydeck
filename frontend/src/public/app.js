@@ -55,6 +55,7 @@ const TERMINAL_FONT_SIZE = 16;
 const TERMINAL_LINE_HEIGHT = 1.2;
 const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace';
 const TERMINAL_CARD_HORIZONTAL_CHROME_PX = 8;
+const TERMINAL_MOUNT_VERTICAL_CHROME_PX = 18;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr"]);
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -1281,7 +1282,7 @@ function measureTerminalCellWidthPx() {
 
 function computeFixedMountHeightPx(rows) {
   const lineHeightPx = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT;
-  return Math.max(120, Math.round(rows * lineHeightPx + 18));
+  return Math.max(120, Math.round(rows * lineHeightPx + TERMINAL_MOUNT_VERTICAL_CHROME_PX));
 }
 
 function computeFixedCardWidthPx(cols) {
@@ -1357,9 +1358,16 @@ function applyMountHeight(entry, rows) {
   if (!entry || !entry.mount) {
     return;
   }
-  const mountHeightPx = computeFixedMountHeightPx(rows);
+  let mountHeightPx = computeFixedMountHeightPx(rows);
   const cardWidthPx = computeFixedCardWidthPx(terminalSettings.cols);
   const mountWidthPx = Math.max(220, cardWidthPx - TERMINAL_CARD_HORIZONTAL_CHROME_PX);
+  const runtimeCellHeightPx = Number(entry?.terminal?._core?._renderService?.dimensions?.css?.cell?.height) || 0;
+  if (runtimeCellHeightPx > 0) {
+    const currentlyVisibleRows = Math.floor(mountHeightPx / runtimeCellHeightPx);
+    if (currentlyVisibleRows < rows) {
+      mountHeightPx += Math.ceil((rows - currentlyVisibleRows) * runtimeCellHeightPx) + 4;
+    }
+  }
   entry.mount.style.height = `${mountHeightPx}px`;
   entry.mount.style.width = `${mountWidthPx}px`;
   entry.element.style.width = `${cardWidthPx}px`;
