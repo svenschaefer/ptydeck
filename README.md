@@ -102,6 +102,18 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Clean multiplexing over a single WebSocket connection
 - Minimal and predictable architecture
 
+## Planned Deck Model (H6 Contract)
+
+The next architecture cycle introduces `Decks` as an isolation boundary above sessions:
+
+- one active deck at a time (tab-based workspace switching),
+- sessions are owned by exactly one deck,
+- active operations default to active-deck scope,
+- non-active-deck sessions remain running but hidden,
+- deck settings are scoped per deck (initially terminal geometry).
+
+Authoritative planning contract: `CODEX_CONTEXT.md` (Deck Domain Contract) + `ROADMAP.md` (`v0.3.0-H6`).
+
 ## Architecture
 
 ### Backend (Node.js)

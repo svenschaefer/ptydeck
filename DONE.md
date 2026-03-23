@@ -8,6 +8,7 @@ Completed and verified topics belong here.
 - [x] Frontend runtime guards now block `input`, `resize`, and `restart` actions for unrestored sessions, with deterministic user feedback in command/terminal flows.
 - [x] Frontend regression coverage extended for unrestored-session UX/guardrails (badge/hint rendering, resize suppression, routed/active input blocking, restart blocking).
 - [x] `PLAT-011` completed: local-only quality-gate workflow documented and aligned across docs (`LOCAL_QUALITY_GATE.md`, `README.md`, `DEPLOYMENT.md`, `ROADMAP.md`) with remote GitHub-runner assumptions removed from active process guidance.
+- [x] `QLT-083` completed: deck-domain contract documented as an authoritative planning baseline (active deck scope, isolation boundaries, default-deck migration, explicit move/delete conflict semantics).
 - [x] `QLT-080` completed: backend REST session responses now expose deterministic `state` metadata (`active` or `unrestored`) for `GET /api/v1/sessions` and `GET /api/v1/sessions/{sessionId}`.
 - [x] Backend OpenAPI + response validation updated so `Session.state` is part of the contract, and session create/update/restart responses now consistently return `state: active`.
 - [x] Backend validation coverage updated for the `Session.state` schema requirement; runtime integration assertions now verify `state: active` on core lifecycle responses.
