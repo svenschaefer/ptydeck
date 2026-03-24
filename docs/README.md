@@ -75,7 +75,7 @@ Authoritative repository documents remain:
 
 - `Codebase Review - Security Foundation Hardening.md`
   - Role: explicit production-security hardening plan
-  - Status: relevant, but mostly outside current local/dev-focused scope
+  - Status: near-term auth transport/mode hardening is implemented in the current baseline; broader production-security themes still remain deferred
   - Backlog landing:
     - `ENT-026`
     - `ENT-027`

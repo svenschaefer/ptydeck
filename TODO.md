@@ -13,9 +13,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `ENT-026` Owner: `BE` Task: Replace WebSocket query-string token transport with a header-based or one-time handshake token flow and ensure token-bearing URLs are never logged or surfaced in browser-visible connection strings.
-- [ ] `ENT-027` Owner: `BE` Task: Split authentication behavior into explicit `AUTH_MODE=dev|prod`, disable `/api/v1/auth/dev-token` outside local/dev mode, and fail fast on insecure production auth configuration.
-- [ ] `ENT-028` Owner: `QA` Task: Add regression coverage for hardened auth transport/mode behavior, including WebSocket auth without query-string tokens, explicit dev-vs-prod mode gating, disabled dev-token route outside dev mode, and no token leakage in observable request/connection surfaces.
+- None currently.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -234,3 +232,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `ENT-022` Owner: `QA` Task: Add non-functional load tests for concurrent session create/input/close and WS fanout stability with documented pass/fail thresholds.
 - [x] `ENT-023` Owner: `PLAT` Task: Add configuration schema validation on startup (fail-fast on invalid/missing critical env values) for backend and frontend runtime configs.
 - [x] `ENT-024` Owner: `PLAT` Task: Define and document data retention/purge policy for persisted session metadata and audit/security logs, including automated cleanup cadence.
+- [x] `ENT-026` Owner: `BE` Task: Replace WebSocket query-string token transport with a header-based or one-time handshake token flow and ensure token-bearing URLs are never logged or surfaced in browser-visible connection strings.
+- [x] `ENT-027` Owner: `BE` Task: Split authentication behavior into explicit `AUTH_MODE=dev|prod`, disable `/api/v1/auth/dev-token` outside local/dev mode, and fail fast on insecure production auth configuration.
+- [x] `ENT-028` Owner: `QA` Task: Add regression coverage for hardened auth transport/mode behavior, including WebSocket auth without query-string tokens, explicit dev-vs-prod mode gating, disabled dev-token route outside dev mode, and no token leakage in observable request/connection surfaces.

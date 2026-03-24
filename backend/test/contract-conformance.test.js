@@ -93,6 +93,15 @@ async function startRuntime() {
   return { runtime, baseUrl: `http://127.0.0.1:${port}/api/v1` };
 }
 
+async function contractFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("connection", "close");
+  return fetch(url, {
+    ...options,
+    headers
+  });
+}
+
 test("runtime routes and statuses conform to openapi contract", async () => {
   const openapiPath = fileURLToPath(new URL("../openapi/openapi.yaml", import.meta.url));
   const openapiRaw = await readFile(openapiPath, "utf8");
@@ -103,7 +112,7 @@ test("runtime routes and statuses conform to openapi contract", async () => {
 
   const { runtime, baseUrl } = await startRuntime();
   try {
-    const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+    const tokenRes = await contractFetch(`${baseUrl}/auth/dev-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({})
@@ -112,7 +121,7 @@ test("runtime routes and statuses conform to openapi contract", async () => {
     const tokenPayload = await tokenRes.json();
     const authHeaders = { authorization: `Bearer ${tokenPayload.accessToken}`, "content-type": "application/json" };
 
-    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+    const wsTicketRes = await contractFetch(`${baseUrl}/auth/ws-ticket`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify({})
@@ -123,115 +132,117 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       `unexpected ws-ticket status ${wsTicketRes.status}: ${wsTicketText}`
     );
 
-    const createRes = await fetch(`${baseUrl}/sessions`, {
+    const createRes = await contractFetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify({})
     });
     assert.ok(operations.get("POST /sessions").has(createRes.status));
 
-    const createInvalidRes = await fetch(`${baseUrl}/sessions`, {
+    const createInvalidRes = await contractFetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify([])
     });
     assert.ok(operations.get("POST /sessions").has(createInvalidRes.status));
 
-    const listRes = await fetch(`${baseUrl}/sessions`, { headers: { authorization: `Bearer ${tokenPayload.accessToken}` } });
+    const listRes = await contractFetch(`${baseUrl}/sessions`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
     assert.ok(operations.get("GET /sessions").has(listRes.status));
 
-    const listCustomCommandsRes = await fetch(`${baseUrl}/custom-commands`, {
+    const listCustomCommandsRes = await contractFetch(`${baseUrl}/custom-commands`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /custom-commands").has(listCustomCommandsRes.status));
 
-    const listDecksRes = await fetch(`${baseUrl}/decks`, {
+    const listDecksRes = await contractFetch(`${baseUrl}/decks`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /decks").has(listDecksRes.status));
 
-    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+    const createDeckRes = await contractFetch(`${baseUrl}/decks`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify({ id: "ops", name: "Ops" })
     });
     assert.ok(operations.get("POST /decks").has(createDeckRes.status));
 
-    const getDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+    const getDeckRes = await contractFetch(`${baseUrl}/decks/ops`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /decks/{deckId}").has(getDeckRes.status));
 
-    const patchDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+    const patchDeckRes = await contractFetch(`${baseUrl}/decks/ops`, {
       method: "PATCH",
       headers: authHeaders,
       body: JSON.stringify({ name: "Operations" })
     });
     assert.ok(operations.get("PATCH /decks/{deckId}").has(patchDeckRes.status));
 
-    const putCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+    const putCustomCommandRes = await contractFetch(`${baseUrl}/custom-commands/docu`, {
       method: "PUT",
       headers: authHeaders,
       body: JSON.stringify({ content: "echo DOCU\\n" })
     });
     assert.ok(operations.get("PUT /custom-commands/{commandName}").has(putCustomCommandRes.status));
 
-    const getCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+    const getCustomCommandRes = await contractFetch(`${baseUrl}/custom-commands/docu`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /custom-commands/{commandName}").has(getCustomCommandRes.status));
 
-    const deleteCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+    const deleteCustomCommandRes = await contractFetch(`${baseUrl}/custom-commands/docu`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("DELETE /custom-commands/{commandName}").has(deleteCustomCommandRes.status));
 
-    const getMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
+    const getMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /sessions/{sessionId}").has(getMissingRes.status));
 
-    const patchMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
+    const patchMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id`, {
       method: "PATCH",
       headers: authHeaders,
       body: JSON.stringify({ name: "renamed" })
     });
     assert.ok(operations.get("PATCH /sessions/{sessionId}").has(patchMissingRes.status));
 
-    const deleteMissingRes = await fetch(`${baseUrl}/sessions/missing-id`, {
+    const deleteMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("DELETE /sessions/{sessionId}").has(deleteMissingRes.status));
 
-    const inputMissingRes = await fetch(`${baseUrl}/sessions/missing-id/input`, {
+    const inputMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/input`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify({ data: "echo hi\n" })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/input").has(inputMissingRes.status));
 
-    const resizeMissingRes = await fetch(`${baseUrl}/sessions/missing-id/resize`, {
+    const resizeMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/resize`, {
       method: "POST",
       headers: authHeaders,
       body: JSON.stringify({ cols: 80, rows: 24 })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/resize").has(resizeMissingRes.status));
 
-    const restartMissingRes = await fetch(`${baseUrl}/sessions/missing-id/restart`, {
+    const restartMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/restart`, {
       method: "POST",
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
 
-    const moveMissingSessionRes = await fetch(`${baseUrl}/decks/ops/sessions/missing-id:move`, {
+    const moveMissingSessionRes = await contractFetch(`${baseUrl}/decks/ops/sessions/missing-id:move`, {
       method: "POST",
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /decks/{deckId}/sessions/{sessionId}:move").has(moveMissingSessionRes.status));
 
-    const deleteDeckRes = await fetch(`${baseUrl}/decks/ops`, {
+    const deleteDeckRes = await contractFetch(`${baseUrl}/decks/ops`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });

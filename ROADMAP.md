@@ -593,16 +593,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H14`
-- Next milestones in progress: `v0.3.0-H15`
+- Latest completed milestone: `v0.3.0-H15`
+- Next milestones in progress: none currently
 - Queued next milestone: none currently
-- Blockers: `v0.3.0-H15` completion is currently gated by backend coverage validation because `npm --prefix backend run test:coverage` did not yield a prompt completion during local validation and was aborted per operator preference against waiting on hanging validators.
+- Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `ENT-026`
-- `ENT-027`
-- `ENT-028`
+- None currently.
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -612,13 +610,13 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
-
-Remaining in this milestone:
-
 - `ENT-026`
 - `ENT-027`
 - `ENT-028`
+
+Remaining in this milestone:
+
+- none
 
 Dependencies:
 

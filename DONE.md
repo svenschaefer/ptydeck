@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ENT-026` completed: WebSocket authentication no longer uses bearer tokens in query strings; the frontend now exchanges the REST bearer token for a one-time WS ticket and sends it via `Sec-WebSocket-Protocol`, while the backend consumes each ticket exactly once.
+- [x] `ENT-027` completed: backend auth configuration now uses explicit `AUTH_MODE=off|dev|prod`, `/api/v1/auth/dev-token` is dev-only, and unsupported `prod` mode fails fast instead of silently falling back.
+- [x] `ENT-028` completed: backend/frontend regression coverage now verifies WS auth without query-string tokens, one-time ticket reuse rejection, explicit auth-mode gating, and disabled dev-token behavior outside dev mode.
+- [x] `v0.3.0-H15` completed: auth transport and mode hardening are now delivered end to end.
+- [x] Backend validation runners were separated by test intent: `backend test` now excludes the non-functional load harness by default, while `backend test:coverage` runs only deterministic coverage-slice tests and leaves contract/load/runtime-stream harnesses to the normal test path.
+- [x] Validation for `ENT-026`/`ENT-027`/`ENT-028` passed: `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, `npm --prefix backend run test:coverage`, `npm --prefix frontend run test:coverage`, and `npm run test:coverage:check`.
 - [x] Promoted the next near-term follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H15` (`ENT-026` ... `ENT-028`) for auth transport hardening, explicit auth mode gating, and matching regression coverage.
 - [x] `LIF-007` completed: backend session runtime now persists authoritative activity state transitions (`active` -> `inactive`) in session metadata (`activityState`, `activityUpdatedAt`, `activityCompletedAt`) and emits a deterministic post-persist `session.activity.completed` runtime event only after the completion transition has been durably saved.
 - [x] `LIF-008` completed: frontend now uses a dedicated browser-notification boundary (`frontend/src/public/activity-completion-notifier.js`) to emit exactly-once Web Notifications for persisted session-activity completion, with permission-safe no-op behavior, duplicate suppression, and bounded aggregation of multiple completions into one notification.

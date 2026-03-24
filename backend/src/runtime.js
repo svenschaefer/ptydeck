@@ -1986,7 +1986,15 @@ export function createRuntime(config) {
     });
 
     if (server.listening) {
-      await new Promise((resolve) => server.close(resolve));
+      await new Promise((resolve) => {
+        server.close(resolve);
+        if (typeof server.closeIdleConnections === "function") {
+          server.closeIdleConnections();
+        }
+        if (typeof server.closeAllConnections === "function") {
+          server.closeAllConnections();
+        }
+      });
     }
 
     isStopped = true;
