@@ -558,7 +558,8 @@ export function createRuntime(config) {
     createPty: typeof config.createPty === "function" ? config.createPty : undefined,
     sessionMaxConcurrent: config.sessionMaxConcurrent,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
-    sessionMaxLifetimeMs: config.sessionMaxLifetimeMs
+    sessionMaxLifetimeMs: config.sessionMaxLifetimeMs,
+    sessionActivityQuietMs: config.sessionActivityQuietMs
   });
   const persistence = new JsonPersistence(config.dataPath, {
     encryptionProvider: config.dataEncryptionProvider || null
@@ -1174,6 +1175,27 @@ export function createRuntime(config) {
       session: getApiSessionOrThrow(sessionId)
     });
   }
+
+  manager.on("session.activity.started", (event) => {
+    logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null });
+    persistSoon();
+  });
+
+  manager.on("session.activity.completed", async (event) => {
+    logDebug("session.event", { type: "session.activity.completed", sessionId: event.sessionId || null });
+    try {
+      await persistNow("session.activity.completed");
+      const apiSession = getApiSessionOrThrow(event.sessionId);
+      broadcast({
+        type: "session.activity.completed",
+        sessionId: event.sessionId,
+        activityCompletedAt: event.activityCompletedAt,
+        session: apiSession
+      });
+    } catch (error) {
+      console.error("failed to persist session activity completion", error);
+    }
+  });
 
   function broadcastDeckUpsert(type, deck) {
     broadcast({

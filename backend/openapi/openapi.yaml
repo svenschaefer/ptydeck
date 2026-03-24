@@ -534,11 +534,13 @@ components:
         - id
         - deckId
         - state
+        - activityState
         - cwd
         - shell
         - tags
         - createdAt
         - updatedAt
+        - activityUpdatedAt
       properties:
         id:
           type: string
@@ -550,6 +552,11 @@ components:
             - starting
             - running
             - unrestored
+        activityState:
+          type: string
+          enum:
+            - active
+            - inactive
         cwd:
           type: string
         shell:
@@ -576,6 +583,14 @@ components:
         updatedAt:
           type: integer
           format: int64
+        activityUpdatedAt:
+          type: integer
+          format: int64
+          nullable: true
+        activityCompletedAt:
+          type: integer
+          format: int64
+          nullable: true
         startedAt:
           type: integer
           format: int64

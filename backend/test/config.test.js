@@ -17,6 +17,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.sessionMaxConcurrent, 0);
   assert.equal(config.sessionIdleTimeoutMs, 0);
   assert.equal(config.sessionMaxLifetimeMs, 0);
+  assert.equal(config.sessionActivityQuietMs, 1400);
   assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
@@ -44,6 +45,7 @@ test("loadConfig maps environment values", () => {
     SESSION_MAX_CONCURRENT: "7",
     SESSION_IDLE_TIMEOUT_MS: "120000",
     SESSION_MAX_LIFETIME_MS: "3600000",
+    SESSION_ACTIVITY_QUIET_MS: "2500",
     SESSION_GUARDRAIL_SWEEP_MS: "250",
     DATA_ENCRYPTION_KEYS: `key-a:${Buffer.alloc(32, 1).toString("base64")}`,
     DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a",
@@ -71,6 +73,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.sessionMaxConcurrent, 7);
   assert.equal(config.sessionIdleTimeoutMs, 120000);
   assert.equal(config.sessionMaxLifetimeMs, 3600000);
+  assert.equal(config.sessionActivityQuietMs, 2500);
   assert.equal(config.sessionGuardrailSweepMs, 250);
   assert.equal(config.dataEncryptionProvider?.getActiveKey().id, "key-a");
   assert.equal(config.debugLogs, true);
@@ -115,6 +118,10 @@ test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(() => loadConfig({ PORT: "0" }), /PORT must be an integer between 1 and 65535\./);
   assert.throws(() => loadConfig({ MAX_BODY_BYTES: "0" }), /MAX_BODY_BYTES must be a positive integer\./);
   assert.throws(() => loadConfig({ RATE_LIMIT_WINDOW_MS: "0" }), /RATE_LIMIT_WINDOW_MS must be a positive integer\./);
+  assert.throws(
+    () => loadConfig({ SESSION_ACTIVITY_QUIET_MS: "0" }),
+    /SESSION_ACTIVITY_QUIET_MS must be a positive integer\./
+  );
   assert.throws(
     () => loadConfig({ RATE_LIMIT_REST_CREATE_MAX: "-1" }),
     /RATE_LIMIT_REST_CREATE_MAX must be a non-negative integer\./

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WebSocket } from "ws";
@@ -25,10 +26,11 @@ function waitFor(predicate, timeoutMs = 4000) {
 
 async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-ws-"));
+  const dataPath = join(dir, "sessions.json");
   const runtime = createRuntime({
     port: 0,
     shell: "sh",
-    dataPath: join(dir, "sessions.json"),
+    dataPath,
     corsOrigin: "*",
     ...overrides
   });
@@ -36,6 +38,7 @@ async function createStartedRuntime(overrides = {}) {
   const { port } = runtime.getAddress();
   return {
     runtime,
+    dataPath,
     baseUrl: `http://127.0.0.1:${port}/api/v1`,
     wsUrl: `ws://127.0.0.1:${port}/ws`
   };
@@ -57,6 +60,8 @@ function assertApiSessionShape(session) {
   assert.equal(typeof session?.cwd, "string");
   assert.equal(typeof session?.shell, "string");
   assert.ok(Array.isArray(session?.tags));
+  assert.ok(session?.activityState === "active" || session?.activityState === "inactive");
+  assert.equal(typeof session?.activityUpdatedAt, "number");
   assert.equal(typeof session?.createdAt, "number");
   assert.equal(typeof session?.updatedAt, "number");
 }
@@ -337,6 +342,60 @@ test("WS emits authoritative deck and session metadata events", async () => {
         (event) => event.type === "deck.deleted" && event.deckId === createdDeck.id && event.fallbackDeckId === "default"
       )
     );
+
+    ws.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("WS emits persisted activity completion events after quiet transition", async () => {
+  const { runtime, baseUrl, wsUrl, dataPath } = await createStartedRuntime({
+    sessionActivityQuietMs: 10
+  });
+  const events = [];
+
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "echo NOTIFY_DONE\n" })
+    });
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.activity.completed" &&
+          event.sessionId === created.id &&
+          event.session?.activityState === "inactive"
+      )
+    );
+
+    const completionEvent = events.find(
+      (event) => event.type === "session.activity.completed" && event.sessionId === created.id
+    );
+    assertApiSessionShape(completionEvent.session);
+    assert.equal(completionEvent.session.activityState, "inactive");
+    assert.equal(typeof completionEvent.activityCompletedAt, "number");
+
+    const persisted = JSON.parse(await readFile(dataPath, "utf8"));
+    const persistedSession = persisted.sessions.find((session) => session.id === created.id);
+    assert.equal(persistedSession.activityState, "inactive");
+    assert.equal(persistedSession.activityCompletedAt, completionEvent.activityCompletedAt);
 
     ws.close();
   } finally {

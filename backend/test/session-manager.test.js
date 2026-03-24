@@ -53,6 +53,9 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.deepEqual(created.tags, []);
   assert.equal(typeof created.themeProfile, "object");
   assert.equal(created.themeProfile.background, "#0a0d12");
+  assert.equal(created.activityState, "inactive");
+  assert.equal(typeof created.activityUpdatedAt, "number");
+  assert.equal(created.activityCompletedAt, null);
 
   const listed = manager.list();
   assert.equal(listed.length, 1);
@@ -105,6 +108,45 @@ test("SessionManager emits stable exit metadata", () => {
   assert.equal(exits[0].signal, "");
   assert.equal(exits[0].exitedAt, 1710000001234);
   assert.equal(exits[0].updatedAt, 1710000001234);
+});
+
+test("SessionManager emits activity completion after quiet period and persists inactive metadata in-session", async () => {
+  const fakePty = createFakePty();
+  let currentTime = 1710000000000;
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => currentTime,
+    sessionActivityQuietMs: 5
+  });
+  const created = manager.create({ cwd: "/tmp" });
+  const events = [];
+  manager.on("session.activity.started", (event) =>
+    events.push({ type: "session.activity.started", state: event.session.activityState })
+  );
+  manager.on("session.activity.completed", (event) =>
+    events.push({
+      type: "session.activity.completed",
+      state: event.session.activityState,
+      activityCompletedAt: event.activityCompletedAt
+    })
+  );
+
+  currentTime += 1;
+  fakePty.write("Working...\n");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const session = manager.get(created.id).meta;
+  assert.deepEqual(events, [
+    { type: "session.activity.started", state: "active" },
+    {
+      type: "session.activity.completed",
+      state: "inactive",
+      activityCompletedAt: session.activityCompletedAt
+    }
+  ]);
+  assert.equal(session.activityState, "inactive");
+  assert.equal(typeof session.activityUpdatedAt, "number");
+  assert.equal(typeof session.activityCompletedAt, "number");
 });
 
 test("SessionManager sendInput and resize call PTY", () => {

@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `LIF-007` completed: backend session runtime now persists authoritative activity state transitions (`active` -> `inactive`) in session metadata (`activityState`, `activityUpdatedAt`, `activityCompletedAt`) and emits a deterministic post-persist `session.activity.completed` runtime event only after the completion transition has been durably saved.
+- [x] `LIF-008` completed: frontend now uses a dedicated browser-notification boundary (`frontend/src/public/activity-completion-notifier.js`) to emit exactly-once Web Notifications for persisted session-activity completion, with permission-safe no-op behavior, duplicate suppression, and bounded aggregation of multiple completions into one notification.
+- [x] `LIF-009` completed: regression coverage now protects authoritative backend activity-completion persistence/events plus frontend notification aggregation/no-duplicate/permission-denied behavior across store/runtime integration paths.
+- [x] `v0.3.0-H14` completed: authoritative session activity-completion signaling and browser completion notifications are now delivered end to end.
+- [x] Validation for `LIF-007`/`LIF-008`/`LIF-009` passed at direct FE/BE scope: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, and `npm --prefix backend run test`. The root `npm run test:coverage:check` wrapper still timed out on the pre-existing backend `contract-conformance` coverage path and remains a validation-wrapper concern rather than an H14 functional blocker.
 - [x] Promoted the next near-term follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H14` (`LIF-007` ... `LIF-009`) for authoritative persisted activity-completion signaling and browser notifications on session completion.
 - [x] `ARC-008` completed: regression coverage now closes the full stream-interpretation foundation by covering stream-adapter normalization, deterministic plugin ordering/conflict behavior, carriage-return overwrite handling, declarative action-dispatch validation, and hidden-session interpretation recovery in the integrated UI path.
 - [x] `v0.3.0-H13` completed: the near-term stream-interpretation foundation (`ARC-003` ... `ARC-008`) is now fully delivered and regression-hardened.

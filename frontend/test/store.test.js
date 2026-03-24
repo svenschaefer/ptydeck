@@ -168,6 +168,30 @@ test("store avoids repeated publishes for already-live session activity", () => 
   assert.equal(store.getState().sessions[0].lifecycleState, "busy");
 });
 
+test("store honors authoritative activityState updates from runtime payloads", () => {
+  const store = createStore();
+
+  store.setSessions([{ id: "a", state: "running", activityState: "inactive", activityUpdatedAt: 1 }]);
+  store.markSessionActivity("a", { timestamp: 10 });
+  let session = store.getState().sessions[0];
+  assert.equal(session.hasLiveActivity, true);
+  assert.equal(session.lifecycleState, "busy");
+
+  store.upsertSession({
+    id: "a",
+    state: "running",
+    activityState: "inactive",
+    activityUpdatedAt: 20,
+    activityCompletedAt: 20,
+    updatedAt: 20
+  });
+  session = store.getState().sessions[0];
+  assert.equal(session.hasLiveActivity, false);
+  assert.equal(session.activityState, "inactive");
+  assert.equal(session.activityCompletedAt, 20);
+  assert.equal(session.lifecycleState, "idle");
+});
+
 test("store applies interpretation actions into session-scoped status, meta, tags, artifacts, and notifications", () => {
   const store = createStore();
   store.setSessions([{ id: "s1", state: "running", tags: ["ops"] }]);

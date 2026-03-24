@@ -36,6 +36,9 @@ const DEFAULT_SESSION_THEME_PROFILE = {
 const SESSION_STATE_STARTING = "starting";
 const SESSION_STATE_RUNNING = "running";
 const SESSION_STATE_EXITED = "exited";
+const SESSION_ACTIVITY_STATE_ACTIVE = "active";
+const SESSION_ACTIVITY_STATE_INACTIVE = "inactive";
+const DEFAULT_SESSION_ACTIVITY_QUIET_MS = 1400;
 
 function consumeCwdMarkers(session, chunk) {
   const markerStart = "__CWD__";
@@ -133,7 +136,10 @@ export class SessionManager {
     sessionMaxConcurrent = 0,
     sessionIdleTimeoutMs = 0,
     sessionMaxLifetimeMs = 0,
-    nowFn = now
+    sessionActivityQuietMs = DEFAULT_SESSION_ACTIVITY_QUIET_MS,
+    nowFn = now,
+    setTimeoutFn = setTimeout,
+    clearTimeoutFn = clearTimeout
   } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
@@ -143,7 +149,13 @@ export class SessionManager {
     this.sessionIdleTimeoutMs = Number.isInteger(sessionIdleTimeoutMs) && sessionIdleTimeoutMs > 0 ? sessionIdleTimeoutMs : 0;
     this.sessionMaxLifetimeMs =
       Number.isInteger(sessionMaxLifetimeMs) && sessionMaxLifetimeMs > 0 ? sessionMaxLifetimeMs : 0;
+    this.sessionActivityQuietMs =
+      Number.isInteger(sessionActivityQuietMs) && sessionActivityQuietMs > 0
+        ? sessionActivityQuietMs
+        : DEFAULT_SESSION_ACTIVITY_QUIET_MS;
     this.nowFn = typeof nowFn === "function" ? nowFn : now;
+    this.setTimeoutFn = typeof setTimeoutFn === "function" ? setTimeoutFn : setTimeout;
+    this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
     this.createPty =
       createPty ||
       (({ shell, cwd, cols, rows, env }) =>
@@ -154,6 +166,58 @@ export class SessionManager {
           rows,
           env: env || process.env
         }));
+  }
+
+  clearSessionActivityTimer(session) {
+    if (!session?.activityTimer) {
+      return;
+    }
+    this.clearTimeoutFn(session.activityTimer);
+    session.activityTimer = null;
+  }
+
+  emitSessionActivityStarted(session, timestamp) {
+    session.meta.activityState = SESSION_ACTIVITY_STATE_ACTIVE;
+    session.meta.activityUpdatedAt = timestamp;
+    session.meta.activityCompletedAt = null;
+    session.meta.updatedAt = timestamp;
+    this.events.emit("session.activity.started", {
+      sessionId: session.id,
+      activityState: session.meta.activityState,
+      activityUpdatedAt: session.meta.activityUpdatedAt,
+      session: session.meta
+    });
+  }
+
+  emitSessionActivityCompleted(session, timestamp) {
+    session.activityTimer = null;
+    if (!session || session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
+      return;
+    }
+    session.meta.activityState = SESSION_ACTIVITY_STATE_INACTIVE;
+    session.meta.activityUpdatedAt = timestamp;
+    session.meta.activityCompletedAt = timestamp;
+    session.meta.updatedAt = timestamp;
+    this.events.emit("session.activity.completed", {
+      sessionId: session.id,
+      activityState: session.meta.activityState,
+      activityUpdatedAt: session.meta.activityUpdatedAt,
+      activityCompletedAt: session.meta.activityCompletedAt,
+      session: session.meta
+    });
+  }
+
+  scheduleSessionActivityCompletion(session) {
+    if (!session) {
+      return;
+    }
+    this.clearSessionActivityTimer(session);
+    session.activityTimer = this.setTimeoutFn(() => {
+      if (!this.sessions.has(session.id)) {
+        return;
+      }
+      this.emitSessionActivityCompleted(session, this.nowFn());
+    }, this.sessionActivityQuietMs);
   }
 
   list() {
@@ -244,6 +308,7 @@ export class SessionManager {
       ptyProcess,
       cwdMarkerBuffer: "",
       outputBuffer: "",
+      activityTimer: null,
       lastActivityAt: initialActivityTimestamp,
       meta: {
         id,
@@ -256,6 +321,9 @@ export class SessionManager {
         tags: normalizedTags,
         themeProfile: normalizedThemeProfile,
         state: SESSION_STATE_STARTING,
+        activityState: SESSION_ACTIVITY_STATE_INACTIVE,
+        activityUpdatedAt: initialActivityTimestamp,
+        activityCompletedAt: null,
         startedAt: null,
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
@@ -267,18 +335,27 @@ export class SessionManager {
       if (cleaned) {
         const timestamp = this.nowFn();
         session.lastActivityAt = timestamp;
-        session.meta.updatedAt = timestamp;
+        if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
+          this.emitSessionActivityStarted(session, timestamp);
+        } else {
+          session.meta.updatedAt = timestamp;
+        }
         session.outputBuffer = `${session.outputBuffer}${cleaned}`;
         if (session.outputBuffer.length > MAX_OUTPUT_BUFFER_CHARS) {
           session.outputBuffer = session.outputBuffer.slice(-MAX_OUTPUT_BUFFER_CHARS);
         }
+        this.scheduleSessionActivityCompletion(session);
         this.events.emit("session.data", { sessionId: id, data: cleaned });
       }
     });
 
     ptyProcess.onExit((exit) => {
+      this.clearSessionActivityTimer(session);
       const exitTimestamp = this.nowFn();
       session.meta.state = SESSION_STATE_EXITED;
+      session.meta.activityState = SESSION_ACTIVITY_STATE_INACTIVE;
+      session.meta.activityUpdatedAt = exitTimestamp;
+      session.meta.activityCompletedAt = exitTimestamp;
       session.meta.exitCode = Number.isInteger(exit.exitCode) ? exit.exitCode : null;
       session.meta.exitSignal = typeof exit.signal === "string" ? exit.signal : "";
       session.meta.exitedAt = exitTimestamp;
@@ -374,6 +451,7 @@ export class SessionManager {
 
   closeWithReason(sessionId, reason) {
     const session = this.get(sessionId);
+    this.clearSessionActivityTimer(session);
     session.ptyProcess.kill();
     this.sessions.delete(sessionId);
     this.events.emit("session.closed", { sessionId, reason });

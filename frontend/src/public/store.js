@@ -99,12 +99,23 @@ function cloneSessionRecord(session) {
           ...notification,
           data: notification?.data && typeof notification.data === "object" ? { ...notification.data } : notification?.data
         }))
-      : []
+      : [],
+    activityState: normalizeSessionActivityState(session.activityState),
+    activityUpdatedAt: normalizeActivityTimestamp(session.activityUpdatedAt),
+    activityCompletedAt: normalizeActivityTimestamp(session.activityCompletedAt)
   };
 }
 
 function normalizeActivityTimestamp(value) {
   return Number.isFinite(value) ? Number(value) : null;
+}
+
+function normalizeSessionActivityState(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "active" || normalized === "inactive") {
+    return normalized;
+  }
+  return "inactive";
 }
 
 function normalizeRawSessionState(value) {
@@ -245,10 +256,13 @@ function deriveSessionLifecycleState(rawState, session) {
   if (normalizedRawState === "created" || normalizedRawState === "starting") {
     return normalizedRawState;
   }
-  if (session?.hasLiveActivity === true) {
+  if (session?.hasLiveActivity === true || normalizeSessionActivityState(session?.activityState) === "active") {
     return "busy";
   }
-  if (normalizeActivityTimestamp(session?.lastOutputAt) !== null) {
+  if (
+    normalizeActivityTimestamp(session?.lastOutputAt) !== null ||
+    normalizeActivityTimestamp(session?.activityCompletedAt) !== null
+  ) {
     return "idle";
   }
   return "running";
@@ -260,7 +274,11 @@ function withSessionActivityDefaults(session) {
   }
   const normalizedSession = {
     ...session,
-    hasLiveActivity: session.hasLiveActivity === true,
+    activityState: normalizeSessionActivityState(session.activityState),
+    activityUpdatedAt: normalizeActivityTimestamp(session.activityUpdatedAt),
+    activityCompletedAt: normalizeActivityTimestamp(session.activityCompletedAt),
+    hasLiveActivity:
+      session.hasLiveActivity === true || normalizeSessionActivityState(session.activityState) === "active",
     hasUnreadActivity: session.hasUnreadActivity === true,
     lastOutputAt: normalizeActivityTimestamp(session.lastOutputAt),
     interpretationState: normalizePluginSessionState(session.interpretationState),
@@ -290,7 +308,11 @@ function createStateSnapshot(state) {
 }
 
 function mergeSessionRecord(currentSession, nextSession) {
-  const merged = withSessionActivityDefaults({ ...currentSession, ...nextSession });
+  const mergedSource = { ...currentSession, ...nextSession };
+  if (nextSession && Object.prototype.hasOwnProperty.call(nextSession, "activityState")) {
+    mergedSource.hasLiveActivity = normalizeSessionActivityState(nextSession.activityState) === "active";
+  }
+  const merged = withSessionActivityDefaults(mergedSource);
   const runtimeState = normalizeText(nextSession?.state).toLowerCase();
   if (runtimeState !== "exited") {
     delete merged.exitCode;
@@ -557,6 +579,9 @@ export function reduceRuntimeState(state, action, options = {}) {
         changed = true;
         return {
           ...session,
+          activityState: "active",
+          activityUpdatedAt: activityTimestamp,
+          activityCompletedAt: null,
           hasLiveActivity: true,
           hasUnreadActivity,
           lastOutputAt: activityTimestamp,
@@ -589,10 +614,15 @@ export function reduceRuntimeState(state, action, options = {}) {
         changed = true;
         return {
           ...session,
+          activityState: "inactive",
+          activityUpdatedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt),
+          activityCompletedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt),
           hasLiveActivity: false,
           lifecycleState: deriveSessionLifecycleState(session.state, {
             ...session,
-            hasLiveActivity: false
+            hasLiveActivity: false,
+            activityState: "inactive",
+            activityCompletedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt)
           })
         };
       });

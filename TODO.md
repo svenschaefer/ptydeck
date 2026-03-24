@@ -13,9 +13,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `LIF-007` Owner: `BE` Task: Persist authoritative session activity-completion transitions (`busy`/active -> `idle`/inactive) in backend session metadata and emit a deterministic post-persist runtime event so downstream clients can react only after the status change is durably recorded.
-- [ ] `LIF-008` Owner: `FE` Task: Add browser-system notifications for session activity completion using the standard Web Notifications API, triggered exactly once per authoritative active->inactive transition, with permission-safe no-op behavior when notifications are unavailable or denied and optional aggregation of multiple completions within a bounded time window (for example 5 seconds).
-- [ ] `LIF-009` Owner: `QA` Task: Add regression coverage for activity-completion notifications, including exactly-once emission per transition, no-duplicate behavior across reconnect/update churn, aggregation behavior for multiple completions in the configured time window, and silent no-op behavior when browser permission is absent or denied.
+- none currently
 
 ## Backend Tasks (OpenAPI-based REST)
 

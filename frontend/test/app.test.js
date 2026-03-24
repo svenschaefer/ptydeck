@@ -653,6 +653,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     }
   ];
   let listSessionsCalls = 0;
+  const browserNotifications = [];
+  class MockNotification {
+    static permission = "granted";
+
+    constructor(title, options = {}) {
+      browserNotifications.push({ title, options });
+    }
+  }
   const win = {
     document: fixture.document,
     location: {
@@ -663,7 +671,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     __PTYDECK_CONFIG__: {
       apiBaseUrl: "http://127.0.0.1:18080/api/v1",
       wsUrl: "ws://127.0.0.1:18080/ws",
-      debugLogs: false
+      debugLogs: false,
+      activityCompletionNotificationWindowMs: 5
     },
     localStorage: {
       getItem(key) {
@@ -674,6 +683,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       }
     },
     Terminal: MockTerminal,
+    Notification: MockNotification,
     FitAddon: {
       FitAddon: MockFitAddon
     },
@@ -1844,6 +1854,102 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
   assert.match(recoveredHiddenCard.querySelector(".session-status-text").textContent, /Working on hidden deck sync/i);
   assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.activity.completed",
+      sessionId: "s-1",
+      activityCompletedAt: 2001,
+      session: {
+        id: "s-1",
+        deckId: "default",
+        name: "one",
+        state: "running",
+        activityState: "inactive",
+        activityUpdatedAt: 2001,
+        activityCompletedAt: 2001,
+        cwd: "/tmp",
+        shell: "bash",
+        tags: [],
+        createdAt: 1000,
+        updatedAt: 2001
+      }
+    })
+  });
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.activity.completed",
+      sessionId: "s-2",
+      activityCompletedAt: 2002,
+      session: {
+        id: "s-2",
+        deckId: "deck-new",
+        name: "two",
+        state: "running",
+        activityState: "inactive",
+        activityUpdatedAt: 2002,
+        activityCompletedAt: 2002,
+        cwd: "/tmp",
+        shell: "bash",
+        tags: [],
+        createdAt: 1001,
+        updatedAt: 2002
+      }
+    })
+  });
+  await sleep(20);
+  assert.equal(browserNotifications.length, 1);
+  assert.equal(browserNotifications[0].title, "2 sessions completed activity");
+  assert.match(browserNotifications[0].options.body, /\[1\] one/);
+  assert.match(browserNotifications[0].options.body, /\[2\] two/);
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.activity.completed",
+      sessionId: "s-1",
+      activityCompletedAt: 2001,
+      session: {
+        id: "s-1",
+        deckId: "default",
+        name: "one",
+        state: "running",
+        activityState: "inactive",
+        activityUpdatedAt: 2001,
+        activityCompletedAt: 2001,
+        cwd: "/tmp",
+        shell: "bash",
+        tags: [],
+        createdAt: 1000,
+        updatedAt: 2001
+      }
+    })
+  });
+  await sleep(20);
+  assert.equal(browserNotifications.length, 1);
+  MockNotification.permission = "denied";
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.activity.completed",
+      sessionId: "s-1",
+      activityCompletedAt: 2003,
+      session: {
+        id: "s-1",
+        deckId: "default",
+        name: "one",
+        state: "running",
+        activityState: "inactive",
+        activityUpdatedAt: 2003,
+        activityCompletedAt: 2003,
+        cwd: "/tmp",
+        shell: "bash",
+        tags: [],
+        createdAt: 1000,
+        updatedAt: 2003
+      }
+    })
+  });
+  await sleep(20);
+  assert.equal(browserNotifications.length, 1);
 
   fixture.elements.commandInput.value = "/filter";
   fixture.elements.sendCommand.click();

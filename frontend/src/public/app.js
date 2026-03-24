@@ -1,4 +1,5 @@
 import { createApiClient } from "./api-client.js";
+import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createCommandEngine } from "./command-engine.js";
 import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
@@ -118,6 +119,11 @@ const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
+const ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS = (() => {
+  const injectedValue = window?.__PTYDECK_CONFIG__?.activityCompletionNotificationWindowMs;
+  const parsed = Number(injectedValue);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 5000;
+})();
 const streamPluginEngine = createStreamPluginEngine({
   getSession(sessionId) {
     return getSessionById(sessionId);
@@ -245,6 +251,20 @@ let recalledSlashCommand = "";
 let sessionViewModel = null;
 let commandEngine = null;
 let commandSuggestionsController = null;
+const activityCompletionNotifier = createActivityCompletionNotifier({
+  windowRef: window,
+  aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
+  formatSessionToken,
+  formatSessionDisplayName,
+  resolveDeckName(deckId) {
+    return getDeckById(deckId)?.name || String(deckId || "").trim();
+  },
+  onError(error) {
+    debugLog("activity-notification.error", {
+      message: error instanceof Error ? error.message : String(error || "")
+    });
+  }
+});
 const uiState = {
   loading: true,
   error: "",
@@ -2768,6 +2788,22 @@ function applyRuntimeEvent(event, options = {}) {
         return true;
       }
       return false;
+    case "session.activity.completed":
+      if (event.session) {
+        upsertSession(event.session);
+        activityCompletionNotifier.queueCompletion(event.session, event.activityCompletedAt);
+        uiState.error = "";
+        return true;
+      }
+      if (event.sessionId) {
+        const session = getSessionById(event.sessionId);
+        if (session) {
+          activityCompletionNotifier.queueCompletion(session, event.activityCompletedAt);
+          uiState.error = "";
+          return true;
+        }
+      }
+      return false;
     case "session.closed":
       if (event.sessionId) {
         markSessionClosed(event.sessionId);
@@ -4083,6 +4119,7 @@ commandInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("beforeunload", () => {
+  activityCompletionNotifier.dispose();
   if (wsClient) {
     wsClient.close();
   }

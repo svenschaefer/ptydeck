@@ -570,13 +570,13 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
-
-Remaining in this milestone:
-
 - `LIF-007`
 - `LIF-008`
 - `LIF-009`
+
+Remaining in this milestone:
+
+- none
 
 Dependencies:
 
@@ -593,16 +593,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H13`
-- Next milestones in progress: `v0.3.0-H14`
+- Latest completed milestone: `v0.3.0-H14`
+- Next milestones in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `LIF-007`
-- `LIF-008`
-- `LIF-009`
+- none currently
 
 ### Completed Items
 
