@@ -34,6 +34,7 @@ import { createCommandSuggestionsController } from "./ui/components.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
+import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
@@ -278,6 +279,7 @@ let commandExecutor = null;
 let commandSuggestionsController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
+let sessionDisposalController = null;
 let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
 let sessionCardRenderController = null;
@@ -1989,39 +1991,20 @@ function render() {
   syncActiveTerminalSearch({ preserveSelection: true });
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
-  let shouldRunResizePass = false;
-  for (const sessionId of terminals.keys()) {
-    if (!activeIds.has(sessionId)) {
-      const entry = terminals.get(sessionId);
-      const observer = terminalObservers.get(sessionId);
-      if (observer) {
-        observer.disconnect();
-      }
-      entry.terminal.dispose();
-      entry.element.remove();
-      terminals.delete(sessionId);
-      terminalObservers.delete(sessionId);
-      closeSettingsDialog(entry.settingsDialog);
-      streamPluginEngine.disposeSession(sessionId);
-      streamAdapter.disposeSession(sessionId);
-      if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
-        clearTerminalSearchSelection(sessionId);
-        terminalSearchState.sessionId = "";
-        terminalSearchState.matches = [];
-        terminalSearchState.activeIndex = -1;
-        terminalSearchState.revision = -1;
-      }
-      const timer = resizeTimers.get(sessionId);
-      if (timer) {
-        clearTimeout(timer);
-      }
-      resizeTimers.delete(sessionId);
-      terminalSizes.delete(sessionId);
-      sessionThemeDrafts.delete(sessionId);
-      sessionCardMetaController?.clearSessionStatusAnchor(sessionId);
-      shouldRunResizePass = true;
-    }
-  }
+  let shouldRunResizePass =
+    sessionDisposalController?.cleanupRemovedSessions({
+      activeSessionIds: activeIds,
+      terminals,
+      terminalObservers,
+      closeSettingsDialog,
+      streamPluginEngine,
+      streamAdapter,
+      terminalSearchState,
+      clearTerminalSearchSelection,
+      resizeTimers,
+      terminalSizes,
+      sessionThemeDrafts
+    }) === true;
 
   for (const session of state.sessions) {
     if (terminals.has(session.id)) {
@@ -2591,6 +2574,12 @@ sessionCardMetaController = createSessionCardMetaController({
   normalizeSessionTags,
   onTick: () => render(),
   windowRef: window
+});
+
+sessionDisposalController = createSessionDisposalController({
+  onClearSessionStatusAnchor(sessionId) {
+    sessionCardMetaController?.clearSessionStatusAnchor(sessionId);
+  }
 });
 
 sessionCardFactoryController = createSessionCardFactoryController({
