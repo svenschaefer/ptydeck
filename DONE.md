@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] The next near-term block was promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `v0.3.0-H11` (`QLT-119` ... `QLT-122`), focused on reducer-backed runtime state, WS-authoritative hydration, and automated FE/BE contract regression checks.
 - [x] `QLT-116` completed: backend now emits authoritative WebSocket metadata events for deck/session state mutations, including `deck.created`, `deck.updated`, `deck.deleted`, `session.updated`, and deck-reassignment propagation during forced deck deletion.
 - [x] `QLT-117` completed: frontend runtime metadata application now flows through explicit snapshot/event reducers instead of scattered local mutation patching after REST calls.
 - [x] `QLT-118` completed: backend/frontend regression coverage now verifies runtime metadata consistency across deck create/update/delete, session rename/settings patch, cross-deck moves, reconnect snapshot replacement, and mixed REST-plus-WebSocket propagation flows.

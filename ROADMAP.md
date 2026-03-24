@@ -475,16 +475,40 @@ Exit criteria:
 - Frontend applies runtime metadata updates through one explicit event/reducer path instead of scattered local mutation handlers.
 - Multi-client runtime state stays consistent across session rename/settings updates, deck mutations, session moves, and reconnect snapshot replacement.
 
+### v0.3.0-H11 - Runtime Store and Contract Hardening
+
+- `QLT-119`
+- `QLT-120`
+- `QLT-121`
+- `QLT-122`
+
+Dependencies:
+
+- `QLT-119` should land first so runtime state transitions for sessions, decks, custom commands, connection state, and related derived metadata move behind one pure reducer/store boundary instead of remaining partially embedded in `app.js`.
+- `QLT-120` depends on `QLT-119` and `QLT-116` ... `QLT-118` so WebSocket-authoritative bootstrap/reconnect behavior builds on the now-complete metadata event surface plus an extracted reducer/store implementation.
+- `QLT-121` depends on `QLT-119` and `QLT-120` so regression coverage targets the final reducer-backed WS-authoritative runtime flow instead of transitional mixed-state behavior.
+- `QLT-122` should follow `QLT-120` so FE/BE contract regression checks are written against the finalized runtime payload expectations and OpenAPI-aligned FE surfaces.
+
+Exit criteria:
+
+- Frontend runtime state for sessions, decks, and custom commands is applied through a dedicated reducer/store module instead of scattered inline mutation logic.
+- Bootstrap and reconnect hydration are WebSocket-authoritative for runtime domains already represented in snapshots/events.
+- Regression coverage validates reducer-backed state consistency and mixed local/remote event ordering behavior.
+- Automated FE/BE contract checks protect OpenAPI/runtime payload alignment for sessions, decks, and custom commands.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H10`
-- Next milestones in progress: none currently
+- Next milestones in progress: `v0.3.0-H11`
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- None currently.
+- `QLT-119`
+- `QLT-120`
+- `QLT-121`
+- `QLT-122`
 
 ### Completed Items
 

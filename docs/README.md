@@ -75,6 +75,9 @@ Authoritative repository documents remain:
   - Still relevant:
     - broader WS-first protocol/state evolution beyond the current runtime metadata baseline is still not complete
   - Backlog landing:
+    - `QLT-119`
+    - `QLT-120`
+    - `QLT-121`
     - `ARC-002`
 
 ### 7. Technical Alternatives
@@ -98,14 +101,14 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- None currently derived from the imported review notes.
+- Reducer-backed runtime-state/store hardening and WebSocket-authoritative bootstrap/reconnect follow-up (`QLT-119`, `QLT-120`, `QLT-121`) are now the current near-term slice promoted from the imported review notes and deferred backlog.
 
 ### Deferred / Outlook
 
 - Replace WebSocket query-string token transport and harden token logging.
 - Split auth behavior into explicit dev/prod modes.
 - Introduce stream interpretation and plugin architecture.
-- Generalize WebSocket-first state handling beyond current domains.
+- Continue WebSocket-first state handling beyond the near-term H11 reducer/store baseline.
 
 ## Duplication Guidance
 

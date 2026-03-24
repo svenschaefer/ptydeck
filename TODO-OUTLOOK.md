@@ -39,7 +39,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 ## Developer Productivity
 
 - [ ] Add ADR process for architecture decisions.
-- [ ] Add automated FE/BE contract tests.
 - [ ] Add templates for new endpoints and UI modules.
 
 ## Technical Alternatives and Stack Evolution
@@ -48,7 +47,7 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] `ALT-002` Owner `BE`: Evaluate a structured WebSocket protocol layer on top of `ws` for multiplexing, multi-client coordination, and shared-session scenarios, including compatibility constraints, migration sequencing, and reasons to keep the current raw event model.
 - [ ] `ALT-003` Owner `BE`: Add a relational persistence option (SQLite first, PostgreSQL-ready abstraction second) with an explicit migration path from JSON persistence for future multi-user, query-heavy, or session-history requirements.
 - [ ] `ALT-004` Owner `FE`: Evaluate a frontend framework migration path (React + Vite or Svelte) for the terminal workspace UI, including component-boundary mapping, xterm integration risks, and rollback criteria if vanilla runtime maintenance remains preferable.
-- [ ] `ALT-005` Owner `FE`: Evaluate an explicit frontend state-management layer (reducer-first store, Zustand, or Redux Toolkit style approach) once session, deck, command, and WebSocket event state become too coupled for the current custom store/runtime model.
+- [ ] `ALT-005` Owner `FE`: Evaluate adoption of an external frontend state-management layer (for example Zustand or Redux Toolkit) after the near-term reducer/store extraction baseline is in place and only if the custom reducer-first runtime model proves insufficient.
 - [ ] `ALT-006` Owner `PLAT`: Evaluate build/workspace modernization (`Vite` for frontend dev/build, `pnpm`-based workspace/monorepo structure) when package count, service count, or contributor count outgrow the current npm-only layout.
 
 ## Observability
@@ -62,7 +61,7 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
-- [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond custom commands to additional frontend domains (session lifecycle, derived state, future plugin artifacts).
+- [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
 - [ ] Add parameterized custom commands (for example `/deploy <env>`) with explicit placeholder rules.
 - [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.

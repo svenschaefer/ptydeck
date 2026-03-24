@@ -13,7 +13,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- None currently.
+- [ ] `QLT-119` Owner: `FE` Task: Extract the frontend runtime reducer/store into a dedicated module boundary with pure state transitions for sessions, decks, custom commands, connection state, filters, and related derived runtime metadata instead of continuing to mutate those domains inline in `app.js`.
+- [ ] `QLT-120` Owner: `FE` Task: Make frontend runtime bootstrap and reconnect hydration WebSocket-authoritative for sessions, decks, and custom commands by routing snapshot/live event application through the dedicated reducer/store path and minimizing REST-driven steady-state state merges.
+- [ ] `QLT-121` Owner: `QA` Task: Add regression coverage for reducer-backed runtime state application and WebSocket-authoritative bootstrap/reconnect behavior, including mixed local mutation plus remote event ordering and multi-client state parity across sessions, decks, and custom commands.
+- [ ] `QLT-122` Owner: `QA` Task: Add automated FE/BE contract regression checks that verify frontend-generated API/runtime expectations stay aligned with backend OpenAPI and representative runtime payload shapes for sessions, decks, and custom commands.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -196,6 +199,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-116` Owner: `BE` Task: Emit authoritative WebSocket metadata events for state-relevant session and deck mutations (`session.updated`, `deck.created`, `deck.updated`, `deck.deleted`, and deterministic session deck-change propagation) so connected clients do not rely on local optimistic merges as the only live-state update path.
 - [x] `QLT-117` Owner: `FE` Task: Introduce a reducer-style runtime event application path for snapshot plus live metadata events and consume the new authoritative session/deck WebSocket events instead of scattered local state patching after REST mutations.
 - [x] `QLT-118` Owner: `QA` Task: Add regression coverage for runtime metadata event consistency across multi-client session rename/settings patch, deck create/rename/delete, session move between decks, reconnect snapshot replacement, and mixed REST mutation plus WebSocket propagation flows.
+- [ ] `QLT-119` Owner: `FE` Task: Extract the frontend runtime reducer/store into a dedicated module boundary with pure state transitions for sessions, decks, custom commands, connection state, filters, and related derived runtime metadata instead of continuing to mutate those domains inline in `app.js`.
+- [ ] `QLT-120` Owner: `FE` Task: Make frontend runtime bootstrap and reconnect hydration WebSocket-authoritative for sessions, decks, and custom commands by routing snapshot/live event application through the dedicated reducer/store path and minimizing REST-driven steady-state state merges.
+- [ ] `QLT-121` Owner: `QA` Task: Add regression coverage for reducer-backed runtime state application and WebSocket-authoritative bootstrap/reconnect behavior, including mixed local mutation plus remote event ordering and multi-client state parity across sessions, decks, and custom commands.
+- [ ] `QLT-122` Owner: `QA` Task: Add automated FE/BE contract regression checks that verify frontend-generated API/runtime expectations stay aligned with backend OpenAPI and representative runtime payload shapes for sessions, decks, and custom commands.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
