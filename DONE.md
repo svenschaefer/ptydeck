@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted terminal mount/runtime wiring from `frontend/src/public/app.js` into `frontend/src/public/ui/session-terminal-runtime-controller.js` (xterm construction, theme/bootstrap wiring, entry registration, resize-observer registration, and deferred initial resize scheduling).
+- [x] Added focused regression coverage for the new session terminal runtime controller in `frontend/test/session-terminal-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/session-terminal-runtime-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, targeted tests `node --test frontend/test/session-terminal-runtime-controller.test.js frontend/test/session-card-interactions-controller.test.js frontend/test/session-card-factory-controller.test.js`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/session-terminal-runtime-controller.test.js`.
 - [x] `ARC-010` progress: extracted session-card interaction binding from `frontend/src/public/app.js` into `frontend/src/public/ui/session-card-interactions-controller.js` (focus/settings dialog wiring, rename/delete flows, settings dirty tracking, theme interaction wiring, and settings apply/cancel behavior).
 - [x] Added focused regression coverage for the new session-card interactions controller in `frontend/test/session-card-interactions-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/ui/session-card-interactions-controller.js` participates in syntax-check gates.

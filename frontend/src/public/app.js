@@ -40,6 +40,7 @@ import { createSessionCardFactoryController } from "./ui/session-card-factory-co
 import { createSessionCardInteractionsController } from "./ui/session-card-interactions-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
+import { createSessionTerminalRuntimeController } from "./ui/session-terminal-runtime-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
 
 const config = resolveRuntimeConfig(window);
@@ -285,6 +286,7 @@ let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
 let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
+let sessionTerminalRuntimeController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
@@ -2112,85 +2114,55 @@ function render() {
       requestRender: () => render()
     });
 
-    const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
-    const terminal = new window.Terminal({
-      convertEol: true,
-      fontSize: TERMINAL_FONT_SIZE,
-      lineHeight: TERMINAL_LINE_HEIGHT,
-      fontFamily: TERMINAL_FONT_FAMILY,
-      cursorBlink: true,
-      theme: initialTheme
+    sessionTerminalRuntimeController?.mountSessionTerminalCard({
+      session,
+      refs: {
+        node,
+        focusBtn,
+        quickIdEl,
+        stateBadgeEl,
+        pluginBadgesEl,
+        unrestoredHintEl,
+        sessionStatusEl,
+        sessionArtifactsEl,
+        settingsDialog,
+        startCwdInput,
+        startCommandInput,
+        startEnvInput,
+        sessionSendTerminatorSelect,
+        sessionTagsInput,
+        startFeedback,
+        tagListEl,
+        settingsApplyBtn,
+        settingsStatus,
+        themeCategory,
+        themeSearch,
+        themeSelect,
+        themeBg,
+        themeFg,
+        themeInputs,
+        mount
+      },
+      initialVisible,
+      gridEl,
+      terminals,
+      terminalObservers,
+      resolveInitialTheme: (sessionId) => buildThemeFromConfig(getSessionThemeConfig(sessionId)),
+      streamPluginEngine,
+      onTerminalData: handleSessionTerminalInput,
+      afterEntryRegistered: (entry, currentSession) => {
+        syncSessionStartupControls(entry, currentSession);
+        syncSessionThemeControls(entry, currentSession.id);
+        setSettingsDirty(entry, false);
+      },
+      onFirstTerminalMounted: () => {
+        if (startupPerf.firstTerminalMountedAtMs === null) {
+          startupPerf.firstTerminalMountedAtMs = nowMs();
+          maybeReportStartupPerf();
+        }
+      },
+      applyResizeForSession
     });
-    debugLog("terminal.created", { sessionId: session.id });
-    streamPluginEngine.ensureSession(session);
-
-    gridEl.appendChild(node);
-    terminal.open(mount);
-    terminal.onData((data) => {
-      store.setActiveSession(session.id);
-      const latestSession = getSessionById(session.id);
-      if (isSessionUnrestored(latestSession)) {
-        setError(getUnrestoredSessionMessage(latestSession));
-        return;
-      }
-      if (isSessionExited(latestSession)) {
-        setError(getExitedSessionMessage(latestSession));
-        return;
-      }
-      api.sendInput(session.id, data).catch(() => setError("Failed to send terminal input."));
-    });
-
-    terminals.set(session.id, {
-      terminal,
-      element: node,
-      focusBtn,
-      quickIdEl,
-      stateBadgeEl,
-      pluginBadgesEl,
-      unrestoredHintEl,
-      sessionStatusEl,
-      sessionArtifactsEl,
-      settingsDialog,
-      startCwdInput,
-      startCommandInput,
-      startEnvInput,
-      sessionSendTerminatorSelect,
-      sessionTagsInput,
-      startFeedback,
-      tagListEl,
-      settingsApplyBtn,
-      settingsStatus,
-      themeCategory,
-      themeSearch,
-      themeSelect,
-      themeBg,
-      themeFg,
-      themeInputs,
-      mount,
-      settingsDirty: false,
-      isVisible: initialVisible,
-      pendingViewportSync: !initialVisible,
-      followOnShow: true,
-      searchRevision: 0
-    });
-    syncSessionStartupControls(terminals.get(session.id), session);
-    syncSessionThemeControls(terminals.get(session.id), session.id);
-    setSettingsDirty(terminals.get(session.id), false);
-    if (startupPerf.firstTerminalMountedAtMs === null) {
-      startupPerf.firstTerminalMountedAtMs = nowMs();
-      maybeReportStartupPerf();
-    }
-
-    const observer = new ResizeObserver(() => {
-      applyResizeForSession(session.id);
-    });
-    observer.observe(mount);
-    terminalObservers.set(session.id, observer);
-
-    applyResizeForSession(session.id);
-    setTimeout(() => applyResizeForSession(session.id), 120);
-    setTimeout(() => applyResizeForSession(session.id), 400);
-    setTimeout(() => applyResizeForSession(session.id), 900);
     shouldRunResizePass = true;
   }
 
@@ -2294,6 +2266,20 @@ function applyRuntimeSnapshot(event) {
   scheduleCommandSuggestions();
   uiState.error = "";
   markRuntimeBootstrapReady("ws");
+}
+
+function handleSessionTerminalInput(sessionId, data) {
+  store.setActiveSession(sessionId);
+  const latestSession = getSessionById(sessionId);
+  if (isSessionUnrestored(latestSession)) {
+    setError(getUnrestoredSessionMessage(latestSession));
+    return;
+  }
+  if (isSessionExited(latestSession)) {
+    setError(getExitedSessionMessage(latestSession));
+    return;
+  }
+  api.sendInput(sessionId, data).catch(() => setError("Failed to send terminal input."));
 }
 
 function applyRuntimeEvent(event, options = {}) {
@@ -2470,6 +2456,14 @@ sessionCardRenderController = createSessionCardRenderController({
   syncSessionStartupControls,
   syncSessionThemeControls,
   setSettingsDirty
+});
+
+sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
+  windowRef: window,
+  terminalFontSize: TERMINAL_FONT_SIZE,
+  terminalLineHeight: TERMINAL_LINE_HEIGHT,
+  terminalFontFamily: TERMINAL_FONT_FAMILY,
+  debugLog
 });
 
 layoutSettingsController = createLayoutSettingsController({
