@@ -13,7 +13,9 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- [ ] `ENT-026` Owner: `BE` Task: Replace WebSocket query-string token transport with a header-based or one-time handshake token flow and ensure token-bearing URLs are never logged or surfaced in browser-visible connection strings.
+- [ ] `ENT-027` Owner: `BE` Task: Split authentication behavior into explicit `AUTH_MODE=dev|prod`, disable `/api/v1/auth/dev-token` outside local/dev mode, and fail fast on insecure production auth configuration.
+- [ ] `ENT-028` Owner: `QA` Task: Add regression coverage for hardened auth transport/mode behavior, including WebSocket auth without query-string tokens, explicit dev-vs-prod mode gating, disabled dev-token route outside dev mode, and no token leakage in observable request/connection surfaces.
 
 ## Backend Tasks (OpenAPI-based REST)
 

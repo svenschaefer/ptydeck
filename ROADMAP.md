@@ -594,13 +594,44 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H14`
-- Next milestones in progress: none currently
+- Next milestones in progress: `v0.3.0-H15`
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- none currently
+- `ENT-026`
+- `ENT-027`
+- `ENT-028`
+
+### v0.3.0-H15 - Auth Transport and Mode Hardening
+
+- `ENT-026`
+- `ENT-027`
+- `ENT-028`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `ENT-026`
+- `ENT-027`
+- `ENT-028`
+
+Dependencies:
+
+- `ENT-026` depends on the existing auth baseline so WebSocket authentication can move off query-string transport without regressing current REST/WS access behavior.
+- `ENT-027` depends on the current `AUTH_DEV_MODE` baseline and should land with explicit runtime validation so insecure production-like combinations fail fast instead of silently falling back.
+- `ENT-028` depends on `ENT-026` and `ENT-027` so regression coverage validates the final handshake/auth-mode contract rather than a transient intermediate transport.
+
+Exit criteria:
+
+- WebSocket authentication no longer requires query-string token transport in steady state.
+- Dev-token issuance is explicitly gated to development mode and unavailable in production mode.
+- Runtime configuration rejects insecure production auth combinations deterministically.
+- Regression coverage protects token-transport hardening, auth-mode gating, and token-leak prevention in observable client/runtime surfaces.
 
 ### Completed Items
 

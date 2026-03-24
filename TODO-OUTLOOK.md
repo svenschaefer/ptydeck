@@ -25,8 +25,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] `ENT-010` Owner `QA`: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).
 - [ ] `ENT-017` Owner `BE`: Enforce WebSocket `Origin` allowlist checks on upgrade requests and return explicit unauthorized-origin errors.
 - [ ] `ENT-025` Owner `BE`: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_DEV_MODE` as local-only fallback.
-- [ ] `ENT-026` Owner `BE`: Replace WebSocket query-string token transport with header-based or one-time handshake token auth and ensure token-bearing URLs are never logged.
-- [ ] `ENT-027` Owner `BE`: Split auth behavior into explicit `AUTH_MODE=dev|prod`, disable `/api/v1/auth/dev-token` outside local/dev mode, and fail fast on insecure production auth configuration.
 
 ## Scale and Runtime Isolation
 

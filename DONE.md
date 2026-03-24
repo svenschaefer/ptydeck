@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Promoted the next near-term follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H15` (`ENT-026` ... `ENT-028`) for auth transport hardening, explicit auth mode gating, and matching regression coverage.
 - [x] `LIF-007` completed: backend session runtime now persists authoritative activity state transitions (`active` -> `inactive`) in session metadata (`activityState`, `activityUpdatedAt`, `activityCompletedAt`) and emits a deterministic post-persist `session.activity.completed` runtime event only after the completion transition has been durably saved.
 - [x] `LIF-008` completed: frontend now uses a dedicated browser-notification boundary (`frontend/src/public/activity-completion-notifier.js`) to emit exactly-once Web Notifications for persisted session-activity completion, with permission-safe no-op behavior, duplicate suppression, and bounded aggregation of multiple completions into one notification.
 - [x] `LIF-009` completed: regression coverage now protects authoritative backend activity-completion persistence/events plus frontend notification aggregation/no-duplicate/permission-denied behavior across store/runtime integration paths.
