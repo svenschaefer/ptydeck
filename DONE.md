@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted existing session-card update/render wiring from `frontend/src/public/app.js` into `frontend/src/public/ui/session-card-render-controller.js` (visibility transitions, state-badge/hint sync, metadata/status/artifact rendering hooks, and settings-control resync path).
+- [x] Added focused regression coverage for the new session-card render controller in `frontend/test/session-card-render-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/session-card-render-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, `node --test frontend/test/session-card-render-controller.test.js frontend/test/session-card-meta-controller.test.js frontend/test/workspace-render-controller.test.js`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/session-card-render-controller.test.js frontend/test/session-card-meta-controller.test.js frontend/test/workspace-render-controller.test.js`.
 - [x] Planning sync completed: added explicit open UX tasks `QLT-123` (system-clipboard copy/paste contract for terminal + composer) and `QLT-124` (terminal-session header refactor) to `TODO.md`.
 - [x] Roadmap sync completed: queued `v0.4.0-H3` (Terminal Interaction Ergonomics) in `ROADMAP.md` with explicit ordering/dependencies/exit criteria for `QLT-123` and `QLT-124`.
 - [x] Context sync completed: `CODEX_CONTEXT.md` updated so open-task inventory reflects `ARC-010` ... `ARC-012`, `QLT-123`, and `QLT-124`.

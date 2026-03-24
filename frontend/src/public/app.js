@@ -35,6 +35,7 @@ import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
+import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
 
@@ -277,6 +278,7 @@ let commandSuggestionsController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
 let sessionCardMetaController = null;
+let sessionCardRenderController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
@@ -2022,41 +2024,13 @@ function render() {
   for (const session of state.sessions) {
     if (terminals.has(session.id)) {
       const entry = terminals.get(session.id);
-      const stateBadgeText = getSessionStateBadgeText(session);
-      const stateHintText = getSessionStateHintText(session);
       const nextVisible = visibleSessionIds.has(session.id);
-      const wasVisible = entry.isVisible !== false;
-      entry.element.classList.toggle("active", state.activeSessionId === session.id);
-      entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
-      entry.element.classList.toggle("exited", isSessionExited(session));
-      entry.element.classList.toggle("attention", session?.attentionActive === true);
-      if (wasVisible && !nextVisible) {
-        entry.followOnShow = isTerminalAtBottom(entry.terminal);
-      }
-      setSessionCardVisibility(entry.element, nextVisible);
-      entry.isVisible = nextVisible;
-      if (nextVisible && (!wasVisible || entry.pendingViewportSync)) {
-        syncTerminalViewportAfterShow(session.id, entry);
-      }
-      entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
-      entry.quickIdEl.textContent = ensureQuickId(session.id);
-      if (entry.stateBadgeEl) {
-        entry.stateBadgeEl.hidden = !stateBadgeText;
-        entry.stateBadgeEl.textContent = stateBadgeText;
-      }
-      if (entry.unrestoredHintEl) {
-        entry.unrestoredHintEl.hidden = !stateHintText;
-        entry.unrestoredHintEl.textContent = stateHintText;
-      }
-      renderSessionTagList(entry, session);
-      renderSessionPluginBadges(entry, session);
-      renderSessionStatus(entry, session);
-      renderSessionArtifacts(entry, session);
-      if (!entry.settingsDirty) {
-        syncSessionStartupControls(entry, session);
-        syncSessionThemeControls(entry, session.id);
-        setSettingsDirty(entry, false);
-      }
+      sessionCardRenderController?.updateExistingSessionCard({
+        entry,
+        session,
+        activeSessionId: state.activeSessionId,
+        nextVisible
+      });
       continue;
     }
 
@@ -2643,6 +2617,24 @@ sessionCardMetaController = createSessionCardMetaController({
   normalizeSessionTags,
   onTick: () => render(),
   windowRef: window
+});
+
+sessionCardRenderController = createSessionCardRenderController({
+  isSessionUnrestored,
+  isSessionExited,
+  getSessionStateBadgeText,
+  getSessionStateHintText,
+  isTerminalAtBottom,
+  setSessionCardVisibility,
+  syncTerminalViewportAfterShow,
+  ensureQuickId,
+  renderSessionTagList,
+  renderSessionPluginBadges,
+  renderSessionStatus,
+  renderSessionArtifacts,
+  syncSessionStartupControls,
+  syncSessionThemeControls,
+  setSettingsDirty
 });
 
 layoutSettingsController = createLayoutSettingsController({
