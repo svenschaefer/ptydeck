@@ -17,12 +17,26 @@ function freezeSessionContext(session, sessionId) {
     name: typeof source.name === "string" ? source.name : "",
     state: normalizeText(source.state),
     lifecycleState: normalizeText(source.lifecycleState),
+    interpretationState: normalizeText(source.interpretationState),
+    statusText: typeof source.statusText === "string" ? source.statusText : "",
+    attentionActive: source.attentionActive === true,
     cwd: typeof source.cwd === "string" ? source.cwd : "",
     tags: Array.isArray(source.tags) ? source.tags.map((value) => String(value)) : [],
-    meta: clonePlainRecord(source.meta)
+    meta: clonePlainRecord(source.meta),
+    pluginBadges: Array.isArray(source.pluginBadges)
+      ? source.pluginBadges
+          .filter((badge) => badge && typeof badge === "object")
+          .map((badge) => ({
+            id: normalizeText(badge.id),
+            text: typeof badge.text === "string" ? badge.text : "",
+            tone: normalizeText(badge.tone),
+            pluginId: normalizeText(badge.pluginId)
+          }))
+      : []
   };
   Object.freeze(context.tags);
   Object.freeze(context.meta);
+  Object.freeze(context.pluginBadges);
   return Object.freeze(context);
 }
 

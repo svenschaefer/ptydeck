@@ -7,6 +7,8 @@ import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
+import { createBuiltInStreamPlugins } from "./stream-builtins.js";
+import { createArtifactStreamPlugins } from "./stream-artifact-plugins.js";
 import { createStreamPluginEngine } from "./stream-plugin-engine.js";
 import {
   getTerminalCellHeightPx,
@@ -152,6 +154,7 @@ const streamAdapter = createSessionStreamAdapter({
     store.clearSessionActivity(sessionId);
   }
 });
+streamPluginEngine.replacePlugins([...createBuiltInStreamPlugins(), ...createArtifactStreamPlugins()]);
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -1491,6 +1494,33 @@ function renderSessionTagList(entry, session) {
   entry.tagListEl.classList.toggle("empty", tags.length === 0);
 }
 
+function renderSessionPluginBadges(entry, session) {
+  if (!entry?.pluginBadgesEl) {
+    return;
+  }
+  const badges = Array.isArray(session?.pluginBadges) ? session.pluginBadges.filter((badge) => badge && badge.text) : [];
+  entry.pluginBadgesEl.textContent = badges.map((badge) => badge.text).join(" · ");
+  entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
+}
+
+function renderSessionStatus(entry, session) {
+  if (!entry?.sessionStatusEl) {
+    return;
+  }
+  const statusText = typeof session?.statusText === "string" ? session.statusText.trim() : "";
+  entry.sessionStatusEl.hidden = !statusText;
+  entry.sessionStatusEl.textContent = statusText;
+}
+
+function renderSessionArtifacts(entry, session) {
+  if (!entry?.sessionArtifactsEl) {
+    return;
+  }
+  const artifacts = Array.isArray(session?.artifacts) ? session.artifacts.filter((artifact) => artifact && artifact.title) : [];
+  entry.sessionArtifactsEl.hidden = artifacts.length === 0;
+  entry.sessionArtifactsEl.textContent = artifacts.map((artifact) => `${artifact.title}: ${artifact.text}`).join("\n\n");
+}
+
 function measureTerminalCellWidthPx() {
   if (!document || typeof document.createElement !== "function") {
     return 10;
@@ -2221,6 +2251,7 @@ function render() {
       entry.element.classList.toggle("active", state.activeSessionId === session.id);
       entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
       entry.element.classList.toggle("exited", isSessionExited(session));
+      entry.element.classList.toggle("attention", session?.attentionActive === true);
       if (wasVisible && !nextVisible) {
         entry.followOnShow = isTerminalAtBottom(entry.terminal);
       }
@@ -2240,6 +2271,9 @@ function render() {
         entry.unrestoredHintEl.textContent = stateHintText;
       }
       renderSessionTagList(entry, session);
+      renderSessionPluginBadges(entry, session);
+      renderSessionStatus(entry, session);
+      renderSessionArtifacts(entry, session);
       if (!entry.settingsDirty) {
         syncSessionStartupControls(entry, session);
         syncSessionThemeControls(entry, session.id);
@@ -2252,7 +2286,10 @@ function render() {
     const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
     const stateBadgeEl = node.querySelector(".session-state-badge");
+    const pluginBadgesEl = node.querySelector(".session-plugin-badges");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
+    const sessionStatusEl = node.querySelector(".session-status-text");
+    const sessionArtifactsEl = node.querySelector(".session-artifacts");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -2296,6 +2333,7 @@ function render() {
     quickIdEl.textContent = quickId;
     node.classList.toggle("unrestored", isSessionUnrestored(session));
     node.classList.toggle("exited", isSessionExited(session));
+    node.classList.toggle("attention", session?.attentionActive === true);
     if (stateBadgeEl) {
       stateBadgeEl.hidden = !stateBadgeText;
       stateBadgeEl.textContent = stateBadgeText;
@@ -2305,6 +2343,9 @@ function render() {
       unrestoredHintEl.textContent = stateHintText;
     }
     renderSessionTagList({ tagListEl }, session);
+    renderSessionPluginBadges({ pluginBadgesEl }, session);
+    renderSessionStatus({ sessionStatusEl }, session);
+    renderSessionArtifacts({ sessionArtifactsEl }, session);
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
     settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
     if (settingsDismissBtn) {
@@ -2553,7 +2594,10 @@ function render() {
       focusBtn,
       quickIdEl,
       stateBadgeEl,
+      pluginBadgesEl,
       unrestoredHintEl,
+      sessionStatusEl,
+      sessionArtifactsEl,
       settingsDialog,
       startCwdInput,
       startCommandInput,

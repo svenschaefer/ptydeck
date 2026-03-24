@@ -4,6 +4,14 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-008` completed: regression coverage now closes the full stream-interpretation foundation by covering stream-adapter normalization, deterministic plugin ordering/conflict behavior, carriage-return overwrite handling, declarative action-dispatch validation, and hidden-session interpretation recovery in the integrated UI path.
+- [x] `v0.3.0-H13` completed: the near-term stream-interpretation foundation (`ARC-003` ... `ARC-008`) is now fully delivered and regression-hardened.
+- [x] `ARC-007` completed: artifact-oriented stream interpretation now extracts summary/result/next-step artifacts from terminal output via `frontend/src/public/stream-artifact-plugins.js` and stores them as session-scoped artifacts without modifying raw terminal output.
+- [x] Session cards now surface interpreted runtime status and extracted artifacts in dedicated UI areas, so stream-derived status/artifact information is visible without polluting the PTY buffer itself.
+- [x] `ARC-006` completed: built-in stream-interpreter plugins now detect active processing text, prompt/idle recovery, and error/attention conditions via `frontend/src/public/stream-builtins.js`.
+- [x] Built-in interpreter output now drives working-state badges, sticky attention state, runtime status text, and warning notifications through the declarative action dispatcher instead of ad hoc UI mutation.
+- [x] Regression coverage for `ARC-006` / `ARC-007` now exists in `frontend/test/stream-builtins.test.js` and `frontend/test/stream-artifact-plugins.test.js`, covering processing detection, idle recovery, error attention signaling, inline artifact extraction, and block-based artifact flushing.
+- [x] Validation for `ARC-006` / `ARC-007` passed at frontend scope: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm --prefix frontend run test:coverage`.
 - [x] `ARC-005` completed: the frontend now has an explicit interpretation-action contract in `frontend/src/public/stream-action-dispatcher.js` covering `setSessionState`, `setSessionStatus`, `markSessionAttention`, `setSessionBadges`, `mergeSessionMeta`, `setSessionTags`, `upsertSessionArtifact`, `removeSessionArtifact`, and `pushSessionNotification`.
 - [x] Plugin `onActions` output is no longer debug-only; `frontend/src/public/app.js` now routes normalized plugin actions through a dedicated dispatcher into reducer-backed store updates instead of leaving declarative plugin output inert.
 - [x] Frontend store now persists session-scoped interpretation state (`interpretationState`, `statusText`, `attentionActive`, `pluginBadges`, `artifacts`, `notifications`, merged `meta`, normalized `tags`) with deterministic normalization, artifact/notification caps, and immutable snapshot cloning.

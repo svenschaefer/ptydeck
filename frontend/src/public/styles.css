@@ -574,6 +574,11 @@ button:hover {
   box-shadow: 0 0 0 1px rgba(142, 192, 124, 0.35);
 }
 
+.terminal-card.attention {
+  border-color: #d98b2b;
+  box-shadow: 0 0 0 1px rgba(217, 139, 43, 0.25);
+}
+
 .terminal-toolbar {
   padding: 8px;
   display: flex;
@@ -616,6 +621,23 @@ button:hover {
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.session-plugin-badges {
+  margin: 0;
+  padding: 2px 8px;
+  border: 1px solid #2f4a3f;
+  border-radius: 999px;
+  color: #a5d68a;
+  background: #17231c;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.session-plugin-badges.empty {
+  display: none;
 }
 
 .session-rename {
@@ -673,6 +695,30 @@ button:hover {
   line-height: 1.35;
 }
 
+.session-status-text {
+  margin: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid #233243;
+  background: #121a24;
+  color: #a9c1d8;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-artifacts {
+  margin: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid #223041;
+  background: #0d131c;
+  color: #b9cadb;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
 .terminal-card.unrestored {
   border-color: #7a4a4a;
 }
@@ -699,6 +745,16 @@ button:hover {
   border-bottom-color: #4a315d;
   background: #1f1728;
   color: #d8c1f0;
+}
+
+.terminal-card.attention .session-status-text {
+  border-bottom-color: #5d4625;
+  background: #231c12;
+  color: #ffd89a;
+}
+
+.terminal-card.attention .session-artifacts {
+  border-bottom-color: #49371d;
 }
 
 .session-settings-dialog {

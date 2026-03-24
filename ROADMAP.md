@@ -536,12 +536,13 @@ Completed in this milestone so far:
 - `ARC-003`
 - `ARC-004`
 - `ARC-005`
-
-Remaining in this milestone:
-
 - `ARC-006`
 - `ARC-007`
 - `ARC-008`
+
+Remaining in this milestone:
+
+- none
 
 Dependencies:
 
@@ -563,16 +564,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H12`
-- Next milestones in progress: `v0.3.0-H13`
+- Latest completed milestone: `v0.3.0-H13`
+- Next milestones in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `ARC-006`
-- `ARC-007`
-- `ARC-008`
+- None currently.
 
 ### Completed Items
 

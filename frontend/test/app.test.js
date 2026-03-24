@@ -341,11 +341,17 @@ function createTerminalCardTemplateNode() {
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
   stateBadge.hidden = true;
+  const pluginBadges = new FakeElement({ className: "session-plugin-badges", tagName: "p" });
+  pluginBadges.classList.add("empty");
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
   tagList.classList.add("empty");
   const unrestoredHint = new FakeElement({ className: "session-unrestored-hint", tagName: "p" });
   unrestoredHint.hidden = true;
+  const sessionStatus = new FakeElement({ className: "session-status-text", tagName: "p" });
+  sessionStatus.hidden = true;
+  const sessionArtifacts = new FakeElement({ className: "session-artifacts", tagName: "pre" });
+  sessionArtifacts.hidden = true;
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
@@ -393,6 +399,7 @@ function createTerminalCardTemplateNode() {
   toolbar.appendChild(quickId);
   toolbar.appendChild(focus);
   toolbar.appendChild(stateBadge);
+  toolbar.appendChild(pluginBadges);
   toolbar.appendChild(tagList);
   toolbar.appendChild(settings);
   settingsPanel.appendChild(settingsDismiss);
@@ -429,6 +436,8 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(settingsFooter);
   card.appendChild(toolbar);
   card.appendChild(unrestoredHint);
+  card.appendChild(sessionStatus);
+  card.appendChild(sessionArtifacts);
   card.appendChild(settingsPanel);
   card.appendChild(mount);
   return card;
@@ -1789,6 +1798,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "background-1\nbackground-2\n" })
   });
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working on hidden deck sync...\n" })
+  });
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Summary: hidden deck output recovered\n" })
+  });
   await tick();
   assert.ok(hiddenDeckTerminal.writes.includes("background-1\nbackground-2\n"));
   assert.ok(
@@ -1823,6 +1838,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     hiddenDeckTerminal.buffer.active.baseY,
     "expected hidden deck terminal to reach appended bottom content after recovery"
   );
+  const recoveredHiddenCard = fixture.elements.terminalGrid.children.find(
+    (entry) => entry.hidden === false && entry.querySelector(".session-focus")?.textContent === "two"
+  );
+  assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
+  assert.match(recoveredHiddenCard.querySelector(".session-status-text").textContent, /Working on hidden deck sync/i);
+  assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
 
   fixture.elements.commandInput.value = "/filter";
   fixture.elements.sendCommand.click();
