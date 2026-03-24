@@ -30,3 +30,15 @@ test("session runtime helpers produce exited messaging", () => {
   assert.equal(model.getSessionStateBadgeText(session), "EXITED");
   assert.match(model.getExitedSessionMessage(session), /exit code 2/);
 });
+
+test("session runtime helpers prefer formal lifecycle state and expose starting badge", () => {
+  const startingSession = { id: "abcd1234", name: "build", state: "running", lifecycleState: "starting" };
+  const busySession = { id: "efgh5678", name: "ops", state: "running", lifecycleState: "busy" };
+  const idleSession = { id: "ijkl9012", name: "ops", state: "running", lifecycleState: "idle" };
+
+  assert.equal(model.getSessionRuntimeState(startingSession), "starting");
+  assert.equal(model.getSessionStateBadgeText(startingSession), "STARTING");
+  assert.match(model.getSessionStateHintText(startingSession), /PTY is ready/i);
+  assert.equal(model.getSessionRuntimeState(busySession), "busy");
+  assert.equal(model.getSessionRuntimeState(idleSession), "idle");
+});

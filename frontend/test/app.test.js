@@ -1694,6 +1694,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const deckNewSessionButton = findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2");
   assert.ok(deckNewSessionButton);
   assert.equal(deckNewSessionButton.querySelector(".session-quick-id").textContent, "2");
+  ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-1\n" }) });
+  ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-2\n" }) });
+  ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-3\n" }) });
+  await tick();
   deckNewSessionButton.click();
   await tick();
   const visibleAfterDeckSidebarSwitch = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);

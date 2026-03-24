@@ -112,4 +112,58 @@ test("store tracks live and unread session activity and clears unread on activat
   target = state.sessions.find((session) => session.id === "b");
   assert.equal(target.hasLiveActivity, false);
   assert.equal(target.hasUnreadActivity, false);
+  assert.equal(target.lifecycleState, "idle");
+});
+
+test("store derives formal lifecycle transitions from runtime state and activity", () => {
+  const store = createStore();
+
+  store.setSessions([
+    { id: "a", state: "starting" },
+    { id: "b", state: "running" }
+  ]);
+
+  let state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "starting");
+  assert.equal(state.sessions.find((session) => session.id === "b")?.lifecycleState, "running");
+
+  store.upsertSession({ id: "a", state: "running" });
+  store.markSessionActivity("a", { timestamp: 50 });
+  state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "busy");
+
+  store.clearSessionActivity("a", { timestamp: 50 });
+  state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "idle");
+
+  store.setSessions([{ id: "a", state: "running" }]);
+  state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "idle");
+
+  store.markSessionExited("a", { exitCode: 7, signal: "SIGTERM", exitedAt: 100 });
+  state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "exited");
+  assert.equal(state.sessions.find((session) => session.id === "a")?.exitCode, 7);
+
+  store.removeSession("a");
+  state = store.getState();
+  assert.equal(state.sessions.find((session) => session.id === "a"), undefined);
+});
+
+test("store avoids repeated publishes for already-live session activity", () => {
+  const store = createStore();
+  let publishes = 0;
+  store.subscribe(() => {
+    publishes += 1;
+  });
+
+  store.setSessions([{ id: "a", state: "running" }]);
+  publishes = 0;
+
+  store.markSessionActivity("a", { timestamp: 10 });
+  store.markSessionActivity("a", { timestamp: 11 });
+  store.markSessionActivity("a", { timestamp: 12 });
+
+  assert.equal(publishes, 1);
+  assert.equal(store.getState().sessions[0].lifecycleState, "busy");
 });

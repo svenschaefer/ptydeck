@@ -20,11 +20,33 @@ export function createSessionViewModel(options = {}) {
   }
 
   function getSessionRuntimeState(session) {
+    const lifecycleState = String(session?.lifecycleState || "").trim().toLowerCase();
+    if (
+      lifecycleState === "created" ||
+      lifecycleState === "starting" ||
+      lifecycleState === "running" ||
+      lifecycleState === "busy" ||
+      lifecycleState === "idle" ||
+      lifecycleState === "unrestored" ||
+      lifecycleState === "exited" ||
+      lifecycleState === "closed"
+    ) {
+      return lifecycleState;
+    }
     const state = String(session?.state || "").trim().toLowerCase();
-    if (state === "unrestored" || state === "exited") {
+    if (
+      state === "created" ||
+      state === "starting" ||
+      state === "running" ||
+      state === "busy" ||
+      state === "idle" ||
+      state === "unrestored" ||
+      state === "exited" ||
+      state === "closed"
+    ) {
       return state;
     }
-    return "active";
+    return "running";
   }
 
   function isSessionUnrestored(session) {
@@ -40,6 +62,9 @@ export function createSessionViewModel(options = {}) {
   }
 
   function getSessionStateBadgeText(session) {
+    if (getSessionRuntimeState(session) === "starting") {
+      return "STARTING";
+    }
     if (isSessionUnrestored(session)) {
       return "UNRESTORED";
     }
@@ -80,6 +105,9 @@ export function createSessionViewModel(options = {}) {
   }
 
   function getSessionStateHintText(session) {
+    if (getSessionRuntimeState(session) === "starting") {
+      return "Session is starting. Input and output will become active as soon as the PTY is ready.";
+    }
     if (isSessionUnrestored(session)) {
       return "Session could not be restored after backend restart. Update settings or delete this session.";
     }

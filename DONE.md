@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Frontend lifecycle groundwork for `LIF-002`/`LIF-003` is now in place: runtime store records a formal per-session `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`) on top of raw backend session metadata instead of treating all non-exited sessions as one generic active state.
+- [x] Frontend session state rendering now surfaces explicit `STARTING` badge/hint behavior while keeping `EXITED` and `UNRESTORED` handling intact.
+- [x] Store regression coverage now verifies ordered lifecycle derivation (`starting` -> `running` -> `busy` -> `idle` -> `exited`), reconnect-style snapshot replacement, and removal after exit.
+- [x] Sidebar activity regression hotfix: repeated output chunks for already-live sessions no longer republish redundant store updates, which removes unnecessary sidebar rerender churn and stabilizes sidebar session switching under background output activity.
+- [x] Frontend app regression coverage now exercises sidebar session-button activation while background output activity is still arriving on another deck/session.
+- [x] Validation for the lifecycle groundwork + sidebar regression fix passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix backend run test`, and `npm --prefix frontend run test:coverage`.
 - [x] `LIF-001` completed: backend session lifecycle signaling now exposes explicit startup/running state instead of collapsing new sessions immediately into a generic active state.
 - [x] Backend session create flow now emits deterministic `session.created` (`starting`) followed by `session.started` and `session.updated` (`running`) lifecycle events, and API-shaped session payloads now expose runtime `state`, `startedAt`, and stable exit metadata fields.
 - [x] Backend session exit contract now preserves stable `exitCode`, `exitSignal`, `exitedAt`, and `updatedAt` metadata in both runtime state and emitted `session.exit` payloads.

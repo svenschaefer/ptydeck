@@ -78,16 +78,52 @@ function normalizeActivityTimestamp(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+function normalizeRawSessionState(value) {
+  const state = normalizeText(value).toLowerCase();
+  if (
+    state === "created" ||
+    state === "starting" ||
+    state === "running" ||
+    state === "busy" ||
+    state === "idle" ||
+    state === "unrestored" ||
+    state === "exited" ||
+    state === "closed"
+  ) {
+    return state;
+  }
+  return "running";
+}
+
+function deriveSessionLifecycleState(rawState, session) {
+  const normalizedRawState = normalizeRawSessionState(rawState || session?.state);
+  if (normalizedRawState === "unrestored" || normalizedRawState === "exited" || normalizedRawState === "closed") {
+    return normalizedRawState;
+  }
+  if (normalizedRawState === "created" || normalizedRawState === "starting") {
+    return normalizedRawState;
+  }
+  if (session?.hasLiveActivity === true) {
+    return "busy";
+  }
+  if (normalizeActivityTimestamp(session?.lastOutputAt) !== null) {
+    return "idle";
+  }
+  return "running";
+}
+
 function withSessionActivityDefaults(session) {
   if (!session || typeof session !== "object") {
     return session;
   }
-  return {
+  const normalizedSession = {
     ...session,
     hasLiveActivity: session.hasLiveActivity === true,
     hasUnreadActivity: session.hasUnreadActivity === true,
     lastOutputAt: normalizeActivityTimestamp(session.lastOutputAt)
   };
+  normalizedSession.lifecycleState = deriveSessionLifecycleState(normalizedSession.state, normalizedSession);
+  return normalizedSession;
 }
 
 function createStateSnapshot(state) {
@@ -166,7 +202,7 @@ export function reduceRuntimeState(state, action, options = {}) {
       if (index >= 0) {
         nextSessions[index] = mergeSessionRecord(nextSessions[index], nextSession);
       } else {
-        nextSessions.push(nextSession);
+        nextSessions.push(withSessionActivityDefaults(nextSession));
       }
       return {
         ...runtimeState,
@@ -186,6 +222,7 @@ export function reduceRuntimeState(state, action, options = {}) {
       const exitedSession = {
         ...currentSession,
         state: "exited",
+        lifecycleState: "exited",
         exitCode: Number.isInteger(action.exitCode) ? action.exitCode : null,
         exitSignal: typeof action.signal === "string" ? action.signal : "",
         exitedAt: Number.isFinite(action.exitedAt) ? action.exitedAt : Date.now(),
@@ -245,11 +282,7 @@ export function reduceRuntimeState(state, action, options = {}) {
           return session;
         }
         const hasUnreadActivity = sessionId === runtimeState.activeSessionId ? false : true;
-        if (
-          session.hasLiveActivity === true &&
-          session.hasUnreadActivity === hasUnreadActivity &&
-          normalizeActivityTimestamp(session.lastOutputAt) === activityTimestamp
-        ) {
+        if (session.hasLiveActivity === true && session.hasUnreadActivity === hasUnreadActivity) {
           return session;
         }
         changed = true;
@@ -257,7 +290,8 @@ export function reduceRuntimeState(state, action, options = {}) {
           ...session,
           hasLiveActivity: true,
           hasUnreadActivity,
-          lastOutputAt: activityTimestamp
+          lastOutputAt: activityTimestamp,
+          lifecycleState: "busy"
         };
       });
       if (!changed) {
@@ -286,7 +320,11 @@ export function reduceRuntimeState(state, action, options = {}) {
         changed = true;
         return {
           ...session,
-          hasLiveActivity: false
+          hasLiveActivity: false,
+          lifecycleState: deriveSessionLifecycleState(session.state, {
+            ...session,
+            hasLiveActivity: false
+          })
         };
       });
       if (!changed) {
