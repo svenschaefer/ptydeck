@@ -36,6 +36,7 @@ import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
+import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -278,6 +279,7 @@ let deckActionsController = null;
 let sessionCardMetaController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
+let workspaceRenderController = null;
 const activityCompletionNotifier = createActivityCompletionNotifier({
   windowRef: window,
   aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
@@ -1935,24 +1937,19 @@ function render() {
     deckDeleteBtn.disabled = !activeDeck || activeDeck.id === DEFAULT_DECK_ID;
   }
   const sessionFilterText = getSessionFilterText();
-  const filtered = resolveFilterSelectors(sessionFilterText, deckSessions);
-  const visibleSessionIds = new Set(
-    filtered.sessions.map((session) => session.id)
-  );
-  const filterActive = Boolean(String(sessionFilterText || "").trim());
-  if (filterActive && filtered.sessions.length > 0) {
-    const firstVisibleId = filtered.sessions[0].id;
-    const activeVisible = state.activeSessionId && visibleSessionIds.has(state.activeSessionId);
-    if (!activeVisible) {
-      store.setActiveSession(firstVisibleId);
-      return;
-    }
-  }
-  if (!filterActive) {
-    visibleSessionIds.clear();
-    for (const session of deckSessions) {
-      visibleSessionIds.add(session.id);
-    }
+  const visibilityState =
+    workspaceRenderController?.resolveVisibleSessions({
+      sessions: state.sessions,
+      deckSessions,
+      sessionFilterText,
+      activeSessionId: state.activeSessionId,
+      resolveFilterSelectors,
+      setActiveSession: (sessionId) => store.setActiveSession(sessionId)
+    }) || {};
+  const visibleSessionIds = visibilityState.visibleSessionIds || new Set(deckSessions.map((session) => session.id));
+  const filterActive = visibilityState.filterActive === true;
+  if (visibilityState.switchedActiveSession) {
+    return;
   }
   pruneQuickIds(state.sessions.map((session) => session.id));
   if (state.sessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
@@ -1968,43 +1965,23 @@ function render() {
     loading: uiState.loading,
     hasError: Boolean(uiState.error)
   });
-  stateEl.textContent = state.connectionState;
   syncStatusTicker(state.sessions);
-  if (state.sessions.length === 0) {
-    emptyStateEl.textContent = "No sessions yet. Create one to start.";
-    emptyStateEl.style.display = "block";
-  } else if (deckSessions.length === 0) {
-    emptyStateEl.textContent = "No sessions in active deck.";
-    emptyStateEl.style.display = "block";
-  } else if (visibleSessionIds.size === 0) {
-    emptyStateEl.textContent = "No sessions match current filter.";
-    emptyStateEl.style.display = "block";
-  } else {
-    emptyStateEl.textContent = "No sessions yet. Create one to start.";
-    emptyStateEl.style.display = "none";
-  }
-  if (uiState.loading) {
-    statusMessageEl.textContent = "Loading sessions...";
-  } else if (uiState.error) {
-    statusMessageEl.textContent = uiState.error;
-  } else if (state.connectionState !== "connected") {
-    statusMessageEl.textContent = `Connection state: ${state.connectionState}`;
-  } else {
-    statusMessageEl.textContent = "";
-  }
-  if (commandFeedbackEl) {
-    commandFeedbackEl.textContent = uiState.commandFeedback || "";
-  }
-  if (commandInlineHintEl) {
-    commandInlineHintEl.textContent = uiState.commandInlineHint || "";
-    commandInlineHintEl.style.setProperty("--hint-prefix-px", `${uiState.commandInlineHintPrefixPx || 0}px`);
-  }
-  if (commandPreviewEl) {
-    commandPreviewEl.textContent = uiState.commandPreview || "";
-  }
-  if (commandSuggestionsEl) {
-    commandSuggestionsEl.textContent = uiState.commandSuggestions || "";
-  }
+  workspaceRenderController?.renderEmptyState({
+    sessions: state.sessions,
+    deckSessions,
+    visibleSessionIds,
+    filterActive
+  });
+  workspaceRenderController?.renderStatus({
+    connectionState: state.connectionState,
+    loading: uiState.loading,
+    error: uiState.error,
+    commandFeedback: uiState.commandFeedback,
+    commandInlineHint: uiState.commandInlineHint,
+    commandInlineHintPrefixPx: uiState.commandInlineHintPrefixPx,
+    commandPreview: uiState.commandPreview,
+    commandSuggestions: uiState.commandSuggestions
+  });
   syncActiveTerminalSearch({ preserveSelection: true });
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
@@ -2686,6 +2663,16 @@ layoutSettingsController = createLayoutSettingsController({
 
 sessionSettingsDialogController = createSessionSettingsDialogController({
   windowRef: window
+});
+
+workspaceRenderController = createWorkspaceRenderController({
+  stateEl,
+  emptyStateEl,
+  statusMessageEl,
+  commandFeedbackEl,
+  commandInlineHintEl,
+  commandPreviewEl,
+  commandSuggestionsEl
 });
 
 deckActionsController = createDeckActionsController({

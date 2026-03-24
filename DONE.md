@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted workspace/grid render-status concerns from `frontend/src/public/app.js` into a dedicated UI controller `frontend/src/public/ui/workspace-render-controller.js` (filter visibility resolution, empty-state rendering, and composer/status surface rendering).
+- [x] Added focused regression coverage for the new workspace render controller in `frontend/test/workspace-render-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/workspace-render-controller.js` is included in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint` and targeted tests/coverage: `node --test frontend/test/workspace-render-controller.test.js frontend/test/layout-settings-controller.test.js frontend/test/session-card-meta-controller.test.js` and `node --test --experimental-test-coverage frontend/test/workspace-render-controller.test.js frontend/test/layout-settings-controller.test.js frontend/test/session-card-meta-controller.test.js`.
 - [x] Documentation governance cleanup completed: `TODO.md` now contains open tasks only (`ARC-010` ... `ARC-012`) and no longer mixes in completed `[x]` task history; completed history remains in `DONE.md`.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` was re-aligned against `docs/*.md`, and explicit deferred review-derived tasks (`DRV-001` ... `DRV-005`) were added for shell-adapter CWD tracking, replay-retention policy, command-schema formalization, command/output correlation, and shell-compatibility QA coverage.
 - [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the docs-vs-outlook alignment and the new `DRV-*` deferred planning baseline.
