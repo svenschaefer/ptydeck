@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
 - [ ] `ARC-010` Owner: `FE` Task: Complete UI-layer decomposition by extracting session-card/grid/settings rendering controllers into dedicated UI modules and reducing `app.js` to runtime bootstrap/composition only.
 - [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
 - [ ] `ARC-012` Owner: `QA` Task: Add architecture regression coverage for layered FE boundaries (module-level contract tests plus integration assertions preventing cross-layer shortcut regressions).
@@ -232,7 +231,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Layered Frontend Architecture Completion (v0.4.0 continuation)
 
-- [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
+- [x] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
 - [ ] `ARC-010` Owner: `FE` Task: Complete UI-layer decomposition by extracting session-card/grid/settings rendering controllers into dedicated UI modules and reducing `app.js` to runtime bootstrap/composition only.
 - [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
 - [ ] `ARC-012` Owner: `QA` Task: Add architecture regression coverage for layered FE boundaries (module-level contract tests plus integration assertions preventing cross-layer shortcut regressions).

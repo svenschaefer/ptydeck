@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-009` completed: command-execution orchestration was extracted from `frontend/src/public/app.js` into `frontend/src/public/command-executor.js`, while `command-engine` remains the parser/selector/completion boundary and custom-command registry boundary stays explicit.
+- [x] `frontend` command-layer runtime wiring now composes parser/registry/executor boundaries explicitly (`command-interpreter` + `command-engine` + `command-executor`) and keeps `app.js` focused on UI/runtime orchestration.
+- [x] Validation for `ARC-009` passed with `npm --prefix frontend run lint` and `node --test frontend/test/command-engine.test.js`; full `node --test frontend/test/app.test.js` currently times out in this sandbox (no test failure output, process watchdog cutoff), so broad FE test-suite confirmation remains a follow-up runtime-validation step outside this tool limitation.
 - [x] `OBS-001` completed: backend `/metrics` now exposes explicit lifecycle and connection-quality signals, including session lifecycle counters (`created`, `started`, `exited`, `unrestored`), per-lifecycle session gauges, and websocket reconnect/error counters with reason labels.
 - [x] Backend observability coverage expanded for the new metrics contract: runtime/ws integration tests now verify lifecycle gauges/counters, unrestored-session metrics, websocket reconnect counting, and websocket auth-upgrade error reason metrics.
 - [x] Validation for `OBS-001` passed at backend scope: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm --prefix backend run test:coverage`.

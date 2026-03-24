@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
-- Active scoped tasks (`H2`): `ARC-009`, `ARC-010`, `ARC-011`, `ARC-012`.
+- Active scoped tasks (`H2`): `ARC-010`, `ARC-011`, `ARC-012` (`ARC-009` completed).
 - Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Dependency Rules
@@ -606,7 +606,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `ARC-009` Owner: `FE`
 - `ARC-010` Owner: `FE`
 - `ARC-011` Owner: `FE`
 - `ARC-012` Owner: `QA`
@@ -674,6 +673,16 @@ Exit criteria:
 ### v0.4.0-H2 - Layered Frontend Architecture Completion
 
 - `ARC-009`
+- `ARC-010`
+- `ARC-011`
+- `ARC-012`
+
+Completed in this milestone so far:
+
+- `ARC-009`
+
+Remaining in this milestone:
+
 - `ARC-010`
 - `ARC-011`
 - `ARC-012`
