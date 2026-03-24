@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-005` completed: the frontend now has an explicit interpretation-action contract in `frontend/src/public/stream-action-dispatcher.js` covering `setSessionState`, `setSessionStatus`, `markSessionAttention`, `setSessionBadges`, `mergeSessionMeta`, `setSessionTags`, `upsertSessionArtifact`, `removeSessionArtifact`, and `pushSessionNotification`.
+- [x] Plugin `onActions` output is no longer debug-only; `frontend/src/public/app.js` now routes normalized plugin actions through a dedicated dispatcher into reducer-backed store updates instead of leaving declarative plugin output inert.
+- [x] Frontend store now persists session-scoped interpretation state (`interpretationState`, `statusText`, `attentionActive`, `pluginBadges`, `artifacts`, `notifications`, merged `meta`, normalized `tags`) with deterministic normalization, artifact/notification caps, and immutable snapshot cloning.
+- [x] Regression coverage for `ARC-005` now exists in `frontend/test/stream-action-dispatcher.test.js` and `frontend/test/store.test.js`, including contract validation, invalid-action isolation, and reducer-backed application of meta/tag/badge/artifact/notification updates.
+- [x] Validation for `ARC-005` passed at frontend scope: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm --prefix frontend run test:coverage`.
 - [x] `ARC-004` completed: the frontend now has a dedicated stream-plugin-engine registry in `frontend/src/public/stream-plugin-engine.js` with deterministic plugin ordering by priority plus registration order.
 - [x] Stream-plugin execution is now session-scoped and lifecycle-aware, including explicit `onSessionStart` / `onSessionDispose` hooks, isolated error handling, frozen session context snapshots, and duplicate-plugin rejection guardrails.
 - [x] Plugin output is now normalized as declarative action arrays with deterministic last-wins conflict resolution (`conflictKey` or action `type`) and an `onActions` handoff boundary for the next action-dispatch layer.

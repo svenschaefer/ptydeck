@@ -6,6 +6,7 @@ import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createSessionViewModel } from "./session-view-model.js";
+import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
 import { createStreamPluginEngine } from "./stream-plugin-engine.js";
 import {
   getTerminalCellHeightPx,
@@ -38,6 +39,17 @@ const debugLog = (event, details = {}) => {
 };
 const api = createApiClient(config.apiBaseUrl, { debug: debugLogs, log: debugLog });
 const store = createStore();
+const streamActionDispatcher = createStreamActionDispatcher({
+  store,
+  onError(details) {
+    debugLog("stream-plugin.action-error", {
+      sessionId: details?.sessionId || null,
+      hook: details?.meta?.hook || null,
+      actionType: details?.action?.type || null,
+      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
+    });
+  }
+});
 
 const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
 const stateEl = document.getElementById("connection-state");
@@ -109,10 +121,11 @@ const streamPluginEngine = createStreamPluginEngine({
     return getSessionById(sessionId);
   },
   onActions(sessionId, actions, meta) {
+    const appliedActions = streamActionDispatcher.dispatch(sessionId, actions, meta);
     debugLog("stream-plugin.actions", {
       sessionId,
       hook: meta?.hook || null,
-      actionTypes: actions.map((action) => action.type)
+      actionTypes: appliedActions.map((action) => action.type)
     });
   },
   onPluginError(details) {

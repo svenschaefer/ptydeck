@@ -1,5 +1,8 @@
 const DEFAULT_CONNECTION_STATE = "connecting";
 const DEFAULT_DECK_ID = "default";
+const SESSION_NOTIFICATION_LIMIT = 20;
+const SESSION_ARTIFACT_LIMIT = 20;
+const SESSION_BADGE_LIMIT = 8;
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -74,6 +77,32 @@ function cloneRecord(record) {
   return record && typeof record === "object" ? { ...record } : record;
 }
 
+function cloneSessionRecord(session) {
+  if (!session || typeof session !== "object") {
+    return session;
+  }
+  return {
+    ...session,
+    env: session.env && typeof session.env === "object" ? { ...session.env } : session.env,
+    themeProfile: session.themeProfile && typeof session.themeProfile === "object" ? { ...session.themeProfile } : session.themeProfile,
+    tags: Array.isArray(session.tags) ? session.tags.slice() : session.tags,
+    meta: session.meta && typeof session.meta === "object" ? { ...session.meta } : session.meta,
+    pluginBadges: Array.isArray(session.pluginBadges) ? session.pluginBadges.map((badge) => ({ ...badge })) : [],
+    artifacts: Array.isArray(session.artifacts)
+      ? session.artifacts.map((artifact) => ({
+          ...artifact,
+          data: artifact?.data && typeof artifact.data === "object" ? { ...artifact.data } : artifact?.data
+        }))
+      : [],
+    notifications: Array.isArray(session.notifications)
+      ? session.notifications.map((notification) => ({
+          ...notification,
+          data: notification?.data && typeof notification.data === "object" ? { ...notification.data } : notification?.data
+        }))
+      : []
+  };
+}
+
 function normalizeActivityTimestamp(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
@@ -93,6 +122,119 @@ function normalizeRawSessionState(value) {
     return state;
   }
   return "running";
+}
+
+function normalizePluginSessionState(value) {
+  const state = normalizeText(value).toLowerCase();
+  return state || "";
+}
+
+function normalizeSessionStatusText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeSessionMeta(record) {
+  return record && typeof record === "object" && !Array.isArray(record) ? { ...record } : {};
+}
+
+function normalizeSessionTags(tags) {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+  const dedupe = new Set();
+  for (const rawTag of tags) {
+    const normalized = normalizeText(rawTag).toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+    dedupe.add(normalized);
+  }
+  return Array.from(dedupe).sort((left, right) => left.localeCompare(right, "en-US", { sensitivity: "base" }));
+}
+
+function normalizeSessionBadgeTone(value) {
+  const tone = normalizeText(value).toLowerCase();
+  if (tone === "success" || tone === "warn" || tone === "danger" || tone === "active" || tone === "muted") {
+    return tone;
+  }
+  return "info";
+}
+
+function normalizeSessionBadges(badges) {
+  if (!Array.isArray(badges)) {
+    return [];
+  }
+  const normalized = [];
+  const seen = new Set();
+  for (const rawBadge of badges) {
+    if (!rawBadge || typeof rawBadge !== "object") {
+      continue;
+    }
+    const id = normalizeText(rawBadge.id || rawBadge.text).toLowerCase();
+    const text = normalizeText(rawBadge.text);
+    if (!id || !text || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    normalized.push({
+      id,
+      text,
+      tone: normalizeSessionBadgeTone(rawBadge.tone),
+      pluginId: normalizeText(rawBadge.pluginId)
+    });
+    if (normalized.length >= SESSION_BADGE_LIMIT) {
+      break;
+    }
+  }
+  return normalized;
+}
+
+function normalizeArtifactRecord(artifact) {
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
+    return null;
+  }
+  const id = normalizeText(artifact.id || artifact.title || artifact.kind).toLowerCase();
+  const kind = normalizeText(artifact.kind).toLowerCase();
+  const title = normalizeText(artifact.title);
+  const text = typeof artifact.text === "string" ? artifact.text : "";
+  if (!id || !kind) {
+    return null;
+  }
+  return {
+    id,
+    kind,
+    title,
+    text,
+    pluginId: normalizeText(artifact.pluginId),
+    createdAt: Number.isFinite(artifact.createdAt) ? Number(artifact.createdAt) : Date.now(),
+    data: artifact.data && typeof artifact.data === "object" && !Array.isArray(artifact.data) ? { ...artifact.data } : {}
+  };
+}
+
+function normalizeNotificationLevel(value) {
+  const level = normalizeText(value).toLowerCase();
+  if (level === "success" || level === "warn" || level === "error" || level === "debug") {
+    return level;
+  }
+  return "info";
+}
+
+function normalizeNotificationRecord(notification) {
+  if (!notification || typeof notification !== "object" || Array.isArray(notification)) {
+    return null;
+  }
+  const message = normalizeSessionStatusText(notification.message);
+  if (!message) {
+    return null;
+  }
+  return {
+    id: normalizeText(notification.id).toLowerCase() || `note-${Date.now()}`,
+    level: normalizeNotificationLevel(notification.level),
+    message,
+    pluginId: normalizeText(notification.pluginId),
+    createdAt: Number.isFinite(notification.createdAt) ? Number(notification.createdAt) : Date.now(),
+    data: notification.data && typeof notification.data === "object" && !Array.isArray(notification.data) ? { ...notification.data } : {}
+  };
 }
 
 function deriveSessionLifecycleState(rawState, session) {
@@ -120,7 +262,19 @@ function withSessionActivityDefaults(session) {
     ...session,
     hasLiveActivity: session.hasLiveActivity === true,
     hasUnreadActivity: session.hasUnreadActivity === true,
-    lastOutputAt: normalizeActivityTimestamp(session.lastOutputAt)
+    lastOutputAt: normalizeActivityTimestamp(session.lastOutputAt),
+    interpretationState: normalizePluginSessionState(session.interpretationState),
+    statusText: normalizeSessionStatusText(session.statusText),
+    attentionActive: session.attentionActive === true,
+    pluginBadges: normalizeSessionBadges(session.pluginBadges),
+    artifacts: Array.isArray(session.artifacts)
+      ? session.artifacts.map((artifact) => normalizeArtifactRecord(artifact)).filter(Boolean).slice(-SESSION_ARTIFACT_LIMIT)
+      : [],
+    notifications: Array.isArray(session.notifications)
+      ? session.notifications.map((notification) => normalizeNotificationRecord(notification)).filter(Boolean).slice(-SESSION_NOTIFICATION_LIMIT)
+      : [],
+    meta: normalizeSessionMeta(session.meta),
+    tags: normalizeSessionTags(session.tags)
   };
   normalizedSession.lifecycleState = deriveSessionLifecycleState(normalizedSession.state, normalizedSession);
   return normalizedSession;
@@ -129,7 +283,7 @@ function withSessionActivityDefaults(session) {
 function createStateSnapshot(state) {
   return {
     ...state,
-    sessions: state.sessions.map(cloneRecord),
+    sessions: state.sessions.map(cloneSessionRecord),
     decks: state.decks.map(cloneRecord),
     customCommands: state.customCommands.map(cloneRecord)
   };
@@ -144,6 +298,106 @@ function mergeSessionRecord(currentSession, nextSession) {
     delete merged.exitedAt;
   }
   return merged;
+}
+
+function applySessionMetaPatch(currentMeta, patch) {
+  const base = normalizeSessionMeta(currentMeta);
+  const normalizedPatch = normalizeSessionMeta(patch);
+  const nextMeta = { ...base };
+  for (const [key, value] of Object.entries(normalizedPatch)) {
+    if (value === null) {
+      delete nextMeta[key];
+      continue;
+    }
+    nextMeta[key] = value;
+  }
+  return nextMeta;
+}
+
+function applyInterpretationAction(session, action) {
+  if (!session || !action || typeof action !== "object") {
+    return session;
+  }
+  switch (action.type) {
+    case "setSessionState": {
+      const interpretationState = normalizePluginSessionState(action.value);
+      if ((session.interpretationState || "") === interpretationState) {
+        return session;
+      }
+      return { ...session, interpretationState };
+    }
+    case "setSessionStatus": {
+      const statusText = normalizeSessionStatusText(action.value);
+      if ((session.statusText || "") === statusText) {
+        return session;
+      }
+      return { ...session, statusText };
+    }
+    case "markSessionAttention": {
+      const attentionActive = action.active === true;
+      if (session.attentionActive === attentionActive) {
+        return session;
+      }
+      return { ...session, attentionActive };
+    }
+    case "setSessionBadges": {
+      const pluginBadges = normalizeSessionBadges(action.badges);
+      if (JSON.stringify(session.pluginBadges || []) === JSON.stringify(pluginBadges)) {
+        return session;
+      }
+      return { ...session, pluginBadges };
+    }
+    case "mergeSessionMeta": {
+      const nextMeta = applySessionMetaPatch(session.meta, action.patch);
+      if (JSON.stringify(session.meta || {}) === JSON.stringify(nextMeta)) {
+        return session;
+      }
+      return { ...session, meta: nextMeta };
+    }
+    case "setSessionTags": {
+      const tags = normalizeSessionTags(action.tags);
+      if (JSON.stringify(session.tags || []) === JSON.stringify(tags)) {
+        return session;
+      }
+      return { ...session, tags };
+    }
+    case "upsertSessionArtifact": {
+      const artifact = normalizeArtifactRecord(action.artifact);
+      if (!artifact) {
+        return session;
+      }
+      const artifacts = Array.isArray(session.artifacts) ? session.artifacts.slice() : [];
+      const index = artifacts.findIndex((entry) => entry.id === artifact.id);
+      if (index >= 0) {
+        artifacts[index] = artifact;
+      } else {
+        artifacts.push(artifact);
+      }
+      return { ...session, artifacts: artifacts.slice(-SESSION_ARTIFACT_LIMIT) };
+    }
+    case "removeSessionArtifact": {
+      const artifactId = normalizeText(action.artifactId).toLowerCase();
+      if (!artifactId) {
+        return session;
+      }
+      const artifacts = Array.isArray(session.artifacts) ? session.artifacts.filter((entry) => entry.id !== artifactId) : [];
+      if (artifacts.length === (session.artifacts || []).length) {
+        return session;
+      }
+      return { ...session, artifacts };
+    }
+    case "pushSessionNotification": {
+      const notification = normalizeNotificationRecord(action.notification);
+      if (!notification) {
+        return session;
+      }
+      const notifications = Array.isArray(session.notifications) ? session.notifications.slice() : [];
+      notifications.push(notification);
+      return { ...session, notifications: notifications.slice(-SESSION_NOTIFICATION_LIMIT) };
+    }
+    default:
+      return session;
+  }
 }
 
 export function createInitialRuntimeState(options = {}) {
@@ -341,6 +595,34 @@ export function reduceRuntimeState(state, action, options = {}) {
             hasLiveActivity: false
           })
         };
+      });
+      if (!changed) {
+        return runtimeState;
+      }
+      return {
+        ...runtimeState,
+        sessions: nextSessions
+      };
+    }
+    case "session.interpretation.apply": {
+      const sessionId = normalizeText(action.sessionId);
+      if (!sessionId || !Array.isArray(action.actions) || action.actions.length === 0) {
+        return runtimeState;
+      }
+      let changed = false;
+      const nextSessions = runtimeState.sessions.map((session) => {
+        if (session.id !== sessionId) {
+          return session;
+        }
+        let nextSession = session;
+        for (const interpretationAction of action.actions) {
+          nextSession = applyInterpretationAction(nextSession, interpretationAction);
+        }
+        if (nextSession !== session) {
+          changed = true;
+          return withSessionActivityDefaults(nextSession);
+        }
+        return session;
       });
       if (!changed) {
         return runtimeState;
@@ -630,6 +912,9 @@ export function createStore(options = {}) {
     },
     setSessionFilterText(value) {
       dispatch({ type: "filter.set", value });
+    },
+    applySessionInterpretationActions(sessionId, actions) {
+      dispatch({ type: "session.interpretation.apply", sessionId, actions });
     }
   };
 }

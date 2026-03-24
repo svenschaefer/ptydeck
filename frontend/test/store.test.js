@@ -167,3 +167,58 @@ test("store avoids repeated publishes for already-live session activity", () => 
   assert.equal(publishes, 1);
   assert.equal(store.getState().sessions[0].lifecycleState, "busy");
 });
+
+test("store applies interpretation actions into session-scoped status, meta, tags, artifacts, and notifications", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running", tags: ["ops"] }]);
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "setSessionState", value: "working" },
+    { type: "setSessionStatus", value: "Working on plan" },
+    {
+      type: "setSessionBadges",
+      badges: [
+        { id: "working", text: "Working", tone: "active" },
+        { id: "working", text: "Duplicate", tone: "warn" }
+      ]
+    },
+    { type: "markSessionAttention", active: true },
+    { type: "mergeSessionMeta", patch: { tool: "codex", runId: "abc" } },
+    { type: "setSessionTags", tags: ["ops", "codex", "OPS"] },
+    {
+      type: "upsertSessionArtifact",
+      artifact: { id: "summary", kind: "summary", title: "Summary", text: "done" }
+    },
+    {
+      type: "pushSessionNotification",
+      notification: { id: "n1", level: "info", message: "Interpreter updated session." }
+    }
+  ]);
+
+  let session = store.getState().sessions.find((entry) => entry.id === "s1");
+  assert.equal(session.interpretationState, "working");
+  assert.equal(session.statusText, "Working on plan");
+  assert.equal(session.attentionActive, true);
+  assert.deepEqual(session.tags, ["codex", "ops"]);
+  assert.deepEqual(session.meta, { tool: "codex", runId: "abc" });
+  assert.deepEqual(session.pluginBadges, [
+    { id: "working", text: "Working", tone: "active", pluginId: "" }
+  ]);
+  assert.equal(session.artifacts.length, 1);
+  assert.equal(session.artifacts[0].id, "summary");
+  assert.equal(session.notifications.length, 1);
+  assert.equal(session.notifications[0].id, "n1");
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "mergeSessionMeta", patch: { runId: null } },
+    { type: "removeSessionArtifact", artifactId: "summary" },
+    { type: "setSessionBadges", badges: [] },
+    { type: "markSessionAttention", active: false }
+  ]);
+
+  session = store.getState().sessions.find((entry) => entry.id === "s1");
+  assert.deepEqual(session.meta, { tool: "codex" });
+  assert.deepEqual(session.pluginBadges, []);
+  assert.equal(session.attentionActive, false);
+  assert.deepEqual(session.artifacts, []);
+});

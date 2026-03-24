@@ -535,10 +535,10 @@ Completed in this milestone so far:
 
 - `ARC-003`
 - `ARC-004`
+- `ARC-005`
 
 Remaining in this milestone:
 
-- `ARC-005`
 - `ARC-006`
 - `ARC-007`
 - `ARC-008`
@@ -570,8 +570,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `ARC-004`
-- `ARC-005`
 - `ARC-006`
 - `ARC-007`
 - `ARC-008`
