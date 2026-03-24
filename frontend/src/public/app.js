@@ -1,6 +1,7 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createCommandEngine } from "./command-engine.js";
+import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
 import { createCommandExecutor } from "./command-executor.js";
 import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
@@ -117,7 +118,6 @@ const sessionQuickIds = new Map();
 let bootstrapPromise = null;
 let bootstrapFallbackTimer = null;
 let runtimeBootstrapSource = "pending";
-let commandPreviewTimer = null;
 let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
@@ -282,6 +282,7 @@ let sessionViewModel = null;
 let runtimeEventController = null;
 let commandEngine = null;
 let commandExecutor = null;
+let commandComposerRuntimeController = null;
 let commandSuggestionsController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
@@ -2612,180 +2613,15 @@ if (terminalSearchClearBtn) {
   });
 }
 async function submitCommand() {
-  resetCommandAutocompleteState();
-  const command = commandInput.value;
-  if (!command.trim()) {
-    return;
-  }
-
-  const interpreted = interpretComposerInput(command);
-  if (interpreted.kind === "quick-switch") {
-    const state = store.getState();
-    const resolved = resolveQuickSwitchTarget(interpreted.selector, state.sessions);
-    if (resolved.error) {
-      setCommandFeedback(resolved.error);
-      return;
-    }
-    const result =
-      resolved.kind === "session" ? activateSessionTarget(resolved.target) : activateDeckTarget(resolved.target);
-    setCommandFeedback(result.message);
-    commandInput.value = "";
-    setCommandPreview("");
-    clearCommandSuggestions();
-    render();
-    return;
-  }
-
-  if (interpreted.kind === "control") {
-    debugLog("command.control.start", {
-      command: interpreted.command,
-      argsCount: interpreted.args.length
-    });
-    try {
-      const feedback = await executeControlCommand(interpreted);
-      setCommandFeedback(feedback);
-      recordSlashHistory(command);
-      debugLog("command.control.ok", { command: interpreted.command });
-      commandInput.value = "";
-      setCommandPreview("");
-      clearCommandSuggestions();
-      resetSlashHistoryNavigationState();
-      render();
-    } catch (err) {
-      setCommandFeedback(getErrorMessage(err, "Failed to execute control command."));
-    }
-    return;
-  }
-
-  const state = store.getState();
-  const sessions = state.sessions;
-  const directRouting = parseDirectTargetRoutingInput(interpreted.data);
-
-  let targetSessionId = state.activeSessionId;
-  let targetSessions = [];
-  let targetPayload = interpreted.data;
-  let routeFeedback = "";
-
-  if (directRouting.matched) {
-    const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, {
-      source: "direct-route",
-      scopeMode: "active-deck",
-      activeDeckId: getActiveDeck()?.id || ""
-    });
-    if (resolvedTargets.error) {
-      setCommandFeedback(resolvedTargets.error);
-      return;
-    }
-    targetSessions = resolvedTargets.sessions;
-    targetSessionId = targetSessions[0]?.id || "";
-    targetPayload = directRouting.payload;
-    if (targetSessions.length === 1) {
-      routeFeedback = `Sent to [${formatSessionToken(targetSessions[0].id)}] ${formatSessionDisplayName(targetSessions[0])}.`;
-    } else {
-      routeFeedback = `Sent to ${targetSessions.length} sessions.`;
-    }
-  }
-
-  if (!targetSessionId) {
-    return;
-  }
-  if (!directRouting.matched) {
-    const activeSession = sessions.find((session) => session.id === targetSessionId) || null;
-    if (isSessionActionBlocked(activeSession)) {
-      setCommandFeedback(getBlockedSessionActionMessage([activeSession], "Command send"));
-      return;
-    }
-  }
-
-  try {
-    if (directRouting.matched && targetSessions.length > 0) {
-      const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
-      if (blockedSessions.length > 0) {
-        setCommandFeedback(getBlockedSessionActionMessage(blockedSessions, "Command send"));
-        return;
-      }
-      await Promise.all(
-        targetSessions.map((session) => {
-          const terminatorMode = getSessionSendTerminator(session.id);
-          debugLog("command.send.start", {
-            activeSessionId: session.id,
-            mode: terminatorMode,
-            directRoute: directRouting.matched
-          });
-          return sendInputWithConfiguredTerminator(api.sendInput.bind(api), session.id, targetPayload, terminatorMode, {
-            normalizeMode: normalizeSendTerminatorMode,
-            delayedSubmitMs: DELAYED_SUBMIT_MS
-          });
-        })
-      );
-    } else {
-      const terminatorMode = getSessionSendTerminator(targetSessionId);
-      debugLog("command.send.start", {
-        activeSessionId: targetSessionId,
-        mode: terminatorMode,
-        directRoute: directRouting.matched
-      });
-      await sendInputWithConfiguredTerminator(api.sendInput.bind(api), targetSessionId, targetPayload, terminatorMode, {
-        normalizeMode: normalizeSendTerminatorMode,
-        delayedSubmitMs: DELAYED_SUBMIT_MS
-      });
-    }
-    commandInput.value = "";
-    setCommandPreview("");
-    clearCommandSuggestions();
-    uiState.error = "";
-    if (routeFeedback) {
-      setCommandFeedback(routeFeedback);
-    }
-    resetSlashHistoryNavigationState();
-    debugLog("command.send.ok", { activeSessionId: targetSessionId, directRoute: directRouting.matched });
-    render();
-  } catch {
-    setError("Failed to send command.");
-  }
+  await commandComposerRuntimeController?.submitCommand();
 }
 
 async function refreshCommandPreview() {
-  const rawInput = commandInput.value || "";
-  const interpreted = interpretComposerInput(rawInput);
-  if (interpreted.kind === "quick-switch") {
-    const preview = formatQuickSwitchPreview(interpreted.selector, store.getState().sessions);
-    setCommandPreview(preview);
-    return;
-  }
-  if (interpreted.kind !== "control") {
-    setCommandPreview("");
-    return;
-  }
-
-  const commandRaw = interpreted.command;
-  const command = commandRaw.toLowerCase();
-  if (!commandRaw || command === "custom" || command === "help") {
-    setCommandPreview("");
-    return;
-  }
-
-  if (interpreted.args.length > 1) {
-    setCommandPreview("");
-    return;
-  }
-
-  const custom = getCustomCommandState(commandRaw);
-  if (custom) {
-    setCommandPreview(custom.content || "");
-    return;
-  }
-  setCommandPreview("");
+  await commandComposerRuntimeController?.refreshCommandPreview();
 }
 
 function scheduleCommandPreview() {
-  if (commandPreviewTimer) {
-    clearTimeout(commandPreviewTimer);
-  }
-  commandPreviewTimer = setTimeout(() => {
-    commandPreviewTimer = null;
-    refreshCommandPreview();
-  }, 120);
+  commandComposerRuntimeController?.scheduleCommandPreview();
 }
 
 commandSuggestionsController = createCommandSuggestionsController({
@@ -2795,6 +2631,47 @@ commandSuggestionsController = createCommandSuggestionsController({
   onSelectionApplied: scheduleCommandPreview,
   documentRef: document,
   windowRef: window
+});
+
+commandComposerRuntimeController = createCommandComposerRuntimeController({
+  windowRef: window,
+  getCommandValue: () => commandInput.value || "",
+  setCommandValue: (value) => {
+    commandInput.value = value;
+  },
+  resetCommandAutocompleteState,
+  interpretComposerInput,
+  getState: () => store.getState(),
+  resolveQuickSwitchTarget,
+  activateSessionTarget,
+  activateDeckTarget,
+  setCommandFeedback,
+  setCommandPreview,
+  clearCommandSuggestions,
+  render,
+  debugLog,
+  executeControlCommand,
+  recordSlashHistory,
+  getErrorMessage,
+  resetSlashHistoryNavigationState,
+  parseDirectTargetRoutingInput,
+  resolveTargetSelectors,
+  getActiveDeck,
+  formatSessionToken,
+  formatSessionDisplayName,
+  getBlockedSessionActionMessage,
+  isSessionActionBlocked,
+  getSessionSendTerminator,
+  apiSendInput: api.sendInput.bind(api),
+  sendInputWithConfiguredTerminator,
+  normalizeSendTerminatorMode,
+  delayedSubmitMs: DELAYED_SUBMIT_MS,
+  setError,
+  clearError: () => {
+    uiState.error = "";
+  },
+  getCustomCommandState,
+  formatQuickSwitchPreview
 });
 
 sendBtn.addEventListener("click", submitCommand);
@@ -2861,9 +2738,7 @@ window.addEventListener("beforeunload", () => {
     wsClient.close();
   }
   sessionTerminalResizeController?.dispose();
-  if (commandPreviewTimer) {
-    clearTimeout(commandPreviewTimer);
-  }
+  commandComposerRuntimeController?.dispose();
   if (commandSuggestionsTimer) {
     clearTimeout(commandSuggestionsTimer);
   }
