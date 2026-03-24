@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "node src/dev-server.js",
     "gen:api-types": "node scripts/generate-api-types.mjs",
-    "build": "npm run gen:api-types && node --check src/dev-server.js src/config.js src/static-path.js src/public/app.js src/public/api-client.js src/public/command-interpreter.js src/public/store.js src/public/ws-client.js src/public/runtime-config.js",
-    "lint": "npm run gen:api-types && node --check src/dev-server.js src/config.js src/static-path.js src/public/app.js src/public/api-client.js src/public/command-interpreter.js src/public/store.js src/public/ws-client.js src/public/runtime-config.js",
+    "build": "npm run gen:api-types && node --check src/dev-server.js src/config.js src/static-path.js src/public/app.js src/public/api-client.js src/public/command-interpreter.js src/public/store.js src/public/terminal-compat.js src/public/ws-client.js src/public/runtime-config.js",
+    "lint": "npm run gen:api-types && node --check src/dev-server.js src/config.js src/static-path.js src/public/app.js src/public/api-client.js src/public/command-interpreter.js src/public/store.js src/public/terminal-compat.js src/public/ws-client.js src/public/runtime-config.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage"
   }

@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-099` completed: xterm rendering/geometry internals are now isolated behind `frontend/src/public/terminal-compat.js` instead of being accessed directly from `app.js`.
+- [x] Viewport sync, repaint, bottom-follow detection, and render-cell-height probing now flow through one compatibility boundary, reducing direct coupling to xterm private `_core` internals.
+- [x] Frontend unit coverage now includes `terminal-compat` behavior for public-buffer bottom detection plus compatibility fallbacks for viewport sync, repaint, and render-dimension access.
+- [x] Frontend `build`/`lint` scripts now explicitly syntax-check `src/public/terminal-compat.js` so the new compatibility layer participates in the same quality gate as the rest of the FE runtime.
+- [x] Validation for `QLT-099` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-097` completed: frontend custom-command state is now WebSocket-first in steady state, with snapshot plus `custom-command.*` events replacing REST reads for listing, previewing, showing, autocompleting, and executing custom commands.
 - [x] `QLT-098` completed: frontend regression coverage now verifies WebSocket-first custom-command synchronization across event-driven create/update/delete flows, reconnect-style snapshot replacement, and execution without fallback REST reads.
 - [x] Custom-command mutations still use REST writes, but the frontend now updates its local authoritative command map immediately and no longer depends on steady-state `GET /api/v1/custom-commands` refresh loops.

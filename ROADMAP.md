@@ -376,11 +376,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`
+- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`
 
 Remaining in this milestone:
 
-- `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`
+- `QLT-100`, `QLT-102`, `QLT-103`
 
 Dependencies:
 
@@ -420,7 +420,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-099`
 - `QLT-100`
 - `QLT-102`
 - `QLT-103`

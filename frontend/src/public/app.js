@@ -3,6 +3,12 @@ import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
+import {
+  getTerminalCellHeightPx,
+  isTerminalAtBottom,
+  refreshTerminalViewport,
+  syncTerminalScrollArea
+} from "./terminal-compat.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 
 const config = resolveRuntimeConfig(window);
@@ -1584,21 +1590,6 @@ function setSessionCardVisibility(node, visible) {
   node.style.display = visible ? "" : "none";
 }
 
-function isTerminalAtBottom(terminal) {
-  if (!terminal || !terminal.buffer || !terminal.buffer.active) {
-    return true;
-  }
-  const active = terminal.buffer.active;
-  return Number(active.baseY) === Number(active.ydisp);
-}
-
-function syncTerminalScrollArea(entry) {
-  const viewport = entry?.terminal?._core?.viewport || entry?.terminal?._core?._viewport || null;
-  if (viewport && typeof viewport.syncScrollArea === "function") {
-    viewport.syncScrollArea();
-  }
-}
-
 function syncTerminalViewportAfterShow(sessionId, entry) {
   if (!entry || !entry.terminal) {
     return;
@@ -1606,15 +1597,12 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
   const shouldFollow = entry.followOnShow !== false;
   const runPass = () => {
     applyResizeForSession(sessionId, { force: true });
-    syncTerminalScrollArea(entry);
-    if (typeof entry.terminal.refresh === "function") {
-      const lastRow = Math.max(0, entry.terminal.rows - 1);
-      entry.terminal.refresh(0, lastRow);
-    }
+    syncTerminalScrollArea(entry.terminal);
+    refreshTerminalViewport(entry.terminal);
     if (shouldFollow && typeof entry.terminal.scrollToBottom === "function") {
       entry.terminal.scrollToBottom();
     }
-    syncTerminalScrollArea(entry);
+    syncTerminalScrollArea(entry.terminal);
   };
   runPass();
   setTimeout(runPass, 80);
@@ -1884,7 +1872,7 @@ function applyMountHeight(entry, cols, rows) {
   let mountHeightPx = computeFixedMountHeightPx(rows);
   const cardWidthPx = computeFixedCardWidthPx(cols);
   const mountWidthPx = Math.max(220, cardWidthPx - TERMINAL_CARD_HORIZONTAL_CHROME_PX);
-  const runtimeCellHeightPx = Number(entry?.terminal?._core?._renderService?.dimensions?.css?.cell?.height) || 0;
+  const runtimeCellHeightPx = getTerminalCellHeightPx(entry?.terminal);
   if (runtimeCellHeightPx > 0) {
     const currentlyVisibleRows = Math.floor(mountHeightPx / runtimeCellHeightPx);
     if (currentlyVisibleRows < rows) {
@@ -2797,14 +2785,11 @@ function appendTerminalData(sessionId, data) {
   const terminal = entry.terminal;
   terminal.write(data, () => {
     if (entry.isVisible !== false) {
-      syncTerminalScrollArea(entry);
+      syncTerminalScrollArea(terminal);
     }
-    if (typeof terminal.refresh === "function") {
-      const lastRow = Math.max(0, terminal.rows - 1);
-      terminal.refresh(0, lastRow);
-    }
+    refreshTerminalViewport(terminal);
     if (entry.isVisible !== false) {
-      syncTerminalScrollArea(entry);
+      syncTerminalScrollArea(terminal);
     }
   });
   return true;
