@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted WebSocket runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/ws-runtime-controller.js` (WS client startup, connection-state propagation, session-data routing, runtime-event handoff, and authenticated ticket-protocol negotiation with `401` refresh retry).
+- [x] Added focused regression coverage for the new WS runtime controller in `frontend/test/ws-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ws-runtime-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, targeted tests `node --test frontend/test/ws-runtime-controller.test.js frontend/test/session-grid-controller.test.js frontend/test/runtime-event-controller.test.js`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/ws-runtime-controller.test.js`.
 - [x] `ARC-010` progress: extracted the main workspace/session render orchestration from `frontend/src/public/app.js` into `frontend/src/public/ui/session-grid-controller.js` (deck-scoped visibility resolution, session-card update/create orchestration, render-status propagation, cleanup handoff, and resize-pass scheduling).
 - [x] Added focused regression coverage for the new session grid controller in `frontend/test/session-grid-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/ui/session-grid-controller.js` participates in syntax-check gates.

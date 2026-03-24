@@ -6,6 +6,7 @@ import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "
 import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
+import { createWsRuntimeController } from "./ws-runtime-controller.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
@@ -271,6 +272,7 @@ let wsAuthTokenExpiresAtMs = 0;
 let authRefreshTimer = null;
 let devAuthRefreshPromise = null;
 let wsClient = null;
+let wsRuntimeController = null;
 let commandAutocompleteRequestId = 0;
 const slashCommandHistory = [];
 let slashHistoryCursor = -1;
@@ -2459,56 +2461,25 @@ async function bootstrapDevAuthToken(options = {}) {
   return devAuthRefreshPromise;
 }
 
-function startWs() {
-  wsClient = createWsClient(config.wsUrl, {
-    onState(status) {
-      debugLog("ws.state", { status });
-      store.setConnectionState(status);
-      if (status === "connected" && runtimeBootstrapSource !== "pending") {
-        uiState.loading = false;
-        uiState.error = "";
-        render();
-      }
-    },
-    onMessage(event) {
-      debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
-      if (event.type === "session.data" && terminals.has(event.sessionId)) {
-        streamAdapter.push(event.sessionId, event.data);
-        return;
-      }
-
-      applyRuntimeEvent(event);
-    }
-  }, {
-    debug: debugLogs,
-    log: debugLog,
-    protocolsProvider: async () => {
-      if (!wsAuthToken) {
-        return ["ptydeck.v1"];
-      }
-      let payload;
-      try {
-        payload = await api.createWsTicket();
-      } catch (err) {
-        const status = err && typeof err.status === "number" ? err.status : 0;
-        if (status === 401) {
-          const refreshed = await bootstrapDevAuthToken({ reason: "ws-ticket-401" });
-          if (!refreshed) {
-            throw err;
-          }
-          payload = await api.createWsTicket();
-        } else {
-          throw err;
-        }
-      }
-      const ticket = payload && typeof payload.ticket === "string" ? payload.ticket.trim() : "";
-      if (!ticket) {
-        throw new Error("WebSocket ticket response did not include a ticket.");
-      }
-      return ["ptydeck.v1", `ptydeck.auth.${ticket}`];
-    }
-  });
-}
+wsRuntimeController = createWsRuntimeController({
+  createWsClient,
+  wsUrl: config.wsUrl,
+  debug: debugLogs,
+  log: debugLog,
+  setConnectionState: (status) => store.setConnectionState(status),
+  getRuntimeBootstrapSource: () => runtimeBootstrapSource,
+  onRuntimeConnected: () => {
+    uiState.loading = false;
+    uiState.error = "";
+    render();
+  },
+  hasTerminal: (sessionId) => terminals.has(sessionId),
+  pushSessionData: (sessionId, data) => streamAdapter.push(sessionId, data),
+  applyRuntimeEvent,
+  getWsAuthToken: () => wsAuthToken,
+  createWsTicket: () => api.createWsTicket(),
+  bootstrapDevAuthToken
+});
 
 store.subscribe(render);
 syncSettingsUi();
@@ -2517,7 +2488,7 @@ render();
 
 async function initializeRuntime() {
   await bootstrapDevAuthToken();
-  startWs();
+  wsClient = wsRuntimeController?.start() || null;
   scheduleBootstrapFallback();
 }
 
