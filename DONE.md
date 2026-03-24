@@ -8,6 +8,8 @@ Completed and verified topics belong here.
 - [x] Added app-level regression coverage for live status ticking so working-status seconds continue to increment without requiring new terminal output events.
 - [x] Frontend auth resilience hotfix: API calls now auto-recover once on `401 Unauthorized` by refreshing the dev token and retrying the original request (excluding `/auth/*` endpoints), so transient token expiry no longer requires a full page reload for terminal input to work again.
 - [x] Added API-client regression coverage for unauthorized-recovery retry behavior (single retry with refreshed bearer token) and explicit no-retry behavior on auth endpoints.
+- [x] Frontend auth keepalive hardening: dev-token refresh is now scheduled proactively before expiry (with retry backoff), so long idle browser sessions keep API auth valid without user interaction.
+- [x] WebSocket ticket acquisition now retries once after `401` by refreshing the dev token, preventing reconnect failures caused by expired bearer tokens after idle periods.
 - [x] Documentation revalidation pass completed: all repository markdown files remain synchronized; `TODO.md` keeps concrete task definitions (currently no open active tasks) and `ROADMAP.md` remains release/dependency-order only with no active release wave.
 - [x] Documentation governance sync pass completed: `TODO.md`, `ROADMAP.md`, and `CODEX_CONTEXT.md` now explicitly state that there is currently no active open delivery wave and no active open implementation tasks.
 - [x] Backend startup now loads local `backend/.env` / `backend/.env.local` values before config resolution, so local `AUTH_MODE=dev` setup works without manually exporting environment variables in the shell.

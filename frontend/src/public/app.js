@@ -130,6 +130,9 @@ const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
+const DEV_AUTH_REFRESH_SAFETY_MS = 60_000;
+const DEV_AUTH_RETRY_DELAY_MS = 30_000;
+const DEV_AUTH_REFRESH_MIN_DELAY_MS = 15_000;
 const ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS = (() => {
   const injectedValue = window?.__PTYDECK_CONFIG__?.activityCompletionNotificationWindowMs;
   const parsed = Number(injectedValue);
@@ -253,6 +256,9 @@ let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
 const sessionStatusDurationAnchors = new Map();
 let wsAuthToken = "";
+let wsAuthTokenExpiresAtMs = 0;
+let authRefreshTimer = null;
+let devAuthRefreshPromise = null;
 let wsClient = null;
 let commandAutocompleteRequestId = 0;
 const slashCommandHistory = [];
@@ -3781,28 +3787,75 @@ async function bootstrapRuntimeFallback() {
   return bootstrapPromise;
 }
 
-async function bootstrapDevAuthToken() {
-  try {
-    const payload = await api.createDevToken();
-    if (payload && typeof payload.accessToken === "string" && payload.accessToken.trim()) {
-      wsAuthToken = payload.accessToken.trim();
-      api.setAuthToken(wsAuthToken);
-      debugLog("auth.dev_token.ok", { expiresIn: payload.expiresIn || 0, scope: payload.scope || "" });
-      return true;
-    }
-  } catch (err) {
-    const status = err && typeof err.status === "number" ? err.status : 0;
-    if (status === 404 || status === 405) {
-      debugLog("auth.dev_token.unavailable", {});
-      return false;
-    }
-    debugLog("auth.dev_token.error", {
-      status,
-      message: err instanceof Error ? err.message : String(err)
-    });
-    return false;
+function clearAuthRefreshTimer() {
+  if (authRefreshTimer !== null) {
+    clearTimeout(authRefreshTimer);
+    authRefreshTimer = null;
   }
-  return false;
+}
+
+function scheduleDevAuthRefreshDelay(delayMs) {
+  clearAuthRefreshTimer();
+  const normalizedDelay = Math.max(DEV_AUTH_REFRESH_MIN_DELAY_MS, Math.floor(Number(delayMs) || 0));
+  authRefreshTimer = setTimeout(() => {
+    bootstrapDevAuthToken({ reason: "scheduled-refresh" }).catch(() => {});
+  }, normalizedDelay);
+}
+
+function scheduleDevAuthRefresh(expiresInSeconds) {
+  const seconds = Number(expiresInSeconds);
+  if (!Number.isFinite(seconds) || seconds <= 0 || !wsAuthToken) {
+    clearAuthRefreshTimer();
+    return;
+  }
+  const ttlMs = Math.max(1_000, Math.floor(seconds * 1_000));
+  const now = Date.now();
+  wsAuthTokenExpiresAtMs = now + ttlMs;
+  scheduleDevAuthRefreshDelay(ttlMs - DEV_AUTH_REFRESH_SAFETY_MS);
+}
+
+async function bootstrapDevAuthToken(options = {}) {
+  if (devAuthRefreshPromise) {
+    return devAuthRefreshPromise;
+  }
+  const reason = typeof options.reason === "string" && options.reason ? options.reason : "bootstrap";
+  devAuthRefreshPromise = (async () => {
+    try {
+      const payload = await api.createDevToken();
+      if (payload && typeof payload.accessToken === "string" && payload.accessToken.trim()) {
+        wsAuthToken = payload.accessToken.trim();
+        api.setAuthToken(wsAuthToken);
+        scheduleDevAuthRefresh(payload.expiresIn);
+        debugLog("auth.dev_token.ok", {
+          reason,
+          expiresIn: payload.expiresIn || 0,
+          scope: payload.scope || "",
+          refreshAtMs: wsAuthTokenExpiresAtMs
+        });
+        return true;
+      }
+    } catch (err) {
+      const status = err && typeof err.status === "number" ? err.status : 0;
+      if (status === 404 || status === 405) {
+        clearAuthRefreshTimer();
+        wsAuthTokenExpiresAtMs = 0;
+        debugLog("auth.dev_token.unavailable", { reason });
+        return false;
+      }
+      scheduleDevAuthRefreshDelay(DEV_AUTH_RETRY_DELAY_MS);
+      debugLog("auth.dev_token.error", {
+        reason,
+        status,
+        message: err instanceof Error ? err.message : String(err)
+      });
+      return false;
+    } finally {
+      devAuthRefreshPromise = null;
+    }
+    scheduleDevAuthRefreshDelay(DEV_AUTH_RETRY_DELAY_MS);
+    return false;
+  })();
+  return devAuthRefreshPromise;
 }
 
 function startWs() {
@@ -3832,7 +3885,21 @@ function startWs() {
       if (!wsAuthToken) {
         return ["ptydeck.v1"];
       }
-      const payload = await api.createWsTicket();
+      let payload;
+      try {
+        payload = await api.createWsTicket();
+      } catch (err) {
+        const status = err && typeof err.status === "number" ? err.status : 0;
+        if (status === 401) {
+          const refreshed = await bootstrapDevAuthToken({ reason: "ws-ticket-401" });
+          if (!refreshed) {
+            throw err;
+          }
+          payload = await api.createWsTicket();
+        } else {
+          throw err;
+        }
+      }
       const ticket = payload && typeof payload.ticket === "string" ? payload.ticket.trim() : "";
       if (!ticket) {
         throw new Error("WebSocket ticket response did not include a ticket.");

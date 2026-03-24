@@ -87,6 +87,7 @@ The deck model is a strict isolation boundary above sessions.
 - Local reverse-proxy and local-domain configuration must remain provider-agnostic in repo docs and be stored only in ignored local configuration paths.
 - Frontend API client now enforces explicit non-2xx handling and surfaces backend error payload fields.
 - Frontend API client now supports one-time unauthorized auto-recovery for non-auth endpoints: on `401`, it can invoke an injected auth-recovery callback, refresh auth state, and retry the original request once.
+- Frontend runtime now proactively refreshes dev auth tokens before expiry (with bounded retry delay on transient failure) so idle browser sessions retain valid API auth without requiring manual interaction.
 - Frontend WebSocket client behavior now has dedicated unit test coverage for reconnect and close paths.
 - Backend runtime negative/error REST paths are covered by integration tests.
 - Backend runtime now enforces configurable max request body size and returns `413` for oversized payloads.
@@ -204,6 +205,7 @@ The deck model is a strict isolation boundary above sessions.
 - Backend auth/authz middleware baseline now supports JWT validation in `AUTH_MODE=dev`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
 - Frontend runtime now wires API unauthorized recovery to `bootstrapDevAuthToken()`, so expired dev-token states recover without full-page reload in normal local flows.
+- WebSocket ticket negotiation now retries once after `401` by refreshing the dev token first, reducing idle-time reconnect failures caused by expired bearer tokens.
 - Backend server startup now loads local `backend/.env` / `backend/.env.local` files before configuration resolution (without overriding already exported shell env vars), so local `AUTH_MODE=dev` can be activated through repo-local env files.
 - Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `TODO-OUTLOOK.md`.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
