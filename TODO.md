@@ -13,8 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
-- [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 - [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
@@ -179,8 +177,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-094` Owner: `QA` Task: Stabilize restore-fallback integration coverage with deterministic PTY/runtime injection so restart-durability tests are environment-independent.
 - [x] `QLT-095` Owner: `FE` Task: Handle backend `session.exit` events in frontend runtime/store with explicit exited-session state, visible UI state, and deterministic post-exit interaction guardrails.
 - [x] `QLT-096` Owner: `QA` Task: Add regression coverage for exited-session lifecycle behavior (`session.exit`, reconnect visibility, restart/delete semantics, and blocked invalid interactions).
-- [ ] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
-- [ ] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
+- [x] `QLT-097` Owner: `FE` Task: Make frontend custom-command state WebSocket-first by treating snapshot + `custom-command.*` events as authoritative state and removing steady-state REST refresh loops.
+- [x] `QLT-098` Owner: `QA` Task: Add regression coverage for WebSocket-first custom-command synchronization across reconnect, multi-client mutation, and command-management flows.
 - [ ] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 - [x] `QLT-101` Owner: `FE` Task: Add `>selector` quick-switch commands to the composer so `>4`, `>A`, `>name`, or other existing single-session selectors activate that session directly and switch decks automatically when the target lives outside the active deck.

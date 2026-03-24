@@ -1,6 +1,6 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H7 quick-switch delivery and hidden-scroll recovery sync completed)
+Last updated: 2026-03-24 (H7 custom-command WS-first sync completed)
 Owner: `CODY`
 Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, and hidden-scroll recovery closure for `QLT-108`/`QLT-109`.
 
@@ -252,8 +252,8 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle G (`v0.3.0-H5`): none.
   - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
   - Planned next in cycle H (`v0.3.0-H6`): none.
-  - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`.
-  - Planned next in cycle I (`v0.3.0-H7`): `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`.
+  - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`.
+  - Planned next in cycle I (`v0.3.0-H7`): `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`.
 
 ## Session Behavior Notes
 

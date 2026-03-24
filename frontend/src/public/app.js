@@ -161,6 +161,7 @@ let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteState = null;
 let commandAutocompleteRequestId = 0;
+const customCommandState = new Map();
 const slashCommandHistory = [];
 let slashHistoryCursor = -1;
 let slashHistoryDraft = "";
@@ -210,6 +211,64 @@ function setError(message) {
 function setCommandFeedback(message) {
   uiState.commandFeedback = message;
   render();
+}
+
+function normalizeCustomCommandName(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function normalizeCustomCommandRecord(command) {
+  if (!command || typeof command !== "object") {
+    return null;
+  }
+  const name = normalizeCustomCommandName(command.name);
+  if (!name) {
+    return null;
+  }
+  return {
+    name,
+    content: typeof command.content === "string" ? command.content : "",
+    createdAt: Number(command.createdAt || 0),
+    updatedAt: Number(command.updatedAt || 0)
+  };
+}
+
+function listCustomCommandState() {
+  return Array.from(customCommandState.values()).sort((left, right) =>
+    left.name.localeCompare(right.name, "en-US", { sensitivity: "base" })
+  );
+}
+
+function getCustomCommandState(name) {
+  const normalizedName = normalizeCustomCommandName(name);
+  if (!normalizedName) {
+    return null;
+  }
+  return customCommandState.get(normalizedName) || null;
+}
+
+function upsertCustomCommandState(command) {
+  const normalized = normalizeCustomCommandRecord(command);
+  if (!normalized) {
+    return null;
+  }
+  customCommandState.set(normalized.name, normalized);
+  return normalized;
+}
+
+function removeCustomCommandState(name) {
+  const normalizedName = normalizeCustomCommandName(name);
+  if (!normalizedName) {
+    return false;
+  }
+  return customCommandState.delete(normalizedName);
+}
+
+function replaceCustomCommandState(commands) {
+  customCommandState.clear();
+  for (const command of Array.isArray(commands) ? commands : []) {
+    upsertCustomCommandState(command);
+  }
 }
 
 function getErrorMessage(err, fallback) {
@@ -808,17 +867,7 @@ async function autocompleteComposerInput(reverse = false) {
     const delta = reverse ? -1 : 1;
     nextIndex = (activeState.index + delta + matches.length) % matches.length;
   } else {
-    const requestId = ++commandAutocompleteRequestId;
-    let customCommands = [];
-    try {
-      customCommands = await api.listCustomCommands();
-    } catch {
-      customCommands = [];
-    }
-    if (requestId !== commandAutocompleteRequestId) {
-      return true;
-    }
-    const context = parseAutocompleteContext(rawInput, customCommands);
+    const context = parseAutocompleteContext(rawInput, listCustomCommandState());
     if (!context) {
       resetCommandAutocompleteState();
       return true;
@@ -851,17 +900,7 @@ async function refreshCommandSuggestions() {
     render();
     return;
   }
-  const requestId = ++commandSuggestionsRequestId;
-  let customCommands = [];
-  try {
-    customCommands = await api.listCustomCommands();
-  } catch {
-    customCommands = [];
-  }
-  if (requestId !== commandSuggestionsRequestId) {
-    return;
-  }
-  const context = parseAutocompleteContext(rawInput, customCommands);
+  const context = parseAutocompleteContext(rawInput, listCustomCommandState());
   if (!context || !Array.isArray(context.matches) || context.matches.length === 0) {
     clearCommandSuggestions();
     render();
@@ -3900,7 +3939,7 @@ async function executeControlCommand(interpreted) {
 
   if (command === "custom") {
     if (args[0] === "list") {
-      const commands = await api.listCustomCommands();
+      const commands = listCustomCommandState();
       if (!Array.isArray(commands) || commands.length === 0) {
         return "No custom commands defined.";
       }
@@ -3912,15 +3951,11 @@ async function executeControlCommand(interpreted) {
       if (!name) {
         return "Usage: /custom show <name>";
       }
-      try {
-        const custom = await api.getCustomCommand(name);
-        return `/${custom.name}\n---\n${custom.content}\n---`;
-      } catch (err) {
-        if (err && err.status === 404) {
-          return `Custom command not found: /${name}`;
-        }
-        throw err;
+      const custom = getCustomCommandState(name);
+      if (!custom) {
+        return `Custom command not found: /${name}`;
       }
+      return `/${custom.name}\n---\n${custom.content}\n---`;
     }
 
     if (args[0] === "remove") {
@@ -3930,6 +3965,7 @@ async function executeControlCommand(interpreted) {
       }
       try {
         await api.deleteCustomCommand(name);
+        removeCustomCommandState(name);
         return `Removed custom command /${name}.`;
       } catch (err) {
         if (err && err.status === 404) {
@@ -3944,6 +3980,7 @@ async function executeControlCommand(interpreted) {
       return `Custom command definition error: ${parsed.error}`;
     }
     const saved = await api.upsertCustomCommand(parsed.name, parsed.content);
+    upsertCustomCommandState(saved);
     return `Saved custom command /${saved.name} (${parsed.mode}).`;
   }
 
@@ -4038,8 +4075,8 @@ async function executeControlCommand(interpreted) {
     return `Applied settings to ${targets.length} session(s): ${appliedKeys.join(", ")}.`;
   }
 
-  try {
-    const custom = await api.getCustomCommand(commandRaw);
+  const custom = getCustomCommandState(commandRaw);
+  if (custom) {
     let targetSessions = [];
     if (args.length === 0) {
       if (!activeSessionId) {
@@ -4074,11 +4111,6 @@ async function executeControlCommand(interpreted) {
       return `Executed /${custom.name} on [${formatSessionToken(targetSessions[0].id)}].`;
     }
     return `Executed /${custom.name} on ${targetSessions.length} sessions.`;
-  } catch (err) {
-    if (err && err.status === 404) {
-      return `Unknown command: /${commandRaw}`;
-    }
-    throw err;
   }
 
   return `Unknown command: /${commandRaw}`;
@@ -4175,8 +4207,11 @@ function startWs() {
     onMessage(event) {
       debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
       if (event.type === "snapshot") {
+        replaceCustomCommandState(event.customCommands || []);
         store.setSessions(event.sessions || []);
         replaySnapshotOutputs(event.outputs);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
         uiState.loading = false;
         uiState.error = "";
         return;
@@ -4195,6 +4230,22 @@ function startWs() {
 
       if (event.type === "session.exit" && event.sessionId) {
         markSessionExited(event.sessionId, event);
+        uiState.error = "";
+        return;
+      }
+
+      if ((event.type === "custom-command.created" || event.type === "custom-command.updated") && event.command) {
+        upsertCustomCommandState(event.command);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return;
+      }
+
+      if (event.type === "custom-command.deleted" && event.command) {
+        removeCustomCommandState(event.command.name);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
         uiState.error = "";
         return;
       }
@@ -4453,24 +4504,12 @@ async function refreshCommandPreview() {
     return;
   }
 
-  const requestId = ++commandPreviewRequestId;
-  try {
-    const custom = await api.getCustomCommand(commandRaw);
-    if (requestId !== commandPreviewRequestId) {
-      return;
-    }
-
+  const custom = getCustomCommandState(commandRaw);
+  if (custom) {
     setCommandPreview(custom.content || "");
-  } catch (err) {
-    if (requestId !== commandPreviewRequestId) {
-      return;
-    }
-    if (err && err.status === 404) {
-      setCommandPreview("");
-      return;
-    }
-    setCommandPreview("");
+    return;
   }
+  setCommandPreview("");
 }
 
 function scheduleCommandPreview() {

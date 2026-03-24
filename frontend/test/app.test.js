@@ -469,6 +469,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const updateSessionCalls = [];
   const customCommandUpserts = [];
   const customCommandDeletes = [];
+  let listCustomCommandCalls = 0;
+  let getCustomCommandCalls = 0;
   const deckDeleteCalls = [];
   const moveSessionCalls = [];
   const sessionDeckById = new Map([
@@ -701,9 +703,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(200, next);
     }
     if (path === "/api/v1/custom-commands" && method === "GET") {
+      listCustomCommandCalls += 1;
       return makeJsonResponse(200, Array.from(customCommands.values()));
     }
     if (path.startsWith("/api/v1/custom-commands/") && method === "GET") {
+      getCustomCommandCalls += 1;
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       if (!customCommands.has(commandName)) {
         return makeJsonResponse(404, { error: "CustomCommandNotFound", message: "missing" });
@@ -849,11 +853,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /\/docu/);
   assert.match(fixture.elements.commandFeedback.textContent, /\/blockcmd/);
+  assert.equal(listCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/custom show docu";
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^\/docu\n---\necho verify\n---$/);
+  assert.equal(getCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/custom go\n---\nTake care of md's and quotes.\n---";
   fixture.elements.sendCommand.click();
@@ -869,6 +875,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
   assert.equal(fixture.elements.commandPreview.textContent, "echo verify");
+  assert.equal(getCustomCommandCalls, 0);
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 2);
@@ -909,6 +916,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
   assert.equal(fixture.elements.commandPreview.textContent, longPreviewPayload);
+  assert.equal(getCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/cl";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1072,7 +1080,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.match(fixture.elements.commandInput.value, /^\/custom show (escdelim|go)$/);
+  assert.match(fixture.elements.commandInput.value, /^\/custom show (escdelim|go|longpreview)$/);
 
   fixture.elements.commandInput.value = "/closeit ";
   fixture.elements.commandInput.dispatchEvent({
@@ -1215,12 +1223,116 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         { id: "s-1", state: "active", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
         { id: "s-2", state: "active", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
       ],
+      customCommands: Array.from(customCommands.values()),
       outputs: []
     })
   });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 2);
   assert.equal(fixture.elements.emptyState.style.display, "none");
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "custom-command.created",
+      command: {
+        name: "remote",
+        content: "echo remote",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+
+  fixture.elements.commandInput.value = "/custom show remote";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "/remote\n---\necho remote\n---");
+  assert.equal(getCustomCommandCalls, 0);
+
+  fixture.elements.commandInput.value = "/remote";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandPreview.textContent, "echo remote");
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "echo remote\r");
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "custom-command.updated",
+      command: {
+        name: "remote",
+        content: "echo remote-updated",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  fixture.elements.commandInput.value = "/remote";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandPreview.textContent, "echo remote-updated");
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "custom-command.deleted",
+      command: {
+        name: "remote",
+        content: "",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  await sleep(160);
+  assert.equal(fixture.elements.commandPreview.textContent, "");
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions: [
+        { id: "s-1", state: "active", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
+        { id: "s-2", state: "active", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
+      ],
+      customCommands: [
+        { name: "snaponly", content: "echo snapshot", createdAt: Date.now(), updatedAt: Date.now() }
+      ],
+      outputs: []
+    })
+  });
+  await tick();
+  await sleep(160);
+  fixture.elements.commandInput.value = "/custom list";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "/snaponly");
+  assert.equal(listCustomCommandCalls, 0);
+
+  fixture.elements.commandInput.value = "/blockcmd";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /blockcmd");
+
+  fixture.elements.commandInput.value = "/snaponly";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads[inputPayloads.length - 1].data, "echo snapshot\r");
+
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions: [
+        { id: "s-1", state: "active", shell: "bash", cwd: "~", name: "one", tags: ["alpha"], createdAt: Date.now(), updatedAt: Date.now() },
+        { id: "s-2", state: "active", shell: "bash", cwd: "~", name: "two", tags: ["beta", "ops"], createdAt: Date.now(), updatedAt: Date.now() }
+      ],
+      customCommands: Array.from(customCommands.values()),
+      outputs: []
+    })
+  });
+  await tick();
 
   const firstCard = fixture.elements.terminalGrid.children[0];
   const secondCard = fixture.elements.terminalGrid.children[1];
@@ -1987,6 +2099,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
           updatedAt: Date.now()
         }
       ],
+      customCommands: [{ name: "blockcmd", content: "line 1\nline 2", createdAt: Date.now(), updatedAt: Date.now() }],
       outputs: []
     })
   });
@@ -1996,7 +2109,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     false
   );
 
-  ws.emit("message", { data: JSON.stringify({ type: "snapshot", sessions: [], outputs: [] }) });
+  ws.emit("message", {
+    data: JSON.stringify({ type: "snapshot", sessions: [], customCommands: [{ name: "blockcmd", content: "line 1\nline 2", createdAt: Date.now(), updatedAt: Date.now() }], outputs: [] })
+  });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 0);
   assert.equal(fixture.elements.emptyState.style.display, "block");

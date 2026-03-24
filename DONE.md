@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-097` completed: frontend custom-command state is now WebSocket-first in steady state, with snapshot plus `custom-command.*` events replacing REST reads for listing, previewing, showing, autocompleting, and executing custom commands.
+- [x] `QLT-098` completed: frontend regression coverage now verifies WebSocket-first custom-command synchronization across event-driven create/update/delete flows, reconnect-style snapshot replacement, and execution without fallback REST reads.
+- [x] Custom-command mutations still use REST writes, but the frontend now updates its local authoritative command map immediately and no longer depends on steady-state `GET /api/v1/custom-commands` refresh loops.
+- [x] Validation for `QLT-097`/`QLT-098` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-108` completed: hidden terminals now resynchronize xterm scroll area explicitly after being shown again, so background output no longer leaves stale scroll range or clipped bottom content.
 - [x] `QLT-109` completed: frontend regression coverage now simulates hidden-session output growth with stale scroll-area state and verifies post-show viewport sync plus bottom-content reachability.
 - [x] Hidden-session viewport recovery now performs guarded xterm scroll-area synchronization on show-time recovery passes instead of relying only on repaint/resize side effects.
