@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Frontend session-status UX hotfix: `Working(...s • esc to interrupt)` countdown text now updates every second client-side while the session remains in `working` interpretation state, instead of only changing on sparse incoming output chunks.
+- [x] Added app-level regression coverage for live status ticking so working-status seconds continue to increment without requiring new terminal output events.
 - [x] Frontend auth resilience hotfix: API calls now auto-recover once on `401 Unauthorized` by refreshing the dev token and retrying the original request (excluding `/auth/*` endpoints), so transient token expiry no longer requires a full page reload for terminal input to work again.
 - [x] Added API-client regression coverage for unauthorized-recovery retry behavior (single retry with refreshed bearer token) and explicit no-retry behavior on auth endpoints.
 - [x] Documentation revalidation pass completed: all repository markdown files remain synchronized; `TODO.md` keeps concrete task definitions (currently no open active tasks) and `ROADMAP.md` remains release/dependency-order only with no active release wave.

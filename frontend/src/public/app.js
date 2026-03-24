@@ -107,6 +107,7 @@ let commandPreviewTimer = null;
 let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
+let statusTickerTimer = null;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const ACTIVE_DECK_STORAGE_KEY = "ptydeck.active-deck.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
@@ -250,6 +251,7 @@ const SYSTEM_SLASH_COMMANDS = [
 let terminalSettings = loadTerminalSettings();
 let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
+const sessionStatusDurationAnchors = new Map();
 let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteRequestId = 0;
@@ -1532,11 +1534,80 @@ function renderSessionPluginBadges(entry, session) {
   entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
 }
 
+function parseDurationStatusText(statusText) {
+  const match = String(statusText || "").match(/^(.*\()(\d+)s([^)]+\))$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    prefix: match[1],
+    seconds: Number.parseInt(match[2], 10),
+    suffix: match[3]
+  };
+}
+
+function formatLiveSessionStatus(session) {
+  const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
+  if (!rawStatus) {
+    sessionStatusDurationAnchors.delete(session?.id);
+    return "";
+  }
+  const parsed = parseDurationStatusText(rawStatus);
+  if (!parsed || !Number.isFinite(parsed.seconds) || session?.interpretationState !== "working") {
+    sessionStatusDurationAnchors.delete(session?.id);
+    return rawStatus;
+  }
+  const sessionId = String(session?.id || "");
+  if (!sessionId) {
+    return rawStatus;
+  }
+  const now = Date.now();
+  const existing = sessionStatusDurationAnchors.get(sessionId);
+  if (!existing || existing.rawStatus !== rawStatus) {
+    sessionStatusDurationAnchors.set(sessionId, {
+      rawStatus,
+      baseSeconds: parsed.seconds,
+      baseAtMs: now,
+      prefix: parsed.prefix,
+      suffix: parsed.suffix
+    });
+    return rawStatus;
+  }
+  const elapsedSeconds = Math.max(0, Math.floor((now - existing.baseAtMs) / 1000));
+  return `${existing.prefix}${existing.baseSeconds + elapsedSeconds}s${existing.suffix}`;
+}
+
+function hasLiveDurationStatus(session) {
+  const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
+  if (!rawStatus || session?.interpretationState !== "working") {
+    return false;
+  }
+  const parsed = parseDurationStatusText(rawStatus);
+  return Boolean(parsed && Number.isFinite(parsed.seconds));
+}
+
+function syncStatusTicker(sessions) {
+  const shouldTick = Array.isArray(sessions) && sessions.some((session) => hasLiveDurationStatus(session));
+  if (shouldTick && statusTickerTimer === null) {
+    statusTickerTimer = setInterval(() => {
+      if (typeof document !== "undefined" && document?.hidden === true) {
+        return;
+      }
+      render();
+    }, 1000);
+    return;
+  }
+  if (!shouldTick && statusTickerTimer !== null) {
+    clearInterval(statusTickerTimer);
+    statusTickerTimer = null;
+  }
+}
+
 function renderSessionStatus(entry, session) {
   if (!entry?.sessionStatusEl) {
     return;
   }
-  const statusText = typeof session?.statusText === "string" ? session.statusText.trim() : "";
+  const statusText = formatLiveSessionStatus(session);
   entry.sessionStatusEl.hidden = !statusText;
   entry.sessionStatusEl.textContent = statusText;
 }
@@ -2199,6 +2270,7 @@ function render() {
     hasError: Boolean(uiState.error)
   });
   stateEl.textContent = state.connectionState;
+  syncStatusTicker(state.sessions);
   if (state.sessions.length === 0) {
     emptyStateEl.textContent = "No sessions yet. Create one to start.";
     emptyStateEl.style.display = "block";
@@ -2266,6 +2338,7 @@ function render() {
       resizeTimers.delete(sessionId);
       terminalSizes.delete(sessionId);
       sessionThemeDrafts.delete(sessionId);
+      sessionStatusDurationAnchors.delete(sessionId);
       shouldRunResizePass = true;
     }
   }

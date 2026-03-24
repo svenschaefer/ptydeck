@@ -242,6 +242,7 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
 - Stream-plugin status extraction now keeps compact activity phrases (for example `Working(...)`) instead of full long source lines, and session status is rendered inline in the existing terminal header metadata area rather than as a dedicated extra row.
+- Working-status duration displays (for example `Working(22s • esc to interrupt)`) now tick client-side once per second while a session is in `working` interpretation state, instead of only updating when fresh PTY output arrives.
 - Snapshot output replay now appends directly to terminal buffers (without passing through live stream-interpretation hooks), reducing startup/reconnect churn from historical output replay.
 - Frontend now exposes per-terminal settings entry points on terminal cards, with session-scoped settings panel shell/toggle behavior.
 - Frontend per-terminal settings now open as a true modal dialog (`<dialog>`) from a gear-icon button, replacing inline panel rendering.

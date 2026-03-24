@@ -1854,6 +1854,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
   assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
   assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working(0s • esc to interrupt)\n" })
+  });
+  await tick();
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working(0s • esc to interrupt)");
+  await sleep(1200);
+  assert.match(
+    recoveredHiddenCard.querySelector(".session-status-text").textContent,
+    /^Working\(([1-9][0-9]*)s • esc to interrupt\)$/
+  );
 
   ws.emit("message", {
     data: JSON.stringify({
