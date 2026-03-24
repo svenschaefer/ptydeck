@@ -19,8 +19,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 - [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
 - [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
-- [ ] `QLT-108` Owner: `FE` Task: Fix hidden-session scroll recovery so terminals that receive new output while invisible rebuild a correct scrollable viewport when shown again, including access to newly appended bottom content.
-- [ ] `QLT-109` Owner: `QA` Task: Add regression coverage for hidden-session output growth while invisible, verifying post-show scroll range, bottom-content reachability, and no stale viewport clipping.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -192,8 +190,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-105` Owner: `FE` Task: Broaden autocomplete coverage across both `/...` and `>...` input flows so terminal selectors, deck selectors, and related navigation targets are suggested consistently wherever deterministic completion is possible.
 - [x] `QLT-106` Owner: `FE` Task: Make `>...` quick-switching reuse the same selector grammar as `/switch`, including explicit `deckSelector::sessionSelector` cross-deck targeting, deterministic single-target ambiguity handling, and consistent resolution across ID, quick ID, name, and unique ID-prefix selectors.
 - [x] `QLT-107` Owner: `FE` Task: Add inline `>...` target preview and pre-submit resolution feedback so quick-switch input shows the resolved deck/session target, clear ambiguity or no-match states, and deterministic no-op behavior when the requested target is already active.
-- [ ] `QLT-108` Owner: `FE` Task: Fix hidden-session scroll recovery so terminals that receive new output while invisible rebuild a correct scrollable viewport when shown again, including access to newly appended bottom content.
-- [ ] `QLT-109` Owner: `QA` Task: Add regression coverage for hidden-session output growth while invisible, verifying post-show scroll range, bottom-content reachability, and no stale viewport clipping.
+- [x] `QLT-108` Owner: `FE` Task: Fix hidden-session scroll recovery so terminals that receive new output while invisible rebuild a correct scrollable viewport when shown again, including access to newly appended bottom content.
+- [x] `QLT-109` Owner: `QA` Task: Add regression coverage for hidden-session output growth while invisible, verifying post-show scroll range, bottom-content reachability, and no stale viewport clipping.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

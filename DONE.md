@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-108` completed: hidden terminals now resynchronize xterm scroll area explicitly after being shown again, so background output no longer leaves stale scroll range or clipped bottom content.
+- [x] `QLT-109` completed: frontend regression coverage now simulates hidden-session output growth with stale scroll-area state and verifies post-show viewport sync plus bottom-content reachability.
+- [x] Hidden-session viewport recovery now performs guarded xterm scroll-area synchronization on show-time recovery passes instead of relying only on repaint/resize side effects.
+- [x] Validation for `QLT-108`/`QLT-109` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-101` completed: composer now supports `>selector` quick-switch input for direct single-session activation with automatic deck switching when the resolved session lives outside the active deck.
 - [x] `QLT-104` completed: `>...` quick-switching now supports direct deck targets in addition to session targets, including deterministic deck activation semantics.
 - [x] `QLT-105` completed: autocomplete coverage was broadened across `/...` and `>...` navigation flows, including session quick IDs, names/IDs, deck IDs/names, and explicit `deck:` suggestions where deterministic completion is possible.

@@ -126,11 +126,21 @@ class MockTerminal {
     this.writes = [];
     this.refreshCalls = [];
     this.scrollToBottomCalls = 0;
+    this.viewportSyncCalls = 0;
+    this.scrollAreaBaseY = 0;
     this.options = { ...options };
     this.buffer = {
       active: {
         baseY: 0,
         ydisp: 0
+      }
+    };
+    this._core = {
+      viewport: {
+        syncScrollArea: () => {
+          this.viewportSyncCalls += 1;
+          this.scrollAreaBaseY = this.buffer.active.baseY;
+        }
       }
     };
     MockTerminal.instances.push(this);
@@ -143,7 +153,9 @@ class MockTerminal {
     }
   }
 
-  open() {}
+  open(mount) {
+    this.mount = mount;
+  }
 
   onData(handler) {
     this.dataHandler = handler;
@@ -154,7 +166,10 @@ class MockTerminal {
     const lineBreaks = String(data).split(/\r\n|\r|\n/).length - 1;
     if (lineBreaks > 0) {
       this.buffer.active.baseY += lineBreaks;
-      this.buffer.active.ydisp = this.buffer.active.baseY;
+      if (this.mount?.parentNode?.hidden !== true) {
+        this.scrollAreaBaseY = this.buffer.active.baseY;
+        this.buffer.active.ydisp = this.buffer.active.baseY;
+      }
     }
     if (typeof callback === "function") {
       callback();
@@ -176,7 +191,7 @@ class MockTerminal {
 
   scrollToBottom() {
     this.scrollToBottomCalls += 1;
-    this.buffer.active.ydisp = this.buffer.active.baseY;
+    this.buffer.active.ydisp = Math.min(this.buffer.active.baseY, this.scrollAreaBaseY);
   }
 
   dispose() {}
@@ -1424,11 +1439,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const hiddenDeckTerminal = MockTerminal.instances[1];
   const hiddenRefreshCountBefore = hiddenDeckTerminal.refreshCalls.length;
   const hiddenScrollCountBefore = hiddenDeckTerminal.scrollToBottomCalls;
+  const hiddenViewportSyncCountBefore = hiddenDeckTerminal.viewportSyncCalls;
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "background-1\nbackground-2\n" })
   });
   await tick();
   assert.ok(hiddenDeckTerminal.writes.includes("background-1\nbackground-2\n"));
+  assert.ok(
+    hiddenDeckTerminal.scrollAreaBaseY < hiddenDeckTerminal.buffer.active.baseY,
+    "expected hidden terminal scroll area to remain stale until viewport recovery runs"
+  );
 
   fixture.elements.commandInput.value = "/deck switch deck-new";
   fixture.elements.sendCommand.click();
@@ -1442,6 +1462,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.ok(
     hiddenDeckTerminal.scrollToBottomCalls > hiddenScrollCountBefore,
     "expected hidden deck terminal scroll recovery after deck switch"
+  );
+  assert.ok(
+    hiddenDeckTerminal.viewportSyncCalls > hiddenViewportSyncCountBefore,
+    "expected hidden deck terminal viewport sync after deck switch"
+  );
+  assert.equal(
+    hiddenDeckTerminal.scrollAreaBaseY,
+    hiddenDeckTerminal.buffer.active.baseY,
+    "expected hidden deck terminal scroll area to catch up to appended output"
+  );
+  assert.equal(
+    hiddenDeckTerminal.buffer.active.ydisp,
+    hiddenDeckTerminal.buffer.active.baseY,
+    "expected hidden deck terminal to reach appended bottom content after recovery"
   );
 
   fixture.elements.commandInput.value = "/filter";

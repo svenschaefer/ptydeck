@@ -1553,6 +1553,13 @@ function isTerminalAtBottom(terminal) {
   return Number(active.baseY) === Number(active.ydisp);
 }
 
+function syncTerminalScrollArea(entry) {
+  const viewport = entry?.terminal?._core?.viewport || entry?.terminal?._core?._viewport || null;
+  if (viewport && typeof viewport.syncScrollArea === "function") {
+    viewport.syncScrollArea();
+  }
+}
+
 function syncTerminalViewportAfterShow(sessionId, entry) {
   if (!entry || !entry.terminal) {
     return;
@@ -1560,6 +1567,7 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
   const shouldFollow = entry.followOnShow !== false;
   const runPass = () => {
     applyResizeForSession(sessionId, { force: true });
+    syncTerminalScrollArea(entry);
     if (typeof entry.terminal.refresh === "function") {
       const lastRow = Math.max(0, entry.terminal.rows - 1);
       entry.terminal.refresh(0, lastRow);
@@ -1567,6 +1575,7 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
     if (shouldFollow && typeof entry.terminal.scrollToBottom === "function") {
       entry.terminal.scrollToBottom();
     }
+    syncTerminalScrollArea(entry);
   };
   runPass();
   setTimeout(runPass, 80);
@@ -2748,9 +2757,15 @@ function appendTerminalData(sessionId, data) {
   }
   const terminal = entry.terminal;
   terminal.write(data, () => {
+    if (entry.isVisible !== false) {
+      syncTerminalScrollArea(entry);
+    }
     if (typeof terminal.refresh === "function") {
       const lastRow = Math.max(0, terminal.rows - 1);
       terminal.refresh(0, lastRow);
+    }
+    if (entry.isVisible !== false) {
+      syncTerminalScrollArea(entry);
     }
   });
   return true;

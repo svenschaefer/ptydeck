@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H7 extended with > quick-switch backlog and hidden-scroll recovery follow-up)
+Last updated: 2026-03-24 (H7 quick-switch delivery and hidden-scroll recovery sync completed)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096` and `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, plus new hidden-scroll backlog items `QLT-108`/`QLT-109`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, and hidden-scroll recovery closure for `QLT-108`/`QLT-109`.
 
 ## Project Purpose
 
@@ -137,7 +137,7 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend now handles backend `session.exit` as an explicit local `exited` session tombstone state with visible badge/hint UI, guarded post-exit interactions, local delete semantics, and reconnect snapshot cleanup.
 - Planned next-step navigation UX now includes `>selector` quick-switch commands that auto-switch decks when needed, direct `>` deck targeting with autocomplete, broader `/...` and `>...` autocomplete coverage, unified `>` selector grammar with `/switch`, and sidebar terminal-entry buttons under each deck section with visible quick IDs.
 - Frontend quick-switch baseline is now implemented: `>selector` activates sessions across decks, `>deckSelector` activates decks directly, `>deckSelector::sessionSelector` performs explicit cross-deck session targeting, and inline preview/ambiguity feedback is rendered in the composer before submit.
-- Hidden-session output recovery still has an explicit follow-up gap: if a terminal grows while invisible, the viewport can reappear with stale scroll range and clipped bottom content until a later manual interaction; this is now tracked in `QLT-108`/`QLT-109`.
+- Hidden-session output recovery is now hardened: when invisible terminals receive background output, show-time recovery explicitly resynchronizes xterm scroll area plus repaint/resize passes so bottom content remains reachable without manual interaction.
 - Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `OUTLOOK-TODO.md` (`ENT-026`, `ENT-027`).
 - Stream/plugin architecture and broader WebSocket-first state architecture from imported review notes are tracked as deferred items in `OUTLOOK-TODO.md` (`ARC-001`, `ARC-002`).
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
@@ -252,8 +252,8 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle G (`v0.3.0-H5`): none.
   - Completed in cycle H (`v0.3.0-H6`): `QLT-083`, `QLT-084`, `QLT-085`, `QLT-086`, `QLT-087`, `QLT-088`, `QLT-089`, `QLT-090`, `QLT-091`, `QLT-092`, `QLT-093`.
   - Planned next in cycle H (`v0.3.0-H6`): none.
-  - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`.
-  - Planned next in cycle I (`v0.3.0-H7`): `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`, `QLT-108`, `QLT-109`.
+  - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-101`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`.
+  - Planned next in cycle I (`v0.3.0-H7`): `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-102`, `QLT-103`.
 
 ## Session Behavior Notes
 
