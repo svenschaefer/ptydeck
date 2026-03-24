@@ -7,6 +7,7 @@ import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
+import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
 import { createBuiltInStreamPlugins } from "./stream-builtins.js";
@@ -275,6 +276,7 @@ let slashHistoryCursor = -1;
 let slashHistoryDraft = "";
 let recalledSlashCommand = "";
 let sessionViewModel = null;
+let runtimeEventController = null;
 let commandEngine = null;
 let commandExecutor = null;
 let commandSuggestionsController = null;
@@ -2140,130 +2142,12 @@ function markSessionClosed(sessionId) {
   store.markSessionClosed(sessionId);
 }
 
-function applyRuntimeSnapshot(event) {
-  if (Array.isArray(event.decks)) {
-    setDecks(event.decks, { preferredActiveDeckId: store.getState().activeDeckId });
-  }
-  replaceCustomCommandState(event.customCommands || []);
-  store.setSessions(event.sessions || []);
-  replaySnapshotOutputs(event.outputs);
-  scheduleCommandPreview();
-  scheduleCommandSuggestions();
-  uiState.error = "";
-  markRuntimeBootstrapReady("ws");
-}
-
 function handleSessionTerminalInput(sessionId, data) {
-  store.setActiveSession(sessionId);
-  const latestSession = getSessionById(sessionId);
-  if (isSessionUnrestored(latestSession)) {
-    setError(getUnrestoredSessionMessage(latestSession));
-    return;
-  }
-  if (isSessionExited(latestSession)) {
-    setError(getExitedSessionMessage(latestSession));
-    return;
-  }
-  api.sendInput(sessionId, data).catch(() => setError("Failed to send terminal input."));
+  runtimeEventController?.handleSessionTerminalInput(sessionId, data);
 }
 
 function applyRuntimeEvent(event, options = {}) {
-  if (!event || typeof event !== "object") {
-    return false;
-  }
-
-  switch (event.type) {
-    case "snapshot":
-      applyRuntimeSnapshot(event);
-      return true;
-    case "session.created":
-    case "session.updated":
-      if (event.session) {
-        upsertSession(event.session);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "session.exit":
-      if (event.sessionId) {
-        markSessionExited(event.sessionId, event);
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "session.activity.completed":
-      if (event.session) {
-        upsertSession(event.session);
-        activityCompletionNotifier.queueCompletion(event.session, event.activityCompletedAt);
-        uiState.error = "";
-        return true;
-      }
-      if (event.sessionId) {
-        const session = getSessionById(event.sessionId);
-        if (session) {
-          activityCompletionNotifier.queueCompletion(session, event.activityCompletedAt);
-          uiState.error = "";
-          return true;
-        }
-      }
-      return false;
-    case "session.closed":
-      if (event.sessionId) {
-        markSessionClosed(event.sessionId);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "deck.created":
-    case "deck.updated":
-      if (event.deck) {
-        upsertDeckInState(event.deck, {
-          preferredActiveDeckId: options.preferredActiveDeckId || store.getState().activeDeckId
-        });
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "deck.deleted":
-      if (event.deckId) {
-        removeDeckFromState(event.deckId, {
-          preferredActiveDeckId: options.preferredActiveDeckId,
-          fallbackDeckId: event.fallbackDeckId || DEFAULT_DECK_ID
-        });
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "custom-command.created":
-    case "custom-command.updated":
-      if (event.command) {
-        upsertCustomCommandState(event.command);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    case "custom-command.deleted":
-      if (event.command) {
-        removeCustomCommandState(event.command.name);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return true;
-      }
-      return false;
-    default:
-      return false;
-  }
+  return runtimeEventController?.applyRuntimeEvent(event, options) === true;
 }
 
 function formatSessionDisplayName(session) {
@@ -2282,6 +2166,37 @@ sessionViewModel = createSessionViewModel({
   sessionEnvKeyPattern: SESSION_ENV_KEY_PATTERN,
   sessionEnvMaxEntries: SESSION_ENV_MAX_ENTRIES,
   formatSessionToken
+});
+
+runtimeEventController = createRuntimeEventController({
+  defaultDeckId: DEFAULT_DECK_ID,
+  getPreferredActiveDeckId: () => store.getState().activeDeckId,
+  setDecks,
+  replaceCustomCommandState,
+  setSessions: (sessions) => store.setSessions(sessions),
+  replaySnapshotOutputs,
+  scheduleCommandPreview,
+  scheduleCommandSuggestions,
+  clearError: () => {
+    uiState.error = "";
+  },
+  markRuntimeBootstrapReady,
+  upsertSession,
+  markSessionExited,
+  markSessionClosed,
+  upsertDeckInState,
+  removeDeckFromState,
+  upsertCustomCommandState,
+  removeCustomCommandState,
+  activityCompletionNotifier,
+  getSessionById,
+  setActiveSession: (sessionId) => store.setActiveSession(sessionId),
+  isSessionUnrestored,
+  getUnrestoredSessionMessage,
+  isSessionExited,
+  getExitedSessionMessage,
+  setError,
+  sendInput: (sessionId, data) => api.sendInput(sessionId, data)
 });
 
 sessionCardMetaController = createSessionCardMetaController({
