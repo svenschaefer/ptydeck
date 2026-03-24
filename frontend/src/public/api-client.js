@@ -47,9 +47,34 @@ async function readResponse(response, { expectJson = true } = {}) {
 export function createApiClient(baseUrl, options = {}) {
   const debug = options.debug === true;
   const log = typeof options.log === "function" ? options.log : () => {};
+  const onUnauthorized = typeof options.onUnauthorized === "function" ? options.onUnauthorized : null;
   let authToken = typeof options.authToken === "string" ? options.authToken.trim() : "";
+  let unauthorizedRefreshPromise = null;
 
-  async function request(path, fetchOptions = {}, { expectJson = true } = {}) {
+  async function tryUnauthorizedRecovery(path) {
+    if (!onUnauthorized) {
+      return false;
+    }
+    const normalizedPath = String(path || "");
+    if (normalizedPath.startsWith("/auth/")) {
+      return false;
+    }
+    if (unauthorizedRefreshPromise) {
+      return unauthorizedRefreshPromise;
+    }
+    unauthorizedRefreshPromise = (async () => {
+      try {
+        return (await onUnauthorized()) === true;
+      } catch {
+        return false;
+      } finally {
+        unauthorizedRefreshPromise = null;
+      }
+    })();
+    return unauthorizedRefreshPromise;
+  }
+
+  async function request(path, fetchOptions = {}, { expectJson = true, retriedUnauthorized = false } = {}) {
     const method = fetchOptions.method || "GET";
     const startedAt = Date.now();
     if (debug) {
@@ -80,6 +105,19 @@ export function createApiClient(baseUrl, options = {}) {
           durationMs: Date.now() - startedAt,
           message: err instanceof Error ? err.message : String(err)
         });
+      }
+      if (
+        err instanceof ApiClientError &&
+        err.status === 401 &&
+        retriedUnauthorized !== true
+      ) {
+        const recovered = await tryUnauthorizedRecovery(path);
+        if (recovered) {
+          if (debug) {
+            log("api.request.retry_after_unauthorized", { method, path });
+          }
+          return request(path, fetchOptions, { expectJson, retriedUnauthorized: true });
+        }
       }
       throw err;
     }

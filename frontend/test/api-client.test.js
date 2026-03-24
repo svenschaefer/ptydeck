@@ -93,6 +93,58 @@ test("api client includes bearer auth header when token is set", async () => {
   assert.equal(calls[0].options.headers.authorization, "Bearer dev-token");
 });
 
+test("api client retries once after 401 when unauthorized recovery succeeds", async () => {
+  const calls = [];
+  let attempt = 0;
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    attempt += 1;
+    if (attempt === 1) {
+      return {
+        ok: false,
+        status: 401,
+        json: async () => ({ error: "Unauthorized", message: "Token expired." })
+      };
+    }
+    return { ok: true, status: 200, json: async () => [] };
+  };
+
+  let recoveryCalls = 0;
+  const api = createApiClient("http://localhost:18080/api/v1", {
+    async onUnauthorized() {
+      recoveryCalls += 1;
+      api.setAuthToken("fresh-token");
+      return true;
+    }
+  });
+  api.setAuthToken("stale-token");
+  await api.listSessions();
+
+  assert.equal(recoveryCalls, 1);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].options.headers.authorization, "Bearer stale-token");
+  assert.equal(calls[1].options.headers.authorization, "Bearer fresh-token");
+});
+
+test("api client does not run unauthorized recovery for auth endpoints", async () => {
+  let recoveryCalls = 0;
+  global.fetch = async () => ({
+    ok: false,
+    status: 401,
+    json: async () => ({ error: "Unauthorized", message: "Unauthorized." })
+  });
+
+  const api = createApiClient("http://localhost:18080/api/v1", {
+    async onUnauthorized() {
+      recoveryCalls += 1;
+      return true;
+    }
+  });
+
+  await assert.rejects(api.createDevToken(), (err) => err.name === "ApiClientError" && err.status === 401);
+  assert.equal(recoveryCalls, 0);
+});
+
 test("api client calls input endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

@@ -40,7 +40,17 @@ const debugLog = (event, details = {}) => {
   const timestamp = new Date().toISOString();
   console.debug(`[ptydeck][${timestamp}] ${event}`, details);
 };
-const api = createApiClient(config.apiBaseUrl, { debug: debugLogs, log: debugLog });
+const api = createApiClient(config.apiBaseUrl, {
+  debug: debugLogs,
+  log: debugLog,
+  async onUnauthorized() {
+    const refreshed = await bootstrapDevAuthToken();
+    if (!refreshed) {
+      debugLog("auth.recovery.failed", {});
+    }
+    return refreshed;
+  }
+});
 const store = createStore();
 const streamActionDispatcher = createStreamActionDispatcher({
   store,
