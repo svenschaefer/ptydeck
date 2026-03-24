@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `LIF-001` completed: backend session lifecycle signaling now exposes explicit startup/running state instead of collapsing new sessions immediately into a generic active state.
+- [x] Backend session create flow now emits deterministic `session.created` (`starting`) followed by `session.started` and `session.updated` (`running`) lifecycle events, and API-shaped session payloads now expose runtime `state`, `startedAt`, and stable exit metadata fields.
+- [x] Backend session exit contract now preserves stable `exitCode`, `exitSignal`, `exitedAt`, and `updatedAt` metadata in both runtime state and emitted `session.exit` payloads.
+- [x] Frontend runtime/store merge paths now preserve non-exited lifecycle metadata correctly while accepting backend `running` session state in generated API types and contract-alignment checks.
+- [x] `LIF-005` completed: sidebar deck-session buttons now show a subtle animated live-activity indicator while output is arriving and a static unseen marker after activity stops until the session is activated.
+- [x] `LIF-006` completed: regression coverage now verifies sidebar activity-indicator transitions across background output, quiet-time decay from live to unseen, and clear-on-activation behavior.
+- [x] Validation for `LIF-001`/`LIF-005`/`LIF-006` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Active-terminal search was moved from the bottom workspace command area into the left sidebar so terminal search no longer consumes additional vertical workspace space.
 - [x] Sidebar scrolling now applies to the full sidebar container instead of a deck-only inner scrollbox, so the deck section is no longer height-capped independently from the rest of the sidebar.
 - [x] `QLT-119` completed: frontend runtime state for sessions, decks, custom commands, connection state, and session filter text now lives behind `frontend/src/public/store.js` with reducer-backed transitions instead of continuing as scattered inline mutation state in `app.js`.

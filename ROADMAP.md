@@ -502,6 +502,8 @@ Exit criteria:
 - `LIF-002`
 - `LIF-003`
 - `LIF-004`
+- `LIF-005`
+- `LIF-006`
 
 Dependencies:
 
@@ -509,6 +511,8 @@ Dependencies:
 - `LIF-002` depends on `LIF-001` and `QLT-119` ... `QLT-122` so the formal FE lifecycle model lands on top of the extracted reducer/store boundary plus the now-authoritative runtime bootstrap/event path.
 - `LIF-003` depends on `LIF-002` so derived `busy` / `idle` semantics extend the explicit lifecycle model rather than introducing a parallel heuristic-only state system.
 - `LIF-004` depends on `LIF-001`, `LIF-002`, and `LIF-003` so regression coverage targets the finalized ordered lifecycle transitions, reconnect replacement behavior, and post-exit guardrails.
+- `LIF-005` depends on `LIF-001` so sidebar session buttons can expose a normalized runtime-activity baseline without waiting on the full FE state-machine formalization.
+- `LIF-006` depends on `LIF-005` and should validate live-vs-unseen indicator transitions plus clear-on-activation semantics.
 
 Exit criteria:
 
@@ -516,6 +520,7 @@ Exit criteria:
 - Frontend runtime state models ordered lifecycle transitions explicitly instead of relying on special-case `exited` handling only.
 - Derived activity state (`busy` / `idle`) is computed on top of the formal lifecycle model without conflating UI heuristics and process liveness.
 - Regression coverage protects ordered lifecycle transitions, reconnect semantics, and invalid post-exit interactions.
+- Sidebar deck/session navigation exposes subtle live and unseen activity indicators so background terminal output is visible without opening each session.
 
 ## Current Status
 
@@ -526,7 +531,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `LIF-001`
 - `LIF-002`
 - `LIF-003`
 - `LIF-004`

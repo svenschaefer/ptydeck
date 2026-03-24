@@ -269,7 +269,7 @@ function isSession(value) {
     isObject(value) &&
     typeof value.id === "string" &&
     typeof value.deckId === "string" &&
-    (value.state === "active" || value.state === "unrestored") &&
+    (value.state === "starting" || value.state === "running" || value.state === "unrestored") &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&

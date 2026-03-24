@@ -33,6 +33,9 @@ const DEFAULT_SESSION_THEME_PROFILE = {
   brightCyan: "#a9d9d6",
   brightWhite: "#f5f7fa"
 };
+const SESSION_STATE_STARTING = "starting";
+const SESSION_STATE_RUNNING = "running";
+const SESSION_STATE_EXITED = "exited";
 
 function consumeCwdMarkers(session, chunk) {
   const markerStart = "__CWD__";
@@ -177,6 +180,23 @@ export class SessionManager {
     return session;
   }
 
+  transitionToRunning(session) {
+    if (!session || session.meta.state === SESSION_STATE_RUNNING) {
+      return session?.meta || null;
+    }
+    const timestamp = this.nowFn();
+    session.meta.state = SESSION_STATE_RUNNING;
+    session.meta.startedAt = Number.isInteger(session.meta.startedAt) ? session.meta.startedAt : timestamp;
+    this.events.emit("session.started", {
+      sessionId: session.id,
+      startedAt: session.meta.startedAt,
+      updatedAt: session.meta.updatedAt,
+      session: session.meta
+    });
+    this.events.emit("session.updated", { session: session.meta });
+    return session.meta;
+  }
+
   create({
     id = randomUUID(),
     cwd,
@@ -235,6 +255,8 @@ export class SessionManager {
         env: normalizedEnv,
         tags: normalizedTags,
         themeProfile: normalizedThemeProfile,
+        state: SESSION_STATE_STARTING,
+        startedAt: null,
         createdAt: createdTimestamp,
         updatedAt: updatedTimestamp
       }
@@ -255,10 +277,18 @@ export class SessionManager {
     });
 
     ptyProcess.onExit((exit) => {
+      const exitTimestamp = this.nowFn();
+      session.meta.state = SESSION_STATE_EXITED;
+      session.meta.exitCode = Number.isInteger(exit.exitCode) ? exit.exitCode : null;
+      session.meta.exitSignal = typeof exit.signal === "string" ? exit.signal : "";
+      session.meta.exitedAt = exitTimestamp;
+      session.meta.updatedAt = exitTimestamp;
       this.events.emit("session.exit", {
         sessionId: id,
-        exitCode: exit.exitCode,
-        signal: exit.signal
+        exitCode: session.meta.exitCode,
+        signal: session.meta.exitSignal,
+        exitedAt: session.meta.exitedAt,
+        updatedAt: session.meta.updatedAt
       });
       const current = this.sessions.get(id);
       if (current === session) {
@@ -267,10 +297,11 @@ export class SessionManager {
     });
 
     this.sessions.set(id, session);
+    this.events.emit("session.created", { session: session.meta });
+    this.transitionToRunning(session);
     if (normalizedStartCommand.trim()) {
       ptyProcess.write(`${normalizedStartCommand}\n`);
     }
-    this.events.emit("session.created", { session: session.meta });
     return session.meta;
   }
 

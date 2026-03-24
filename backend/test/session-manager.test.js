@@ -44,6 +44,8 @@ test("SessionManager create/list/get/delete lifecycle", () => {
 
   const created = manager.create({ cwd: "/tmp", shell: "bash" });
   assert.equal(typeof created.id, "string");
+  assert.equal(created.state, "running");
+  assert.equal(typeof created.startedAt, "number");
   assert.equal(created.cwd, "/tmp");
   assert.equal(created.startCwd, "/tmp");
   assert.equal(created.startCommand, "");
@@ -62,6 +64,47 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   manager.delete(created.id);
   assert.equal(fakePty.killed, true);
   assert.equal(manager.list().length, 0);
+});
+
+test("SessionManager emits explicit created and started lifecycle events", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const events = [];
+
+  manager.on("session.created", (event) => events.push({ type: "session.created", state: event.session.state }));
+  manager.on("session.started", (event) => events.push({ type: "session.started", state: event.session.state }));
+  manager.on("session.updated", (event) => events.push({ type: "session.updated", state: event.session.state }));
+
+  const created = manager.create({ cwd: "/tmp" });
+
+  assert.equal(created.state, "running");
+  assert.deepEqual(events, [
+    { type: "session.created", state: "starting" },
+    { type: "session.started", state: "running" },
+    { type: "session.updated", state: "running" }
+  ]);
+});
+
+test("SessionManager emits stable exit metadata", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => 1710000001234
+  });
+  const created = manager.create({ cwd: "/tmp" });
+  const exits = [];
+  manager.on("session.exit", (event) => exits.push(event));
+
+  fakePty.kill();
+
+  assert.equal(exits.length, 1);
+  assert.equal(exits[0].sessionId, created.id);
+  assert.equal(exits[0].exitCode, 0);
+  assert.equal(exits[0].signal, "");
+  assert.equal(exits[0].exitedAt, 1710000001234);
+  assert.equal(exits[0].updatedAt, 1710000001234);
 });
 
 test("SessionManager sendInput and resize call PTY", () => {

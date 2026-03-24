@@ -53,7 +53,7 @@ function assertApiSessionShape(session) {
   assert.equal(typeof session?.id, "string");
   assert.equal(typeof session?.deckId, "string");
   assert.equal(typeof session?.state, "string");
-  assert.ok(session.state === "active" || session.state === "unrestored");
+  assert.ok(session.state === "starting" || session.state === "running" || session.state === "unrestored");
   assert.equal(typeof session?.cwd, "string");
   assert.equal(typeof session?.shell, "string");
   assert.ok(Array.isArray(session?.tags));
@@ -121,7 +121,16 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     );
     const createdEvent = events.find((event) => event.type === "session.created" && event.session.id === created.id);
     assertApiSessionShape(createdEvent.session);
+    assert.equal(createdEvent.session.state, "starting");
     assert.equal(createdEvent.session.deckId, "default");
+    await waitFor(() =>
+      events.some((event) => event.type === "session.started" && event.session.id === created.id)
+    );
+    const startedEvent = events.find((event) => event.type === "session.started" && event.session.id === created.id);
+    assertApiSessionShape(startedEvent.session);
+    assert.equal(startedEvent.session.state, "running");
+    assert.equal(typeof startedEvent.startedAt, "number");
+    assert.equal(typeof startedEvent.updatedAt, "number");
 
     await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",

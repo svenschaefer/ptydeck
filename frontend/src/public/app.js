@@ -66,6 +66,7 @@ const terminalSearchStatusEl = document.getElementById("terminal-search-status")
 const terminals = new Map();
 const terminalObservers = new Map();
 const resizeTimers = new Map();
+const activityQuietTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
 let globalResizeTimer = null;
@@ -98,6 +99,7 @@ const SESSION_TAG_MAX_LENGTH = 32;
 const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
+const SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -1124,6 +1126,10 @@ function getSessionStateHintText(session) {
   return sessionViewModel.getSessionStateHintText(session);
 }
 
+function getSessionActivityIndicatorState(session) {
+  return sessionViewModel.getSessionActivityIndicatorState(session);
+}
+
 function getUnrestoredSessionMessage(session) {
   return sessionViewModel.getUnrestoredSessionMessage(session);
 }
@@ -1265,6 +1271,30 @@ function setSessionCardVisibility(node, visible) {
   }
   node.hidden = !visible;
   node.style.display = visible ? "" : "none";
+}
+
+function clearSessionActivityQuietTimer(sessionId) {
+  const timer = activityQuietTimers.get(sessionId);
+  if (!timer) {
+    return;
+  }
+  clearTimeout(timer);
+  activityQuietTimers.delete(sessionId);
+}
+
+function scheduleSessionActivityQuiet(sessionId, timestamp) {
+  clearSessionActivityQuietTimer(sessionId);
+  const timer = setTimeout(() => {
+    activityQuietTimers.delete(sessionId);
+    store.clearSessionActivity(sessionId, { timestamp });
+  }, SESSION_ACTIVITY_QUIET_MS);
+  activityQuietTimers.set(sessionId, timer);
+}
+
+function markSessionActivity(sessionId) {
+  const timestamp = Date.now();
+  store.markSessionActivity(sessionId, { timestamp });
+  scheduleSessionActivityQuiet(sessionId, timestamp);
 }
 
 function syncTerminalViewportAfterShow(sessionId, entry) {
@@ -1879,8 +1909,18 @@ function renderDeckTabs(sessions) {
         sessionNameEl.className = "deck-session-name";
         sessionNameEl.textContent = formatSessionDisplayName(session);
 
+        const activityIndicatorEl = document.createElement("span");
+        activityIndicatorEl.className = "deck-session-activity-indicator";
+        const activityIndicatorState = getSessionActivityIndicatorState(session);
+        activityIndicatorEl.hidden = !activityIndicatorState;
+        if (activityIndicatorState) {
+          activityIndicatorEl.classList.add(activityIndicatorState);
+        }
+        activityIndicatorEl.setAttribute("aria-hidden", "true");
+
         sessionButton.appendChild(quickIdEl);
         sessionButton.appendChild(sessionNameEl);
+        sessionButton.appendChild(activityIndicatorEl);
         sessionButton.addEventListener("click", () => {
           activateSessionTarget(session);
         });
@@ -2118,6 +2158,7 @@ function render() {
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
       closeSettingsDialog(entry.settingsDialog);
+      clearSessionActivityQuietTimer(sessionId);
       if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
         clearTerminalSearchSelection(sessionId);
         terminalSearchState.sessionId = "";
@@ -2552,6 +2593,7 @@ function appendTerminalData(sessionId, data) {
       syncActiveTerminalSearch({ preserveSelection: true });
     }
   });
+  markSessionActivity(sessionId);
   return true;
 }
 
@@ -2592,6 +2634,8 @@ function markSessionExited(sessionId, exitDetails = {}) {
     exitedAt: Date.now(),
     updatedAt: Date.now()
   });
+  clearSessionActivityQuietTimer(sessionId);
+  store.clearSessionActivity(sessionId);
   const nextSession = getSessionById(sessionId);
   if (store.getState().activeSessionId === sessionId) {
     setCommandFeedback(getExitedSessionMessage(nextSession));

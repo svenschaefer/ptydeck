@@ -547,7 +547,8 @@ components:
         state:
           type: string
           enum:
-            - active
+            - starting
+            - running
             - unrestored
         cwd:
           type: string
@@ -575,6 +576,19 @@ components:
         updatedAt:
           type: integer
           format: int64
+        startedAt:
+          type: integer
+          format: int64
+          nullable: true
+        exitCode:
+          type: integer
+          nullable: true
+        exitSignal:
+          type: string
+        exitedAt:
+          type: integer
+          format: int64
+          nullable: true
     CustomCommand:
       type: object
       required:

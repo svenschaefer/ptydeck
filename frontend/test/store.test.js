@@ -84,3 +84,32 @@ test("store manages normalized custom commands and protects internal snapshots",
   assert.equal(store.getCustomCommand("go")?.content, "echo replaced");
   assert.equal(state.decks.length, 0);
 });
+
+test("store tracks live and unread session activity and clears unread on activation", () => {
+  const store = createStore();
+
+  store.setDecks([{ id: "default", name: "Default" }]);
+  store.setSessions([
+    { id: "a", deckId: "default" },
+    { id: "b", deckId: "default" }
+  ]);
+
+  store.markSessionActivity("b", { timestamp: 100 });
+  let state = store.getState();
+  let target = state.sessions.find((session) => session.id === "b");
+  assert.equal(target.hasLiveActivity, true);
+  assert.equal(target.hasUnreadActivity, true);
+  assert.equal(target.lastOutputAt, 100);
+
+  store.setActiveSession("b");
+  state = store.getState();
+  target = state.sessions.find((session) => session.id === "b");
+  assert.equal(target.hasLiveActivity, true);
+  assert.equal(target.hasUnreadActivity, false);
+
+  store.clearSessionActivity("b", { timestamp: 100 });
+  state = store.getState();
+  target = state.sessions.find((session) => session.id === "b");
+  assert.equal(target.hasLiveActivity, false);
+  assert.equal(target.hasUnreadActivity, false);
+});

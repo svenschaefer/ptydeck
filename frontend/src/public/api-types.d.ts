@@ -46,7 +46,7 @@ export type UpdateDeckRequest = {
 export type Session = {
   id: string;
   deckId: string;
-  state: "active" | "unrestored";
+  state: "starting" | "running" | "unrestored";
   cwd: string;
   shell: string;
   tags: string[];
@@ -57,6 +57,10 @@ export type Session = {
   themeProfile?: SessionThemeProfile;
   createdAt: number;
   updatedAt: number;
+  startedAt?: number | null;
+  exitCode?: number | null;
+  exitSignal?: string;
+  exitedAt?: number | null;
 };
 
 export type CreateSessionRequest = {

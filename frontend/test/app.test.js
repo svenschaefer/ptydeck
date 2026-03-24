@@ -2585,12 +2585,31 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "No matches in active terminal.");
   assert.equal(MockTerminal.instances[1].selected, null);
+  let sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
+  let indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
+  assert.ok(sessionButton);
+  assert.ok(indicator);
+  assert.equal(indicator.hidden, false);
+  assert.equal(indicator.classList.contains("live"), true);
+  assert.equal(indicator.classList.contains("unseen"), false);
+
+  await sleep(1550);
+  await tick();
+  sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
+  indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
+  assert.equal(indicator.hidden, false);
+  assert.equal(indicator.classList.contains("live"), false);
+  assert.equal(indicator.classList.contains("unseen"), true);
 
   fixture.elements.commandInput.value = "/deck switch ops";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 1/1");
   assert.equal(MockTerminal.instances[1].selected?.row, 0);
+  sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
+  indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
+  assert.equal(sessionButton.classList.contains("active"), true);
+  assert.equal(indicator.hidden, true);
 
   fixture.elements.terminalSearchClear.click();
   await tick();

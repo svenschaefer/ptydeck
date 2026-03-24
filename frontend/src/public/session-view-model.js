@@ -49,6 +49,24 @@ export function createSessionViewModel(options = {}) {
     return "";
   }
 
+  function hasSessionLiveActivity(session) {
+    return session?.hasLiveActivity === true;
+  }
+
+  function hasSessionUnreadActivity(session) {
+    return session?.hasUnreadActivity === true;
+  }
+
+  function getSessionActivityIndicatorState(session) {
+    if (hasSessionLiveActivity(session)) {
+      return "live";
+    }
+    if (hasSessionUnreadActivity(session)) {
+      return "unseen";
+    }
+    return "";
+  }
+
   function getExitedSessionStatusSuffix(session) {
     const details = [];
     if (Number.isInteger(session?.exitCode)) {
@@ -203,6 +221,9 @@ export function createSessionViewModel(options = {}) {
     isSessionUnrestored,
     isSessionExited,
     isSessionActionBlocked,
+    hasSessionLiveActivity,
+    hasSessionUnreadActivity,
+    getSessionActivityIndicatorState,
     getSessionStateBadgeText,
     getExitedSessionStatusSuffix,
     getSessionStateHintText,

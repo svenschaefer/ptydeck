@@ -1040,11 +1040,12 @@ export function createRuntime(config) {
     };
   }
 
-  function toApiSession(session, state) {
+  function toApiSession(session, explicitState) {
+    const sessionState = typeof explicitState === "string" && explicitState.trim() ? explicitState.trim() : String(session?.state || "").trim();
     return {
       ...session,
       deckId: resolveSessionDeckId(session.id),
-      state
+      state: sessionState || "running"
     };
   }
 
@@ -1052,7 +1053,7 @@ export function createRuntime(config) {
     const payload = [];
     const seen = new Set();
     for (const session of manager.list()) {
-      const apiSession = toApiSession(session, "active");
+      const apiSession = toApiSession(session);
       if (!deckId || apiSession.deckId === deckId) {
         payload.push(apiSession);
       }
@@ -1073,7 +1074,7 @@ export function createRuntime(config) {
   function getApiSessionOrThrow(sessionId) {
     try {
       const active = manager.get(sessionId).meta;
-      return toApiSession(active, "active");
+      return toApiSession(active);
     } catch (error) {
       if (!(error instanceof ApiError) || error.statusCode !== 404) {
         throw error;
@@ -1189,17 +1190,17 @@ export function createRuntime(config) {
     });
   }
 
-  const wsEventNames = ["session.created", "session.data", "session.exit", "session.closed"];
+  const wsEventNames = ["session.created", "session.started", "session.updated", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
       if (eventName !== "session.data") {
         logDebug("session.event", { type: eventName, sessionId: event.session?.id || event.sessionId || null });
       }
-      if (eventName === "session.created" && event && event.session) {
+      if ((eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") && event && event.session) {
         broadcast({
           type: eventName,
           ...event,
-          session: toApiSession(event.session, "active")
+          session: toApiSession(event.session)
         });
       } else {
         broadcast({ type: eventName, ...event });
@@ -1449,7 +1450,7 @@ export function createRuntime(config) {
           themeProfile
         });
         sessionDeckAssignments.set(payload.id, DEFAULT_DECK_ID);
-        const apiPayload = toApiSession(payload, "active");
+        const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
         writeJson(req, res, 201, apiPayload);
@@ -1504,7 +1505,7 @@ export function createRuntime(config) {
           throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
         }
         const payload = manager.updateSession(match.params.sessionId, patch);
-        const apiPayload = toApiSession(payload, "active");
+        const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.update");
         broadcast({
@@ -1529,7 +1530,7 @@ export function createRuntime(config) {
 
       if (match.kind === "restart") {
         const payload = manager.restart(match.params.sessionId);
-        const apiPayload = toApiSession(payload, "active");
+        const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.restart");
         writeJson(req, res, 200, apiPayload);

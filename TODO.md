@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
 - [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
 - [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
 - [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
@@ -206,10 +205,12 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Lifecycle and State Modeling (v0.3.0 continuation)
 
-- [ ] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
+- [x] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
 - [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
 - [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
 - [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
+- [x] `LIF-005` Owner: `FE` Task: Add subtle sidebar session-activity indicators in the deck section so each session button shows animated live output activity and a sticky unseen marker that clears only when that session becomes active.
+- [x] `LIF-006` Owner: `QA` Task: Add regression coverage for sidebar session-activity indicators, including live-activity animation state, unseen-state persistence after activity stops, and clear-on-activation behavior.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

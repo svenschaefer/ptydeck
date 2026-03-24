@@ -74,6 +74,22 @@ function cloneRecord(record) {
   return record && typeof record === "object" ? { ...record } : record;
 }
 
+function normalizeActivityTimestamp(value) {
+  return Number.isFinite(value) ? Number(value) : null;
+}
+
+function withSessionActivityDefaults(session) {
+  if (!session || typeof session !== "object") {
+    return session;
+  }
+  return {
+    ...session,
+    hasLiveActivity: session.hasLiveActivity === true,
+    hasUnreadActivity: session.hasUnreadActivity === true,
+    lastOutputAt: normalizeActivityTimestamp(session.lastOutputAt)
+  };
+}
+
 function createStateSnapshot(state) {
   return {
     ...state,
@@ -84,9 +100,9 @@ function createStateSnapshot(state) {
 }
 
 function mergeSessionRecord(currentSession, nextSession) {
-  const merged = { ...currentSession, ...nextSession };
+  const merged = withSessionActivityDefaults({ ...currentSession, ...nextSession });
   const runtimeState = normalizeText(nextSession?.state).toLowerCase();
-  if (!runtimeState || runtimeState === "active") {
+  if (runtimeState !== "exited") {
     delete merged.exitCode;
     delete merged.exitSignal;
     delete merged.exitedAt;
@@ -124,7 +140,12 @@ export function reduceRuntimeState(state, action, options = {}) {
       };
     }
     case "sessions.replace": {
-      const nextSessions = Array.isArray(action.sessions) ? action.sessions.slice() : [];
+      const nextSessions = Array.isArray(action.sessions)
+        ? action.sessions.map((session) => {
+            const currentSession = runtimeState.sessions.find((entry) => entry.id === session?.id);
+            return currentSession ? mergeSessionRecord(currentSession, session) : withSessionActivityDefaults(session);
+          })
+        : [];
       const nextActiveSessionId = resolveActiveSessionId(runtimeState.activeSessionId, nextSessions, runtimeState.activeDeckId, defaultDeckId);
       if (runtimeState.sessions === nextSessions && runtimeState.activeSessionId === nextActiveSessionId) {
         return runtimeState;
@@ -190,11 +211,90 @@ export function reduceRuntimeState(state, action, options = {}) {
     case "session.active.set": {
       const nextActiveSessionId = normalizeText(action.sessionId) || null;
       if (runtimeState.activeSessionId === nextActiveSessionId) {
+        if (!nextActiveSessionId) {
+          return runtimeState;
+        }
+        const currentSession = runtimeState.sessions.find((session) => session.id === nextActiveSessionId);
+        if (!currentSession?.hasUnreadActivity) {
+          return runtimeState;
+        }
+        return {
+          ...runtimeState,
+          sessions: runtimeState.sessions.map((session) =>
+            session.id === nextActiveSessionId ? { ...session, hasUnreadActivity: false } : session
+          )
+        };
+      }
+      return {
+        ...runtimeState,
+        sessions: runtimeState.sessions.map((session) =>
+          session.id === nextActiveSessionId ? { ...session, hasUnreadActivity: false } : session
+        ),
+        activeSessionId: nextActiveSessionId
+      };
+    }
+    case "session.activity.bump": {
+      const sessionId = normalizeText(action.sessionId);
+      if (!sessionId) {
+        return runtimeState;
+      }
+      const activityTimestamp = normalizeActivityTimestamp(action.timestamp) || Date.now();
+      let changed = false;
+      const nextSessions = runtimeState.sessions.map((session) => {
+        if (session.id !== sessionId) {
+          return session;
+        }
+        const hasUnreadActivity = sessionId === runtimeState.activeSessionId ? false : true;
+        if (
+          session.hasLiveActivity === true &&
+          session.hasUnreadActivity === hasUnreadActivity &&
+          normalizeActivityTimestamp(session.lastOutputAt) === activityTimestamp
+        ) {
+          return session;
+        }
+        changed = true;
+        return {
+          ...session,
+          hasLiveActivity: true,
+          hasUnreadActivity,
+          lastOutputAt: activityTimestamp
+        };
+      });
+      if (!changed) {
         return runtimeState;
       }
       return {
         ...runtimeState,
-        activeSessionId: nextActiveSessionId
+        sessions: nextSessions
+      };
+    }
+    case "session.activity.clear": {
+      const sessionId = normalizeText(action.sessionId);
+      if (!sessionId) {
+        return runtimeState;
+      }
+      let changed = false;
+      const cutoffTimestamp = normalizeActivityTimestamp(action.timestamp);
+      const nextSessions = runtimeState.sessions.map((session) => {
+        if (session.id !== sessionId || session.hasLiveActivity !== true) {
+          return session;
+        }
+        const lastOutputAt = normalizeActivityTimestamp(session.lastOutputAt);
+        if (cutoffTimestamp !== null && lastOutputAt !== null && lastOutputAt > cutoffTimestamp) {
+          return session;
+        }
+        changed = true;
+        return {
+          ...session,
+          hasLiveActivity: false
+        };
+      });
+      if (!changed) {
+        return runtimeState;
+      }
+      return {
+        ...runtimeState,
+        sessions: nextSessions
       };
     }
     case "connection.set": {
@@ -273,6 +373,9 @@ export function reduceRuntimeState(state, action, options = {}) {
         : runtimeState.sessions.find((session) => getSessionDeckId(session, defaultDeckId) === deckId)?.id || null;
       return {
         ...runtimeState,
+        sessions: runtimeState.sessions.map((session) =>
+          session.id === nextActiveSessionId ? { ...session, hasUnreadActivity: false } : session
+        ),
         activeDeckId: deckId,
         activeSessionId: nextActiveSessionId
       };
@@ -394,6 +497,20 @@ export function createStore(options = {}) {
     },
     setActiveSession(sessionId) {
       dispatch({ type: "session.active.set", sessionId });
+    },
+    markSessionActivity(sessionId, options = {}) {
+      dispatch({
+        type: "session.activity.bump",
+        sessionId,
+        timestamp: options.timestamp
+      });
+    },
+    clearSessionActivity(sessionId, options = {}) {
+      dispatch({
+        type: "session.activity.clear",
+        sessionId,
+        timestamp: options.timestamp
+      });
     },
     setConnectionState(connectionState) {
       dispatch({ type: "connection.set", connectionState });
