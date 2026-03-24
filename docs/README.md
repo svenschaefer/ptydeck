@@ -57,6 +57,12 @@ Authoritative repository documents remain:
   - Status: mid/long-term relevant, not current-scope delivery
   - Backlog landing:
     - `ARC-001`
+    - `ARC-003`
+    - `ARC-004`
+    - `ARC-005`
+    - `ARC-006`
+    - `ARC-007`
+    - `ARC-008`
     - `ARC-002`
 
 ### 5. Security Hardening

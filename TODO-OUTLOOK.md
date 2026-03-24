@@ -61,6 +61,12 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
+- [ ] `ARC-003` Owner `FE`: Add a session-scoped frontend stream-adapter boundary that normalizes raw PTY chunks into `onData`, `onLine`, and `onIdle` events with deterministic carriage-return handling, line reconstruction, and ANSI-aware parsing options.
+- [ ] `ARC-004` Owner `FE`: Add a deterministic plugin-engine registry for session-scoped stream interpreters, including explicit plugin ordering, conflict resolution rules, lifecycle hooks, and no-direct-DOM/no-direct-side-effect guardrails.
+- [ ] `ARC-005` Owner `FE`: Define and implement the allowed interpretation-action contract plus dispatcher integration (`setSessionState`, `setSessionStatus`, badges, artifacts, notifications, meta/tags) so plugins emit declarative actions instead of mutating runtime/UI state directly.
+- [ ] `ARC-006` Owner `FE`: Add baseline built-in stream-interpretation plugins for active-processing detection (for example Codex-style `Working ...` lines), prompt/idle recovery, and explicit attention/error signaling.
+- [ ] `ARC-007` Owner `FE`: Add artifact-oriented stream interpretation for summary/delimiter extraction and surface those artifacts in session-scoped UI/state without polluting raw terminal output.
+- [ ] `ARC-008` Owner `QA`: Add regression coverage for stream-adapter normalization, plugin-engine ordering/conflict behavior, carriage-return overwrite cases, hidden-session interpretation behavior, and action-dispatch determinism.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
 - [ ] Add parameterized custom commands (for example `/deploy <env>`) with explicit placeholder rules.
