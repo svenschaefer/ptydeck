@@ -15,6 +15,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `ROADMAP.md`: execution order, versions, and dependencies only.
 - `DONE.md`: completed and verified topics only.
 - `TODO-OUTLOOK.md`: mid/long-term items only.
+- `TODO.md` currently contains open tasks only (`ARC-010` ... `ARC-012`); completed history remains exclusively in `DONE.md`.
 - `README.md`: architecture and product behavior reference.
 - `AGENTS.md`: agent roles, collaboration rules, and change control.
 - `LOCAL_QUALITY_GATE.md`: required local validation workflow (authoritative quality-gate commands).

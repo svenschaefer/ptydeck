@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Documentation governance cleanup completed: `TODO.md` now contains open tasks only (`ARC-010` ... `ARC-012`) and no longer mixes in completed `[x]` task history; completed history remains in `DONE.md`.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` was re-aligned against `docs/*.md`, and explicit deferred review-derived tasks (`DRV-001` ... `DRV-005`) were added for shell-adapter CWD tracking, replay-retention policy, command-schema formalization, command/output correlation, and shell-compatibility QA coverage.
 - [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the docs-vs-outlook alignment and the new `DRV-*` deferred planning baseline.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` now captures deferred slash-workflow-chain follow-ups as explicit owned tasks (`SWF-001` ... `SWF-008`) instead of leaving the concept only in `docs/`.
