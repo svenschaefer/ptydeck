@@ -38,6 +38,7 @@ import { createLayoutSettingsController } from "./ui/layout-settings-controller.
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
+import { createSessionGridController } from "./ui/session-grid-controller.js";
 import { createSessionCardInteractionsController } from "./ui/session-card-interactions-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
@@ -285,6 +286,7 @@ let deckActionsController = null;
 let sessionDisposalController = null;
 let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
+let sessionGridController = null;
 let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
 let sessionTerminalResizeController = null;
@@ -1820,245 +1822,14 @@ async function deleteDeckFlow() {
 
 function render() {
   const state = store.getState();
-  const activeDeck = getActiveDeck();
-  const activeDeckId = activeDeck ? activeDeck.id : "";
-  const deckSessions = activeDeckId
-    ? state.sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
-    : state.sessions.slice();
-  renderDeckTabs(state.sessions);
-  const hasDecks = state.decks.length > 0;
-  if (deckRenameBtn) {
-    deckRenameBtn.disabled = !hasDecks;
-  }
-  if (deckDeleteBtn) {
-    deckDeleteBtn.disabled = !activeDeck || activeDeck.id === DEFAULT_DECK_ID;
-  }
-  const sessionFilterText = getSessionFilterText();
-  const visibilityState =
-    workspaceRenderController?.resolveVisibleSessions({
-      sessions: state.sessions,
-      deckSessions,
-      sessionFilterText,
-      activeSessionId: state.activeSessionId,
-      resolveFilterSelectors,
-      setActiveSession: (sessionId) => store.setActiveSession(sessionId)
-    }) || {};
-  const visibleSessionIds = visibilityState.visibleSessionIds || new Set(deckSessions.map((session) => session.id));
-  const filterActive = visibilityState.filterActive === true;
-  if (visibilityState.switchedActiveSession) {
-    return;
-  }
-  pruneQuickIds(state.sessions.map((session) => session.id));
-  if (state.sessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
-    startupPerf.firstNonEmptyRenderAtMs = nowMs();
-    maybeReportStartupPerf();
-  }
-  debugLog("ui.render", {
-    sessions: state.sessions.length,
-    deckSessions: deckSessions.length,
-    visibleSessions: visibleSessionIds.size,
-    activeSessionId: state.activeSessionId,
-    connectionState: state.connectionState,
-    loading: uiState.loading,
-    hasError: Boolean(uiState.error)
+  sessionGridController?.renderWorkspace({
+    state,
+    uiState,
+    startupPerf,
+    nowMs,
+    maybeReportStartupPerf,
+    resolveFilterSelectors
   });
-  syncStatusTicker(state.sessions);
-  workspaceRenderController?.renderEmptyState({
-    sessions: state.sessions,
-    deckSessions,
-    visibleSessionIds,
-    filterActive
-  });
-  workspaceRenderController?.renderStatus({
-    connectionState: state.connectionState,
-    loading: uiState.loading,
-    error: uiState.error,
-    commandFeedback: uiState.commandFeedback,
-    commandInlineHint: uiState.commandInlineHint,
-    commandInlineHintPrefixPx: uiState.commandInlineHintPrefixPx,
-    commandPreview: uiState.commandPreview,
-    commandSuggestions: uiState.commandSuggestions
-  });
-  syncActiveTerminalSearch({ preserveSelection: true });
-
-  const activeIds = new Set(state.sessions.map((s) => s.id));
-  let shouldRunResizePass =
-    sessionDisposalController?.cleanupRemovedSessions({
-      activeSessionIds: activeIds,
-      terminals,
-      terminalObservers,
-      closeSettingsDialog,
-      streamPluginEngine,
-      streamAdapter,
-      terminalSearchState,
-      clearTerminalSearchSelection,
-      resizeTimers,
-      terminalSizes,
-      sessionThemeDrafts
-    }) === true;
-
-  for (const session of state.sessions) {
-    if (terminals.has(session.id)) {
-      const entry = terminals.get(session.id);
-      const nextVisible = visibleSessionIds.has(session.id);
-      sessionCardRenderController?.updateExistingSessionCard({
-        entry,
-        session,
-        activeSessionId: state.activeSessionId,
-        nextVisible
-      });
-      continue;
-    }
-
-    const initialVisible = visibleSessionIds.has(session.id);
-    const {
-      node,
-      quickIdEl,
-      focusBtn,
-      stateBadgeEl,
-      pluginBadgesEl,
-      unrestoredHintEl,
-      sessionStatusEl,
-      sessionArtifactsEl,
-      settingsBtn,
-      renameBtn,
-      closeBtn,
-      settingsDialog,
-      settingsDismissBtn,
-      startCwdInput,
-      startCommandInput,
-      startEnvInput,
-      sessionSendTerminatorSelect,
-      sessionTagsInput,
-      startFeedback,
-      tagListEl,
-      themeCategory,
-      themeSearch,
-      themeSelect,
-      themeBg,
-      themeFg,
-      themeInputs,
-      settingsApplyBtn,
-      settingsCancelBtn,
-      settingsStatus,
-      mount
-    } =
-      sessionCardFactoryController?.createSessionCardView({
-        template,
-        session,
-        themeProfileKeys: THEME_PROFILE_KEYS,
-        activeSessionId: state.activeSessionId,
-        visible: initialVisible
-      }) || {};
-    sessionCardInteractionsController?.bindSessionCardInteractions({
-      session,
-      refs: {
-        focusBtn,
-        settingsBtn,
-        renameBtn,
-        closeBtn,
-        settingsDialog,
-        settingsDismissBtn,
-        startCwdInput,
-        startCommandInput,
-        startEnvInput,
-        sessionSendTerminatorSelect,
-        sessionTagsInput,
-        startFeedback,
-        themeCategory,
-        themeSearch,
-        themeSelect,
-        themeBg,
-        themeFg,
-        themeInputs,
-        settingsApplyBtn,
-        settingsCancelBtn
-      },
-      api,
-      getSession: () => getSessionById(session.id),
-      getEntry: () => terminals.get(session.id),
-      onActivateSession: (sessionId) => store.setActiveSession(sessionId),
-      toggleSettingsDialog,
-      closeSettingsDialog,
-      confirmSessionDelete,
-      removeSession,
-      setCommandFeedback,
-      formatSessionToken,
-      formatSessionDisplayName,
-      setError,
-      clearError: () => {
-        uiState.error = "";
-      },
-      applyRuntimeEvent,
-      syncSessionThemeControls,
-      syncSessionStartupControls,
-      applyThemeForSession,
-      getSessionThemeConfig,
-      sessionThemeDrafts,
-      setSettingsDirty,
-      setSessionSendTerminator,
-      setStartupSettingsFeedback,
-      requestRender: () => render()
-    });
-
-    sessionTerminalRuntimeController?.mountSessionTerminalCard({
-      session,
-      refs: {
-        node,
-        focusBtn,
-        quickIdEl,
-        stateBadgeEl,
-        pluginBadgesEl,
-        unrestoredHintEl,
-        sessionStatusEl,
-        sessionArtifactsEl,
-        settingsDialog,
-        startCwdInput,
-        startCommandInput,
-        startEnvInput,
-        sessionSendTerminatorSelect,
-        sessionTagsInput,
-        startFeedback,
-        tagListEl,
-        settingsApplyBtn,
-        settingsStatus,
-        themeCategory,
-        themeSearch,
-        themeSelect,
-        themeBg,
-        themeFg,
-        themeInputs,
-        mount
-      },
-      initialVisible,
-      gridEl,
-      terminals,
-      terminalObservers,
-      resolveInitialTheme: (sessionId) => buildThemeFromConfig(getSessionThemeConfig(sessionId)),
-      streamPluginEngine,
-      onTerminalData: handleSessionTerminalInput,
-      afterEntryRegistered: (entry, currentSession) => {
-        syncSessionStartupControls(entry, currentSession);
-        syncSessionThemeControls(entry, currentSession.id);
-        setSettingsDirty(entry, false);
-      },
-      onFirstTerminalMounted: () => {
-        if (startupPerf.firstTerminalMountedAtMs === null) {
-          startupPerf.firstTerminalMountedAtMs = nowMs();
-          maybeReportStartupPerf();
-        }
-      },
-      applyResizeForSession
-    });
-    shouldRunResizePass = true;
-  }
-
-  syncActiveTerminalSearch({ preserveSelection: true });
-
-  if (shouldRunResizePass) {
-    scheduleGlobalResize();
-    scheduleDeferredResizePasses();
-  }
 }
 
 function appendTerminalChunk(sessionId, data, options = {}) {
@@ -2334,6 +2105,66 @@ deckSidebarController = createDeckSidebarController({
   getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => setActiveDeck(deckId),
   onActivateSession: (session) => activateSessionTarget(session)
+});
+
+sessionGridController = createSessionGridController({
+  defaultDeckId: DEFAULT_DECK_ID,
+  deckRenameBtn,
+  deckDeleteBtn,
+  terminals,
+  terminalObservers,
+  resizeTimers,
+  terminalSizes,
+  sessionThemeDrafts,
+  template,
+  gridEl,
+  getActiveDeck,
+  resolveSessionDeckId,
+  getSessionFilterText,
+  pruneQuickIds,
+  renderDeckTabs,
+  workspaceRenderController,
+  syncStatusTicker,
+  syncActiveTerminalSearch,
+  sessionDisposalController,
+  closeSettingsDialog,
+  streamPluginEngine,
+  streamAdapter,
+  terminalSearchState,
+  clearTerminalSearchSelection,
+  sessionCardRenderController,
+  sessionCardFactoryController,
+  sessionCardInteractionsController,
+  sessionTerminalRuntimeController,
+  resolveInitialTheme: (sessionId) => buildThemeFromConfig(getSessionThemeConfig(sessionId)),
+  handleSessionTerminalInput,
+  syncSessionStartupControls,
+  syncSessionThemeControls,
+  setSettingsDirty,
+  applyResizeForSession,
+  scheduleGlobalResize,
+  scheduleDeferredResizePasses,
+  setActiveSession: (sessionId) => store.setActiveSession(sessionId),
+  getSessionById,
+  toggleSettingsDialog,
+  confirmSessionDelete,
+  removeSession,
+  setCommandFeedback,
+  formatSessionToken,
+  formatSessionDisplayName,
+  setError,
+  clearError: () => {
+    uiState.error = "";
+  },
+  applyRuntimeEvent,
+  applyThemeForSession,
+  getSessionThemeConfig,
+  setSessionSendTerminator,
+  setStartupSettingsFeedback,
+  requestRender: () => render(),
+  api,
+  themeProfileKeys: THEME_PROFILE_KEYS,
+  debugLog
 });
 
 commandEngine = createCommandEngine({

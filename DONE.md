@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted the main workspace/session render orchestration from `frontend/src/public/app.js` into `frontend/src/public/ui/session-grid-controller.js` (deck-scoped visibility resolution, session-card update/create orchestration, render-status propagation, cleanup handoff, and resize-pass scheduling).
+- [x] Added focused regression coverage for the new session grid controller in `frontend/test/session-grid-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/session-grid-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, targeted tests `node --test frontend/test/session-grid-controller.test.js frontend/test/runtime-event-controller.test.js frontend/test/session-terminal-runtime-controller.test.js frontend/test/session-terminal-resize-controller.test.js`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/session-grid-controller.test.js`.
 - [x] `ARC-010` progress: extracted runtime-event application and terminal-input guardrails from `frontend/src/public/app.js` into `frontend/src/public/runtime-event-controller.js` (snapshot application, session/deck/custom-command event routing, activity-completion notification handoff, and guarded direct terminal input send path).
 - [x] Added focused regression coverage for the new runtime event controller in `frontend/test/runtime-event-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/runtime-event-controller.js` participates in syntax-check gates.
