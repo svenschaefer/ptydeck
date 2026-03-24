@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Promoted the next near-term follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H14` (`LIF-007` ... `LIF-009`) for authoritative persisted activity-completion signaling and browser notifications on session completion.
 - [x] `ARC-008` completed: regression coverage now closes the full stream-interpretation foundation by covering stream-adapter normalization, deterministic plugin ordering/conflict behavior, carriage-return overwrite handling, declarative action-dispatch validation, and hidden-session interpretation recovery in the integrated UI path.
 - [x] `v0.3.0-H13` completed: the near-term stream-interpretation foundation (`ARC-003` ... `ARC-008`) is now fully delivered and regression-hardened.
 - [x] `ARC-007` completed: artifact-oriented stream interpretation now extracts summary/result/next-step artifacts from terminal output via `frontend/src/public/stream-artifact-plugins.js` and stores them as session-scoped artifacts without modifying raw terminal output.

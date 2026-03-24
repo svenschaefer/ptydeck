@@ -562,16 +562,47 @@ Exit criteria:
 - Artifact-oriented interpretation is available without polluting raw terminal output.
 - Regression coverage protects normalization, plugin ordering/conflict handling, hidden-session behavior, and declarative action dispatch determinism.
 
+### v0.3.0-H14 - Activity Completion Notifications
+
+- `LIF-007`
+- `LIF-008`
+- `LIF-009`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `LIF-007`
+- `LIF-008`
+- `LIF-009`
+
+Dependencies:
+
+- `LIF-007` depends on `LIF-001` ... `LIF-004` so backend-persisted activity-completion signaling builds on the formal lifecycle baseline instead of ad hoc UI-local transitions.
+- `LIF-008` depends on `LIF-007` so browser notifications trigger only from authoritative post-persist activity-completion events, and should reuse the current session/deck runtime store path without duplicate local inference.
+- `LIF-009` depends on `LIF-007` and `LIF-008` so regression coverage validates exactly-once semantics, aggregation, permission-denied no-op behavior, and reconnect/update churn on top of the final backend/FE contract.
+
+Exit criteria:
+
+- Backend exposes an authoritative persisted activity-completion signal for session transitions from active to inactive.
+- Frontend emits standard browser notifications exactly once per persisted active-to-inactive transition without throwing when notifications are unsupported or denied.
+- Multiple completions inside the configured aggregation window can be collapsed into one deterministic notification payload.
+- Regression coverage protects no-duplicate semantics, aggregation behavior, and permission-safe failure handling.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H13`
-- Next milestones in progress: none currently
+- Next milestones in progress: `v0.3.0-H14`
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- None currently.
+- `LIF-007`
+- `LIF-008`
+- `LIF-009`
 
 ### Completed Items
 
