@@ -40,6 +40,7 @@ import { createSessionCardFactoryController } from "./ui/session-card-factory-co
 import { createSessionCardInteractionsController } from "./ui/session-card-interactions-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
+import { createSessionTerminalResizeController } from "./ui/session-terminal-resize-controller.js";
 import { createSessionTerminalRuntimeController } from "./ui/session-terminal-runtime-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
 
@@ -110,8 +111,6 @@ const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
-let globalResizeTimer = null;
-let deferredResizeTimer = null;
 let bootstrapPromise = null;
 let bootstrapFallbackTimer = null;
 let runtimeBootstrapSource = "pending";
@@ -286,6 +285,7 @@ let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
 let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
+let sessionTerminalResizeController = null;
 let sessionTerminalRuntimeController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
@@ -1621,37 +1621,8 @@ async function applyTerminalSizeSettings(nextCols, nextRows) {
   render();
 }
 
-function applyMountHeight(entry, cols, rows) {
-  if (!entry || !entry.mount) {
-    return;
-  }
-  let mountHeightPx = computeFixedMountHeightPx(rows);
-  const cardWidthPx = computeFixedCardWidthPx(cols);
-  const mountWidthPx = Math.max(220, cardWidthPx - TERMINAL_CARD_HORIZONTAL_CHROME_PX);
-  const runtimeCellHeightPx = getTerminalCellHeightPx(entry?.terminal);
-  if (runtimeCellHeightPx > 0) {
-    const currentlyVisibleRows = Math.floor(mountHeightPx / runtimeCellHeightPx);
-    if (currentlyVisibleRows < rows) {
-      mountHeightPx += Math.ceil((rows - currentlyVisibleRows) * runtimeCellHeightPx) + 2;
-    }
-  }
-  entry.mount.style.height = `${mountHeightPx}px`;
-  entry.mount.style.width = `${mountWidthPx}px`;
-  entry.element.style.width = `${cardWidthPx}px`;
-}
-
 function applySettingsToAllTerminals(options = {}) {
-  const deckIdFilter = String(options.deckId || "").trim();
-  const force = options.force !== false;
-  for (const sessionId of terminals.keys()) {
-    if (deckIdFilter) {
-      const session = getSessionById(sessionId);
-      if (session && resolveSessionDeckId(session) !== deckIdFilter) {
-        continue;
-      }
-    }
-    applyResizeForSession(sessionId, { force });
-  }
+  sessionTerminalResizeController?.applySettingsToAllTerminals(options);
 }
 
 function findNextQuickId() {
@@ -1680,62 +1651,8 @@ function pruneQuickIds(activeSessionIds) {
   }
 }
 
-function computeTerminalSize(entry, session) {
-  if (!entry || !entry.mount || entry.mount.clientWidth < 40 || entry.mount.clientHeight < 40) {
-    return null;
-  }
-  const geometry = getSessionTerminalGeometry(session);
-  return {
-    cols: geometry.cols,
-    rows: geometry.rows
-  };
-}
-
 function applyResizeForSession(sessionId, options = {}) {
-  const entry = terminals.get(sessionId);
-  if (!entry) {
-    return;
-  }
-  const session = getSessionById(sessionId);
-  if (isSessionActionBlocked(session)) {
-    const pendingTimer = resizeTimers.get(sessionId);
-    if (pendingTimer) {
-      clearTimeout(pendingTimer);
-      resizeTimers.delete(sessionId);
-    }
-    return;
-  }
-  const size = computeTerminalSize(entry, session);
-  if (!size) {
-    return;
-  }
-
-  const { cols, rows } = size;
-  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 2) {
-    return;
-  }
-  const previous = terminalSizes.get(sessionId);
-  if (!options.force && previous && previous.cols === cols && previous.rows === rows) {
-    return;
-  }
-
-  terminalSizes.set(sessionId, { cols, rows });
-  applyMountHeight(entry, cols, rows);
-  entry.terminal.resize(cols, rows);
-  debugLog("terminal.resize.local", { sessionId, cols, rows });
-
-  const pendingTimer = resizeTimers.get(sessionId);
-  if (pendingTimer) {
-    clearTimeout(pendingTimer);
-  }
-
-  const timer = setTimeout(() => {
-    debugLog("terminal.resize.remote.start", { sessionId, cols, rows });
-    api.resizeSession(sessionId, cols, rows).catch(() => {
-      debugLog("terminal.resize.remote.error", { sessionId, cols, rows });
-    });
-  }, 180);
-  resizeTimers.set(sessionId, timer);
+  sessionTerminalResizeController?.applyResizeForSession(sessionId, options);
 }
 
 async function onApplySettings() {
@@ -1763,23 +1680,7 @@ function setSidebarVisible(visible) {
 }
 
 function scheduleGlobalResize(options = {}) {
-  const deckIdFilter = String(options.deckId || "").trim();
-  const force = options.force === true;
-  if (globalResizeTimer) {
-    clearTimeout(globalResizeTimer);
-  }
-  globalResizeTimer = setTimeout(() => {
-    globalResizeTimer = null;
-    for (const sessionId of terminals.keys()) {
-      if (deckIdFilter) {
-        const session = getSessionById(sessionId);
-        if (session && resolveSessionDeckId(session) !== deckIdFilter) {
-          continue;
-        }
-      }
-      applyResizeForSession(sessionId, force ? { force: true } : undefined);
-    }
-  }, 120);
+  sessionTerminalResizeController?.scheduleGlobalResize(options);
 }
 
 function openSettingsDialog(dialog) {
@@ -1799,23 +1700,7 @@ function toggleSettingsDialog(dialog) {
 }
 
 function scheduleDeferredResizePasses(options = {}) {
-  const deckIdFilter = String(options.deckId || "").trim();
-  const force = options.force === true;
-  if (deferredResizeTimer) {
-    clearTimeout(deferredResizeTimer);
-  }
-  const delays = [250, 700, 1400];
-  let index = 0;
-  function runNext() {
-    scheduleGlobalResize(deckIdFilter ? { deckId: deckIdFilter, force } : force ? { force: true } : {});
-    index += 1;
-    if (index < delays.length) {
-      deferredResizeTimer = setTimeout(runNext, delays[index]);
-    } else {
-      deferredResizeTimer = null;
-    }
-  }
-  deferredResizeTimer = setTimeout(runNext, delays[index]);
+  sessionTerminalResizeController?.scheduleDeferredResizePasses(options);
 }
 
 function maybeReportStartupPerf() {
@@ -2456,6 +2341,23 @@ sessionCardRenderController = createSessionCardRenderController({
   syncSessionStartupControls,
   syncSessionThemeControls,
   setSettingsDirty
+});
+
+sessionTerminalResizeController = createSessionTerminalResizeController({
+  windowRef: window,
+  terminals,
+  resizeTimers,
+  terminalSizes,
+  getSessionById,
+  resolveSessionDeckId,
+  getSessionTerminalGeometry,
+  isSessionActionBlocked,
+  computeFixedMountHeightPx,
+  computeFixedCardWidthPx,
+  getTerminalCellHeightPx,
+  terminalCardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
+  debugLog,
+  api
 });
 
 sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
@@ -3241,20 +3143,12 @@ window.addEventListener("beforeunload", () => {
   if (wsClient) {
     wsClient.close();
   }
-  if (globalResizeTimer) {
-    clearTimeout(globalResizeTimer);
-  }
-  if (deferredResizeTimer) {
-    clearTimeout(deferredResizeTimer);
-  }
+  sessionTerminalResizeController?.dispose();
   if (commandPreviewTimer) {
     clearTimeout(commandPreviewTimer);
   }
   if (commandSuggestionsTimer) {
     clearTimeout(commandSuggestionsTimer);
-  }
-  for (const timer of resizeTimers.values()) {
-    clearTimeout(timer);
   }
   for (const observer of terminalObservers.values()) {
     observer.disconnect();
