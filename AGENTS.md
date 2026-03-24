@@ -44,39 +44,52 @@ This file documents the active roles, responsibilities, and collaboration rules 
 
 - Keep markdown content in US English.
 - Do not mark tasks as done before implementation + validation.
+- Keep strict planning-document separation:
+  - `TODO.md` must contain open tasks only.
+  - `DONE.md` must contain completed/validated work only.
 - Update `ROADMAP.md` when task sequencing/dependencies change.
 - Update `CODEX_CONTEXT.md` for architecture/process/governance changes.
 - Keep ownership explicit on all tasks in `TODO.md`.
 - Escalate unresolved decision points to `SAS`.
 
-## 5. Development Workflow
+## 5. Execution Hygiene (Mandatory)
+
+- Do not leave orphan background terminals/processes.
+- If a validation command hangs or stalls, stop it immediately, clean up processes, and continue with a deterministic fallback.
+- Before every commit, verify there are no leftover background validation processes.
+- Prefer deterministic, non-interactive validation commands and avoid stacking multiple long-running full-suite commands in parallel.
+
+## 6. Development Workflow
 
 1. Pick next scoped task(s) from `TODO.md` according to `ROADMAP.md`.
 2. Implement in smallest safe increments.
-3. Run validation:
+3. Run focused validation for changed scope first (targeted tests).
+4. Run required quality gates for completion:
    - `npm run lint`
    - `npm run test`
-   - `npm run test:coverage`
-4. Fix issues until validation is green.
-5. Update docs (`TODO.md`, `DONE.md`, `ROADMAP.md`, `CODEX_CONTEXT.md`, and others as needed).
-6. Commit with clear message and push.
+   - `npm run test:coverage:check` (or documented equivalent for the current scope)
+5. Fix issues until validation is green.
+6. Confirm no hanging/background validation processes remain.
+7. Update docs (`TODO.md`, `DONE.md`, `ROADMAP.md`, `CODEX_CONTEXT.md`, and others as needed).
+8. Commit with clear message and push.
 
-## 6. Runtime Notes
+## 7. Runtime Notes
 
 - Default Node version: see `.nvmrc`.
 - In WSL + Windows browser scenarios, frontend resolves API/WS host from browser host.
 - Backend default CORS origin is `*` for local development compatibility.
 
-## 7. Definition of Done
+## 8. Definition of Done
 
 A task is done when all apply:
 - Code implemented and integrated.
 - Relevant tests added/updated.
-- Local lint/test/coverage pass.
+- Local lint/test/coverage gates pass for the agreed scope.
+- No orphan validation/background processes remain.
 - Task status/documentation updated.
 - Changes committed and pushed.
 
-## 8. Change Control
+## 9. Change Control
 
 - Major architecture changes require explicit confirmation by `SAS`.
 - If uncertain between options with meaningful tradeoffs, document options and request `SAS` decision.
