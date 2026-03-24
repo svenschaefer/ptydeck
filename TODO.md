@@ -13,7 +13,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- None currently.
+- [ ] `QLT-112` Owner: `FE` Task: Introduce a declarative completion-spec model for the ptydeck command plane (`/`, `>`, and settings-related arguments) so command names, argument definitions, descriptions, and insertion behavior are data-driven instead of hardcoded across the frontend runtime.
+- [ ] `QLT-113` Owner: `FE` Task: Add generator-backed contextual suggestion providers for command arguments (for example decks, sessions, tags, custom commands, paths, env keys, and themes) with deterministic caching, bounded latency, and explicit no-side-effect guarantees while typing.
+- [ ] `QLT-114` Owner: `FE` Task: Add richer autocomplete presentation metadata (descriptions, examples, completion kinds, and insert previews) while preserving the existing inline composer UX, deterministic keyboard-first behavior, and fallback order.
+- [ ] `QLT-115` Owner: `QA` Task: Add regression coverage for declarative and generator-backed autocomplete behavior, including deterministic ranking, timeout/fallback behavior, generator error isolation, and no unintended side effects during suggestion resolution.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -189,6 +192,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-109` Owner: `QA` Task: Add regression coverage for hidden-session output growth while invisible, verifying post-show scroll range, bottom-content reachability, and no stale viewport clipping.
 - [x] `QLT-110` Owner: `FE` Task: Add in-terminal output search/find UX with deterministic match navigation (`next`/`previous`), visible no-match feedback, and active-terminal focus semantics that survive deck/session switching.
 - [x] `QLT-111` Owner: `QA` Task: Add regression coverage for terminal search/find behavior (match navigation, no-match state, buffer growth, and deck/session visibility transitions).
+- [ ] `QLT-112` Owner: `FE` Task: Introduce a declarative completion-spec model for the ptydeck command plane (`/`, `>`, and settings-related arguments) so command names, argument definitions, descriptions, and insertion behavior are data-driven instead of hardcoded across the frontend runtime.
+- [ ] `QLT-113` Owner: `FE` Task: Add generator-backed contextual suggestion providers for command arguments (for example decks, sessions, tags, custom commands, paths, env keys, and themes) with deterministic caching, bounded latency, and explicit no-side-effect guarantees while typing.
+- [ ] `QLT-114` Owner: `FE` Task: Add richer autocomplete presentation metadata (descriptions, examples, completion kinds, and insert previews) while preserving the existing inline composer UX, deterministic keyboard-first behavior, and fallback order.
+- [ ] `QLT-115` Owner: `QA` Task: Add regression coverage for declarative and generator-backed autocomplete behavior, including deterministic ranking, timeout/fallback behavior, generator error isolation, and no unintended side effects during suggestion resolution.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

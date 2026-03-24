@@ -428,16 +428,39 @@ Exit criteria:
 - Search feedback distinguishes between match, wraparound, and no-match states without mutating PTY output.
 - Search behavior remains correct across deck/session switching and buffer growth.
 
+### v0.3.0-H9 - Declarative Command Autocomplete
+
+- `QLT-112`
+- `QLT-113`
+- `QLT-114`
+- `QLT-115`
+
+Dependencies:
+
+- `QLT-112` should land first so command completion behavior is defined from explicit specs instead of continuing to spread hardcoded parser metadata across the FE runtime.
+- `QLT-113` depends on `QLT-112` so contextual suggestion providers plug into one declarative command/argument contract instead of introducing a second autocomplete model.
+- `QLT-114` depends on `QLT-112` and `QLT-113` so richer suggestion metadata and inline presentation are designed against the finalized suggestion payload shape.
+- `QLT-115` depends on `QLT-112`, `QLT-113`, and `QLT-114` so regression coverage targets the final declarative/generator-backed autocomplete behavior rather than an intermediate contract.
+
+Exit criteria:
+
+- Slash and quick-switch autocomplete are driven by declarative command and argument specs instead of scattered hardcoded runtime branches.
+- Contextual argument suggestions can be generated from live FE state via bounded-latency providers without mutating runtime state during typing.
+- Inline autocomplete feedback can expose richer metadata while preserving deterministic keyboard-first behavior and explicit fallback semantics.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H8`
-- Next milestones in progress: none
-- Queued next milestone after H8: none
+- Next milestones in progress: `v0.3.0-H9`
+- Queued next milestone after H9: none
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- None currently.
+- `QLT-112`
+- `QLT-113`
+- `QLT-114`
+- `QLT-115`
 
 ### Completed Items
 
