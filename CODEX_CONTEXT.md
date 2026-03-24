@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H12 completed; H13 stream-adapter foundation started; send-body newline normalization hardened)
+Last updated: 2026-03-24 (H12 completed; H13 adapter+plugin foundations in place)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), completion of the explicit lifecycle-state-model block (`LIF-001` ... `LIF-006`), promotion of the stream-interpretation/plugin follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13`, completion of `ARC-003` stream-adapter foundation, send-body newline normalization hardening so only the configured final terminator emits control-submit sequences, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), completion of the explicit lifecycle-state-model block (`LIF-001` ... `LIF-006`), promotion of the stream-interpretation/plugin follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13`, completion of `ARC-003` stream-adapter foundation, completion of `ARC-004` deterministic plugin-engine registry foundation, send-body newline normalization hardening so only the configured final terminator emits control-submit sequences, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -144,8 +144,9 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend sidebar deck/session buttons now surface subtle runtime activity indicators: animated live output while activity is happening, then a sticky unseen marker until the session becomes active.
 - Sidebar activity handling no longer republishes redundant store updates for every background-output chunk once a session is already in live-activity state, reducing unnecessary sidebar rerenders and improving sidebar click responsiveness under output churn.
 - `ARC-003` is now completed: PTY chunk handling passes through a dedicated session-scoped stream adapter that emits deterministic `onData`, `onLine`, and `onIdle` callbacks with carriage-return overwrite handling, chunk-boundary line reconstruction, and optional ANSI stripping for line consumers.
+- `ARC-004` is now completed: frontend stream interpretation has a dedicated plugin-engine registry with deterministic priority/registration ordering, frozen session-context snapshots, session lifecycle hooks, error isolation, and last-wins action conflict resolution at the registry boundary.
 - Multiline send-path normalization now preserves plain `LF` line breaks inside payload bodies for all submit modes; only the final configured terminator (`CR`, `CRLF`, `CR2`, or delayed `CR`) is emitted as a submit control sequence, which avoids mid-payload fragmentation in Codex/TUI sessions.
-- The active near-term block remains `v0.3.0-H13`, now focused on the remaining plugin/action layers (`ARC-004` ... `ARC-008`) on top of the completed stream-adapter boundary.
+- The active near-term block remains `v0.3.0-H13`, now focused on the remaining action/artifact layers (`ARC-005` ... `ARC-008`) on top of the completed stream-adapter and plugin-registry foundations.
 - Planned next-step navigation UX now includes `>selector` quick-switch commands that auto-switch decks when needed, direct `>` deck targeting with autocomplete, broader `/...` and `>...` autocomplete coverage, unified `>` selector grammar with `/switch`, and sidebar terminal-entry buttons under each deck section with visible quick IDs.
 - Frontend quick-switch baseline is now implemented: `>selector` activates sessions across decks, `>deckSelector` activates decks directly, `>deckSelector::sessionSelector` performs explicit cross-deck session targeting, and inline preview/ambiguity feedback is rendered in the composer before submit.
 - Hidden-session output recovery is now hardened: when invisible terminals receive background output, show-time recovery explicitly resynchronizes xterm scroll area plus repaint/resize passes so bottom content remains reachable without manual interaction.
@@ -280,8 +281,8 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle M (`v0.3.0-H11`): none.
   - Completed in cycle N so far (`v0.3.0-H12`): `LIF-001`, `LIF-005`, `LIF-006`.
   - Completed in cycle N (`v0.3.0-H12`): `LIF-001`, `LIF-002`, `LIF-003`, `LIF-004`, `LIF-005`, `LIF-006`.
-  - Completed in cycle O so far (`v0.3.0-H13`): `ARC-003`.
-  - Planned next in cycle O (`v0.3.0-H13`): `ARC-004`, `ARC-005`, `ARC-006`, `ARC-007`, `ARC-008`.
+  - Completed in cycle O so far (`v0.3.0-H13`): `ARC-003`, `ARC-004`.
+  - Planned next in cycle O (`v0.3.0-H13`): `ARC-005`, `ARC-006`, `ARC-007`, `ARC-008`.
 
 ## Session Behavior Notes
 

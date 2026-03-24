@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `ARC-004` Owner: `FE` Task: Add a deterministic plugin-engine registry for session-scoped stream interpreters, including explicit plugin ordering, conflict resolution rules, lifecycle hooks, and no-direct-DOM/no-direct-side-effect guardrails.
 - [ ] `ARC-005` Owner: `FE` Task: Define and implement the allowed interpretation-action contract plus dispatcher integration (`setSessionState`, `setSessionStatus`, badges, artifacts, notifications, meta/tags) so plugins emit declarative actions instead of mutating runtime/UI state directly.
 - [ ] `ARC-006` Owner: `FE` Task: Add baseline built-in stream-interpretation plugins for active-processing detection (for example Codex-style `Working ...` lines), prompt/idle recovery, and explicit attention/error signaling.
 - [ ] `ARC-007` Owner: `FE` Task: Add artifact-oriented stream interpretation for summary/delimiter extraction and surface those artifacts in session-scoped UI/state without polluting raw terminal output.

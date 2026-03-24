@@ -6,6 +6,7 @@ import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createSessionViewModel } from "./session-view-model.js";
+import { createStreamPluginEngine } from "./stream-plugin-engine.js";
 import {
   getTerminalCellHeightPx,
   isTerminalAtBottom,
@@ -103,13 +104,38 @@ const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
+const streamPluginEngine = createStreamPluginEngine({
+  getSession(sessionId) {
+    return getSessionById(sessionId);
+  },
+  onActions(sessionId, actions, meta) {
+    debugLog("stream-plugin.actions", {
+      sessionId,
+      hook: meta?.hook || null,
+      actionTypes: actions.map((action) => action.type)
+    });
+  },
+  onPluginError(details) {
+    debugLog("stream-plugin.error", {
+      pluginId: details?.pluginId || null,
+      hook: details?.hook || null,
+      sessionId: details?.sessionId || null,
+      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
+    });
+  }
+});
 const streamAdapter = createSessionStreamAdapter({
   idleMs: SESSION_ACTIVITY_QUIET_MS,
   onData(sessionId, chunk) {
+    streamPluginEngine.handleData(sessionId, chunk);
     appendTerminalChunk(sessionId, chunk);
     markSessionActivity(sessionId);
   },
+  onLine(sessionId, line) {
+    streamPluginEngine.handleLine(sessionId, line);
+  },
   onIdle(sessionId) {
+    streamPluginEngine.handleIdle(sessionId);
     store.clearSessionActivity(sessionId);
   }
 });
@@ -2152,6 +2178,7 @@ function render() {
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
       closeSettingsDialog(entry.settingsDialog);
+      streamPluginEngine.disposeSession(sessionId);
       streamAdapter.disposeSession(sessionId);
       if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
         clearTerminalSearchSelection(sessionId);
@@ -2489,6 +2516,7 @@ function render() {
       theme: initialTheme
     });
     debugLog("terminal.created", { sessionId: session.id });
+    streamPluginEngine.ensureSession(session);
 
     gridEl.appendChild(node);
     terminal.open(mount);

@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-004` completed: the frontend now has a dedicated stream-plugin-engine registry in `frontend/src/public/stream-plugin-engine.js` with deterministic plugin ordering by priority plus registration order.
+- [x] Stream-plugin execution is now session-scoped and lifecycle-aware, including explicit `onSessionStart` / `onSessionDispose` hooks, isolated error handling, frozen session context snapshots, and duplicate-plugin rejection guardrails.
+- [x] Plugin output is now normalized as declarative action arrays with deterministic last-wins conflict resolution (`conflictKey` or action `type`) and an `onActions` handoff boundary for the next action-dispatch layer.
+- [x] Frontend runtime wiring now connects the stream adapter into the plugin engine for `onData`, `onLine`, and `onIdle` events while keeping actual UI behavior unchanged until `ARC-005` introduces action dispatch.
+- [x] Validation for `ARC-004` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm --prefix frontend run test:coverage`.
 - [x] Command-send payload normalization was hardened so multiline input now keeps plain `LF` line breaks inside the payload body and only applies the configured submit terminator sequence at the end, avoiding mid-payload `CR` control characters that fragmented delivery in Codex/TUI-style sessions.
 - [x] Frontend send-path regression coverage now verifies that `CR`, `CRLF`, and `CR_DELAY` modes preserve normal body line breaks while still emitting the configured final submit sequence.
 - [x] `ARC-003` completed: frontend PTY output now flows through a dedicated session-scoped stream adapter in `frontend/src/public/terminal-stream.js` before reaching terminal rendering, instead of sending raw WebSocket chunks straight into `app.js`.

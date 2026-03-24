@@ -534,10 +534,10 @@ Exit criteria:
 Completed in this milestone so far:
 
 - `ARC-003`
+- `ARC-004`
 
 Remaining in this milestone:
 
-- `ARC-004`
 - `ARC-005`
 - `ARC-006`
 - `ARC-007`
