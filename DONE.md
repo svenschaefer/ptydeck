@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-010` progress: extracted session-card interaction binding from `frontend/src/public/app.js` into `frontend/src/public/ui/session-card-interactions-controller.js` (focus/settings dialog wiring, rename/delete flows, settings dirty tracking, theme interaction wiring, and settings apply/cancel behavior).
+- [x] Added focused regression coverage for the new session-card interactions controller in `frontend/test/session-card-interactions-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/session-card-interactions-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, targeted tests `node --test frontend/test/session-card-interactions-controller.test.js frontend/test/session-card-factory-controller.test.js frontend/test/session-card-render-controller.test.js`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/session-card-interactions-controller.test.js`.
 - [x] `ARC-010` progress: extracted render-loop session cleanup/disposal behavior from `frontend/src/public/app.js` into `frontend/src/public/ui/session-disposal-controller.js` (terminal/observer teardown, resize-timer cleanup, stream/plugin dispose hooks, search-state reset, and status-anchor cleanup).
 - [x] Added focused regression coverage for the new session disposal controller in `frontend/test/session-disposal-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/ui/session-disposal-controller.js` participates in syntax-check gates.

@@ -215,6 +215,7 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend UI decomposition for `v0.4.0-H2` is now underway: deck/sidebar rendering is extracted to `ui/deck-sidebar-controller.js` and session-card metadata/status/settings-state rendering concerns are extracted to `ui/session-card-meta-controller.js`, with `app.js` consuming these controller boundaries.
 - Existing session-card update/render flow is now also extracted to `ui/session-card-render-controller.js`, further reducing inline card-visibility/state/status wiring in `app.js`.
 - Session-card template instantiation/ref wiring and initial card-state setup are now extracted to `ui/session-card-factory-controller.js`, reducing additional DOM selector/initialization logic in `app.js`.
+- Session-card interaction binding is now extracted to `ui/session-card-interactions-controller.js`, reducing inline event-wiring and settings-flow orchestration in `app.js`.
 - Render-loop session cleanup/disposal logic is now extracted to `ui/session-disposal-controller.js`, reducing inline teardown responsibilities in `app.js`.
 - Frontend layout/settings synchronization is now extracted to `ui/layout-settings-controller.js` (sidebar visibility UI sync, terminal geometry CSS sizing, and settings-form read path), further reducing direct UI concerns embedded in `app.js`.
 - Frontend session settings dialog interactions are now extracted to `ui/session-settings-dialog-controller.js` (open/close/toggle and delete-confirm flows), further shrinking inline dialog orchestration in `app.js`.

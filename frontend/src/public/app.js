@@ -37,6 +37,7 @@ import { createLayoutSettingsController } from "./ui/layout-settings-controller.
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
+import { createSessionCardInteractionsController } from "./ui/session-card-interactions-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
@@ -282,6 +283,7 @@ let deckActionsController = null;
 let sessionDisposalController = null;
 let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
+let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
@@ -2059,214 +2061,55 @@ function render() {
         activeSessionId: state.activeSessionId,
         visible: initialVisible
       }) || {};
-    focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
-    settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
-    if (settingsDismissBtn) {
-      settingsDismissBtn.addEventListener("click", () => closeSettingsDialog(settingsDialog));
-    }
-    if (settingsDialog && typeof settingsDialog.addEventListener === "function") {
-      settingsDialog.addEventListener("cancel", (event) => {
-        if (event && typeof event.preventDefault === "function") {
-          event.preventDefault();
-        }
-        closeSettingsDialog(settingsDialog);
-      });
-    }
-    renameBtn.addEventListener("click", async () => {
-      const currentSession = getSessionById(session.id) || session;
-      if (isSessionExited(currentSession)) {
-        setError(getBlockedSessionActionMessage([currentSession], "Rename"));
-        return;
-      }
-      const nextName = window.prompt("Session name", currentSession.name || session.id.slice(0, 8));
-      if (nextName === null) {
-        return;
-      }
-      const trimmed = nextName.trim();
-      if (!trimmed) {
-        setError("Session name cannot be empty.");
-        return;
-      }
-      try {
-        const updated = await api.updateSession(session.id, { name: trimmed });
-        applyRuntimeEvent({ type: "session.updated", session: updated });
-        uiState.error = "";
-      } catch {
-        setError("Failed to rename session.");
-      }
-    });
-    closeBtn.addEventListener("click", async () => {
-      const currentSession = getSessionById(session.id) || session;
-      if (!confirmSessionDelete(session)) {
-        return;
-      }
-      if (isSessionExited(currentSession)) {
-        removeSession(currentSession.id);
-        closeSettingsDialog(settingsDialog);
-        uiState.error = "";
-        setCommandFeedback(
-          `Removed exited session [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`
-        );
-        return;
-      }
-      try {
-        await api.deleteSession(session.id);
-        applyRuntimeEvent({ type: "session.closed", sessionId: session.id });
-        uiState.error = "";
-      } catch {
-        setError("Failed to delete session.");
-      }
-    });
-    const markDirtyFromControls = () => {
-      const nextDirty = isSessionSettingsDirty(
-        { startCwdInput, startCommandInput, startEnvInput, sessionSendTerminatorSelect, sessionTagsInput, themeInputs },
-        getSessionById(session.id)
-      );
-      setSettingsDirty(terminals.get(session.id), nextDirty);
-    };
-    startCwdInput.addEventListener("input", markDirtyFromControls);
-    startCommandInput.addEventListener("input", markDirtyFromControls);
-    startEnvInput.addEventListener("input", markDirtyFromControls);
-    if (sessionTagsInput) {
-      sessionTagsInput.addEventListener("input", markDirtyFromControls);
-    }
-    if (sessionSendTerminatorSelect) {
-      sessionSendTerminatorSelect.addEventListener("change", markDirtyFromControls);
-    }
-    themeSelect.addEventListener("change", () => {
-      const nextPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
-      const currentProfile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
-      const preset = getThemePresetById(nextPreset);
-      const nextProfile = nextPreset === "custom" || !preset ? currentProfile : normalizeThemeProfile(preset.profile);
-      sessionThemeDrafts.set(session.id, {
-        preset: nextPreset,
-        profile: nextProfile,
-        category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
-        search: String(themeSearch?.value || "")
-      });
-      syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
-      applyThemeForSession(session.id);
-      markDirtyFromControls();
-      uiState.error = "";
-      render();
-    });
-    if (themeCategory) {
-      themeCategory.addEventListener("change", () => {
-        const current = getSessionThemeConfig(session.id);
-        const category = normalizeThemeFilterCategory(String(themeCategory.value || "all").toLowerCase());
-        sessionThemeDrafts.set(session.id, {
-          ...current,
-          category,
-          search: String(themeSearch?.value || "")
-        });
-        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
-        markDirtyFromControls();
-      });
-    }
-    if (themeSearch) {
-      themeSearch.addEventListener("input", () => {
-        const current = getSessionThemeConfig(session.id);
-        sessionThemeDrafts.set(session.id, {
-          ...current,
-          category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
-          search: String(themeSearch.value || "")
-        });
-        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
-        markDirtyFromControls();
-      });
-    }
-    for (const key of THEME_PROFILE_KEYS) {
-      const input = themeInputs[key];
-      if (!input) {
-        continue;
-      }
-      input.addEventListener("input", () => {
-        const draft = getSessionThemeConfig(session.id);
-        sessionThemeDrafts.set(session.id, {
-          ...draft,
-          preset: "custom",
-          profile: readThemeProfileFromControls({ themeInputs, themeBg, themeFg })
-        });
-        applyThemeForSession(session.id);
-        markDirtyFromControls();
-      });
-    }
-    settingsApplyBtn.addEventListener("click", async () => {
-      const currentSession = getSessionById(session.id) || session;
-      if (isSessionExited(currentSession)) {
-        const blockedMessage = getBlockedSessionActionMessage([currentSession], "Settings apply");
-        setError(blockedMessage);
-        setStartupSettingsFeedback({ startFeedback }, blockedMessage, true);
-        return;
-      }
-      const startupDraft = readSessionStartupFromControls({
+    sessionCardInteractionsController?.bindSessionCardInteractions({
+      session,
+      refs: {
+        focusBtn,
+        settingsBtn,
+        renameBtn,
+        closeBtn,
+        settingsDialog,
+        settingsDismissBtn,
         startCwdInput,
         startCommandInput,
         startEnvInput,
+        sessionSendTerminatorSelect,
         sessionTagsInput,
-        sessionSendTerminatorSelect
-      });
-      if (!startupDraft.startCwd) {
-        setStartupSettingsFeedback({ startFeedback }, "Working Directory cannot be empty.", true);
-        return;
-      }
-      if (!startupDraft.envResult.ok) {
-        setStartupSettingsFeedback({ startFeedback }, startupDraft.envResult.error, true);
-        return;
-      }
-      if (!startupDraft.tagResult.ok) {
-        setStartupSettingsFeedback({ startFeedback }, startupDraft.tagResult.error, true);
-        return;
-      }
-      const profile = readThemeProfileFromControls({ themeInputs, themeBg, themeFg });
-      const invalidKey = THEME_PROFILE_KEYS.find((key) => !isValidHexColor(profile[key]));
-      if (invalidKey) {
-        setError("Custom theme colors must be valid hex values like #1d2021.");
-        return;
-      }
-      const detectedPreset = detectThemePreset(profile);
-      const requestedPreset = TERMINAL_THEME_MODE_SET.has(themeSelect.value) ? themeSelect.value : "custom";
-      const nextPreset = requestedPreset === "custom" ? "custom" : detectedPreset === requestedPreset ? requestedPreset : "custom";
-      sessionThemeDrafts.set(session.id, {
-        preset: nextPreset,
-        profile,
-        category: normalizeThemeFilterCategory(String(themeCategory?.value || "all").toLowerCase()),
-        search: String(themeSearch?.value || "")
-      });
-      applyThemeForSession(session.id);
-      syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
-      uiState.error = "";
-      try {
-        const updated = await api.updateSession(session.id, {
-          startCwd: startupDraft.startCwd,
-          startCommand: startupDraft.startCommand,
-          env: startupDraft.envResult.env,
-          tags: startupDraft.tagResult.tags,
-          themeProfile: profile
-        });
-        applyRuntimeEvent({ type: "session.updated", session: updated });
-        sessionThemeDrafts.delete(session.id);
-        setSessionSendTerminator(session.id, startupDraft.sendTerminator);
-        setStartupSettingsFeedback({ startFeedback }, "Settings saved.");
-        setSettingsDirty(terminals.get(session.id), false);
-      } catch {
-        setError("Failed to save theme settings.");
-        setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
-      }
-    });
-    settingsCancelBtn.addEventListener("click", () => {
-      const freshSession = getSessionById(session.id);
-      sessionThemeDrafts.delete(session.id);
-      if (freshSession) {
-        syncSessionStartupControls(
-          { startCwdInput, startCommandInput, startEnvInput, sessionTagsInput, sessionSendTerminatorSelect },
-          freshSession
-        );
-        syncSessionThemeControls({ themeSelect, themeCategory, themeSearch, themeInputs, themeBg, themeFg }, session.id);
-      }
-      applyThemeForSession(session.id);
-      setStartupSettingsFeedback({ startFeedback }, "");
-      setSettingsDirty(terminals.get(session.id), false);
+        startFeedback,
+        themeCategory,
+        themeSearch,
+        themeSelect,
+        themeBg,
+        themeFg,
+        themeInputs,
+        settingsApplyBtn,
+        settingsCancelBtn
+      },
+      api,
+      getSession: () => getSessionById(session.id),
+      getEntry: () => terminals.get(session.id),
+      onActivateSession: (sessionId) => store.setActiveSession(sessionId),
+      toggleSettingsDialog,
+      closeSettingsDialog,
+      confirmSessionDelete,
+      removeSession,
+      setCommandFeedback,
+      formatSessionToken,
+      formatSessionDisplayName,
+      setError,
+      clearError: () => {
+        uiState.error = "";
+      },
+      applyRuntimeEvent,
+      syncSessionThemeControls,
+      syncSessionStartupControls,
+      applyThemeForSession,
+      getSessionThemeConfig,
+      sessionThemeDrafts,
+      setSettingsDirty,
+      setSessionSendTerminator,
+      setStartupSettingsFeedback,
+      requestRender: () => render()
     });
 
     const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
@@ -2593,6 +2436,22 @@ sessionCardFactoryController = createSessionCardFactoryController({
   renderSessionStatus,
   renderSessionArtifacts,
   setSessionCardVisibility
+});
+
+sessionCardInteractionsController = createSessionCardInteractionsController({
+  windowRef: window,
+  themeModeSet: TERMINAL_THEME_MODE_SET,
+  themeProfileKeys: THEME_PROFILE_KEYS,
+  getThemePresetById,
+  normalizeThemeProfile,
+  normalizeThemeFilterCategory,
+  readThemeProfileFromControls,
+  readSessionStartupFromControls,
+  isValidHexColor,
+  detectThemePreset,
+  isSessionSettingsDirty,
+  isSessionExited,
+  getBlockedSessionActionMessage
 });
 
 sessionCardRenderController = createSessionCardRenderController({
