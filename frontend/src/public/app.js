@@ -34,6 +34,7 @@ import { createCommandSuggestionsController } from "./ui/components.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
+import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -274,6 +275,7 @@ let commandSuggestionsController = null;
 let deckSidebarController = null;
 let sessionCardMetaController = null;
 let layoutSettingsController = null;
+let sessionSettingsDialogController = null;
 const activityCompletionNotifier = createActivityCompletionNotifier({
   windowRef: window,
   aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
@@ -1767,51 +1769,19 @@ function scheduleGlobalResize(options = {}) {
 }
 
 function openSettingsDialog(dialog) {
-  if (!dialog) {
-    return;
-  }
-  if (typeof dialog.showModal === "function") {
-    if (!dialog.open) {
-      dialog.showModal();
-    }
-    return;
-  }
-  dialog.open = true;
-  dialog.classList.add("open");
+  sessionSettingsDialogController?.open(dialog);
 }
 
 function closeSettingsDialog(dialog) {
-  if (!dialog) {
-    return;
-  }
-  if (typeof dialog.close === "function") {
-    if (dialog.open) {
-      dialog.close();
-    }
-    return;
-  }
-  dialog.open = false;
-  dialog.classList.remove("open");
+  sessionSettingsDialogController?.close(dialog);
 }
 
 function confirmSessionDelete(session) {
-  const sessionLabel = String(session?.name || session?.id || "").trim() || "this session";
-  const message = `Delete session '${sessionLabel}' permanently?`;
-  if (!window || typeof window.confirm !== "function") {
-    return true;
-  }
-  return window.confirm(message);
+  return sessionSettingsDialogController?.confirmSessionDelete(session) !== false;
 }
 
 function toggleSettingsDialog(dialog) {
-  if (!dialog) {
-    return;
-  }
-  if (dialog.open) {
-    closeSettingsDialog(dialog);
-    return;
-  }
-  openSettingsDialog(dialog);
+  sessionSettingsDialogController?.toggle(dialog);
 }
 
 function scheduleDeferredResizePasses(options = {}) {
@@ -2790,6 +2760,10 @@ layoutSettingsController = createLayoutSettingsController({
   terminalFontFamily: TERMINAL_FONT_FAMILY,
   cardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
   mountVerticalChromePx: TERMINAL_MOUNT_VERTICAL_CHROME_PX
+});
+
+sessionSettingsDialogController = createSessionSettingsDialogController({
+  windowRef: window
 });
 
 deckSidebarController = createDeckSidebarController({
