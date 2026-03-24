@@ -41,6 +41,13 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add ADR process for architecture decisions.
 - [ ] Add templates for new endpoints and UI modules.
 
+## Lifecycle and State Modeling
+
+- [ ] `LIF-001` Owner `BE`: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
+- [ ] `LIF-002` Owner `FE`: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
+- [ ] `LIF-003` Owner `FE`: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
+- [ ] `LIF-004` Owner `QA`: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
+
 ## Technical Alternatives and Stack Evolution
 
 - [ ] `ALT-001` Owner `BE`: Evaluate and, if adoption triggers are met, migrate the backend HTTP/runtime shell from the current raw Node.js router to a structured framework baseline (Fastify preferred, Express fallback) while preserving the existing OpenAPI contract, WebSocket behavior, and test suite.

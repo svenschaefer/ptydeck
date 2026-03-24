@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Remaining explicit-session-lifecycle follow-up beyond the already implemented `session.exit` fix was decomposed into explicit deferred backlog items (`LIF-001` ... `LIF-004`) in `TODO-OUTLOOK.md`.
 - [x] Deferred plugin/stream-interpretation architecture was decomposed in `TODO-OUTLOOK.md` into explicit follow-up tasks (`ARC-003` ... `ARC-008`) covering stream adaptation, plugin engine, action contract, baseline built-in detectors, artifact extraction, and regression coverage.
 - [x] The next near-term block was promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `v0.3.0-H11` (`QLT-119` ... `QLT-122`), focused on reducer-backed runtime state, WS-authoritative hydration, and automated FE/BE contract regression checks.
 - [x] `QLT-116` completed: backend now emits authoritative WebSocket metadata events for deck/session state mutations, including `deck.created`, `deck.updated`, `deck.deleted`, `session.updated`, and deck-reassignment propagation during forced deck deletion.

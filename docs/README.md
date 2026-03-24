@@ -40,10 +40,14 @@ Authoritative repository documents remain:
 
 - `Codebase Review - Explicit Session Lifecycle Modeling.md`
   - Role: explicit session-state-machine proposal with `session.exit` focus
-  - Status: implemented in current baseline and still useful as a reference for later lifecycle cleanup
+  - Status: critical `session.exit` handling is implemented in the current baseline, but the full lifecycle-state-machine target is not yet realized
   - Backlog landing:
     - `QLT-095`
     - `QLT-096`
+    - `LIF-001`
+    - `LIF-002`
+    - `LIF-003`
+    - `LIF-004`
 
 ### 4. Plugin / Stream Interpretation
 
