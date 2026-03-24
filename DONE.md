@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `withfig/autocomplete` was added to `TODO-OUTLOOK.md` as an explicit inspiration source for deferred command-completion architecture work, yielding new medium-term backlog items for declarative completion specs, generator-backed suggestions, richer suggestion metadata, and autocomplete regression coverage (`REM-010` ... `REM-013`).
 - [x] `QLT-110` completed: active terminals now expose deterministic output search with a dedicated search row, explicit next/previous navigation, wraparound/no-match feedback, and selection/focus behavior that follows deck/session switching without mutating PTY output.
 - [x] `QLT-111` completed: regression coverage now verifies terminal search/find behavior across match navigation, wraparound, no-match state, active-session retargeting after deck switches, and buffer growth while searching.
 - [x] Search state is now synchronized against the active session buffer revision so appended output updates the current result set without requiring a page refresh or manual terminal interaction.
