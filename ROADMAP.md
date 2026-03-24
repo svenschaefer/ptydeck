@@ -496,16 +496,40 @@ Exit criteria:
 - Regression coverage validates reducer-backed state consistency and mixed local/remote event ordering behavior.
 - Automated FE/BE contract checks protect OpenAPI/runtime payload alignment for sessions, decks, and custom commands.
 
+### v0.3.0-H12 - Explicit Session Lifecycle Modeling
+
+- `LIF-001`
+- `LIF-002`
+- `LIF-003`
+- `LIF-004`
+
+Dependencies:
+
+- `LIF-001` should land first so backend runtime events expose an explicit lifecycle contract for startup/running state instead of leaving frontend state to infer process liveness indirectly from partial output or reconnect timing.
+- `LIF-002` depends on `LIF-001` and `QLT-119` ... `QLT-122` so the formal FE lifecycle model lands on top of the extracted reducer/store boundary plus the now-authoritative runtime bootstrap/event path.
+- `LIF-003` depends on `LIF-002` so derived `busy` / `idle` semantics extend the explicit lifecycle model rather than introducing a parallel heuristic-only state system.
+- `LIF-004` depends on `LIF-001`, `LIF-002`, and `LIF-003` so regression coverage targets the finalized ordered lifecycle transitions, reconnect replacement behavior, and post-exit guardrails.
+
+Exit criteria:
+
+- Backend runtime events expose a deterministic startup/running lifecycle contract plus stable exit metadata.
+- Frontend runtime state models ordered lifecycle transitions explicitly instead of relying on special-case `exited` handling only.
+- Derived activity state (`busy` / `idle`) is computed on top of the formal lifecycle model without conflating UI heuristics and process liveness.
+- Regression coverage protects ordered lifecycle transitions, reconnect semantics, and invalid post-exit interactions.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H11`
-- Next milestones in progress: none currently
+- Next milestones in progress: `v0.3.0-H12`
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- None currently.
+- `LIF-001`
+- `LIF-002`
+- `LIF-003`
+- `LIF-004`
 
 ### Completed Items
 

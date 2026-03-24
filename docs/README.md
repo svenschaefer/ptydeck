@@ -40,7 +40,7 @@ Authoritative repository documents remain:
 
 - `Codebase Review - Explicit Session Lifecycle Modeling.md`
   - Role: explicit session-state-machine proposal with `session.exit` focus
-  - Status: critical `session.exit` handling is implemented in the current baseline, but the full lifecycle-state-machine target is not yet realized
+  - Status: critical `session.exit` handling is implemented in the current baseline, and the remaining lifecycle-state-machine formalization is now the active near-term planning block
   - Backlog landing:
     - `QLT-095`
     - `QLT-096`
@@ -112,7 +112,7 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- No imported-doc-derived near-term task block is currently active; the last promoted runtime hardening slice (`QLT-119` ... `QLT-122`) is now completed.
+- The explicit session lifecycle formalization slice (`LIF-001` ... `LIF-004`) is now the active imported-doc-derived near-term block as `v0.3.0-H12`.
 
 ### Deferred / Outlook
 

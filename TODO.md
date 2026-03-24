@@ -13,7 +13,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- None currently.
+- [ ] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
+- [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
+- [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
+- [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -200,6 +203,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-120` Owner: `FE` Task: Make frontend runtime bootstrap and reconnect hydration WebSocket-authoritative for sessions, decks, and custom commands by routing snapshot/live event application through the dedicated reducer/store path and minimizing REST-driven steady-state state merges.
 - [x] `QLT-121` Owner: `QA` Task: Add regression coverage for reducer-backed runtime state application and WebSocket-authoritative bootstrap/reconnect behavior, including mixed local mutation plus remote event ordering and multi-client state parity across sessions, decks, and custom commands.
 - [x] `QLT-122` Owner: `QA` Task: Add automated FE/BE contract regression checks that verify frontend-generated API/runtime expectations stay aligned with backend OpenAPI and representative runtime payload shapes for sessions, decks, and custom commands.
+
+## Lifecycle and State Modeling (v0.3.0 continuation)
+
+- [ ] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
+- [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
+- [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
+- [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 
