@@ -44,6 +44,7 @@ const DEFAULT_DECK_NAME = "Default";
 const DEFAULT_AUTH_WS_TICKET_TTL_SECONDS = 30;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
+const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -602,7 +603,10 @@ export function createRuntime(config) {
     wsErrorsTotal: 0,
     httpRequestsByStatus: new Map(),
     httpRequestsByRoute: new Map(),
-    wsErrorsByReason: new Map()
+    httpRequestDurationMsBuckets: new Map(),
+    wsErrorsByReason: new Map(),
+    wsDisconnectsByReason: new Map(),
+    wsReconnectsByReason: new Map()
   };
   const wsClientConnections = new Map();
   const customCommandMaxCount =
@@ -720,6 +724,14 @@ export function createRuntime(config) {
     lines.push("# HELP ptydeck_http_request_duration_ms_count Total number of observed HTTP request durations.");
     lines.push("# TYPE ptydeck_http_request_duration_ms_count counter");
     lines.push(`ptydeck_http_request_duration_ms_count ${metrics.httpDurationMsCount}`);
+    lines.push("# HELP ptydeck_http_request_duration_ms_bucket HTTP request duration histogram buckets in milliseconds.");
+    lines.push("# TYPE ptydeck_http_request_duration_ms_bucket histogram");
+    for (const bucketLimitMs of HTTP_DURATION_BUCKETS_MS) {
+      lines.push(
+        `ptydeck_http_request_duration_ms_bucket{le="${escapePrometheusLabel(bucketLimitMs)}"} ${metrics.httpRequestDurationMsBuckets.get(bucketLimitMs) || 0}`
+      );
+    }
+    lines.push(`ptydeck_http_request_duration_ms_bucket{le="+Inf"} ${metrics.httpDurationMsCount}`);
     lines.push("# HELP ptydeck_sessions_active Number of active PTY sessions.");
     lines.push("# TYPE ptydeck_sessions_active gauge");
     lines.push(`ptydeck_sessions_active ${manager.list().length}`);
@@ -759,6 +771,16 @@ export function createRuntime(config) {
     lines.push("# TYPE ptydeck_ws_errors_by_reason_total counter");
     for (const [reason, count] of metrics.wsErrorsByReason.entries()) {
       lines.push(`ptydeck_ws_errors_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
+    }
+    lines.push("# HELP ptydeck_ws_disconnects_by_reason_total Websocket disconnects grouped by normalized reason.");
+    lines.push("# TYPE ptydeck_ws_disconnects_by_reason_total counter");
+    for (const [reason, count] of metrics.wsDisconnectsByReason.entries()) {
+      lines.push(`ptydeck_ws_disconnects_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
+    }
+    lines.push("# HELP ptydeck_ws_reconnects_by_reason_total Websocket reconnects grouped by previous disconnect reason.");
+    lines.push("# TYPE ptydeck_ws_reconnects_by_reason_total counter");
+    for (const [reason, count] of metrics.wsReconnectsByReason.entries()) {
+      lines.push(`ptydeck_ws_reconnects_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
     }
     lines.push("# HELP ptydeck_http_requests_by_status_total HTTP requests grouped by status code.");
     lines.push("# TYPE ptydeck_http_requests_by_status_total counter");
@@ -805,6 +827,39 @@ export function createRuntime(config) {
   function recordWsError(reason) {
     metrics.wsErrorsTotal += 1;
     bumpMetricCounter(metrics.wsErrorsByReason, reason);
+  }
+
+  function recordHttpDuration(durationMs) {
+    for (const bucketLimitMs of HTTP_DURATION_BUCKETS_MS) {
+      if (durationMs <= bucketLimitMs) {
+        bumpMetricCounter(metrics.httpRequestDurationMsBuckets, bucketLimitMs);
+      }
+    }
+  }
+
+  function normalizeWsDisconnectReason(code, wsReasonText, wsReasonHint) {
+    if (typeof wsReasonHint === "string" && wsReasonHint) {
+      return wsReasonHint;
+    }
+    if (code === 1000) {
+      return "normal_closure";
+    }
+    if (code === 1001) {
+      return "going_away";
+    }
+    if (code === 1006) {
+      return "abnormal_closure";
+    }
+    if (code >= 4000 && code <= 4999) {
+      return "app_code_4xxx";
+    }
+    if (code >= 3000 && code <= 3999) {
+      return "library_code_3xxx";
+    }
+    if (typeof wsReasonText === "string" && wsReasonText.toLowerCase().includes("timeout")) {
+      return "timeout";
+    }
+    return "other";
   }
 
   function consumeWsTicket(ticket) {
@@ -1381,6 +1436,7 @@ export function createRuntime(config) {
       metrics.httpRequestsTotal += 1;
       metrics.httpDurationMsCount += 1;
       metrics.httpDurationMsSum += durationMs;
+      recordHttpDuration(durationMs);
       if (res.statusCode >= 400) {
         metrics.httpErrorsTotal += 1;
       }
@@ -1796,10 +1852,16 @@ export function createRuntime(config) {
       const normalizedClientIp = typeof requestContext.clientIp === "string" && requestContext.clientIp ? requestContext.clientIp : "unknown";
       const wsClientState = wsClientConnections.get(normalizedClientIp) || {
         activeConnections: 0,
-        acceptedConnections: 0
+        acceptedConnections: 0,
+        lastDisconnectReason: "none"
       };
       if (wsClientState.acceptedConnections > 0 && wsClientState.activeConnections === 0) {
         metrics.wsReconnectsTotal += 1;
+        const reconnectReason =
+          typeof wsClientState.lastDisconnectReason === "string" && wsClientState.lastDisconnectReason
+            ? wsClientState.lastDisconnectReason
+            : "unknown";
+        bumpMetricCounter(metrics.wsReconnectsByReason, reconnectReason);
       }
       wsClientState.acceptedConnections += 1;
       wsClientState.activeConnections += 1;
@@ -1817,13 +1879,17 @@ export function createRuntime(config) {
         ws.isAlive = true;
       });
 
-      ws.on("close", () => {
+      ws.on("close", (code, reasonBuffer) => {
         sockets.delete(ws);
         metrics.wsConnectionsClosedTotal += 1;
         const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
         const wsClientState = wsClientConnections.get(clientIp);
+        const reasonText = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString("utf8") : "";
+        const disconnectReason = normalizeWsDisconnectReason(code, reasonText, ws.closeReasonHint);
+        bumpMetricCounter(metrics.wsDisconnectsByReason, disconnectReason);
         if (wsClientState) {
           wsClientState.activeConnections = Math.max(0, wsClientState.activeConnections - 1);
+          wsClientState.lastDisconnectReason = disconnectReason;
           wsClientConnections.set(clientIp, wsClientState);
         }
         logDebug("ws.client.closed", { socketCount: sockets.size });
@@ -1855,6 +1921,7 @@ export function createRuntime(config) {
   const heartbeat = setInterval(() => {
     for (const ws of sockets) {
       if (!ws.isAlive) {
+        ws.closeReasonHint = "heartbeat_timeout";
         ws.terminate();
         sockets.delete(ws);
         continue;
@@ -2044,6 +2111,7 @@ export function createRuntime(config) {
     }
 
     for (const ws of sockets) {
+      ws.closeReasonHint = "server_shutdown";
       ws.terminate();
     }
     sockets.clear();

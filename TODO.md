@@ -13,7 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
 - [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
 - [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
 - [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
@@ -229,7 +228,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Observability Expansion (v0.4.0 continuation)
 
 - [x] `OBS-001` Owner: `BE` Task: Extend backend metrics with explicit session-lifecycle and connection-quality signals (session create/start/exit/unrestored counters, active-session gauge by lifecycle state, WS reconnect/error counters).
-- [ ] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
+- [x] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
 - [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
 - [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
 

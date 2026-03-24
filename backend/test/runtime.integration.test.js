@@ -990,6 +990,8 @@ test("metrics endpoint exposes request counters and lifecycle/session gauges", a
 
     assert.match(metrics, /# TYPE ptydeck_http_requests_total counter/);
     assert.match(metrics, /ptydeck_http_requests_total \d+/);
+    assert.match(metrics, /# TYPE ptydeck_http_request_duration_ms_bucket histogram/);
+    assert.match(metrics, /ptydeck_http_request_duration_ms_bucket\{le="\+Inf"\} \d+/);
     assert.match(metrics, /# TYPE ptydeck_sessions_active gauge/);
     assert.match(metrics, /ptydeck_sessions_active 1/);
     assert.match(metrics, /# TYPE ptydeck_sessions_active_by_lifecycle gauge/);

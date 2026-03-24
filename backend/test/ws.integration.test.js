@@ -208,6 +208,8 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     assert.equal(reconnectMetricsRes.status, 200);
     const reconnectMetrics = await reconnectMetricsRes.text();
     assert.match(reconnectMetrics, /ptydeck_ws_reconnects_total [1-9]\d*/);
+    assert.match(reconnectMetrics, /ptydeck_ws_reconnects_by_reason_total\{reason="[^"]+"\} [1-9]\d*/);
+    assert.match(reconnectMetrics, /ptydeck_ws_disconnects_by_reason_total\{reason="[^"]+"\} [1-9]\d*/);
 
     const customDeleteRes = await fetch(`${baseUrl}/custom-commands/DoCu`, {
       method: "DELETE"
