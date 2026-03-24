@@ -1,4 +1,5 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { URL } from "node:url";
@@ -40,6 +41,7 @@ const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_DECK_ID = "default";
 const DEFAULT_DECK_NAME = "Default";
+const DEFAULT_AUTH_WS_TICKET_TTL_SECONDS = 30;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
 const DEFAULT_SESSION_THEME_PROFILE = {
@@ -144,6 +146,9 @@ function route(pathname, method) {
   }
   if (pathname === "/api/v1/auth/dev-token" && method === "POST") {
     return { kind: "devToken" };
+  }
+  if (pathname === "/api/v1/auth/ws-ticket" && method === "POST") {
+    return { kind: "wsTicket" };
   }
   if (pathname === "/api/v1/custom-commands" && method === "GET") {
     return { kind: "listCustomCommands" };
@@ -566,7 +571,13 @@ export function createRuntime(config) {
   });
   const createSessionRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
-  const wsServer = new WebSocketServer({ noServer: true });
+  const wsServer = new WebSocketServer({
+    noServer: true,
+    handleProtocols(protocols) {
+      return protocols.has("ptydeck.v1") ? "ptydeck.v1" : false;
+    }
+  });
+  const wsTickets = new Map();
   const sockets = new Set();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
@@ -604,6 +615,10 @@ export function createRuntime(config) {
     Number.isInteger(config.sessionGuardrailSweepMs) && config.sessionGuardrailSweepMs > 0
       ? config.sessionGuardrailSweepMs
       : 1000;
+  const authWsTicketTtlSeconds =
+    Number.isInteger(config.authWsTicketTtlSeconds) && config.authWsTicketTtlSeconds > 0
+      ? config.authWsTicketTtlSeconds
+      : DEFAULT_AUTH_WS_TICKET_TTL_SECONDS;
   const guardrailTimer = setInterval(() => {
     manager.enforceGuardrails();
   }, guardrailSweepMs);
@@ -712,6 +727,63 @@ export function createRuntime(config) {
     return `${lines.join("\n")}\n`;
   }
 
+  function pruneExpiredWsTickets(now = Date.now()) {
+    for (const [ticket, entry] of wsTickets.entries()) {
+      if (entry.expiresAt <= now) {
+        wsTickets.delete(ticket);
+      }
+    }
+  }
+
+  function issueWsTicket(auth) {
+    pruneExpiredWsTickets();
+    const ticket = crypto.randomBytes(24).toString("base64url");
+    wsTickets.set(ticket, {
+      expiresAt: Date.now() + (authWsTicketTtlSeconds * 1000),
+      auth: {
+        subject: auth.subject,
+        tenantId: auth.tenantId,
+        scopes: Array.isArray(auth.scopes) ? auth.scopes.slice() : []
+      }
+    });
+    return {
+      ticket,
+      tokenType: "WsTicket",
+      expiresIn: authWsTicketTtlSeconds
+    };
+  }
+
+  function consumeWsTicket(ticket) {
+    pruneExpiredWsTickets();
+    const normalized = typeof ticket === "string" ? ticket.trim() : "";
+    if (!normalized) {
+      throw new ApiError(401, "Unauthorized", "Missing WebSocket ticket.");
+    }
+    const entry = wsTickets.get(normalized);
+    if (!entry) {
+      throw new ApiError(401, "Unauthorized", "Invalid or expired WebSocket ticket.");
+    }
+    wsTickets.delete(normalized);
+    return entry.auth;
+  }
+
+  function parseRequestedProtocols(headerValue) {
+    if (typeof headerValue !== "string" || !headerValue.trim()) {
+      return [];
+    }
+    return headerValue.split(",").map((entry) => entry.trim()).filter(Boolean);
+  }
+
+  function resolveWsTicketFromProtocols(request) {
+    const protocols = parseRequestedProtocols(request.headers["sec-websocket-protocol"]);
+    for (const protocol of protocols) {
+      if (protocol.startsWith("ptydeck.auth.")) {
+        return protocol.slice("ptydeck.auth.".length);
+      }
+    }
+    return "";
+  }
+
   function requiredScopeForRoute(kind) {
     if (kind === "listDecks" || kind === "getDeck") {
       return "sessions:read";
@@ -730,6 +802,9 @@ export function createRuntime(config) {
     }
     if (kind === "createSession") {
       return "sessions:create";
+    }
+    if (kind === "wsTicket") {
+      return "ws:connect";
     }
     if (kind === "deleteSession") {
       return "sessions:delete";
@@ -1338,6 +1413,14 @@ export function createRuntime(config) {
         return;
       }
 
+      if (match.kind === "wsTicket") {
+        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
+        const payload = issueWsTicket(auth);
+        validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
       if (match.kind !== "notFound") {
         authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
       }
@@ -1619,11 +1702,13 @@ export function createRuntime(config) {
     if (config.authEnabled) {
       try {
         const token = resolveBearerToken(request, requestUrl);
-        const auth = verifyDevToken(token, {
-          secret: config.authDevSecret,
-          issuer: config.authIssuer,
-          audience: config.authAudience
-        });
+        const auth = token
+          ? verifyDevToken(token, {
+              secret: config.authDevSecret,
+              issuer: config.authIssuer,
+              audience: config.authAudience
+            })
+          : consumeWsTicket(resolveWsTicketFromProtocols(request));
         ensureScope(auth, "ws:connect");
       } catch (err) {
         const mapped = toErrorResponse(err);

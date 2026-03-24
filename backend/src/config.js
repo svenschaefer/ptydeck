@@ -42,6 +42,17 @@ function parseBoolean(rawValue) {
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
+function parseAuthMode(rawValue) {
+  const normalized = String(rawValue || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "off" || normalized === "dev" || normalized === "prod") {
+    return normalized;
+  }
+  throw new Error("AUTH_MODE must be one of: off, dev, prod.");
+}
+
 export function loadConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
   const enforceTlsIngress = parseBoolean(env.ENFORCE_TLS_INGRESS ?? (nodeEnv === "production" ? "1" : "0"));
@@ -84,11 +95,14 @@ export function loadConfig(env = process.env) {
       throw new Error("ENFORCE_TLS_INGRESS requires TRUST_PROXY to be configured.");
     }
   }
-  const authEnabledRaw = parseBoolean(env.AUTH_ENABLED);
-  const authDevMode = parseBoolean(env.AUTH_DEV_MODE);
-  const authEnabled = authEnabledRaw || authDevMode;
-  if (authEnabled && !authDevMode) {
-    throw new Error("AUTH_ENABLED currently requires AUTH_DEV_MODE=1.");
+  const authModeRaw = parseAuthMode(env.AUTH_MODE);
+  const legacyAuthEnabled = parseBoolean(env.AUTH_ENABLED);
+  const legacyAuthDevMode = parseBoolean(env.AUTH_DEV_MODE);
+  const authMode = authModeRaw || (legacyAuthEnabled || legacyAuthDevMode ? "dev" : "off");
+  const authEnabled = authMode !== "off";
+  const authDevMode = authMode === "dev";
+  if (authMode === "prod") {
+    throw new Error("AUTH_MODE=prod is not yet supported; use AUTH_MODE=off or AUTH_MODE=dev.");
   }
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
@@ -134,6 +148,10 @@ export function loadConfig(env = process.env) {
     env.AUTH_DEV_TOKEN_TTL_SECONDS || 900,
     "AUTH_DEV_TOKEN_TTL_SECONDS"
   );
+  const authWsTicketTtlSeconds = parsePositiveInt(
+    env.AUTH_WS_TICKET_TTL_SECONDS || 30,
+    "AUTH_WS_TICKET_TTL_SECONDS"
+  );
   return {
     nodeEnv,
     port,
@@ -155,11 +173,13 @@ export function loadConfig(env = process.env) {
     enforceTlsIngress,
     dataEncryptionProvider,
     trustedProxy,
+    authMode,
     authEnabled,
     authDevMode,
     authDevSecret,
     authIssuer,
     authAudience,
-    authDevTokenTtlSeconds
+    authDevTokenTtlSeconds,
+    authWsTicketTtlSeconds
   };
 }

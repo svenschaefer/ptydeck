@@ -158,6 +158,9 @@ export function createApiClient(baseUrl, options = {}) {
     async createDevToken(payload = {}) {
       return request("/auth/dev-token", withJson(payload));
     },
+    async createWsTicket(payload = {}) {
+      return request("/auth/ws-ticket", withJson(payload));
+    },
     async upsertCustomCommand(commandName, content) {
       return request(`/custom-commands/${encodeURIComponent(commandName)}`, {
         method: "PUT",

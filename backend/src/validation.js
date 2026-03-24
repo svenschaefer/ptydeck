@@ -182,6 +182,12 @@ export function validateRequest({ method, pathname, params, body }) {
     }
   }
 
+  if (method === "POST" && pathname === "/api/v1/auth/ws-ticket") {
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
+
   if (method === "GET" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
     if (!params.commandName || typeof params.commandName !== "string") {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
@@ -295,6 +301,15 @@ function isAuthToken(value) {
   );
 }
 
+function isWsTicket(value) {
+  return (
+    isObject(value) &&
+    typeof value.ticket === "string" &&
+    typeof value.tokenType === "string" &&
+    Number.isInteger(value.expiresIn)
+  );
+}
+
 function isCustomCommand(value) {
   return (
     isObject(value) &&
@@ -324,6 +339,10 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "authToken" && !isAuthToken(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match AuthTokenResponse schema.");
+  }
+
+  if (expect === "wsTicket" && !isWsTicket(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match WsTicketResponse schema.");
   }
 
   if (expect === "customCommand" && !isCustomCommand(body)) {

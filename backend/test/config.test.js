@@ -24,12 +24,14 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.enforceTlsIngress, false);
   assert.equal(config.dataEncryptionProvider, null);
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
+  assert.equal(config.authMode, "off");
   assert.equal(config.authEnabled, false);
   assert.equal(config.authDevMode, false);
   assert.equal(config.authDevSecret, "ptydeck-dev-secret");
   assert.equal(config.authIssuer, "ptydeck-dev");
   assert.equal(config.authAudience, "ptydeck-local");
   assert.equal(config.authDevTokenTtlSeconds, 900);
+  assert.equal(config.authWsTicketTtlSeconds, 30);
 });
 
 test("loadConfig maps environment values", () => {
@@ -52,12 +54,12 @@ test("loadConfig maps environment values", () => {
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
     TRUST_PROXY: "loopback",
-    AUTH_ENABLED: "true",
-    AUTH_DEV_MODE: "true",
+    AUTH_MODE: "dev",
     AUTH_DEV_SECRET: "custom-secret",
     AUTH_ISSUER: "issuer-a",
     AUTH_AUDIENCE: "aud-a",
     AUTH_DEV_TOKEN_TTL_SECONDS: "1200",
+    AUTH_WS_TICKET_TTL_SECONDS: "45",
     ENFORCE_TLS_INGRESS: "true"
   });
 
@@ -80,12 +82,14 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
   assert.equal(config.enforceTlsIngress, true);
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
+  assert.equal(config.authMode, "dev");
   assert.equal(config.authEnabled, true);
   assert.equal(config.authDevMode, true);
   assert.equal(config.authDevSecret, "custom-secret");
   assert.equal(config.authIssuer, "issuer-a");
   assert.equal(config.authAudience, "aud-a");
   assert.equal(config.authDevTokenTtlSeconds, 1200);
+  assert.equal(config.authWsTicketTtlSeconds, 45);
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
@@ -189,10 +193,12 @@ test("loadConfig rejects insecure production CORS wildcard and TLS ingress misma
   );
 });
 
-test("loadConfig rejects unsupported auth mode without dev mode", () => {
+test("loadConfig derives dev mode from legacy flags and rejects unsupported prod mode", () => {
+  const legacy = loadConfig({ AUTH_ENABLED: "true", AUTH_DEV_MODE: "true" });
+  assert.equal(legacy.authMode, "dev");
   assert.throws(
-    () => loadConfig({ AUTH_ENABLED: "true", AUTH_DEV_MODE: "false" }),
-    /AUTH_ENABLED currently requires AUTH_DEV_MODE=1\./
+    () => loadConfig({ AUTH_MODE: "prod" }),
+    /AUTH_MODE=prod is not yet supported; use AUTH_MODE=off or AUTH_MODE=dev\./
   );
 });
 

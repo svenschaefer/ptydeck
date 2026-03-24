@@ -207,6 +207,27 @@ test("api client calls create dev token endpoint", async () => {
   assert.equal(calls[0].options.method, "POST");
 });
 
+test("api client calls create ws ticket endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ticket: "ticket-123", tokenType: "WsTicket", expiresIn: 30 })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  api.setAuthToken("dev-token");
+  await api.createWsTicket();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/auth/ws-ticket");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.headers.authorization, "Bearer dev-token");
+});
+
 test("api client calls upsert custom command endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

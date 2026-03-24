@@ -50,6 +50,7 @@ function parseOperations(yamlText) {
 function runtimeOperationKeys() {
   return new Set([
     "POST /auth/dev-token",
+    "POST /auth/ws-ticket",
     "GET /custom-commands",
     "GET /custom-commands/{commandName}",
     "PUT /custom-commands/{commandName}",
@@ -78,6 +79,7 @@ async function startRuntime() {
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
     corsOrigin: "*",
+    authMode: "dev",
     authEnabled: true,
     authDevMode: true,
     authDevSecret: "test-secret",
@@ -109,6 +111,17 @@ test("runtime routes and statuses conform to openapi contract", async () => {
     assert.ok(operations.get("POST /auth/dev-token").has(tokenRes.status));
     const tokenPayload = await tokenRes.json();
     const authHeaders = { authorization: `Bearer ${tokenPayload.accessToken}`, "content-type": "application/json" };
+
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({})
+    });
+    const wsTicketText = await wsTicketRes.text();
+    assert.ok(
+      operations.get("POST /auth/ws-ticket").has(wsTicketRes.status),
+      `unexpected ws-ticket status ${wsTicketRes.status}: ${wsTicketText}`
+    );
 
     const createRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",

@@ -596,7 +596,7 @@ Exit criteria:
 - Latest completed milestone: `v0.3.0-H14`
 - Next milestones in progress: `v0.3.0-H15`
 - Queued next milestone: none currently
-- Blockers: none recorded
+- Blockers: `v0.3.0-H15` completion is currently gated by backend coverage validation because `npm --prefix backend run test:coverage` did not yield a prompt completion during local validation and was aborted per operator preference against waiting on hanging validators.
 
 ### Active Open Tasks (Execution Queue)
 

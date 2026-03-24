@@ -116,12 +116,8 @@ export function verifyDevToken(token, { secret, issuer, audience }) {
 }
 
 export function resolveBearerToken(req, parsedUrl) {
-  const headerToken = parseAuthHeader(req.headers.authorization);
-  if (headerToken) {
-    return headerToken;
-  }
-  const queryToken = parsedUrl.searchParams.get("access_token");
-  return typeof queryToken === "string" ? queryToken.trim() : "";
+  void parsedUrl;
+  return parseAuthHeader(req.headers.authorization);
 }
 
 export function ensureScope(auth, requiredScope) {

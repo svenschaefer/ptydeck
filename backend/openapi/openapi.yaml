@@ -37,6 +37,37 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /auth/ws-ticket:
+    post:
+      operationId: createWsTicket
+      summary: Create a short-lived one-time WebSocket handshake ticket from an authenticated bearer session.
+      responses:
+        '200':
+          description: WebSocket ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WsTicketResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Missing ws:connect scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /custom-commands:
     get:
       operationId: listCustomCommands
@@ -787,6 +818,20 @@ components:
           type: integer
         scope:
           type: string
+    WsTicketResponse:
+      type: object
+      required:
+        - ticket
+        - tokenType
+        - expiresIn
+      properties:
+        ticket:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
   responses:
     TlsRequired:
       description: TLS is required for this endpoint.

@@ -135,6 +135,17 @@ test("validateRequest accepts valid dev token request payload", () => {
   });
 });
 
+test("validateRequest accepts valid ws ticket request payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/auth/ws-ticket",
+      params: {},
+      body: {}
+    });
+  });
+});
+
 test("validateResponse accepts auth token response", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -145,6 +156,20 @@ test("validateResponse accepts auth token response", () => {
         tokenType: "Bearer",
         expiresIn: 900,
         scope: "sessions:read"
+      }
+    });
+  });
+});
+
+test("validateResponse accepts ws ticket response", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "wsTicket",
+      body: {
+        ticket: "ticket-123",
+        tokenType: "WsTicket",
+        expiresIn: 30
       }
     });
   });

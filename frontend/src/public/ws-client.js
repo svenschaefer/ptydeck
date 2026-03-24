@@ -6,19 +6,10 @@ export function createWsClient(url, handlers, options = {}) {
   let closed = false;
   let reconnectTimer = null;
   let reconnectAttempts = 0;
+  let connectGeneration = 0;
   const debug = options.debug === true;
   const log = typeof options.log === "function" ? options.log : () => {};
-  const tokenProvider = typeof options.tokenProvider === "function" ? options.tokenProvider : null;
-
-  function resolveConnectUrl() {
-    const token = tokenProvider ? String(tokenProvider() || "").trim() : "";
-    if (!token) {
-      return url;
-    }
-    const parsed = new URL(url);
-    parsed.searchParams.set("access_token", token);
-    return parsed.toString();
-  }
+  const protocolsProvider = typeof options.protocolsProvider === "function" ? options.protocolsProvider : null;
 
   function nextReconnectDelayMs() {
     const base = Math.min(MAX_RECONNECT_MS, BASE_RECONNECT_MS * (2 ** reconnectAttempts));
@@ -28,18 +19,52 @@ export function createWsClient(url, handlers, options = {}) {
     return Math.max(100, Math.min(MAX_RECONNECT_MS, jittered));
   }
 
-  function connect() {
-    const connectUrl = resolveConnectUrl();
+  function scheduleReconnect() {
+    const delayMs = nextReconnectDelayMs();
     if (debug) {
-      log("ws.connecting", { url: connectUrl });
+      log("ws.closed.reconnect", { url, delayMs, reconnectAttempts });
+    }
+    handlers.onState("reconnecting");
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delayMs);
+  }
+
+  async function connect() {
+    const generation = ++connectGeneration;
+    if (debug) {
+      log("ws.connecting", { url });
     }
     handlers.onState("connecting");
-    socket = new WebSocket(connectUrl);
+    let protocols = undefined;
+    try {
+      const resolved = protocolsProvider ? await protocolsProvider() : undefined;
+      if (Array.isArray(resolved) && resolved.length > 0) {
+        protocols = resolved;
+      }
+    } catch (error) {
+      if (closed || generation !== connectGeneration) {
+        return;
+      }
+      if (debug) {
+        log("ws.protocols.error", { message: error instanceof Error ? error.message : String(error) });
+      }
+      handlers.onState("error");
+      scheduleReconnect();
+      return;
+    }
+
+    if (closed || generation !== connectGeneration) {
+      return;
+    }
+
+    socket = new WebSocket(url, protocols);
 
     socket.addEventListener("open", () => {
       reconnectAttempts = 0;
       if (debug) {
-        log("ws.open", { url: connectUrl });
+        log("ws.open", { url });
       }
       handlers.onState("connected");
     });
@@ -61,7 +86,7 @@ export function createWsClient(url, handlers, options = {}) {
 
     socket.addEventListener("error", () => {
       if (debug) {
-        log("ws.error", { url: connectUrl });
+        log("ws.error", { url });
       }
       handlers.onState("error");
     });
@@ -69,19 +94,11 @@ export function createWsClient(url, handlers, options = {}) {
     socket.addEventListener("close", () => {
       if (closed) {
         if (debug) {
-          log("ws.closed.manual", { url: connectUrl });
+          log("ws.closed.manual", { url });
         }
         return;
       }
-      const delayMs = nextReconnectDelayMs();
-      if (debug) {
-        log("ws.closed.reconnect", { url: connectUrl, delayMs, reconnectAttempts });
-      }
-      handlers.onState("reconnecting");
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        connect();
-      }, delayMs);
+      scheduleReconnect();
     });
   }
 
@@ -90,6 +107,7 @@ export function createWsClient(url, handlers, options = {}) {
   return {
     close() {
       closed = true;
+      connectGeneration += 1;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }

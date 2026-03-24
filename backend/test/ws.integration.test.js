@@ -500,6 +500,7 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     shell: "sh",
     dataPath: join(dir, "sessions.json"),
     corsOrigin: "*",
+    authMode: "dev",
     authEnabled: true,
     authDevMode: true,
     authDevSecret: "test-secret",
@@ -531,12 +532,43 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     assert.equal(tokenRes.status, 200);
     const tokenPayload = await tokenRes.json();
 
+    const legacyQueryEvents = [];
+    const legacyQueryWs = new WebSocket(`${wsUrl}?access_token=${encodeURIComponent(tokenPayload.accessToken)}`);
+    legacyQueryWs.on("error", () => {
+      legacyQueryEvents.push("error");
+    });
+    legacyQueryWs.on("close", () => {
+      legacyQueryEvents.push("close");
+    });
+    await waitFor(() => legacyQueryEvents.includes("close"));
+
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tokenPayload.accessToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    assert.equal(wsTicketRes.status, 200);
+    const wsTicketPayload = await wsTicketRes.json();
+
     const events = [];
-    const authedWs = new WebSocket(`${wsUrl}?access_token=${encodeURIComponent(tokenPayload.accessToken)}`);
+    const authedWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${wsTicketPayload.ticket}`]);
     authedWs.on("message", (buffer) => {
       events.push(JSON.parse(buffer.toString()));
     });
     await waitFor(() => events.some((event) => event.type === "snapshot"));
+
+    const reusedEvents = [];
+    const reusedWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${wsTicketPayload.ticket}`]);
+    reusedWs.on("error", () => {
+      reusedEvents.push("error");
+    });
+    reusedWs.on("close", () => {
+      reusedEvents.push("close");
+    });
+    await waitFor(() => reusedEvents.includes("close"));
 
     const metricsRes = await fetch(`http://127.0.0.1:${port}/metrics`);
     assert.equal(metricsRes.status, 200);

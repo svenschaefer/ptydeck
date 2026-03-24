@@ -5,8 +5,9 @@ import { createWsClient } from "../src/public/ws-client.js";
 class MockWebSocket {
   static instances = [];
 
-  constructor(url) {
+  constructor(url, protocols) {
     this.url = url;
+    this.protocols = protocols;
     this.listeners = new Map();
     this.closeCalls = 0;
     MockWebSocket.instances.push(this);
@@ -174,16 +175,18 @@ test("ws client emits error state and applies bounded reconnect backoff with jit
   assert.equal(timers[5].ms, 10000);
 });
 
-test("ws client appends access_token query when token provider is set", (t) => {
+test("ws client resolves handshake protocols without mutating URL", async (t) => {
   withMockedGlobals(t);
   const client = createWsClient("ws://localhost:18080/ws", {
     onState: () => {},
     onMessage: () => {}
   }, {
-    tokenProvider: () => "dev-token"
+    protocolsProvider: async () => ["ptydeck.v1", "ptydeck.auth.ticket-123"]
   });
 
+  await Promise.resolve();
   assert.equal(MockWebSocket.instances.length, 1);
-  assert.equal(MockWebSocket.instances[0].url, "ws://localhost:18080/ws?access_token=dev-token");
+  assert.equal(MockWebSocket.instances[0].url, "ws://localhost:18080/ws");
+  assert.deepEqual(MockWebSocket.instances[0].protocols, ["ptydeck.v1", "ptydeck.auth.ticket-123"]);
   client.close();
 });

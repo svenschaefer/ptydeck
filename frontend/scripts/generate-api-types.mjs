@@ -21,6 +21,7 @@ const requiredMarkers = [
   "UpsertCustomCommandRequest:",
   "CreateDevTokenRequest:",
   "AuthTokenResponse:",
+  "WsTicketResponse:",
   "ErrorResponse:"
 ];
 for (const marker of requiredMarkers) {
@@ -78,6 +79,8 @@ export type Session = {
   id: string;
   deckId: string;
   state: "starting" | "running" | "unrestored";
+  activityState: "active" | "inactive";
+  activityUpdatedAt: number;
   cwd: string;
   shell: string;
   tags: string[];
@@ -89,6 +92,7 @@ export type Session = {
   createdAt: number;
   updatedAt: number;
   startedAt?: number | null;
+  activityCompletedAt?: number | null;
   exitCode?: number | null;
   exitSignal?: string;
   exitedAt?: number | null;
@@ -136,6 +140,12 @@ export type AuthTokenResponse = {
   tokenType: string;
   expiresIn: number;
   scope: string;
+};
+
+export type WsTicketResponse = {
+  ticket: string;
+  tokenType: string;
+  expiresIn: number;
 };
 
 export type ErrorResponse = {

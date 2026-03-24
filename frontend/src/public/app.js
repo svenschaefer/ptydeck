@@ -3741,7 +3741,21 @@ function startWs() {
 
       applyRuntimeEvent(event);
     }
-  }, { debug: debugLogs, log: debugLog, tokenProvider: () => wsAuthToken });
+  }, {
+    debug: debugLogs,
+    log: debugLog,
+    protocolsProvider: async () => {
+      if (!wsAuthToken) {
+        return ["ptydeck.v1"];
+      }
+      const payload = await api.createWsTicket();
+      const ticket = payload && typeof payload.ticket === "string" ? payload.ticket.trim() : "";
+      if (!ticket) {
+        throw new Error("WebSocket ticket response did not include a ticket.");
+      }
+      return ["ptydeck.v1", `ptydeck.auth.${ticket}`];
+    }
+  });
 }
 
 store.subscribe(render);

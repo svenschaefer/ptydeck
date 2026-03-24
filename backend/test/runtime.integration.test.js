@@ -916,6 +916,7 @@ test("TLS ingress enforcement accepts trusted forwarded HTTPS requests", async (
 
 test("auth dev mode issues token and protects session routes", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
+    authMode: "dev",
     authEnabled: true,
     authDevMode: true,
     authDevSecret: "test-secret",
@@ -938,6 +939,18 @@ test("auth dev mode issues token and protects session routes", async () => {
     assert.equal(tokenRes.status, 200);
     const tokenPayload = await tokenRes.json();
     assert.equal(typeof tokenPayload.accessToken, "string");
+
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tokenPayload.accessToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    assert.equal(wsTicketRes.status, 200);
+    const wsTicketPayload = await wsTicketRes.json();
+    assert.equal(typeof wsTicketPayload.ticket, "string");
 
     const listRes = await fetch(`${baseUrl}/sessions`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }

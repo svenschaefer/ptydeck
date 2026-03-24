@@ -13,6 +13,7 @@ test("generated frontend api types stay aligned with backend openapi markers", a
   ]);
 
   const requiredOpenApiMarkers = [
+    "operationId: createWsTicket",
     "operationId: listDecks",
     "operationId: listCustomCommands",
     "operationId: createSession",
@@ -46,7 +47,9 @@ test("generated frontend api types stay aligned with backend openapi markers", a
     "content: string;",
     "export type UpsertCustomCommandRequest = {",
     "export type AuthTokenResponse = {",
-    "accessToken: string;"
+    "accessToken: string;",
+    "export type WsTicketResponse = {",
+    "ticket: string;"
   ];
   for (const marker of requiredGeneratedTypeMarkers) {
     assert.ok(apiTypes.includes(marker), `expected generated api type marker ${marker}`);
