@@ -1,0 +1,106 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { createSessionCardMetaController } from "../src/public/ui/session-card-meta-controller.js";
+
+function createClassList() {
+  const values = new Set();
+  return {
+    add(value) {
+      values.add(String(value));
+    },
+    remove(value) {
+      values.delete(String(value));
+    },
+    toggle(value, force) {
+      const key = String(value);
+      if (force === true) {
+        values.add(key);
+        return true;
+      }
+      if (force === false) {
+        values.delete(key);
+        return false;
+      }
+      if (values.has(key)) {
+        values.delete(key);
+        return false;
+      }
+      values.add(key);
+      return true;
+    },
+    contains(value) {
+      return values.has(String(value));
+    }
+  };
+}
+
+test("session-card-meta controller updates dirty/saved state", () => {
+  const entry = {
+    settingsStatus: { textContent: "", classList: createClassList() },
+    settingsApplyBtn: { disabled: false },
+    settingsDirty: false
+  };
+  const controller = createSessionCardMetaController({
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    now: () => 0,
+    windowRef: { document: { hidden: false } }
+  });
+
+  controller.setSettingsDirty(entry, true);
+  assert.equal(entry.settingsDirty, true);
+  assert.equal(entry.settingsApplyBtn.disabled, false);
+  assert.equal(entry.settingsStatus.textContent, "Unsaved changes");
+  assert.equal(entry.settingsStatus.classList.contains("dirty"), true);
+
+  controller.setSettingsDirty(entry, false);
+  assert.equal(entry.settingsDirty, false);
+  assert.equal(entry.settingsApplyBtn.disabled, true);
+  assert.equal(entry.settingsStatus.textContent, "Saved");
+  assert.equal(entry.settingsStatus.classList.contains("saved"), true);
+});
+
+test("session-card-meta controller renders tags, badges, status and artifacts", () => {
+  let nowMs = 1_000;
+  const controller = createSessionCardMetaController({
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    now: () => nowMs,
+    windowRef: { document: { hidden: false } }
+  });
+
+  const entry = {
+    tagListEl: { textContent: "", classList: createClassList() },
+    pluginBadgesEl: { textContent: "", classList: createClassList() },
+    sessionStatusEl: { textContent: "", hidden: true },
+    sessionArtifactsEl: { textContent: "", hidden: true }
+  };
+  const session = {
+    id: "s-1",
+    tags: ["alpha", "beta"],
+    pluginBadges: [{ text: "Working" }, { text: "GPU" }],
+    interpretationState: "working",
+    statusText: "Working (7m 04s • esc to interrupt)",
+    artifacts: [{ title: "Summary", text: "Done" }]
+  };
+
+  controller.renderSessionTagList(entry, session);
+  controller.renderSessionPluginBadges(entry, session);
+  controller.renderSessionStatus(entry, session);
+  controller.renderSessionArtifacts(entry, session);
+
+  assert.equal(entry.tagListEl.textContent, "#alpha #beta");
+  assert.equal(entry.pluginBadgesEl.textContent, "Working · GPU");
+  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
+  assert.equal(entry.sessionStatusEl.hidden, false);
+  assert.equal(entry.sessionArtifactsEl.textContent, "Summary: Done");
+  assert.equal(entry.sessionArtifactsEl.hidden, false);
+
+  nowMs += 2_000;
+  controller.renderSessionStatus(entry, session);
+  assert.equal(entry.sessionStatusEl.textContent, "Working (426s • esc to interrupt)");
+
+  controller.clearSessionStatusAnchor("s-1");
+  nowMs += 2_000;
+  controller.renderSessionStatus(entry, session);
+  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
+});

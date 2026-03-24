@@ -31,6 +31,8 @@ import {
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createCommandSuggestionsController } from "./ui/components.js";
+import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
+import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -108,7 +110,6 @@ let commandPreviewTimer = null;
 let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
 let commandSuggestionsRequestId = 0;
-let statusTickerTimer = null;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const ACTIVE_DECK_STORAGE_KEY = "ptydeck.active-deck.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
@@ -255,7 +256,6 @@ const SYSTEM_SLASH_COMMANDS = [
 let terminalSettings = loadTerminalSettings();
 let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
-const sessionStatusDurationAnchors = new Map();
 let wsAuthToken = "";
 let wsAuthTokenExpiresAtMs = 0;
 let authRefreshTimer = null;
@@ -270,6 +270,8 @@ let sessionViewModel = null;
 let commandEngine = null;
 let commandExecutor = null;
 let commandSuggestionsController = null;
+let deckSidebarController = null;
+let sessionCardMetaController = null;
 const activityCompletionNotifier = createActivityCompletionNotifier({
   windowRef: window,
   aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
@@ -1467,27 +1469,11 @@ function areStringArraysEqual(left, right) {
 }
 
 function setSettingsStatus(entry, text, kind = "") {
-  if (!entry?.settingsStatus) {
-    return;
-  }
-  entry.settingsStatus.textContent = String(text || "");
-  entry.settingsStatus.classList.toggle("dirty", kind === "dirty");
-  entry.settingsStatus.classList.toggle("saved", kind === "saved");
+  sessionCardMetaController?.setSettingsStatus(entry, text, kind);
 }
 
 function setSettingsDirty(entry, dirty) {
-  if (!entry) {
-    return;
-  }
-  entry.settingsDirty = Boolean(dirty);
-  if (entry.settingsApplyBtn) {
-    entry.settingsApplyBtn.disabled = !entry.settingsDirty;
-  }
-  if (entry.settingsDirty) {
-    setSettingsStatus(entry, "Unsaved changes", "dirty");
-  } else {
-    setSettingsStatus(entry, "Saved", "saved");
-  }
+  sessionCardMetaController?.setSettingsDirty(entry, dirty);
 }
 
 function isSessionSettingsDirty(entry, session) {
@@ -1525,111 +1511,23 @@ function isSessionSettingsDirty(entry, session) {
 }
 
 function renderSessionTagList(entry, session) {
-  if (!entry?.tagListEl) {
-    return;
-  }
-  const tags = normalizeSessionTags(session?.tags);
-  entry.tagListEl.textContent = tags.map((tag) => `#${tag}`).join(" ");
-  entry.tagListEl.classList.toggle("empty", tags.length === 0);
+  sessionCardMetaController?.renderSessionTagList(entry, session);
 }
 
 function renderSessionPluginBadges(entry, session) {
-  if (!entry?.pluginBadgesEl) {
-    return;
-  }
-  const badges = Array.isArray(session?.pluginBadges) ? session.pluginBadges.filter((badge) => badge && badge.text) : [];
-  entry.pluginBadgesEl.textContent = badges.map((badge) => badge.text).join(" · ");
-  entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
-}
-
-function parseDurationStatusText(statusText) {
-  const match = String(statusText || "").match(/^(.*\()(?:(\d+)m\s*)?(\d{1,2})s([^)]+\))$/);
-  if (!match) {
-    return null;
-  }
-  const minutes = match[2] ? Number.parseInt(match[2], 10) : 0;
-  const secondsPart = Number.parseInt(match[3], 10);
-  const seconds = minutes * 60 + secondsPart;
-  return {
-    prefix: match[1],
-    seconds,
-    suffix: match[4]
-  };
-}
-
-function formatLiveSessionStatus(session) {
-  const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
-  if (!rawStatus) {
-    sessionStatusDurationAnchors.delete(session?.id);
-    return "";
-  }
-  const parsed = parseDurationStatusText(rawStatus);
-  if (!parsed || !Number.isFinite(parsed.seconds) || session?.interpretationState !== "working") {
-    sessionStatusDurationAnchors.delete(session?.id);
-    return rawStatus;
-  }
-  const sessionId = String(session?.id || "");
-  if (!sessionId) {
-    return rawStatus;
-  }
-  const now = Date.now();
-  const existing = sessionStatusDurationAnchors.get(sessionId);
-  if (!existing || existing.rawStatus !== rawStatus) {
-    sessionStatusDurationAnchors.set(sessionId, {
-      rawStatus,
-      baseSeconds: parsed.seconds,
-      baseAtMs: now,
-      prefix: parsed.prefix,
-      suffix: parsed.suffix
-    });
-    return rawStatus;
-  }
-  const elapsedSeconds = Math.max(0, Math.floor((now - existing.baseAtMs) / 1000));
-  return `${existing.prefix}${existing.baseSeconds + elapsedSeconds}s${existing.suffix}`;
-}
-
-function hasLiveDurationStatus(session) {
-  const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
-  if (!rawStatus || session?.interpretationState !== "working") {
-    return false;
-  }
-  const parsed = parseDurationStatusText(rawStatus);
-  return Boolean(parsed && Number.isFinite(parsed.seconds));
+  sessionCardMetaController?.renderSessionPluginBadges(entry, session);
 }
 
 function syncStatusTicker(sessions) {
-  const shouldTick = Array.isArray(sessions) && sessions.some((session) => hasLiveDurationStatus(session));
-  if (shouldTick && statusTickerTimer === null) {
-    statusTickerTimer = setInterval(() => {
-      if (typeof document !== "undefined" && document?.hidden === true) {
-        return;
-      }
-      render();
-    }, 1000);
-    return;
-  }
-  if (!shouldTick && statusTickerTimer !== null) {
-    clearInterval(statusTickerTimer);
-    statusTickerTimer = null;
-  }
+  sessionCardMetaController?.syncStatusTicker(sessions);
 }
 
 function renderSessionStatus(entry, session) {
-  if (!entry?.sessionStatusEl) {
-    return;
-  }
-  const statusText = formatLiveSessionStatus(session);
-  entry.sessionStatusEl.hidden = !statusText;
-  entry.sessionStatusEl.textContent = statusText;
+  sessionCardMetaController?.renderSessionStatus(entry, session);
 }
 
 function renderSessionArtifacts(entry, session) {
-  if (!entry?.sessionArtifactsEl) {
-    return;
-  }
-  const artifacts = Array.isArray(session?.artifacts) ? session.artifacts.filter((artifact) => artifact && artifact.title) : [];
-  entry.sessionArtifactsEl.hidden = artifacts.length === 0;
-  entry.sessionArtifactsEl.textContent = artifacts.map((artifact) => `${artifact.title}: ${artifact.text}`).join("\n\n");
+  sessionCardMetaController?.renderSessionArtifacts(entry, session);
 }
 
 function measureTerminalCellWidthPx() {
@@ -2017,94 +1915,23 @@ function scheduleBootstrapFallback() {
 }
 
 function getSessionCountForDeck(deckId, sessions) {
+  if (deckSidebarController) {
+    return deckSidebarController.getSessionCountForDeck(deckId, sessions);
+  }
   return sessions.reduce((count, session) => (resolveSessionDeckId(session) === deckId ? count + 1 : count), 0);
 }
 
 function renderDeckTabs(sessions) {
-  if (!deckTabsEl || typeof document.createElement !== "function") {
+  if (!deckSidebarController) {
     return;
   }
   const state = store.getState();
-  const activeSessionId = state.activeSessionId;
-  const decks = state.decks;
-  const activeDeckId = state.activeDeckId;
-  while (deckTabsEl.firstChild) {
-    deckTabsEl.removeChild(deckTabsEl.firstChild);
-  }
-  if (!Array.isArray(decks) || decks.length === 0) {
-    const hint = document.createElement("span");
-    hint.className = "deck-tab deck-tab-empty";
-    hint.textContent = "No decks";
-    deckTabsEl.appendChild(hint);
-    return;
-  }
-  for (const deck of decks) {
-    const group = document.createElement("div");
-    group.className = "deck-group";
-    group.setAttribute("data-deck-id", deck.id);
-
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.className = "deck-tab";
-    if (deck.id === activeDeckId) {
-      tab.classList.add("active");
-    }
-    tab.setAttribute("data-deck-id", deck.id);
-    const count = getSessionCountForDeck(deck.id, sessions);
-    const nameEl = document.createElement("span");
-    nameEl.className = "deck-tab-name";
-    nameEl.textContent = deck.name;
-    const countEl = document.createElement("span");
-    countEl.className = "deck-tab-count";
-    countEl.textContent = String(count);
-    tab.appendChild(nameEl);
-    tab.appendChild(countEl);
-    tab.addEventListener("click", () => setActiveDeck(deck.id));
-    group.appendChild(tab);
-
-    const deckSessions = sessions.filter((session) => resolveSessionDeckId(session) === deck.id);
-    if (deckSessions.length > 0) {
-      const sessionList = document.createElement("div");
-      sessionList.className = "deck-session-list";
-      for (const session of deckSessions) {
-        const sessionButton = document.createElement("button");
-        sessionButton.type = "button";
-        sessionButton.className = "deck-session-btn";
-        sessionButton.setAttribute("data-session-id", session.id);
-        if (activeSessionId === session.id) {
-          sessionButton.classList.add("active");
-        }
-
-        const quickIdEl = document.createElement("span");
-        quickIdEl.className = "deck-session-quick-id session-quick-id";
-        quickIdEl.textContent = ensureQuickId(session.id);
-
-        const sessionNameEl = document.createElement("span");
-        sessionNameEl.className = "deck-session-name";
-        sessionNameEl.textContent = formatSessionDisplayName(session);
-
-        const activityIndicatorEl = document.createElement("span");
-        activityIndicatorEl.className = "deck-session-activity-indicator";
-        const activityIndicatorState = getSessionActivityIndicatorState(session);
-        activityIndicatorEl.hidden = !activityIndicatorState;
-        if (activityIndicatorState) {
-          activityIndicatorEl.classList.add(activityIndicatorState);
-        }
-        activityIndicatorEl.setAttribute("aria-hidden", "true");
-
-        sessionButton.appendChild(quickIdEl);
-        sessionButton.appendChild(sessionNameEl);
-        sessionButton.appendChild(activityIndicatorEl);
-        sessionButton.addEventListener("click", () => {
-          activateSessionTarget(session);
-        });
-        sessionList.appendChild(sessionButton);
-      }
-      group.appendChild(sessionList);
-    }
-
-    deckTabsEl.appendChild(group);
-  }
+  deckSidebarController.render({
+    decks: state.decks,
+    sessions,
+    activeDeckId: state.activeDeckId,
+    activeSessionId: state.activeSessionId
+  });
 }
 
 function setActiveDeck(deckId) {
@@ -2349,7 +2176,7 @@ function render() {
       resizeTimers.delete(sessionId);
       terminalSizes.delete(sessionId);
       sessionThemeDrafts.delete(sessionId);
-      sessionStatusDurationAnchors.delete(sessionId);
+      sessionCardMetaController?.clearSessionStatusAnchor(sessionId);
       shouldRunResizePass = true;
     }
   }
@@ -2972,6 +2799,23 @@ sessionViewModel = createSessionViewModel({
   sessionEnvKeyPattern: SESSION_ENV_KEY_PATTERN,
   sessionEnvMaxEntries: SESSION_ENV_MAX_ENTRIES,
   formatSessionToken
+});
+
+sessionCardMetaController = createSessionCardMetaController({
+  normalizeSessionTags,
+  onTick: () => render(),
+  windowRef: window
+});
+
+deckSidebarController = createDeckSidebarController({
+  containerEl: deckTabsEl,
+  documentRef: document,
+  resolveSessionDeckId,
+  ensureQuickId,
+  formatSessionDisplayName,
+  getSessionActivityIndicatorState,
+  onActivateDeck: (deckId) => setActiveDeck(deckId),
+  onActivateSession: (session) => activateSessionTarget(session)
 });
 
 commandEngine = createCommandEngine({
