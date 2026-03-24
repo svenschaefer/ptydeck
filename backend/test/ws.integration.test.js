@@ -204,6 +204,10 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     assertCustomCommandShape(reconnectSnapshot.customCommands[0]);
     assert.equal(reconnectSnapshot.customCommands[0].name, "docu");
     assertDeckShape(reconnectSnapshot.decks.find((deck) => deck.id === "default"));
+    const reconnectMetricsRes = await fetch(`http://${new URL(baseUrl).host}/metrics`);
+    assert.equal(reconnectMetricsRes.status, 200);
+    const reconnectMetrics = await reconnectMetricsRes.text();
+    assert.match(reconnectMetrics, /ptydeck_ws_reconnects_total [1-9]\d*/);
 
     const customDeleteRes = await fetch(`${baseUrl}/custom-commands/DoCu`, {
       method: "DELETE"
@@ -574,6 +578,8 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     assert.equal(metricsRes.status, 200);
     const metricsText = await metricsRes.text();
     assert.match(metricsText, /ptydeck_ws_connections_active 1/);
+    assert.match(metricsText, /ptydeck_ws_errors_total [1-9]\d*/);
+    assert.match(metricsText, /ptydeck_ws_errors_by_reason_total\{reason="upgrade_auth_rejected"\} [1-9]\d*/);
 
     authedWs.close();
   } finally {

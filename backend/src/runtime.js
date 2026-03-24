@@ -260,6 +260,10 @@ function escapePrometheusLabel(value) {
     .replaceAll("\n", "\\n");
 }
 
+function bumpMetricCounter(map, key, amount = 1) {
+  map.set(key, (map.get(key) || 0) + amount);
+}
+
 function normalizeCustomCommandName(value) {
   return String(value || "")
     .trim()
@@ -588,11 +592,19 @@ export function createRuntime(config) {
     httpErrorsTotal: 0,
     httpDurationMsSum: 0,
     httpDurationMsCount: 0,
+    sessionsCreatedTotal: 0,
+    sessionsStartedTotal: 0,
+    sessionsExitedTotal: 0,
+    sessionsUnrestoredTotal: 0,
     wsConnectionsOpenedTotal: 0,
     wsConnectionsClosedTotal: 0,
+    wsReconnectsTotal: 0,
+    wsErrorsTotal: 0,
     httpRequestsByStatus: new Map(),
-    httpRequestsByRoute: new Map()
+    httpRequestsByRoute: new Map(),
+    wsErrorsByReason: new Map()
   };
+  const wsClientConnections = new Map();
   const customCommandMaxCount =
     Number.isInteger(config.customCommandMaxCount) && config.customCommandMaxCount > 0
       ? config.customCommandMaxCount
@@ -686,6 +698,15 @@ export function createRuntime(config) {
   }
 
   function renderMetrics() {
+    const sessionsByLifecycle = new Map();
+    for (const session of manager.list()) {
+      const state = typeof session.state === "string" && session.state ? session.state : "unknown";
+      bumpMetricCounter(sessionsByLifecycle, state);
+    }
+    if (unrestoredSessions.size > 0) {
+      bumpMetricCounter(sessionsByLifecycle, "unrestored", unrestoredSessions.size);
+    }
+
     const lines = [];
     lines.push("# HELP ptydeck_http_requests_total Total number of HTTP requests.");
     lines.push("# TYPE ptydeck_http_requests_total counter");
@@ -702,6 +723,23 @@ export function createRuntime(config) {
     lines.push("# HELP ptydeck_sessions_active Number of active PTY sessions.");
     lines.push("# TYPE ptydeck_sessions_active gauge");
     lines.push(`ptydeck_sessions_active ${manager.list().length}`);
+    lines.push("# HELP ptydeck_sessions_active_by_lifecycle Number of sessions grouped by lifecycle state.");
+    lines.push("# TYPE ptydeck_sessions_active_by_lifecycle gauge");
+    for (const [state, count] of sessionsByLifecycle.entries()) {
+      lines.push(`ptydeck_sessions_active_by_lifecycle{state="${escapePrometheusLabel(state)}"} ${count}`);
+    }
+    lines.push("# HELP ptydeck_sessions_created_total Total number of created sessions.");
+    lines.push("# TYPE ptydeck_sessions_created_total counter");
+    lines.push(`ptydeck_sessions_created_total ${metrics.sessionsCreatedTotal}`);
+    lines.push("# HELP ptydeck_sessions_started_total Total number of started sessions.");
+    lines.push("# TYPE ptydeck_sessions_started_total counter");
+    lines.push(`ptydeck_sessions_started_total ${metrics.sessionsStartedTotal}`);
+    lines.push("# HELP ptydeck_sessions_exited_total Total number of exited sessions.");
+    lines.push("# TYPE ptydeck_sessions_exited_total counter");
+    lines.push(`ptydeck_sessions_exited_total ${metrics.sessionsExitedTotal}`);
+    lines.push("# HELP ptydeck_sessions_unrestored_total Total number of sessions marked unrestored during startup.");
+    lines.push("# TYPE ptydeck_sessions_unrestored_total counter");
+    lines.push(`ptydeck_sessions_unrestored_total ${metrics.sessionsUnrestoredTotal}`);
     lines.push("# HELP ptydeck_ws_connections_active Number of active WebSocket connections.");
     lines.push("# TYPE ptydeck_ws_connections_active gauge");
     lines.push(`ptydeck_ws_connections_active ${sockets.size}`);
@@ -711,6 +749,17 @@ export function createRuntime(config) {
     lines.push("# HELP ptydeck_ws_connections_closed_total Total number of closed WebSocket connections.");
     lines.push("# TYPE ptydeck_ws_connections_closed_total counter");
     lines.push(`ptydeck_ws_connections_closed_total ${metrics.wsConnectionsClosedTotal}`);
+    lines.push("# HELP ptydeck_ws_reconnects_total Total number of websocket reconnects observed per client IP.");
+    lines.push("# TYPE ptydeck_ws_reconnects_total counter");
+    lines.push(`ptydeck_ws_reconnects_total ${metrics.wsReconnectsTotal}`);
+    lines.push("# HELP ptydeck_ws_errors_total Total number of websocket upgrade/socket errors.");
+    lines.push("# TYPE ptydeck_ws_errors_total counter");
+    lines.push(`ptydeck_ws_errors_total ${metrics.wsErrorsTotal}`);
+    lines.push("# HELP ptydeck_ws_errors_by_reason_total Websocket errors grouped by reason.");
+    lines.push("# TYPE ptydeck_ws_errors_by_reason_total counter");
+    for (const [reason, count] of metrics.wsErrorsByReason.entries()) {
+      lines.push(`ptydeck_ws_errors_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
+    }
     lines.push("# HELP ptydeck_http_requests_by_status_total HTTP requests grouped by status code.");
     lines.push("# TYPE ptydeck_http_requests_by_status_total counter");
     for (const [statusCode, count] of metrics.httpRequestsByStatus.entries()) {
@@ -751,6 +800,11 @@ export function createRuntime(config) {
       tokenType: "WsTicket",
       expiresIn: authWsTicketTtlSeconds
     };
+  }
+
+  function recordWsError(reason) {
+    metrics.wsErrorsTotal += 1;
+    bumpMetricCounter(metrics.wsErrorsByReason, reason);
   }
 
   function consumeWsTicket(ticket) {
@@ -1302,6 +1356,13 @@ export function createRuntime(config) {
       } else {
         broadcast({ type: eventName, ...event });
       }
+      if (eventName === "session.created") {
+        metrics.sessionsCreatedTotal += 1;
+      } else if (eventName === "session.started") {
+        metrics.sessionsStartedTotal += 1;
+      } else if (eventName === "session.exit") {
+        metrics.sessionsExitedTotal += 1;
+      }
       if (eventName !== "session.data") {
         persistSoon();
       }
@@ -1323,8 +1384,8 @@ export function createRuntime(config) {
       if (res.statusCode >= 400) {
         metrics.httpErrorsTotal += 1;
       }
-      metrics.httpRequestsByStatus.set(statusCode, (metrics.httpRequestsByStatus.get(statusCode) || 0) + 1);
-      metrics.httpRequestsByRoute.set(routeKey, (metrics.httpRequestsByRoute.get(routeKey) || 0) + 1);
+      bumpMetricCounter(metrics.httpRequestsByStatus, statusCode);
+      bumpMetricCounter(metrics.httpRequestsByRoute, routeKey);
       logDebug("http.request.done", {
         method: methodForLog,
         pathname: pathnameForLog,
@@ -1661,6 +1722,7 @@ export function createRuntime(config) {
     const requestContext = resolveRequestContext(request, config.trustedProxy);
     const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
     if (requestUrl.pathname !== "/ws") {
+      recordWsError("upgrade_path_rejected");
       logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
       socket.destroy();
       return;
@@ -1675,6 +1737,7 @@ export function createRuntime(config) {
         trustedProxy: requestContext.trustedProxy,
         protocol: requestContext.protocol
       });
+      recordWsError("upgrade_tls_rejected");
       socket.write(
         `HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(payload)}`
       );
@@ -1692,6 +1755,7 @@ export function createRuntime(config) {
         clientIp: requestContext.clientIp,
         trustedProxy: requestContext.trustedProxy
       });
+      recordWsError("upgrade_rate_limited");
       socket.write(
         `HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nConnection: close\r\nRetry-After: ${wsRateLimitResult.retryAfterSeconds}\r\n\r\n${JSON.stringify(payload)}`
       );
@@ -1717,6 +1781,7 @@ export function createRuntime(config) {
           error: mapped.body.error,
           message: mapped.body.message
         });
+        recordWsError("upgrade_auth_rejected");
         socket.write(
           `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
         );
@@ -1728,6 +1793,18 @@ export function createRuntime(config) {
     wsServer.handleUpgrade(request, socket, head, (ws) => {
       sockets.add(ws);
       metrics.wsConnectionsOpenedTotal += 1;
+      const normalizedClientIp = typeof requestContext.clientIp === "string" && requestContext.clientIp ? requestContext.clientIp : "unknown";
+      const wsClientState = wsClientConnections.get(normalizedClientIp) || {
+        activeConnections: 0,
+        acceptedConnections: 0
+      };
+      if (wsClientState.acceptedConnections > 0 && wsClientState.activeConnections === 0) {
+        metrics.wsReconnectsTotal += 1;
+      }
+      wsClientState.acceptedConnections += 1;
+      wsClientState.activeConnections += 1;
+      wsClientConnections.set(normalizedClientIp, wsClientState);
+      ws.clientIp = normalizedClientIp;
       ws.isAlive = true;
       logDebug("ws.upgrade.accepted", {
         socketCount: sockets.size,
@@ -1743,7 +1820,16 @@ export function createRuntime(config) {
       ws.on("close", () => {
         sockets.delete(ws);
         metrics.wsConnectionsClosedTotal += 1;
+        const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
+        const wsClientState = wsClientConnections.get(clientIp);
+        if (wsClientState) {
+          wsClientState.activeConnections = Math.max(0, wsClientState.activeConnections - 1);
+          wsClientConnections.set(clientIp, wsClientState);
+        }
         logDebug("ws.client.closed", { socketCount: sockets.size });
+      });
+      ws.on("error", () => {
+        recordWsError("socket_error");
       });
 
       const snapshot = manager.getSnapshot();
@@ -1885,6 +1971,7 @@ export function createRuntime(config) {
 
         if (!restored) {
           unrestoredSessions.set(normalizedUnrestoredSession.id, normalizedUnrestoredSession);
+          metrics.sessionsUnrestoredTotal += 1;
           logDebug("runtime.restore.session_marked_unrestored", {
             sessionId: normalizedUnrestoredSession.id
           });

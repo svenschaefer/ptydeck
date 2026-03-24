@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H1` (Observability Expansion).
-- Active scoped tasks (`H1`): `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
+- Active scoped tasks (`H1`): `OBS-002`, `OBS-003`, `OBS-004` (`OBS-001` completed).
 - Next queued wave (after `H1`): `v0.4.0-H2` (Layered Frontend Architecture Completion) with `ARC-009`, `ARC-010`, `ARC-011`, `ARC-012`.
 
 ## Dependency Rules
@@ -600,13 +600,19 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H15`
-- Next milestones in progress: none currently
-- Queued next milestone: none currently
+- Next milestone in progress: `v0.4.0-H1` (Observability Expansion)
+- Queued next milestone: `v0.4.0-H2` (Layered Frontend Architecture Completion)
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- None currently.
+- `OBS-002` Owner: `BE`
+- `OBS-003` Owner: `PLAT`
+- `OBS-004` Owner: `QA`
+- `ARC-009` Owner: `FE` (queued next wave `v0.4.0-H2`)
+- `ARC-010` Owner: `FE` (queued next wave `v0.4.0-H2`)
+- `ARC-011` Owner: `FE` (queued next wave `v0.4.0-H2`)
+- `ARC-012` Owner: `QA` (queued next wave `v0.4.0-H2`)
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 

@@ -973,7 +973,7 @@ test("auth dev mode issues token and protects session routes", async () => {
   }
 });
 
-test("metrics endpoint exposes request counters and active session gauge", async () => {
+test("metrics endpoint exposes request counters and lifecycle/session gauges", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
   try {
@@ -992,6 +992,16 @@ test("metrics endpoint exposes request counters and active session gauge", async
     assert.match(metrics, /ptydeck_http_requests_total \d+/);
     assert.match(metrics, /# TYPE ptydeck_sessions_active gauge/);
     assert.match(metrics, /ptydeck_sessions_active 1/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_active_by_lifecycle gauge/);
+    assert.match(metrics, /ptydeck_sessions_active_by_lifecycle\{state="running"\} 1/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_created_total counter/);
+    assert.match(metrics, /ptydeck_sessions_created_total 1/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_started_total counter/);
+    assert.match(metrics, /ptydeck_sessions_started_total 1/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_exited_total counter/);
+    assert.match(metrics, /ptydeck_sessions_exited_total 0/);
+    assert.match(metrics, /# TYPE ptydeck_sessions_unrestored_total counter/);
+    assert.match(metrics, /ptydeck_sessions_unrestored_total 0/);
     assert.match(metrics, /ptydeck_http_requests_by_route_total\{method="POST",route="\/api\/v1\/sessions"\} \d+/);
   } finally {
     await runtime.stop();
@@ -1322,6 +1332,11 @@ test("runtime keeps unrestored persisted sessions visible across restart cycles"
 
   try {
     await runtimeA.start();
+    const metricsResA = await fetch(`http://127.0.0.1:${runtimeA.getAddress().port}/metrics`);
+    assert.equal(metricsResA.status, 200);
+    const metricsA = await metricsResA.text();
+    assert.match(metricsA, /ptydeck_sessions_unrestored_total 1/);
+    assert.match(metricsA, /ptydeck_sessions_active_by_lifecycle\{state="unrestored"\} 1/);
     const baseUrlA = `http://127.0.0.1:${runtimeA.getAddress().port}/api/v1`;
     const listResA = await fetch(`${baseUrlA}/sessions`);
     assert.equal(listResA.status, 200);

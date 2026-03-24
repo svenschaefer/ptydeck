@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `OBS-001` completed: backend `/metrics` now exposes explicit lifecycle and connection-quality signals, including session lifecycle counters (`created`, `started`, `exited`, `unrestored`), per-lifecycle session gauges, and websocket reconnect/error counters with reason labels.
+- [x] Backend observability coverage expanded for the new metrics contract: runtime/ws integration tests now verify lifecycle gauges/counters, unrestored-session metrics, websocket reconnect counting, and websocket auth-upgrade error reason metrics.
+- [x] Validation for `OBS-001` passed at backend scope: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm --prefix backend run test:coverage`.
 - [x] Documentation consistency pass: clarified active-vs-queued roadmap execution status so `ROADMAP.md` now explicitly marks `v0.4.0-H1` as active and `v0.4.0-H2` as queued next, aligning with open-task scope in `TODO.md`.
 - [x] Promoted the remaining actionable items from `docs/Codebase Review - Decomposing app js into a Layered Frontend Architecture.md` into active planning backlog as `v0.4.0-H2` (`ARC-009` ... `ARC-012`) with explicit ownership and dependency ordering.
 - [x] Promoted the next execution block from `TODO-OUTLOOK.md` into active planning as `v0.4.0-H1` (Observability Expansion): `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
