@@ -934,19 +934,40 @@ export function createRuntime(config) {
     }
   }
 
+  function listSessionIdsInDeck(deckId) {
+    const sessionIds = [];
+    for (const session of manager.list()) {
+      if (resolveSessionDeckId(session.id) === deckId) {
+        sessionIds.push(session.id);
+      }
+    }
+    for (const [sessionId] of unrestoredSessions.entries()) {
+      if (resolveSessionDeckId(sessionId) === deckId) {
+        sessionIds.push(sessionId);
+      }
+    }
+    return sessionIds;
+  }
+
   function deleteDeck(deckId, { force = false } = {}) {
     if (deckId === DEFAULT_DECK_ID) {
       throw new ApiError(409, "DeckDeleteForbidden", "Default deck cannot be deleted.");
     }
     getDeckOrThrow(deckId);
-    if (countSessionsInDeck(deckId) > 0 && !force) {
+    const affectedSessionIds = listSessionIdsInDeck(deckId);
+    if (affectedSessionIds.length > 0 && !force) {
       throw new ApiError(409, "DeckNotEmpty", "Deck is not empty. Use force=true to delete and reassign sessions.");
     }
-    if (countSessionsInDeck(deckId) > 0 && force) {
+    if (affectedSessionIds.length > 0 && force) {
       ensureDefaultDeck();
       reassignDeckSessions(deckId, DEFAULT_DECK_ID);
     }
     decks.delete(deckId);
+    return {
+      deckId,
+      fallbackDeckId: DEFAULT_DECK_ID,
+      reassignedSessionIds: force ? affectedSessionIds : []
+    };
   }
 
   function ensureSessionExistsOrThrow(sessionId) {
@@ -1146,6 +1167,28 @@ export function createRuntime(config) {
     }
   }
 
+  function broadcastSessionUpdated(sessionId) {
+    broadcast({
+      type: "session.updated",
+      session: getApiSessionOrThrow(sessionId)
+    });
+  }
+
+  function broadcastDeckUpsert(type, deck) {
+    broadcast({
+      type,
+      deck: toApiDeck(deck)
+    });
+  }
+
+  function broadcastDeckDeleted(deckId, fallbackDeckId = DEFAULT_DECK_ID) {
+    broadcast({
+      type: "deck.deleted",
+      deckId,
+      fallbackDeckId
+    });
+  }
+
   const wsEventNames = ["session.created", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
@@ -1325,6 +1368,7 @@ export function createRuntime(config) {
         const payload = createDeck(body);
         validateResponse({ statusCode: 201, body: payload, expect: "deck" });
         await persistNow("deck.create");
+        broadcastDeckUpsert("deck.created", payload);
         writeJson(req, res, 201, payload);
         return;
       }
@@ -1340,14 +1384,19 @@ export function createRuntime(config) {
         const payload = updateDeck(match.params.deckId, body);
         validateResponse({ statusCode: 200, body: payload, expect: "deck" });
         await persistNow("deck.update");
+        broadcastDeckUpsert("deck.updated", payload);
         writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "deleteDeck") {
         const force = parseBooleanQueryParam(parsedUrl.searchParams.get("force"), "force");
-        deleteDeck(match.params.deckId, { force });
+        const result = deleteDeck(match.params.deckId, { force });
         await persistNow("deck.delete");
+        for (const sessionId of result.reassignedSessionIds) {
+          broadcastSessionUpdated(sessionId);
+        }
+        broadcastDeckDeleted(result.deckId, result.fallbackDeckId);
         writeJson(req, res, 204);
         return;
       }
@@ -1355,6 +1404,7 @@ export function createRuntime(config) {
       if (match.kind === "moveSessionToDeck") {
         moveSessionToDeck(match.params.sessionId, match.params.deckId);
         await persistNow("deck.move-session");
+        broadcastSessionUpdated(match.params.sessionId);
         writeJson(req, res, 204);
         return;
       }
@@ -1457,6 +1507,10 @@ export function createRuntime(config) {
         const apiPayload = toApiSession(payload, "active");
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.update");
+        broadcast({
+          type: "session.updated",
+          session: apiPayload
+        });
         writeJson(req, res, 200, apiPayload);
         return;
       }
@@ -1592,7 +1646,8 @@ export function createRuntime(config) {
           type: "snapshot",
           sessions: snapshotSessions,
           outputs: snapshot.outputs,
-          customCommands: customCommandSnapshot
+          customCommands: customCommandSnapshot,
+          decks: listDecks()
         })
       );
       logDebug("ws.snapshot.sent", {

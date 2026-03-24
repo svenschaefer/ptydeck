@@ -173,6 +173,119 @@ test("WS emits session events and reconnect receives snapshot", async () => {
   }
 });
 
+test("WS emits authoritative deck and session metadata events", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
+  const events = [];
+
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+
+    const snapshot = events.find((event) => event.type === "snapshot");
+    assert.ok(Array.isArray(snapshot.decks));
+    assert.ok(snapshot.decks.some((deck) => deck.id === "default"));
+
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    await waitFor(() =>
+      events.some((event) => event.type === "session.created" && event.session && event.session.id === createdSession.id)
+    );
+
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Ops", settings: { terminal: { cols: 91, rows: 33 } } })
+    });
+    assert.equal(createDeckRes.status, 201);
+    const createdDeck = await createDeckRes.json();
+
+    await waitFor(() =>
+      events.some((event) => event.type === "deck.created" && event.deck && event.deck.id === createdDeck.id)
+    );
+
+    const patchDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Operations" })
+    });
+    assert.equal(patchDeckRes.status, 200);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "deck.updated" && event.deck && event.deck.id === createdDeck.id && event.deck.name === "Operations"
+      )
+    );
+
+    const patchSessionRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "alpha", tags: ["ops"] })
+    });
+    assert.equal(patchSessionRes.status, 200);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session &&
+          event.session.id === createdSession.id &&
+          event.session.name === "alpha" &&
+          Array.isArray(event.session.tags) &&
+          event.session.tags.includes("ops")
+      )
+    );
+
+    const moveRes = await fetch(`${baseUrl}/decks/${createdDeck.id}/sessions/${createdSession.id}:move`, {
+      method: "POST"
+    });
+    assert.equal(moveRes.status, 204);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session &&
+          event.session.id === createdSession.id &&
+          event.session.deckId === createdDeck.id
+      )
+    );
+
+    const deleteDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}?force=true`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteDeckRes.status, 204);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session &&
+          event.session.id === createdSession.id &&
+          event.session.deckId === "default"
+      )
+    );
+    await waitFor(() =>
+      events.some(
+        (event) => event.type === "deck.deleted" && event.deckId === createdDeck.id && event.fallbackDeckId === "default"
+      )
+    );
+
+    ws.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("WS custom-command lifecycle events are broadcast to multiple connected clients", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
   const firstEvents = [];

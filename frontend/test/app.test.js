@@ -1573,6 +1573,27 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Created deck [deck-new] Ops.");
+  assert.equal(
+    fixture.elements.deckTabs.children.filter((entry) => entry.getAttribute("data-deck-id") === "deck-new").length,
+    1
+  );
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "deck.created",
+      deck: {
+        id: "deck-new",
+        name: "Ops",
+        settings: { terminal: { cols: 101, rows: 33 } },
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  assert.equal(
+    fixture.elements.deckTabs.children.filter((entry) => entry.getAttribute("data-deck-id") === "deck-new").length,
+    1
+  );
 
   fixture.elements.commandInput.value = "/deck switch deck-new";
   fixture.elements.sendCommand.click();
@@ -1595,6 +1616,25 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
   assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "deck-new", sessionId: "s-2" });
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "session.updated",
+      session: {
+        id: "s-2",
+        state: "active",
+        shell: "bash",
+        cwd: "~",
+        name: "two",
+        tags: ["beta", "ops"],
+        deckId: "deck-new",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    })
+  });
+  await tick();
+  assert.equal(findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2"), null);
+  assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2"));
 
   fixture.elements.commandInput.value = ">2";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1816,6 +1856,15 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "deck.deleted",
+      deckId: "deck-new",
+      fallbackDeckId: "default"
+    })
+  });
+  await tick();
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "deck-new"), null);
 
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");
@@ -2117,18 +2166,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "@default::ops,default::s-1 echo overlap";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, overlappedDirectBefore + 2);
+  assert.equal(inputPayloads.length, overlappedDirectBefore + 3);
   const overlappedDirectTargets = inputPayloads.slice(overlappedDirectBefore).map((entry) => entry.sessionId).sort();
-  assert.deepEqual(overlappedDirectTargets, ["ops", "s-1"]);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to 2 sessions.");
+  assert.deepEqual(overlappedDirectTargets, ["ops", "s-1", "s-2"]);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to 3 sessions.");
   const overlappedCustomBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "/blockcmd default::ops,default::s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, overlappedCustomBefore + 2);
+  assert.equal(inputPayloads.length, overlappedCustomBefore + 3);
   const overlappedCustomTargets = inputPayloads.slice(overlappedCustomBefore).map((entry) => entry.sessionId).sort();
-  assert.deepEqual(overlappedCustomTargets, ["ops", "s-1"]);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Executed /blockcmd on 2 sessions.");
+  assert.deepEqual(overlappedCustomTargets, ["ops", "s-1", "s-2"]);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Executed /blockcmd on 3 sessions.");
 
   fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"lf"}';
   fixture.elements.sendCommand.click();
@@ -2263,6 +2312,22 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   ws.emit("message", {
     data: JSON.stringify({
       type: "snapshot",
+      decks: [
+        {
+          id: "default",
+          name: "Default",
+          settings: { terminal: { cols: 90, rows: 30 } },
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        {
+          id: "qa",
+          name: "QA",
+          settings: { terminal: { cols: 100, rows: 40 } },
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      ],
       sessions: [
         {
           id: "s-1",
@@ -2298,13 +2363,32 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
     false
   );
+  assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
+  assert.ok(findDeckGroup(fixture.elements.deckTabs, "qa"));
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "deck-new"), null);
 
   ws.emit("message", {
-    data: JSON.stringify({ type: "snapshot", sessions: [], customCommands: [{ name: "blockcmd", content: "line 1\nline 2", createdAt: Date.now(), updatedAt: Date.now() }], outputs: [] })
+    data: JSON.stringify({
+      type: "snapshot",
+      decks: [
+        {
+          id: "default",
+          name: "Default",
+          settings: { terminal: { cols: 90, rows: 30 } },
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      ],
+      sessions: [],
+      customCommands: [{ name: "blockcmd", content: "line 1\nline 2", createdAt: Date.now(), updatedAt: Date.now() }],
+      outputs: []
+    })
   });
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 0);
   assert.equal(fixture.elements.emptyState.style.display, "block");
+  assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "qa"), null);
   const noActiveBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "/blockcmd";
   fixture.elements.sendCommand.click();

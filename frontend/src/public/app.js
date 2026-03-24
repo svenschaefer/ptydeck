@@ -872,6 +872,32 @@ function setDecks(nextDecks, options = {}) {
   render();
 }
 
+function upsertDeckInState(nextDeck, options = {}) {
+  const normalizedDeck = normalizeDeckEntry(nextDeck);
+  if (!normalizedDeck.id) {
+    return;
+  }
+  const nextDecks = deckState.decks.filter((deck) => deck.id !== normalizedDeck.id);
+  nextDecks.push(normalizedDeck);
+  setDecks(nextDecks, {
+    preferredActiveDeckId: options.preferredActiveDeckId || deckState.activeDeckId || normalizedDeck.id
+  });
+}
+
+function removeDeckFromState(deckId, options = {}) {
+  const normalizedDeckId = String(deckId || "").trim();
+  if (!normalizedDeckId) {
+    return;
+  }
+  const nextDecks = deckState.decks.filter((deck) => deck.id !== normalizedDeckId);
+  const preferredActiveDeckId =
+    options.preferredActiveDeckId ||
+    (deckState.activeDeckId === normalizedDeckId ? options.fallbackDeckId || DEFAULT_DECK_ID : deckState.activeDeckId);
+  setDecks(nextDecks, {
+    preferredActiveDeckId
+  });
+}
+
 function normalizeSendTerminatorMode(value) {
   return SEND_TERMINATOR_MODE_SET.has(value) ? value : "auto";
 }
@@ -1496,17 +1522,13 @@ async function applyTerminalSizeSettings(nextCols, nextRows) {
       }
     }
   });
-  deckState = {
-    ...deckState,
-    decks: deckState.decks.map((deck) => (deck.id === updatedDeck.id ? normalizeDeckEntry(updatedDeck) : deck))
-  };
-  terminalSettings = {
-    ...terminalSettings,
-    cols: nextCols,
-    rows: nextRows
-  };
-  saveTerminalSettings();
-  syncSettingsUi();
+  applyRuntimeEvent(
+    {
+      type: "deck.updated",
+      deck: updatedDeck
+    },
+    { preferredActiveDeckId: updatedDeck.id }
+  );
   uiState.error = "";
   applySettingsToAllTerminals({ deckId: activeDeck.id, force: true });
   scheduleGlobalResize({ deckId: activeDeck.id, force: true });
@@ -1872,11 +1894,6 @@ function setActiveDeck(deckId) {
   return true;
 }
 
-async function reloadDecks(options = {}) {
-  const decks = await api.listDecks();
-  setDecks(decks, options);
-}
-
 async function createDeckFlow() {
   if (!window || typeof window.prompt !== "function") {
     return;
@@ -1899,7 +1916,13 @@ async function createDeckFlow() {
       }
     }
   });
-  await reloadDecks({ preferredActiveDeckId: created.id });
+  applyRuntimeEvent(
+    {
+      type: "deck.created",
+      deck: created
+    },
+    { preferredActiveDeckId: created.id }
+  );
   setCommandFeedback(`Created deck '${created.name}'.`);
 }
 
@@ -1922,7 +1945,13 @@ async function renameDeckFlow() {
     return;
   }
   const updated = await api.updateDeck(activeDeck.id, { name });
-  await reloadDecks({ preferredActiveDeckId: updated.id });
+  applyRuntimeEvent(
+    {
+      type: "deck.updated",
+      deck: updated
+    },
+    { preferredActiveDeckId: updated.id }
+  );
   setCommandFeedback(`Renamed deck to '${updated.name}'.`);
 }
 
@@ -1955,7 +1984,14 @@ async function deleteDeckFlow() {
     }
   }
   const fallbackId = deckState.decks.find((deck) => deck.id !== activeDeck.id)?.id || DEFAULT_DECK_ID;
-  await reloadDecks({ preferredActiveDeckId: fallbackId });
+  applyRuntimeEvent(
+    {
+      type: "deck.deleted",
+      deckId: activeDeck.id,
+      fallbackDeckId: fallbackId
+    },
+    { preferredActiveDeckId: fallbackId }
+  );
   setCommandFeedback(`Deleted deck '${activeDeck.name}'.`);
 }
 
@@ -2201,7 +2237,7 @@ function render() {
       }
       try {
         const updated = await api.updateSession(session.id, { name: trimmed });
-        upsertSession(updated);
+        applyRuntimeEvent({ type: "session.updated", session: updated });
         uiState.error = "";
       } catch {
         setError("Failed to rename session.");
@@ -2223,7 +2259,7 @@ function render() {
       }
       try {
         await api.deleteSession(session.id);
-        removeSession(session.id);
+        applyRuntimeEvent({ type: "session.closed", sessionId: session.id });
         uiState.error = "";
       } catch {
         setError("Failed to delete session.");
@@ -2356,7 +2392,7 @@ function render() {
           tags: startupDraft.tagResult.tags,
           themeProfile: profile
         });
-        upsertSession(updated);
+        applyRuntimeEvent({ type: "session.updated", session: updated });
         sessionThemeDrafts.delete(session.id);
         setSessionSendTerminator(session.id, startupDraft.sendTerminator);
         setStartupSettingsFeedback({ startFeedback }, "Settings saved.");
@@ -2561,6 +2597,102 @@ function removeSession(sessionId) {
   store.setSessions(nextSessions);
 }
 
+function applyRuntimeSnapshot(event) {
+  if (Array.isArray(event.decks)) {
+    setDecks(event.decks, { preferredActiveDeckId: deckState.activeDeckId });
+  }
+  replaceCustomCommandState(event.customCommands || []);
+  store.setSessions(event.sessions || []);
+  replaySnapshotOutputs(event.outputs);
+  scheduleCommandPreview();
+  scheduleCommandSuggestions();
+  uiState.loading = false;
+  uiState.error = "";
+}
+
+function applyRuntimeEvent(event, options = {}) {
+  if (!event || typeof event !== "object") {
+    return false;
+  }
+
+  switch (event.type) {
+    case "snapshot":
+      applyRuntimeSnapshot(event);
+      return true;
+    case "session.created":
+    case "session.updated":
+      if (event.session) {
+        upsertSession(event.session);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "session.exit":
+      if (event.sessionId) {
+        markSessionExited(event.sessionId, event);
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "session.closed":
+      if (event.sessionId) {
+        removeSession(event.sessionId);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "deck.created":
+    case "deck.updated":
+      if (event.deck) {
+        upsertDeckInState(event.deck, {
+          preferredActiveDeckId: options.preferredActiveDeckId || deckState.activeDeckId
+        });
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "deck.deleted":
+      if (event.deckId) {
+        removeDeckFromState(event.deckId, {
+          preferredActiveDeckId: options.preferredActiveDeckId,
+          fallbackDeckId: event.fallbackDeckId || DEFAULT_DECK_ID
+        });
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "custom-command.created":
+    case "custom-command.updated":
+      if (event.command) {
+        upsertCustomCommandState(event.command);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    case "custom-command.deleted":
+      if (event.command) {
+        removeCustomCommandState(event.command.name);
+        scheduleCommandPreview();
+        scheduleCommandSuggestions();
+        uiState.error = "";
+        return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
 function formatSessionDisplayName(session) {
   return sessionViewModel.formatSessionDisplayName(session);
 }
@@ -2749,7 +2881,13 @@ async function executeControlCommand(interpreted) {
           }
         }
       });
-      await reloadDecks({ preferredActiveDeckId: created.id });
+      applyRuntimeEvent(
+        {
+          type: "deck.created",
+          deck: created
+        },
+        { preferredActiveDeckId: created.id }
+      );
       return `Created deck [${created.id}] ${created.name}.`;
     }
 
@@ -2778,7 +2916,13 @@ async function executeControlCommand(interpreted) {
         return "Usage: /deck rename <name> | /deck rename <deckSelector> <name>";
       }
       const updated = await api.updateDeck(targetDeck.id, { name });
-      await reloadDecks({ preferredActiveDeckId: updated.id });
+      applyRuntimeEvent(
+        {
+          type: "deck.updated",
+          deck: updated
+        },
+        { preferredActiveDeckId: updated.id }
+      );
       return `Renamed deck [${updated.id}] to ${updated.name}.`;
     }
 
@@ -2843,7 +2987,14 @@ async function executeControlCommand(interpreted) {
       }
 
       const fallbackId = decks.find((deck) => deck.id !== targetDeck.id)?.id || DEFAULT_DECK_ID;
-      await reloadDecks({ preferredActiveDeckId: fallbackId });
+      applyRuntimeEvent(
+        {
+          type: "deck.deleted",
+          deckId: targetDeck.id,
+          fallbackDeckId: fallbackId
+        },
+        { preferredActiveDeckId: fallbackId }
+      );
       return `Deleted deck [${targetDeck.id}] ${targetDeck.name}.`;
     }
 
@@ -2872,7 +3023,7 @@ async function executeControlCommand(interpreted) {
       resolvedTargets.sessions.map((session) => api.moveSessionToDeck(resolvedDeck.deck.id, session.id))
     );
     for (const session of moved) {
-      upsertSession(session);
+      applyRuntimeEvent({ type: "session.updated", session });
     }
     if (moved.length === 1) {
       return `Moved session [${formatSessionToken(moved[0].id)}] to deck [${resolvedDeck.deck.id}] ${resolvedDeck.deck.name}.`;
@@ -2946,7 +3097,7 @@ async function executeControlCommand(interpreted) {
       payload.shell = args[0];
     }
     const session = await api.createSession(payload);
-    upsertSession(session);
+    applyRuntimeEvent({ type: "session.created", session });
     store.setActiveSession(session.id);
     return `Created session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
   }
@@ -2979,7 +3130,7 @@ async function executeControlCommand(interpreted) {
     const liveTargets = targetSessions.filter((session) => !isSessionExited(session));
     await Promise.all(liveTargets.map((session) => api.deleteSession(session.id)));
     for (const session of targetSessions) {
-      removeSession(session.id);
+      applyRuntimeEvent({ type: "session.closed", sessionId: session.id });
     }
     if (exitedTargets.length > 0 && liveTargets.length === 0) {
       return exitedTargets.length === 1
@@ -3054,7 +3205,7 @@ async function executeControlCommand(interpreted) {
         return getBlockedSessionActionMessage([activeSession], "Rename");
       }
       const updated = await api.updateSession(activeSessionId, { name });
-      upsertSession(updated);
+      applyRuntimeEvent({ type: "session.updated", session: updated });
       return `Renamed active session to ${updated.name}.`;
     }
 
@@ -3074,7 +3225,7 @@ async function executeControlCommand(interpreted) {
       return getBlockedSessionActionMessage(resolvedTargets.sessions, "Rename");
     }
     const updated = await api.updateSession(resolvedTargets.sessions[0].id, { name });
-    upsertSession(updated);
+    applyRuntimeEvent({ type: "session.updated", session: updated });
     return `Renamed session [${formatSessionToken(updated.id)}] to ${updated.name}.`;
   }
 
@@ -3108,7 +3259,7 @@ async function executeControlCommand(interpreted) {
     }
     const restartedSessions = await Promise.all(targetSessions.map((session) => api.restartSession(session.id)));
     for (const restarted of restartedSessions) {
-      upsertSession(restarted);
+      applyRuntimeEvent({ type: "session.updated", session: restarted });
     }
     if (restartedSessions.length > 0) {
       store.setActiveSession(restartedSessions[0].id);
@@ -3243,7 +3394,7 @@ async function executeControlCommand(interpreted) {
     if (hasPatch) {
       const updatedSessions = await Promise.all(targets.map((session) => api.updateSession(session.id, patch)));
       for (const updated of updatedSessions) {
-        upsertSession(updated);
+        applyRuntimeEvent({ type: "session.updated", session: updated });
       }
     }
     if (hasTerminator) {
@@ -3398,54 +3549,12 @@ function startWs() {
     },
     onMessage(event) {
       debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
-      if (event.type === "snapshot") {
-        replaceCustomCommandState(event.customCommands || []);
-        store.setSessions(event.sessions || []);
-        replaySnapshotOutputs(event.outputs);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.loading = false;
-        uiState.error = "";
-        return;
-      }
-
       if (event.type === "session.data" && terminals.has(event.sessionId)) {
         appendTerminalData(event.sessionId, event.data);
         return;
       }
 
-      if (event.type === "session.created" && event.session) {
-        upsertSession(event.session);
-        uiState.error = "";
-        return;
-      }
-
-      if (event.type === "session.exit" && event.sessionId) {
-        markSessionExited(event.sessionId, event);
-        uiState.error = "";
-        return;
-      }
-
-      if ((event.type === "custom-command.created" || event.type === "custom-command.updated") && event.command) {
-        upsertCustomCommandState(event.command);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return;
-      }
-
-      if (event.type === "custom-command.deleted" && event.command) {
-        removeCustomCommandState(event.command.name);
-        scheduleCommandPreview();
-        scheduleCommandSuggestions();
-        uiState.error = "";
-        return;
-      }
-
-      if (event.type === "session.closed" && event.sessionId) {
-        removeSession(event.sessionId);
-        uiState.error = "";
-      }
+      applyRuntimeEvent(event);
     }
   }, { debug: debugLogs, log: debugLog, tokenProvider: () => wsAuthToken });
 }
@@ -3475,7 +3584,10 @@ createBtn.addEventListener("click", async () => {
     if (activeDeck && resolveSessionDeckId(createdSession) !== activeDeck.id) {
       session = await api.moveSessionToDeck(activeDeck.id, createdSession.id);
     }
-    upsertSession(session);
+    applyRuntimeEvent({
+      type: session.deckId === createdSession.deckId ? "session.created" : "session.updated",
+      session
+    });
     uiState.error = "";
     debugLog("sessions.create.ok", { sessionId: session.id, deckId: session.deckId || null });
   } catch {

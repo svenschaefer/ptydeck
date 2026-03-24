@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-116` completed: backend now emits authoritative WebSocket metadata events for deck/session state mutations, including `deck.created`, `deck.updated`, `deck.deleted`, `session.updated`, and deck-reassignment propagation during forced deck deletion.
+- [x] `QLT-117` completed: frontend runtime metadata application now flows through explicit snapshot/event reducers instead of scattered local mutation patching after REST calls.
+- [x] `QLT-118` completed: backend/frontend regression coverage now verifies runtime metadata consistency across deck create/update/delete, session rename/settings patch, cross-deck moves, reconnect snapshot replacement, and mixed REST-plus-WebSocket propagation flows.
+- [x] Backend WebSocket snapshots now include authoritative `decks` state alongside `sessions` and custom commands, allowing reconnect replacement to rebuild runtime metadata from one canonical payload.
+- [x] Frontend deck/session mutation paths now reuse runtime event application helpers (`applyRuntimeSnapshot`, `applyRuntimeEvent`) so locally initiated REST mutations and remotely received WebSocket events converge on one deterministic state-update path.
+- [x] Validation for `QLT-116`/`QLT-117`/`QLT-118` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-112` completed: frontend command autocomplete is now driven by an explicit declarative command-spec layer for `/...` and `>...` flows instead of hardcoded branching spread across the runtime.
 - [x] `QLT-113` completed: contextual suggestion providers now generate deck/session/tag/custom-command/path/env/theme candidates through one cached provider registry with bounded result sets and no mutation side effects while typing.
 - [x] `QLT-114` completed: inline autocomplete suggestions now expose richer metadata (`kind`, description, examples, and insert preview) while preserving the existing keyboard-first composer UX and inline ghost-hint behavior.

@@ -454,6 +454,14 @@ Exit criteria:
 - `QLT-117`
 - `QLT-118`
 
+Completed in this milestone:
+
+- `QLT-116`, `QLT-117`, `QLT-118`
+
+Remaining in this milestone:
+
+- none
+
 Dependencies:
 
 - `QLT-116` should land first so the backend exposes authoritative WebSocket events for session and deck metadata changes instead of leaving connected clients dependent on local mutation responses only.
@@ -469,16 +477,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H9`
-- Next milestones in progress: `v0.3.0-H10`
-- Queued next milestone after H10: none currently
+- Latest completed milestone: `v0.3.0-H10`
+- Next milestones in progress: none currently
+- Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-116`
-- `QLT-117`
-- `QLT-118`
+- None currently.
 
 ### Completed Items
 

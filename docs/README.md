@@ -73,11 +73,8 @@ Authoritative repository documents remain:
 - `Codebase Review - WebSocket as Single Source of Truth.md`
   - Role: state-flow simplification plan
   - Still relevant:
-    - broader WS-first state layering is still not complete
+    - broader WS-first protocol/state evolution beyond the current runtime metadata baseline is still not complete
   - Backlog landing:
-    - `QLT-116`
-    - `QLT-117`
-    - `QLT-118`
     - `ARC-002`
 
 ### 7. Technical Alternatives
