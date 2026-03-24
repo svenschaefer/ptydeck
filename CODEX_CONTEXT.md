@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (QLT-100 layered frontend refactor synced)
+Last updated: 2026-03-24 (QLT-110/QLT-111 terminal search completion and autocomplete outlook sync)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between near-term `QLT-110`/`QLT-111` and deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between near-term `QLT-110`/`QLT-111` and deferred `REM-001` ... `REM-013`.
 
 ## Project Purpose
 
