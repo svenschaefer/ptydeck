@@ -376,11 +376,11 @@ Exit criteria:
 
 Completed in this milestone:
 
-- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`
+- `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`
 
 Remaining in this milestone:
 
-- `QLT-100`
+- none
 
 Dependencies:
 
@@ -430,14 +430,13 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H6`
-- Next milestones in progress: `v0.3.0-H7`
-- Queued next milestone after H7: `v0.3.0-H8`
+- Latest completed milestone: `v0.3.0-H7`
+- Next milestones in progress: `v0.3.0-H8`
+- Queued next milestone after H8: none
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-100`
 - `QLT-110`
 - `QLT-111`
 

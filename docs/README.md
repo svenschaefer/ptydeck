@@ -18,22 +18,22 @@ Authoritative repository documents remain:
 - `Codebase Review.md`
   - Role: overall review of strengths, architectural risks, and strategic priorities
   - Still relevant:
-    - `frontend/src/public/app.js` is structurally overloaded
-    - frontend still lacks explicit `session.exit` handling
     - WebSocket query-string token transport is still used
-    - frontend custom-command state is not yet fully WebSocket-first
-    - xterm private internals are still accessed directly
+    - terminal output search/find UX is still missing from current scope
   - Partially outdated:
+    - explicit frontend `session.exit` handling now exists
+    - frontend custom-command state is now WebSocket-first in steady state
+    - xterm private internals are now isolated behind `terminal-compat`
+    - `app.js` has been partially decomposed into layered helper modules
     - some runtime/auth/custom-command capabilities described as missing now exist in baseline form
 
 ### 2. Frontend Architecture Refactoring
 
 - `Codebase Review - Decomposing app js into a Layered Frontend Architecture.md`
   - Role: concrete refactoring plan for breaking `app.js` into layered modules
-  - Status: still relevant
+  - Status: partially implemented; still useful as a follow-on cleanup/reference document
   - Backlog landing:
     - `QLT-099`
-    - `QLT-100`
 
 ### 3. Explicit Session Lifecycle Modeling
 
@@ -72,11 +72,8 @@ Authoritative repository documents remain:
 - `Codebase Review - WebSocket as Single Source of Truth.md`
   - Role: state-flow simplification plan
   - Still relevant:
-    - frontend custom-command state still mixes WebSocket events with REST refresh reads
     - broader WS-first state layering is still not complete
   - Backlog landing:
-    - `QLT-097`
-    - `QLT-098`
     - `ARC-002`
 
 ### 7. Technical Alternatives
@@ -93,10 +90,7 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- Add explicit frontend `session.exit` lifecycle handling.
-- Move custom-command runtime state to a WebSocket-first model.
-- Isolate xterm private internals behind one compatibility layer.
-- Decompose `frontend/src/public/app.js` into modular layers.
+- Add in-terminal output search/find UX.
 
 ### Deferred / Outlook
 

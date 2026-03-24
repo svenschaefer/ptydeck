@@ -1,0 +1,951 @@
+function normalizeCustomCommandName(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function normalizeCustomCommandRecord(command) {
+  if (!command || typeof command !== "object") {
+    return null;
+  }
+  const name = normalizeCustomCommandName(command.name);
+  if (!name) {
+    return null;
+  }
+  return {
+    name,
+    content: typeof command.content === "string" ? command.content : "",
+    createdAt: Number(command.createdAt || 0),
+    updatedAt: Number(command.updatedAt || 0)
+  };
+}
+
+export function createCustomCommandRegistry() {
+  const state = new Map();
+  return {
+    normalizeName: normalizeCustomCommandName,
+    list() {
+      return Array.from(state.values()).sort((left, right) => left.name.localeCompare(right.name, "en-US", { sensitivity: "base" }));
+    },
+    get(name) {
+      const normalizedName = normalizeCustomCommandName(name);
+      if (!normalizedName) {
+        return null;
+      }
+      return state.get(normalizedName) || null;
+    },
+    upsert(command) {
+      const normalized = normalizeCustomCommandRecord(command);
+      if (!normalized) {
+        return null;
+      }
+      state.set(normalized.name, normalized);
+      return normalized;
+    },
+    remove(name) {
+      const normalizedName = normalizeCustomCommandName(name);
+      if (!normalizedName) {
+        return false;
+      }
+      return state.delete(normalizedName);
+    },
+    replace(commands) {
+      state.clear();
+      for (const command of Array.isArray(commands) ? commands : []) {
+        const normalized = normalizeCustomCommandRecord(command);
+        if (normalized) {
+          state.set(normalized.name, normalized);
+        }
+      }
+    }
+  };
+}
+
+export function createCommandEngine(options = {}) {
+  const systemSlashCommands = Array.isArray(options.systemSlashCommands) ? options.systemSlashCommands : [];
+  const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
+  const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
+  const getDecks = typeof options.getDecks === "function" ? options.getDecks : () => [];
+  const getActiveDeckId = typeof options.getActiveDeckId === "function" ? options.getActiveDeckId : () => "";
+  const getActiveSessionId = typeof options.getActiveSessionId === "function" ? options.getActiveSessionId : () => null;
+  const getSessionToken =
+    typeof options.getSessionToken === "function" ? options.getSessionToken : (sessionId) => String(sessionId || "");
+  const getSessionDisplayName =
+    typeof options.getSessionDisplayName === "function"
+      ? options.getSessionDisplayName
+      : (session) => session?.name || String(session?.id || "").slice(0, 8);
+  const getSessionDeckId =
+    typeof options.getSessionDeckId === "function" ? options.getSessionDeckId : (session) => String(session?.deckId || "default");
+
+  function parseSlashInputForAutocomplete(rawInput) {
+    const value = typeof rawInput === "string" ? rawInput : "";
+    if (!value.startsWith("/")) {
+      return null;
+    }
+    if (value.includes("\n")) {
+      return null;
+    }
+    return {
+      value,
+      afterSlash: value.slice(1)
+    };
+  }
+
+  function parseQuickSwitchInputForAutocomplete(rawInput) {
+    const value = typeof rawInput === "string" ? rawInput : "";
+    if (!value.startsWith(">")) {
+      return null;
+    }
+    if (value.includes("\n")) {
+      return null;
+    }
+    return {
+      value,
+      afterMarker: value.slice(1)
+    };
+  }
+
+  function buildCommandAutocompleteCandidates(customCommands) {
+    const ordered = [];
+    const seen = new Set();
+
+    for (const name of systemSlashCommands) {
+      const normalized = String(name || "").trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      ordered.push(normalized);
+    }
+
+    for (const entry of Array.isArray(customCommands) ? customCommands : []) {
+      const normalized = String(entry?.name || "").trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      ordered.push(normalized);
+    }
+
+    return ordered;
+  }
+
+  function buildCustomCommandNameList(customCommands) {
+    const ordered = [];
+    const seen = new Set();
+    for (const entry of Array.isArray(customCommands) ? customCommands : []) {
+      const normalized = String(entry?.name || "").trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      ordered.push(normalized);
+    }
+    return ordered;
+  }
+
+  function pushUniqueCandidate(candidates, seen, value, prefix = "") {
+    const token = String(value || "").trim();
+    if (!token) {
+      return;
+    }
+    const normalizedToken = token.toLowerCase();
+    const normalizedPrefix = String(prefix || "").toLowerCase();
+    if (normalizedPrefix && !normalizedToken.startsWith(normalizedPrefix)) {
+      return;
+    }
+    if (seen.has(normalizedToken)) {
+      return;
+    }
+    seen.add(normalizedToken);
+    candidates.push(token);
+  }
+
+  function buildSessionAutocompleteCandidates(prefix = "", extraOptions = {}) {
+    const sessions = Array.isArray(extraOptions.sessions) ? extraOptions.sessions : getSessions();
+    const includeNamesWithWhitespace = extraOptions.includeNamesWithWhitespace === true;
+    const candidates = [];
+    const seen = new Set();
+    for (const session of sessions) {
+      pushUniqueCandidate(candidates, seen, getSessionToken(session.id), prefix);
+      const sessionName = String(session?.name || "").trim();
+      if (sessionName && (includeNamesWithWhitespace || !/\s/.test(sessionName))) {
+        pushUniqueCandidate(candidates, seen, sessionName, prefix);
+      }
+      pushUniqueCandidate(candidates, seen, session?.id, prefix);
+    }
+    return candidates;
+  }
+
+  function buildDeckAutocompleteCandidates(prefix = "", extraOptions = {}) {
+    const candidates = [];
+    const seen = new Set();
+    const includeExplicitPrefix = extraOptions.includeExplicitPrefix === true;
+    for (const deck of getDecks()) {
+      const id = String(deck?.id || "").trim();
+      const name = String(deck?.name || "").trim();
+      if (!id) {
+        continue;
+      }
+      pushUniqueCandidate(candidates, seen, id, prefix);
+      pushUniqueCandidate(candidates, seen, name, prefix);
+      if (includeExplicitPrefix) {
+        pushUniqueCandidate(candidates, seen, `deck:${id}`, prefix);
+        pushUniqueCandidate(candidates, seen, `deck:${name}`, prefix);
+      }
+    }
+    return candidates;
+  }
+
+  function resolveSessionToken(token, sessions) {
+    const normalized = String(token || "").trim();
+    if (!normalized) {
+      return { session: null, error: "Missing session identifier." };
+    }
+
+    const exactId = sessions.find((session) => session.id === normalized);
+    if (exactId) {
+      return { session: exactId, error: "" };
+    }
+
+    const normalizedUpper = normalized.toUpperCase();
+    const quickIdMatches = sessions.filter((session) => getSessionToken(session.id).toUpperCase() === normalizedUpper);
+    if (quickIdMatches.length === 1) {
+      return { session: quickIdMatches[0], error: "" };
+    }
+    if (quickIdMatches.length > 1) {
+      return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+    }
+
+    const lower = normalized.toLowerCase();
+    const exactNameMatches = sessions.filter((session) => typeof session.name === "string" && session.name.toLowerCase() === lower);
+    if (exactNameMatches.length === 1) {
+      return { session: exactNameMatches[0], error: "" };
+    }
+    if (exactNameMatches.length > 1) {
+      return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+    }
+
+    const prefixMatches = sessions.filter((session) => session.id.startsWith(normalized));
+    if (prefixMatches.length === 1) {
+      return { session: prefixMatches[0], error: "" };
+    }
+    if (prefixMatches.length > 1) {
+      return { session: null, error: `Ambiguous session identifier: ${normalized}` };
+    }
+
+    return { session: null, error: `Unknown session identifier: ${normalized}` };
+  }
+
+  function resolveDeckToken(token, decks = getDecks()) {
+    const normalized = String(token || "").trim();
+    if (!normalized) {
+      return { deck: null, error: "Missing deck identifier." };
+    }
+
+    const exactId = decks.find((deck) => deck.id === normalized) || null;
+    if (exactId) {
+      return { deck: exactId, error: "" };
+    }
+
+    const lower = normalized.toLowerCase();
+    const exactNameMatches = decks.filter((deck) => String(deck?.name || "").toLowerCase() === lower);
+    if (exactNameMatches.length === 1) {
+      return { deck: exactNameMatches[0], error: "" };
+    }
+    if (exactNameMatches.length > 1) {
+      return { deck: null, error: `Ambiguous deck identifier: ${normalized}` };
+    }
+
+    const prefixMatches = decks.filter((deck) => String(deck?.id || "").startsWith(normalized));
+    if (prefixMatches.length === 1) {
+      return { deck: prefixMatches[0], error: "" };
+    }
+    if (prefixMatches.length > 1) {
+      return { deck: null, error: `Ambiguous deck identifier: ${normalized}` };
+    }
+
+    return { deck: null, error: `Unknown deck identifier: ${normalized}` };
+  }
+
+  function normalizeSessionTagToken(token) {
+    return String(token || "").trim().toLowerCase();
+  }
+
+  function resolveCrossDeckSelector(selectorToken, sessions) {
+    const normalizedSelector = String(selectorToken || "").trim();
+    const splitIndex = normalizedSelector.indexOf("::");
+    if (splitIndex <= 0) {
+      return {
+        ok: false,
+        explicit: false,
+        sessions,
+        token: normalizedSelector,
+        error: ""
+      };
+    }
+    const deckToken = normalizedSelector.slice(0, splitIndex).trim();
+    const nestedToken = normalizedSelector.slice(splitIndex + 2).trim();
+    if (!deckToken || !nestedToken) {
+      return {
+        ok: true,
+        explicit: true,
+        sessions: [],
+        token: "",
+        error: "Cross-deck selector must be '<deckSelector>::<sessionSelector>'."
+      };
+    }
+    const resolvedDeck = resolveDeckToken(deckToken, getDecks());
+    if (!resolvedDeck.deck) {
+      return {
+        ok: true,
+        explicit: true,
+        sessions: [],
+        token: "",
+        error: resolvedDeck.error
+      };
+    }
+    return {
+      ok: true,
+      explicit: true,
+      sessions: sessions.filter((session) => getSessionDeckId(session) === resolvedDeck.deck.id),
+      token: nestedToken,
+      deckId: resolvedDeck.deck.id,
+      error: ""
+    };
+  }
+
+  function resolveSelectorMatches(selector, sessions, extraOptions = {}) {
+    const normalized = String(selector || "").trim();
+    if (!normalized) {
+      return { sessions: [], error: "Missing session identifier." };
+    }
+
+    const allSessions = Array.isArray(sessions) ? sessions : [];
+    let candidateSessions = allSessions;
+    const scopeMode = extraOptions.scopeMode === "active-deck" ? "active-deck" : "all";
+    const activeDeckId = String(extraOptions.activeDeckId || "").trim();
+    if (scopeMode === "active-deck" && activeDeckId) {
+      candidateSessions = allSessions.filter((session) => getSessionDeckId(session) === activeDeckId);
+    }
+
+    const crossDeck = resolveCrossDeckSelector(normalized, allSessions);
+    if (crossDeck.error) {
+      return { sessions: [], error: crossDeck.error };
+    }
+    if (crossDeck.explicit) {
+      candidateSessions = crossDeck.sessions;
+    }
+    const token = crossDeck.explicit ? crossDeck.token : normalized;
+    const normalizedToken = token.toLowerCase();
+
+    if (token === "*") {
+      return { sessions: candidateSessions.slice(), error: "" };
+    }
+
+    if (normalizedToken.startsWith("deck:")) {
+      const deckToken = token.slice("deck:".length).trim();
+      if (!deckToken) {
+        return { sessions: [], error: "Deck selector must be 'deck:<deckSelector>'." };
+      }
+      const resolvedDeck = resolveDeckToken(deckToken, getDecks());
+      if (!resolvedDeck.deck) {
+        return { sessions: [], error: resolvedDeck.error };
+      }
+      const deckMatches = allSessions.filter((session) => getSessionDeckId(session) === resolvedDeck.deck.id);
+      if (deckMatches.length === 0) {
+        return { sessions: [], error: `No sessions found for deck '${resolvedDeck.deck.id}'.` };
+      }
+      return { sessions: deckMatches, error: "" };
+    }
+
+    const dedupe = new Map();
+    const resolved = resolveSessionToken(token, candidateSessions);
+    if (resolved.session) {
+      dedupe.set(resolved.session.id, resolved.session);
+    }
+
+    const tagToken = normalizeSessionTagToken(token);
+    const tagMatches = candidateSessions.filter((session) =>
+      Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
+    );
+    for (const session of tagMatches) {
+      dedupe.set(session.id, session);
+    }
+
+    if (dedupe.size === 0) {
+      return { sessions: [], error: resolved.error || `Unknown session/tag identifier: ${normalized}` };
+    }
+    return { sessions: Array.from(dedupe.values()), error: "" };
+  }
+
+  function parseSelectorList(text, { source = "slash" } = {}) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return [];
+    }
+    if (source === "direct-route") {
+      return raw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    return raw
+      .split(/[,\s]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  function resolveTargetSelectors(selectorText, sessions, extraOptions = {}) {
+    const selectorList = parseSelectorList(selectorText, { source: extraOptions.source || "slash" });
+    if (selectorList.length === 0) {
+      return { sessions: [], error: "Missing session identifier." };
+    }
+    const dedupe = new Map();
+    for (const selector of selectorList) {
+      const matched = resolveSelectorMatches(selector, sessions, extraOptions);
+      if (matched.error) {
+        return { sessions: [], error: matched.error };
+      }
+      for (const session of matched.sessions) {
+        dedupe.set(session.id, session);
+      }
+    }
+    return { sessions: Array.from(dedupe.values()), error: "" };
+  }
+
+  function resolveFilterSelectors(selectorText, sessions, extraOptions = {}) {
+    const selectorList = parseSelectorList(selectorText, { source: "slash" });
+    if (selectorList.length === 0) {
+      return { sessions: [], error: "" };
+    }
+    const scopeMode = extraOptions.scopeMode === "active-deck" ? "active-deck" : "all";
+    const activeDeckId = String(extraOptions.activeDeckId || "").trim();
+    const allSessions = Array.isArray(sessions) ? sessions : [];
+    let candidateSessions = allSessions;
+    if (scopeMode === "active-deck" && activeDeckId) {
+      candidateSessions = allSessions.filter((session) => getSessionDeckId(session) === activeDeckId);
+    }
+    const dedupe = new Map();
+    for (const selector of selectorList) {
+      const crossDeck = resolveCrossDeckSelector(selector, allSessions);
+      if (crossDeck.error) {
+        return { sessions: [], error: crossDeck.error };
+      }
+      const selectorSessions = crossDeck.explicit ? crossDeck.sessions : candidateSessions;
+      const token = crossDeck.explicit ? crossDeck.token : String(selector || "").trim();
+      if (!token) {
+        continue;
+      }
+      if (token === "*") {
+        for (const session of selectorSessions) {
+          dedupe.set(session.id, session);
+        }
+        continue;
+      }
+      const normalizedToken = token.toLowerCase();
+      if (normalizedToken.startsWith("deck:")) {
+        const deckToken = token.slice("deck:".length).trim();
+        if (!deckToken) {
+          return { sessions: [], error: "Deck selector must be 'deck:<deckSelector>'." };
+        }
+        const resolvedDeck = resolveDeckToken(deckToken, getDecks());
+        if (!resolvedDeck.deck) {
+          return { sessions: [], error: resolvedDeck.error };
+        }
+        const deckMatches = allSessions.filter((session) => getSessionDeckId(session) === resolvedDeck.deck.id);
+        if (deckMatches.length === 0) {
+          return { sessions: [], error: `No sessions found for deck '${resolvedDeck.deck.id}'.` };
+        }
+        for (const session of deckMatches) {
+          dedupe.set(session.id, session);
+        }
+        continue;
+      }
+      const exactIdMatch = selectorSessions.find((session) => session.id === token) || null;
+      let idMatches = [];
+      if (exactIdMatch) {
+        idMatches = [exactIdMatch];
+      } else {
+        const prefixMatches = selectorSessions.filter((session) => session.id.startsWith(token));
+        if (prefixMatches.length > 1) {
+          return { sessions: [], error: `Ambiguous session id prefix: ${token}` };
+        }
+        idMatches = prefixMatches;
+      }
+      const tagToken = normalizeSessionTagToken(token);
+      const tagMatches = selectorSessions.filter((session) =>
+        Array.isArray(session.tags) && session.tags.some((entry) => normalizeSessionTagToken(entry) === tagToken)
+      );
+      if (idMatches.length === 0 && tagMatches.length === 0) {
+        return { sessions: [], error: `Unknown session id/tag: ${token}` };
+      }
+      for (const session of idMatches) {
+        dedupe.set(session.id, session);
+      }
+      for (const session of tagMatches) {
+        dedupe.set(session.id, session);
+      }
+    }
+    return { sessions: Array.from(dedupe.values()), error: "" };
+  }
+
+  function resolveSettingsTargets(selectorText, sessions, activeSessionId) {
+    const normalized = String(selectorText || "").trim().toLowerCase();
+    if (!normalized || normalized === "active") {
+      if (!activeSessionId) {
+        return { sessions: [], error: "No active session for settings command." };
+      }
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return { sessions: [], error: "No active session for settings command." };
+      }
+      return { sessions: [activeSession], error: "" };
+    }
+    return resolveTargetSelectors(selectorText, sessions, { source: "slash" });
+  }
+
+  function resolveSingleSessionSwitchTarget(selector, sessions) {
+    const resolved = resolveSelectorMatches(selector, sessions, { source: "quick-switch" });
+    if (resolved.error) {
+      return { session: null, error: resolved.error, kind: "unknown" };
+    }
+    if (resolved.sessions.length === 1) {
+      return { session: resolved.sessions[0], error: "", kind: "ok" };
+    }
+    if (resolved.sessions.length > 1) {
+      return {
+        session: null,
+        error: "Quick-switch selector must resolve to exactly one session.",
+        kind: "ambiguous"
+      };
+    }
+    return { session: null, error: "Unknown session identifier.", kind: "unknown" };
+  }
+
+  function resolveQuickSwitchTarget(selectorText, sessions = getSessions()) {
+    const selector = String(selectorText || "").trim();
+    if (!selector) {
+      return { kind: "", target: null, error: "Usage: >selector" };
+    }
+
+    if (selector.includes("::")) {
+      const sessionResolved = resolveSingleSessionSwitchTarget(selector, sessions);
+      if (sessionResolved.error) {
+        return { kind: "", target: null, error: sessionResolved.error };
+      }
+      return { kind: "session", target: sessionResolved.session, error: "" };
+    }
+
+    if (selector.toLowerCase().startsWith("deck:")) {
+      const deckResolved = resolveDeckToken(selector.slice("deck:".length), getDecks());
+      if (!deckResolved.deck) {
+        return { kind: "", target: null, error: deckResolved.error };
+      }
+      return { kind: "deck", target: deckResolved.deck, error: "" };
+    }
+
+    const sessionResolved = resolveSingleSessionSwitchTarget(selector, sessions);
+    const deckResolved = resolveDeckToken(selector, getDecks());
+    const hasSession = Boolean(sessionResolved.session);
+    const hasDeck = Boolean(deckResolved.deck);
+
+    if (hasSession && hasDeck) {
+      return {
+        kind: "",
+        target: null,
+        error: `Ambiguous quick-switch target: '${selector}' matches both a session and a deck. Use 'deck:${selector}' for the deck target.`
+      };
+    }
+    if (hasSession) {
+      return { kind: "session", target: sessionResolved.session, error: "" };
+    }
+    if (sessionResolved.kind === "ambiguous") {
+      return { kind: "", target: null, error: sessionResolved.error };
+    }
+    if (hasDeck) {
+      return { kind: "deck", target: deckResolved.deck, error: "" };
+    }
+    if (deckResolved.error && !deckResolved.error.startsWith("Unknown deck identifier")) {
+      return { kind: "", target: null, error: deckResolved.error };
+    }
+    return { kind: "", target: null, error: sessionResolved.error || deckResolved.error || "Unknown navigation target." };
+  }
+
+  function formatQuickSwitchPreview(selectorText, sessions = getSessions()) {
+    const resolved = resolveQuickSwitchTarget(selectorText, sessions);
+    if (resolved.error) {
+      return resolved.error;
+    }
+    if (resolved.kind === "session" && resolved.target) {
+      const targetDeck = getDecks().find((deck) => deck.id === getSessionDeckId(resolved.target)) || null;
+      const activation = getActiveSessionId() === resolved.target.id ? "Already active" : "Target session";
+      const deckLabel = targetDeck ? ` deck [${targetDeck.id}] ${targetDeck.name}` : "";
+      return `${activation}: [${getSessionToken(resolved.target.id)}] ${getSessionDisplayName(resolved.target)}${deckLabel}`;
+    }
+    if (resolved.kind === "deck" && resolved.target) {
+      const activation = getActiveDeckId() === resolved.target.id ? "Already active" : "Target deck";
+      return `${activation}: [${resolved.target.id}] ${resolved.target.name}`;
+    }
+    return "";
+  }
+
+  function resolveSlashAutocompleteContext(rawInput, customCommands) {
+    const parsed = parseSlashInputForAutocomplete(rawInput);
+    if (!parsed) {
+      return null;
+    }
+
+    const afterSlash = parsed.afterSlash;
+    const trailingSpace = /\s$/.test(afterSlash);
+    const trimmed = afterSlash.trim();
+    const customCandidates = buildCommandAutocompleteCandidates(customCommands);
+    const customNames = buildCustomCommandNameList(customCommands);
+    const customSet = new Set(customNames);
+
+    if (!trimmed) {
+      return {
+        replacePrefix: "/",
+        matches: customCandidates
+      };
+    }
+
+    const hasWhitespace = /\s/.test(afterSlash);
+    const parts = trimmed.split(/\s+/);
+    const commandRaw = parts[0] || "";
+    const command = commandRaw.toLowerCase();
+
+    if (!hasWhitespace) {
+      const matches = customCandidates.filter((name) => name.startsWith(command));
+      return {
+        replacePrefix: "/",
+        matches
+      };
+    }
+
+    if ((command === "switch" || command === "close" || command === "restart" || command === "rename" || command === "filter") && parts.length <= 2) {
+      const targetPrefix = parts.length === 2 ? parts[1] : "";
+      return {
+        replacePrefix: `/${commandRaw} `,
+        matches: buildSessionAutocompleteCandidates(targetPrefix)
+      };
+    }
+
+    if (command === "custom" && (parts[1] === "show" || parts[1] === "remove") && parts.length <= 3) {
+      const subcommand = parts[1];
+      const namePrefix = parts.length === 3 ? parts[2].toLowerCase() : "";
+      return {
+        replacePrefix: `/custom ${subcommand} `,
+        matches: customNames.filter((name) => name.startsWith(namePrefix))
+      };
+    }
+
+    if (command === "custom" && parts.length <= 2) {
+      const subcommands = ["show", "remove"];
+      const subPrefix = parts.length === 2 ? String(parts[1] || "").toLowerCase() : "";
+      return {
+        replacePrefix: "/custom ",
+        matches: subcommands.filter((entry) => entry.startsWith(subPrefix))
+      };
+    }
+
+    if (customSet.has(command) && (trailingSpace || parts.length === 2) && parts.length <= 2) {
+      const targetPrefix = parts.length === 2 ? parts[1] : "";
+      return {
+        replacePrefix: `/${commandRaw} `,
+        matches: buildSessionAutocompleteCandidates(targetPrefix)
+      };
+    }
+
+    if (command === "deck" && parts.length <= 2) {
+      const subcommands = ["list", "new", "rename", "switch", "delete"];
+      const subPrefix = parts.length === 2 ? String(parts[1] || "").toLowerCase() : "";
+      return {
+        replacePrefix: "/deck ",
+        matches: subcommands.filter((entry) => entry.startsWith(subPrefix))
+      };
+    }
+
+    if (command === "deck" && (parts[1] === "switch" || parts[1] === "delete") && parts.length <= 3) {
+      const deckPrefix = parts.length === 3 ? parts[2] : "";
+      return {
+        replacePrefix: `/deck ${parts[1]} `,
+        matches: buildDeckAutocompleteCandidates(deckPrefix)
+      };
+    }
+
+    if (command === "move") {
+      if (parts.length <= 2) {
+        const sessionPrefix = parts.length === 2 ? parts[1] : "";
+        return {
+          replacePrefix: "/move ",
+          matches: buildSessionAutocompleteCandidates(sessionPrefix)
+        };
+      }
+      if (parts.length === 3) {
+        const deckPrefix = parts[2];
+        return {
+          replacePrefix: `/move ${parts[1]} `,
+          matches: buildDeckAutocompleteCandidates(deckPrefix)
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function resolveQuickSwitchAutocompleteContext(rawInput) {
+    const parsed = parseQuickSwitchInputForAutocomplete(rawInput);
+    if (!parsed) {
+      return null;
+    }
+
+    const rawSelector = parsed.afterMarker;
+    const selector = rawSelector.trim();
+    if (!selector) {
+      return {
+        replacePrefix: ">",
+        matches: [
+          ...buildSessionAutocompleteCandidates("", { includeNamesWithWhitespace: true }),
+          ...buildDeckAutocompleteCandidates("")
+        ]
+      };
+    }
+
+    const crossDeckIndex = selector.indexOf("::");
+    if (crossDeckIndex >= 0) {
+      const deckPrefix = selector.slice(0, crossDeckIndex).trim();
+      const nestedPrefix = selector.slice(crossDeckIndex + 2).trim();
+      if (!deckPrefix) {
+        return {
+          replacePrefix: ">",
+          matches: buildDeckAutocompleteCandidates("")
+        };
+      }
+      const resolvedDeck = resolveDeckToken(deckPrefix, getDecks());
+      if (!resolvedDeck.deck) {
+        return {
+          replacePrefix: ">",
+          matches: buildDeckAutocompleteCandidates(deckPrefix)
+        };
+      }
+      const deckSessions = getSessions().filter((session) => getSessionDeckId(session) === resolvedDeck.deck.id);
+      return {
+        replacePrefix: `>${selector.slice(0, crossDeckIndex + 2)}`,
+        matches: buildSessionAutocompleteCandidates(nestedPrefix, {
+          sessions: deckSessions,
+          includeNamesWithWhitespace: true
+        })
+      };
+    }
+
+    if (selector.toLowerCase().startsWith("deck:")) {
+      const deckPrefix = selector.slice("deck:".length);
+      return {
+        replacePrefix: ">deck:",
+        matches: buildDeckAutocompleteCandidates(deckPrefix)
+      };
+    }
+
+    const matches = [
+      ...buildSessionAutocompleteCandidates(selector, { includeNamesWithWhitespace: true }),
+      ...buildDeckAutocompleteCandidates(selector, { includeExplicitPrefix: true })
+    ];
+    return {
+      replacePrefix: ">",
+      matches
+    };
+  }
+
+  function parseAutocompleteContext(rawInput, customCommands = listCustomCommands()) {
+    return resolveSlashAutocompleteContext(rawInput, customCommands) || resolveQuickSwitchAutocompleteContext(rawInput);
+  }
+
+  function parseSettingsPayload(raw) {
+    const text = String(raw || "").trim();
+    if (!text) {
+      return { ok: false, error: "Missing JSON payload for /settings apply." };
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { ok: false, error: "Invalid JSON payload for /settings apply." };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: "Settings payload must be a JSON object." };
+    }
+    return { ok: true, payload: parsed };
+  }
+
+  function parseSizeCommandArgs(args, currentCols, currentRows) {
+    const COLS_MIN = 20;
+    const COLS_MAX = 400;
+    const ROWS_MIN = 5;
+    const ROWS_MAX = 120;
+    const rawArgs = Array.isArray(args) ? args.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
+    if (rawArgs.length === 0) {
+      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+    }
+
+    let cols = currentCols;
+    let rows = currentRows;
+    let updatedCols = false;
+    let updatedRows = false;
+
+    const parseBoundedInt = (raw, min, max, label) => {
+      if (!/^\d+$/.test(raw)) {
+        return { ok: false, error: `${label} must be an integer.` };
+      }
+      const value = Number.parseInt(raw, 10);
+      if (!Number.isInteger(value) || value < min || value > max) {
+        return { ok: false, error: `${label} must be between ${min} and ${max}.` };
+      }
+      return { ok: true, value };
+    };
+
+    if (rawArgs.length === 2 && /^\d+$/.test(rawArgs[0]) && /^\d+$/.test(rawArgs[1])) {
+      const nextCols = parseBoundedInt(rawArgs[0], COLS_MIN, COLS_MAX, "Columns");
+      if (!nextCols.ok) {
+        return nextCols;
+      }
+      const nextRows = parseBoundedInt(rawArgs[1], ROWS_MIN, ROWS_MAX, "Rows");
+      if (!nextRows.ok) {
+        return nextRows;
+      }
+      return { ok: true, cols: nextCols.value, rows: nextRows.value };
+    }
+
+    for (const tokenRaw of rawArgs) {
+      const token = tokenRaw.toLowerCase();
+      const colsMatch = /^c(\d+)$/.exec(token);
+      if (colsMatch) {
+        const parsed = parseBoundedInt(colsMatch[1], COLS_MIN, COLS_MAX, "Columns");
+        if (!parsed.ok) {
+          return parsed;
+        }
+        cols = parsed.value;
+        updatedCols = true;
+        continue;
+      }
+      const rowsMatch = /^r(\d+)$/.exec(token);
+      if (rowsMatch) {
+        const parsed = parseBoundedInt(rowsMatch[1], ROWS_MIN, ROWS_MAX, "Rows");
+        if (!parsed.ok) {
+          return parsed;
+        }
+        rows = parsed.value;
+        updatedRows = true;
+        continue;
+      }
+      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+    }
+
+    if (!updatedCols && !updatedRows) {
+      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+    }
+    return { ok: true, cols, rows };
+  }
+
+  function parseDirectTargetRoutingInput(rawInput) {
+    const input = String(rawInput || "");
+    const match = /^@([^\s]+)\s+([\s\S]+)$/.exec(input);
+    if (!match) {
+      return {
+        matched: false,
+        targetToken: "",
+        payload: ""
+      };
+    }
+    return {
+      matched: true,
+      targetToken: match[1],
+      payload: match[2]
+    };
+  }
+
+  function parseCustomDefinition(rawInput) {
+    const raw = String(rawInput || "").replaceAll("\r\n", "\n");
+    const trimmedStart = raw.trimStart();
+    const prefix = "/custom";
+    if (!trimmedStart.startsWith(prefix)) {
+      return { ok: false, error: "Invalid /custom command input." };
+    }
+
+    const afterPrefix = trimmedStart.slice(prefix.length);
+    const newlineIndex = afterPrefix.indexOf("\n");
+
+    if (newlineIndex === -1) {
+      const trimmed = afterPrefix.trim();
+      if (!trimmed) {
+        return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+      }
+      const firstWhitespace = trimmed.search(/\s/);
+      if (firstWhitespace < 0) {
+        return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+      }
+      const name = trimmed.slice(0, firstWhitespace);
+      const content = trimmed.slice(firstWhitespace).trimStart();
+      if (!content) {
+        return { ok: false, error: "Inline custom-command content cannot be empty." };
+      }
+      return { ok: true, name, content, mode: "inline" };
+    }
+
+    const header = afterPrefix.slice(0, newlineIndex).trim();
+    if (!header) {
+      return { ok: false, error: "Missing custom-command name in block definition." };
+    }
+    if (/\s/.test(header)) {
+      return { ok: false, error: "Block definition header must be '/custom <name>' only." };
+    }
+
+    const trailing = afterPrefix.slice(newlineIndex + 1);
+    const lines = trailing.split("\n");
+    if (lines.length === 0 || lines[0].trim() !== "---") {
+      return { ok: false, error: "Block definition must start with '---' on its own line." };
+    }
+
+    let closingIndex = -1;
+    for (let index = 1; index < lines.length; index += 1) {
+      if (lines[index].trim() === "---") {
+        closingIndex = index;
+        break;
+      }
+    }
+    if (closingIndex < 0) {
+      return { ok: false, error: "Block definition must end with a closing '---' line." };
+    }
+
+    const contentLines = lines.slice(1, closingIndex);
+    const normalizedContentLines = contentLines.map((line) => (line.trim() === "\\---" ? "---" : line));
+    const blockContent = normalizedContentLines.join("\n");
+    if (!blockContent) {
+      return { ok: false, error: "Block custom-command content cannot be empty." };
+    }
+
+    const trailingLines = lines.slice(closingIndex + 1);
+    const afterClosing = trailingLines.join("\n").trim();
+    if (afterClosing) {
+      return {
+        ok: false,
+        error: "Block payload contains content after closing '---'. For a literal delimiter line inside payload, use '\\---'."
+      };
+    }
+
+    return { ok: true, name: header, content: blockContent, mode: "block" };
+  }
+
+  return {
+    resolveSessionToken,
+    resolveDeckToken,
+    resolveQuickSwitchTarget,
+    formatQuickSwitchPreview,
+    resolveTargetSelectors,
+    resolveFilterSelectors,
+    resolveSettingsTargets,
+    parseSettingsPayload,
+    parseSizeCommandArgs,
+    parseDirectTargetRoutingInput,
+    parseCustomDefinition,
+    parseAutocompleteContext
+  };
+}
