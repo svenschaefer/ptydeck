@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Active-terminal search was moved from the bottom workspace command area into the left sidebar so terminal search no longer consumes additional vertical workspace space.
+- [x] Sidebar scrolling now applies to the full sidebar container instead of a deck-only inner scrollbox, so the deck section is no longer height-capped independently from the rest of the sidebar.
 - [x] `QLT-119` completed: frontend runtime state for sessions, decks, custom commands, connection state, and session filter text now lives behind `frontend/src/public/store.js` with reducer-backed transitions instead of continuing as scattered inline mutation state in `app.js`.
 - [x] Store snapshots are now defensive copies, so the extracted runtime-store boundary no longer leaks mutable internal session/deck/custom-command collections to callers.
 - [x] `QLT-120` completed: frontend bootstrap/reconnect hydration is now WebSocket-authoritative when snapshot data arrives, with REST boot moved behind a delayed fallback path instead of being the default steady-state bootstrap source.

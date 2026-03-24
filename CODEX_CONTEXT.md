@@ -119,6 +119,8 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend app behavior tests now cover create-session failure, delete-session failure, command-send failure, and reconnecting/disconnected status rendering.
 - Frontend app integration tests now cover terminal card lifecycle updates, active-session focus switching, and empty-state rendering.
 - Frontend sidebar now includes terminal geometry settings via user-configurable `cols`/`rows` (default `80x20`) persisted via `localStorage`; the previous fixed-size toggle was removed and geometry now consistently follows configured values.
+- Active-terminal search now lives in the left sidebar instead of the bottom workspace command strip, preserving vertical terminal space in the main workspace.
+- Sidebar overflow now belongs to the whole sidebar container rather than a deck-only inner scroll region, so deck navigation is no longer independently height-capped.
 - Frontend fixed-size terminal rendering now derives card width and mount height deterministically from configured `cols`/`rows`, with uniform per-card sizing so row packing depends only on viewport width.
 - Frontend fixed-size terminal rendering width chrome was fine-tuned by an additional 2px reduction after initial geometry correction.
 - Frontend terminal workspace now hardens horizontal overflow behavior via fixed-size grid column constraints, card shrink guards, toolbar text truncation, and root `overflow-x` containment.

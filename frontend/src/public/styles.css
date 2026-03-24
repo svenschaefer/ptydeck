@@ -45,6 +45,8 @@ body {
   padding: 16px;
   border-right: 1px solid var(--border);
   background: #0f151f;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-head {
@@ -87,7 +89,24 @@ body {
   gap: 10px;
 }
 
+.terminal-search-panel {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #101924;
+  display: grid;
+  gap: 10px;
+}
+
 .settings-panel h2 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.terminal-search-panel h2 {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
@@ -142,9 +161,6 @@ body {
   display: grid;
   gap: 6px;
   min-width: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .deck-group {
@@ -286,13 +302,14 @@ body {
 
 .terminal-search-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 220px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
   min-width: 0;
 }
 
 .terminal-search-row input {
+  grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border);
@@ -311,12 +328,13 @@ body {
 }
 
 .terminal-search-status {
+  grid-column: 1 / -1;
   margin: 0;
   min-width: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
-  text-align: right;
+  text-align: left;
   white-space: pre-wrap;
 }
 
