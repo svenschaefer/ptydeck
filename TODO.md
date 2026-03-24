@@ -17,6 +17,10 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
 - [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
 - [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
+- [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
+- [ ] `ARC-010` Owner: `FE` Task: Complete UI-layer decomposition by extracting session-card/grid/settings rendering controllers into dedicated UI modules and reducing `app.js` to runtime bootstrap/composition only.
+- [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
+- [ ] `ARC-012` Owner: `QA` Task: Add architecture regression coverage for layered FE boundaries (module-level contract tests plus integration assertions preventing cross-layer shortcut regressions).
 - `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.
 
 ## Backend Tasks (OpenAPI-based REST)
@@ -229,6 +233,13 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [ ] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
 - [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
 - [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
+
+## Layered Frontend Architecture Completion (v0.4.0 continuation)
+
+- [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
+- [ ] `ARC-010` Owner: `FE` Task: Complete UI-layer decomposition by extracting session-card/grid/settings rendering controllers into dedicated UI modules and reducing `app.js` to runtime bootstrap/composition only.
+- [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
+- [ ] `ARC-012` Owner: `QA` Task: Add architecture regression coverage for layered FE boundaries (module-level contract tests plus integration assertions preventing cross-layer shortcut regressions).
 - [x] `ENT-009` Owner: `PLAT` Task: Add backup/restore automation for persistence data and include periodic restore verification procedure.
 - [x] `ENT-011` Owner: `PLAT` Task: Enforce TLS-only ingress in production (HTTPS/WSS), document certificate lifecycle, and add automated expiry checks.
 - [x] `ENT-012` Owner: `BE` Task: Add encryption-at-rest option for persistence data (key-provider abstraction + key rotation support) and tests for decrypt/rotate paths.

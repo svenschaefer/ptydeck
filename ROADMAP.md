@@ -656,6 +656,26 @@ Exit criteria:
 - Deployment/quality-gate docs define a concrete observability baseline for scrape, panel, and alert wiring.
 - Regression coverage guards observability contract stability and runtime counter/gauge behavior.
 
+### v0.4.0-H2 - Layered Frontend Architecture Completion
+
+- `ARC-009`
+- `ARC-010`
+- `ARC-011`
+- `ARC-012`
+
+Dependencies:
+
+- `ARC-010` depends on `ARC-009` so UI decomposition lands on top of stabilized command-layer boundaries.
+- `ARC-011` depends on `ARC-009` and `ARC-010` to enforce layer contracts after module extraction points are established.
+- `ARC-012` depends on `ARC-009`, `ARC-010`, and `ARC-011` so architecture-regression coverage validates the final boundary model.
+
+Exit criteria:
+
+- Remaining `app.js` command orchestration logic is split into parser/registry/executor modules with stable contracts.
+- Remaining `app.js` UI orchestration logic is split into dedicated UI modules, leaving `app.js` as bootstrap/composition boundary.
+- Cross-layer shortcut paths are removed so stream/interpretation/state/UI boundaries are explicit and enforceable.
+- Regression coverage protects architectural boundaries against future monolith regressions.
+
 ### Completed Items
 
 - `DOC-001`, `DOC-002`
