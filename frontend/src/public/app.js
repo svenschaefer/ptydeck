@@ -32,6 +32,7 @@ import {
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createCommandSuggestionsController } from "./ui/components.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
+import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 
 const config = resolveRuntimeConfig(window);
@@ -272,6 +273,7 @@ let commandExecutor = null;
 let commandSuggestionsController = null;
 let deckSidebarController = null;
 let sessionCardMetaController = null;
+let layoutSettingsController = null;
 const activityCompletionNotifier = createActivityCompletionNotifier({
   windowRef: window,
   aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
@@ -1531,78 +1533,45 @@ function renderSessionArtifacts(entry, session) {
 }
 
 function measureTerminalCellWidthPx() {
-  if (!document || typeof document.createElement !== "function") {
+  if (!layoutSettingsController) {
     return 10;
   }
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) {
-    return 10;
-  }
-  context.font = `${TERMINAL_FONT_SIZE}px ${TERMINAL_FONT_FAMILY}`;
-  const metrics = context.measureText("W");
-  return Math.max(7, Math.ceil(metrics.width));
+  return Math.max(7, Math.ceil((layoutSettingsController.computeFixedCardWidthPx(1) - TERMINAL_CARD_HORIZONTAL_CHROME_PX) || 10));
 }
 
 function computeFixedMountHeightPx(rows) {
-  const lineHeightPx = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT;
-  return Math.max(120, Math.round(rows * lineHeightPx + TERMINAL_MOUNT_VERTICAL_CHROME_PX));
+  if (!layoutSettingsController) {
+    const lineHeightPx = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT;
+    return Math.max(120, Math.round(rows * lineHeightPx + TERMINAL_MOUNT_VERTICAL_CHROME_PX));
+  }
+  return layoutSettingsController.computeFixedMountHeightPx(rows);
 }
 
 function computeFixedCardWidthPx(cols) {
-  const cellWidthPx = measureTerminalCellWidthPx();
-  return Math.max(260, Math.round(cols * cellWidthPx + TERMINAL_CARD_HORIZONTAL_CHROME_PX));
+  if (!layoutSettingsController) {
+    const cellWidthPx = measureTerminalCellWidthPx();
+    return Math.max(260, Math.round(cols * cellWidthPx + TERMINAL_CARD_HORIZONTAL_CHROME_PX));
+  }
+  return layoutSettingsController.computeFixedCardWidthPx(cols);
 }
 
 function syncTerminalGeometryCss() {
-  if (!document || !document.documentElement) {
-    return;
-  }
-  const root = document.documentElement;
-  const cardWidthPx = computeFixedCardWidthPx(terminalSettings.cols);
-  const mountHeightPx = computeFixedMountHeightPx(terminalSettings.rows);
-  root.style.setProperty("--ptydeck-terminal-card-width", `${cardWidthPx}px`);
-  root.style.setProperty("--ptydeck-terminal-mount-height", `${mountHeightPx}px`);
-  if (gridEl) {
-    gridEl.classList.add("fixed-size");
-  }
+  layoutSettingsController?.syncTerminalGeometryCss(terminalSettings);
 }
 
 function syncSettingsUi() {
-  if (settingsColsEl) {
-    settingsColsEl.value = String(terminalSettings.cols);
-  }
-  if (settingsRowsEl) {
-    settingsRowsEl.value = String(terminalSettings.rows);
-  }
-  const sidebarVisible = terminalSettings.sidebarVisible !== false;
-  if (appShellEl && appShellEl.classList) {
-    appShellEl.classList.toggle("sidebar-collapsed", !sidebarVisible);
-  }
-  if (sidebarToggleBtn) {
-    sidebarToggleBtn.setAttribute("aria-label", "Collapse sidebar");
-    sidebarToggleBtn.setAttribute("title", "Collapse sidebar");
-    sidebarToggleBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
-    sidebarToggleBtn.hidden = !sidebarVisible;
-  }
-  if (sidebarToggleIcon) {
-    sidebarToggleIcon.textContent = "⮜";
-  }
-  if (sidebarLauncherBtn) {
-    sidebarLauncherBtn.setAttribute("aria-label", "Expand sidebar");
-    sidebarLauncherBtn.setAttribute("title", "Expand sidebar");
-    sidebarLauncherBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
-    sidebarLauncherBtn.hidden = sidebarVisible;
-  }
-  syncTerminalGeometryCss();
+  layoutSettingsController?.syncSettingsUi(terminalSettings);
 }
 
 function readSettingsFromUi() {
-  return {
-    cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
-    rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
-    sidebarVisible: terminalSettings.sidebarVisible !== false
-  };
+  if (!layoutSettingsController) {
+    return {
+      cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
+      rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
+      sidebarVisible: terminalSettings.sidebarVisible !== false
+    };
+  }
+  return layoutSettingsController.readSettingsFromUi(terminalSettings);
 }
 
 async function applyTerminalSizeSettings(nextCols, nextRows) {
@@ -2805,6 +2774,22 @@ sessionCardMetaController = createSessionCardMetaController({
   normalizeSessionTags,
   onTick: () => render(),
   windowRef: window
+});
+
+layoutSettingsController = createLayoutSettingsController({
+  documentRef: document,
+  gridEl,
+  appShellEl,
+  sidebarToggleBtn,
+  sidebarToggleIcon,
+  sidebarLauncherBtn,
+  settingsColsEl,
+  settingsRowsEl,
+  terminalFontSize: TERMINAL_FONT_SIZE,
+  terminalLineHeight: TERMINAL_LINE_HEIGHT,
+  terminalFontFamily: TERMINAL_FONT_FAMILY,
+  cardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
+  mountVerticalChromePx: TERMINAL_MOUNT_VERTICAL_CHROME_PX
 });
 
 deckSidebarController = createDeckSidebarController({

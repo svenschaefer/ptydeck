@@ -5,8 +5,10 @@ Completed and verified topics belong here.
 ## 2026-03-24
 
 - [x] `ARC-010` progress: extracted dedicated UI controllers for deck sidebar rendering (`frontend/src/public/ui/deck-sidebar-controller.js`) and session-card metadata/status/settings rendering concerns (`frontend/src/public/ui/session-card-meta-controller.js`), and rewired `app.js` to consume these controller boundaries.
+- [x] `ARC-010` progress: extracted a dedicated layout/settings UI controller (`frontend/src/public/ui/layout-settings-controller.js`) for sidebar/settings synchronization and terminal geometry CSS computation, and rewired `app.js` to consume this boundary.
 - [x] Added focused controller regression coverage: `frontend/test/deck-sidebar-controller.test.js` and `frontend/test/session-card-meta-controller.test.js`.
-- [x] Validation for this ARC-010 step passed: `npm --prefix frontend run lint`, `node --test frontend/test/deck-sidebar-controller.test.js`, `node --test frontend/test/session-card-meta-controller.test.js`, and `node --test frontend/test/stream-builtins.test.js`.
+- [x] Added focused regression coverage for layout/settings UI controller behavior in `frontend/test/layout-settings-controller.test.js`.
+- [x] Validation for this ARC-010 step passed: `npm --prefix frontend run lint`, `node --test frontend/test/deck-sidebar-controller.test.js`, `node --test frontend/test/session-card-meta-controller.test.js`, `node --test frontend/test/layout-settings-controller.test.js`, and `node --test frontend/test/stream-builtins.test.js`.
 - [x] Stream interpretation hardening: built-in activity detection now supports Codex-style status/timer patterns (`Status (7m 04s • esc to interrupt)`), including spinner-prefixed lines and broader active-status verbs.
 - [x] Stream interpretation now parses `Completed files ...` transfer progress lines (with optional speed) and stores normalized progress metadata via `mergeSessionMeta`.
 - [x] Frontend live status ticker now parses and increments both `22s` and `7m 04s` timer formats in working-status text.
