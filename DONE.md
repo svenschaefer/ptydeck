@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Documentation sync pass completed: `TODO-OUTLOOK.md` was re-aligned against `docs/*.md`, and explicit deferred review-derived tasks (`DRV-001` ... `DRV-005`) were added for shell-adapter CWD tracking, replay-retention policy, command-schema formalization, command/output correlation, and shell-compatibility QA coverage.
+- [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the docs-vs-outlook alignment and the new `DRV-*` deferred planning baseline.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` now captures deferred slash-workflow-chain follow-ups as explicit owned tasks (`SWF-001` ... `SWF-008`) instead of leaving the concept only in `docs/`.
 - [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the new deferred workflow-chain planning baseline and remains aligned with current active-wave state (`v0.4.0-H2`).
 - [x] `ARC-010` progress: extracted dedicated UI controllers for deck sidebar rendering (`frontend/src/public/ui/deck-sidebar-controller.js`) and session-card metadata/status/settings rendering concerns (`frontend/src/public/ui/session-card-meta-controller.js`), and rewired `app.js` to consume these controller boundaries.
