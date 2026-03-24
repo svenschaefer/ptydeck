@@ -1,3 +1,10 @@
+import {
+  createSlashCommandSpecs,
+  createSuggestionProviderRegistry,
+  normalizeCompletionCandidate,
+  normalizeCompletionCandidates
+} from "./command-completion.js";
+
 function normalizeCustomCommandName(name) {
   return String(name || "").trim().toLowerCase();
 }
@@ -64,6 +71,7 @@ export function createCommandEngine(options = {}) {
   const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
   const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const getDecks = typeof options.getDecks === "function" ? options.getDecks : () => [];
+  const getThemes = typeof options.getThemes === "function" ? options.getThemes : () => [];
   const getActiveDeckId = typeof options.getActiveDeckId === "function" ? options.getActiveDeckId : () => "";
   const getActiveSessionId = typeof options.getActiveSessionId === "function" ? options.getActiveSessionId : () => null;
   const getSessionToken =
@@ -74,6 +82,19 @@ export function createCommandEngine(options = {}) {
       : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionDeckId =
     typeof options.getSessionDeckId === "function" ? options.getSessionDeckId : (session) => String(session?.deckId || "default");
+  const slashCommandSpecs = createSlashCommandSpecs(systemSlashCommands);
+  const slashCommandSpecMap = new Map(
+    slashCommandSpecs.map((spec) => [normalizeCustomCommandName(spec?.insertText), spec]).filter((entry) => Boolean(entry[0]))
+  );
+  const suggestionProviders = createSuggestionProviderRegistry({
+    getSessions,
+    getDecks,
+    getThemes,
+    listCustomCommands,
+    getSessionToken,
+    getSessionDisplayName,
+    getSessionDeckId
+  });
 
   function parseSlashInputForAutocomplete(rawInput) {
     const value = typeof rawInput === "string" ? rawInput : "";
@@ -140,6 +161,74 @@ export function createCommandEngine(options = {}) {
       ordered.push(normalized);
     }
     return ordered;
+  }
+
+  function getSlashCommandSpec(commandName) {
+    return slashCommandSpecMap.get(normalizeCustomCommandName(commandName)) || null;
+  }
+
+  function deriveReplacePrefix(rawInput, token) {
+    const input = typeof rawInput === "string" ? rawInput : "";
+    const currentToken = typeof token === "string" ? token : "";
+    if (!currentToken) {
+      return input;
+    }
+    return input.endsWith(currentToken) ? input.slice(0, input.length - currentToken.length) : input;
+  }
+
+  function filterCompletionCandidates(candidates, prefix = "") {
+    const normalizedPrefix = normalizeCustomCommandName(prefix);
+    const normalizedCandidates = normalizeCompletionCandidates(candidates);
+    if (!normalizedPrefix) {
+      return normalizedCandidates;
+    }
+    return normalizedCandidates.filter((candidate) => {
+      const normalized = normalizeCompletionCandidate(candidate);
+      if (!normalized) {
+        return false;
+      }
+      return (
+        normalized.insertText.toLowerCase().startsWith(normalizedPrefix) ||
+        normalized.label.toLowerCase().startsWith(`/${normalizedPrefix}`) ||
+        normalized.label.toLowerCase().startsWith(normalizedPrefix)
+      );
+    });
+  }
+
+  function buildRootSlashCompletionCandidates(customCommands = listCustomCommands()) {
+    const candidates = [...slashCommandSpecs];
+    for (const entry of Array.isArray(customCommands) ? customCommands : []) {
+      const name = String(entry?.name || "").trim().toLowerCase();
+      if (!name) {
+        continue;
+      }
+      candidates.push({
+        key: `slash-custom:${name}`,
+        insertText: name,
+        label: `/${name}`,
+        kind: "custom-command",
+        description: "saved custom command",
+        example: `/${name} 1`
+      });
+    }
+    return normalizeCompletionCandidates(candidates, { replacePrefix: "/" });
+  }
+
+  function resolveProviderAutocompleteContext(rawInput, argSpecs, argTokens, context = {}) {
+    if (!Array.isArray(argSpecs) || argSpecs.length === 0) {
+      return null;
+    }
+    const trailingSpace = /\s$/.test(String(rawInput || ""));
+    const currentToken = trailingSpace ? "" : String(argTokens[argTokens.length - 1] || "");
+    const argIndex = trailingSpace ? argTokens.length : Math.max(argTokens.length - 1, 0);
+    const argSpec = argSpecs[argIndex] || null;
+    if (!argSpec?.provider) {
+      return null;
+    }
+    return {
+      replacePrefix: deriveReplacePrefix(rawInput, currentToken),
+      matches: suggestionProviders.provide(argSpec.provider, currentToken, context)
+    };
   }
 
   function pushUniqueCandidate(candidates, seen, value, prefix = "") {
@@ -597,14 +686,14 @@ export function createCommandEngine(options = {}) {
     const afterSlash = parsed.afterSlash;
     const trailingSpace = /\s$/.test(afterSlash);
     const trimmed = afterSlash.trim();
-    const customCandidates = buildCommandAutocompleteCandidates(customCommands);
+    const rootCandidates = buildRootSlashCompletionCandidates(customCommands);
     const customNames = buildCustomCommandNameList(customCommands);
     const customSet = new Set(customNames);
 
     if (!trimmed) {
       return {
         replacePrefix: "/",
-        matches: customCandidates
+        matches: rootCandidates
       };
     }
 
@@ -614,79 +703,64 @@ export function createCommandEngine(options = {}) {
     const command = commandRaw.toLowerCase();
 
     if (!hasWhitespace) {
-      const matches = customCandidates.filter((name) => name.startsWith(command));
+      const matches = filterCompletionCandidates(rootCandidates, command);
       return {
         replacePrefix: "/",
         matches
       };
     }
 
-    if ((command === "switch" || command === "close" || command === "restart" || command === "rename" || command === "filter") && parts.length <= 2) {
-      const targetPrefix = parts.length === 2 ? parts[1] : "";
-      return {
-        replacePrefix: `/${commandRaw} `,
-        matches: buildSessionAutocompleteCandidates(targetPrefix)
-      };
-    }
-
-    if (command === "custom" && (parts[1] === "show" || parts[1] === "remove") && parts.length <= 3) {
-      const subcommand = parts[1];
-      const namePrefix = parts.length === 3 ? parts[2].toLowerCase() : "";
-      return {
-        replacePrefix: `/custom ${subcommand} `,
-        matches: customNames.filter((name) => name.startsWith(namePrefix))
-      };
-    }
-
-    if (command === "custom" && parts.length <= 2) {
-      const subcommands = ["show", "remove"];
-      const subPrefix = parts.length === 2 ? String(parts[1] || "").toLowerCase() : "";
-      return {
-        replacePrefix: "/custom ",
-        matches: subcommands.filter((entry) => entry.startsWith(subPrefix))
-      };
-    }
-
     if (customSet.has(command) && (trailingSpace || parts.length === 2) && parts.length <= 2) {
-      const targetPrefix = parts.length === 2 ? parts[1] : "";
       return {
-        replacePrefix: `/${commandRaw} `,
-        matches: buildSessionAutocompleteCandidates(targetPrefix)
+        replacePrefix: deriveReplacePrefix(rawInput, trailingSpace ? "" : String(parts[1] || "")),
+        matches: suggestionProviders.provide("session-selector", trailingSpace ? "" : String(parts[1] || ""))
       };
     }
 
-    if (command === "deck" && parts.length <= 2) {
-      const subcommands = ["list", "new", "rename", "switch", "delete"];
-      const subPrefix = parts.length === 2 ? String(parts[1] || "").toLowerCase() : "";
-      return {
-        replacePrefix: "/deck ",
-        matches: subcommands.filter((entry) => entry.startsWith(subPrefix))
-      };
+    const spec = getSlashCommandSpec(command);
+    if (!spec) {
+      return null;
     }
 
-    if (command === "deck" && (parts[1] === "switch" || parts[1] === "delete") && parts.length <= 3) {
-      const deckPrefix = parts.length === 3 ? parts[2] : "";
-      return {
-        replacePrefix: `/deck ${parts[1]} `,
-        matches: buildDeckAutocompleteCandidates(deckPrefix)
-      };
-    }
+    if (spec.subcommands) {
+      const subcommands = Object.values(spec.subcommands);
+      const subcommandRaw = String(parts[1] || "");
+      const subcommand = subcommandRaw.toLowerCase();
+      const resolvedSubcommand = spec.subcommands[subcommand] || null;
 
-    if (command === "move") {
-      if (parts.length <= 2) {
-        const sessionPrefix = parts.length === 2 ? parts[1] : "";
+      if (parts.length === 1 || (!trailingSpace && parts.length === 2 && !resolvedSubcommand)) {
         return {
-          replacePrefix: "/move ",
-          matches: buildSessionAutocompleteCandidates(sessionPrefix)
+          replacePrefix: deriveReplacePrefix(rawInput, parts.length === 2 ? subcommandRaw : ""),
+          matches: filterCompletionCandidates(subcommands, parts.length === 2 ? subcommandRaw : "")
         };
       }
-      if (parts.length === 3) {
-        const deckPrefix = parts[2];
+
+      if (!resolvedSubcommand) {
+        return null;
+      }
+
+      if (!trailingSpace && parts.length === 2) {
         return {
-          replacePrefix: `/move ${parts[1]} `,
-          matches: buildDeckAutocompleteCandidates(deckPrefix)
+          replacePrefix: deriveReplacePrefix(rawInput, subcommandRaw),
+          matches: filterCompletionCandidates([resolvedSubcommand], subcommandRaw)
         };
       }
+
+      return resolveProviderAutocompleteContext(rawInput, resolvedSubcommand.args, parts.slice(2), {
+        commandName: command,
+        subcommandName: subcommand
+      });
+    }
+
+    if (spec.args) {
+      const context = {
+        commandName: command
+      };
+      if (command === "filter") {
+        context.scopeMode = "active-deck";
+        context.activeDeckId = getActiveDeckId();
+      }
+      return resolveProviderAutocompleteContext(rawInput, spec.args, parts.slice(1), context);
     }
 
     return null;
@@ -703,10 +777,7 @@ export function createCommandEngine(options = {}) {
     if (!selector) {
       return {
         replacePrefix: ">",
-        matches: [
-          ...buildSessionAutocompleteCandidates("", { includeNamesWithWhitespace: true }),
-          ...buildDeckAutocompleteCandidates("")
-        ]
+        matches: suggestionProviders.provide("quick-switch-target", "", { includeNamesWithWhitespace: true })
       };
     }
 
@@ -717,20 +788,20 @@ export function createCommandEngine(options = {}) {
       if (!deckPrefix) {
         return {
           replacePrefix: ">",
-          matches: buildDeckAutocompleteCandidates("")
+          matches: suggestionProviders.provide("quick-switch-deck", "")
         };
       }
       const resolvedDeck = resolveDeckToken(deckPrefix, getDecks());
       if (!resolvedDeck.deck) {
         return {
           replacePrefix: ">",
-          matches: buildDeckAutocompleteCandidates(deckPrefix)
+          matches: suggestionProviders.provide("quick-switch-deck", deckPrefix)
         };
       }
       const deckSessions = getSessions().filter((session) => getSessionDeckId(session) === resolvedDeck.deck.id);
       return {
-        replacePrefix: `>${selector.slice(0, crossDeckIndex + 2)}`,
-        matches: buildSessionAutocompleteCandidates(nestedPrefix, {
+        replacePrefix: deriveReplacePrefix(rawInput, nestedPrefix),
+        matches: suggestionProviders.provide("quick-switch-session", nestedPrefix, {
           sessions: deckSessions,
           includeNamesWithWhitespace: true
         })
@@ -740,18 +811,17 @@ export function createCommandEngine(options = {}) {
     if (selector.toLowerCase().startsWith("deck:")) {
       const deckPrefix = selector.slice("deck:".length);
       return {
-        replacePrefix: ">deck:",
-        matches: buildDeckAutocompleteCandidates(deckPrefix)
+        replacePrefix: deriveReplacePrefix(rawInput, deckPrefix),
+        matches: suggestionProviders.provide("quick-switch-deck", deckPrefix)
       };
     }
 
-    const matches = [
-      ...buildSessionAutocompleteCandidates(selector, { includeNamesWithWhitespace: true }),
-      ...buildDeckAutocompleteCandidates(selector, { includeExplicitPrefix: true })
-    ];
     return {
       replacePrefix: ">",
-      matches
+      matches: suggestionProviders.provide("quick-switch-target", selector, {
+        includeNamesWithWhitespace: true,
+        includeExplicitPrefix: true
+      })
     };
   }
 

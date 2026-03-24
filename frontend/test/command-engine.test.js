@@ -7,18 +7,39 @@ function createEngineFixture() {
   const registry = createCustomCommandRegistry();
   registry.upsert({ name: "Docu", content: "sync docs" });
   const sessions = [
-    { id: "sess-1-abcdef", name: "alpha", deckId: "default", tags: ["ops"] },
-    { id: "sess-2-fedcba", name: "beta", deckId: "ops", tags: ["ops", "db"] }
+    {
+      id: "sess-1-abcdef",
+      name: "alpha",
+      deckId: "default",
+      tags: ["ops"],
+      cwd: "~/alpha",
+      startCwd: "~/alpha",
+      env: { APP_ENV: "dev" }
+    },
+    {
+      id: "sess-2-fedcba",
+      name: "beta",
+      deckId: "ops",
+      tags: ["ops", "db"],
+      cwd: "~/ops",
+      startCwd: "~/ops",
+      env: { APP_ENV: "prod", DB_HOST: "db" }
+    }
   ];
   const decks = [
     { id: "default", name: "Default" },
     { id: "ops", name: "Ops" }
   ];
+  const themes = [
+    { id: "ptydeck-default", name: "Ptydeck Default", category: "dark" },
+    { id: "solarized-light", name: "Solarized Light", category: "light" }
+  ];
   return createCommandEngine({
-    systemSlashCommands: ["switch", "custom", "deck", "move"],
+    systemSlashCommands: ["switch", "custom", "deck", "move", "settings", "filter", "close", "restart"],
     listCustomCommands: () => registry.list(),
     getSessions: () => sessions,
     getDecks: () => decks,
+    getThemes: () => themes,
     getActiveDeckId: () => "default",
     getActiveSessionId: () => "sess-1-abcdef",
     getSessionToken: (id) => (id === "sess-1-abcdef" ? "1" : "2"),
@@ -45,9 +66,46 @@ test("command engine parses custom block definitions", () => {
   });
 });
 
-test("command engine exposes autocomplete context for slash commands", () => {
+test("command engine exposes declarative autocomplete context for slash commands", () => {
   const engine = createEngineFixture();
   const context = engine.parseAutocompleteContext("/custom sh");
   assert.equal(context.replacePrefix, "/custom ");
-  assert.deepEqual(context.matches, ["show"]);
+  assert.deepEqual(
+    context.matches.map((candidate) => candidate.insertText),
+    ["show"]
+  );
+  assert.equal(context.matches[0].kind, "subcommand");
+  assert.match(context.matches[0].description, /show custom command/i);
+});
+
+test("command engine resolves declarative provider autocomplete for command arguments", () => {
+  const engine = createEngineFixture();
+
+  const moveContext = engine.parseAutocompleteContext("/move 1 o");
+  assert.equal(moveContext.replacePrefix, "/move 1 ");
+  assert.equal(moveContext.matches[0].insertText, "ops");
+  assert.equal(moveContext.matches[0].kind, "deck");
+
+  const settingsContext = engine.parseAutocompleteContext("/settings show ");
+  assert.equal(settingsContext.replacePrefix, "/settings show ");
+  assert.deepEqual(
+    settingsContext.matches.map((candidate) => candidate.insertText),
+    ["1", "alpha", "sess-1-abcdef", "2", "beta", "sess-2-fedcba"]
+  );
+});
+
+test("command engine returns structured quick-switch autocomplete candidates", () => {
+  const engine = createEngineFixture();
+
+  const quickSwitchContext = engine.parseAutocompleteContext(">");
+  assert.equal(quickSwitchContext.replacePrefix, ">");
+  assert.ok(quickSwitchContext.matches.some((candidate) => candidate.kind === "session"));
+  assert.ok(quickSwitchContext.matches.some((candidate) => candidate.kind === "deck"));
+
+  const crossDeckContext = engine.parseAutocompleteContext(">ops::");
+  assert.equal(crossDeckContext.replacePrefix, ">ops::");
+  assert.deepEqual(
+    crossDeckContext.matches.map((candidate) => candidate.insertText),
+    ["2", "beta", "sess-2-fedcba"]
+  );
 });

@@ -1,3 +1,9 @@
+import {
+  formatCompletionSuggestionLine,
+  normalizeCompletionCandidate,
+  normalizeCompletionCandidates
+} from "../command-completion.js";
+
 export function createCommandSuggestionsController(options = {}) {
   const commandInput = options.commandInput || null;
   const uiState = options.uiState || null;
@@ -14,7 +20,8 @@ export function createCommandSuggestionsController(options = {}) {
   }
 
   function set(replacePrefix, matches, index = 0) {
-    if (!Array.isArray(matches) || matches.length === 0) {
+    const normalizedMatches = normalizeCompletionCandidates(matches, { replacePrefix });
+    if (!Array.isArray(normalizedMatches) || normalizedMatches.length === 0) {
       autocompleteState = null;
       if (uiState) {
         uiState.commandSuggestions = "";
@@ -23,16 +30,15 @@ export function createCommandSuggestionsController(options = {}) {
       render();
       return;
     }
-    const nextIndex = Math.min(Math.max(index, 0), matches.length - 1);
+    const nextIndex = Math.min(Math.max(index, 0), normalizedMatches.length - 1);
     autocompleteState = {
-      matches,
+      matches: normalizedMatches,
       index: nextIndex,
       replacePrefix
     };
-    const lines = matches.map((entry, entryIndex) => {
-      const full = `${replacePrefix}${entry}`;
-      return `${entryIndex === nextIndex ? ">" : " "} ${full}`;
-    });
+    const lines = normalizedMatches.map((entry, entryIndex) =>
+      formatCompletionSuggestionLine(entry, replacePrefix, entryIndex === nextIndex)
+    );
     if (uiState) {
       uiState.commandSuggestions = lines.join("\n");
       uiState.commandSuggestionSelectedIndex = nextIndex;
@@ -79,13 +85,18 @@ export function createCommandSuggestionsController(options = {}) {
     }
     const nextIndex = Math.min(Math.max(index, 0), autocompleteState.matches.length - 1);
     autocompleteState.index = nextIndex;
-    if (commandInput) {
-      commandInput.value = `${autocompleteState.replacePrefix}${autocompleteState.matches[nextIndex]}`;
-    }
-    const lines = autocompleteState.matches.map((entry, entryIndex) => {
-      const full = `${autocompleteState.replacePrefix}${entry}`;
-      return `${entryIndex === nextIndex ? ">" : " "} ${full}`;
+    const selected = normalizeCompletionCandidate(autocompleteState.matches[nextIndex], {
+      replacePrefix: autocompleteState.replacePrefix
     });
+    if (!selected) {
+      return false;
+    }
+    if (commandInput) {
+      commandInput.value = `${autocompleteState.replacePrefix}${selected.insertText}`;
+    }
+    const lines = autocompleteState.matches.map((entry, entryIndex) =>
+      formatCompletionSuggestionLine(entry, autocompleteState.replacePrefix, entryIndex === nextIndex)
+    );
     if (uiState) {
       uiState.commandSuggestions = lines.join("\n");
       uiState.commandSuggestionSelectedIndex = nextIndex;

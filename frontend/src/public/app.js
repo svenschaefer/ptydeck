@@ -1,5 +1,6 @@
 import { createApiClient } from "./api-client.js";
 import { createCommandEngine, createCustomCommandRegistry } from "./command-engine.js";
+import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
@@ -622,7 +623,10 @@ async function autocompleteComposerInput(reverse = false) {
     activeState.index >= 0 &&
     activeState.index < activeState.matches.length &&
     typeof activeState.replacePrefix === "string" &&
-    commandInput.value === `${activeState.replacePrefix}${activeState.matches[activeState.index]}`;
+    commandInput.value ===
+      `${activeState.replacePrefix}${normalizeCompletionCandidate(activeState.matches[activeState.index], {
+        replacePrefix: activeState.replacePrefix
+      })?.insertText || ""}`;
 
   let matches = [];
   let replacePrefix = "/";
@@ -679,19 +683,16 @@ async function refreshCommandSuggestions() {
     commandSuggestionsController.getState() &&
     commandSuggestionsController.getState().replacePrefix === context.replacePrefix &&
     Array.isArray(commandSuggestionsController.getState().matches) &&
-    commandSuggestionsController.getState().matches.length === context.matches.length &&
-    commandSuggestionsController
-      .getState()
-      .matches.every((entry, entryIndex) => entry === context.matches[entryIndex])
+    areCompletionCandidateListsEqual(commandSuggestionsController.getState().matches, context.matches)
   ) {
     index = Math.min(Math.max(commandSuggestionsController.getState().index, 0), context.matches.length - 1);
   }
-  const selected = context.matches[index] || "";
+  const selected = normalizeCompletionCandidate(context.matches[index], { replacePrefix: context.replacePrefix });
   const inputValue = commandInput.value || "";
   const prefix = context.replacePrefix || "";
   const tokenPrefix = inputValue.startsWith(prefix) ? inputValue.slice(prefix.length) : "";
-  if (selected && tokenPrefix.length <= selected.length && selected.startsWith(tokenPrefix)) {
-    uiState.commandInlineHint = selected.slice(tokenPrefix.length);
+  if (selected && tokenPrefix.length <= selected.insertText.length && selected.insertText.startsWith(tokenPrefix)) {
+    uiState.commandInlineHint = selected.insertText.slice(tokenPrefix.length);
     uiState.commandInlineHintPrefixPx = measureComposerPrefixWidthPx(inputValue);
   } else {
     uiState.commandInlineHint = "";
@@ -2583,6 +2584,7 @@ commandEngine = createCommandEngine({
   listCustomCommands: listCustomCommandState,
   getSessions: () => store.getState().sessions,
   getDecks: () => deckState.decks,
+  getThemes: () => TERMINAL_THEME_PRESETS,
   getActiveDeckId: () => deckState.activeDeckId,
   getActiveSessionId: () => store.getState().activeSessionId,
   getSessionToken: formatSessionToken,

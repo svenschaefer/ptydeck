@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-112` completed: frontend command autocomplete is now driven by an explicit declarative command-spec layer for `/...` and `>...` flows instead of hardcoded branching spread across the runtime.
+- [x] `QLT-113` completed: contextual suggestion providers now generate deck/session/tag/custom-command/path/env/theme candidates through one cached provider registry with bounded result sets and no mutation side effects while typing.
+- [x] `QLT-114` completed: inline autocomplete suggestions now expose richer metadata (`kind`, description, examples, and insert preview) while preserving the existing keyboard-first composer UX and inline ghost-hint behavior.
+- [x] `QLT-115` completed: regression coverage now verifies declarative spec metadata, structured quick-switch/slash suggestions, provider-bounded results, and provider-error isolation.
+- [x] Frontend command completion now flows through the new `frontend/src/public/command-completion.js` boundary, with `command-engine`, `ui/components`, and `app` consuming normalized structured completion candidates instead of plain suggestion strings.
+- [x] Frontend autocomplete now uses structural candidate equality and insert-text semantics, so cycling, inline hints, and suggestion refresh stay deterministic even when richer metadata is attached to suggestions.
+- [x] Validation for `QLT-112`/`QLT-113`/`QLT-114`/`QLT-115` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] The remaining `docs/*.md` technical-alternatives recommendations were reviewed and translated into explicit deferred stack-evolution backlog in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) instead of being left as prose-only options.
 - [x] `withfig/autocomplete` was added to `TODO-OUTLOOK.md` as an explicit inspiration source for deferred command-completion architecture work, yielding new medium-term backlog items for declarative completion specs, generator-backed suggestions, richer suggestion metadata, and autocomplete regression coverage (`REM-010` ... `REM-013`).
 - [x] `QLT-110` completed: active terminals now expose deterministic output search with a dedicated search row, explicit next/previous navigation, wraparound/no-match feedback, and selection/focus behavior that follows deck/session switching without mutating PTY output.

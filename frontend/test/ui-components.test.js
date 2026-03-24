@@ -24,9 +24,17 @@ test("command suggestions controller updates UI state and applies selection", ()
     }
   });
 
-  controller.set("/", ["help", "hello"], 0);
+  controller.set(
+    "/",
+    [
+      { insertText: "help", label: "/help", kind: "command", description: "show command help" },
+      { insertText: "hello", label: "/hello", kind: "custom-command", description: "saved custom command" }
+    ],
+    0
+  );
   assert.equal(uiState.commandSuggestionSelectedIndex, 0);
   assert.match(uiState.commandSuggestions, /> \/help/);
+  assert.match(uiState.commandSuggestions, /\[command\]/);
 
   assert.equal(controller.move(1), true);
   assert.equal(commandInput.value, "/hello");
