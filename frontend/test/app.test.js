@@ -400,6 +400,7 @@ function createTerminalCardTemplateNode() {
   toolbar.appendChild(focus);
   toolbar.appendChild(stateBadge);
   toolbar.appendChild(pluginBadges);
+  toolbar.appendChild(sessionStatus);
   toolbar.appendChild(tagList);
   toolbar.appendChild(settings);
   settingsPanel.appendChild(settingsDismiss);
@@ -436,7 +437,6 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(settingsFooter);
   card.appendChild(toolbar);
   card.appendChild(unrestoredHint);
-  card.appendChild(sessionStatus);
   card.appendChild(sessionArtifacts);
   card.appendChild(settingsPanel);
   card.appendChild(mount);
@@ -1852,7 +1852,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     (entry) => entry.hidden === false && entry.querySelector(".session-focus")?.textContent === "two"
   );
   assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
-  assert.match(recoveredHiddenCard.querySelector(".session-status-text").textContent, /Working on hidden deck sync/i);
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
   assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
 
   ws.emit("message", {

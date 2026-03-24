@@ -202,6 +202,7 @@ The deck model is a strict isolation boundary above sessions.
 - Release evidence bundle automation now exists via `scripts/generate-release-evidence.sh`, producing manifest/checksum tracked artifacts that include test logs, coverage gate output, SCA output, SBOM files, and CI commit provenance metadata.
 - Backend auth/authz middleware baseline now supports JWT validation in `AUTH_MODE=dev`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
+- Backend server startup now loads local `backend/.env` / `backend/.env.local` files before configuration resolution (without overriding already exported shell env vars), so local `AUTH_MODE=dev` can be activated through repo-local env files.
 - Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `TODO-OUTLOOK.md`.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
 - Frontend runtime config now supports no-parameter domain operation: `ptydeck.*` browser hosts auto-target `api.<current-host>` for REST/WS, while localhost/IP hosts retain `18080` fallback for development.
@@ -238,6 +239,8 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend now supports non-slash direct target routing via `@<target> <text>` that reuses deterministic session-token resolution and does not switch active-session focus.
 - Frontend `/custom` block parser now supports escaped delimiter payload lines (`\---` -> literal `---`) and returns explicit guidance for unescaped delimiter edge cases.
 - Frontend terminal output append path now forces explicit post-write repaint to avoid delayed visual updates on non-focused sessions.
+- Stream-plugin status extraction now keeps compact activity phrases (for example `Working(...)`) instead of full long source lines, and session status is rendered inline in the existing terminal header metadata area rather than as a dedicated extra row.
+- Snapshot output replay now appends directly to terminal buffers (without passing through live stream-interpretation hooks), reducing startup/reconnect churn from historical output replay.
 - Frontend now exposes per-terminal settings entry points on terminal cards, with session-scoped settings panel shell/toggle behavior.
 - Frontend per-terminal settings now open as a true modal dialog (`<dialog>`) from a gear-icon button, replacing inline panel rendering.
 - Frontend `Rename` and `Delete` actions now live inside the per-session settings dialog instead of the direct terminal toolbar.

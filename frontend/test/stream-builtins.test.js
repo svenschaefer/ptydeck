@@ -16,7 +16,7 @@ test("activity-status plugin detects active processing output from data chunks",
     ["setSessionState", "setSessionStatus", "setSessionBadges"]
   );
   assert.equal(actions[0].value, "working");
-  assert.match(actions[1].value, /Working on plan/i);
+  assert.equal(actions[1].value, "Working");
   assert.deepEqual(actions[2].badges, [{ id: "working", text: "Working", tone: "active" }]);
 });
 

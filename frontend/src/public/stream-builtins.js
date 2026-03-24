@@ -17,9 +17,13 @@ function detectActiveProcessingText(text) {
     .map((line) => line.trim())
     .filter(Boolean);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index];
-    if (/\b(working|thinking|analyzing|processing|planning|executing)\b/i.test(line)) {
-      return line;
+    const line = lines[index].replace(/^[\s`~*•◦·>›→-]+/, "");
+    const match = line.match(
+      /\b(working|thinking|analyzing|processing|planning|executing)(?:\s*\([^)\r\n]{1,120}\))?/i
+    );
+    if (match && typeof match[0] === "string" && match[0].trim()) {
+      const token = match[0].trim();
+      return token.charAt(0).toUpperCase() + token.slice(1);
     }
   }
   return "";

@@ -697,12 +697,12 @@ button:hover {
 
 .session-status-text {
   margin: 0;
-  padding: 6px 10px;
-  border-bottom: 1px solid #233243;
-  background: #121a24;
+  padding: 0;
   color: #a9c1d8;
   font-size: 11px;
   line-height: 1.35;
+  flex: 0 1 42%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -748,8 +748,6 @@ button:hover {
 }
 
 .terminal-card.attention .session-status-text {
-  border-bottom-color: #5d4625;
-  background: #231c12;
   color: #ffd89a;
 }
 

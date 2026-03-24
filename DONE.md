@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Backend startup now loads local `backend/.env` / `backend/.env.local` values before config resolution, so local `AUTH_MODE=dev` setup works without manually exporting environment variables in the shell.
+- [x] Stream status interpretation was tightened to concise activity tokens (for example `Working(...)`) instead of rendering full long terminal lines in session status UI.
+- [x] Session status text moved into the existing terminal header metadata area (no dedicated extra status row under the header).
+- [x] Snapshot output replay no longer runs through the live stream-interpreter path and no longer triggers redundant activity churn during initial reconnect/bootstrap history restore.
+- [x] Frontend send/stream regression tests were updated to match compact status rendering and header placement semantics.
 - [x] Markdown auth terminology is now synchronized to the current baseline (`AUTH_MODE=dev`) across README/deployment/context/roadmap/outlook docs; stale `AUTH_DEV_MODE` wording was removed from active guidance.
 - [x] `ENT-026` completed: WebSocket authentication no longer uses bearer tokens in query strings; the frontend now exchanges the REST bearer token for a one-time WS ticket and sends it via `Sec-WebSocket-Protocol`, while the backend consumes each ticket exactly once.
 - [x] `ENT-027` completed: backend auth configuration now uses explicit `AUTH_MODE=off|dev|prod`, `/api/v1/auth/dev-token` is dev-only, and unsupported `prod` mode fails fast instead of silently falling back.

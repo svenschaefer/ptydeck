@@ -150,7 +150,6 @@ const streamAdapter = createSessionStreamAdapter({
   onData(sessionId, chunk) {
     streamPluginEngine.handleData(sessionId, chunk);
     appendTerminalChunk(sessionId, chunk);
-    markSessionActivity(sessionId);
   },
   onLine(sessionId, line) {
     streamPluginEngine.handleLine(sessionId, line);
@@ -2670,7 +2669,7 @@ function render() {
   }
 }
 
-function appendTerminalChunk(sessionId, data) {
+function appendTerminalChunk(sessionId, data, options = {}) {
   const entry = terminals.get(sessionId);
   if (!entry || typeof data !== "string" || data.length === 0) {
     return false;
@@ -2692,7 +2691,9 @@ function appendTerminalChunk(sessionId, data) {
       syncActiveTerminalSearch({ preserveSelection: true });
     }
   });
-  markSessionActivity(sessionId);
+  if (options.markActivity !== false) {
+    markSessionActivity(sessionId);
+  }
   return true;
 }
 
@@ -2710,7 +2711,7 @@ function replaySnapshotOutputs(outputs, attempt = 0) {
       missing += 1;
       continue;
     }
-    streamAdapter.push(entry.sessionId, entry.data);
+    appendTerminalChunk(entry.sessionId, entry.data, { markActivity: false });
   }
 
   if (missing > 0 && attempt < 4) {
