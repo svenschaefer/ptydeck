@@ -5,3 +5,7 @@ backend/data/
 local-config/
 artifacts/
 backups/
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
