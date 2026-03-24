@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Markdown auth terminology is now synchronized to the current baseline (`AUTH_MODE=dev`) across README/deployment/context/roadmap/outlook docs; stale `AUTH_DEV_MODE` wording was removed from active guidance.
 - [x] `ENT-026` completed: WebSocket authentication no longer uses bearer tokens in query strings; the frontend now exchanges the REST bearer token for a one-time WS ticket and sends it via `Sec-WebSocket-Protocol`, while the backend consumes each ticket exactly once.
 - [x] `ENT-027` completed: backend auth configuration now uses explicit `AUTH_MODE=off|dev|prod`, `/api/v1/auth/dev-token` is dev-only, and unsupported `prod` mode fails fast instead of silently falling back.
 - [x] `ENT-028` completed: backend/frontend regression coverage now verifies WS auth without query-string tokens, one-time ticket reuse rejection, explicit auth-mode gating, and disabled dev-token behavior outside dev mode.
@@ -452,7 +453,7 @@ Completed and verified topics belong here.
 - [x] Deployment guide now explicitly documents host/path routing contract (`/api/v1`, `/ws`), required forwarded headers, TLS expectation, and WebSocket upgrade requirements.
 - [x] Deployment guide behavior summary updated to match fail-fast production CORS validation (`CORS_ORIGIN` required in production).
 - [x] `ENT-001` completed (baseline): added auth/authz middleware for REST and WebSocket with JWT dev-mode validation and route scope enforcement.
-- [x] Backend now provides `POST /api/v1/auth/dev-token` in `AUTH_DEV_MODE=1`, and protected routes return explicit `401 Unauthorized` / `403 Forbidden` responses.
+- [x] Backend now provides `POST /api/v1/auth/dev-token` in `AUTH_MODE=dev`, and protected routes return explicit `401 Unauthorized` / `403 Forbidden` responses.
 - [x] Frontend now auto-requests a dev token when available and applies it to REST bearer auth and WS `access_token` connection parameter.
 - [x] Added backend auth coverage for protected REST and WS behavior plus contract/validation coverage for new auth token endpoint.
 - [x] Validation for `ENT-001` cycle passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.

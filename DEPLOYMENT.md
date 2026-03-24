@@ -68,7 +68,7 @@ Optional for troubleshooting:
 
 Optional local auth baseline (development only):
 
-- Backend: `AUTH_DEV_MODE=1`
+- Backend: `AUTH_MODE=dev`
 - Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
 - Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
 
@@ -89,7 +89,7 @@ Runtime secret injection pattern:
 
 Minimum secret inventory (current baseline):
 
-- `AUTH_DEV_SECRET` (when `AUTH_DEV_MODE=1`)
+- `AUTH_DEV_SECRET` (when `AUTH_MODE=dev`)
 - Future production auth credentials/keys (OIDC/JWKS-related values)
 - Any future encryption-at-rest keys
 
@@ -164,7 +164,7 @@ Behavior summary:
 - `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
 - `production` without `CORS_ORIGIN`: startup fails fast (`CORS_ORIGIN` is required).
 - `production` with `CORS_ORIGIN=*`: startup fails fast (wildcard is blocked in production).
-- `AUTH_ENABLED=true` without `AUTH_DEV_MODE=1`: startup fails (only dev-mode auth provider is implemented in current baseline).
+- `AUTH_MODE=prod`: startup fails currently (production provider is not implemented in current baseline).
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
 ### 7.1 Provider-Agnostic HTTPS/WSS Reverse-Proxy Contract

@@ -93,7 +93,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)
-- Optional local auth baseline via `AUTH_DEV_MODE=1` with automatic frontend dev-token acquisition (`/api/v1/auth/dev-token`)
+- Optional local auth baseline via `AUTH_MODE=dev` with automatic frontend dev-token acquisition (`/api/v1/auth/dev-token`)
 - Production logging standard documented in `DEPLOYMENT.md` (JSON format, correlation IDs, redaction, retention baseline)
 - Monitoring baseline via `GET /metrics` (Prometheus-style counters/gauges for requests, sessions, and WebSocket connections)
 - Secrets-management strategy baseline documented in `DEPLOYMENT.md` (runtime injection and rotation guidance)

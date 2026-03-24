@@ -621,7 +621,7 @@ Remaining in this milestone:
 Dependencies:
 
 - `ENT-026` depends on the existing auth baseline so WebSocket authentication can move off query-string transport without regressing current REST/WS access behavior.
-- `ENT-027` depends on the current `AUTH_DEV_MODE` baseline and should land with explicit runtime validation so insecure production-like combinations fail fast instead of silently falling back.
+- `ENT-027` depends on the current `AUTH_MODE=dev` baseline and should land with explicit runtime validation so insecure production-like combinations fail fast instead of silently falling back.
 - `ENT-028` depends on `ENT-026` and `ENT-027` so regression coverage validates the final handshake/auth-mode contract rather than a transient intermediate transport.
 
 Exit criteria:

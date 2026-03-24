@@ -200,7 +200,7 @@ The deck model is a strict isolation boundary above sessions.
 - Backup/restore automation now exists via `scripts/backup-sessions.sh` and `scripts/restore-sessions.sh`, with deterministic roundtrip verification in CI/non-prod via `scripts/verify-backup-restore.sh`.
 - Retention/purge automation now exists via `scripts/purge-retention.sh` with configurable retention windows for backups/logs/security artifacts and CI dry-run validation cadence.
 - Release evidence bundle automation now exists via `scripts/generate-release-evidence.sh`, producing manifest/checksum tracked artifacts that include test logs, coverage gate output, SCA output, SBOM files, and CI commit provenance metadata.
-- Backend auth/authz middleware baseline now supports JWT validation in `AUTH_DEV_MODE=1`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
+- Backend auth/authz middleware baseline now supports JWT validation in `AUTH_MODE=dev`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
 - Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `TODO-OUTLOOK.md`.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
