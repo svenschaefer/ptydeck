@@ -13,7 +13,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H1` (Observability Expansion).
-- Active scoped tasks: `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
+- Active scoped tasks (`H1`): `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
+- Next queued wave (after `H1`): `v0.4.0-H2` (Layered Frontend Architecture Completion) with `ARC-009`, `ARC-010`, `ARC-011`, `ARC-012`.
 
 ## Dependency Rules
 
