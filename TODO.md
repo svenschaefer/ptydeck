@@ -14,8 +14,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Active Open Tasks (Current)
 
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
-- [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
-- [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -181,8 +179,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-099` Owner: `FE` Task: Isolate xterm private/internal rendering and geometry access behind a dedicated compatibility adapter instead of using internals directly throughout `app.js`.
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
 - [x] `QLT-101` Owner: `FE` Task: Add `>selector` quick-switch commands to the composer so `>4`, `>A`, `>name`, or other existing single-session selectors activate that session directly and switch decks automatically when the target lives outside the active deck.
-- [ ] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
-- [ ] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
+- [x] `QLT-102` Owner: `FE` Task: Add per-deck terminal buttons beneath the deck controls in the sidebar, with slight visual indentation and visible quick IDs next to terminal names so users can click to focus and see the matching `>...` shortcut at a glance.
+- [x] `QLT-103` Owner: `QA` Task: Add regression coverage for quick-switch and sidebar-terminal navigation behavior, including deck auto-switch, quick-ID rendering, active-terminal highlighting, and selector parity between `>...` commands and sidebar buttons.
 - [x] `QLT-104` Owner: `FE` Task: Extend `>...` quick-switching so deck selectors are supported as direct targets as well, including autocomplete for deck names/IDs and deterministic deck activation when the `>` target resolves to a deck instead of a terminal.
 - [x] `QLT-105` Owner: `FE` Task: Broaden autocomplete coverage across both `/...` and `>...` input flows so terminal selectors, deck selectors, and related navigation targets are suggested consistently wherever deterministic completion is possible.
 - [x] `QLT-106` Owner: `FE` Task: Make `>...` quick-switching reuse the same selector grammar as `/switch`, including explicit `deckSelector::sessionSelector` cross-deck targeting, deterministic single-target ambiguity handling, and consistent resolution across ID, quick ID, name, and unique ID-prefix selectors.

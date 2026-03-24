@@ -147,6 +147,12 @@ body {
   scrollbar-width: thin;
 }
 
+.deck-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .deck-tab {
   border: 1px solid #304055;
   border-radius: 8px;
@@ -177,6 +183,53 @@ body {
 .deck-tab-count {
   opacity: 0.75;
   font-size: 11px;
+}
+
+.deck-session-list {
+  display: grid;
+  gap: 4px;
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px solid #233142;
+}
+
+.deck-session-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #27384b;
+  border-radius: 7px;
+  background: #0d141d;
+  color: #9db8d2;
+  padding: 5px 8px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.deck-session-btn:hover {
+  border-color: #4f6a88;
+}
+
+.deck-session-btn.active {
+  border-color: var(--active);
+  color: #d7f2ce;
+  background: #152116;
+}
+
+.deck-session-btn .session-quick-id {
+  min-width: 1.75rem;
+  font-size: 11px;
+  padding: 2px 5px;
+}
+
+.deck-session-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deck-actions {

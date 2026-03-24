@@ -45,20 +45,47 @@ class FakeElement {
     this.id = id;
     this.tagName = tagName.toUpperCase();
     this.classList = new ClassList(className);
+    this.attributes = new Map();
     this.children = [];
     this.parentNode = null;
-    this.style = {};
+    this.style = {
+      setProperty(name, value) {
+        this[name] = value;
+      },
+      removeProperty(name) {
+        delete this[name];
+      }
+    };
     this.textContent = "";
     this.value = "";
     this.clientWidth = clientWidth;
     this.clientHeight = clientHeight;
     this.listeners = new Map();
     this.open = false;
+    this.hidden = false;
+    this.disabled = false;
+  }
+
+  set className(value) {
+    this.classList = new ClassList(String(value || ""));
+  }
+
+  get className() {
+    return this.classList.toString();
   }
 
   appendChild(child) {
     child.parentNode = this;
     this.children.push(child);
+    return child;
+  }
+
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) {
+      this.children.splice(index, 1);
+      child.parentNode = null;
+    }
     return child;
   }
 
@@ -99,7 +126,29 @@ class FakeElement {
     this.open = false;
   }
 
+  setAttribute(name, value) {
+    this.attributes.set(String(name), String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.has(String(name)) ? this.attributes.get(String(name)) : null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(String(name));
+  }
+
+  get firstChild() {
+    return this.children[0] || null;
+  }
+
   querySelector(selector) {
+    if (selector.startsWith("#")) {
+      const id = selector.slice(1);
+      if (this.id === id) {
+        return this;
+      }
+    }
     if (!selector.startsWith(".")) {
       return null;
     }
@@ -351,23 +400,28 @@ function createTerminalCardTemplateNode() {
 function createDocumentFixture() {
   const byId = new Map();
 
+  const appShell = new FakeElement({ className: "app-shell" });
   const connectionState = new FakeElement({ id: "connection-state" });
   const terminalGrid = new FakeElement({ id: "terminal-grid" });
+  const sidebarToggle = new FakeElement({ id: "sidebar-toggle", tagName: "button" });
+  const sidebarToggleIcon = new FakeElement({ id: "sidebar-toggle-icon", tagName: "span" });
+  const sidebarLauncher = new FakeElement({ id: "sidebar-launcher", tagName: "button" });
   const createSession = new FakeElement({ id: "create-session", tagName: "button" });
-  const settingsFixedSize = new FakeElement({ id: "settings-fixed-size", tagName: "input" });
-  settingsFixedSize.checked = true;
+  const deckTabs = new FakeElement({ id: "deck-tabs" });
+  const deckCreate = new FakeElement({ id: "deck-create", tagName: "button" });
+  const deckRename = new FakeElement({ id: "deck-rename", tagName: "button" });
+  const deckDelete = new FakeElement({ id: "deck-delete", tagName: "button" });
   const settingsCols = new FakeElement({ id: "settings-cols", tagName: "input" });
   settingsCols.value = "80";
   const settingsRows = new FakeElement({ id: "settings-rows", tagName: "input" });
   settingsRows.value = "20";
-  const settingsSendTerminator = new FakeElement({ id: "settings-send-terminator", tagName: "select" });
-  settingsSendTerminator.value = "auto";
   const settingsApply = new FakeElement({ id: "settings-apply", tagName: "button" });
   const commandInput = new FakeElement({ id: "command-input", tagName: "textarea" });
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
+  const commandInlineHint = new FakeElement({ id: "command-inline-hint" });
   const commandPreview = new FakeElement({ id: "command-preview", tagName: "p" });
   const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
   const template = {
@@ -384,17 +438,23 @@ function createDocumentFixture() {
   for (const element of [
     connectionState,
     terminalGrid,
+    sidebarToggle,
+    sidebarToggleIcon,
+    sidebarLauncher,
     createSession,
-    settingsFixedSize,
+    deckTabs,
+    deckCreate,
+    deckRename,
+    deckDelete,
     settingsCols,
     settingsRows,
-    settingsSendTerminator,
     settingsApply,
     commandInput,
     sendCommand,
     emptyState,
     statusMessage,
     commandFeedback,
+    commandInlineHint,
     commandPreview,
     commandSuggestions
   ]) {
@@ -406,23 +466,45 @@ function createDocumentFixture() {
     elements: {
       connectionState,
       terminalGrid,
+      sidebarToggle,
+      sidebarToggleIcon,
+      sidebarLauncher,
       createSession,
-      settingsFixedSize,
+      deckTabs,
+      deckCreate,
+      deckRename,
+      deckDelete,
       settingsCols,
       settingsRows,
-      settingsSendTerminator,
       settingsApply,
       commandInput,
       sendCommand,
       emptyState,
       statusMessage,
       commandFeedback,
+      commandInlineHint,
       commandPreview,
       commandSuggestions
     },
     document: {
       getElementById(id) {
         return byId.get(id) || null;
+      },
+      querySelector(selector) {
+        if (selector === ".app-shell") {
+          return appShell;
+        }
+        return null;
+      },
+      createElement(tagName) {
+        if (String(tagName).toLowerCase() === "canvas") {
+          return {
+            getContext() {
+              return null;
+            }
+          };
+        }
+        return new FakeElement({ tagName });
       }
     }
   };
@@ -448,6 +530,28 @@ async function tick() {
 
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function findDeckGroup(deckTabs, deckId) {
+  return deckTabs.children.find((entry) => entry.getAttribute("data-deck-id") === deckId) || null;
+}
+
+function findDeckSessionButton(deckTabs, deckId, sessionId) {
+  const group = findDeckGroup(deckTabs, deckId);
+  if (!group) {
+    return null;
+  }
+  for (const child of group.children) {
+    if (!child.classList || !child.classList.contains("deck-session-list")) {
+      continue;
+    }
+    for (const sessionButton of child.children) {
+      if (sessionButton.getAttribute("data-session-id") === sessionId) {
+        return sessionButton;
+      }
+    }
+  }
+  return null;
 }
 
 test("app handles critical error paths, DOM lifecycle, and connection state rendering", async (t) => {
@@ -1230,6 +1334,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.terminalGrid.children.length, 2);
   assert.equal(fixture.elements.emptyState.style.display, "none");
+  assert.equal(fixture.elements.deckTabs.children.length, 1);
+  assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
+  assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1"));
+  assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2"));
+  assert.equal(
+    findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1").querySelector(".session-quick-id").textContent,
+    "1"
+  );
+  assert.equal(
+    findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2").querySelector(".session-quick-id").textContent,
+    "2"
+  );
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1483,6 +1599,27 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
 
+  const deckNewSessionButton = findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2");
+  assert.ok(deckNewSessionButton);
+  assert.equal(deckNewSessionButton.querySelector(".session-quick-id").textContent, "2");
+  deckNewSessionButton.click();
+  await tick();
+  const visibleAfterDeckSidebarSwitch = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  assert.equal(visibleAfterDeckSidebarSwitch.length, 1);
+  assert.equal(visibleAfterDeckSidebarSwitch[0].querySelector(".session-focus").textContent, "two");
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "deck-new").querySelector(".deck-tab").classList.contains("active"), true);
+  assert.equal(findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2").classList.contains("active"), true);
+
+  const defaultSessionButton = findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1");
+  assert.ok(defaultSessionButton);
+  defaultSessionButton.click();
+  await tick();
+  const visibleAfterDefaultSidebarSwitch = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  assert.equal(visibleAfterDefaultSidebarSwitch.length, 1);
+  assert.equal(visibleAfterDefaultSidebarSwitch[0].querySelector(".session-focus").textContent, "one");
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "default").querySelector(".deck-tab").classList.contains("active"), true);
+  assert.equal(findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1").classList.contains("active"), true);
+
   fixture.elements.commandInput.value = "/filter s-2";
   fixture.elements.sendCommand.click();
   await tick();
@@ -1514,6 +1651,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
+  assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2"));
 
   fixture.elements.commandInput.value = "/deck switch deck-new";
   fixture.elements.sendCommand.click();

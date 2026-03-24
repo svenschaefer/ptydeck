@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-102` completed: the left sidebar now renders deck-local terminal navigation beneath each deck entry, with indented clickable session buttons and visible quick IDs alongside session names.
+- [x] `QLT-103` completed: regression coverage now verifies sidebar terminal navigation parity with `>...` quick-switching, including cross-deck auto-switch, quick-ID visibility, and active highlight updates.
+- [x] Sidebar navigation now uses the same `activateSessionTarget(...)` path as quick-switch activation instead of inventing a second focus model for deck/session selection.
+- [x] Validation for `QLT-102`/`QLT-103` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-099` completed: xterm rendering/geometry internals are now isolated behind `frontend/src/public/terminal-compat.js` instead of being accessed directly from `app.js`.
 - [x] Viewport sync, repaint, bottom-follow detection, and render-cell-height probing now flow through one compatibility boundary, reducing direct coupling to xterm private `_core` internals.
 - [x] Frontend unit coverage now includes `terminal-compat` behavior for public-buffer bottom detection plus compatibility fallbacks for viewport sync, repaint, and render-dimension access.

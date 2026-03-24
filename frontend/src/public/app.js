@@ -2122,6 +2122,7 @@ function renderDeckTabs(sessions) {
   if (!deckTabsEl || typeof document.createElement !== "function") {
     return;
   }
+  const activeSessionId = store.getState().activeSessionId;
   while (deckTabsEl.firstChild) {
     deckTabsEl.removeChild(deckTabsEl.firstChild);
   }
@@ -2133,6 +2134,10 @@ function renderDeckTabs(sessions) {
     return;
   }
   for (const deck of deckState.decks) {
+    const group = document.createElement("div");
+    group.className = "deck-group";
+    group.setAttribute("data-deck-id", deck.id);
+
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "deck-tab";
@@ -2150,7 +2155,40 @@ function renderDeckTabs(sessions) {
     tab.appendChild(nameEl);
     tab.appendChild(countEl);
     tab.addEventListener("click", () => setActiveDeck(deck.id));
-    deckTabsEl.appendChild(tab);
+    group.appendChild(tab);
+
+    const deckSessions = sessions.filter((session) => resolveSessionDeckId(session) === deck.id);
+    if (deckSessions.length > 0) {
+      const sessionList = document.createElement("div");
+      sessionList.className = "deck-session-list";
+      for (const session of deckSessions) {
+        const sessionButton = document.createElement("button");
+        sessionButton.type = "button";
+        sessionButton.className = "deck-session-btn";
+        sessionButton.setAttribute("data-session-id", session.id);
+        if (activeSessionId === session.id) {
+          sessionButton.classList.add("active");
+        }
+
+        const quickIdEl = document.createElement("span");
+        quickIdEl.className = "deck-session-quick-id session-quick-id";
+        quickIdEl.textContent = ensureQuickId(session.id);
+
+        const sessionNameEl = document.createElement("span");
+        sessionNameEl.className = "deck-session-name";
+        sessionNameEl.textContent = formatSessionDisplayName(session);
+
+        sessionButton.appendChild(quickIdEl);
+        sessionButton.appendChild(sessionNameEl);
+        sessionButton.addEventListener("click", () => {
+          activateSessionTarget(session);
+        });
+        sessionList.appendChild(sessionButton);
+      }
+      group.appendChild(sessionList);
+    }
+
+    deckTabsEl.appendChild(group);
   }
 }
 
