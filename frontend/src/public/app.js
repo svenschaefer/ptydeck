@@ -35,6 +35,7 @@ import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
+import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
@@ -278,6 +279,7 @@ let commandSuggestionsController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
 let sessionCardMetaController = null;
+let sessionCardFactoryController = null;
 let sessionCardRenderController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
@@ -2034,70 +2036,46 @@ function render() {
       continue;
     }
 
-    const node = template.content.firstElementChild.cloneNode(true);
-    const quickIdEl = node.querySelector(".session-quick-id");
-    const focusBtn = node.querySelector(".session-focus");
-    const stateBadgeEl = node.querySelector(".session-state-badge");
-    const pluginBadgesEl = node.querySelector(".session-plugin-badges");
-    const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
-    const sessionStatusEl = node.querySelector(".session-status-text");
-    const sessionArtifactsEl = node.querySelector(".session-artifacts");
-    const settingsBtn = node.querySelector(".session-settings");
-    const renameBtn = node.querySelector(".session-rename");
-    const closeBtn = node.querySelector(".session-close");
-    const settingsDialog = node.querySelector(".session-settings-dialog");
-    const settingsDismissBtn = node.querySelector(".session-settings-dismiss");
-    const startCwdInput = node.querySelector(".session-start-cwd");
-    const startCommandInput = node.querySelector(".session-start-command");
-    const startEnvInput = node.querySelector(".session-start-env");
-    const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
-    const sessionTagsInput = node.querySelector(".session-tags-input");
-    const startFeedback = node.querySelector(".session-start-feedback");
-    const tagListEl = node.querySelector(".session-tag-list");
-    const themeCategory = node.querySelector(".session-theme-category");
-    const themeSearch = node.querySelector(".session-theme-search");
-    const themeSelect = node.querySelector(".session-theme-select");
-    const themeBg = node.querySelector(".session-theme-bg");
-    const themeFg = node.querySelector(".session-theme-fg");
-    const themeInputs = {
-      background: themeBg,
-      foreground: themeFg
-    };
-    for (const key of THEME_PROFILE_KEYS) {
-      if (themeInputs[key]) {
-        continue;
-      }
-      const classSuffix = key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-      const input = node.querySelector(`.session-theme-${classSuffix}`);
-      if (input) {
-        themeInputs[key] = input;
-      }
-    }
-    const settingsApplyBtn = node.querySelector(".session-settings-apply");
-    const settingsCancelBtn = node.querySelector(".session-settings-cancel");
-    const settingsStatus = node.querySelector(".session-settings-status");
-    const mount = node.querySelector(".terminal-mount");
-    const quickId = ensureQuickId(session.id);
-    const stateBadgeText = getSessionStateBadgeText(session);
-    const stateHintText = getSessionStateHintText(session);
-
-    focusBtn.textContent = session.name || session.id.slice(0, 8);
-    quickIdEl.textContent = quickId;
-    node.classList.toggle("unrestored", isSessionUnrestored(session));
-    node.classList.toggle("exited", isSessionExited(session));
-    node.classList.toggle("attention", session?.attentionActive === true);
-    if (stateBadgeEl) {
-      stateBadgeEl.hidden = !stateBadgeText;
-      stateBadgeEl.textContent = stateBadgeText;
-    }
-    if (unrestoredHintEl) {
-      unrestoredHintEl.hidden = !stateHintText;
-      unrestoredHintEl.textContent = stateHintText;
-    }
-    renderSessionTagList({ tagListEl }, session);
-    renderSessionPluginBadges({ pluginBadgesEl }, session);
-    renderSessionStatus({ sessionStatusEl }, session);
-    renderSessionArtifacts({ sessionArtifactsEl }, session);
+    const initialVisible = visibleSessionIds.has(session.id);
+    const {
+      node,
+      quickIdEl,
+      focusBtn,
+      stateBadgeEl,
+      pluginBadgesEl,
+      unrestoredHintEl,
+      sessionStatusEl,
+      sessionArtifactsEl,
+      settingsBtn,
+      renameBtn,
+      closeBtn,
+      settingsDialog,
+      settingsDismissBtn,
+      startCwdInput,
+      startCommandInput,
+      startEnvInput,
+      sessionSendTerminatorSelect,
+      sessionTagsInput,
+      startFeedback,
+      tagListEl,
+      themeCategory,
+      themeSearch,
+      themeSelect,
+      themeBg,
+      themeFg,
+      themeInputs,
+      settingsApplyBtn,
+      settingsCancelBtn,
+      settingsStatus,
+      mount
+    } =
+      sessionCardFactoryController?.createSessionCardView({
+        template,
+        session,
+        themeProfileKeys: THEME_PROFILE_KEYS,
+        activeSessionId: state.activeSessionId,
+        visible: initialVisible
+      }) || {};
     focusBtn.addEventListener("click", () => store.setActiveSession(session.id));
     settingsBtn.addEventListener("click", () => toggleSettingsDialog(settingsDialog));
     if (settingsDismissBtn) {
@@ -2307,10 +2285,6 @@ function render() {
       setStartupSettingsFeedback({ startFeedback }, "");
       setSettingsDirty(terminals.get(session.id), false);
     });
-
-    node.classList.toggle("active", state.activeSessionId === session.id);
-    setSessionCardVisibility(node, visibleSessionIds.has(session.id));
-    const initialVisible = visibleSessionIds.has(session.id);
 
     const initialTheme = buildThemeFromConfig(getSessionThemeConfig(session.id));
     const terminal = new window.Terminal({
@@ -2617,6 +2591,19 @@ sessionCardMetaController = createSessionCardMetaController({
   normalizeSessionTags,
   onTick: () => render(),
   windowRef: window
+});
+
+sessionCardFactoryController = createSessionCardFactoryController({
+  ensureQuickId,
+  getSessionStateBadgeText,
+  getSessionStateHintText,
+  isSessionUnrestored,
+  isSessionExited,
+  renderSessionTagList,
+  renderSessionPluginBadges,
+  renderSessionStatus,
+  renderSessionArtifacts,
+  setSessionCardVisibility
 });
 
 sessionCardRenderController = createSessionCardRenderController({
