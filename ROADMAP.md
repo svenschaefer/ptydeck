@@ -412,15 +412,34 @@ Exit criteria:
 - `>...` quick-switching exposes inline resolved-target preview and explicit ambiguity/no-match/no-op feedback before activation.
 - Hidden sessions that receive output while invisible recover a correct scrollable viewport when shown again, including bottom-content reachability after background growth.
 
+### v0.3.0-H8 - Terminal Search UX
+
+- `QLT-110`
+- `QLT-111`
+
+Dependencies:
+
+- `QLT-110` depends on `QLT-100` so search/find UX lands on top of the decomposed FE command/state/view structure instead of deepening the current `app.js` monolith.
+- `QLT-111` depends on `QLT-110` so regression coverage targets the finalized search/find interaction model rather than an intermediate UI contract.
+
+Exit criteria:
+
+- Active terminals support deterministic output search with explicit next/previous navigation.
+- Search feedback distinguishes between match, wraparound, and no-match states without mutating PTY output.
+- Search behavior remains correct across deck/session switching and buffer growth.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H6`
 - Next milestones in progress: `v0.3.0-H7`
+- Queued next milestone after H7: `v0.3.0-H8`
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
 - `QLT-100`
+- `QLT-110`
+- `QLT-111`
 
 ### Completed Items
 

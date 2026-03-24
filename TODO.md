@@ -14,6 +14,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Active Open Tasks (Current)
 
 - [ ] `QLT-100` Owner: `FE` Task: Decompose `frontend/src/public/app.js` into layered modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) without behavior regressions.
+- [ ] `QLT-110` Owner: `FE` Task: Add in-terminal output search/find UX with deterministic match navigation (`next`/`previous`), visible no-match feedback, and active-terminal focus semantics that survive deck/session switching.
+- [ ] `QLT-111` Owner: `QA` Task: Add regression coverage for terminal search/find behavior (match navigation, no-match state, buffer growth, and deck/session visibility transitions).
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -71,7 +73,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Documentation Tasks (Codex Ownership)
 
 - [x] `DOC-001` Owner: `CODY` Task: Keep `CODEX_CONTEXT.md` synchronized with architecture, conventions, and decision history.
-- [x] `DOC-002` Owner: `CODY` Task: Keep `TODO.md`, `ROADMAP.md`, `DONE.md`, and `OUTLOOK-TODO.md` consistent after each planning change.
+- [x] `DOC-002` Owner: `CODY` Task: Keep `TODO.md`, `ROADMAP.md`, `DONE.md`, and `TODO-OUTLOOK.md` consistent after each planning change.
 
 ## Quality and Coverage Hardening (v0.3.0 continuation)
 
@@ -187,6 +189,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 - [x] `QLT-107` Owner: `FE` Task: Add inline `>...` target preview and pre-submit resolution feedback so quick-switch input shows the resolved deck/session target, clear ambiguity or no-match states, and deterministic no-op behavior when the requested target is already active.
 - [x] `QLT-108` Owner: `FE` Task: Fix hidden-session scroll recovery so terminals that receive new output while invisible rebuild a correct scrollable viewport when shown again, including access to newly appended bottom content.
 - [x] `QLT-109` Owner: `QA` Task: Add regression coverage for hidden-session output growth while invisible, verifying post-show scroll range, bottom-content reachability, and no stale viewport clipping.
+- [ ] `QLT-110` Owner: `FE` Task: Add in-terminal output search/find UX with deterministic match navigation (`next`/`previous`), visible no-match feedback, and active-terminal focus semantics that survive deck/session switching.
+- [ ] `QLT-111` Owner: `QA` Task: Add regression coverage for terminal search/find behavior (match navigation, no-match state, buffer growth, and deck/session visibility transitions).
 
 ## Enterprise Readiness Backlog (v0.3.0 continuation)
 

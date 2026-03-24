@@ -36,7 +36,7 @@ This file documents the active roles, responsibilities, and collaboration rules 
 - `TODO.md`: explicit, concrete tasks only (what to build)
 - `ROADMAP.md`: ordering, versions, dependencies, release flow
 - `DONE.md`: completed and verified work only
-- `OUTLOOK-TODO.md`: mid/long-term items only
+- `TODO-OUTLOOK.md`: mid/long-term items only
 - `CODEX_CONTEXT.md`: persistent project context and governance
 - `DEPLOYMENT.md`: production/deployment runbook
 

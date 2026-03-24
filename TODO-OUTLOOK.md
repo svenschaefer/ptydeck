@@ -1,4 +1,4 @@
-# OUTLOOK TODO - Mid and Long Term
+# TODO-OUTLOOK - Mid and Long Term
 
 Items in this file are intentionally not part of near-term delivery in `TODO.md`.
 
@@ -49,7 +49,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 
 ## Extensibility
 
-- [ ] Add safe file transfer option per session.
 - [ ] Add optional controlled mouse forwarding.
 - [ ] Add plugin interface for project-specific automations.
 - [ ] Add session replay/export capabilities.
@@ -60,7 +59,16 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.
 - [ ] Add scoped custom-command sets (global, project, session scopes) with deterministic precedence.
 - [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
-- [ ] Add import support for external terminal color-scheme catalogs (for example iTerm2-compatible palettes) with strict format validation and deterministic mapping.
-- [ ] Add remote execution adapters (SSH sessions and multi-host routing).
-- [ ] Add multi-client shared sessions with separate view/control permissions.
 - [ ] Add broadcast input modes for explicit session groups.
+
+Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current scope):
+
+- [ ] `REM-001` Owner `BE`: Add remote session kind support (`local`, `ssh`) with persisted non-secret connection metadata and deterministic launch/reconnect semantics.
+- [ ] `REM-002` Owner `BE`: Add SSH authentication matrix for remote sessions (password, private key, keyboard-interactive) with secure secret handling and explicit forwarding/proxy guardrails.
+- [ ] `REM-003` Owner `BE`: Add SSH host-key trust-store workflow (`known_hosts` semantics, first-connect trust contract, changed-host-key rejection path).
+- [ ] `REM-004` Owner `FE`: Add saved connection profiles and reusable launch presets for local shells and SSH targets (`host`, `port`, `username`, `shell`, `cwd`, `env`, `tags`, `deck`, `theme`).
+- [ ] `REM-005` Owner `BE`: Add remote-session disconnect/reconnect contract for SSH-backed sessions, including explicit degraded/offline state, retry policy, and deterministic user-visible recovery semantics.
+- [ ] `REM-006` Owner `BE`: Add controlled session file-transfer support with explicit upload/download permission model, progress reporting, and large-transfer guardrails.
+- [ ] `REM-007` Owner `FE`: Add session/deck sharing UX with explicit read-only spectator mode and visible control/write-permission state.
+- [ ] `REM-008` Owner `FE`: Add terminal theme import/export compatibility for external theme catalogs/formats (for example iTerm2, Windows Terminal, or Xresources-style payloads) with deterministic mapping and validation.
+- [ ] `REM-009` Owner `QA`: Add integration/security coverage for remote-session auth, host-key verification, transfer guardrails, and read-only sharing semantics.

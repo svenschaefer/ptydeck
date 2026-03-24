@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H7 sidebar deck-session navigation sync completed)
+Last updated: 2026-03-24 (TODO-OUTLOOK rename plus external-tool backlog split synced)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, and hidden-scroll recovery closure for `QLT-108`/`QLT-109`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between near-term `QLT-110`/`QLT-111` and deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -14,7 +14,7 @@ The system separates backend execution concerns from frontend rendering concerns
 - `TODO.md`: explicit implementation tasks only.
 - `ROADMAP.md`: execution order, versions, and dependencies only.
 - `DONE.md`: completed and verified topics only.
-- `OUTLOOK-TODO.md`: mid/long-term items only.
+- `TODO-OUTLOOK.md`: mid/long-term items only.
 - `README.md`: architecture and product behavior reference.
 - `AGENTS.md`: agent roles, collaboration rules, and change control.
 - `LOCAL_QUALITY_GATE.md`: required local validation workflow (authoritative quality-gate commands).
@@ -138,8 +138,10 @@ The deck model is a strict isolation boundary above sessions.
 - Planned next-step navigation UX now includes `>selector` quick-switch commands that auto-switch decks when needed, direct `>` deck targeting with autocomplete, broader `/...` and `>...` autocomplete coverage, unified `>` selector grammar with `/switch`, and sidebar terminal-entry buttons under each deck section with visible quick IDs.
 - Frontend quick-switch baseline is now implemented: `>selector` activates sessions across decks, `>deckSelector` activates decks directly, `>deckSelector::sessionSelector` performs explicit cross-deck session targeting, and inline preview/ambiguity feedback is rendered in the composer before submit.
 - Hidden-session output recovery is now hardened: when invisible terminals receive background output, show-time recovery explicitly resynchronizes xterm scroll area plus repaint/resize passes so bottom content remains reachable without manual interaction.
-- Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `OUTLOOK-TODO.md` (`ENT-026`, `ENT-027`).
-- Stream/plugin architecture and broader WebSocket-first state architecture from imported review notes are tracked as deferred items in `OUTLOOK-TODO.md` (`ARC-001`, `ARC-002`).
+- Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `TODO-OUTLOOK.md` (`ENT-026`, `ENT-027`).
+- Stream/plugin architecture and broader WebSocket-first state architecture from imported review notes are tracked as deferred items in `TODO-OUTLOOK.md` (`ARC-001`, `ARC-002`).
+- External terminal/SSH tool survey follow-up is intentionally deferred to `TODO-OUTLOOK.md` as explicit medium-term backlog (`REM-001` ... `REM-009`) covering SSH session kinds, auth/trust, saved connection profiles, remote-session reconnect semantics, controlled file transfer, sharing/read-only mode, and theme import/export compatibility.
+- Terminal search/find was the only survey-derived feature kept in near-term scope; it is tracked as `QLT-110`/`QLT-111` in `TODO.md` and planned for `v0.3.0-H8` after the remaining H7 modularization task.
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.
@@ -179,7 +181,7 @@ The deck model is a strict isolation boundary above sessions.
 - Release evidence bundle automation now exists via `scripts/generate-release-evidence.sh`, producing manifest/checksum tracked artifacts that include test logs, coverage gate output, SCA output, SBOM files, and CI commit provenance metadata.
 - Backend auth/authz middleware baseline now supports JWT validation in `AUTH_DEV_MODE=1`, scope-based route guards for REST/WS, and explicit `401`/`403` API responses.
 - Backend now exposes `/api/v1/auth/dev-token` when auth dev mode is enabled; frontend automatically acquires this token and applies it to REST and WebSocket connections.
-- Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `OUTLOOK-TODO.md`.
+- Auth/tenant hardening items beyond current baseline (`ENT-002`, `ENT-003`, `ENT-010`, `ENT-017`, `ENT-025`) are intentionally deferred to `TODO-OUTLOOK.md`.
 - Default local runtime ports are now backend `18080` and frontend `18081` to reduce conflicts with common project/dynamic port ranges.
 - Frontend runtime config now supports no-parameter domain operation: `ptydeck.*` browser hosts auto-target `api.<current-host>` for REST/WS, while localhost/IP hosts retain `18080` fallback for development.
 - Backend now persists global custom commands and exposes OpenAPI-backed CRUD endpoints at `/api/v1/custom-commands` and `/api/v1/custom-commands/{commandName}`.
@@ -254,6 +256,7 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle H (`v0.3.0-H6`): none.
   - Completed in cycle I (`v0.3.0-H7`): `QLT-095`, `QLT-096`, `QLT-097`, `QLT-098`, `QLT-099`, `QLT-101`, `QLT-102`, `QLT-103`, `QLT-104`, `QLT-105`, `QLT-106`, `QLT-107`, `QLT-108`, `QLT-109`.
   - Planned next in cycle I (`v0.3.0-H7`): `QLT-100`.
+  - Planned next in cycle J (`v0.3.0-H8`): `QLT-110`, `QLT-111`.
 
 ## Session Behavior Notes
 

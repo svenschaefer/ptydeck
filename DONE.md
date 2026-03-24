@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] The deferred-planning document was renamed from `OUTLOOK-TODO.md` to `TODO-OUTLOOK.md`, and repository references were synchronized (`AGENTS.md`, `CODEX_CONTEXT.md`, `docs/README.md`, `TODO.md`, `DONE.md`).
+- [x] External terminal/SSH tool survey follow-up was captured as explicit medium-term backlog in `TODO-OUTLOOK.md` (`REM-001` ... `REM-009`) instead of expanding the active near-term `TODO.md` scope.
+- [x] The same external-tool survey also produced one near-term active-scope UX backlog item set in `TODO.md`/`ROADMAP.md`: terminal output search/find (`QLT-110`, `QLT-111`).
 - [x] `QLT-102` completed: the left sidebar now renders deck-local terminal navigation beneath each deck entry, with indented clickable session buttons and visible quick IDs alongside session names.
 - [x] `QLT-103` completed: regression coverage now verifies sidebar terminal navigation parity with `>...` quick-switching, including cross-deck auto-switch, quick-ID visibility, and active highlight updates.
 - [x] Sidebar navigation now uses the same `activateSessionTarget(...)` path as quick-switch activation instead of inventing a second focus model for deck/session selection.
@@ -35,7 +38,7 @@ Completed and verified topics belong here.
 - [x] Validation for `QLT-095`/`QLT-096` passed: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] Imported `docs/` architecture-review notes are now consolidated by `docs/README.md` so strategy papers are indexed without pretending to be implementation-status documents.
 - [x] Review-derived current-scope tasks were extracted into explicit near-term backlog items `QLT-095` ... `QLT-100` in `TODO.md`.
-- [x] Review-derived deferred security and architecture themes were added to `OUTLOOK-TODO.md` as explicit backlog items (`ENT-026`, `ENT-027`, `ARC-001`, `ARC-002`).
+- [x] Review-derived deferred security and architecture themes were added to `TODO-OUTLOOK.md` as explicit backlog items (`ENT-026`, `ENT-027`, `ARC-001`, `ARC-002`).
 - [x] `ROADMAP.md` was extended with `v0.3.0-H7` so the new FE state/architecture tasks have explicit ordering and dependency semantics.
 - [x] `CODEX_CONTEXT.md` was synchronized with the `docs/` review outcome and now records the active H7 backlog plus the non-authoritative role of `docs/README.md`.
 
@@ -199,11 +202,11 @@ Completed and verified topics belong here.
 ## 2026-03-22
 
 - [x] Initial `README.md` drafted with architecture, protocol, and operational concepts.
-- [x] Initial planning set created: `TODO.md`, `ROADMAP.md`, `DONE.md`, `OUTLOOK-TODO.md`.
+- [x] Initial planning set created: `TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`.
 - [x] Documentation normalized to US English and ownership model defined.
 - [x] `CODEX_CONTEXT.md` created to persist project context for future Codex runs.
 - [x] `DOC-001` completed: `CODEX_CONTEXT.md` synchronized with current architecture, ownership model, and process rules.
-- [x] `DOC-002` completed: planning docs (`TODO.md`, `ROADMAP.md`, `DONE.md`, `OUTLOOK-TODO.md`) aligned and kept consistent.
+- [x] `DOC-002` completed: planning docs (`TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`) aligned and kept consistent.
 - [x] Git repository initialized in `/home/wsl/workspace/code/ptydeck`.
 - [x] `v0.1.0` baseline delivery completed: `BE-001`, `BE-002`, `FE-001`, `INT-001`, `INT-002`, `INT-009` implemented.
 - [x] CI baseline implemented (`INT-003`) with lint, test, and build jobs for backend and frontend.

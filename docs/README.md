@@ -8,7 +8,7 @@ Authoritative repository documents remain:
 - `TODO.md` for explicit implementation tasks
 - `ROADMAP.md` for ordering, versions, and dependencies
 - `DONE.md` for completed work
-- `OUTLOOK-TODO.md` for deferred mid/long-term items
+- `TODO-OUTLOOK.md` for deferred mid/long-term items
 - `CODEX_CONTEXT.md` for persistent project context
 
 ## Inventory and Current Relevance
