@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Planning sync completed: added explicit open UX tasks `QLT-123` (system-clipboard copy/paste contract for terminal + composer) and `QLT-124` (terminal-session header refactor) to `TODO.md`.
+- [x] Roadmap sync completed: queued `v0.4.0-H3` (Terminal Interaction Ergonomics) in `ROADMAP.md` with explicit ordering/dependencies/exit criteria for `QLT-123` and `QLT-124`.
+- [x] Context sync completed: `CODEX_CONTEXT.md` updated so open-task inventory reflects `ARC-010` ... `ARC-012`, `QLT-123`, and `QLT-124`.
 - [x] `ARC-010` progress: extracted workspace/grid render-status concerns from `frontend/src/public/app.js` into a dedicated UI controller `frontend/src/public/ui/workspace-render-controller.js` (filter visibility resolution, empty-state rendering, and composer/status surface rendering).
 - [x] Added focused regression coverage for the new workspace render controller in `frontend/test/workspace-render-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/ui/workspace-render-controller.js` is included in syntax-check gates.

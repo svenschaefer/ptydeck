@@ -14,6 +14,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
 - Active scoped tasks (`H2`): `ARC-010`, `ARC-011`, `ARC-012` (`ARC-009` completed).
+- Queued next release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics) with `QLT-123`, `QLT-124`.
 - Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Dependency Rules
@@ -601,7 +602,7 @@ Exit criteria:
 
 - Latest completed milestone: `v0.3.0-H15`
 - Next milestone in progress: `v0.4.0-H2` (Layered Frontend Architecture Completion)
-- Queued next milestone: none currently
+- Queued next milestone: `v0.4.0-H3` (Terminal Interaction Ergonomics)
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
@@ -609,6 +610,8 @@ Exit criteria:
 - `ARC-010` Owner: `FE`
 - `ARC-011` Owner: `FE`
 - `ARC-012` Owner: `QA`
+- `QLT-123` Owner: `FE` (queued for `v0.4.0-H3`)
+- `QLT-124` Owner: `FE` (queued for `v0.4.0-H3`)
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -699,6 +702,32 @@ Exit criteria:
 - Remaining `app.js` UI orchestration logic is split into dedicated UI modules, leaving `app.js` as bootstrap/composition boundary.
 - Cross-layer shortcut paths are removed so stream/interpretation/state/UI boundaries are explicit and enforceable.
 - Regression coverage protects architectural boundaries against future monolith regressions.
+
+### v0.4.0-H3 - Terminal Interaction Ergonomics
+
+- `QLT-123`
+- `QLT-124`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-123`
+- `QLT-124`
+
+Dependencies:
+
+- `QLT-123` should run after `ARC-010` so copy/paste interaction handling can be integrated on top of cleaner UI boundaries instead of deepening `app.js` coupling.
+- `QLT-124` should run after `ARC-010` and alongside `QLT-123` so terminal-header UX/layout improvements align with the same interaction model and avoid duplicate churn in session-card wiring.
+
+Exit criteria:
+
+- Terminal sessions and command-input box share a consistent system-clipboard-only copy/paste UX contract (left-drag + `Enter` copy, middle-click paste, right-click keeps default system context menu).
+- No separate primary-selection clipboard model is introduced; behavior remains deterministic against system clipboard APIs.
+- Terminal-session header implementation is structurally simplified and UX-optimized without removing current semantic header elements.
+- Regression coverage protects copy/paste interaction behavior and header rendering/interaction stability.
 
 ### Completed Items
 
