@@ -235,6 +235,51 @@ Recommended runtime env pattern:
 
 ## 9.1 SLO/SLI and Alerting Baseline (ENT-008)
 
+### 9.1.0 Local Observability Wiring Baseline (OBS-003)
+
+Scrape targets (local):
+
+- Backend operational endpoint: `http://127.0.0.1:18080/metrics`
+- Recommended scrape interval: `15s`
+- Recommended scrape timeout: `5s`
+
+Minimal dashboard panels (required baseline):
+
+- API request volume and error ratio:
+  - `ptydeck_http_requests_total`
+  - `ptydeck_http_errors_total`
+  - `ptydeck_http_requests_by_status_total`
+- API latency:
+  - `ptydeck_http_request_duration_ms_sum`
+  - `ptydeck_http_request_duration_ms_count`
+  - `ptydeck_http_request_duration_ms_bucket`
+- Session lifecycle:
+  - `ptydeck_sessions_active`
+  - `ptydeck_sessions_active_by_lifecycle`
+  - `ptydeck_sessions_created_total`
+  - `ptydeck_sessions_started_total`
+  - `ptydeck_sessions_exited_total`
+  - `ptydeck_sessions_unrestored_total`
+- WebSocket quality:
+  - `ptydeck_ws_connections_active`
+  - `ptydeck_ws_connections_opened_total`
+  - `ptydeck_ws_connections_closed_total`
+  - `ptydeck_ws_reconnects_total`
+  - `ptydeck_ws_reconnects_by_reason_total`
+  - `ptydeck_ws_disconnects_by_reason_total`
+  - `ptydeck_ws_errors_total`
+  - `ptydeck_ws_errors_by_reason_total`
+
+Recommended local alert thresholds:
+
+- Warning:
+  - `ptydeck_sessions_unrestored_total > 0` for `5m`.
+  - `rate(ptydeck_ws_disconnects_by_reason_total[5m]) > 0` sustained for `15m`.
+  - `rate(ptydeck_ws_errors_total[5m]) > 0` sustained for `15m`.
+- Critical:
+  - `increase(ptydeck_ws_disconnects_by_reason_total{reason="heartbeat_timeout"}[5m]) > 0`.
+  - API 5xx ratio over 5 minutes greater than `5%` (as defined in `9.1`).
+
 Baseline SLI signals:
 
 - API availability:

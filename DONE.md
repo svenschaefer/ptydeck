@@ -10,6 +10,9 @@ Completed and verified topics belong here.
 - [x] `OBS-002` completed: backend metrics now include bounded in-memory latency/quality aggregations with HTTP duration histogram buckets and websocket disconnect/reconnect counters grouped by normalized reason labels.
 - [x] Backend observability coverage now verifies histogram/reasoned-quality contract fields (`ptydeck_http_request_duration_ms_bucket`, `ptydeck_ws_disconnects_by_reason_total`, `ptydeck_ws_reconnects_by_reason_total`) in runtime/ws integration paths.
 - [x] Validation for `OBS-002` passed at backend scope: `npm --prefix backend run lint`, `npm --prefix backend run test`, and `npm --prefix backend run test:coverage`.
+- [x] `OBS-003` completed: deployment/quality-gate docs now define an explicit local observability baseline (scrape target, scrape cadence/timeout, required dashboard panel metrics, and warning/critical threshold recommendations).
+- [x] `OBS-004` completed: observability metric-contract regression coverage now verifies metric naming presence/type stability plus representative lifecycle/reconnect/disconnect counter behavior in backend runtime/ws integration tests.
+- [x] `v0.4.0-H1` completed: observability expansion (`OBS-001` ... `OBS-004`) is fully delivered and synchronized across runtime, tests, and operations docs.
 - [x] Documentation consistency pass: clarified active-vs-queued roadmap execution status so `ROADMAP.md` now explicitly marks `v0.4.0-H1` as active and `v0.4.0-H2` as queued next, aligning with open-task scope in `TODO.md`.
 - [x] Promoted the remaining actionable items from `docs/Codebase Review - Decomposing app js into a Layered Frontend Architecture.md` into active planning backlog as `v0.4.0-H2` (`ARC-009` ... `ARC-012`) with explicit ownership and dependency ordering.
 - [x] Promoted the next execution block from `TODO-OUTLOOK.md` into active planning as `v0.4.0-H1` (Observability Expansion): `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.

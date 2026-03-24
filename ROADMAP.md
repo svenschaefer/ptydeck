@@ -12,9 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H1` (Observability Expansion).
-- Active scoped tasks (`H1`): `OBS-003`, `OBS-004` (`OBS-001` and `OBS-002` completed).
-- Next queued wave (after `H1`): `v0.4.0-H2` (Layered Frontend Architecture Completion) with `ARC-009`, `ARC-010`, `ARC-011`, `ARC-012`.
+- Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
+- Active scoped tasks (`H2`): `ARC-009`, `ARC-010`, `ARC-011`, `ARC-012`.
+- Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Dependency Rules
 
@@ -600,18 +600,16 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H15`
-- Next milestone in progress: `v0.4.0-H1` (Observability Expansion)
-- Queued next milestone: `v0.4.0-H2` (Layered Frontend Architecture Completion)
+- Next milestone in progress: `v0.4.0-H2` (Layered Frontend Architecture Completion)
+- Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `OBS-003` Owner: `PLAT`
-- `OBS-004` Owner: `QA`
-- `ARC-009` Owner: `FE` (queued next wave `v0.4.0-H2`)
-- `ARC-010` Owner: `FE` (queued next wave `v0.4.0-H2`)
-- `ARC-011` Owner: `FE` (queued next wave `v0.4.0-H2`)
-- `ARC-012` Owner: `QA` (queued next wave `v0.4.0-H2`)
+- `ARC-009` Owner: `FE`
+- `ARC-010` Owner: `FE`
+- `ARC-011` Owner: `FE`
+- `ARC-012` Owner: `QA`
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -648,6 +646,17 @@ Exit criteria:
 - `OBS-002`
 - `OBS-003`
 - `OBS-004`
+
+Completed in this milestone:
+
+- `OBS-001`
+- `OBS-002`
+- `OBS-003`
+- `OBS-004`
+
+Remaining in this milestone:
+
+- none
 
 Dependencies:
 

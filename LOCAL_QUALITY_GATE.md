@@ -27,6 +27,21 @@ npm run runtime:profile:check
 npm run dr:drill
 ```
 
+## Observability Contract Check (OBS-003/OBS-004)
+
+When backend metrics or lifecycle/websocket runtime behavior changes, run this local contract check after `npm run dev`:
+
+```bash
+curl -fsS http://127.0.0.1:18080/metrics > /tmp/ptydeck.metrics.txt
+rg "ptydeck_http_request_duration_ms_bucket|ptydeck_sessions_active_by_lifecycle|ptydeck_sessions_unrestored_total|ptydeck_ws_disconnects_by_reason_total|ptydeck_ws_reconnects_by_reason_total|ptydeck_ws_errors_by_reason_total" /tmp/ptydeck.metrics.txt
+```
+
+Expected outcome:
+
+- Metrics endpoint is reachable and non-empty.
+- Required observability contract metric names are present.
+- No local parsing/runtime errors occur while scraping.
+
 ## Policy
 
 - Do not rely on remote runner results.

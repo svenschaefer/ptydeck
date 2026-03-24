@@ -13,8 +13,6 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
-- [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
 - [ ] `ARC-009` Owner: `FE` Task: Complete command-layer decomposition by extracting `command-parser`, `command-registry`, and `command-executor` boundaries from remaining orchestration logic in `app.js`, while preserving existing slash/quick-switch behavior.
 - [ ] `ARC-010` Owner: `FE` Task: Complete UI-layer decomposition by extracting session-card/grid/settings rendering controllers into dedicated UI modules and reducing `app.js` to runtime bootstrap/composition only.
 - [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
@@ -229,8 +227,8 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 - [x] `OBS-001` Owner: `BE` Task: Extend backend metrics with explicit session-lifecycle and connection-quality signals (session create/start/exit/unrestored counters, active-session gauge by lifecycle state, WS reconnect/error counters).
 - [x] `OBS-002` Owner: `BE` Task: Add bounded in-memory latency/quality aggregations for REST and WS paths (request duration buckets and WS disconnect/reconnect reason counters) and expose them via `/metrics`.
-- [ ] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
-- [ ] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
+- [x] `OBS-003` Owner: `PLAT` Task: Define and document local observability baseline wiring (metrics scrape targets, minimal dashboard panels, and alert-threshold recommendations) in `DEPLOYMENT.md` and `LOCAL_QUALITY_GATE.md`.
+- [x] `OBS-004` Owner: `QA` Task: Add regression coverage for observability metric contracts (presence, naming stability, and counter/gauge behavior under representative lifecycle and reconnect scenarios).
 
 ## Layered Frontend Architecture Completion (v0.4.0 continuation)
 
