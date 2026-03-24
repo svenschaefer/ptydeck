@@ -40,7 +40,7 @@ Authoritative repository documents remain:
 
 - `Codebase Review - Explicit Session Lifecycle Modeling.md`
   - Role: explicit session-state-machine proposal with `session.exit` focus
-  - Status: backend startup/running lifecycle signaling and stable exit metadata are now implemented, critical `session.exit` handling is implemented, and the remaining FE lifecycle-state-machine formalization is still the active near-term planning block
+  - Status: implemented in the current baseline; backend startup/running lifecycle signaling, stable exit metadata, FE lifecycle-state modeling, derived `busy` / `idle`, and lifecycle regression coverage now exist
   - Backlog landing:
     - `QLT-095`
     - `QLT-096`
@@ -114,8 +114,8 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- The explicit session lifecycle formalization slice (`LIF-001` ... `LIF-004`) is now the active imported-doc-derived near-term block as `v0.3.0-H12`.
-- The lifecycle block now also includes completed sidebar activity-visibility follow-ups (`LIF-005`, `LIF-006`) so background terminal output is visible from the deck/session navigation area.
+- The explicit session lifecycle formalization slice is now completed in the baseline (`LIF-001` ... `LIF-006`).
+- The next imported-doc-derived near-term block is now `v0.3.0-H13`, covering stream normalization plus declarative stream-interpretation/plugin plumbing (`ARC-003` ... `ARC-008`).
 
 ### Deferred / Outlook
 

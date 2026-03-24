@@ -522,18 +522,48 @@ Exit criteria:
 - Regression coverage protects ordered lifecycle transitions, reconnect semantics, and invalid post-exit interactions.
 - Sidebar deck/session navigation exposes subtle live and unseen activity indicators so background terminal output is visible without opening each session.
 
+### v0.3.0-H13 - Stream Interpretation Foundation
+
+- `ARC-003`
+- `ARC-004`
+- `ARC-005`
+- `ARC-006`
+- `ARC-007`
+- `ARC-008`
+
+Dependencies:
+
+- `ARC-003` depends on `QLT-100`, `QLT-119` ... `QLT-122`, and `LIF-002` ... `LIF-004` so stream normalization lands on top of the decomposed frontend runtime, reducer-backed state flow, and explicit lifecycle/activity semantics.
+- `ARC-004` depends on `ARC-003` so plugins consume one deterministic normalized stream surface rather than raw PTY chunk heuristics.
+- `ARC-005` depends on `ARC-004` and `QLT-117` so plugin output reuses declarative runtime-event/update paths instead of mutating UI state ad hoc.
+- `ARC-006` depends on `ARC-003`, `ARC-004`, and `ARC-005` so built-in detectors are implemented on top of the final adapter and action-dispatch contract.
+- `ARC-007` depends on `ARC-005` and `ARC-006` so extracted artifacts share the same declarative state/update model as status and attention signals.
+- `ARC-008` depends on `ARC-003` ... `ARC-007` so regression coverage targets the finalized normalization, plugin, and artifact-dispatch behavior.
+
+Exit criteria:
+
+- Frontend PTY stream handling is normalized through an explicit session-scoped adapter boundary (`onData`, `onLine`, `onIdle`) instead of raw UI-time parsing.
+- A deterministic plugin-engine registry exists with explicit lifecycle, ordering, and side-effect guardrails.
+- Plugin output is constrained to a declarative interpretation-action contract routed through existing runtime/store update paths.
+- Built-in stream interpreters cover active-processing detection, prompt/idle recovery, and explicit attention/error signaling.
+- Artifact-oriented interpretation is available without polluting raw terminal output.
+- Regression coverage protects normalization, plugin ordering/conflict handling, hidden-session behavior, and declarative action dispatch determinism.
+
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H11`
-- Next milestones in progress: `v0.3.0-H12`
+- Latest completed milestone: `v0.3.0-H12`
+- Next milestones in progress: `v0.3.0-H13`
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `LIF-002`
-- `LIF-003`
-- `LIF-004`
+- `ARC-003`
+- `ARC-004`
+- `ARC-005`
+- `ARC-006`
+- `ARC-007`
+- `ARC-008`
 
 ### Completed Items
 

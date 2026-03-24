@@ -145,7 +145,7 @@ test("store derives formal lifecycle transitions from runtime state and activity
   assert.equal(state.sessions.find((session) => session.id === "a")?.lifecycleState, "exited");
   assert.equal(state.sessions.find((session) => session.id === "a")?.exitCode, 7);
 
-  store.removeSession("a");
+  store.markSessionClosed("a");
   state = store.getState();
   assert.equal(state.sessions.find((session) => session.id === "a"), undefined);
 });

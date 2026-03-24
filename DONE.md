@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `LIF-002` completed: frontend runtime state now models explicit session lifecycle via reducer-backed `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`, `closed`) instead of treating all non-exited sessions as one generic active state.
+- [x] `LIF-003` completed: derived activity-state handling now promotes running sessions into `busy` and `idle` deterministically from normalized output activity without conflating backend startup/running state with UI-only heuristics.
+- [x] `LIF-004` completed: regression coverage now protects ordered lifecycle transitions, reconnect-style snapshot replacement, explicit closed-vs-exited handling, sidebar activation under background output churn, and invalid post-exit interaction guardrails.
+- [x] Frontend store now has an explicit `session.close` reducer path in addition to `session.exit`, so `closed` is modeled as a distinct terminal lifecycle outcome even though cards are removed immediately afterward.
+- [x] Validation for `LIF-002`/`LIF-003`/`LIF-004` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix backend run test`, and `npm --prefix frontend run test:coverage`.
+- [x] The next near-term block was promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13` (`ARC-003` ... `ARC-008`), focused on normalized terminal stream interpretation and declarative plugin/action plumbing.
 - [x] Frontend lifecycle groundwork for `LIF-002`/`LIF-003` is now in place: runtime store records a formal per-session `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`) on top of raw backend session metadata instead of treating all non-exited sessions as one generic active state.
 - [x] Frontend session state rendering now surfaces explicit `STARTING` badge/hint behavior while keeping `EXITED` and `UNRESTORED` handling intact.
 - [x] Store regression coverage now verifies ordered lifecycle derivation (`starting` -> `running` -> `busy` -> `idle` -> `exited`), reconnect-style snapshot replacement, and removal after exit.

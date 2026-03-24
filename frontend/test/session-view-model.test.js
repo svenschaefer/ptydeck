@@ -35,10 +35,12 @@ test("session runtime helpers prefer formal lifecycle state and expose starting 
   const startingSession = { id: "abcd1234", name: "build", state: "running", lifecycleState: "starting" };
   const busySession = { id: "efgh5678", name: "ops", state: "running", lifecycleState: "busy" };
   const idleSession = { id: "ijkl9012", name: "ops", state: "running", lifecycleState: "idle" };
+  const closedSession = { id: "mnop3456", name: "ops", state: "closed" };
 
   assert.equal(model.getSessionRuntimeState(startingSession), "starting");
   assert.equal(model.getSessionStateBadgeText(startingSession), "STARTING");
   assert.match(model.getSessionStateHintText(startingSession), /PTY is ready/i);
   assert.equal(model.getSessionRuntimeState(busySession), "busy");
   assert.equal(model.getSessionRuntimeState(idleSession), "idle");
+  assert.equal(model.getSessionRuntimeState(closedSession), "closed");
 });

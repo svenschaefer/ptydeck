@@ -2646,6 +2646,10 @@ function removeSession(sessionId) {
   store.removeSession(sessionId);
 }
 
+function markSessionClosed(sessionId) {
+  store.markSessionClosed(sessionId);
+}
+
 function applyRuntimeSnapshot(event) {
   if (Array.isArray(event.decks)) {
     setDecks(event.decks, { preferredActiveDeckId: store.getState().activeDeckId });
@@ -2687,7 +2691,7 @@ function applyRuntimeEvent(event, options = {}) {
       return false;
     case "session.closed":
       if (event.sessionId) {
-        removeSession(event.sessionId);
+        markSessionClosed(event.sessionId);
         scheduleCommandPreview();
         scheduleCommandSuggestions();
         uiState.error = "";

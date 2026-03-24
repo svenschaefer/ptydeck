@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H12 partially completed with backend lifecycle signaling, FE lifecycle groundwork, and sidebar activity stabilization)
+Last updated: 2026-03-24 (H12 completed; H13 stream-interpretation foundation promoted)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), promotion of the explicit lifecycle-state-model follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H12`, completion of `LIF-001` backend lifecycle signaling plus `LIF-005`/`LIF-006` sidebar activity-indicator delivery, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), completion of the explicit lifecycle-state-model block (`LIF-001` ... `LIF-006`), promotion of the stream-interpretation/plugin follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13`, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -137,12 +137,13 @@ The deck model is a strict isolation boundary above sessions.
 - Imported architecture review notes in `docs/` are now indexed in `docs/README.md`, with explicit separation between current-scope action items and deferred themes.
 - The docs-review-confirmed current-scope frontend gap for terminal output search/find (`QLT-110`, `QLT-111`) is now closed.
 - Frontend now handles backend `session.exit` as an explicit local `exited` session tombstone state with visible badge/hint UI, guarded post-exit interactions, local delete semantics, and reconnect snapshot cleanup.
-- The broader explicit session-state-machine target from the lifecycle review is now the active near-term block in `TODO.md` / `ROADMAP.md` as `v0.3.0-H12` (`LIF-001` ... `LIF-004`) because the critical exit-handling baseline is done and the reducer/store foundation is now in place.
+- The explicit session lifecycle formalization block (`LIF-001` ... `LIF-006`) is now completed, including backend startup/running signaling, FE lifecycle-state modeling, derived `busy` / `idle`, explicit `closed` reducer semantics, and lifecycle regression coverage.
 - Backend session lifecycle signaling now exposes explicit `starting` -> `running` startup transitions via `session.created`, `session.started`, and `session.updated`, and API/runtime payloads now carry stable `startedAt` / exit metadata instead of collapsing everything to a generic active state.
-- Frontend runtime store now derives a dedicated per-session `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`) from backend state plus normalized activity signals, rather than collapsing all non-exited sessions into one generic active state.
+- Frontend runtime store now derives a dedicated per-session `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`, `closed`) from backend state plus normalized activity signals, rather than collapsing all non-exited sessions into one generic active state.
 - Frontend session-state UI now exposes an explicit `STARTING` badge/hint while preserving existing `UNRESTORED` and `EXITED` guardrail behavior.
 - Frontend sidebar deck/session buttons now surface subtle runtime activity indicators: animated live output while activity is happening, then a sticky unseen marker until the session becomes active.
 - Sidebar activity handling no longer republishes redundant store updates for every background-output chunk once a session is already in live-activity state, reducing unnecessary sidebar rerenders and improving sidebar click responsiveness under output churn.
+- The next near-term block is now `v0.3.0-H13` (`ARC-003` ... `ARC-008`), focused on normalized stream adaptation, deterministic plugin registration, declarative interpretation actions, and built-in stream-derived status/artifact extraction.
 - Planned next-step navigation UX now includes `>selector` quick-switch commands that auto-switch decks when needed, direct `>` deck targeting with autocomplete, broader `/...` and `>...` autocomplete coverage, unified `>` selector grammar with `/switch`, and sidebar terminal-entry buttons under each deck section with visible quick IDs.
 - Frontend quick-switch baseline is now implemented: `>selector` activates sessions across decks, `>deckSelector` activates decks directly, `>deckSelector::sessionSelector` performs explicit cross-deck session targeting, and inline preview/ambiguity feedback is rendered in the composer before submit.
 - Hidden-session output recovery is now hardened: when invisible terminals receive background output, show-time recovery explicitly resynchronizes xterm scroll area plus repaint/resize passes so bottom content remains reachable without manual interaction.
@@ -251,7 +252,7 @@ The deck model is a strict isolation boundary above sessions.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycles: `v0.3.0-H12`.
+- Active next cycles: `v0.3.0-H13`.
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: none (current-scope enterprise tasks complete).
@@ -276,7 +277,8 @@ The deck model is a strict isolation boundary above sessions.
   - Completed in cycle M (`v0.3.0-H11`): `QLT-119`, `QLT-120`, `QLT-121`, `QLT-122`.
   - Planned next in cycle M (`v0.3.0-H11`): none.
   - Completed in cycle N so far (`v0.3.0-H12`): `LIF-001`, `LIF-005`, `LIF-006`.
-  - Planned next in cycle N (`v0.3.0-H12`): `LIF-002`, `LIF-003`, `LIF-004`.
+  - Completed in cycle N (`v0.3.0-H12`): `LIF-001`, `LIF-002`, `LIF-003`, `LIF-004`, `LIF-005`, `LIF-006`.
+  - Planned next in cycle N (`v0.3.0-H13`): `ARC-003`, `ARC-004`, `ARC-005`, `ARC-006`, `ARC-007`, `ARC-008`.
 
 ## Session Behavior Notes
 

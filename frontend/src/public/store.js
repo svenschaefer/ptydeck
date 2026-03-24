@@ -245,6 +245,21 @@ export function reduceRuntimeState(state, action, options = {}) {
         activeSessionId: resolveActiveSessionId(runtimeState.activeSessionId, nextSessions, runtimeState.activeDeckId, defaultDeckId)
       };
     }
+    case "session.close": {
+      const sessionId = normalizeText(action.sessionId);
+      if (!sessionId) {
+        return runtimeState;
+      }
+      const nextSessions = runtimeState.sessions.filter((entry) => entry.id !== sessionId);
+      if (nextSessions.length === runtimeState.sessions.length) {
+        return runtimeState;
+      }
+      return {
+        ...runtimeState,
+        sessions: nextSessions,
+        activeSessionId: resolveActiveSessionId(runtimeState.activeSessionId, nextSessions, runtimeState.activeDeckId, defaultDeckId)
+      };
+    }
     case "session.active.set": {
       const nextActiveSessionId = normalizeText(action.sessionId) || null;
       if (runtimeState.activeSessionId === nextActiveSessionId) {
@@ -532,6 +547,9 @@ export function createStore(options = {}) {
     },
     removeSession(sessionId) {
       dispatch({ type: "session.remove", sessionId });
+    },
+    markSessionClosed(sessionId) {
+      dispatch({ type: "session.close", sessionId });
     },
     setActiveSession(sessionId) {
       dispatch({ type: "session.active.set", sessionId });

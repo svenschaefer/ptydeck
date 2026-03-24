@@ -13,9 +13,12 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
-- [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
-- [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
+- [ ] `ARC-003` Owner: `FE` Task: Add a session-scoped frontend stream-adapter boundary that normalizes raw PTY chunks into `onData`, `onLine`, and `onIdle` events with deterministic carriage-return handling, line reconstruction, and ANSI-aware parsing options.
+- [ ] `ARC-004` Owner: `FE` Task: Add a deterministic plugin-engine registry for session-scoped stream interpreters, including explicit plugin ordering, conflict resolution rules, lifecycle hooks, and no-direct-DOM/no-direct-side-effect guardrails.
+- [ ] `ARC-005` Owner: `FE` Task: Define and implement the allowed interpretation-action contract plus dispatcher integration (`setSessionState`, `setSessionStatus`, badges, artifacts, notifications, meta/tags) so plugins emit declarative actions instead of mutating runtime/UI state directly.
+- [ ] `ARC-006` Owner: `FE` Task: Add baseline built-in stream-interpretation plugins for active-processing detection (for example Codex-style `Working ...` lines), prompt/idle recovery, and explicit attention/error signaling.
+- [ ] `ARC-007` Owner: `FE` Task: Add artifact-oriented stream interpretation for summary/delimiter extraction and surface those artifacts in session-scoped UI/state without polluting raw terminal output.
+- [ ] `ARC-008` Owner: `QA` Task: Add regression coverage for stream-adapter normalization, plugin-engine ordering/conflict behavior, carriage-return overwrite cases, hidden-session interpretation behavior, and action-dispatch determinism.
 
 ## Backend Tasks (OpenAPI-based REST)
 
@@ -206,9 +209,9 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Lifecycle and State Modeling (v0.3.0 continuation)
 
 - [x] `LIF-001` Owner: `BE` Task: Extend backend session lifecycle signaling to cover an explicit started/running transition plus stable exit metadata contract so frontend state does not infer process-start semantics indirectly from partial runtime events.
-- [ ] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
-- [ ] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
-- [ ] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
+- [x] `LIF-002` Owner: `FE` Task: Introduce a formal frontend session lifecycle state model (`created`, `starting`, `running`, `busy`, `idle`, `exited`, `closed`) with explicit reducer transitions instead of relying on only the current `exited` tombstone special case.
+- [x] `LIF-003` Owner: `FE` Task: Add deterministic derived activity-state handling (`busy` / `idle`) on top of the explicit lifecycle model, using normalized stream activity/idle signals without conflating process liveness with UI heuristics.
+- [x] `LIF-004` Owner: `QA` Task: Add lifecycle-state regression coverage for ordered transitions, reconnect/snapshot replacement, exited-vs-closed distinction, and invalid post-exit interaction guardrails across the formal state machine.
 - [x] `LIF-005` Owner: `FE` Task: Add subtle sidebar session-activity indicators in the deck section so each session button shows animated live output activity and a sticky unseen marker that clears only when that session becomes active.
 - [x] `LIF-006` Owner: `QA` Task: Add regression coverage for sidebar session-activity indicators, including live-activity animation state, unseen-state persistence after activity stops, and clear-on-activation behavior.
 
