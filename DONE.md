@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Command-send payload normalization was hardened so multiline input now keeps plain `LF` line breaks inside the payload body and only applies the configured submit terminator sequence at the end, avoiding mid-payload `CR` control characters that fragmented delivery in Codex/TUI-style sessions.
+- [x] Frontend send-path regression coverage now verifies that `CR`, `CRLF`, and `CR_DELAY` modes preserve normal body line breaks while still emitting the configured final submit sequence.
 - [x] `ARC-003` completed: frontend PTY output now flows through a dedicated session-scoped stream adapter in `frontend/src/public/terminal-stream.js` before reaching terminal rendering, instead of sending raw WebSocket chunks straight into `app.js`.
 - [x] The stream adapter now normalizes per-session `onData`, `onLine`, and `onIdle` callbacks with deterministic chunk-boundary line reconstruction, carriage-return overwrite handling, ANSI-stripping option support for line consumers, and isolated idle timers per session.
 - [x] Frontend runtime wiring now uses the stream adapter for both live `session.data` WebSocket events and snapshot output replay, while terminal rendering behavior remains unchanged through the adapter's `onData` callback path.

@@ -1043,7 +1043,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, 3);
-  assert.equal(inputPayloads[2].data, "line 1\rline 2\r");
+  assert.equal(inputPayloads[2].data, "line 1\nline 2\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/blockcmd on \[1\]\./);
 
   fixture.elements.commandInput.value = "/go";
@@ -2069,7 +2069,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, directRouteCountBefore + 1);
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "slash-line1\rslash-line2\r" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "slash-line1\nslash-line2\r" });
   secondStartEnv.value = "1INVALID=value";
   secondStartEnv.dispatchEvent({ type: "input" });
   const callsBeforeInvalidEnv = updateSessionCalls.length;
@@ -2201,11 +2201,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "@s-1 line1\nline2";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line1\rline2\r" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line1\nline2\r" });
   fixture.elements.commandInput.value = "/blockcmd s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\rline 2\r" });
+  assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\nline 2\r" });
 
   const unresolvedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@does-not-exist echo routed";

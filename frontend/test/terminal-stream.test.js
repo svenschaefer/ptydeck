@@ -12,6 +12,11 @@ test("withSingleTrailingNewline normalizes CRLF mode to exactly one terminator",
   assert.equal(withSingleTrailingNewline("echo 1\n\n", "crlf"), "echo 1\r\n");
 });
 
+test("withSingleTrailingNewline preserves normal LF line breaks inside multiline payloads", () => {
+  assert.equal(withSingleTrailingNewline("alpha\nbeta\n", "crlf"), "alpha\nbeta\r\n");
+  assert.equal(withSingleTrailingNewline("alpha\r\nbeta\r\n", "cr"), "alpha\nbeta\r");
+});
+
 test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mode", async () => {
   const writes = [];
   await sendInputWithConfiguredTerminator(
@@ -27,7 +32,7 @@ test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mod
     }
   );
   assert.deepEqual(writes, [
-    { sessionId: "s1", payload: "hello\rworld" },
+    { sessionId: "s1", payload: "hello\nworld" },
     { sessionId: "s1", payload: "\r" }
   ]);
 });

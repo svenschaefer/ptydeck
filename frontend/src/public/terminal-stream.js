@@ -3,20 +3,18 @@ export function withSingleTrailingNewline(value, mode = "auto") {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/\n+$/g, "");
-  const lineSeparator = mode === "lf" ? "\n" : "\r";
   const suffix =
     mode === "lf" ? "\n" : mode === "crlf" ? "\r\n" : mode === "cr2" ? "\r\r" : "\r";
-  const body = normalizedLines.replace(/\n/g, lineSeparator);
-  return `${body}${suffix}`;
+  return `${normalizedLines}${suffix}`;
 }
 
 export function normalizePayloadWithoutTrailingNewline(value, mode = "auto") {
+  void mode;
   const normalizedLines = String(value || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/\n+$/g, "");
-  const lineSeparator = mode === "lf" ? "\n" : "\r";
-  return normalizedLines.replace(/\n/g, lineSeparator);
+  return normalizedLines;
 }
 
 export async function sendInputWithConfiguredTerminator(sendInput, sessionId, value, mode, options = {}) {
@@ -25,7 +23,7 @@ export async function sendInputWithConfiguredTerminator(sendInput, sessionId, va
   const delayedSubmitMs = Number.isFinite(options.delayedSubmitMs) ? options.delayedSubmitMs : 90;
   const normalizedMode = normalizeMode(String(mode || "").toLowerCase());
   if (normalizedMode === "cr_delay") {
-    const body = normalizePayloadWithoutTrailingNewline(value, "cr");
+    const body = normalizePayloadWithoutTrailingNewline(value, "lf");
     if (body) {
       await sendInput(sessionId, body);
     }
