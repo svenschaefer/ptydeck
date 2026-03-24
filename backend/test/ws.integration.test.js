@@ -41,6 +41,33 @@ async function createStartedRuntime(overrides = {}) {
   };
 }
 
+function assertDeckShape(deck) {
+  assert.equal(typeof deck?.id, "string");
+  assert.equal(typeof deck?.name, "string");
+  assert.ok(deck?.settings && typeof deck.settings === "object");
+  assert.equal(typeof deck?.createdAt, "number");
+  assert.equal(typeof deck?.updatedAt, "number");
+}
+
+function assertApiSessionShape(session) {
+  assert.equal(typeof session?.id, "string");
+  assert.equal(typeof session?.deckId, "string");
+  assert.equal(typeof session?.state, "string");
+  assert.ok(session.state === "active" || session.state === "unrestored");
+  assert.equal(typeof session?.cwd, "string");
+  assert.equal(typeof session?.shell, "string");
+  assert.ok(Array.isArray(session?.tags));
+  assert.equal(typeof session?.createdAt, "number");
+  assert.equal(typeof session?.updatedAt, "number");
+}
+
+function assertCustomCommandShape(command) {
+  assert.equal(typeof command?.name, "string");
+  assert.equal(typeof command?.content, "string");
+  assert.equal(typeof command?.createdAt, "number");
+  assert.equal(typeof command?.updatedAt, "number");
+}
+
 test("WS connection creation is rate limited per client", async () => {
   const { runtime, wsUrl } = await createStartedRuntime({
     rateLimitWindowMs: 60000,
@@ -93,6 +120,7 @@ test("WS emits session events and reconnect receives snapshot", async () => {
       events.some((event) => event.type === "session.created" && event.session.id === created.id)
     );
     const createdEvent = events.find((event) => event.type === "session.created" && event.session.id === created.id);
+    assertApiSessionShape(createdEvent.session);
     assert.equal(createdEvent.session.deckId, "default");
 
     await fetch(`${baseUrl}/sessions/${created.id}/input`, {
@@ -150,12 +178,18 @@ test("WS emits session events and reconnect receives snapshot", async () => {
 
     await waitFor(() => reconnectEvents.some((event) => event.type === "snapshot"));
     const reconnectSnapshot = reconnectEvents.find((event) => event.type === "snapshot");
+    assert.ok(Array.isArray(reconnectSnapshot.sessions));
+    assert.ok(Array.isArray(reconnectSnapshot.outputs));
+    assert.ok(Array.isArray(reconnectSnapshot.decks));
+    assert.ok(Array.isArray(reconnectSnapshot.customCommands));
     const reconnectSession = reconnectSnapshot.sessions.find((session) => session.id === created.id);
     assert.ok(reconnectSession);
+    assertApiSessionShape(reconnectSession);
     assert.equal(reconnectSession.deckId, "default");
-    assert.ok(Array.isArray(reconnectSnapshot.customCommands));
     assert.equal(reconnectSnapshot.customCommands.length, 1);
+    assertCustomCommandShape(reconnectSnapshot.customCommands[0]);
     assert.equal(reconnectSnapshot.customCommands[0].name, "docu");
+    assertDeckShape(reconnectSnapshot.decks.find((deck) => deck.id === "default"));
 
     const customDeleteRes = await fetch(`${baseUrl}/custom-commands/DoCu`, {
       method: "DELETE"
@@ -187,6 +221,7 @@ test("WS emits authoritative deck and session metadata events", async () => {
     const snapshot = events.find((event) => event.type === "snapshot");
     assert.ok(Array.isArray(snapshot.decks));
     assert.ok(snapshot.decks.some((deck) => deck.id === "default"));
+    assertDeckShape(snapshot.decks.find((deck) => deck.id === "default"));
 
     const createSessionRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
@@ -211,6 +246,8 @@ test("WS emits authoritative deck and session metadata events", async () => {
     await waitFor(() =>
       events.some((event) => event.type === "deck.created" && event.deck && event.deck.id === createdDeck.id)
     );
+    const createdDeckEvent = events.find((event) => event.type === "deck.created" && event.deck && event.deck.id === createdDeck.id);
+    assertDeckShape(createdDeckEvent.deck);
 
     const patchDeckRes = await fetch(`${baseUrl}/decks/${createdDeck.id}`, {
       method: "PATCH",
@@ -225,6 +262,10 @@ test("WS emits authoritative deck and session metadata events", async () => {
           event.type === "deck.updated" && event.deck && event.deck.id === createdDeck.id && event.deck.name === "Operations"
       )
     );
+    const updatedDeckEvent = events.find(
+      (event) => event.type === "deck.updated" && event.deck && event.deck.id === createdDeck.id && event.deck.name === "Operations"
+    );
+    assertDeckShape(updatedDeckEvent.deck);
 
     const patchSessionRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`, {
       method: "PATCH",
@@ -244,6 +285,14 @@ test("WS emits authoritative deck and session metadata events", async () => {
           event.session.tags.includes("ops")
       )
     );
+    const updatedSessionEvent = events.find(
+      (event) =>
+        event.type === "session.updated" &&
+        event.session &&
+        event.session.id === createdSession.id &&
+        event.session.name === "alpha"
+    );
+    assertApiSessionShape(updatedSessionEvent.session);
 
     const moveRes = await fetch(`${baseUrl}/decks/${createdDeck.id}/sessions/${createdSession.id}:move`, {
       method: "POST"

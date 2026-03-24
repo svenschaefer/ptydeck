@@ -902,7 +902,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await import("../src/public/app.js?app-test");
   await tick();
   assert.equal(fixture.elements.statusMessage.textContent, "Loading sessions...");
-  await sleep(90);
+  await sleep(320);
   assert.equal(listSessionsCalls, 1);
 
   fixture.elements.createSession.click();
@@ -2418,6 +2418,8 @@ test("app search tracks active terminal matches across buffer growth and deck sw
 
   const listeners = new Map();
   const localStorageData = new Map();
+  let listDecksCalls = 0;
+  let listSessionsCalls = 0;
   const deckState = [
     {
       id: "default",
@@ -2509,9 +2511,11 @@ test("app search tracks active terminal matches across buffer growth and deck sw
     const method = options.method || "GET";
 
     if (path === "/api/v1/decks" && method === "GET") {
+      listDecksCalls += 1;
       return makeJsonResponse(200, deckState);
     }
     if (path === "/api/v1/sessions" && method === "GET") {
+      listSessionsCalls += 1;
       return makeJsonResponse(200, sessions);
     }
     return makeJsonResponse(204, {});
@@ -2534,6 +2538,20 @@ test("app search tracks active terminal matches across buffer growth and deck sw
 
   const ws = MockWebSocket.instances[0];
   assert.ok(ws, "expected websocket client to initialize");
+  ws.emit("open", {});
+  ws.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions,
+      decks: deckState,
+      customCommands: [],
+      outputs: []
+    })
+  });
+  await tick();
+  await sleep(320);
+  assert.equal(listDecksCalls, 0);
+  assert.equal(listSessionsCalls, 0);
 
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-1", data: "alpha one\nalpha two\n" })
@@ -2578,4 +2596,39 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "");
   assert.equal(MockTerminal.instances[1].selected, null);
+
+  ws.emit("close", {});
+  await tick();
+  await sleep(700);
+  assert.equal(MockWebSocket.instances.length, 2);
+
+  const reconnectWs = MockWebSocket.instances[1];
+  reconnectWs.emit("open", {});
+  reconnectWs.emit("message", {
+    data: JSON.stringify({
+      type: "snapshot",
+      sessions: [
+        {
+          id: "s-2",
+          deckId: "ops",
+          state: "active",
+          shell: "bash",
+          cwd: "~",
+          name: "ops-node",
+          tags: ["ops"],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      ],
+      decks: [deckState[1]],
+      customCommands: [],
+      outputs: []
+    })
+  });
+  await tick();
+  assert.equal(fixture.elements.terminalGrid.children.length, 1);
+  assert.ok(findDeckGroup(fixture.elements.deckTabs, "ops"));
+  assert.equal(findDeckGroup(fixture.elements.deckTabs, "default"), null);
+  assert.equal(listDecksCalls, 0);
+  assert.equal(listSessionsCalls, 0);
 });

@@ -1,5 +1,5 @@
 import { createApiClient } from "./api-client.js";
-import { createCommandEngine, createCustomCommandRegistry } from "./command-engine.js";
+import { createCommandEngine } from "./command-engine.js";
 import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
 import { createStore } from "./store.js";
@@ -71,6 +71,8 @@ const sessionQuickIds = new Map();
 let globalResizeTimer = null;
 let deferredResizeTimer = null;
 let bootstrapPromise = null;
+let bootstrapFallbackTimer = null;
+let runtimeBootstrapSource = "pending";
 let commandPreviewTimer = null;
 let commandPreviewRequestId = 0;
 let commandSuggestionsTimer = null;
@@ -87,6 +89,7 @@ const TERMINAL_MOUNT_VERTICAL_CHROME_PX = 18;
 const QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SEND_TERMINATOR_MODE_SET = new Set(["auto", "crlf", "lf", "cr", "cr2", "cr_delay"]);
 const DELAYED_SUBMIT_MS = 90;
+const WS_BOOTSTRAP_FALLBACK_MS = 250;
 const SESSION_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -173,16 +176,11 @@ const SYSTEM_SLASH_COMMANDS = [
   "help"
 ];
 let terminalSettings = loadTerminalSettings();
-let deckState = {
-  decks: [],
-  activeDeckId: loadStoredActiveDeckId()
-};
 let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
 let wsAuthToken = "";
 let wsClient = null;
 let commandAutocompleteRequestId = 0;
-const customCommandRegistry = createCustomCommandRegistry();
 const slashCommandHistory = [];
 let slashHistoryCursor = -1;
 let slashHistoryDraft = "";
@@ -193,7 +191,6 @@ let commandSuggestionsController = null;
 const uiState = {
   loading: true,
   error: "",
-  sessionFilterText: "",
   commandFeedback: "",
   commandInlineHint: "",
   commandInlineHintPrefixPx: 0,
@@ -231,30 +228,28 @@ if (typeof window !== "undefined") {
 }
 
 function normalizeCustomCommandName(name) {
-  return customCommandRegistry.normalizeName(name);
+  return String(name || "").trim().toLowerCase();
 }
 
 function listCustomCommandState() {
-  return customCommandRegistry.list();
+  return store.listCustomCommands();
 }
 
 function getCustomCommandState(name) {
-  return customCommandRegistry.get(name);
+  return store.getCustomCommand(name);
 }
 
 function upsertCustomCommandState(command) {
-  return customCommandRegistry.upsert(command);
+  return store.upsertCustomCommand(command);
 }
 
 function removeCustomCommandState(name) {
-  return customCommandRegistry.remove(name);
+  return store.removeCustomCommand(name);
 }
 
 function replaceCustomCommandState(commands) {
-  customCommandRegistry.replace(commands);
+  store.replaceCustomCommands(commands);
 }
-
-uiState.sessionFilterText = loadStoredSessionFilterText();
 
 if (typeof window.Terminal !== "function") {
   setError("Terminal library failed to load.");
@@ -784,6 +779,15 @@ function saveStoredActiveDeckId(deckId) {
   }
 }
 
+function getSessionFilterText() {
+  return store.getState().sessionFilterText || "";
+}
+
+function setSessionFilterText(value) {
+  store.setSessionFilterText(value);
+  saveStoredSessionFilterText(store.getState().sessionFilterText);
+}
+
 function normalizeDeckTerminalSettings(rawSettings) {
   const terminal = rawSettings && typeof rawSettings === "object" ? rawSettings.terminal : null;
   return {
@@ -806,16 +810,17 @@ function normalizeDeckEntry(deck) {
 }
 
 function getDeckById(deckId) {
-  return deckState.decks.find((deck) => deck.id === deckId) || null;
+  return store.getState().decks.find((deck) => deck.id === deckId) || null;
 }
 
 function getActiveDeck() {
-  const preferred = getDeckById(deckState.activeDeckId);
+  const preferred = getDeckById(store.getState().activeDeckId);
   if (preferred) {
     return preferred;
   }
-  if (deckState.decks.length > 0) {
-    return deckState.decks[0];
+  const decks = store.getState().decks;
+  if (decks.length > 0) {
+    return decks[0];
   }
   return null;
 }
@@ -856,20 +861,10 @@ function setDecks(nextDecks, options = {}) {
   const normalizedDecks = Array.isArray(nextDecks)
     ? nextDecks.map(normalizeDeckEntry).filter((deck) => Boolean(deck.id))
     : [];
-  const sortedDecks = normalizedDecks.slice().sort((left, right) => left.name.localeCompare(right.name, "en-US"));
-  const preferredActiveDeckId = String(options.preferredActiveDeckId || deckState.activeDeckId || "").trim();
-  const nextActiveDeck =
-    sortedDecks.find((deck) => deck.id === preferredActiveDeckId) ||
-    sortedDecks.find((deck) => deck.id === DEFAULT_DECK_ID) ||
-    sortedDecks[0] ||
-    null;
-  deckState = {
-    decks: sortedDecks,
-    activeDeckId: nextActiveDeck ? nextActiveDeck.id : ""
-  };
-  saveStoredActiveDeckId(deckState.activeDeckId);
+  const preferredActiveDeckId = String(options.preferredActiveDeckId || store.getState().activeDeckId || "").trim();
+  store.setDecks(normalizedDecks, { preferredActiveDeckId });
+  saveStoredActiveDeckId(store.getState().activeDeckId);
   syncActiveDeckGeometryFromState();
-  render();
 }
 
 function upsertDeckInState(nextDeck, options = {}) {
@@ -877,11 +872,11 @@ function upsertDeckInState(nextDeck, options = {}) {
   if (!normalizedDeck.id) {
     return;
   }
-  const nextDecks = deckState.decks.filter((deck) => deck.id !== normalizedDeck.id);
-  nextDecks.push(normalizedDeck);
-  setDecks(nextDecks, {
-    preferredActiveDeckId: options.preferredActiveDeckId || deckState.activeDeckId || normalizedDeck.id
+  store.upsertDeck(normalizedDeck, {
+    preferredActiveDeckId: options.preferredActiveDeckId || store.getState().activeDeckId || normalizedDeck.id
   });
+  saveStoredActiveDeckId(store.getState().activeDeckId);
+  syncActiveDeckGeometryFromState();
 }
 
 function removeDeckFromState(deckId, options = {}) {
@@ -889,13 +884,12 @@ function removeDeckFromState(deckId, options = {}) {
   if (!normalizedDeckId) {
     return;
   }
-  const nextDecks = deckState.decks.filter((deck) => deck.id !== normalizedDeckId);
-  const preferredActiveDeckId =
-    options.preferredActiveDeckId ||
-    (deckState.activeDeckId === normalizedDeckId ? options.fallbackDeckId || DEFAULT_DECK_ID : deckState.activeDeckId);
-  setDecks(nextDecks, {
-    preferredActiveDeckId
+  store.removeDeck(normalizedDeckId, {
+    preferredActiveDeckId: options.preferredActiveDeckId,
+    fallbackDeckId: options.fallbackDeckId || DEFAULT_DECK_ID
   });
+  saveStoredActiveDeckId(store.getState().activeDeckId);
+  syncActiveDeckGeometryFromState();
 }
 
 function normalizeSendTerminatorMode(value) {
@@ -956,6 +950,11 @@ function saveStoredSessionFilterText(value) {
     // ignore storage failures (private mode / quota)
   }
 }
+
+store.hydrateRuntimePreferences({
+  activeDeckId: loadStoredActiveDeckId(),
+  sessionFilterText: loadStoredSessionFilterText()
+});
 
 function saveSessionInputSettings() {
   try {
@@ -1784,6 +1783,35 @@ function maybeReportStartupPerf() {
   });
 }
 
+function clearBootstrapFallbackTimer() {
+  if (!bootstrapFallbackTimer) {
+    return;
+  }
+  clearTimeout(bootstrapFallbackTimer);
+  bootstrapFallbackTimer = null;
+}
+
+function markRuntimeBootstrapReady(source) {
+  runtimeBootstrapSource = source;
+  clearBootstrapFallbackTimer();
+  uiState.loading = false;
+  if (startupPerf.bootstrapReadyAtMs === null) {
+    startupPerf.bootstrapReadyAtMs = nowMs();
+  }
+  maybeReportStartupPerf();
+  render();
+}
+
+function scheduleBootstrapFallback() {
+  if (runtimeBootstrapSource !== "pending" || bootstrapPromise || bootstrapFallbackTimer) {
+    return;
+  }
+  bootstrapFallbackTimer = setTimeout(() => {
+    bootstrapFallbackTimer = null;
+    bootstrapRuntimeFallback().catch(() => {});
+  }, WS_BOOTSTRAP_FALLBACK_MS);
+}
+
 function getSessionCountForDeck(deckId, sessions) {
   return sessions.reduce((count, session) => (resolveSessionDeckId(session) === deckId ? count + 1 : count), 0);
 }
@@ -1792,18 +1820,21 @@ function renderDeckTabs(sessions) {
   if (!deckTabsEl || typeof document.createElement !== "function") {
     return;
   }
-  const activeSessionId = store.getState().activeSessionId;
+  const state = store.getState();
+  const activeSessionId = state.activeSessionId;
+  const decks = state.decks;
+  const activeDeckId = state.activeDeckId;
   while (deckTabsEl.firstChild) {
     deckTabsEl.removeChild(deckTabsEl.firstChild);
   }
-  if (!Array.isArray(deckState.decks) || deckState.decks.length === 0) {
+  if (!Array.isArray(decks) || decks.length === 0) {
     const hint = document.createElement("span");
     hint.className = "deck-tab deck-tab-empty";
     hint.textContent = "No decks";
     deckTabsEl.appendChild(hint);
     return;
   }
-  for (const deck of deckState.decks) {
+  for (const deck of decks) {
     const group = document.createElement("div");
     group.className = "deck-group";
     group.setAttribute("data-deck-id", deck.id);
@@ -1811,7 +1842,7 @@ function renderDeckTabs(sessions) {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "deck-tab";
-    if (deck.id === deckState.activeDeckId) {
+    if (deck.id === activeDeckId) {
       tab.classList.add("active");
     }
     tab.setAttribute("data-deck-id", deck.id);
@@ -1871,23 +1902,14 @@ function setActiveDeck(deckId) {
   if (!target) {
     return false;
   }
-  if (deckState.activeDeckId === normalized) {
+  if (store.getState().activeDeckId === normalized) {
     return true;
   }
-  deckState = {
-    ...deckState,
-    activeDeckId: normalized
-  };
-  saveStoredActiveDeckId(normalized);
-  const state = store.getState();
-  const activeInDeck =
-    state.activeSessionId &&
-    state.sessions.some((session) => session.id === state.activeSessionId && resolveSessionDeckId(session) === normalized);
-  if (!activeInDeck) {
-    const firstInDeck = state.sessions.find((session) => resolveSessionDeckId(session) === normalized) || null;
-    store.setActiveSession(firstInDeck ? firstInDeck.id : null);
+  const changed = store.setActiveDeck(normalized);
+  if (!changed) {
+    return true;
   }
-  render();
+  saveStoredActiveDeckId(normalized);
   syncActiveDeckGeometryFromState();
   scheduleGlobalResize({ deckId: normalized, force: true });
   scheduleDeferredResizePasses({ deckId: normalized, force: true });
@@ -1983,7 +2005,7 @@ async function deleteDeckFlow() {
       throw err;
     }
   }
-  const fallbackId = deckState.decks.find((deck) => deck.id !== activeDeck.id)?.id || DEFAULT_DECK_ID;
+  const fallbackId = store.getState().decks.find((deck) => deck.id !== activeDeck.id)?.id || DEFAULT_DECK_ID;
   applyRuntimeEvent(
     {
       type: "deck.deleted",
@@ -2003,18 +2025,19 @@ function render() {
     ? state.sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
     : state.sessions.slice();
   renderDeckTabs(state.sessions);
-  const hasDecks = deckState.decks.length > 0;
+  const hasDecks = state.decks.length > 0;
   if (deckRenameBtn) {
     deckRenameBtn.disabled = !hasDecks;
   }
   if (deckDeleteBtn) {
     deckDeleteBtn.disabled = !activeDeck || activeDeck.id === DEFAULT_DECK_ID;
   }
-  const filtered = resolveFilterSelectors(uiState.sessionFilterText, deckSessions);
+  const sessionFilterText = getSessionFilterText();
+  const filtered = resolveFilterSelectors(sessionFilterText, deckSessions);
   const visibleSessionIds = new Set(
     filtered.sessions.map((session) => session.id)
   );
-  const filterActive = Boolean(String(uiState.sessionFilterText || "").trim());
+  const filterActive = Boolean(String(sessionFilterText || "").trim());
   if (filterActive && filtered.sessions.length > 0) {
     const firstVisibleId = filtered.sessions[0].id;
     const activeVisible = state.activeSessionId && visibleSessionIds.has(state.activeSessionId);
@@ -2555,21 +2578,7 @@ function replaySnapshotOutputs(outputs, attempt = 0) {
 }
 
 function upsertSession(nextSession) {
-  const currentSessions = store.getState().sessions;
-  const nextSessions = currentSessions.slice();
-  const index = nextSessions.findIndex((entry) => entry.id === nextSession.id);
-  if (index >= 0) {
-    const merged = { ...nextSessions[index], ...nextSession };
-    if (getSessionRuntimeState(nextSession) === "active") {
-      delete merged.exitCode;
-      delete merged.exitSignal;
-      delete merged.exitedAt;
-    }
-    nextSessions[index] = merged;
-  } else {
-    nextSessions.push(nextSession);
-  }
-  store.setSessions(nextSessions);
+  store.upsertSession(nextSession);
 }
 
 function markSessionExited(sessionId, exitDetails = {}) {
@@ -2577,37 +2586,33 @@ function markSessionExited(sessionId, exitDetails = {}) {
   if (!session) {
     return;
   }
-  const nextSession = {
-    ...session,
-    state: "exited",
-    exitCode: Number.isInteger(exitDetails.exitCode) ? exitDetails.exitCode : null,
-    exitSignal: typeof exitDetails.signal === "string" ? exitDetails.signal : "",
+  store.markSessionExited(sessionId, {
+    exitCode: exitDetails.exitCode,
+    signal: exitDetails.signal,
     exitedAt: Date.now(),
     updatedAt: Date.now()
-  };
-  upsertSession(nextSession);
+  });
+  const nextSession = getSessionById(sessionId);
   if (store.getState().activeSessionId === sessionId) {
     setCommandFeedback(getExitedSessionMessage(nextSession));
   }
 }
 
 function removeSession(sessionId) {
-  const currentSessions = store.getState().sessions;
-  const nextSessions = currentSessions.filter((entry) => entry.id !== sessionId);
-  store.setSessions(nextSessions);
+  store.removeSession(sessionId);
 }
 
 function applyRuntimeSnapshot(event) {
   if (Array.isArray(event.decks)) {
-    setDecks(event.decks, { preferredActiveDeckId: deckState.activeDeckId });
+    setDecks(event.decks, { preferredActiveDeckId: store.getState().activeDeckId });
   }
   replaceCustomCommandState(event.customCommands || []);
   store.setSessions(event.sessions || []);
   replaySnapshotOutputs(event.outputs);
   scheduleCommandPreview();
   scheduleCommandSuggestions();
-  uiState.loading = false;
   uiState.error = "";
+  markRuntimeBootstrapReady("ws");
 }
 
 function applyRuntimeEvent(event, options = {}) {
@@ -2649,7 +2654,7 @@ function applyRuntimeEvent(event, options = {}) {
     case "deck.updated":
       if (event.deck) {
         upsertDeckInState(event.deck, {
-          preferredActiveDeckId: options.preferredActiveDeckId || deckState.activeDeckId
+          preferredActiveDeckId: options.preferredActiveDeckId || store.getState().activeDeckId
         });
         scheduleCommandPreview();
         scheduleCommandSuggestions();
@@ -2715,9 +2720,9 @@ commandEngine = createCommandEngine({
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
   listCustomCommands: listCustomCommandState,
   getSessions: () => store.getState().sessions,
-  getDecks: () => deckState.decks,
+  getDecks: () => store.getState().decks,
   getThemes: () => TERMINAL_THEME_PRESETS,
-  getActiveDeckId: () => deckState.activeDeckId,
+  getActiveDeckId: () => store.getState().activeDeckId,
   getActiveSessionId: () => store.getState().activeSessionId,
   getSessionToken: formatSessionToken,
   getSessionDisplayName: formatSessionDisplayName,
@@ -2742,7 +2747,7 @@ function activateSessionTarget(session) {
   }
   const beforeState = store.getState();
   const previousActiveSessionId = beforeState.activeSessionId;
-  const previousActiveDeckId = deckState.activeDeckId;
+  const previousActiveDeckId = beforeState.activeDeckId;
   const targetDeckId = resolveSessionDeckId(session);
   if (targetDeckId) {
     setActiveDeck(targetDeckId);
@@ -2767,7 +2772,7 @@ function activateDeckTarget(deck) {
   if (!deck || !deck.id) {
     return { ok: false, message: "Unknown deck target." };
   }
-  if (deckState.activeDeckId === deck.id) {
+  if (store.getState().activeDeckId === deck.id) {
     return {
       ok: true,
       message: `Deck already active: [${deck.id}] ${deck.name}.`,
@@ -2852,7 +2857,7 @@ async function executeControlCommand(interpreted) {
   if (command === "deck") {
     const subcommand = String(args[0] || "").toLowerCase();
     const rest = args.slice(1);
-    const decks = deckState.decks.slice();
+    const decks = state.decks.slice();
     const activeDeck = getActiveDeck();
 
     if (!subcommand || subcommand === "list") {
@@ -3014,7 +3019,7 @@ async function executeControlCommand(interpreted) {
     if (resolvedTargets.sessions.length === 0) {
       return "No sessions resolved for /move.";
     }
-    const resolvedDeck = resolveDeckToken(deckSelector, deckState.decks);
+    const resolvedDeck = resolveDeckToken(deckSelector, state.decks);
     if (!resolvedDeck.deck) {
       return resolvedDeck.error;
     }
@@ -3044,8 +3049,7 @@ async function executeControlCommand(interpreted) {
   if (command === "filter") {
     const selectorText = args.join(" ").trim();
     if (!selectorText) {
-      uiState.sessionFilterText = "";
-      saveStoredSessionFilterText("");
+      setSessionFilterText("");
       render();
       return "Display filter cleared.";
     }
@@ -3058,8 +3062,7 @@ async function executeControlCommand(interpreted) {
     if (resolved.error) {
       return resolved.error;
     }
-    uiState.sessionFilterText = selectorText;
-    saveStoredSessionFilterText(selectorText);
+    setSessionFilterText(selectorText);
     if (selectorText.includes("::") && resolved.sessions.length > 0) {
       const targetDeckId = resolveSessionDeckId(resolved.sessions[0]);
       if (targetDeckId && targetDeckId !== activeDeckId) {
@@ -3459,7 +3462,7 @@ async function executeControlCommand(interpreted) {
   return `Unknown command: /${commandRaw}`;
 }
 
-async function bootstrapSessions() {
+async function bootstrapRuntimeFallback() {
   if (bootstrapPromise) {
     return bootstrapPromise;
   }
@@ -3468,49 +3471,67 @@ async function bootstrapSessions() {
     bootstrapRequestCount: startupPerf.bootstrapRequestCount
   });
   bootstrapPromise = (async () => {
-  try {
-    debugLog("sessions.bootstrap.start");
-    const sessions = await api.listSessions();
-    store.setSessions(sessions);
-    uiState.loading = false;
-    uiState.error = "";
-    if (startupPerf.bootstrapReadyAtMs === null) {
-      startupPerf.bootstrapReadyAtMs = nowMs();
+    try {
+      debugLog("runtime.bootstrap.start");
+      const [decksResult, sessionsResult] = await Promise.allSettled([api.listDecks(), api.listSessions()]);
+
+      if (runtimeBootstrapSource === "ws") {
+        debugLog("runtime.bootstrap.skipped", { reason: "ws_snapshot_already_applied" });
+        return;
+      }
+
+      let hasError = false;
+      if (decksResult.status === "fulfilled") {
+        setDecks(decksResult.value, { preferredActiveDeckId: store.getState().activeDeckId });
+      } else {
+        hasError = true;
+        debugLog("decks.bootstrap.error", {
+          message: decksResult.reason instanceof Error ? decksResult.reason.message : String(decksResult.reason)
+        });
+        setDecks(
+          [
+            {
+              id: DEFAULT_DECK_ID,
+              name: "Default",
+              settings: {
+                terminal: {
+                  cols: terminalSettings.cols,
+                  rows: terminalSettings.rows
+                }
+              }
+            }
+          ],
+          { preferredActiveDeckId: DEFAULT_DECK_ID }
+        );
+      }
+
+      if (sessionsResult.status === "fulfilled") {
+        store.setSessions(sessionsResult.value || []);
+      } else {
+        hasError = true;
+        debugLog("sessions.bootstrap.error", {
+          message: sessionsResult.reason instanceof Error ? sessionsResult.reason.message : String(sessionsResult.reason)
+        });
+      }
+
+      uiState.error = hasError ? "Failed to fully load runtime state." : "";
+      debugLog("runtime.bootstrap.ok", {
+        decksLoaded: decksResult.status === "fulfilled",
+        sessionsLoaded: sessionsResult.status === "fulfilled",
+        sessionCount: sessionsResult.status === "fulfilled" ? sessionsResult.value.length : 0
+      });
+      markRuntimeBootstrapReady("rest");
+    } catch (err) {
+      debugLog("runtime.bootstrap.error", {
+        message: err instanceof Error ? err.message : String(err)
+      });
+      uiState.error = "Failed to load runtime state.";
+      markRuntimeBootstrapReady("rest");
+    } finally {
+      bootstrapPromise = null;
     }
-    maybeReportStartupPerf();
-    debugLog("sessions.bootstrap.ok", { count: sessions.length });
-  } catch {
-    setError("Failed to load sessions.");
-  }
   })();
   return bootstrapPromise;
-}
-
-async function bootstrapDecks() {
-  try {
-    debugLog("decks.bootstrap.start");
-    const decks = await api.listDecks();
-    setDecks(decks, { preferredActiveDeckId: deckState.activeDeckId });
-    debugLog("decks.bootstrap.ok", { count: Array.isArray(decks) ? decks.length : 0, activeDeckId: deckState.activeDeckId });
-  } catch (err) {
-    debugLog("decks.bootstrap.error", { message: err instanceof Error ? err.message : String(err) });
-    setDecks(
-      [
-        {
-          id: DEFAULT_DECK_ID,
-          name: "Default",
-          settings: {
-            terminal: {
-              cols: terminalSettings.cols,
-              rows: terminalSettings.rows
-            }
-          }
-        }
-      ],
-      { preferredActiveDeckId: DEFAULT_DECK_ID }
-    );
-    setError("Failed to load decks.");
-  }
 }
 
 async function bootstrapDevAuthToken() {
@@ -3542,9 +3563,10 @@ function startWs() {
     onState(status) {
       debugLog("ws.state", { status });
       store.setConnectionState(status);
-      if (status === "connected") {
+      if (status === "connected" && runtimeBootstrapSource !== "pending") {
         uiState.loading = false;
         uiState.error = "";
+        render();
       }
     },
     onMessage(event) {
@@ -3566,9 +3588,8 @@ render();
 
 async function initializeRuntime() {
   await bootstrapDevAuthToken();
-  await bootstrapDecks();
-  await bootstrapSessions();
   startWs();
+  scheduleBootstrapFallback();
 }
 
 initializeRuntime().catch(() => {

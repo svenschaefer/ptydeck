@@ -88,6 +88,7 @@ Authoritative repository documents remain:
     - `QLT-119`
     - `QLT-120`
     - `QLT-121`
+    - `QLT-122`
     - `ARC-002`
 
 ### 7. Technical Alternatives
@@ -111,7 +112,7 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- Reducer-backed runtime-state/store hardening and WebSocket-authoritative bootstrap/reconnect follow-up (`QLT-119`, `QLT-120`, `QLT-121`) are now the current near-term slice promoted from the imported review notes and deferred backlog.
+- No imported-doc-derived near-term task block is currently active; the last promoted runtime hardening slice (`QLT-119` ... `QLT-122`) is now completed.
 
 ### Deferred / Outlook
 

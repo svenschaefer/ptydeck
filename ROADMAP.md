@@ -498,17 +498,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H10`
-- Next milestones in progress: `v0.3.0-H11`
+- Latest completed milestone: `v0.3.0-H11`
+- Next milestones in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-119`
-- `QLT-120`
-- `QLT-121`
-- `QLT-122`
+- None currently.
 
 ### Completed Items
 

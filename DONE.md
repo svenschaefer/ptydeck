@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-119` completed: frontend runtime state for sessions, decks, custom commands, connection state, and session filter text now lives behind `frontend/src/public/store.js` with reducer-backed transitions instead of continuing as scattered inline mutation state in `app.js`.
+- [x] Store snapshots are now defensive copies, so the extracted runtime-store boundary no longer leaks mutable internal session/deck/custom-command collections to callers.
+- [x] `QLT-120` completed: frontend bootstrap/reconnect hydration is now WebSocket-authoritative when snapshot data arrives, with REST boot moved behind a delayed fallback path instead of being the default steady-state bootstrap source.
+- [x] `QLT-121` completed: regression coverage now verifies reducer-backed runtime-store behavior plus WS-first bootstrap/reconnect hydration, including zero-REST early-snapshot bootstrap, reconnect snapshot replacement, and mixed local-mutation plus follow-up runtime-event convergence.
+- [x] `QLT-122` completed: FE/BE contract regression now catches generated type drift against backend OpenAPI and representative runtime payload shapes for sessions, decks, and custom commands; the stale frontend API type generation was corrected as part of this closure.
+- [x] Validation for `QLT-119`/`QLT-120`/`QLT-121`/`QLT-122` passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Remaining explicit-session-lifecycle follow-up beyond the already implemented `session.exit` fix was decomposed into explicit deferred backlog items (`LIF-001` ... `LIF-004`) in `TODO-OUTLOOK.md`.
 - [x] Deferred plugin/stream-interpretation architecture was decomposed in `TODO-OUTLOOK.md` into explicit follow-up tasks (`ARC-003` ... `ARC-008`) covering stream adaptation, plugin engine, action contract, baseline built-in detectors, artifact extraction, and regression coverage.
 - [x] The next near-term block was promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `v0.3.0-H11` (`QLT-119` ... `QLT-122`), focused on reducer-backed runtime state, WS-authoritative hydration, and automated FE/BE contract regression checks.
