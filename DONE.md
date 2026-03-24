@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Documentation sync pass completed: `TODO-OUTLOOK.md` now captures deferred slash-workflow-chain follow-ups as explicit owned tasks (`SWF-001` ... `SWF-008`) instead of leaving the concept only in `docs/`.
+- [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the new deferred workflow-chain planning baseline and remains aligned with current active-wave state (`v0.4.0-H2`).
 - [x] `ARC-010` progress: extracted dedicated UI controllers for deck sidebar rendering (`frontend/src/public/ui/deck-sidebar-controller.js`) and session-card metadata/status/settings rendering concerns (`frontend/src/public/ui/session-card-meta-controller.js`), and rewired `app.js` to consume these controller boundaries.
 - [x] `ARC-010` progress: extracted a dedicated layout/settings UI controller (`frontend/src/public/ui/layout-settings-controller.js`) for sidebar/settings synchronization and terminal geometry CSS computation, and rewired `app.js` to consume this boundary.
 - [x] `ARC-010` progress: extracted session-settings dialog interactions (`open`/`close`/`toggle`/delete-confirm) into `frontend/src/public/ui/session-settings-dialog-controller.js` and rewired `app.js` to use this controller boundary.
