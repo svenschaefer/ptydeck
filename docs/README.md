@@ -75,6 +75,9 @@ Authoritative repository documents remain:
   - Still relevant:
     - broader WS-first state layering is still not complete
   - Backlog landing:
+    - `QLT-116`
+    - `QLT-117`
+    - `QLT-118`
     - `ARC-002`
 
 ### 7. Technical Alternatives

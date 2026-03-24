@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H9 declarative autocomplete backlog promotion synced)
+Last updated: 2026-03-24 (H9/H10 docs-derived backlog promotion synced)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, promotion of the `withfig/autocomplete`-inspired declarative autocomplete block into active near-term backlog (`QLT-112` ... `QLT-115`), the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between active near-term work and deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, promotion of the `withfig/autocomplete`-inspired declarative autocomplete block into active near-term backlog (`QLT-112` ... `QLT-115`), promotion of the next docs-derived runtime metadata event-consistency block into queued near-term backlog (`QLT-116` ... `QLT-118`), the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between active near-term work and deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -144,6 +144,7 @@ The deck model is a strict isolation boundary above sessions.
 - External terminal/SSH tool survey follow-up remains intentionally deferred to `TODO-OUTLOOK.md` as explicit medium-term backlog (`REM-001` ... `REM-009`) covering SSH session kinds, auth/trust, saved connection profiles, remote-session reconnect semantics, controlled file transfer, sharing/read-only mode, and theme import/export compatibility.
 - Terminal search/find was the only survey-derived feature kept in near-term scope; it is now implemented via `QLT-110`/`QLT-111` on top of the `QLT-100` FE modularization baseline.
 - The `withfig/autocomplete`-inspired declarative command-completion architecture is now the next active near-term FE/QA block, promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `QLT-112` ... `QLT-115`.
+- Imported docs still identify broader WebSocket-first runtime-state consistency as a real near-term structural gap beyond custom commands; that gap is now captured as queued `v0.3.0-H10` work (`QLT-116` ... `QLT-118`) instead of remaining only as a high-level review note.
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.
@@ -241,7 +242,7 @@ The deck model is a strict isolation boundary above sessions.
 - `v0.3.0` status: completed.
 - Includes previous frontend, quality gate, and deployment-baseline content under the compressed v0.3.0 milestone.
 - Cycle A status: `v0.3.0-H1` quality/coverage hardening backlog completed (`QLT-001` ... `QLT-036`).
-- Active next cycles: `v0.3.0-H9` declarative autocomplete architecture.
+- Active next cycles: `v0.3.0-H9` declarative autocomplete architecture, followed by queued `v0.3.0-H10` runtime metadata event consistency.
   - Completed in cycle A: `QLT-001`, `QLT-002`, `QLT-003`, `QLT-004`, `QLT-007`, `QLT-008`, `QLT-009`, `QLT-010`, `QLT-011`, `QLT-012`, `QLT-013`, `QLT-014`, `QLT-015`, `QLT-016`, `QLT-017`, `QLT-018`, `QLT-019`, `QLT-020`, `QLT-021`, `QLT-022`, `QLT-023`, `QLT-024`, `QLT-025`, `QLT-028`, `QLT-029`, `QLT-030`, `QLT-031`, `QLT-032`, `QLT-033`, `QLT-034`, `QLT-035`, `QLT-036`.
   - Completed in cycle B: `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-023`, `ENT-024`.
   - Planned next in cycle B: none (current-scope enterprise tasks complete).
@@ -260,6 +261,7 @@ The deck model is a strict isolation boundary above sessions.
   - Completed in cycle J (`v0.3.0-H8`): `QLT-110`, `QLT-111`.
   - Planned next in cycle J (`v0.3.0-H8`): none.
   - Planned next in cycle K (`v0.3.0-H9`): `QLT-112`, `QLT-113`, `QLT-114`, `QLT-115`.
+  - Queued after cycle K in cycle L (`v0.3.0-H10`): `QLT-116`, `QLT-117`, `QLT-118`.
 
 ## Session Behavior Notes
 

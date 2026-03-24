@@ -448,11 +448,30 @@ Exit criteria:
 - Contextual argument suggestions can be generated from live FE state via bounded-latency providers without mutating runtime state during typing.
 - Inline autocomplete feedback can expose richer metadata while preserving deterministic keyboard-first behavior and explicit fallback semantics.
 
+### v0.3.0-H10 - Runtime Metadata Event Consistency
+
+- `QLT-116`
+- `QLT-117`
+- `QLT-118`
+
+Dependencies:
+
+- `QLT-116` should land first so the backend exposes authoritative WebSocket events for session and deck metadata changes instead of leaving connected clients dependent on local mutation responses only.
+- `QLT-117` depends on `QLT-116` so the frontend reducer/event-application path can consume a complete runtime event surface rather than inventing client-only patch semantics for missing events.
+- `QLT-117` should follow `QLT-112` ... `QLT-114` so command/autocomplete structural cleanup lands before broader runtime-state event consolidation touches the same frontend orchestration code.
+- `QLT-118` depends on `QLT-116` and `QLT-117` so regression coverage targets the finalized backend event model and frontend reducer flow instead of intermediate partial behavior.
+
+Exit criteria:
+
+- Backend emits authoritative metadata events for live session/deck changes that matter to connected clients.
+- Frontend applies runtime metadata updates through one explicit event/reducer path instead of scattered local mutation handlers.
+- Multi-client runtime state stays consistent across session rename/settings updates, deck mutations, session moves, and reconnect snapshot replacement.
+
 ## Current Status
 
 - Latest completed milestone: `v0.3.0-H8`
 - Next milestones in progress: `v0.3.0-H9`
-- Queued next milestone after H9: none
+- Queued next milestone after H9: `v0.3.0-H10`
 - Blockers: none recorded
 
 ### Active Open Tasks (Execution Queue)
