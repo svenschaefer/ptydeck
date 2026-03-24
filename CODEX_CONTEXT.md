@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H9/H10 docs-derived backlog promotion synced)
+Last updated: 2026-03-24 (docs-derived outlook stack-evolution backlog synced)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, promotion of the `withfig/autocomplete`-inspired declarative autocomplete block into active near-term backlog (`QLT-112` ... `QLT-115`), promotion of the next docs-derived runtime metadata event-consistency block into queued near-term backlog (`QLT-116` ... `QLT-118`), the `TODO-OUTLOOK.md` filename correction, and external-tool survey backlog split between active near-term work and deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, promotion of the `withfig/autocomplete`-inspired declarative autocomplete block into active near-term backlog (`QLT-112` ... `QLT-115`), promotion of the next docs-derived runtime metadata event-consistency block into queued near-term backlog (`QLT-116` ... `QLT-118`), the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -145,6 +145,7 @@ The deck model is a strict isolation boundary above sessions.
 - Terminal search/find was the only survey-derived feature kept in near-term scope; it is now implemented via `QLT-110`/`QLT-111` on top of the `QLT-100` FE modularization baseline.
 - The `withfig/autocomplete`-inspired declarative command-completion architecture is now the next active near-term FE/QA block, promoted from `TODO-OUTLOOK.md` into `TODO.md` / `ROADMAP.md` as `QLT-112` ... `QLT-115`.
 - Imported docs still identify broader WebSocket-first runtime-state consistency as a real near-term structural gap beyond custom commands; that gap is now captured as queued `v0.3.0-H10` work (`QLT-116` ... `QLT-118`) instead of remaining only as a high-level review note.
+- Imported technical-alternatives notes now also land explicitly in `TODO-OUTLOOK.md` as deferred stack-evolution items (`ALT-001` ... `ALT-006`) covering backend framework adoption, structured WS protocol layering, relational persistence options, frontend framework migration, stronger state-management approaches, and build/workspace modernization.
 - Frontend active-session selection now falls back deterministically when switching decks: if current focus is outside active deck, focus moves to first session in deck (or clears when deck has no sessions).
 - Frontend slash command plane now includes deck operations (`/deck list|new|rename|switch|delete`) and session-to-deck move (`/move <sessionSelector> <deckSelector>`) with explicit deterministic feedback.
 - Slash autocomplete now includes deck subcommand and selector contexts for `/deck ...` and `/move ...` argument positions.

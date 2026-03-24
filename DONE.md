@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] The remaining `docs/*.md` technical-alternatives recommendations were reviewed and translated into explicit deferred stack-evolution backlog in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) instead of being left as prose-only options.
 - [x] `withfig/autocomplete` was added to `TODO-OUTLOOK.md` as an explicit inspiration source for deferred command-completion architecture work, yielding new medium-term backlog items for declarative completion specs, generator-backed suggestions, richer suggestion metadata, and autocomplete regression coverage (`REM-010` ... `REM-013`).
 - [x] `QLT-110` completed: active terminals now expose deterministic output search with a dedicated search row, explicit next/previous navigation, wraparound/no-match feedback, and selection/focus behavior that follows deck/session switching without mutating PTY output.
 - [x] `QLT-111` completed: regression coverage now verifies terminal search/find behavior across match navigation, wraparound, no-match state, active-session retargeting after deck switches, and buffer growth while searching.

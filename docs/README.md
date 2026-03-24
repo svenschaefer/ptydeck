@@ -85,6 +85,13 @@ Authoritative repository documents remain:
 - `Technical Alternatives Evaluation for Current Stack.md`
   - Role: decision-support note for possible stack migrations or upgrades
   - Status: reference only; no immediate implementation commitment
+  - Backlog landing:
+    - `ALT-001`
+    - `ALT-002`
+    - `ALT-003`
+    - `ALT-004`
+    - `ALT-005`
+    - `ALT-006`
   - Current interpretation:
     - keep current stack unless scalability, security isolation, or team-size pressure creates a concrete need
 
