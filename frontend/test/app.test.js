@@ -172,16 +172,32 @@ class MockTerminal {
   constructor(options = {}) {
     this.cols = 120;
     this.rows = 24;
+    this.lines = [""];
     this.writes = [];
     this.refreshCalls = [];
     this.scrollToBottomCalls = 0;
+    this.scrollToLineCalls = [];
     this.viewportSyncCalls = 0;
+    this.clearSelectionCalls = 0;
     this.scrollAreaBaseY = 0;
+    this.selected = null;
     this.options = { ...options };
     this.buffer = {
       active: {
         baseY: 0,
-        ydisp: 0
+        ydisp: 0,
+        length: 1,
+        getLine: (index) => {
+          const text = this.lines[index];
+          if (typeof text !== "string") {
+            return null;
+          }
+          return {
+            translateToString() {
+              return text;
+            }
+          };
+        }
       }
     };
     this._core = {
@@ -212,7 +228,14 @@ class MockTerminal {
 
   write(data, callback) {
     this.writes.push(data);
-    const lineBreaks = String(data).split(/\r\n|\r|\n/).length - 1;
+    const normalized = String(data).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const parts = normalized.split("\n");
+    this.lines[this.lines.length - 1] += parts[0] || "";
+    for (let index = 1; index < parts.length; index += 1) {
+      this.lines.push(parts[index] || "");
+    }
+    this.buffer.active.length = this.lines.length;
+    const lineBreaks = parts.length - 1;
     if (lineBreaks > 0) {
       this.buffer.active.baseY += lineBreaks;
       if (this.mount?.parentNode?.hidden !== true) {
@@ -241,6 +264,20 @@ class MockTerminal {
   scrollToBottom() {
     this.scrollToBottomCalls += 1;
     this.buffer.active.ydisp = Math.min(this.buffer.active.baseY, this.scrollAreaBaseY);
+  }
+
+  scrollToLine(line) {
+    this.scrollToLineCalls.push(line);
+    this.buffer.active.ydisp = line;
+  }
+
+  clearSelection() {
+    this.clearSelectionCalls += 1;
+    this.selected = null;
+  }
+
+  select(column, row, length) {
+    this.selected = { column, row, length };
   }
 
   dispose() {}
@@ -421,6 +458,11 @@ function createDocumentFixture() {
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
+  const terminalSearchInput = new FakeElement({ id: "terminal-search-input", tagName: "input" });
+  const terminalSearchPrev = new FakeElement({ id: "terminal-search-prev", tagName: "button" });
+  const terminalSearchNext = new FakeElement({ id: "terminal-search-next", tagName: "button" });
+  const terminalSearchClear = new FakeElement({ id: "terminal-search-clear", tagName: "button" });
+  const terminalSearchStatus = new FakeElement({ id: "terminal-search-status", tagName: "p" });
   const commandInlineHint = new FakeElement({ id: "command-inline-hint" });
   const commandPreview = new FakeElement({ id: "command-preview", tagName: "p" });
   const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
@@ -454,6 +496,11 @@ function createDocumentFixture() {
     emptyState,
     statusMessage,
     commandFeedback,
+    terminalSearchInput,
+    terminalSearchPrev,
+    terminalSearchNext,
+    terminalSearchClear,
+    terminalSearchStatus,
     commandInlineHint,
     commandPreview,
     commandSuggestions
@@ -482,6 +529,11 @@ function createDocumentFixture() {
       emptyState,
       statusMessage,
       commandFeedback,
+      terminalSearchInput,
+      terminalSearchPrev,
+      terminalSearchNext,
+      terminalSearchClear,
+      terminalSearchStatus,
       commandInlineHint,
       commandPreview,
       commandSuggestions
@@ -2267,4 +2319,179 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.statusMessage.textContent, "Connection state: reconnecting");
   assert.equal(listSessionsCalls, 1);
   assert.equal(win.__PTYDECK_PERF__.bootstrapRequestCount, 1);
+});
+
+test("app search tracks active terminal matches across buffer growth and deck switching", async (t) => {
+  const previousDocument = global.document;
+  const previousWindow = global.window;
+  const previousResizeObserver = global.ResizeObserver;
+  const previousWebSocket = global.WebSocket;
+  const previousFetch = global.fetch;
+
+  const fixture = createDocumentFixture();
+  MockWebSocket.instances = [];
+  MockTerminal.instances = [];
+
+  const listeners = new Map();
+  const localStorageData = new Map();
+  const deckState = [
+    {
+      id: "default",
+      name: "Default",
+      settings: { terminal: { cols: 80, rows: 20 } },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    },
+    {
+      id: "ops",
+      name: "Ops",
+      settings: { terminal: { cols: 90, rows: 25 } },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+  ];
+  const sessions = [
+    {
+      id: "s-1",
+      deckId: "default",
+      state: "active",
+      shell: "bash",
+      cwd: "~",
+      name: "one",
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    },
+    {
+      id: "s-2",
+      deckId: "ops",
+      state: "active",
+      shell: "bash",
+      cwd: "~",
+      name: "ops-node",
+      tags: ["ops"],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+  ];
+
+  const win = {
+    document: fixture.document,
+    location: {
+      protocol: "http:",
+      hostname: "127.0.0.1",
+      search: ""
+    },
+    __PTYDECK_CONFIG__: {
+      apiBaseUrl: "http://127.0.0.1:18080/api/v1",
+      wsUrl: "ws://127.0.0.1:18080/ws",
+      debugLogs: false
+    },
+    localStorage: {
+      getItem(key) {
+        return localStorageData.has(key) ? localStorageData.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageData.set(key, String(value));
+      }
+    },
+    Terminal: MockTerminal,
+    FitAddon: {
+      FitAddon: MockFitAddon
+    },
+    prompt() {
+      return null;
+    },
+    addEventListener(type, handler) {
+      const list = listeners.get(type) || [];
+      list.push(handler);
+      listeners.set(type, list);
+    },
+    dispatchEvent(event) {
+      const list = listeners.get(event.type) || [];
+      for (const handler of list) {
+        handler(event);
+      }
+    }
+  };
+
+  global.window = win;
+  global.document = fixture.document;
+  global.ResizeObserver = MockResizeObserver;
+  global.WebSocket = MockWebSocket;
+  global.fetch = async (url, options = {}) => {
+    const requestUrl = new URL(url);
+    const path = requestUrl.pathname;
+    const method = options.method || "GET";
+
+    if (path === "/api/v1/decks" && method === "GET") {
+      return makeJsonResponse(200, deckState);
+    }
+    if (path === "/api/v1/sessions" && method === "GET") {
+      return makeJsonResponse(200, sessions);
+    }
+    return makeJsonResponse(204, {});
+  };
+
+  t.after(() => {
+    try {
+      win.dispatchEvent({ type: "beforeunload" });
+    } catch {}
+    global.document = previousDocument;
+    global.window = previousWindow;
+    global.ResizeObserver = previousResizeObserver;
+    global.WebSocket = previousWebSocket;
+    global.fetch = previousFetch;
+  });
+
+  await import("../src/public/app.js?app-search-test");
+  await tick();
+  await tick();
+
+  const ws = MockWebSocket.instances[0];
+  assert.ok(ws, "expected websocket client to initialize");
+
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-1", data: "alpha one\nalpha two\n" })
+  });
+  await tick();
+
+  fixture.elements.terminalSearchInput.value = "alpha";
+  fixture.elements.terminalSearchInput.dispatchEvent({ type: "input" });
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 1/2");
+  assert.equal(MockTerminal.instances[0].selected?.row, 0);
+
+  fixture.elements.terminalSearchNext.click();
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 2/2");
+  assert.equal(MockTerminal.instances[0].selected?.row, 1);
+
+  fixture.elements.terminalSearchNext.click();
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "Wrapped to next match (Match 1/2).");
+  assert.equal(MockTerminal.instances[0].selected?.row, 0);
+
+  fixture.elements.terminalSearchInput.value = "ops";
+  fixture.elements.terminalSearchInput.dispatchEvent({ type: "input" });
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "No matches in active terminal.");
+
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops ready\n" })
+  });
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "No matches in active terminal.");
+  assert.equal(MockTerminal.instances[1].selected, null);
+
+  fixture.elements.commandInput.value = "/deck switch ops";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 1/1");
+  assert.equal(MockTerminal.instances[1].selected?.row, 0);
+
+  fixture.elements.terminalSearchClear.click();
+  await tick();
+  assert.equal(fixture.elements.terminalSearchStatus.textContent, "");
+  assert.equal(MockTerminal.instances[1].selected, null);
 });

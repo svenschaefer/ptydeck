@@ -284,6 +284,46 @@ body {
   min-width: 0;
 }
 
+.terminal-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 220px);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.terminal-search-row input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: #101924;
+  color: var(--text);
+  font-family: var(--command-composer-font-family);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.terminal-search-row button {
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.terminal-search-status {
+  margin: 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+  white-space: pre-wrap;
+}
+
+.terminal-search-status:empty {
+  display: none;
+}
+
 .command-entry-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -11,6 +11,12 @@ import {
   refreshTerminalViewport,
   syncTerminalScrollArea
 } from "./terminal-compat.js";
+import {
+  applyTerminalSearchMatch,
+  collectTerminalSearchMatches,
+  formatTerminalSearchStatus,
+  normalizeTerminalSearchQuery
+} from "./terminal-search.js";
 import { normalizeCustomCommandPayloadForShell, sendInputWithConfiguredTerminator } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createCommandSuggestionsController } from "./ui/components.js";
@@ -50,6 +56,11 @@ const commandFeedbackEl = document.getElementById("command-feedback");
 const commandInlineHintEl = document.getElementById("command-inline-hint");
 const commandPreviewEl = document.getElementById("command-preview");
 const commandSuggestionsEl = document.getElementById("command-suggestions");
+const terminalSearchInputEl = document.getElementById("terminal-search-input");
+const terminalSearchPrevBtn = document.getElementById("terminal-search-prev");
+const terminalSearchNextBtn = document.getElementById("terminal-search-next");
+const terminalSearchClearBtn = document.getElementById("terminal-search-clear");
+const terminalSearchStatusEl = document.getElementById("terminal-search-status");
 
 const terminals = new Map();
 const terminalObservers = new Map();
@@ -189,6 +200,17 @@ const uiState = {
   commandSuggestions: "",
   commandSuggestionSelectedIndex: -1
 };
+const terminalSearchState = {
+  query: "",
+  sessionId: "",
+  selectedSessionId: "",
+  matches: [],
+  activeIndex: -1,
+  revision: -1,
+  wrapped: false,
+  direction: "next",
+  missingActiveSession: false
+};
 const nowMs =
   typeof window !== "undefined" &&
   window.performance &&
@@ -259,6 +281,197 @@ function getErrorMessage(err, fallback) {
 function setCommandPreview(message) {
   uiState.commandPreview = message;
   render();
+}
+
+function clearTerminalSearchSelection(sessionId = terminalSearchState.selectedSessionId) {
+  const entry = terminals.get(sessionId);
+  if (entry && typeof entry.terminal?.clearSelection === "function") {
+    entry.terminal.clearSelection();
+  }
+  if (terminalSearchState.selectedSessionId === sessionId) {
+    terminalSearchState.selectedSessionId = "";
+  }
+}
+
+function updateTerminalSearchUi() {
+  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
+  const hasMatches = terminalSearchState.matches.length > 0;
+  const missingActiveSession = Boolean(query) && terminalSearchState.missingActiveSession;
+  const statusText = formatTerminalSearchStatus({
+    query,
+    matches: terminalSearchState.matches,
+    activeIndex: terminalSearchState.activeIndex,
+    wrapped: terminalSearchState.wrapped,
+    direction: terminalSearchState.direction,
+    missingActiveSession
+  });
+
+  if (terminalSearchInputEl && terminalSearchInputEl.value !== terminalSearchState.query) {
+    terminalSearchInputEl.value = terminalSearchState.query;
+  }
+  if (terminalSearchStatusEl) {
+    terminalSearchStatusEl.textContent = statusText;
+  }
+  if (terminalSearchPrevBtn) {
+    terminalSearchPrevBtn.disabled = !query || !hasMatches;
+  }
+  if (terminalSearchNextBtn) {
+    terminalSearchNextBtn.disabled = !query || !hasMatches;
+  }
+  if (terminalSearchClearBtn) {
+    terminalSearchClearBtn.disabled = !query;
+  }
+}
+
+function applyActiveTerminalSearchSelection() {
+  const activeSessionId = terminalSearchState.sessionId;
+  const entry = terminals.get(activeSessionId);
+  if (!entry || terminalSearchState.matches.length === 0 || terminalSearchState.activeIndex < 0) {
+    clearTerminalSearchSelection(activeSessionId);
+    updateTerminalSearchUi();
+    return;
+  }
+
+  if (terminalSearchState.selectedSessionId && terminalSearchState.selectedSessionId !== activeSessionId) {
+    clearTerminalSearchSelection(terminalSearchState.selectedSessionId);
+  }
+  applyTerminalSearchMatch(entry.terminal, terminalSearchState.matches[terminalSearchState.activeIndex]);
+  terminalSearchState.selectedSessionId = activeSessionId;
+  updateTerminalSearchUi();
+}
+
+function resetTerminalSearchState() {
+  clearTerminalSearchSelection();
+  terminalSearchState.sessionId = "";
+  terminalSearchState.matches = [];
+  terminalSearchState.activeIndex = -1;
+  terminalSearchState.revision = -1;
+  terminalSearchState.wrapped = false;
+  terminalSearchState.direction = "next";
+  terminalSearchState.missingActiveSession = false;
+}
+
+function syncActiveTerminalSearch({ preserveSelection = true } = {}) {
+  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
+  terminalSearchState.query = query;
+
+  if (!query) {
+    resetTerminalSearchState();
+    updateTerminalSearchUi();
+    return;
+  }
+
+  const activeSessionId = store.getState().activeSessionId || "";
+  if (!activeSessionId) {
+    resetTerminalSearchState();
+    terminalSearchState.query = query;
+    terminalSearchState.missingActiveSession = true;
+    updateTerminalSearchUi();
+    return;
+  }
+
+  const entry = terminals.get(activeSessionId);
+  if (!entry) {
+    resetTerminalSearchState();
+    terminalSearchState.query = query;
+    terminalSearchState.sessionId = activeSessionId;
+    terminalSearchState.missingActiveSession = true;
+    updateTerminalSearchUi();
+    return;
+  }
+
+  const revision = Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0;
+  const previousSessionId = terminalSearchState.sessionId;
+  const previousMatch =
+    preserveSelection &&
+    previousSessionId === activeSessionId &&
+    terminalSearchState.activeIndex >= 0 &&
+    terminalSearchState.matches[terminalSearchState.activeIndex]
+      ? terminalSearchState.matches[terminalSearchState.activeIndex]
+      : null;
+  const matches = collectTerminalSearchMatches(entry.terminal, query);
+  let activeIndex = -1;
+
+  if (matches.length > 0) {
+    if (previousMatch) {
+      activeIndex = matches.findIndex(
+        (match) =>
+          match.row === previousMatch.row &&
+          match.column === previousMatch.column &&
+          match.length === previousMatch.length
+      );
+    }
+    if (activeIndex < 0) {
+      activeIndex = 0;
+    }
+  }
+
+  terminalSearchState.query = query;
+  terminalSearchState.sessionId = activeSessionId;
+  terminalSearchState.matches = matches;
+  terminalSearchState.activeIndex = activeIndex;
+  terminalSearchState.revision = revision;
+  terminalSearchState.wrapped = false;
+  terminalSearchState.direction = "next";
+  terminalSearchState.missingActiveSession = false;
+  applyActiveTerminalSearchSelection();
+}
+
+function navigateActiveTerminalSearch(direction) {
+  const normalizedDirection = direction === "previous" ? "previous" : "next";
+  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
+  if (!query) {
+    updateTerminalSearchUi();
+    return;
+  }
+
+  const activeSessionId = store.getState().activeSessionId || "";
+  const entry = terminals.get(activeSessionId);
+  if (!entry) {
+    terminalSearchState.query = query;
+    terminalSearchState.missingActiveSession = true;
+    updateTerminalSearchUi();
+    return;
+  }
+
+  const revision = Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0;
+  if (
+    terminalSearchState.sessionId !== activeSessionId ||
+    terminalSearchState.query !== query ||
+    terminalSearchState.revision !== revision
+  ) {
+    syncActiveTerminalSearch({ preserveSelection: true });
+  }
+
+  if (terminalSearchState.matches.length === 0) {
+    updateTerminalSearchUi();
+    return;
+  }
+
+  let nextIndex = terminalSearchState.activeIndex;
+  if (nextIndex < 0) {
+    nextIndex = 0;
+  } else if (normalizedDirection === "previous") {
+    nextIndex -= 1;
+  } else {
+    nextIndex += 1;
+  }
+
+  let wrapped = false;
+  if (nextIndex < 0) {
+    nextIndex = terminalSearchState.matches.length - 1;
+    wrapped = true;
+  }
+  if (nextIndex >= terminalSearchState.matches.length) {
+    nextIndex = 0;
+    wrapped = true;
+  }
+
+  terminalSearchState.activeIndex = nextIndex;
+  terminalSearchState.wrapped = wrapped;
+  terminalSearchState.direction = normalizedDirection;
+  terminalSearchState.missingActiveSession = false;
+  applyActiveTerminalSearchSelection();
 }
 
 function resetCommandAutocompleteState() {
@@ -1829,6 +2042,7 @@ function render() {
   if (commandSuggestionsEl) {
     commandSuggestionsEl.textContent = uiState.commandSuggestions || "";
   }
+  syncActiveTerminalSearch({ preserveSelection: true });
 
   const activeIds = new Set(state.sessions.map((s) => s.id));
   let shouldRunResizePass = false;
@@ -1844,6 +2058,13 @@ function render() {
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
       closeSettingsDialog(entry.settingsDialog);
+      if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
+        clearTerminalSearchSelection(sessionId);
+        terminalSearchState.sessionId = "";
+        terminalSearchState.matches = [];
+        terminalSearchState.activeIndex = -1;
+        terminalSearchState.revision = -1;
+      }
       const timer = resizeTimers.get(sessionId);
       if (timer) {
         clearTimeout(timer);
@@ -2217,7 +2438,8 @@ function render() {
       settingsDirty: false,
       isVisible: initialVisible,
       pendingViewportSync: !initialVisible,
-      followOnShow: true
+      followOnShow: true,
+      searchRevision: 0
     });
     syncSessionStartupControls(terminals.get(session.id), session);
     syncSessionThemeControls(terminals.get(session.id), session.id);
@@ -2240,6 +2462,8 @@ function render() {
     shouldRunResizePass = true;
   }
 
+  syncActiveTerminalSearch({ preserveSelection: true });
+
   if (shouldRunResizePass) {
     scheduleGlobalResize();
     scheduleDeferredResizePasses();
@@ -2256,12 +2480,16 @@ function appendTerminalData(sessionId, data) {
   }
   const terminal = entry.terminal;
   terminal.write(data, () => {
+    entry.searchRevision = (Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0) + 1;
     if (entry.isVisible !== false) {
       syncTerminalScrollArea(terminal);
     }
     refreshTerminalViewport(terminal);
     if (entry.isVisible !== false) {
       syncTerminalScrollArea(terminal);
+    }
+    if (store.getState().activeSessionId === sessionId && terminalSearchState.query) {
+      syncActiveTerminalSearch({ preserveSelection: true });
     }
   });
   return true;
@@ -3311,6 +3539,41 @@ if (settingsRowsEl) {
       event.preventDefault();
       onApplySettings();
     }
+  });
+}
+if (terminalSearchInputEl) {
+  terminalSearchInputEl.addEventListener("input", () => {
+    terminalSearchState.query = terminalSearchInputEl.value || "";
+    syncActiveTerminalSearch({ preserveSelection: false });
+  });
+  terminalSearchInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      navigateActiveTerminalSearch(event.shiftKey ? "previous" : "next");
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      terminalSearchState.query = "";
+      if (terminalSearchInputEl) {
+        terminalSearchInputEl.value = "";
+      }
+      syncActiveTerminalSearch({ preserveSelection: false });
+    }
+  });
+}
+if (terminalSearchPrevBtn) {
+  terminalSearchPrevBtn.addEventListener("click", () => navigateActiveTerminalSearch("previous"));
+}
+if (terminalSearchNextBtn) {
+  terminalSearchNextBtn.addEventListener("click", () => navigateActiveTerminalSearch("next"));
+}
+if (terminalSearchClearBtn) {
+  terminalSearchClearBtn.addEventListener("click", () => {
+    terminalSearchState.query = "";
+    if (terminalSearchInputEl) {
+      terminalSearchInputEl.value = "";
+    }
+    syncActiveTerminalSearch({ preserveSelection: false });
   });
 }
 async function submitCommand() {

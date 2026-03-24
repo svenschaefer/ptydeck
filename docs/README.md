@@ -19,27 +19,28 @@ Authoritative repository documents remain:
   - Role: overall review of strengths, architectural risks, and strategic priorities
   - Still relevant:
     - WebSocket query-string token transport is still used
-    - terminal output search/find UX is still missing from current scope
   - Partially outdated:
+    - terminal output search/find UX now exists in current scope
     - explicit frontend `session.exit` handling now exists
     - frontend custom-command state is now WebSocket-first in steady state
     - xterm private internals are now isolated behind `terminal-compat`
-    - `app.js` has been partially decomposed into layered helper modules
+    - `app.js` has been decomposed into layered helper modules
     - some runtime/auth/custom-command capabilities described as missing now exist in baseline form
 
 ### 2. Frontend Architecture Refactoring
 
 - `Codebase Review - Decomposing app js into a Layered Frontend Architecture.md`
   - Role: concrete refactoring plan for breaking `app.js` into layered modules
-  - Status: partially implemented; still useful as a follow-on cleanup/reference document
+  - Status: implemented as the current FE baseline; still useful as a cleanup/reference document
   - Backlog landing:
     - `QLT-099`
+    - `QLT-100`
 
 ### 3. Explicit Session Lifecycle Modeling
 
 - `Codebase Review - Explicit Session Lifecycle Modeling.md`
   - Role: explicit session-state-machine proposal with `session.exit` focus
-  - Status: still relevant
+  - Status: implemented in current baseline and still useful as a reference for later lifecycle cleanup
   - Backlog landing:
     - `QLT-095`
     - `QLT-096`
@@ -90,7 +91,7 @@ The imported review notes reduce to these actionable themes:
 
 ### Current Scope
 
-- Add in-terminal output search/find UX.
+- None currently derived from the imported review notes.
 
 ### Deferred / Outlook
 

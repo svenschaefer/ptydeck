@@ -4,13 +4,17 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `QLT-110` completed: active terminals now expose deterministic output search with a dedicated search row, explicit next/previous navigation, wraparound/no-match feedback, and selection/focus behavior that follows deck/session switching without mutating PTY output.
+- [x] `QLT-111` completed: regression coverage now verifies terminal search/find behavior across match navigation, wraparound, no-match state, active-session retargeting after deck switches, and buffer growth while searching.
+- [x] Search state is now synchronized against the active session buffer revision so appended output updates the current result set without requiring a page refresh or manual terminal interaction.
+- [x] Validation for `QLT-110`/`QLT-111` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] `QLT-100` completed: `frontend/src/public/app.js` is now decomposed into layered helper modules (`terminal-stream`, `session-view-model`, `command-engine`, `ui/components`) while preserving current FE behavior.
 - [x] Frontend command registry/state resolution, selector/autocomplete parsing, session-view normalization, and command-suggestion rendering now live behind explicit module boundaries instead of being embedded directly in the app runtime file.
 - [x] Frontend unit coverage was expanded for the new module surfaces (`command-engine`, `session-view-model`, `terminal-stream`, `ui/components`) and frontend `build`/`lint` now syntax-check the extracted files directly.
 - [x] Validation for `QLT-100` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
 - [x] The deferred-planning document was renamed from `OUTLOOK-TODO.md` to `TODO-OUTLOOK.md`, and repository references were synchronized (`AGENTS.md`, `CODEX_CONTEXT.md`, `docs/README.md`, `TODO.md`, `DONE.md`).
 - [x] External terminal/SSH tool survey follow-up was captured as explicit medium-term backlog in `TODO-OUTLOOK.md` (`REM-001` ... `REM-009`) instead of expanding the active near-term `TODO.md` scope.
-- [x] The same external-tool survey also produced one near-term active-scope UX backlog item set in `TODO.md`/`ROADMAP.md`: terminal output search/find (`QLT-110`, `QLT-111`).
+- [x] The same external-tool survey also produced one near-term active-scope UX backlog item set in `TODO.md`/`ROADMAP.md`: terminal output search/find (`QLT-110`, `QLT-111`), which is now implemented and validated.
 - [x] `QLT-102` completed: the left sidebar now renders deck-local terminal navigation beneath each deck entry, with indented clickable session buttons and visible quick IDs alongside session names.
 - [x] `QLT-103` completed: regression coverage now verifies sidebar terminal navigation parity with `>...` quick-switching, including cross-deck auto-switch, quick-ID visibility, and active highlight updates.
 - [x] Sidebar navigation now uses the same `activateSessionTarget(...)` path as quick-switch activation instead of inventing a second focus model for deck/session selection.
