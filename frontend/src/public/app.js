@@ -1543,14 +1543,17 @@ function renderSessionPluginBadges(entry, session) {
 }
 
 function parseDurationStatusText(statusText) {
-  const match = String(statusText || "").match(/^(.*\()(\d+)s([^)]+\))$/);
+  const match = String(statusText || "").match(/^(.*\()(?:(\d+)m\s*)?(\d{1,2})s([^)]+\))$/);
   if (!match) {
     return null;
   }
+  const minutes = match[2] ? Number.parseInt(match[2], 10) : 0;
+  const secondsPart = Number.parseInt(match[3], 10);
+  const seconds = minutes * 60 + secondsPart;
   return {
     prefix: match[1],
-    seconds: Number.parseInt(match[2], 10),
-    suffix: match[3]
+    seconds,
+    suffix: match[4]
   };
 }
 

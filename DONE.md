@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Stream interpretation hardening: built-in activity detection now supports Codex-style status/timer patterns (`Status (7m 04s • esc to interrupt)`), including spinner-prefixed lines and broader active-status verbs.
+- [x] Stream interpretation now parses `Completed files ...` transfer progress lines (with optional speed) and stores normalized progress metadata via `mergeSessionMeta`.
+- [x] Frontend live status ticker now parses and increments both `22s` and `7m 04s` timer formats in working-status text.
+- [x] Added/updated frontend regression coverage for the new status/progress parser behavior in `frontend/test/stream-builtins.test.js`.
+- [x] Validation for this cycle: `npm --prefix frontend run lint` and `node --test frontend/test/stream-builtins.test.js` passed.
 - [x] `ARC-009` completed: command-execution orchestration was extracted from `frontend/src/public/app.js` into `frontend/src/public/command-executor.js`, while `command-engine` remains the parser/selector/completion boundary and custom-command registry boundary stays explicit.
 - [x] `frontend` command-layer runtime wiring now composes parser/registry/executor boundaries explicitly (`command-interpreter` + `command-engine` + `command-executor`) and keeps `app.js` focused on UI/runtime orchestration.
 - [x] Validation for `ARC-009` passed with `npm --prefix frontend run lint` and `node --test frontend/test/command-engine.test.js`; full `node --test frontend/test/app.test.js` currently times out in this sandbox (no test failure output, process watchdog cutoff), so broad FE test-suite confirmation remains a follow-up runtime-validation step outside this tool limitation.

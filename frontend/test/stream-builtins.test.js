@@ -20,6 +20,53 @@ test("activity-status plugin detects active processing output from data chunks",
   assert.deepEqual(actions[2].badges, [{ id: "working", text: "Working", tone: "active" }]);
 });
 
+test("activity-status plugin normalizes codex-style status lines with timer", () => {
+  const plugin = getPlugin("activity-status");
+  const actions = plugin.onData({}, "•Identifying a path issue (7m 04s • esc to interrupt)\n");
+
+  assert.deepEqual(
+    actions.map((action) => action.type),
+    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+  );
+  assert.equal(actions[1].value, "Identifying a path issue (7m 04s • esc to interrupt)");
+});
+
+test("activity-status plugin extracts completed-files progress with optional speed", () => {
+  const plugin = getPlugin("activity-status");
+  const actions = plugin.onData({}, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s\n");
+
+  assert.ok(Array.isArray(actions));
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].type, "mergeSessionMeta");
+  assert.deepEqual(actions[0].patch, {
+    progress: {
+      filesDone: 0,
+      filesTotal: 1,
+      bytesDone: "94.5MiB",
+      bytesTotal: "279.5MiB",
+      speed: "6.8MiB/s"
+    }
+  });
+});
+
+test("activity-status plugin extracts completed-files progress without speed", () => {
+  const plugin = getPlugin("activity-status");
+  const actions = plugin.onData({}, "⠧ Completed files 0/1 | 32.0MiB/279.5MiB\n");
+
+  assert.ok(Array.isArray(actions));
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].type, "mergeSessionMeta");
+  assert.deepEqual(actions[0].patch, {
+    progress: {
+      filesDone: 0,
+      filesTotal: 1,
+      bytesDone: "32MiB",
+      bytesTotal: "279.5MiB",
+      speed: ""
+    }
+  });
+});
+
 test("prompt-idle-recovery plugin clears working state on prompt or idle", () => {
   const plugin = getPlugin("prompt-idle-recovery");
   const session = {
