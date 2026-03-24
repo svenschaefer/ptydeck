@@ -4,6 +4,7 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Documentation governance sync pass completed: `TODO.md`, `ROADMAP.md`, and `CODEX_CONTEXT.md` now explicitly state that there is currently no active open delivery wave and no active open implementation tasks.
 - [x] Backend startup now loads local `backend/.env` / `backend/.env.local` values before config resolution, so local `AUTH_MODE=dev` setup works without manually exporting environment variables in the shell.
 - [x] Stream status interpretation was tightened to concise activity tokens (for example `Working(...)`) instead of rendering full long terminal lines in session status UI.
 - [x] Session status text moved into the existing terminal header metadata area (no dedicated extra status row under the header).

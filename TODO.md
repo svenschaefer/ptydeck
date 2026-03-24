@@ -14,6 +14,7 @@ Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
 ## Active Open Tasks (Current)
 
 - None currently.
+- `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.
 
 ## Backend Tasks (OpenAPI-based REST)
 

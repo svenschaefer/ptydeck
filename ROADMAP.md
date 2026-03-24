@@ -10,6 +10,11 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Final decision authority: `SAS` (Sven A. Schaefer, `svenschaefer`, `sven.schaefer@gmail.com`)
 - Versioning scheme: compressed pre-1.0 milestones up to `v0.3.0`
 
+## Current Execution Status
+
+- Active release wave: none currently.
+- `TODO.md` active-open list is empty; next executable wave must be promoted explicitly from `TODO-OUTLOOK.md` into `TODO.md` first.
+
 ## Dependency Rules
 
 - `BE-002` is a hard dependency for `BE-003` through `BE-010` and `FE-007`.
