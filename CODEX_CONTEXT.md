@@ -214,6 +214,7 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend UI decomposition for `v0.4.0-H2` is now underway: deck/sidebar rendering is extracted to `ui/deck-sidebar-controller.js` and session-card metadata/status/settings-state rendering concerns are extracted to `ui/session-card-meta-controller.js`, with `app.js` consuming these controller boundaries.
 - Frontend layout/settings synchronization is now extracted to `ui/layout-settings-controller.js` (sidebar visibility UI sync, terminal geometry CSS sizing, and settings-form read path), further reducing direct UI concerns embedded in `app.js`.
 - Frontend session settings dialog interactions are now extracted to `ui/session-settings-dialog-controller.js` (open/close/toggle and delete-confirm flows), further shrinking inline dialog orchestration in `app.js`.
+- Frontend deck create/rename/delete action orchestration is now extracted to `ui/deck-actions-controller.js`, reducing prompt/confirm-driven UI flow logic embedded directly in `app.js`.
 - Backend now persists global custom commands and exposes OpenAPI-backed CRUD endpoints at `/api/v1/custom-commands` and `/api/v1/custom-commands/{commandName}`.
 - Persistence format now supports runtime state object storage (`sessions` + `customCommands`) with backward-compatible restore from legacy session-array snapshots.
 - Backend custom-command guardrails now enforce reserved system-command collision rejection, name regex, max name length, max content length, and max command count with explicit API errors.

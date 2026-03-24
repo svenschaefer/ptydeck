@@ -31,6 +31,7 @@ import {
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createCommandSuggestionsController } from "./ui/components.js";
+import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -273,6 +274,7 @@ let commandEngine = null;
 let commandExecutor = null;
 let commandSuggestionsController = null;
 let deckSidebarController = null;
+let deckActionsController = null;
 let sessionCardMetaController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
@@ -1897,104 +1899,24 @@ function setActiveDeck(deckId) {
 }
 
 async function createDeckFlow() {
-  if (!window || typeof window.prompt !== "function") {
+  if (!deckActionsController) {
     return;
   }
-  const input = window.prompt("Deck name", "New Deck");
-  if (input === null) {
-    return;
-  }
-  const name = input.trim();
-  if (!name) {
-    setError("Deck name cannot be empty.");
-    return;
-  }
-  const created = await api.createDeck({
-    name,
-    settings: {
-      terminal: {
-        cols: terminalSettings.cols,
-        rows: terminalSettings.rows
-      }
-    }
-  });
-  applyRuntimeEvent(
-    {
-      type: "deck.created",
-      deck: created
-    },
-    { preferredActiveDeckId: created.id }
-  );
-  setCommandFeedback(`Created deck '${created.name}'.`);
+  await deckActionsController.createDeckFlow();
 }
 
 async function renameDeckFlow() {
-  const activeDeck = getActiveDeck();
-  if (!activeDeck) {
-    setError("No active deck to rename.");
+  if (!deckActionsController) {
     return;
   }
-  if (!window || typeof window.prompt !== "function") {
-    return;
-  }
-  const input = window.prompt("Deck name", activeDeck.name || activeDeck.id);
-  if (input === null) {
-    return;
-  }
-  const name = input.trim();
-  if (!name) {
-    setError("Deck name cannot be empty.");
-    return;
-  }
-  const updated = await api.updateDeck(activeDeck.id, { name });
-  applyRuntimeEvent(
-    {
-      type: "deck.updated",
-      deck: updated
-    },
-    { preferredActiveDeckId: updated.id }
-  );
-  setCommandFeedback(`Renamed deck to '${updated.name}'.`);
+  await deckActionsController.renameDeckFlow();
 }
 
 async function deleteDeckFlow() {
-  const activeDeck = getActiveDeck();
-  if (!activeDeck) {
-    setError("No active deck to delete.");
+  if (!deckActionsController) {
     return;
   }
-  if (!window || typeof window.confirm !== "function") {
-    return;
-  }
-  const confirmed = window.confirm(`Delete deck '${activeDeck.name}'?`);
-  if (!confirmed) {
-    return;
-  }
-  try {
-    await api.deleteDeck(activeDeck.id, { force: false });
-  } catch (err) {
-    if (err && err.status === 409) {
-      const forceConfirmed = window.confirm(
-        `Deck '${activeDeck.name}' still contains sessions. Force delete and move sessions to default deck?`
-      );
-      if (!forceConfirmed) {
-        return;
-      }
-      await api.deleteDeck(activeDeck.id, { force: true });
-    } else {
-      throw err;
-    }
-  }
-  const fallbackId = store.getState().decks.find((deck) => deck.id !== activeDeck.id)?.id || DEFAULT_DECK_ID;
-  applyRuntimeEvent(
-    {
-      type: "deck.deleted",
-      deckId: activeDeck.id,
-      fallbackDeckId: fallbackId
-    },
-    { preferredActiveDeckId: fallbackId }
-  );
-  setCommandFeedback(`Deleted deck '${activeDeck.name}'.`);
+  await deckActionsController.deleteDeckFlow();
 }
 
 function render() {
@@ -2764,6 +2686,18 @@ layoutSettingsController = createLayoutSettingsController({
 
 sessionSettingsDialogController = createSessionSettingsDialogController({
   windowRef: window
+});
+
+deckActionsController = createDeckActionsController({
+  windowRef: window,
+  api,
+  getActiveDeck,
+  getDecks: () => store.getState().decks,
+  getTerminalSettings: () => terminalSettings,
+  applyRuntimeEvent,
+  setCommandFeedback,
+  setError,
+  defaultDeckId: DEFAULT_DECK_ID
 });
 
 deckSidebarController = createDeckSidebarController({
