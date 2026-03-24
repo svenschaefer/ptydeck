@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] Promoted the next execution block from `TODO-OUTLOOK.md` into active planning as `v0.4.0-H1` (Observability Expansion): `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
+- [x] Synced planning separation after promotion: `TODO.md` now defines explicit open observability tasks and `ROADMAP.md` now defines the corresponding order/dependencies/exit criteria for `v0.4.0-H1`.
 - [x] Frontend session-status UX hotfix: `Working(...s • esc to interrupt)` countdown text now updates every second client-side while the session remains in `working` interpretation state, instead of only changing on sparse incoming output chunks.
 - [x] Added app-level regression coverage for live status ticking so working-status seconds continue to increment without requiring new terminal output events.
 - [x] Frontend auth resilience hotfix: API calls now auto-recover once on `401 Unauthorized` by refreshing the dev token and retrying the original request (excluding `/auth/*` endpoints), so transient token expiry no longer requires a full page reload for terminal input to work again.

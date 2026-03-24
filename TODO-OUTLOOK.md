@@ -50,7 +50,8 @@ Deferred from `TODO.md` scope (explicit backlog items):
 
 ## Observability
 
-- [ ] Add metrics for session lifecycle and connection quality.
+- Promoted to active delivery (`v0.4.0-H1` in `TODO.md` / `ROADMAP.md`):
+  - `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`
 - [ ] Add distributed tracing across REST, WS, and PTY pathways.
 
 ## Extensibility

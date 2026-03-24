@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- `TODO.md` active-open list is empty; next executable wave must be promoted explicitly from `TODO-OUTLOOK.md` into `TODO.md` first.
+- Active release wave: `v0.4.0-H1` (Observability Expansion).
+- Active scoped tasks: `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`.
 
 ## Dependency Rules
 
@@ -635,6 +635,26 @@ Exit criteria:
 - Dev-token issuance is explicitly gated to development mode and unavailable in production mode.
 - Runtime configuration rejects insecure production auth combinations deterministically.
 - Regression coverage protects token-transport hardening, auth-mode gating, and token-leak prevention in observable client/runtime surfaces.
+
+### v0.4.0-H1 - Observability Expansion
+
+- `OBS-001`
+- `OBS-002`
+- `OBS-003`
+- `OBS-004`
+
+Dependencies:
+
+- `OBS-002` depends on `OBS-001` so derived latency/quality aggregations are built on top of stable metric naming and lifecycle signal definitions.
+- `OBS-003` depends on `OBS-001` and `OBS-002` so deployment guidance and dashboard/alert recommendations reflect actual emitted metric contracts.
+- `OBS-004` depends on `OBS-001` and `OBS-002`, and should run alongside `OBS-003` to lock the documented metric surface to tested runtime behavior.
+
+Exit criteria:
+
+- Backend `/metrics` exposes explicit lifecycle and connection-quality signals with stable names.
+- REST and WS quality signals include bounded latency/reconnect/error visibility suitable for local operations.
+- Deployment/quality-gate docs define a concrete observability baseline for scrape, panel, and alert wiring.
+- Regression coverage guards observability contract stability and runtime counter/gauge behavior.
 
 ### Completed Items
 
