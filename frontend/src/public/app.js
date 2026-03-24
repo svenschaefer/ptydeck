@@ -18,7 +18,11 @@ import {
   formatTerminalSearchStatus,
   normalizeTerminalSearchQuery
 } from "./terminal-search.js";
-import { normalizeCustomCommandPayloadForShell, sendInputWithConfiguredTerminator } from "./terminal-stream.js";
+import {
+  createSessionStreamAdapter,
+  normalizeCustomCommandPayloadForShell,
+  sendInputWithConfiguredTerminator
+} from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createCommandSuggestionsController } from "./ui/components.js";
 
@@ -66,7 +70,6 @@ const terminalSearchStatusEl = document.getElementById("terminal-search-status")
 const terminals = new Map();
 const terminalObservers = new Map();
 const resizeTimers = new Map();
-const activityQuietTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
 let globalResizeTimer = null;
@@ -100,6 +103,16 @@ const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
+const streamAdapter = createSessionStreamAdapter({
+  idleMs: SESSION_ACTIVITY_QUIET_MS,
+  onData(sessionId, chunk) {
+    appendTerminalChunk(sessionId, chunk);
+    markSessionActivity(sessionId);
+  },
+  onIdle(sessionId) {
+    store.clearSessionActivity(sessionId);
+  }
+});
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -1273,28 +1286,9 @@ function setSessionCardVisibility(node, visible) {
   node.style.display = visible ? "" : "none";
 }
 
-function clearSessionActivityQuietTimer(sessionId) {
-  const timer = activityQuietTimers.get(sessionId);
-  if (!timer) {
-    return;
-  }
-  clearTimeout(timer);
-  activityQuietTimers.delete(sessionId);
-}
-
-function scheduleSessionActivityQuiet(sessionId, timestamp) {
-  clearSessionActivityQuietTimer(sessionId);
-  const timer = setTimeout(() => {
-    activityQuietTimers.delete(sessionId);
-    store.clearSessionActivity(sessionId, { timestamp });
-  }, SESSION_ACTIVITY_QUIET_MS);
-  activityQuietTimers.set(sessionId, timer);
-}
-
 function markSessionActivity(sessionId) {
   const timestamp = Date.now();
   store.markSessionActivity(sessionId, { timestamp });
-  scheduleSessionActivityQuiet(sessionId, timestamp);
 }
 
 function syncTerminalViewportAfterShow(sessionId, entry) {
@@ -2158,7 +2152,7 @@ function render() {
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
       closeSettingsDialog(entry.settingsDialog);
-      clearSessionActivityQuietTimer(sessionId);
+      streamAdapter.disposeSession(sessionId);
       if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
         clearTerminalSearchSelection(sessionId);
         terminalSearchState.sessionId = "";
@@ -2571,7 +2565,7 @@ function render() {
   }
 }
 
-function appendTerminalData(sessionId, data) {
+function appendTerminalChunk(sessionId, data) {
   const entry = terminals.get(sessionId);
   if (!entry || typeof data !== "string" || data.length === 0) {
     return false;
@@ -2611,7 +2605,7 @@ function replaySnapshotOutputs(outputs, attempt = 0) {
       missing += 1;
       continue;
     }
-    appendTerminalData(entry.sessionId, entry.data);
+    streamAdapter.push(entry.sessionId, entry.data);
   }
 
   if (missing > 0 && attempt < 4) {
@@ -2634,7 +2628,7 @@ function markSessionExited(sessionId, exitDetails = {}) {
     exitedAt: Date.now(),
     updatedAt: Date.now()
   });
-  clearSessionActivityQuietTimer(sessionId);
+  streamAdapter.disposeSession(sessionId);
   store.clearSessionActivity(sessionId);
   const nextSession = getSessionById(sessionId);
   if (store.getState().activeSessionId === sessionId) {
@@ -3620,7 +3614,7 @@ function startWs() {
     onMessage(event) {
       debugLog("ws.event", { type: event.type, sessionId: event.sessionId || null });
       if (event.type === "session.data" && terminals.has(event.sessionId)) {
-        appendTerminalData(event.sessionId, event.data);
+        streamAdapter.push(event.sessionId, event.data);
         return;
       }
 

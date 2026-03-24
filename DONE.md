@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-24
 
+- [x] `ARC-003` completed: frontend PTY output now flows through a dedicated session-scoped stream adapter in `frontend/src/public/terminal-stream.js` before reaching terminal rendering, instead of sending raw WebSocket chunks straight into `app.js`.
+- [x] The stream adapter now normalizes per-session `onData`, `onLine`, and `onIdle` callbacks with deterministic chunk-boundary line reconstruction, carriage-return overwrite handling, ANSI-stripping option support for line consumers, and isolated idle timers per session.
+- [x] Frontend runtime wiring now uses the stream adapter for both live `session.data` WebSocket events and snapshot output replay, while terminal rendering behavior remains unchanged through the adapter's `onData` callback path.
+- [x] Regression coverage now exists for stream-adapter chunk reconstruction, carriage-return overwrite semantics, ANSI-stripped line emission, and per-session idle-timer isolation.
+- [x] Validation for `ARC-003` passed: `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm --prefix frontend run test:coverage`.
 - [x] `LIF-002` completed: frontend runtime state now models explicit session lifecycle via reducer-backed `lifecycleState` (`starting`, `running`, `busy`, `idle`, `exited`, `closed`) instead of treating all non-exited sessions as one generic active state.
 - [x] `LIF-003` completed: derived activity-state handling now promotes running sessions into `busy` and `idle` deterministically from normalized output activity without conflating backend startup/running state with UI-only heuristics.
 - [x] `LIF-004` completed: regression coverage now protects ordered lifecycle transitions, reconnect-style snapshot replacement, explicit closed-vs-exited handling, sidebar activation under background output churn, and invalid post-exit interaction guardrails.

@@ -60,7 +60,7 @@ Authoritative repository documents remain:
     - both documents describe the same architectural direction
     - `Frontend Plugin System for Terminal Stream Interpretation.md` is the more complete implementation-oriented version
     - `Codebase Review - Frontend Plugin & Stream Interpretation Layer.md` is still useful as review framing, but not the canonical detailed proposal
-  - Status: mid/long-term relevant, not current-scope delivery
+  - Status: partially implemented in the near-term baseline; the stream-adapter foundation (`ARC-003`) now exists, while the plugin engine/action/artifact layers remain current-scope follow-up work
   - Backlog landing:
     - `ARC-001`
     - `ARC-003`
@@ -115,7 +115,7 @@ The imported review notes reduce to these actionable themes:
 ### Current Scope
 
 - The explicit session lifecycle formalization slice is now completed in the baseline (`LIF-001` ... `LIF-006`).
-- The next imported-doc-derived near-term block is now `v0.3.0-H13`, covering stream normalization plus declarative stream-interpretation/plugin plumbing (`ARC-003` ... `ARC-008`).
+- The current imported-doc-derived near-term block is `v0.3.0-H13`; its stream-normalization foundation (`ARC-003`) is now completed, and the remaining current-scope work continues with declarative plugin/action plumbing (`ARC-004` ... `ARC-008`).
 
 ### Deferred / Outlook
 

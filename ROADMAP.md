@@ -531,6 +531,18 @@ Exit criteria:
 - `ARC-007`
 - `ARC-008`
 
+Completed in this milestone so far:
+
+- `ARC-003`
+
+Remaining in this milestone:
+
+- `ARC-004`
+- `ARC-005`
+- `ARC-006`
+- `ARC-007`
+- `ARC-008`
+
 Dependencies:
 
 - `ARC-003` depends on `QLT-100`, `QLT-119` ... `QLT-122`, and `LIF-002` ... `LIF-004` so stream normalization lands on top of the decomposed frontend runtime, reducer-backed state flow, and explicit lifecycle/activity semantics.
@@ -558,7 +570,6 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- `ARC-003`
 - `ARC-004`
 - `ARC-005`
 - `ARC-006`

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  createSessionStreamAdapter,
   normalizeCustomCommandPayloadForShell,
   sendInputWithConfiguredTerminator,
   withSingleTrailingNewline
@@ -34,4 +35,93 @@ test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mod
 test("normalizeCustomCommandPayloadForShell escapes only unmatched single quotes", () => {
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'unterminated"), "echo \\'unterminated");
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'ok'"), "echo 'ok'");
+});
+
+test("createSessionStreamAdapter reconstructs lines across chunk boundaries", async () => {
+  const events = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    onData(sessionId, chunk) {
+      events.push(["data", sessionId, chunk]);
+    },
+    onLine(sessionId, line) {
+      events.push(["line", sessionId, line]);
+    },
+    onIdle(sessionId) {
+      events.push(["idle", sessionId]);
+    }
+  });
+
+  adapter.push("s1", "alpha");
+  adapter.push("s1", " beta\ncharlie");
+  adapter.push("s1", "\n");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(events, [
+    ["data", "s1", "alpha"],
+    ["data", "s1", " beta\ncharlie"],
+    ["line", "s1", "alpha beta"],
+    ["data", "s1", "\n"],
+    ["line", "s1", "charlie"],
+    ["idle", "s1"]
+  ]);
+});
+
+test("createSessionStreamAdapter applies carriage return overwrite semantics", async () => {
+  const lines = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    onLine(_sessionId, line) {
+      lines.push(line);
+    }
+  });
+
+  adapter.push("s1", "Working 1");
+  adapter.push("s1", "\rWorking 2");
+  adapter.push("s1", "\rDone\n");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(lines, ["Done"]);
+  assert.equal(adapter.getPendingLine("s1"), "");
+});
+
+test("createSessionStreamAdapter can strip ANSI codes for emitted lines", async () => {
+  const lines = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    stripAnsiForLines: true,
+    onLine(_sessionId, line) {
+      lines.push(line);
+    }
+  });
+
+  adapter.push("s1", "\u001b[31mred\u001b[0m\n");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(lines, ["red"]);
+});
+
+test("createSessionStreamAdapter isolates pending lines and idle timers per session", async () => {
+  const events = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    onLine(sessionId, line) {
+      events.push(["line", sessionId, line]);
+    },
+    onIdle(sessionId) {
+      events.push(["idle", sessionId]);
+    }
+  });
+
+  adapter.push("s1", "alpha");
+  adapter.push("s2", "bravo\n");
+  adapter.push("s1", "\n");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(events, [
+    ["line", "s2", "bravo"],
+    ["line", "s1", "alpha"],
+    ["idle", "s2"],
+    ["idle", "s1"]
+  ]);
 });

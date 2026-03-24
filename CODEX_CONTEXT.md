@@ -1,8 +1,8 @@
 # CODEX_CONTEXT - ptydeck
 
-Last updated: 2026-03-24 (H12 completed; H13 stream-interpretation foundation promoted)
+Last updated: 2026-03-24 (H12 completed; H13 stream-adapter foundation started)
 Owner: `CODY`
-Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), completion of the explicit lifecycle-state-model block (`LIF-001` ... `LIF-006`), promotion of the stream-interpretation/plugin follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13`, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
+Documentation sync status: all repository markdown files reviewed and aligned on 2026-03-24, including `docs/` review-note consolidation, TODO/ROADMAP separation validation, explicit open-task ownership sync, completion sync for `QLT-095`/`QLT-096`, `QLT-097`/`QLT-098`, `QLT-099`, `QLT-100`, `QLT-101`/`QLT-104`/`QLT-105`/`QLT-106`/`QLT-107`, hidden-scroll recovery closure for `QLT-108`/`QLT-109`, `QLT-110`/`QLT-111` terminal search completion, completion sync for the declarative autocomplete milestone (`QLT-112` ... `QLT-115`), completion sync for runtime metadata event consistency (`QLT-116` ... `QLT-118`), closure of the runtime store and contract hardening block (`QLT-119` ... `QLT-122`), completion of the explicit lifecycle-state-model block (`LIF-001` ... `LIF-006`), promotion of the stream-interpretation/plugin follow-up into `TODO.md` / `ROADMAP.md` as `v0.3.0-H13`, completion of `ARC-003` stream-adapter foundation, explicit decomposition of deferred plugin/stream-interpretation architecture into implementable `ARC-003` ... `ARC-008` subtasks, the `TODO-OUTLOOK.md` filename correction, and docs-derived deferred stack-evolution capture in `TODO-OUTLOOK.md` (`ALT-001` ... `ALT-006`) alongside deferred `REM-001` ... `REM-009`.
 
 ## Project Purpose
 
@@ -143,13 +143,14 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend session-state UI now exposes an explicit `STARTING` badge/hint while preserving existing `UNRESTORED` and `EXITED` guardrail behavior.
 - Frontend sidebar deck/session buttons now surface subtle runtime activity indicators: animated live output while activity is happening, then a sticky unseen marker until the session becomes active.
 - Sidebar activity handling no longer republishes redundant store updates for every background-output chunk once a session is already in live-activity state, reducing unnecessary sidebar rerenders and improving sidebar click responsiveness under output churn.
-- The next near-term block is now `v0.3.0-H13` (`ARC-003` ... `ARC-008`), focused on normalized stream adaptation, deterministic plugin registration, declarative interpretation actions, and built-in stream-derived status/artifact extraction.
+- `ARC-003` is now completed: PTY chunk handling passes through a dedicated session-scoped stream adapter that emits deterministic `onData`, `onLine`, and `onIdle` callbacks with carriage-return overwrite handling, chunk-boundary line reconstruction, and optional ANSI stripping for line consumers.
+- The active near-term block remains `v0.3.0-H13`, now focused on the remaining plugin/action layers (`ARC-004` ... `ARC-008`) on top of the completed stream-adapter boundary.
 - Planned next-step navigation UX now includes `>selector` quick-switch commands that auto-switch decks when needed, direct `>` deck targeting with autocomplete, broader `/...` and `>...` autocomplete coverage, unified `>` selector grammar with `/switch`, and sidebar terminal-entry buttons under each deck section with visible quick IDs.
 - Frontend quick-switch baseline is now implemented: `>selector` activates sessions across decks, `>deckSelector` activates decks directly, `>deckSelector::sessionSelector` performs explicit cross-deck session targeting, and inline preview/ambiguity feedback is rendered in the composer before submit.
 - Hidden-session output recovery is now hardened: when invisible terminals receive background output, show-time recovery explicitly resynchronizes xterm scroll area plus repaint/resize passes so bottom content remains reachable without manual interaction.
 - Frontend app runtime has now been split across explicit helper layers: `frontend/src/public/terminal-stream.js`, `frontend/src/public/session-view-model.js`, `frontend/src/public/command-engine.js`, and `frontend/src/public/ui/components.js`, with `app.js` acting as orchestration glue instead of owning those concerns inline.
 - Security/auth hardening items confirmed by docs review but kept out of near-term scope are tracked in `TODO-OUTLOOK.md` (`ENT-026`, `ENT-027`).
-- Stream/plugin architecture remains deferred in `TODO-OUTLOOK.md` (`ARC-001`, `ARC-003` ... `ARC-008`); the near-term runtime store and WebSocket-authoritative hardening slice (`v0.3.0-H11`, `QLT-119` ... `QLT-122`) is now completed, while the broader post-H11 continuation remains deferred as `ARC-002`.
+- Broader stream/plugin architecture remains deferred in `TODO-OUTLOOK.md` as `ARC-001` and `ARC-002`, while the near-term implementation slice has been promoted into `v0.3.0-H13` and now has its stream-adapter foundation (`ARC-003`) completed.
 - External terminal/SSH tool survey follow-up remains intentionally deferred to `TODO-OUTLOOK.md` as explicit medium-term backlog (`REM-001` ... `REM-009`) covering SSH session kinds, auth/trust, saved connection profiles, remote-session reconnect semantics, controlled file transfer, sharing/read-only mode, and theme import/export compatibility.
 - Terminal search/find was the only survey-derived feature kept in near-term scope; it is now implemented via `QLT-110`/`QLT-111` on top of the `QLT-100` FE modularization baseline.
 - The `withfig/autocomplete`-inspired declarative command-completion architecture is now implemented through `frontend/src/public/command-completion.js`, declarative slash-command specs, cached contextual providers, and richer inline suggestion metadata (`QLT-112` ... `QLT-115`).
@@ -278,7 +279,8 @@ The deck model is a strict isolation boundary above sessions.
   - Planned next in cycle M (`v0.3.0-H11`): none.
   - Completed in cycle N so far (`v0.3.0-H12`): `LIF-001`, `LIF-005`, `LIF-006`.
   - Completed in cycle N (`v0.3.0-H12`): `LIF-001`, `LIF-002`, `LIF-003`, `LIF-004`, `LIF-005`, `LIF-006`.
-  - Planned next in cycle N (`v0.3.0-H13`): `ARC-003`, `ARC-004`, `ARC-005`, `ARC-006`, `ARC-007`, `ARC-008`.
+  - Completed in cycle O so far (`v0.3.0-H13`): `ARC-003`.
+  - Planned next in cycle O (`v0.3.0-H13`): `ARC-004`, `ARC-005`, `ARC-006`, `ARC-007`, `ARC-008`.
 
 ## Session Behavior Notes
 
