@@ -18,6 +18,7 @@ test("session-disposal controller cleans removed sessions and related runtime st
     [
       "s1",
       {
+        disposeClipboardBindings: () => calls.push("clipboard.dispose"),
         terminal: { dispose: () => calls.push("terminal.dispose") },
         element: { remove: () => calls.push("element.remove") },
         settingsDialog: { open: true }
@@ -74,6 +75,7 @@ test("session-disposal controller cleans removed sessions and related runtime st
   assert.equal(terminalSearchState.sessionId, "");
   assert.equal(terminalSearchState.activeIndex, -1);
   assert.deepEqual(calls.includes("observer.disconnect"), true);
+  assert.deepEqual(calls.includes("clipboard.dispose"), true);
   assert.deepEqual(calls.includes("terminal.dispose"), true);
   assert.deepEqual(calls.includes("search.clear:s1"), true);
   assert.deepEqual(calls.includes("status:s1"), true);

@@ -13,7 +13,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics).
-- Active scoped tasks (`H3`): `QLT-123`, `QLT-124`.
+- Active scoped tasks (`H3`): `QLT-124`.
+- Completed in active wave so far: `QLT-123`.
 - Previous completed wave: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Previous completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -600,18 +601,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.3.0-H15`
-- Next milestone in progress: `v0.4.0-H2` (Layered Frontend Architecture Completion)
-- Queued next milestone: `v0.4.0-H3` (Terminal Interaction Ergonomics)
+- Latest completed milestone: `v0.4.0-H2` (Layered Frontend Architecture Completion)
+- Next milestone in progress: `v0.4.0-H3` (Terminal Interaction Ergonomics)
+- Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `ARC-010` Owner: `FE`
-- `ARC-011` Owner: `FE`
-- `ARC-012` Owner: `QA`
-- `QLT-123` Owner: `FE` (queued for `v0.4.0-H3`)
-- `QLT-124` Owner: `FE` (queued for `v0.4.0-H3`)
+- `QLT-124` Owner: `FE`
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -721,17 +718,16 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
+- `QLT-123`
 
 Remaining in this milestone:
 
-- `QLT-123`
 - `QLT-124`
 
 Dependencies:
 
-- `QLT-123` should run after `ARC-010` so copy/paste interaction handling can be integrated on top of cleaner UI boundaries instead of deepening `app.js` coupling.
-- `QLT-124` should run after `ARC-010` and alongside `QLT-123` so terminal-header UX/layout improvements align with the same interaction model and avoid duplicate churn in session-card wiring.
+- `QLT-123` ran after `ARC-010` so copy/paste interaction handling could be integrated on top of cleaner UI boundaries instead of deepening `app.js` coupling.
+- `QLT-124` should run after `QLT-123` so terminal-header UX/layout improvements align with the finalized interaction model and avoid duplicate churn in session-card wiring.
 
 Exit criteria:
 

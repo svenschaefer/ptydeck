@@ -1,5 +1,6 @@
 export function createSessionTerminalRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const navigatorRef = options.navigatorRef || windowRef.navigator || globalThis.navigator || null;
   const ResizeObserverCtor =
     typeof windowRef.ResizeObserver === "function" ? windowRef.ResizeObserver : globalThis.ResizeObserver;
   const setTimeoutFn =
@@ -10,6 +11,113 @@ export function createSessionTerminalRuntimeController(options = {}) {
   const terminalLineHeight = Number(options.terminalLineHeight) || 1.2;
   const terminalFontFamily = String(options.terminalFontFamily || "monospace");
   const debugLog = options.debugLog || (() => {});
+  const writeClipboardText =
+    typeof options.writeClipboardText === "function"
+      ? options.writeClipboardText
+      : async (text) => {
+          if (!navigatorRef?.clipboard || typeof navigatorRef.clipboard.writeText !== "function") {
+            return false;
+          }
+          await navigatorRef.clipboard.writeText(String(text ?? ""));
+          return true;
+        };
+  const readClipboardText =
+    typeof options.readClipboardText === "function"
+      ? options.readClipboardText
+      : async () => {
+          if (!navigatorRef?.clipboard || typeof navigatorRef.clipboard.readText !== "function") {
+            return "";
+          }
+          const text = await navigatorRef.clipboard.readText();
+          return typeof text === "string" ? text : String(text ?? "");
+        };
+
+  function getTerminalSelection(terminal) {
+    if (!terminal) {
+      return "";
+    }
+    if (typeof terminal.getSelection === "function") {
+      const selection = terminal.getSelection();
+      return typeof selection === "string" ? selection : String(selection ?? "");
+    }
+    return "";
+  }
+
+  function hasTerminalSelection(terminal) {
+    if (!terminal) {
+      return false;
+    }
+    if (typeof terminal.hasSelection === "function") {
+      return terminal.hasSelection() === true;
+    }
+    return getTerminalSelection(terminal).length > 0;
+  }
+
+  function bindTerminalClipboardInteractions({ session, mount, terminal, onTerminalData }) {
+    if (!mount || typeof mount.addEventListener !== "function") {
+      return () => {};
+    }
+
+    const handleKeydown = (event) => {
+      if (!event || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (!hasTerminalSelection(terminal)) {
+        return;
+      }
+      const selection = getTerminalSelection(terminal);
+      if (!selection) {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      Promise.resolve(writeClipboardText(selection))
+        .then((copied) => {
+          if (copied) {
+            debugLog("clipboard.copy.terminal", { sessionId: session.id, length: selection.length });
+          }
+        })
+        .catch(() => {});
+    };
+
+    const handleMiddleMouseDown = (event) => {
+      if (!event || event.button !== 1) {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      Promise.resolve(readClipboardText())
+        .then((text) => {
+          if (!text) {
+            return;
+          }
+          terminal.focus?.();
+          onTerminalData(session.id, text);
+          debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length });
+        })
+        .catch(() => {});
+    };
+
+    const handleAuxClick = (event) => {
+      if (!event || event.button !== 1) {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
+    };
+
+    mount.addEventListener("keydown", handleKeydown, true);
+    mount.addEventListener("mousedown", handleMiddleMouseDown);
+    mount.addEventListener("auxclick", handleAuxClick);
+
+    return () => {
+      if (typeof mount.removeEventListener === "function") {
+        mount.removeEventListener("keydown", handleKeydown, true);
+        mount.removeEventListener("mousedown", handleMiddleMouseDown);
+        mount.removeEventListener("auxclick", handleAuxClick);
+      }
+    };
+  }
 
   function mountSessionTerminalCard(args = {}) {
     const session = args.session;
@@ -40,6 +148,12 @@ export function createSessionTerminalRuntimeController(options = {}) {
     terminal.open(refs.mount);
     terminal.onData((data) => {
       onTerminalData(session.id, data);
+    });
+    const disposeClipboardBindings = bindTerminalClipboardInteractions({
+      session,
+      mount: refs.mount,
+      terminal,
+      onTerminalData
     });
 
     const entry = {
@@ -77,7 +191,8 @@ export function createSessionTerminalRuntimeController(options = {}) {
       followOnShow: true,
       searchRevision: 0,
       artifactRenderKey: "",
-      dismissedArtifactKey: ""
+      dismissedArtifactKey: "",
+      disposeClipboardBindings
     };
     terminals.set(session.id, entry);
     afterEntryRegistered(entry, session);

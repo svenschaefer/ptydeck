@@ -7,6 +7,9 @@ class FakeInput {
   constructor() {
     this.value = "";
     this.listeners = new Map();
+    this.selectionStart = 0;
+    this.selectionEnd = 0;
+    this.focusCalls = 0;
   }
 
   addEventListener(type, handler) {
@@ -26,6 +29,28 @@ class FakeInput {
     for (const handler of handlers) {
       handler(event);
     }
+  }
+
+  focus() {
+    this.focusCalls += 1;
+  }
+
+  setSelectionRange(start, end) {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+  }
+
+  setRangeText(text, start, end, selectionMode = "end") {
+    const replacement = String(text ?? "");
+    this.value = `${this.value.slice(0, start)}${replacement}${this.value.slice(end)}`;
+    const nextCursor = start + replacement.length;
+    if (selectionMode === "select") {
+      this.selectionStart = start;
+      this.selectionEnd = nextCursor;
+      return;
+    }
+    this.selectionStart = nextCursor;
+    this.selectionEnd = nextCursor;
   }
 }
 
@@ -86,6 +111,21 @@ function createKeyEvent(key, options = {}) {
     defaultPrevented: false,
     preventDefault() {
       this.defaultPrevented = true;
+    }
+  };
+}
+
+function createMouseEvent(type, button) {
+  return {
+    type,
+    button,
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
     }
   };
 }
@@ -216,4 +256,49 @@ test("command-composer autocomplete controller replays slash history and guards 
   await Promise.resolve();
   assert.equal(allowedRepeat.defaultPrevented, true);
   assert.equal(submitCalls, 1);
+});
+
+test("command-composer autocomplete controller copies the selected input text on plain Enter", async () => {
+  const commandInput = new FakeInput();
+  commandInput.value = "echo selected text";
+  commandInput.setSelectionRange(5, 13);
+  const clipboardWrites = [];
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+
+  controller.bindUiEvents();
+  const enterEvent = createKeyEvent("Enter");
+  commandInput.dispatchEvent(enterEvent);
+  await Promise.resolve();
+
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["selected"]);
+});
+
+test("command-composer autocomplete controller pastes system clipboard text on middle click", async () => {
+  const commandInput = new FakeInput();
+  commandInput.value = "/help";
+  commandInput.setSelectionRange(5, 5);
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    readClipboardText: async () => " --verbose"
+  });
+
+  controller.bindUiEvents();
+  const middleDown = createMouseEvent("mousedown", 1);
+  commandInput.dispatchEvent(middleDown);
+  await Promise.resolve();
+
+  assert.equal(middleDown.defaultPrevented, true);
+  assert.equal(commandInput.value, "/help --verbose");
+  assert.equal(commandInput.focusCalls, 1);
 });

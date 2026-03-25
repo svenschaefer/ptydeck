@@ -20,6 +20,7 @@ export function createSessionDisposalController(options = {}) {
       }
       const entry = terminals.get(sessionId);
       const observer = terminalObservers.get(sessionId);
+      entry?.disposeClipboardBindings?.();
       if (observer && typeof observer.disconnect === "function") {
         observer.disconnect();
       }

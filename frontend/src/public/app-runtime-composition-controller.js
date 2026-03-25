@@ -5,6 +5,7 @@ import { createAppCommandUiFacadeController } from "./app-command-ui-facade-cont
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
+import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
@@ -69,6 +70,9 @@ const api = createApiClient(config.apiBaseUrl, {
     }
     return refreshed;
   }
+});
+const clipboardRuntimeController = createClipboardRuntimeController({
+  navigatorRef: window?.navigator || globalThis.navigator || null
 });
 const store = createStore();
 const streamActionDispatcher = createStreamActionDispatcher({
@@ -635,6 +639,8 @@ sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
   terminalFontSize: TERMINAL_FONT_SIZE,
   terminalLineHeight: TERMINAL_LINE_HEIGHT,
   terminalFontFamily: TERMINAL_FONT_FAMILY,
+  readClipboardText: () => clipboardRuntimeController.readText(),
+  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   debugLog
 });
 
@@ -796,6 +802,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   sessionViewModel,
   runtimeEventController,
   deckRuntimeController,
+  readClipboardText: () => clipboardRuntimeController.readText(),
+  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS

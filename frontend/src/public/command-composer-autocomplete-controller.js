@@ -3,6 +3,7 @@ import { createCommandSuggestionsController } from "./ui/components.js";
 
 export function createCommandComposerAutocompleteController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const navigatorRef = options.navigatorRef || windowRef.navigator || globalThis.navigator || null;
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const setTimeoutFn =
     typeof windowRef.setTimeout === "function"
@@ -22,6 +23,26 @@ export function createCommandComposerAutocompleteController(options = {}) {
   const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
+  const writeClipboardText =
+    typeof options.writeClipboardText === "function"
+      ? options.writeClipboardText
+      : async (text) => {
+          if (!navigatorRef?.clipboard || typeof navigatorRef.clipboard.writeText !== "function") {
+            return false;
+          }
+          await navigatorRef.clipboard.writeText(String(text ?? ""));
+          return true;
+        };
+  const readClipboardText =
+    typeof options.readClipboardText === "function"
+      ? options.readClipboardText
+      : async () => {
+          if (!navigatorRef?.clipboard || typeof navigatorRef.clipboard.readText !== "function") {
+            return "";
+          }
+          const text = await navigatorRef.clipboard.readText();
+          return typeof text === "string" ? text : String(text ?? "");
+        };
   const commandSuggestionsController =
     options.commandSuggestionsController ||
     createCommandSuggestionsController({
@@ -40,6 +61,8 @@ export function createCommandComposerAutocompleteController(options = {}) {
   let recalledSlashCommand = "";
   let inputListener = null;
   let keydownListener = null;
+  let middleMouseDownListener = null;
+  let middleAuxClickListener = null;
 
   function clearSuggestionsTimer() {
     if (commandSuggestionsTimer) {
@@ -175,6 +198,83 @@ export function createCommandComposerAutocompleteController(options = {}) {
     };
   }
 
+  function getComposerSelectionRange() {
+    if (!commandInput) {
+      return null;
+    }
+    const currentValue = String(commandInput.value || "");
+    const start = Number.isInteger(commandInput.selectionStart) ? commandInput.selectionStart : 0;
+    const end = Number.isInteger(commandInput.selectionEnd) ? commandInput.selectionEnd : start;
+    return {
+      start,
+      end,
+      currentValue
+    };
+  }
+
+  function getSelectedComposerText() {
+    const range = getComposerSelectionRange();
+    if (!range || range.start === range.end) {
+      return "";
+    }
+    return range.currentValue.slice(range.start, range.end);
+  }
+
+  async function copySelectedComposerText() {
+    const selectedText = getSelectedComposerText();
+    if (!selectedText) {
+      return false;
+    }
+    try {
+      return (await writeClipboardText(selectedText)) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  function insertComposerText(text) {
+    if (!commandInput) {
+      return false;
+    }
+    const range = getComposerSelectionRange();
+    if (!range) {
+      return false;
+    }
+    const insertion = String(text ?? "");
+    const nextCursor = range.start + insertion.length;
+    if (typeof commandInput.setRangeText === "function") {
+      commandInput.setRangeText(insertion, range.start, range.end, "end");
+    } else {
+      commandInput.value =
+        `${range.currentValue.slice(0, range.start)}${insertion}${range.currentValue.slice(range.end)}`;
+      if (typeof commandInput.setSelectionRange === "function") {
+        commandInput.setSelectionRange(nextCursor, nextCursor);
+      } else {
+        commandInput.selectionStart = nextCursor;
+        commandInput.selectionEnd = nextCursor;
+      }
+    }
+    handleInput();
+    commandInput.focus?.();
+    return true;
+  }
+
+  async function pasteClipboardIntoComposer() {
+    try {
+      const text = await readClipboardText();
+      if (!text) {
+        return false;
+      }
+      return insertComposerText(text);
+    } catch {
+      return false;
+    }
+  }
+
+  function isMiddleMouseEvent(event) {
+    return Boolean(event && typeof event === "object" && event.button === 1);
+  }
+
   async function autocompleteInput(reverse = false) {
     const rawInput = commandInput?.value || "";
     const parsedSlash = parseSlashInputForAutocomplete(rawInput);
@@ -304,6 +404,14 @@ export function createCommandComposerAutocompleteController(options = {}) {
       return;
     }
 
+    if (event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      if (getSelectedComposerText()) {
+        event.preventDefault?.();
+        Promise.resolve(copySelectedComposerText()).catch(() => {});
+        return;
+      }
+    }
+
     if (event.key === "ArrowUp") {
       if (moveSuggestion(-1)) {
         event.preventDefault?.();
@@ -363,6 +471,23 @@ export function createCommandComposerAutocompleteController(options = {}) {
     }
   }
 
+  function handleMiddleMouseDown(event) {
+    if (!isMiddleMouseEvent(event)) {
+      return;
+    }
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    Promise.resolve(pasteClipboardIntoComposer()).catch(() => {});
+  }
+
+  function handleMiddleAuxClick(event) {
+    if (!isMiddleMouseEvent(event)) {
+      return;
+    }
+    event.preventDefault?.();
+    event.stopPropagation?.();
+  }
+
   function bindUiEvents() {
     if (!commandInput || typeof commandInput.addEventListener !== "function") {
       return;
@@ -375,6 +500,14 @@ export function createCommandComposerAutocompleteController(options = {}) {
       keydownListener = (event) => handleKeydown(event);
       commandInput.addEventListener("keydown", keydownListener);
     }
+    if (!middleMouseDownListener) {
+      middleMouseDownListener = (event) => handleMiddleMouseDown(event);
+      commandInput.addEventListener("mousedown", middleMouseDownListener);
+    }
+    if (!middleAuxClickListener) {
+      middleAuxClickListener = (event) => handleMiddleAuxClick(event);
+      commandInput.addEventListener("auxclick", middleAuxClickListener);
+    }
   }
 
   function dispose() {
@@ -386,9 +519,17 @@ export function createCommandComposerAutocompleteController(options = {}) {
       if (keydownListener) {
         commandInput.removeEventListener("keydown", keydownListener);
       }
+      if (middleMouseDownListener) {
+        commandInput.removeEventListener("mousedown", middleMouseDownListener);
+      }
+      if (middleAuxClickListener) {
+        commandInput.removeEventListener("auxclick", middleAuxClickListener);
+      }
     }
     inputListener = null;
     keydownListener = null;
+    middleMouseDownListener = null;
+    middleAuxClickListener = null;
   }
 
   function getState() {

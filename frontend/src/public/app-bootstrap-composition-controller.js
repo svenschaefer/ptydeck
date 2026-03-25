@@ -72,6 +72,10 @@ export function createAppBootstrapCompositionController(options = {}) {
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const wsStateRef = options.wsStateRef || { current: null };
   const activityCompletionNotifier = options.activityCompletionNotifier || { dispose() {} };
+  const readClipboardText =
+    typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
+  const writeClipboardText =
+    typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
   const createBtn = options.createBtn || null;
   const deckCreateBtn = options.deckCreateBtn || null;
   const deckRenameBtn = options.deckRenameBtn || null;
@@ -201,6 +205,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       documentRef,
       commandInput,
       uiState,
+      navigatorRef: windowRef?.navigator || globalThis.navigator || null,
+      readClipboardText,
+      writeClipboardText,
       render: () => appCommandUiFacadeController?.render?.(),
       scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview?.(),
       parseAutocompleteContext: (rawInput, customCommands) => commandEngine?.parseAutocompleteContext?.(rawInput, customCommands) || null,
