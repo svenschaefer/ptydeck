@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted layout/deck/dialog/resize/deck-action adapter glue from `frontend/src/public/app.js` into `frontend/src/public/app-layout-deck-facade-controller.js`, centralizing composition-facing delegation to `layout-runtime-controller.js`, `deck-runtime-controller.js`, `ui/session-terminal-resize-controller.js`, `ui/session-settings-dialog-controller.js`, and `ui/deck-actions-controller.js`.
+- [x] App runtime now composes deck activation, deck-count/filter reads, terminal geometry helpers, settings-dialog flows, deck CRUD UI flows, and terminal-size/layout delegation through the dedicated app layout/deck facade instead of keeping those wrapper helpers inline in `frontend/src/public/app.js`.
+- [x] Added focused regression coverage for the new layout/deck facade in `frontend/test/app-layout-deck-facade-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/app-layout-deck-facade-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 1147 lines after the app layout/deck facade extraction step.
+- [x] Validation for this `ARC-010` step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/app-layout-deck-facade-controller.test.js frontend/test/layout-runtime-controller.test.js frontend/test/deck-runtime-controller.test.js frontend/test/deck-actions-controller.test.js frontend/test/app.test.js`.
+- [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `95.50%` lines overall.
 - [x] `ARC-010` progress: extracted session/view/theme/meta adapter glue from `frontend/src/public/app.js` into `frontend/src/public/ui/session-ui-facade-controller.js`, centralizing session-view-model delegation, session-theme/settings-state delegation, and session-card meta/render helper delegation behind one composition-facing facade.
 - [x] App runtime now composes session-card factory/render/interactions, runtime-event guards, command execution guards, and deck-sidebar activity state through the dedicated session UI facade instead of keeping those adapter wrappers inline in `frontend/src/public/app.js`.
 - [x] Added focused regression coverage for the new session UI facade in `frontend/test/session-ui-facade-controller.test.js`.

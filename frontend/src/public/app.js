@@ -1,5 +1,6 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
+import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppLifecycleController } from "./app-lifecycle-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
@@ -269,6 +270,7 @@ let wsClient = null;
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
 let appLifecycleController = null;
+let appLayoutDeckFacadeController = null;
 let appRuntimeStateController = null;
 let deckRuntimeController = null;
 let sessionViewModel = null;
@@ -301,7 +303,7 @@ const activityCompletionNotifier = createActivityCompletionNotifier({
   formatSessionToken,
   formatSessionDisplayName,
   resolveDeckName(deckId) {
-    return getDeckById(deckId)?.name || String(deckId || "").trim();
+    return appLayoutDeckFacadeController?.resolveDeckName(deckId) || String(deckId || "").trim();
   },
   onError(error) {
     debugLog("activity-notification.error", {
@@ -379,11 +381,11 @@ layoutRuntimeController = createLayoutRuntimeController({
   setSessionInputSettings: (nextSettings) => {
     sessionInputSettings = nextSettings;
   },
-  getActiveDeck,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   api,
   applyRuntimeEvent,
-  applySettingsToAllTerminals,
-  scheduleGlobalResize,
+  applySettingsToAllTerminals: (options) => appLayoutDeckFacadeController?.applySettingsToAllTerminals(options),
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   render,
   setCommandFeedback,
   setError,
@@ -404,19 +406,34 @@ deckRuntimeController = createDeckRuntimeController({
   defaultDeckId: DEFAULT_DECK_ID,
   defaultTerminalCols: DEFAULT_TERMINAL_COLS,
   defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
-  clampInt,
+  clampInt: (value, fallback, min, max) => appLayoutDeckFacadeController?.clampInt(value, fallback, min, max) ?? fallback,
   getTerminalSettings: () => terminalSettings,
   setTerminalSettings: (nextSettings) => {
     terminalSettings = nextSettings;
   },
-  persistTerminalSettings: saveTerminalSettings,
-  syncSettingsUi,
-  applySettingsToAllTerminals,
-  scheduleGlobalResize,
-  scheduleDeferredResizePasses,
+  persistTerminalSettings: () => appLayoutDeckFacadeController?.saveTerminalSettings(),
+  syncSettingsUi: () => appLayoutDeckFacadeController?.syncSettingsUi(),
+  applySettingsToAllTerminals: (options) => appLayoutDeckFacadeController?.applySettingsToAllTerminals(options),
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
+  scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
   getDeckSidebarController: () => deckSidebarController,
   resolveSessionDeckId,
   getSessionById
+});
+
+appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
+  store,
+  getLayoutRuntimeController: () => layoutRuntimeController,
+  getDeckRuntimeController: () => deckRuntimeController,
+  getSessionTerminalResizeController: () => sessionTerminalResizeController,
+  getSessionSettingsDialogController: () => sessionSettingsDialogController,
+  getDeckActionsController: () => deckActionsController,
+  getTerminalSettings: () => terminalSettings,
+  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
+  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
+  terminalFontSize: TERMINAL_FONT_SIZE,
+  terminalLineHeight: TERMINAL_LINE_HEIGHT,
+  clearUiError: () => appRuntimeStateController?.clearError()
 });
 
 function normalizeCustomCommandName(name) {
@@ -484,81 +501,10 @@ function scheduleCommandSuggestions() {
   commandComposerAutocompleteController?.scheduleSuggestions();
 }
 
-function clampInt(value, fallback, min, max) {
-  return layoutRuntimeController?.clampInt(value, fallback, min, max) ?? fallback;
-}
-
-function saveTerminalSettings() {
-  layoutRuntimeController?.saveTerminalSettings();
-}
-
-function getSessionFilterText() {
-  return store.getState().sessionFilterText || "";
-}
-
-function setSessionFilterText(value) {
-  store.setSessionFilterText(value);
-  saveStoredSessionFilterText(store.getState().sessionFilterText);
-}
-
-function getDeckById(deckId) {
-  return deckRuntimeController?.getDeckById(deckId) || null;
-}
-
-function getActiveDeck() {
-  return deckRuntimeController?.getActiveDeck() || null;
-}
-
-function getDeckTerminalGeometry(deckId) {
-  return deckRuntimeController?.getDeckTerminalGeometry(deckId) || {
-    cols: DEFAULT_TERMINAL_COLS,
-    rows: DEFAULT_TERMINAL_ROWS
-  };
-}
-
-function getSessionTerminalGeometry(sessionOrId) {
-  return deckRuntimeController?.getSessionTerminalGeometry(sessionOrId) || {
-    cols: DEFAULT_TERMINAL_COLS,
-    rows: DEFAULT_TERMINAL_ROWS
-  };
-}
-
-function setDecks(nextDecks, options = {}) {
-  deckRuntimeController?.setDecks(nextDecks, options);
-}
-
-function upsertDeckInState(nextDeck, options = {}) {
-  deckRuntimeController?.upsertDeckInState(nextDeck, options);
-}
-
-function removeDeckFromState(deckId, options = {}) {
-  deckRuntimeController?.removeDeckFromState(deckId, options);
-}
-
-function normalizeSendTerminatorMode(value) {
-  return layoutRuntimeController?.normalizeSendTerminatorMode(value) || "auto";
-}
-
-function loadStoredSessionFilterText() {
-  return layoutRuntimeController?.loadStoredSessionFilterText() || "";
-}
-
-function saveStoredSessionFilterText(value) {
-  layoutRuntimeController?.saveStoredSessionFilterText(value);
-}
-
 store.hydrateRuntimePreferences({
   activeDeckId: deckRuntimeController.loadStoredActiveDeckId(),
-  sessionFilterText: loadStoredSessionFilterText()
+  sessionFilterText: appLayoutDeckFacadeController.loadStoredSessionFilterText()
 });
-
-function getSessionSendTerminator(sessionId) {
-  return layoutRuntimeController?.getSessionSendTerminator(sessionId) || "auto";
-}
-
-function setSessionSendTerminator(sessionId, mode) {
-  layoutRuntimeController?.setSessionSendTerminator(sessionId, mode);
-}
 
 function getSessionById(sessionId) {
   return store.getState().sessions.find((session) => session.id === sessionId) || null;
@@ -587,7 +533,7 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
   }
   const shouldFollow = entry.followOnShow !== false;
   const runPass = () => {
-    applyResizeForSession(sessionId, { force: true });
+    appLayoutDeckFacadeController?.applyResizeForSession(sessionId, { force: true });
     syncTerminalScrollArea(entry.terminal);
     refreshTerminalViewport(entry.terminal);
     if (shouldFollow && typeof entry.terminal.scrollToBottom === "function") {
@@ -599,43 +545,6 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
   setTimeout(runPass, 80);
   setTimeout(runPass, 220);
   entry.pendingViewportSync = false;
-}
-
-function measureTerminalCellWidthPx() {
-  return layoutRuntimeController?.measureTerminalCellWidthPx() || 10;
-}
-
-function computeFixedMountHeightPx(rows) {
-  return layoutRuntimeController?.computeFixedMountHeightPx(rows) || Math.max(120, Math.round(rows * TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT));
-}
-
-function computeFixedCardWidthPx(cols) {
-  return layoutRuntimeController?.computeFixedCardWidthPx(cols) || Math.max(260, Math.round(cols * measureTerminalCellWidthPx()));
-}
-
-function syncTerminalGeometryCss() {
-  layoutRuntimeController?.syncTerminalGeometryCss();
-}
-
-function syncSettingsUi() {
-  layoutRuntimeController?.syncSettingsUi();
-}
-
-function readSettingsFromUi() {
-  return layoutRuntimeController?.readSettingsFromUi() || {
-    cols: terminalSettings?.cols || DEFAULT_TERMINAL_COLS,
-    rows: terminalSettings?.rows || DEFAULT_TERMINAL_ROWS,
-    sidebarVisible: terminalSettings?.sidebarVisible !== false
-  };
-}
-
-async function applyTerminalSizeSettings(nextCols, nextRows) {
-  appRuntimeStateController?.clearError();
-  return layoutRuntimeController?.applyTerminalSizeSettings(nextCols, nextRows);
-}
-
-function applySettingsToAllTerminals(options = {}) {
-  sessionTerminalResizeController?.applySettingsToAllTerminals(options);
 }
 
 function findNextQuickId() {
@@ -650,42 +559,6 @@ function pruneQuickIds(activeSessionIds) {
   sessionRuntimeController?.pruneQuickIds(activeSessionIds);
 }
 
-function applyResizeForSession(sessionId, options = {}) {
-  sessionTerminalResizeController?.applyResizeForSession(sessionId, options);
-}
-
-async function onApplySettings() {
-  return layoutRuntimeController?.onApplySettings();
-}
-
-function setSidebarVisible(visible) {
-  return layoutRuntimeController?.setSidebarVisible(visible);
-}
-
-function scheduleGlobalResize(options = {}) {
-  sessionTerminalResizeController?.scheduleGlobalResize(options);
-}
-
-function openSettingsDialog(dialog) {
-  sessionSettingsDialogController?.open(dialog);
-}
-
-function closeSettingsDialog(dialog) {
-  sessionSettingsDialogController?.close(dialog);
-}
-
-function confirmSessionDelete(session) {
-  return sessionSettingsDialogController?.confirmSessionDelete(session) !== false;
-}
-
-function toggleSettingsDialog(dialog) {
-  sessionSettingsDialogController?.toggle(dialog);
-}
-
-function scheduleDeferredResizePasses(options = {}) {
-  sessionTerminalResizeController?.scheduleDeferredResizePasses(options);
-}
-
 function maybeReportStartupPerf() {
   appRuntimeStateController?.maybeReportStartupPerf();
 }
@@ -696,39 +569,6 @@ function markRuntimeBootstrapReady(source) {
 
 function scheduleBootstrapFallback() {
   appRuntimeStateController?.scheduleBootstrapFallback();
-}
-
-function getSessionCountForDeck(deckId, sessions) {
-  return deckRuntimeController?.getSessionCountForDeck(deckId, sessions) || 0;
-}
-
-function renderDeckTabs(sessions) {
-  deckRuntimeController?.renderDeckTabs(sessions);
-}
-
-function setActiveDeck(deckId) {
-  return deckRuntimeController?.setActiveDeck(deckId) === true;
-}
-
-async function createDeckFlow() {
-  if (!deckActionsController) {
-    return;
-  }
-  await deckActionsController.createDeckFlow();
-}
-
-async function renameDeckFlow() {
-  if (!deckActionsController) {
-    return;
-  }
-  await deckActionsController.renameDeckFlow();
-}
-
-async function deleteDeckFlow() {
-  if (!deckActionsController) {
-    return;
-  }
-  await deckActionsController.deleteDeckFlow();
 }
 
 function render() {
@@ -824,7 +664,7 @@ sessionRuntimeController = createSessionRuntimeController({
 runtimeEventController = createRuntimeEventController({
   defaultDeckId: DEFAULT_DECK_ID,
   getPreferredActiveDeckId: () => store.getState().activeDeckId,
-  setDecks,
+  setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
   replaceCustomCommandState,
   setSessions: (sessions) => store.setSessions(sessions),
   replaySnapshotOutputs,
@@ -835,8 +675,8 @@ runtimeEventController = createRuntimeEventController({
   upsertSession,
   markSessionExited,
   markSessionClosed,
-  upsertDeckInState,
-  removeDeckFromState,
+  upsertDeckInState: (nextDeck, options) => appLayoutDeckFacadeController?.upsertDeckInState(nextDeck, options),
+  removeDeckFromState: (deckId, options) => appLayoutDeckFacadeController?.removeDeckFromState(deckId, options),
   upsertCustomCommandState,
   removeCustomCommandState,
   activityCompletionNotifier,
@@ -884,8 +724,8 @@ sessionSettingsStateController = createSessionSettingsStateController({
   terminalThemeModeSet: TERMINAL_THEME_MODE_SET,
   sessionThemeDrafts,
   getSessionById,
-  getSessionSendTerminator,
-  normalizeSendTerminatorMode,
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
   formatSessionEnv: sessionUiFacadeController.formatSessionEnv,
   formatSessionTags: sessionUiFacadeController.formatSessionTags,
   parseSessionEnv: sessionUiFacadeController.parseSessionEnv,
@@ -936,10 +776,10 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   terminalSizes,
   getSessionById,
   resolveSessionDeckId,
-  getSessionTerminalGeometry,
+  getSessionTerminalGeometry: (sessionOrId) => appLayoutDeckFacadeController?.getSessionTerminalGeometry(sessionOrId),
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
-  computeFixedMountHeightPx,
-  computeFixedCardWidthPx,
+  computeFixedMountHeightPx: (rows) => appLayoutDeckFacadeController?.computeFixedMountHeightPx(rows),
+  computeFixedCardWidthPx: (cols) => appLayoutDeckFacadeController?.computeFixedCardWidthPx(cols),
   getTerminalCellHeightPx,
   terminalCardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
   debugLog,
@@ -998,7 +838,7 @@ terminalSearchController = createTerminalSearchController({
 deckActionsController = createDeckActionsController({
   windowRef: window,
   api,
-  getActiveDeck,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   getDecks: () => store.getState().decks,
   getTerminalSettings: () => terminalSettings,
   applyRuntimeEvent,
@@ -1014,7 +854,7 @@ deckSidebarController = createDeckSidebarController({
   ensureQuickId,
   formatSessionDisplayName,
   getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
-  onActivateDeck: (deckId) => setActiveDeck(deckId),
+  onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
   onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session)
 });
 
@@ -1029,16 +869,16 @@ sessionGridController = createSessionGridController({
   sessionThemeDrafts,
   template,
   gridEl,
-  getActiveDeck,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   resolveSessionDeckId,
-  getSessionFilterText,
+  getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText() || "",
   pruneQuickIds,
-  renderDeckTabs,
+  renderDeckTabs: (sessions) => appLayoutDeckFacadeController?.renderDeckTabs(sessions),
   workspaceRenderController,
   syncStatusTicker: sessionUiFacadeController.syncStatusTicker,
   syncActiveTerminalSearch,
   sessionDisposalController,
-  closeSettingsDialog,
+  closeSettingsDialog: (dialog) => appLayoutDeckFacadeController?.closeSettingsDialog(dialog),
   streamPluginEngine,
   streamAdapter,
   terminalSearchState,
@@ -1053,13 +893,13 @@ sessionGridController = createSessionGridController({
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
-  applyResizeForSession,
-  scheduleGlobalResize,
-  scheduleDeferredResizePasses,
+  applyResizeForSession: (sessionId, options) => appLayoutDeckFacadeController?.applyResizeForSession(sessionId, options),
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
+  scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
   setActiveSession: (sessionId) => store.setActiveSession(sessionId),
   getSessionById,
-  toggleSettingsDialog,
-  confirmSessionDelete,
+  toggleSettingsDialog: (dialog) => appLayoutDeckFacadeController?.toggleSettingsDialog(dialog),
+  confirmSessionDelete: (session) => appLayoutDeckFacadeController?.confirmSessionDelete(session),
   removeSession,
   setCommandFeedback,
   formatSessionToken,
@@ -1069,7 +909,7 @@ sessionGridController = createSessionGridController({
   applyRuntimeEvent,
   applyThemeForSession: sessionUiFacadeController.applyThemeForSession,
   getSessionThemeConfig: sessionUiFacadeController.getSessionThemeConfig,
-  setSessionSendTerminator,
+  setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
   setStartupSettingsFeedback: sessionUiFacadeController.setStartupSettingsFeedback,
   requestRender: () => render(),
   api,
@@ -1093,7 +933,7 @@ commandEngine = createCommandEngine({
 commandTargetRuntimeController = createCommandTargetRuntimeController({
   commandEngine,
   store,
-  setActiveDeck,
+  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
   resolveSessionDeckId,
   formatSessionToken,
   formatSessionDisplayName
@@ -1108,12 +948,12 @@ commandExecutor = createCommandExecutor({
   resolveFilterSelectors: commandTargetRuntimeController.resolveFilterSelectors,
   resolveDeckToken: commandTargetRuntimeController.resolveDeckToken,
   parseSizeCommandArgs: commandTargetRuntimeController.parseSizeCommandArgs,
-  applyTerminalSizeSettings,
-  setSessionFilterText,
-  getActiveDeck,
-  getSessionCountForDeck,
+  applyTerminalSizeSettings: (nextCols, nextRows) => appLayoutDeckFacadeController?.applyTerminalSizeSettings(nextCols, nextRows),
+  setSessionFilterText: (value) => appLayoutDeckFacadeController?.setSessionFilterText(value),
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
+  getSessionCountForDeck: (deckId, sessions) => appLayoutDeckFacadeController?.getSessionCountForDeck(deckId, sessions) || 0,
   applyRuntimeEvent,
-  setActiveDeck,
+  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
   resolveSessionDeckId,
   formatSessionToken,
   formatSessionDisplayName,
@@ -1128,9 +968,9 @@ commandExecutor = createCommandExecutor({
   upsertCustomCommandState,
   resolveSettingsTargets: commandTargetRuntimeController.resolveSettingsTargets,
   parseSettingsPayload: commandTargetRuntimeController.parseSettingsPayload,
-  normalizeSendTerminatorMode,
-  setSessionSendTerminator,
-  getSessionSendTerminator,
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
+  setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
   sendInputWithConfiguredTerminator,
   normalizeCustomCommandPayloadForShell,
   normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
@@ -1149,7 +989,7 @@ authBootstrapRuntimeController = createAuthBootstrapRuntimeController({
   getTerminalSettings: () => terminalSettings,
   getPreferredActiveDeckId: () => store.getState().activeDeckId,
   getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource() || "pending",
-  setDecks,
+  setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
   setSessions: (sessions) => store.setSessions(sessions || []),
   setUiError: (message) => appRuntimeStateController?.setUiError(message),
   markRuntimeBootstrapReady,
@@ -1176,8 +1016,8 @@ wsRuntimeController = createWsRuntimeController({
 });
 
 store.subscribe(render);
-syncSettingsUi();
-syncTerminalGeometryCss();
+appLayoutDeckFacadeController?.syncSettingsUi();
+appLayoutDeckFacadeController?.syncTerminalGeometryCss();
 render();
 
 layoutRuntimeController?.bindUiEvents();
@@ -1232,15 +1072,15 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState(),
   parseDirectTargetRoutingInput: commandTargetRuntimeController.parseDirectTargetRoutingInput,
   resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
-  getActiveDeck,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   formatSessionToken,
   formatSessionDisplayName,
   getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
-  getSessionSendTerminator,
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
   apiSendInput: api.sendInput.bind(api),
   sendInputWithConfiguredTerminator,
-  normalizeSendTerminatorMode,
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   setError,
   clearError: () => appRuntimeStateController?.clearError(),
@@ -1258,16 +1098,16 @@ appLifecycleController = createAppLifecycleController({
   deckDeleteBtn,
   sendBtn,
   api,
-  getActiveDeck,
+  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   resolveSessionDeckId,
   applyRuntimeEvent,
   setError,
   clearUiError: () => appRuntimeStateController?.clearError(),
   getErrorMessage,
   debugLog,
-  createDeckFlow,
-  renameDeckFlow,
-  deleteDeckFlow,
+  createDeckFlow: () => appLayoutDeckFacadeController?.createDeckFlow(),
+  renameDeckFlow: () => appLayoutDeckFacadeController?.renameDeckFlow(),
+  deleteDeckFlow: () => appLayoutDeckFacadeController?.deleteDeckFlow(),
   submitCommand,
   bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options),
   startWsRuntime: () => wsRuntimeController?.start() || null,
@@ -1275,7 +1115,7 @@ appLifecycleController = createAppLifecycleController({
     wsClient = client;
   },
   scheduleBootstrapFallback: () => appRuntimeStateController?.scheduleBootstrapFallback(),
-  scheduleGlobalResize,
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   disposeAppRuntimeState: () => appRuntimeStateController?.dispose(),
   disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose(),
   closeWsClient: () => {
