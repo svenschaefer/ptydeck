@@ -1,5 +1,13 @@
 export function createCommandComposerRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const setTimeoutFn =
+    typeof windowRef.setTimeout === "function"
+      ? windowRef.setTimeout.bind(windowRef)
+      : globalThis.setTimeout.bind(globalThis);
+  const clearTimeoutFn =
+    typeof windowRef.clearTimeout === "function"
+      ? windowRef.clearTimeout.bind(windowRef)
+      : globalThis.clearTimeout.bind(globalThis);
   const getCommandValue = options.getCommandValue || (() => "");
   const setCommandValue = options.setCommandValue || (() => {});
   const resetCommandAutocompleteState = options.resetCommandAutocompleteState || (() => {});
@@ -38,7 +46,7 @@ export function createCommandComposerRuntimeController(options = {}) {
 
   function clearPreviewTimer() {
     if (commandPreviewTimer !== null) {
-      windowRef.clearTimeout(commandPreviewTimer);
+      clearTimeoutFn(commandPreviewTimer);
       commandPreviewTimer = null;
     }
   }
@@ -212,7 +220,7 @@ export function createCommandComposerRuntimeController(options = {}) {
 
   function scheduleCommandPreview() {
     clearPreviewTimer();
-    commandPreviewTimer = windowRef.setTimeout(() => {
+    commandPreviewTimer = setTimeoutFn(() => {
       commandPreviewTimer = null;
       refreshCommandPreview();
     }, 120);

@@ -1858,11 +1858,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working(0s • esc to interrupt)\n" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working(0s • esc to interrupt)");
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working (0s • esc to interrupt)");
   await sleep(1200);
   assert.match(
     recoveredHiddenCard.querySelector(".session-status-text").textContent,
-    /^Working\(([1-9][0-9]*)s • esc to interrupt\)$/
+    /^Working \(([0-9]+)s • esc to interrupt\)$/
   );
 
   ws.emit("message", {

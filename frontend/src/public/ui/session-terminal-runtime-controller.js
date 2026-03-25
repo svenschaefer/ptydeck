@@ -1,5 +1,11 @@
 export function createSessionTerminalRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const ResizeObserverCtor =
+    typeof windowRef.ResizeObserver === "function" ? windowRef.ResizeObserver : globalThis.ResizeObserver;
+  const setTimeoutFn =
+    typeof windowRef.setTimeout === "function"
+      ? windowRef.setTimeout.bind(windowRef)
+      : globalThis.setTimeout.bind(globalThis);
   const terminalFontSize = Number(options.terminalFontSize) || 16;
   const terminalLineHeight = Number(options.terminalLineHeight) || 1.2;
   const terminalFontFamily = String(options.terminalFontFamily || "monospace");
@@ -72,7 +78,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     terminals.set(session.id, entry);
     afterEntryRegistered(entry, session);
 
-    const observer = new windowRef.ResizeObserver(() => {
+    const observer = new ResizeObserverCtor(() => {
       applyResizeForSession(session.id);
     });
     observer.observe(refs.mount);
@@ -80,9 +86,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
 
     onFirstTerminalMounted();
     applyResizeForSession(session.id);
-    windowRef.setTimeout(() => applyResizeForSession(session.id), 120);
-    windowRef.setTimeout(() => applyResizeForSession(session.id), 400);
-    windowRef.setTimeout(() => applyResizeForSession(session.id), 900);
+    setTimeoutFn(() => applyResizeForSession(session.id), 120);
+    setTimeoutFn(() => applyResizeForSession(session.id), 400);
+    setTimeoutFn(() => applyResizeForSession(session.id), 900);
 
     return entry;
   }

@@ -1,5 +1,6 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
+import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
 import { createCommandEngine } from "./command-engine.js";
 import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
 import { createCommandExecutor } from "./command-executor.js";
@@ -115,7 +116,6 @@ const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
-let bootstrapPromise = null;
 let bootstrapFallbackTimer = null;
 let runtimeBootstrapSource = "pending";
 let commandPreviewRequestId = 0;
@@ -267,12 +267,9 @@ const SYSTEM_SLASH_COMMANDS = [
 let terminalSettings = loadTerminalSettings();
 let sessionInputSettings = loadSessionInputSettings();
 const sessionThemeDrafts = new Map();
-let wsAuthToken = "";
-let wsAuthTokenExpiresAtMs = 0;
-let authRefreshTimer = null;
-let devAuthRefreshPromise = null;
 let wsClient = null;
 let wsRuntimeController = null;
+let authBootstrapRuntimeController = null;
 let commandAutocompleteRequestId = 0;
 const slashCommandHistory = [];
 let slashHistoryCursor = -1;
@@ -1750,11 +1747,18 @@ function markRuntimeBootstrapReady(source) {
 }
 
 function scheduleBootstrapFallback() {
-  if (runtimeBootstrapSource !== "pending" || bootstrapPromise || bootstrapFallbackTimer) {
+  if (
+    runtimeBootstrapSource !== "pending" ||
+    authBootstrapRuntimeController?.hasBootstrapInFlight?.() ||
+    bootstrapFallbackTimer
+  ) {
     return;
   }
   bootstrapFallbackTimer = setTimeout(() => {
     bootstrapFallbackTimer = null;
+    if (runtimeBootstrapSource !== "pending") {
+      return;
+    }
     bootstrapRuntimeFallback().catch(() => {});
   }, WS_BOOTSTRAP_FALLBACK_MS);
 }
@@ -2320,147 +2324,43 @@ async function executeControlCommand(interpreted) {
 }
 
 async function bootstrapRuntimeFallback() {
-  if (bootstrapPromise) {
-    return bootstrapPromise;
-  }
-  startupPerf.bootstrapRequestCount += 1;
-  debugLog("sessions.bootstrap.request", {
-    bootstrapRequestCount: startupPerf.bootstrapRequestCount
-  });
-  bootstrapPromise = (async () => {
-    try {
-      debugLog("runtime.bootstrap.start");
-      const [decksResult, sessionsResult] = await Promise.allSettled([api.listDecks(), api.listSessions()]);
-
-      if (runtimeBootstrapSource === "ws") {
-        debugLog("runtime.bootstrap.skipped", { reason: "ws_snapshot_already_applied" });
-        return;
-      }
-
-      let hasError = false;
-      if (decksResult.status === "fulfilled") {
-        setDecks(decksResult.value, { preferredActiveDeckId: store.getState().activeDeckId });
-      } else {
-        hasError = true;
-        debugLog("decks.bootstrap.error", {
-          message: decksResult.reason instanceof Error ? decksResult.reason.message : String(decksResult.reason)
-        });
-        setDecks(
-          [
-            {
-              id: DEFAULT_DECK_ID,
-              name: "Default",
-              settings: {
-                terminal: {
-                  cols: terminalSettings.cols,
-                  rows: terminalSettings.rows
-                }
-              }
-            }
-          ],
-          { preferredActiveDeckId: DEFAULT_DECK_ID }
-        );
-      }
-
-      if (sessionsResult.status === "fulfilled") {
-        store.setSessions(sessionsResult.value || []);
-      } else {
-        hasError = true;
-        debugLog("sessions.bootstrap.error", {
-          message: sessionsResult.reason instanceof Error ? sessionsResult.reason.message : String(sessionsResult.reason)
-        });
-      }
-
-      uiState.error = hasError ? "Failed to fully load runtime state." : "";
-      debugLog("runtime.bootstrap.ok", {
-        decksLoaded: decksResult.status === "fulfilled",
-        sessionsLoaded: sessionsResult.status === "fulfilled",
-        sessionCount: sessionsResult.status === "fulfilled" ? sessionsResult.value.length : 0
-      });
-      markRuntimeBootstrapReady("rest");
-    } catch (err) {
-      debugLog("runtime.bootstrap.error", {
-        message: err instanceof Error ? err.message : String(err)
-      });
-      uiState.error = "Failed to load runtime state.";
-      markRuntimeBootstrapReady("rest");
-    } finally {
-      bootstrapPromise = null;
-    }
-  })();
-  return bootstrapPromise;
-}
-
-function clearAuthRefreshTimer() {
-  if (authRefreshTimer !== null) {
-    clearTimeout(authRefreshTimer);
-    authRefreshTimer = null;
-  }
-}
-
-function scheduleDevAuthRefreshDelay(delayMs) {
-  clearAuthRefreshTimer();
-  const normalizedDelay = Math.max(DEV_AUTH_REFRESH_MIN_DELAY_MS, Math.floor(Number(delayMs) || 0));
-  authRefreshTimer = setTimeout(() => {
-    bootstrapDevAuthToken({ reason: "scheduled-refresh" }).catch(() => {});
-  }, normalizedDelay);
-}
-
-function scheduleDevAuthRefresh(expiresInSeconds) {
-  const seconds = Number(expiresInSeconds);
-  if (!Number.isFinite(seconds) || seconds <= 0 || !wsAuthToken) {
-    clearAuthRefreshTimer();
+  if (!authBootstrapRuntimeController || runtimeBootstrapSource !== "pending") {
     return;
   }
-  const ttlMs = Math.max(1_000, Math.floor(seconds * 1_000));
-  const now = Date.now();
-  wsAuthTokenExpiresAtMs = now + ttlMs;
-  scheduleDevAuthRefreshDelay(ttlMs - DEV_AUTH_REFRESH_SAFETY_MS);
+  if (!authBootstrapRuntimeController.hasBootstrapInFlight()) {
+    startupPerf.bootstrapRequestCount += 1;
+    debugLog("sessions.bootstrap.request", {
+      bootstrapRequestCount: startupPerf.bootstrapRequestCount
+    });
+  }
+  return authBootstrapRuntimeController.bootstrapRuntimeFallback();
 }
 
 async function bootstrapDevAuthToken(options = {}) {
-  if (devAuthRefreshPromise) {
-    return devAuthRefreshPromise;
-  }
-  const reason = typeof options.reason === "string" && options.reason ? options.reason : "bootstrap";
-  devAuthRefreshPromise = (async () => {
-    try {
-      const payload = await api.createDevToken();
-      if (payload && typeof payload.accessToken === "string" && payload.accessToken.trim()) {
-        wsAuthToken = payload.accessToken.trim();
-        api.setAuthToken(wsAuthToken);
-        scheduleDevAuthRefresh(payload.expiresIn);
-        debugLog("auth.dev_token.ok", {
-          reason,
-          expiresIn: payload.expiresIn || 0,
-          scope: payload.scope || "",
-          refreshAtMs: wsAuthTokenExpiresAtMs
-        });
-        return true;
-      }
-    } catch (err) {
-      const status = err && typeof err.status === "number" ? err.status : 0;
-      if (status === 404 || status === 405) {
-        clearAuthRefreshTimer();
-        wsAuthTokenExpiresAtMs = 0;
-        debugLog("auth.dev_token.unavailable", { reason });
-        return false;
-      }
-      scheduleDevAuthRefreshDelay(DEV_AUTH_RETRY_DELAY_MS);
-      debugLog("auth.dev_token.error", {
-        reason,
-        status,
-        message: err instanceof Error ? err.message : String(err)
-      });
-      return false;
-    } finally {
-      devAuthRefreshPromise = null;
-    }
-    scheduleDevAuthRefreshDelay(DEV_AUTH_RETRY_DELAY_MS);
+  if (!authBootstrapRuntimeController) {
     return false;
-  })();
-  return devAuthRefreshPromise;
+  }
+  return authBootstrapRuntimeController.bootstrapDevAuthToken(options);
 }
+
+authBootstrapRuntimeController = createAuthBootstrapRuntimeController({
+  windowRef: window,
+  api,
+  defaultDeckId: DEFAULT_DECK_ID,
+  getTerminalSettings: () => terminalSettings,
+  getPreferredActiveDeckId: () => store.getState().activeDeckId,
+  getRuntimeBootstrapSource: () => runtimeBootstrapSource,
+  setDecks,
+  setSessions: (sessions) => store.setSessions(sessions || []),
+  setUiError: (message) => {
+    uiState.error = message;
+  },
+  markRuntimeBootstrapReady,
+  debugLog,
+  devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
+  devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
+  devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
+});
 
 wsRuntimeController = createWsRuntimeController({
   createWsClient,
@@ -2477,7 +2377,7 @@ wsRuntimeController = createWsRuntimeController({
   hasTerminal: (sessionId) => terminals.has(sessionId),
   pushSessionData: (sessionId, data) => streamAdapter.push(sessionId, data),
   applyRuntimeEvent,
-  getWsAuthToken: () => wsAuthToken,
+  getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
   createWsTicket: () => api.createWsTicket(),
   bootstrapDevAuthToken
 });
@@ -2492,10 +2392,6 @@ async function initializeRuntime() {
   wsClient = wsRuntimeController?.start() || null;
   scheduleBootstrapFallback();
 }
-
-initializeRuntime().catch(() => {
-  setError("Failed to initialize application runtime.");
-});
 
 createBtn.addEventListener("click", async () => {
   try {
@@ -2732,11 +2628,16 @@ commandInput.addEventListener("keydown", (event) => {
   }
 });
 
+initializeRuntime().catch(() => {
+  setError("Failed to initialize application runtime.");
+});
+
 window.addEventListener("beforeunload", () => {
   activityCompletionNotifier.dispose();
   if (wsClient) {
     wsClient.close();
   }
+  authBootstrapRuntimeController?.dispose();
   sessionTerminalResizeController?.dispose();
   commandComposerRuntimeController?.dispose();
   if (commandSuggestionsTimer) {

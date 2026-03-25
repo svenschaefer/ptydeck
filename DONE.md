@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted auth/bootstrap runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/auth-bootstrap-runtime-controller.js` (REST snapshot fallback, dev-token acquisition/refresh scheduling, WebSocket bearer-token handoff, and bootstrap dedupe/guardrails).
+- [x] App runtime bootstrap order is now hardened so controller wiring completes before network bootstrap starts, preventing the WebSocket-snapshot vs REST-fallback race exercised by `frontend/test/app.test.js`.
+- [x] Runtime controller compatibility hardening completed: `frontend/src/public/command-composer-runtime-controller.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js` now fall back to global timer / `ResizeObserver` primitives when injected `window` shims omit them.
+- [x] Added focused regression coverage for the new auth/bootstrap runtime controller in `frontend/test/auth-bootstrap-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/auth-bootstrap-runtime-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted coverage via `node --test --experimental-test-coverage frontend/test/auth-bootstrap-runtime-controller.test.js`.
 - [x] `ARC-010` progress: extracted command composer runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/command-composer-runtime-controller.js` (submit flow for quick-switch/control/input, preview refresh scheduling, configured-terminator send path, and composer preview-timer disposal).
 - [x] Added focused regression coverage for the new command composer runtime controller in `frontend/test/command-composer-runtime-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/command-composer-runtime-controller.js` participates in syntax-check gates.
