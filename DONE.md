@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010D` is now completed: explicit closeout regression coverage was added in `frontend/test/app-architecture-closeout.test.js` to lock `frontend/src/public/app.js` to a bootstrap-only entrypoint and guard runtime assembly ownership in `frontend/src/public/app-runtime-composition-controller.js`.
+- [x] `ARC-010` is now fully closed: `ARC-010A` through `ARC-010D` are completed and validated, and `frontend/src/public/app.js` is reduced to a stable bootstrap/error-boundary shell.
+- [x] Focused regression validation for `ARC-010D` passed with `node --test frontend/test/app-architecture-closeout.test.js frontend/test/app.test.js frontend/test/app-bootstrap-composition-controller.test.js`.
+- [x] Full validation for `ARC-010D` passed with `npm run lint` and `npm run test:coverage:check`; `npm run test` again stalled at the root wrapper after the underlying per-workspace suites had already completed, so the deterministic fallback remained `npm --prefix backend run test` plus `npm --prefix frontend run test` per execution-hygiene policy.
+- [x] Coverage after the `ARC-010D` closeout step: backend `91.60%` lines, frontend `95.81%` lines overall.
 - [x] `ARC-010C` is now completed: the remaining inline runtime/controller assembly was removed from `frontend/src/public/app.js` and moved into `frontend/src/public/app-runtime-composition-controller.js`.
 - [x] `frontend/src/public/app.js` is now reduced to top-level app startup and error-boundary wiring only.
 - [x] The new runtime-composition controller now owns runtime config resolution, API/store/bootstrap setup, DOM-ref collection, stream engine setup, shared runtime state creation, controller/facade assembly, and bootstrap-controller handoff.
