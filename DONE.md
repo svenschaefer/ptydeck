@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted app-shell lifecycle orchestration from `frontend/src/public/app.js` into `frontend/src/public/app-lifecycle-controller.js` (runtime bootstrap sequencing, create/deck/send button wiring, global resize binding, and beforeunload cleanup orchestration).
+- [x] App runtime now composes startup/shutdown and top-level shell-event behavior through the dedicated lifecycle controller instead of keeping those flows inline in `frontend/src/public/app.js`.
+- [x] Added focused regression coverage for the new lifecycle controller in `frontend/test/app-lifecycle-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/app-lifecycle-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 1647 lines after the lifecycle extraction step.
+- [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm --prefix frontend run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/app-lifecycle-controller.test.js frontend/test/app.test.js`.
 - [x] `ARC-010` progress: extracted layout/runtime persistence orchestration from `frontend/src/public/app.js` into `frontend/src/public/layout-runtime-controller.js` (terminal settings persistence, session input terminator persistence, session-filter storage, sidebar visibility state, deck terminal-size apply flow, and settings UI event binding).
 - [x] App runtime now composes layout/runtime behavior through the dedicated layout runtime controller while keeping `frontend/src/public/ui/layout-settings-controller.js` focused on DOM/CSS geometry and settings-form parsing only.
 - [x] Added focused regression coverage for the new layout runtime controller in `frontend/test/layout-runtime-controller.test.js`.

@@ -1,5 +1,6 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
+import { createAppLifecycleController } from "./app-lifecycle-controller.js";
 import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
 import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
 import { createCommandEngine } from "./command-engine.js";
@@ -266,6 +267,7 @@ const sessionThemeDrafts = new Map();
 let wsClient = null;
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
+let appLifecycleController = null;
 let deckRuntimeController = null;
 let sessionViewModel = null;
 let runtimeEventController = null;
@@ -1515,65 +1517,6 @@ syncSettingsUi();
 syncTerminalGeometryCss();
 render();
 
-async function initializeRuntime() {
-  await bootstrapDevAuthToken();
-  wsClient = wsRuntimeController?.start() || null;
-  scheduleBootstrapFallback();
-}
-
-createBtn.addEventListener("click", async () => {
-  try {
-    debugLog("sessions.create.start");
-    const createdSession = await api.createSession();
-    let session = createdSession;
-    const activeDeck = getActiveDeck();
-    if (activeDeck && resolveSessionDeckId(createdSession) !== activeDeck.id) {
-      session = await api.moveSessionToDeck(activeDeck.id, createdSession.id);
-    }
-    applyRuntimeEvent({
-      type: session.deckId === createdSession.deckId ? "session.created" : "session.updated",
-      session
-    });
-    uiState.error = "";
-    debugLog("sessions.create.ok", { sessionId: session.id, deckId: session.deckId || null });
-  } catch {
-    setError("Failed to create session.");
-  }
-});
-
-if (deckCreateBtn) {
-  deckCreateBtn.addEventListener("click", async () => {
-    try {
-      await createDeckFlow();
-      uiState.error = "";
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to create deck."));
-    }
-  });
-}
-
-if (deckRenameBtn) {
-  deckRenameBtn.addEventListener("click", async () => {
-    try {
-      await renameDeckFlow();
-      uiState.error = "";
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to rename deck."));
-    }
-  });
-}
-
-if (deckDeleteBtn) {
-  deckDeleteBtn.addEventListener("click", async () => {
-    try {
-      await deleteDeckFlow();
-      uiState.error = "";
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to delete deck."));
-    }
-  });
-}
-
 layoutRuntimeController?.bindUiEvents();
 terminalSearchController?.bindUiEvents();
 terminalSearchController?.updateUi();
@@ -1644,29 +1587,61 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   formatQuickSwitchPreview
 });
 
-sendBtn.addEventListener("click", submitCommand);
 commandComposerAutocompleteController?.bindUiEvents();
 
-initializeRuntime().catch(() => {
+appLifecycleController = createAppLifecycleController({
+  windowRef: window,
+  createBtn,
+  deckCreateBtn,
+  deckRenameBtn,
+  deckDeleteBtn,
+  sendBtn,
+  api,
+  getActiveDeck,
+  resolveSessionDeckId,
+  applyRuntimeEvent,
+  setError,
+  clearUiError: () => {
+    uiState.error = "";
+  },
+  getErrorMessage,
+  debugLog,
+  createDeckFlow,
+  renameDeckFlow,
+  deleteDeckFlow,
+  submitCommand,
+  bootstrapDevAuthToken,
+  startWsRuntime: () => wsRuntimeController?.start() || null,
+  setWsClient: (client) => {
+    wsClient = client;
+  },
+  scheduleBootstrapFallback,
+  scheduleGlobalResize,
+  disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose(),
+  closeWsClient: () => {
+    if (wsClient) {
+      wsClient.close();
+    }
+  },
+  disposeAuthBootstrapRuntime: () => authBootstrapRuntimeController?.dispose(),
+  disposeSessionTerminalResize: () => sessionTerminalResizeController?.dispose(),
+  disposeTerminalSearch: () => terminalSearchController?.dispose(),
+  disposeCommandComposerRuntime: () => commandComposerRuntimeController?.dispose(),
+  disposeCommandComposerAutocomplete: () => commandComposerAutocompleteController?.dispose(),
+  disconnectTerminalObservers: () => {
+    for (const observer of terminalObservers.values()) {
+      observer.disconnect();
+    }
+  },
+  disposeTerminals: () => {
+    for (const entry of terminals.values()) {
+      entry.terminal.dispose();
+    }
+  }
+});
+appLifecycleController.bindUiEvents();
+appLifecycleController.bindWindowEvents();
+
+appLifecycleController.initializeRuntime().catch(() => {
   setError("Failed to initialize application runtime.");
 });
-
-window.addEventListener("beforeunload", () => {
-  activityCompletionNotifier.dispose();
-  if (wsClient) {
-    wsClient.close();
-  }
-  authBootstrapRuntimeController?.dispose();
-  sessionTerminalResizeController?.dispose();
-  terminalSearchController?.dispose();
-  commandComposerRuntimeController?.dispose();
-  commandComposerAutocompleteController?.dispose();
-  for (const observer of terminalObservers.values()) {
-    observer.disconnect();
-  }
-  for (const entry of terminals.values()) {
-    entry.terminal.dispose();
-  }
-});
-
-window.addEventListener("resize", scheduleGlobalResize);
