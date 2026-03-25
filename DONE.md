@@ -4,6 +4,8 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] Governance documents were revalidated after the `ARC-010` closeout: `TODO.md` still contains only the open tasks `ARC-011`, `ARC-012`, `QLT-123`, and `QLT-124`; `ROADMAP.md` still limits `v0.4.0-H2` to `ARC-011` and `ARC-012`, with `QLT-123` and `QLT-124` queued in `v0.4.0-H3`.
+- [x] Persistent coordination context was refreshed so `CODEX_CONTEXT.md` records the current post-`ARC-010` governance baseline and explicit ownership split (`CODY`, `FE`, `QA`, `BE`, `PLAT`, `SAS`) without re-opening already completed work.
 - [x] `ARC-010D` is now completed: explicit closeout regression coverage was added in `frontend/test/app-architecture-closeout.test.js` to lock `frontend/src/public/app.js` to a bootstrap-only entrypoint and guard runtime assembly ownership in `frontend/src/public/app-runtime-composition-controller.js`.
 - [x] `ARC-010` is now fully closed: `ARC-010A` through `ARC-010D` are completed and validated, and `frontend/src/public/app.js` is reduced to a stable bootstrap/error-boundary shell.
 - [x] Focused regression validation for `ARC-010D` passed with `node --test frontend/test/app-architecture-closeout.test.js frontend/test/app.test.js frontend/test/app-bootstrap-composition-controller.test.js`.
