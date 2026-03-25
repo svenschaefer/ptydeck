@@ -14,6 +14,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: `v0.4.0-H5`.
 - Active scoped tasks: `QLT-125`.
+- Queued next wave: `v0.4.0-H6` (`QLT-126`, `QLT-127`).
 - Latest completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
 - Previous completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
@@ -793,6 +794,33 @@ Exit criteria:
 - Inactive sessions are not marked as newly active by empty, redraw-only, transport-only, or otherwise semantically no-op stream updates.
 - Activity tracking continues to react to meaningful terminal output without regressing existing status/progress/plugin interpretation behavior.
 - Regression coverage demonstrates the difference between meaningful output chunks and ignorable no-op stream noise.
+
+### v0.4.0-H6 - Startup Warmup Gate and Bootstrap Deferral
+
+- `QLT-126`
+- `QLT-127`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-126`
+- `QLT-127`
+
+Dependencies:
+
+- `QLT-126` runs after `QLT-125` so backend startup readiness does not depend on semantically empty activity noise that should already be filtered out of session-activity semantics.
+- `QLT-127` depends on `QLT-126` so frontend bootstrap deferral and the operator skip affordance consume one explicit backend warmup-state contract instead of inferring readiness from ad-hoc startup timing heuristics.
+
+Exit criteria:
+
+- Backend exposes one explicit startup warmup state indicating that persisted sessions are still being brought back after server boot.
+- The backend warmup state remains active until no session has been in the active state for one continuous second after startup.
+- Frontend delays normal bootstrap while the backend warmup state is active and offers an explicit user-controlled skip path.
+- Frontend starts automatically once the warmup state clears, without requiring a manual reload after the server finishes session startup.
+- Regression coverage demonstrates backend warmup-state transitions, frontend wait/skip behavior, and automatic bootstrap handoff when startup settles.
 
 ### Completed Items
 

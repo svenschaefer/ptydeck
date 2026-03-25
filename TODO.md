@@ -15,6 +15,8 @@ Completed work belongs in `DONE.md`.
 ## Active Open Tasks (Current)
 
 - `QLT-125` Owner `FE`: Ignore empty or semantically no-op stream updates for session activity tracking so inactive sessions are not marked as "activity happened" again when the runtime emits transport-level or redraw-only chunks that carry no meaningful terminal output.
+- `QLT-126` Owner `BE`: Introduce a backend startup warmup status for restart recovery so the server reports "starting sessions" until no session has held the active state for one full second after boot, while keeping the runtime recovery path observable to clients.
+- `QLT-127` Owner `FE`: Gate normal frontend bootstrap behind the backend startup warmup status, render an explicit wait/skip affordance during "server is starting sessions", and continue startup automatically when the backend warmup state clears or immediately when the user chooses to skip waiting.
 
 ## Active Ownership Role
 

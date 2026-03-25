@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] Planning sync completed: promoted `QLT-126` and `QLT-127` into `TODO.md` for backend startup warmup-state reporting and frontend bootstrap deferral with explicit skip behavior.
+- [x] Roadmap sync completed: queued `v0.4.0-H6` after `v0.4.0-H5` with explicit dependency ordering between `QLT-125`, `QLT-126`, and `QLT-127`.
+- [x] Context sync completed: `CODEX_CONTEXT.md` now reflects the queued startup warmup gate follow-up and no longer claims that `TODO.md` has no open implementation tasks.
 - [x] Planning sync completed: promoted `QLT-125` into `TODO.md` as the next explicit frontend bugfix task for ignoring empty/no-op stream updates in activity tracking.
 - [x] Roadmap sync completed: `ROADMAP.md` now marks `v0.4.0-H5` as the active wave with `QLT-125` as the active scoped task and explicit exit criteria for stream-activity noise filtering.
 - [x] Context sync completed: `CODEX_CONTEXT.md` now reflects `v0.4.0-H5` as the active wave and records the new open-task focus on filtering semantically empty stream updates out of activity-state transitions.
