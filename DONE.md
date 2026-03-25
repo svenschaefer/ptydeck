@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010C` is now completed: the remaining inline runtime/controller assembly was removed from `frontend/src/public/app.js` and moved into `frontend/src/public/app-runtime-composition-controller.js`.
+- [x] `frontend/src/public/app.js` is now reduced to top-level app startup and error-boundary wiring only.
+- [x] The new runtime-composition controller now owns runtime config resolution, API/store/bootstrap setup, DOM-ref collection, stream engine setup, shared runtime state creation, controller/facade assembly, and bootstrap-controller handoff.
+- [x] Frontend build/lint script coverage was updated so `src/public/app-runtime-composition-controller.js` participates in syntax-check gates.
+- [x] Focused regression validation for the `ARC-010C` refactor passed with `npm --prefix frontend run lint` and `node --test frontend/test/app.test.js frontend/test/app-bootstrap-composition-controller.test.js`.
+- [x] Full validation for `ARC-010C` passed with `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`; the root `npm run test` wrapper stalled after the underlying component suites had already completed successfully, so the deterministic per-workspace fallback was used per repository execution-hygiene rules.
+- [x] Coverage after the `ARC-010C` closeout step: backend `91.60%` lines, frontend `95.80%` lines overall.
 - [x] `ARC-010B` is now completed: the remaining startup/bootstrap composition wiring was extracted from `frontend/src/public/app.js` into `frontend/src/public/app-bootstrap-composition-controller.js`.
 - [x] The new bootstrap composition controller now owns command-engine/target/executor startup assembly, auth bootstrap runtime assembly, WS runtime assembly, composer runtime assembly, lifecycle assembly, store hydration/subscription, and initial UI/runtime bootstrap sequencing.
 - [x] Added focused regression coverage for the new bootstrap composition controller in `frontend/test/app-bootstrap-composition-controller.test.js`, including composition-order and bootstrap-sequencing assertions.

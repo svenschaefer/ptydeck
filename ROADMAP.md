@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
-- Active scoped tasks (`H2`): `ARC-010C`, `ARC-010D`, `ARC-011`, `ARC-012` (`ARC-009`, `ARC-010A`, and `ARC-010B` completed; `ARC-010` remains the umbrella closeout block for `ARC-010C` and `ARC-010D`).
+- Active scoped tasks (`H2`): `ARC-010D`, `ARC-011`, `ARC-012` (`ARC-009`, `ARC-010A`, `ARC-010B`, and `ARC-010C` completed; `ARC-010` remains the umbrella closeout block for `ARC-010D`).
 - Queued next release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics) with `QLT-123`, `QLT-124`.
 - Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -688,10 +688,10 @@ Completed in this milestone so far:
 - `ARC-009`
 - `ARC-010A`
 - `ARC-010B`
+- `ARC-010C`
 
 Remaining in this milestone:
 
-- `ARC-010C`
 - `ARC-010D`
 - `ARC-011`
 - `ARC-012`
@@ -700,7 +700,7 @@ Dependencies:
 
 - `ARC-010A` depends on `ARC-009` and is completed; the last app-level command/UI delegation glue is now extracted on top of stabilized command/runtime boundaries.
 - `ARC-010B` depended on `ARC-010A` and is completed; startup/bootstrap composition wiring now lives in `frontend/src/public/app-bootstrap-composition-controller.js`, so `frontend/src/public/app.js` no longer owns the hidden runtime-assembly cluster.
-- `ARC-010C` depends on `ARC-010A` and `ARC-010B` so final `app.js` cleanup happens only after the remaining orchestration has explicit homes.
+- `ARC-010C` depended on `ARC-010A` and `ARC-010B` and is completed; `frontend/src/public/app.js` is now reduced to top-level startup/error-boundary code while the former inline runtime assembly lives in `frontend/src/public/app-runtime-composition-controller.js`.
 - `ARC-010D` depends on `ARC-010A`, `ARC-010B`, and `ARC-010C` so closeout coverage validates the actual final architecture shape rather than an in-progress split.
 - `ARC-011` depends on `ARC-009` and completion of `ARC-010A` ... `ARC-010D` to enforce layer contracts after extraction points are final.
 - `ARC-012` depends on `ARC-009`, completion of `ARC-010A` ... `ARC-010D`, and `ARC-011` so architecture-regression coverage validates the final boundary model.
