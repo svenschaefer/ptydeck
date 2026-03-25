@@ -32,6 +32,7 @@ import {
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
+import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -258,8 +259,9 @@ const SYSTEM_SLASH_COMMANDS = [
   "custom",
   "help"
 ];
-let terminalSettings = loadTerminalSettings();
-let sessionInputSettings = loadSessionInputSettings();
+let layoutRuntimeController = null;
+let terminalSettings = null;
+let sessionInputSettings = {};
 const sessionThemeDrafts = new Map();
 let wsClient = null;
 let wsRuntimeController = null;
@@ -339,6 +341,42 @@ const startupPerf = {
 if (typeof window !== "undefined") {
   window.__PTYDECK_PERF__ = startupPerf;
 }
+
+layoutRuntimeController = createLayoutRuntimeController({
+  windowRef: window,
+  settingsStorageKey: SETTINGS_STORAGE_KEY,
+  sessionInputSettingsStorageKey: SESSION_INPUT_SETTINGS_STORAGE_KEY,
+  sessionFilterStorageKey: SESSION_FILTER_STORAGE_KEY,
+  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
+  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
+  sendTerminatorModeSet: SEND_TERMINATOR_MODE_SET,
+  cardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
+  getLayoutSettingsController: () => layoutSettingsController,
+  getTerminalSettings: () => terminalSettings,
+  setTerminalSettings: (nextSettings) => {
+    terminalSettings = nextSettings;
+  },
+  getSessionInputSettings: () => sessionInputSettings,
+  setSessionInputSettings: (nextSettings) => {
+    sessionInputSettings = nextSettings;
+  },
+  getActiveDeck,
+  api,
+  applyRuntimeEvent,
+  applySettingsToAllTerminals,
+  scheduleGlobalResize,
+  render,
+  setCommandFeedback,
+  setError,
+  getErrorMessage,
+  settingsApplyBtn,
+  settingsColsEl,
+  settingsRowsEl,
+  sidebarToggleBtn,
+  sidebarLauncherBtn
+});
+terminalSettings = layoutRuntimeController.loadTerminalSettings();
+sessionInputSettings = layoutRuntimeController.loadSessionInputSettings();
 
 deckRuntimeController = createDeckRuntimeController({
   store,
@@ -435,11 +473,7 @@ function scheduleCommandSuggestions() {
 }
 
 function clampInt(value, fallback, min, max) {
-  const parsed = Number.parseInt(String(value ?? ""), 10);
-  if (!Number.isInteger(parsed)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, parsed));
+  return layoutRuntimeController?.clampInt(value, fallback, min, max) ?? fallback;
 }
 
 function readStoredSettings() {
@@ -458,23 +492,17 @@ function readStoredSettings() {
 }
 
 function saveTerminalSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
-      return;
-    }
-    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(terminalSettings));
-  } catch {
-    // ignore storage failures (private mode / quota)
-  }
+  layoutRuntimeController?.saveTerminalSettings();
 }
 
 function loadTerminalSettings() {
-  const stored = readStoredSettings();
-  return {
-    cols: clampInt(stored?.cols, DEFAULT_TERMINAL_COLS, 20, 400),
-    rows: clampInt(stored?.rows, DEFAULT_TERMINAL_ROWS, 5, 120),
-    sidebarVisible: stored?.sidebarVisible !== false
-  };
+  return (
+    layoutRuntimeController?.loadTerminalSettings() || {
+      cols: DEFAULT_TERMINAL_COLS,
+      rows: DEFAULT_TERMINAL_ROWS,
+      sidebarVisible: true
+    }
+  );
 }
 
 function getSessionFilterText() {
@@ -521,62 +549,19 @@ function removeDeckFromState(deckId, options = {}) {
 }
 
 function normalizeSendTerminatorMode(value) {
-  return SEND_TERMINATOR_MODE_SET.has(value) ? value : "auto";
+  return layoutRuntimeController?.normalizeSendTerminatorMode(value) || "auto";
 }
 
 function loadSessionInputSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
-      return {};
-    }
-    const raw = window.localStorage.getItem(SESSION_INPUT_SETTINGS_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-    const next = {};
-    for (const [sessionId, value] of Object.entries(parsed)) {
-      const mode = normalizeSendTerminatorMode(String(value?.sendTerminator || "").toLowerCase());
-      next[sessionId] = { sendTerminator: mode };
-    }
-    return next;
-  } catch {
-    return {};
-  }
+  return layoutRuntimeController?.loadSessionInputSettings() || {};
 }
 
 function loadStoredSessionFilterText() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
-      return "";
-    }
-    const raw = window.localStorage.getItem(SESSION_FILTER_STORAGE_KEY);
-    if (typeof raw !== "string") {
-      return "";
-    }
-    return raw.trim();
-  } catch {
-    return "";
-  }
+  return layoutRuntimeController?.loadStoredSessionFilterText() || "";
 }
 
 function saveStoredSessionFilterText(value) {
-  try {
-    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
-      return;
-    }
-    const normalized = String(value || "").trim();
-    if (!normalized && typeof window.localStorage.removeItem === "function") {
-      window.localStorage.removeItem(SESSION_FILTER_STORAGE_KEY);
-      return;
-    }
-    window.localStorage.setItem(SESSION_FILTER_STORAGE_KEY, normalized);
-  } catch {
-    // ignore storage failures (private mode / quota)
-  }
+  layoutRuntimeController?.saveStoredSessionFilterText(value);
 }
 
 store.hydrateRuntimePreferences({
@@ -585,34 +570,15 @@ store.hydrateRuntimePreferences({
 });
 
 function saveSessionInputSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.setItem !== "function") {
-      return;
-    }
-    window.localStorage.setItem(SESSION_INPUT_SETTINGS_STORAGE_KEY, JSON.stringify(sessionInputSettings));
-  } catch {
-    // ignore storage failures (private mode / quota)
-  }
+  layoutRuntimeController?.saveSessionInputSettings();
 }
 
 function getSessionSendTerminator(sessionId) {
-  if (!sessionId || typeof sessionId !== "string") {
-    return "auto";
-  }
-  const mode = sessionInputSettings?.[sessionId]?.sendTerminator;
-  return normalizeSendTerminatorMode(String(mode || "").toLowerCase());
+  return layoutRuntimeController?.getSessionSendTerminator(sessionId) || "auto";
 }
 
 function setSessionSendTerminator(sessionId, mode) {
-  if (!sessionId || typeof sessionId !== "string") {
-    return;
-  }
-  const nextMode = normalizeSendTerminatorMode(String(mode || "").toLowerCase());
-  sessionInputSettings = {
-    ...sessionInputSettings,
-    [sessionId]: { sendTerminator: nextMode }
-  };
-  saveSessionInputSettings();
+  layoutRuntimeController?.setSessionSendTerminator(sessionId, mode);
 }
 
 function isValidHexColor(value) {
@@ -822,76 +788,36 @@ function renderSessionArtifacts(entry, session) {
 }
 
 function measureTerminalCellWidthPx() {
-  if (!layoutSettingsController) {
-    return 10;
-  }
-  return Math.max(7, Math.ceil((layoutSettingsController.computeFixedCardWidthPx(1) - TERMINAL_CARD_HORIZONTAL_CHROME_PX) || 10));
+  return layoutRuntimeController?.measureTerminalCellWidthPx() || 10;
 }
 
 function computeFixedMountHeightPx(rows) {
-  if (!layoutSettingsController) {
-    const lineHeightPx = TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT;
-    return Math.max(120, Math.round(rows * lineHeightPx + TERMINAL_MOUNT_VERTICAL_CHROME_PX));
-  }
-  return layoutSettingsController.computeFixedMountHeightPx(rows);
+  return layoutRuntimeController?.computeFixedMountHeightPx(rows) || Math.max(120, Math.round(rows * TERMINAL_FONT_SIZE * TERMINAL_LINE_HEIGHT));
 }
 
 function computeFixedCardWidthPx(cols) {
-  if (!layoutSettingsController) {
-    const cellWidthPx = measureTerminalCellWidthPx();
-    return Math.max(260, Math.round(cols * cellWidthPx + TERMINAL_CARD_HORIZONTAL_CHROME_PX));
-  }
-  return layoutSettingsController.computeFixedCardWidthPx(cols);
+  return layoutRuntimeController?.computeFixedCardWidthPx(cols) || Math.max(260, Math.round(cols * measureTerminalCellWidthPx()));
 }
 
 function syncTerminalGeometryCss() {
-  layoutSettingsController?.syncTerminalGeometryCss(terminalSettings);
+  layoutRuntimeController?.syncTerminalGeometryCss();
 }
 
 function syncSettingsUi() {
-  layoutSettingsController?.syncSettingsUi(terminalSettings);
+  layoutRuntimeController?.syncSettingsUi();
 }
 
 function readSettingsFromUi() {
-  if (!layoutSettingsController) {
-    return {
-      cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
-      rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
-      sidebarVisible: terminalSettings.sidebarVisible !== false
-    };
-  }
-  return layoutSettingsController.readSettingsFromUi(terminalSettings);
+  return layoutRuntimeController?.readSettingsFromUi() || {
+    cols: terminalSettings?.cols || DEFAULT_TERMINAL_COLS,
+    rows: terminalSettings?.rows || DEFAULT_TERMINAL_ROWS,
+    sidebarVisible: terminalSettings?.sidebarVisible !== false
+  };
 }
 
 async function applyTerminalSizeSettings(nextCols, nextRows) {
-  const activeDeck = getActiveDeck();
-  if (!activeDeck) {
-    throw new Error("No active deck available.");
-  }
-  const currentSettings =
-    activeDeck.settings && typeof activeDeck.settings === "object" && !Array.isArray(activeDeck.settings)
-      ? activeDeck.settings
-      : {};
-  const updatedDeck = await api.updateDeck(activeDeck.id, {
-    settings: {
-      ...currentSettings,
-      terminal: {
-        cols: nextCols,
-        rows: nextRows
-      }
-    }
-  });
-  applyRuntimeEvent(
-    {
-      type: "deck.updated",
-      deck: updatedDeck
-    },
-    { preferredActiveDeckId: updatedDeck.id }
-  );
   uiState.error = "";
-  applySettingsToAllTerminals({ deckId: activeDeck.id, force: true });
-  scheduleGlobalResize({ deckId: activeDeck.id, force: true });
-  render();
+  return layoutRuntimeController?.applyTerminalSizeSettings(nextCols, nextRows);
 }
 
 function applySettingsToAllTerminals(options = {}) {
@@ -915,27 +841,11 @@ function applyResizeForSession(sessionId, options = {}) {
 }
 
 async function onApplySettings() {
-  const next = readSettingsFromUi();
-  try {
-    await applyTerminalSizeSettings(next.cols, next.rows);
-    setCommandFeedback(`Deck size set to ${next.cols}x${next.rows} for '${getActiveDeck()?.name || "deck"}'.`);
-  } catch (err) {
-    setError(getErrorMessage(err, "Failed to save deck settings."));
-  }
+  return layoutRuntimeController?.onApplySettings();
 }
 
 function setSidebarVisible(visible) {
-  const nextVisible = Boolean(visible);
-  if ((terminalSettings.sidebarVisible !== false) === nextVisible) {
-    return;
-  }
-  terminalSettings = {
-    ...terminalSettings,
-    sidebarVisible: nextVisible
-  };
-  saveTerminalSettings();
-  syncSettingsUi();
-  scheduleGlobalResize();
+  return layoutRuntimeController?.setSidebarVisible(visible);
 }
 
 function scheduleGlobalResize(options = {}) {
@@ -1664,33 +1574,7 @@ if (deckDeleteBtn) {
   });
 }
 
-if (sidebarToggleBtn) {
-  sidebarToggleBtn.addEventListener("click", () => setSidebarVisible(false));
-}
-
-if (sidebarLauncherBtn) {
-  sidebarLauncherBtn.addEventListener("click", () => setSidebarVisible(true));
-}
-
-if (settingsApplyBtn) {
-  settingsApplyBtn.addEventListener("click", onApplySettings);
-}
-if (settingsColsEl) {
-  settingsColsEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onApplySettings();
-    }
-  });
-}
-if (settingsRowsEl) {
-  settingsRowsEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onApplySettings();
-    }
-  });
-}
+layoutRuntimeController?.bindUiEvents();
 terminalSearchController?.bindUiEvents();
 terminalSearchController?.updateUi();
 async function submitCommand() {

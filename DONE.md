@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted layout/runtime persistence orchestration from `frontend/src/public/app.js` into `frontend/src/public/layout-runtime-controller.js` (terminal settings persistence, session input terminator persistence, session-filter storage, sidebar visibility state, deck terminal-size apply flow, and settings UI event binding).
+- [x] App runtime now composes layout/runtime behavior through the dedicated layout runtime controller while keeping `frontend/src/public/ui/layout-settings-controller.js` focused on DOM/CSS geometry and settings-form parsing only.
+- [x] Added focused regression coverage for the new layout runtime controller in `frontend/test/layout-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/layout-runtime-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 1672 lines after the layout/runtime extraction step.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/layout-runtime-controller.test.js frontend/test/layout-settings-controller.test.js frontend/test/app.test.js`.
 - [x] `ARC-010` progress: extracted session runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/session-runtime-controller.js` (quick-id allocation/pruning, terminal chunk append/replay, session exit/close/remove store handoff, runtime-event delegation, and display-name/token helpers).
 - [x] App runtime now composes session runtime behavior through the dedicated session runtime controller while preserving existing store/reducer semantics, hidden-terminal replay handling, and runtime-event wiring.
 - [x] Added focused regression coverage for the new session runtime controller in `frontend/test/session-runtime-controller.test.js`.
