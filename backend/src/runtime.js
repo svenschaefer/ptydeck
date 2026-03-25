@@ -670,11 +670,7 @@ export function createRuntime(config) {
   function buildCorsHeaders(req) {
     const requestOrigin = typeof req.headers.origin === "string" ? req.headers.origin : "";
     const allowAnyOrigin = corsAllowedOrigins.includes("*");
-    const allowedOrigin = allowAnyOrigin
-      ? "*"
-      : requestOrigin && corsAllowedOrigins.includes(requestOrigin)
-        ? requestOrigin
-        : "";
+    const allowedOrigin = resolveAllowedRequestOrigin(requestOrigin);
 
     const headers = {
       ...buildSecurityHeaders(),
@@ -691,6 +687,17 @@ export function createRuntime(config) {
     }
 
     return headers;
+  }
+
+  function resolveAllowedRequestOrigin(requestOrigin) {
+    const allowAnyOrigin = corsAllowedOrigins.includes("*");
+    if (allowAnyOrigin) {
+      return "*";
+    }
+    if (requestOrigin && corsAllowedOrigins.includes(requestOrigin)) {
+      return requestOrigin;
+    }
+    return "";
   }
 
   function buildSecurityHeaders() {
@@ -1887,6 +1894,7 @@ export function createRuntime(config) {
   server.on("upgrade", (request, socket, head) => {
     const requestContext = resolveRequestContext(request, config.trustedProxy);
     const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
+    const requestOrigin = typeof request.headers.origin === "string" ? request.headers.origin : "";
     if (requestUrl.pathname !== "/ws") {
       recordWsError("upgrade_path_rejected");
       logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
@@ -1906,6 +1914,24 @@ export function createRuntime(config) {
       recordWsError("upgrade_tls_rejected");
       socket.write(
         `HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(payload)}`
+      );
+      socket.destroy();
+      return;
+    }
+    const allowedRequestOrigin = resolveAllowedRequestOrigin(requestOrigin);
+    if (!allowedRequestOrigin) {
+      const payload = {
+        error: "UnauthorizedOrigin",
+        message: "WebSocket origin is not allowed."
+      };
+      logDebug("ws.upgrade.origin_rejected", {
+        clientIp: requestContext.clientIp,
+        trustedProxy: requestContext.trustedProxy,
+        origin: requestOrigin || null
+      });
+      recordWsError("upgrade_origin_rejected");
+      socket.write(
+        `HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nConnection: close\r\nVary: Origin\r\n\r\n${JSON.stringify(payload)}`
       );
       socket.destroy();
       return;

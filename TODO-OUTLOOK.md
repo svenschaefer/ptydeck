@@ -23,7 +23,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] `ENT-002` Owner `BE`: Add tenant-aware session scoping model (tenantId propagation, API filtering, WS event isolation by tenant).
 - [ ] `ENT-003` Owner `BE`: Add structured audit logging for security-relevant actions (session create/delete/input/resize, auth failures) with actor identity and outcome.
 - [ ] `ENT-010` Owner `QA`: Add security-focused integration tests (authz boundary checks, tenant isolation checks, rate-limit enforcement checks).
-- [ ] `ENT-017` Owner `BE`: Enforce WebSocket `Origin` allowlist checks on upgrade requests and return explicit unauthorized-origin errors.
 - [ ] `ENT-025` Owner `BE`: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_MODE=dev` as local-only fallback.
 
 ## Scale and Runtime Isolation

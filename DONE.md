@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ENT-017` is now completed: WebSocket upgrade requests are now checked against the configured origin allowlist before acceptance, and missing or disallowed origins are rejected with an explicit `UnauthorizedOrigin` error contract instead of silently proceeding.
+- [x] WebSocket origin enforcement is applied early in the backend upgrade path in `backend/src/runtime.js`, before rate-limit and auth-ticket handling, so disallowed browser origins are rejected deterministically without consuming normal connection admission flow.
+- [x] Regression coverage for `ENT-017` was added in `backend/test/ws.integration.test.js`, covering missing-origin rejection, disallowed-origin rejection, allowed-origin acceptance, and the existing TLS-forwarded acceptance path under explicit origin requirements.
+- [x] Validation for `ENT-017` passed with targeted backend regressions (`node --test backend/test/ws.integration.test.js` and `node --test backend/test/runtime.integration.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with deterministic serial validation and no leftover background validation processes.
+- [x] Coverage after the `ENT-017` closeout step: backend `91.60%` lines, frontend `95.62%` lines overall.
+- [x] `v0.4.0-H7` is now fully completed: `ENT-017` was promoted from `TODO-OUTLOOK.md`, implemented, validated, and closed in one cycle, and there is currently no active open delivery wave in `ROADMAP.md`.
 - [x] `QLT-126` is now completed: backend startup readiness now includes an explicit warmup phase for restart recovery, and `/ready` reports `booting`, `starting_sessions`, and `ready` phases with structured warmup metadata until restored sessions have been quiet for one continuous second.
 - [x] Backend startup warmup activates only for restore scenarios with persisted sessions, so clean empty startups do not pay an unnecessary readiness delay while restart recovery remains observable and deterministic.
 - [x] `QLT-127` is now completed: frontend bootstrap now waits on the backend warmup state before normal auth/WS startup, renders a dedicated startup-warmup wait surface, and exposes an explicit skip action so the operator can bypass the wait when desired.

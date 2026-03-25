@@ -610,6 +610,7 @@ test("WS TLS ingress enforcement rejects non-HTTPS and accepts trusted forwarded
 
     const acceptedEvents = [];
     const acceptedWs = new WebSocket(wsUrl, {
+      origin: "https://app.example.com",
       headers: {
         "x-forwarded-proto": "https",
         "x-forwarded-host": "api.example.com"
@@ -620,6 +621,55 @@ test("WS TLS ingress enforcement rejects non-HTTPS and accepts trusted forwarded
     });
     await waitFor(() => acceptedEvents.some((event) => event.type === "snapshot"));
     acceptedWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("WS origin allowlist rejects missing or disallowed origin and accepts allowed origin", async () => {
+  const { runtime, wsUrl, baseUrl } = await createStartedRuntime({
+    corsOrigin: "https://app.example.com",
+    corsAllowedOrigins: ["https://app.example.com"]
+  });
+
+  try {
+    const missingOriginEvents = [];
+    const missingOriginWs = new WebSocket(wsUrl);
+    missingOriginWs.on("error", () => {
+      missingOriginEvents.push("error");
+    });
+    missingOriginWs.on("close", () => {
+      missingOriginEvents.push("close");
+    });
+    await waitFor(() => missingOriginEvents.includes("close"));
+
+    const disallowedOriginEvents = [];
+    const disallowedOriginWs = new WebSocket(wsUrl, {
+      origin: "https://evil.example.com"
+    });
+    disallowedOriginWs.on("error", () => {
+      disallowedOriginEvents.push("error");
+    });
+    disallowedOriginWs.on("close", () => {
+      disallowedOriginEvents.push("close");
+    });
+    await waitFor(() => disallowedOriginEvents.includes("close"));
+
+    const allowedEvents = [];
+    const allowedWs = new WebSocket(wsUrl, {
+      origin: "https://app.example.com"
+    });
+    allowedWs.on("message", (buffer) => {
+      allowedEvents.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => allowedEvents.some((event) => event.type === "snapshot"));
+
+    const metricsRes = await fetch(`http://${new URL(baseUrl).host}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metricsText = await metricsRes.text();
+    assert.match(metricsText, /ptydeck_ws_errors_by_reason_total\{reason="upgrade_origin_rejected"\} [1-9]\d*/);
+
+    allowedWs.close();
   } finally {
     await runtime.stop();
   }

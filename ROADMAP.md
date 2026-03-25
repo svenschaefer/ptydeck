@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
-- Previous completed wave: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
+- Latest completed wave: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
+- Previous completed wave: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
+- Previous completed wave before that: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
 - Previous completed wave before that: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
@@ -604,7 +605,7 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral)
+- Latest completed milestone: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement)
 - Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
@@ -822,6 +823,29 @@ Exit criteria:
 - Frontend delays normal bootstrap while the backend warmup state is active and offers an explicit user-controlled skip path.
 - Frontend starts automatically once the warmup state clears, without requiring a manual reload after the server finishes session startup.
 - Regression coverage demonstrates backend warmup-state transitions, frontend wait/skip behavior, and automatic bootstrap handoff when startup settles.
+
+### v0.4.0-H7 - WebSocket Origin Allowlist Enforcement
+
+- `ENT-017`
+
+Completed in this milestone so far:
+
+- `ENT-017`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `ENT-017` runs after `v0.4.0-H6` so the restart-recovery bootstrap contract is already stable before tightening WebSocket browser-origin admission semantics on the upgrade path.
+
+Exit criteria:
+
+- WebSocket upgrade requests are checked against the configured origin allowlist before the connection is accepted.
+- Missing or disallowed upgrade origins are rejected with an explicit unauthorized-origin error contract instead of silently proceeding.
+- Explicitly allowed origins continue to connect successfully without regressing existing TLS, auth-ticket, or reconnect behavior.
+- Regression coverage demonstrates allowed, missing, and disallowed WebSocket origin behavior on the upgrade path.
 
 ### Completed Items
 
