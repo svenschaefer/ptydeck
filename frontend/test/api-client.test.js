@@ -16,6 +16,26 @@ test("api client calls list sessions endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions");
 });
 
+test("api client calls ready endpoint outside api v1 base path", async () => {
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push({ url, method: "GET" });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "starting", phase: "starting_sessions", warmup: { enabled: true } })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const payload = await api.getReadyStatus();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/ready");
+  assert.equal(payload.status, "starting");
+  assert.equal(payload.phase, "starting_sessions");
+});
+
 test("api client calls deck lifecycle and move endpoints", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

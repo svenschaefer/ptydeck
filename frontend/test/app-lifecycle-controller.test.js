@@ -23,12 +23,16 @@ function createEventTarget() {
   };
 }
 
-test("app lifecycle controller initializes runtime in auth -> ws -> fallback order", async () => {
+test("app lifecycle controller initializes runtime in warmup -> auth -> ws -> fallback order", async () => {
   const calls = [];
   let wsClient = null;
   const expectedClient = { close() {} };
 
   const controller = createAppLifecycleController({
+    waitForStartupWarmup: async () => {
+      calls.push("warmup");
+      return "ready";
+    },
     bootstrapDevAuthToken: async () => {
       calls.push("auth");
     },
@@ -47,7 +51,7 @@ test("app lifecycle controller initializes runtime in auth -> ws -> fallback ord
 
   await controller.initializeRuntime();
 
-  assert.deepEqual(calls, ["auth", "ws", "set", "fallback"]);
+  assert.deepEqual(calls, ["warmup", "auth", "ws", "set", "fallback"]);
   assert.equal(wsClient, expectedClient);
 });
 
@@ -111,6 +115,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   const deckCreateBtn = createEventTarget();
   const deckRenameBtn = createEventTarget();
   const deckDeleteBtn = createEventTarget();
+  const startupWarmupSkipBtn = createEventTarget();
   const sendBtn = createEventTarget();
   const errors = [];
   const cleanup = [];
@@ -129,6 +134,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     deckCreateBtn,
     deckRenameBtn,
     deckDeleteBtn,
+    startupWarmupSkipBtn,
     sendBtn,
     createDeckFlow: async () => {},
     renameDeckFlow: async () => {
@@ -138,6 +144,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     submitCommand: async () => {
       sendCalls += 1;
     },
+    skipStartupWarmupWait: () => cleanup.push("skip-warmup"),
     setError: (message) => errors.push(message),
     clearUiError: () => {
       clearCalls += 1;
@@ -148,6 +155,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     },
     disposeAppRuntimeState: () => cleanup.push("app-runtime"),
     disposeActivityCompletionNotifier: () => cleanup.push("activity"),
+    disposeStartupWarmup: () => cleanup.push("startup-warmup"),
     disposeStreamDebugTrace: () => cleanup.push("stream-debug"),
     closeWsClient: () => cleanup.push("ws"),
     disposeAuthBootstrapRuntime: () => cleanup.push("auth"),
@@ -165,6 +173,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   await deckCreateBtn.dispatch("click");
   await deckRenameBtn.dispatch("click");
   await deckDeleteBtn.dispatch("click");
+  await startupWarmupSkipBtn.dispatch("click");
   await sendBtn.dispatch("click");
 
   assert.equal(clearCalls, 2);
@@ -180,8 +189,10 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     handler({ type: "beforeunload" });
   }
   assert.deepEqual(cleanup, [
+    "skip-warmup",
     "app-runtime",
     "activity",
+    "startup-warmup",
     "stream-debug",
     "ws",
     "auth",

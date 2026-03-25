@@ -6,6 +6,10 @@ export function createWorkspaceRenderController(options = {}) {
   const commandInlineHintEl = options.commandInlineHintEl || null;
   const commandPreviewEl = options.commandPreviewEl || null;
   const commandSuggestionsEl = options.commandSuggestionsEl || null;
+  const startupWarmupGateEl = options.startupWarmupGateEl || null;
+  const startupWarmupMessageEl = options.startupWarmupMessageEl || null;
+  const startupWarmupDetailEl = options.startupWarmupDetailEl || null;
+  const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
 
   function resolveVisibleSessions({
     sessions = [],
@@ -78,6 +82,10 @@ export function createWorkspaceRenderController(options = {}) {
   function renderStatus({
     connectionState = "",
     loading = false,
+    startupGateActive = false,
+    startupGateMessage = "",
+    startupGateDetail = "",
+    startupGateCanSkip = false,
     error = "",
     commandFeedback = "",
     commandInlineHint = "",
@@ -89,7 +97,9 @@ export function createWorkspaceRenderController(options = {}) {
       stateEl.textContent = connectionState;
     }
     if (statusMessageEl) {
-      if (loading) {
+      if (startupGateActive) {
+        statusMessageEl.textContent = startupGateMessage || "Server is starting sessions.";
+      } else if (loading) {
         statusMessageEl.textContent = "Loading sessions...";
       } else if (error) {
         statusMessageEl.textContent = error;
@@ -111,6 +121,18 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (commandSuggestionsEl) {
       commandSuggestionsEl.textContent = commandSuggestions || "";
+    }
+    if (startupWarmupGateEl) {
+      startupWarmupGateEl.hidden = startupGateActive !== true;
+    }
+    if (startupWarmupMessageEl) {
+      startupWarmupMessageEl.textContent = startupGateMessage || "Server is starting sessions.";
+    }
+    if (startupWarmupDetailEl) {
+      startupWarmupDetailEl.textContent = startupGateDetail || "";
+    }
+    if (startupWarmupSkipBtn) {
+      startupWarmupSkipBtn.hidden = startupGateCanSkip !== true;
     }
   }
 

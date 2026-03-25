@@ -74,6 +74,8 @@ function createBaseOptions(overrides = {}) {
   const appRuntimeStateController = {
     getRuntimeBootstrapSource: () => "pending",
     setUiError: (message) => calls.push(["ui-error", message]),
+    setStartupGateState: (payload) => calls.push(["startup-gate", payload.phase]),
+    clearStartupGateState: () => calls.push(["startup-gate-clear"]),
     bootstrapDevAuthToken: async () => true,
     clearError: () => calls.push(["clear-error"]),
     markRuntimeConnected: () => calls.push(["runtime-connected"]),
@@ -221,6 +223,14 @@ test("app bootstrap composition controller composes the startup controller chain
         dispose() {}
       };
     },
+    createStartupWarmupController: (nextOptions) => {
+      calls.push(["factory", "startup-warmup", typeof nextOptions.api.getReadyStatus]);
+      return {
+        waitForServerWarmup: async () => "ready",
+        skipWait() {},
+        dispose() {}
+      };
+    },
     createWsRuntimeController: (nextOptions) => {
       calls.push(["factory", "ws", nextOptions.wsUrl]);
       return { start: () => ({ close() {} }) };
@@ -263,7 +273,7 @@ test("app bootstrap composition controller composes the startup controller chain
   assert.ok(composed.appLifecycleController);
   assert.deepEqual(
     calls.filter((entry) => entry[0] === "factory").map((entry) => entry[1]),
-    ["engine", "target", "executor", "auth", "ws", "autocomplete", "composer-runtime", "lifecycle"]
+    ["engine", "target", "executor", "auth", "startup-warmup", "ws", "autocomplete", "composer-runtime", "lifecycle"]
   );
 });
 

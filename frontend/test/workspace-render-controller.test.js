@@ -59,6 +59,10 @@ test("workspace-render controller renders empty-state and status fields", () => 
   const commandInlineHintEl = createTextEl();
   const commandPreviewEl = createTextEl();
   const commandSuggestionsEl = createTextEl();
+  const startupWarmupGateEl = { hidden: true };
+  const startupWarmupMessageEl = createTextEl();
+  const startupWarmupDetailEl = createTextEl();
+  const startupWarmupSkipBtn = { hidden: true };
 
   const controller = createWorkspaceRenderController({
     stateEl,
@@ -67,7 +71,11 @@ test("workspace-render controller renders empty-state and status fields", () => 
     commandFeedbackEl,
     commandInlineHintEl,
     commandPreviewEl,
-    commandSuggestionsEl
+    commandSuggestionsEl,
+    startupWarmupGateEl,
+    startupWarmupMessageEl,
+    startupWarmupDetailEl,
+    startupWarmupSkipBtn
   });
 
   controller.renderEmptyState({
@@ -105,4 +113,19 @@ test("workspace-render controller renders empty-state and status fields", () => 
   assert.equal(commandInlineHintEl.style.getPropertyValue("--hint-prefix-px"), "24px");
   assert.equal(commandPreviewEl.textContent, "preview");
   assert.equal(commandSuggestionsEl.textContent, "suggestions");
+
+  controller.renderStatus({
+    connectionState: "starting sessions",
+    loading: true,
+    startupGateActive: true,
+    startupGateMessage: "Server is starting sessions.",
+    startupGateDetail: "Waiting for quiet.",
+    startupGateCanSkip: true
+  });
+
+  assert.equal(statusMessageEl.textContent, "Server is starting sessions.");
+  assert.equal(startupWarmupGateEl.hidden, false);
+  assert.equal(startupWarmupMessageEl.textContent, "Server is starting sessions.");
+  assert.equal(startupWarmupDetailEl.textContent, "Waiting for quiet.");
+  assert.equal(startupWarmupSkipBtn.hidden, false);
 });

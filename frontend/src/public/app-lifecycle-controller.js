@@ -4,6 +4,7 @@ export function createAppLifecycleController(options = {}) {
   const deckCreateBtn = options.deckCreateBtn || null;
   const deckRenameBtn = options.deckRenameBtn || null;
   const deckDeleteBtn = options.deckDeleteBtn || null;
+  const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
   const api = options.api || null;
   const getActiveDeck = typeof options.getActiveDeck === "function" ? options.getActiveDeck : () => null;
@@ -20,6 +21,10 @@ export function createAppLifecycleController(options = {}) {
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
   const bootstrapDevAuthToken =
     typeof options.bootstrapDevAuthToken === "function" ? options.bootstrapDevAuthToken : () => Promise.resolve(false);
+  const waitForStartupWarmup =
+    typeof options.waitForStartupWarmup === "function" ? options.waitForStartupWarmup : () => Promise.resolve("ready");
+  const skipStartupWarmupWait =
+    typeof options.skipStartupWarmupWait === "function" ? options.skipStartupWarmupWait : () => {};
   const startWsRuntime = typeof options.startWsRuntime === "function" ? options.startWsRuntime : () => null;
   const setWsClient = typeof options.setWsClient === "function" ? options.setWsClient : () => {};
   const scheduleBootstrapFallback =
@@ -29,6 +34,8 @@ export function createAppLifecycleController(options = {}) {
   const scheduleGlobalResize = typeof options.scheduleGlobalResize === "function" ? options.scheduleGlobalResize : () => {};
   const disposeActivityCompletionNotifier =
     typeof options.disposeActivityCompletionNotifier === "function" ? options.disposeActivityCompletionNotifier : () => {};
+  const disposeStartupWarmup =
+    typeof options.disposeStartupWarmup === "function" ? options.disposeStartupWarmup : () => {};
   const disposeStreamDebugTrace =
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const closeWsClient = typeof options.closeWsClient === "function" ? options.closeWsClient : () => {};
@@ -86,6 +93,11 @@ export function createAppLifecycleController(options = {}) {
     bindAsyncClick(deckCreateBtn, createDeckFlow, "Failed to create deck.");
     bindAsyncClick(deckRenameBtn, renameDeckFlow, "Failed to rename deck.");
     bindAsyncClick(deckDeleteBtn, deleteDeckFlow, "Failed to delete deck.");
+    if (startupWarmupSkipBtn && typeof startupWarmupSkipBtn.addEventListener === "function") {
+      startupWarmupSkipBtn.addEventListener("click", () => {
+        skipStartupWarmupWait();
+      });
+    }
     if (sendBtn && typeof sendBtn.addEventListener === "function") {
       sendBtn.addEventListener("click", () => {
         submitCommand().catch(() => {
@@ -98,6 +110,7 @@ export function createAppLifecycleController(options = {}) {
   function handleBeforeUnload() {
     disposeAppRuntimeState();
     disposeActivityCompletionNotifier();
+    disposeStartupWarmup();
     disposeStreamDebugTrace();
     closeWsClient();
     disposeAuthBootstrapRuntime();
@@ -117,6 +130,7 @@ export function createAppLifecycleController(options = {}) {
   }
 
   async function initializeRuntime() {
+    await waitForStartupWarmup();
     await bootstrapDevAuthToken();
     setWsClient(startWsRuntime() || null);
     scheduleBootstrapFallback();

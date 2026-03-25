@@ -12,11 +12,12 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H6`.
-- Active scoped tasks: `QLT-126`, `QLT-127`.
-- Latest completed wave: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
-- Previous completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
-- Previous completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
+- Previous completed wave: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
+- Previous completed wave before that: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
+- Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -603,7 +604,7 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H4` (Declarative Command Contract)
+- Latest completed milestone: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral)
 - Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
@@ -802,17 +803,17 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
-
-Remaining in this milestone:
-
 - `QLT-126`
 - `QLT-127`
 
+Remaining in this milestone:
+
+- none
+
 Dependencies:
 
-- `QLT-126` runs after `QLT-125` so backend startup readiness does not depend on semantically empty activity noise that should already be filtered out of session-activity semantics.
-- `QLT-127` depends on `QLT-126` so frontend bootstrap deferral and the operator skip affordance consume one explicit backend warmup-state contract instead of inferring readiness from ad-hoc startup timing heuristics.
+- `QLT-126` ran after `QLT-125` so backend startup readiness did not depend on semantically empty activity noise that should already be filtered out of session-activity semantics.
+- `QLT-127` depended on `QLT-126` so frontend bootstrap deferral and the operator skip affordance consumed one explicit backend warmup-state contract instead of inferring readiness from ad-hoc startup timing heuristics.
 
 Exit criteria:
 

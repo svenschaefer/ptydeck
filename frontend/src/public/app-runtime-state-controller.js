@@ -56,6 +56,31 @@ export function createAppRuntimeStateController(options = {}) {
     requestRender();
   }
 
+  function setStartupGateState(nextState = {}) {
+    uiState.startupGateActive = nextState.active === true;
+    uiState.startupGatePhase = typeof nextState.phase === "string" ? nextState.phase : "";
+    uiState.startupGateMessage = typeof nextState.message === "string" ? nextState.message : "";
+    uiState.startupGateDetail = typeof nextState.detail === "string" ? nextState.detail : "";
+    uiState.startupGateCanSkip = nextState.canSkip === true;
+    requestRender();
+  }
+
+  function clearStartupGateState({ render = true } = {}) {
+    const hadState =
+      uiState.startupGateActive === true ||
+      Boolean(uiState.startupGateMessage) ||
+      Boolean(uiState.startupGateDetail) ||
+      uiState.startupGateCanSkip === true;
+    uiState.startupGateActive = false;
+    uiState.startupGatePhase = "";
+    uiState.startupGateMessage = "";
+    uiState.startupGateDetail = "";
+    uiState.startupGateCanSkip = false;
+    if (render && hadState) {
+      requestRender();
+    }
+  }
+
   function getErrorMessage(err, fallback) {
     if (err && typeof err.message === "string" && err.message.trim()) {
       return err.message.trim();
@@ -98,6 +123,7 @@ export function createAppRuntimeStateController(options = {}) {
   function markRuntimeBootstrapReady(source) {
     runtimeBootstrapSource = source;
     clearBootstrapFallbackTimer();
+    clearStartupGateState({ render: false });
     uiState.loading = false;
     if (startupPerf && startupPerf.bootstrapReadyAtMs === null) {
       startupPerf.bootstrapReadyAtMs = nowMs();
@@ -107,6 +133,7 @@ export function createAppRuntimeStateController(options = {}) {
   }
 
   function markRuntimeConnected() {
+    clearStartupGateState({ render: false });
     uiState.loading = false;
     uiState.error = "";
     requestRender();
@@ -152,6 +179,8 @@ export function createAppRuntimeStateController(options = {}) {
     setError,
     setCommandFeedback,
     setCommandPreview,
+    setStartupGateState,
+    clearStartupGateState,
     getErrorMessage,
     maybeReportStartupPerf,
     clearBootstrapFallbackTimer,

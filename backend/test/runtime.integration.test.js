@@ -38,6 +38,47 @@ function createFallbackAwarePtyFactory() {
   };
 }
 
+function createDelayedBootPtyFactory({ bootChunk = "BOOT\n", bootDelayMs = 20 } = {}) {
+  return () => {
+    let exitHandler = null;
+    let dataHandler = null;
+    let bootTimer = null;
+
+    function scheduleBoot() {
+      if (bootTimer !== null) {
+        return;
+      }
+      bootTimer = setTimeout(() => {
+        bootTimer = null;
+        if (dataHandler) {
+          dataHandler(bootChunk);
+        }
+      }, bootDelayMs);
+    }
+
+    return {
+      onExit(handler) {
+        exitHandler = handler;
+      },
+      onData(handler) {
+        dataHandler = handler;
+        scheduleBoot();
+      },
+      write() {},
+      resize() {},
+      kill() {
+        if (bootTimer !== null) {
+          clearTimeout(bootTimer);
+          bootTimer = null;
+        }
+        if (exitHandler) {
+          exitHandler({ exitCode: 0, signal: 0 });
+        }
+      }
+    };
+  };
+}
+
 async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const runtime = createRuntime({
@@ -47,6 +88,7 @@ async function createStartedRuntime(overrides = {}) {
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
     ...overrides
   });
   await runtime.start();
@@ -323,7 +365,8 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     dataPath,
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
-    maxBodyBytes: 1024 * 1024
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
   });
   await runtimeB.start();
   const baseUrlB = `http://127.0.0.1:${runtimeB.getAddress().port}/api/v1`;
@@ -1164,7 +1207,8 @@ test("runtime migrates legacy persistence to default deck catalog and deckId ass
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
-    createPty: createFallbackAwarePtyFactory()
+    createPty: createFallbackAwarePtyFactory(),
+    startupWarmupQuietMs: 20
   });
   try {
     await runtime.start();
@@ -1329,7 +1373,8 @@ test("runtime keeps unrestored persisted sessions visible across restart cycles"
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
-    sessionMaxConcurrent: 1
+    sessionMaxConcurrent: 1,
+    startupWarmupQuietMs: 20
   });
 
   try {
@@ -1372,7 +1417,8 @@ test("runtime keeps unrestored persisted sessions visible across restart cycles"
     corsOrigin: "*",
     corsAllowedOrigins: ["*"],
     maxBodyBytes: 1024 * 1024,
-    sessionMaxConcurrent: 1
+    sessionMaxConcurrent: 1,
+    startupWarmupQuietMs: 20
   });
   try {
     await runtimeB.start();
@@ -1414,14 +1460,93 @@ test("ready endpoint returns starting before startup gate and ready after releas
   const { port } = runtime.getAddress();
   const readyBefore = await fetch(`http://127.0.0.1:${port}/ready`);
   assert.equal(readyBefore.status, 200);
-  assert.deepEqual(await readyBefore.json(), { status: "starting" });
+  const readyBeforeBody = await readyBefore.json();
+  assert.equal(readyBeforeBody.status, "starting");
+  assert.equal(readyBeforeBody.phase, "booting");
+  assert.equal(readyBeforeBody.warmup.enabled, false);
 
   releaseReadyGate();
   await startPromise;
 
   const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);
   assert.equal(readyAfter.status, 200);
-  assert.deepEqual(await readyAfter.json(), { status: "ready" });
+  const readyAfterBody = await readyAfter.json();
+  assert.equal(readyAfterBody.status, "ready");
+  assert.equal(readyAfterBody.phase, "ready");
+  assert.equal(readyAfterBody.warmup.enabled, false);
+
+  await runtime.stop();
+});
+
+test("ready endpoint stays in starting_sessions until restored sessions go quiet", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const restoredSessionId = "restore-warmup";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: restoredSessionId,
+            cwd: homedir(),
+            shell: "sh",
+            name: "warmup",
+            startCwd: homedir(),
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        customCommands: [],
+        decks: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 60,
+    sessionActivityQuietMs: 25,
+    createPty: createDelayedBootPtyFactory({
+      bootChunk: "booting\n",
+      bootDelayMs: 15
+    })
+  });
+
+  const startPromise = runtime.start();
+  while (!runtime.getAddress()) {
+    await sleep(5);
+  }
+
+  const { port } = runtime.getAddress();
+  const readyDuringWarmup = await fetch(`http://127.0.0.1:${port}/ready`);
+  assert.equal(readyDuringWarmup.status, 200);
+  const readyDuringWarmupBody = await readyDuringWarmup.json();
+  assert.equal(readyDuringWarmupBody.status, "starting");
+  assert.equal(readyDuringWarmupBody.phase, "starting_sessions");
+  assert.equal(readyDuringWarmupBody.warmup.enabled, true);
+  assert.ok(readyDuringWarmupBody.warmup.quietPeriodMs >= 60);
+
+  await startPromise;
+
+  const readyAfter = await fetch(`http://127.0.0.1:${port}/ready`);
+  assert.equal(readyAfter.status, 200);
+  const readyAfterBody = await readyAfter.json();
+  assert.equal(readyAfterBody.status, "ready");
+  assert.equal(readyAfterBody.phase, "ready");
+  assert.equal(readyAfterBody.warmup.enabled, true);
 
   await runtime.stop();
 });

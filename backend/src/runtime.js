@@ -42,6 +42,7 @@ const SESSION_THEME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_DECK_ID = "default";
 const DEFAULT_DECK_NAME = "Default";
 const DEFAULT_AUTH_WS_TICKET_TTL_SECONDS = 30;
+const DEFAULT_STARTUP_WARMUP_QUIET_MS = 1000;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
@@ -622,6 +623,12 @@ export function createRuntime(config) {
       ? config.customCommandMaxContentLength
       : DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH;
   let isReady = false;
+  let startupWarmupEnabled = false;
+  let startupWarmupGateReleased = false;
+  let startupWarmupQuietTimer = null;
+  let startupWarmupQuietDeadlineAt = 0;
+  let startupWarmupResolve = null;
+  let startupWarmupReadyPromise = Promise.resolve();
   let isStopping = false;
   let isStopped = false;
   let stopPromise = null;
@@ -635,6 +642,10 @@ export function createRuntime(config) {
     Number.isInteger(config.authWsTicketTtlSeconds) && config.authWsTicketTtlSeconds > 0
       ? config.authWsTicketTtlSeconds
       : DEFAULT_AUTH_WS_TICKET_TTL_SECONDS;
+  const startupWarmupQuietMs =
+    Number.isInteger(config.startupWarmupQuietMs) && config.startupWarmupQuietMs > 0
+      ? config.startupWarmupQuietMs
+      : DEFAULT_STARTUP_WARMUP_QUIET_MS;
   const guardrailTimer = setInterval(() => {
     manager.enforceGuardrails();
   }, guardrailSweepMs);
@@ -699,6 +710,100 @@ export function createRuntime(config) {
     }
 
     res.end(JSON.stringify(body));
+  }
+
+  function clearStartupWarmupQuietTimer() {
+    if (!startupWarmupQuietTimer) {
+      return;
+    }
+    clearTimeout(startupWarmupQuietTimer);
+    startupWarmupQuietTimer = null;
+    startupWarmupQuietDeadlineAt = 0;
+  }
+
+  function countActiveSessions() {
+    let activeSessionCount = 0;
+    for (const session of manager.list()) {
+      if (session?.activityState === "active") {
+        activeSessionCount += 1;
+      }
+    }
+    return activeSessionCount;
+  }
+
+  function buildReadyPayload() {
+    return {
+      status: isReady ? "ready" : "starting",
+      phase: isReady ? "ready" : startupWarmupGateReleased && startupWarmupEnabled ? "starting_sessions" : "booting",
+      warmup: {
+        enabled: startupWarmupEnabled,
+        gateReleased: startupWarmupGateReleased,
+        quietPeriodMs: startupWarmupQuietMs,
+        activeSessionCount: countActiveSessions(),
+        quietMsRemaining:
+          startupWarmupEnabled && startupWarmupQuietDeadlineAt > 0
+            ? Math.max(0, startupWarmupQuietDeadlineAt - Date.now())
+            : 0
+      }
+    };
+  }
+
+  function markRuntimeReady() {
+    if (isReady) {
+      return;
+    }
+    clearStartupWarmupQuietTimer();
+    isReady = true;
+    if (typeof startupWarmupResolve === "function") {
+      startupWarmupResolve();
+    }
+    startupWarmupResolve = null;
+    logDebug("runtime.ready", {
+      port: config.port,
+      sessionCount: manager.list().length,
+      startupWarmupEnabled,
+      startupWarmupQuietMs
+    });
+  }
+
+  function reconcileStartupWarmup() {
+    if (isReady || isStopping) {
+      clearStartupWarmupQuietTimer();
+      return;
+    }
+    if (!startupWarmupEnabled) {
+      markRuntimeReady();
+      return;
+    }
+    if (!startupWarmupGateReleased) {
+      clearStartupWarmupQuietTimer();
+      return;
+    }
+
+    const activeSessionCount = countActiveSessions();
+    if (activeSessionCount > 0) {
+      clearStartupWarmupQuietTimer();
+      logDebug("runtime.startup_warmup.active", { activeSessionCount });
+      return;
+    }
+    if (startupWarmupQuietTimer) {
+      return;
+    }
+
+    startupWarmupQuietDeadlineAt = Date.now() + startupWarmupQuietMs;
+    logDebug("runtime.startup_warmup.quiet_wait", { quietMs: startupWarmupQuietMs });
+    startupWarmupQuietTimer = setTimeout(() => {
+      startupWarmupQuietTimer = null;
+      startupWarmupQuietDeadlineAt = 0;
+      if (isStopping || isReady || !startupWarmupGateReleased) {
+        return;
+      }
+      if (countActiveSessions() > 0) {
+        reconcileStartupWarmup();
+        return;
+      }
+      markRuntimeReady();
+    }, startupWarmupQuietMs);
   }
 
   function renderMetrics() {
@@ -1362,11 +1467,13 @@ export function createRuntime(config) {
 
   manager.on("session.activity.started", (event) => {
     logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null });
+    reconcileStartupWarmup();
     persistSoon();
   });
 
   manager.on("session.activity.completed", async (event) => {
     logDebug("session.event", { type: "session.activity.completed", sessionId: event.sessionId || null });
+    reconcileStartupWarmup();
     try {
       await persistNow("session.activity.completed");
       const apiSession = getApiSessionOrThrow(event.sessionId);
@@ -1419,6 +1526,9 @@ export function createRuntime(config) {
         metrics.sessionsExitedTotal += 1;
       }
       if (eventName !== "session.data") {
+        if (eventName === "session.created" || eventName === "session.started" || eventName === "session.exit" || eventName === "session.closed") {
+          reconcileStartupWarmup();
+        }
         persistSoon();
       }
     });
@@ -1487,7 +1597,7 @@ export function createRuntime(config) {
       }
 
       if (match.kind === "ready") {
-        writeJson(req, res, 200, { status: isReady ? "ready" : "starting" });
+        writeJson(req, res, 200, buildReadyPayload());
         return;
       }
 
@@ -1935,8 +2045,15 @@ export function createRuntime(config) {
     isStopped = false;
     isStopping = false;
     isReady = false;
+    startupWarmupEnabled = false;
+    startupWarmupGateReleased = false;
+    clearStartupWarmupQuietTimer();
+    startupWarmupReadyPromise = new Promise((resolve) => {
+      startupWarmupResolve = resolve;
+    });
 
     const persistedState = await persistence.loadState();
+    startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
     decks.clear();
     sessionDeckAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
@@ -2096,13 +2213,21 @@ export function createRuntime(config) {
     if (typeof config.onBeforeReady === "function") {
       await config.onBeforeReady();
     }
-    isReady = true;
-    logDebug("runtime.ready", { port: config.port, sessionCount: manager.list().length });
+    startupWarmupGateReleased = true;
+    reconcileStartupWarmup();
+    await startupWarmupReadyPromise;
   }
 
   async function stopInternal() {
     isStopping = true;
     isReady = false;
+    startupWarmupEnabled = false;
+    startupWarmupGateReleased = false;
+    clearStartupWarmupQuietTimer();
+    if (typeof startupWarmupResolve === "function") {
+      startupWarmupResolve();
+    }
+    startupWarmupResolve = null;
     clearInterval(heartbeat);
     clearInterval(guardrailTimer);
     if (persistTimer) {

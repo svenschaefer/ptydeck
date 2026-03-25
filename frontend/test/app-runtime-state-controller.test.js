@@ -66,7 +66,7 @@ test("app-runtime state controller schedules bootstrap fallback and reports star
   let bootstrapInFlight = false;
   const controller = createAppRuntimeStateController({
     windowRef,
-    uiState: { loading: true, error: "" },
+    uiState: { loading: true, error: "", startupGateActive: false },
     startupPerf,
     nowMs: () => 220,
     wsBootstrapFallbackMs: 250,
@@ -83,6 +83,13 @@ test("app-runtime state controller schedules bootstrap fallback and reports star
   assert.equal(windowRef.timers[0].delay, 250);
 
   await windowRef.timers[0].fn();
+  controller.setStartupGateState({
+    active: true,
+    phase: "starting_sessions",
+    message: "Server is starting sessions.",
+    detail: "Waiting for quiet.",
+    canSkip: true
+  });
   controller.markRuntimeBootstrapReady("rest");
   controller.markRuntimeBootstrapReady("rest");
 
@@ -92,10 +99,11 @@ test("app-runtime state controller schedules bootstrap fallback and reports star
   assert.equal(calls[0][0], "sessions.bootstrap.request");
   assert.equal(calls[0][1].bootstrapRequestCount, 1);
   assert.deepEqual(calls[1], ["fallback"]);
-  assert.equal(calls[2][0], "perf.startup.ready");
-  assert.equal(calls[2][1].bootstrapRequestCount, 1);
-  assert.equal(calls[2][1].toBootstrapReadyMs, 120);
-  assert.deepEqual(calls.slice(3), [["render"], ["render"]]);
+  assert.deepEqual(calls[2], ["render"]);
+  assert.equal(calls[3][0], "perf.startup.ready");
+  assert.equal(calls[3][1].bootstrapRequestCount, 1);
+  assert.equal(calls[3][1].toBootstrapReadyMs, 120);
+  assert.deepEqual(calls.slice(4), [["render"], ["render"]]);
 
   bootstrapInFlight = true;
   controller.scheduleBootstrapFallback();
@@ -105,7 +113,8 @@ test("app-runtime state controller schedules bootstrap fallback and reports star
 test("app-runtime state controller tracks runtime bootstrap source, connectivity, and dev auth passthrough", async () => {
   const uiState = {
     loading: true,
-    error: "broken"
+    error: "broken",
+    startupGateActive: false
   };
   const calls = [];
   const controller = createAppRuntimeStateController({
@@ -122,14 +131,49 @@ test("app-runtime state controller tracks runtime bootstrap source, connectivity
   assert.equal(controller.getRuntimeBootstrapSource(), "pending");
 
   const refreshed = await controller.bootstrapDevAuthToken({ reason: "bootstrap" });
+  controller.setStartupGateState({
+    active: true,
+    phase: "booting",
+    message: "Starting server...",
+    detail: "Waiting for backend.",
+    canSkip: true
+  });
   controller.markRuntimeConnected();
 
   assert.equal(refreshed, true);
   assert.equal(controller.getRuntimeBootstrapSource(), "pending");
   assert.equal(uiState.loading, false);
   assert.equal(uiState.error, "");
+  assert.equal(uiState.startupGateActive, false);
   assert.deepEqual(calls, [
     ["dev-auth", "bootstrap"],
+    ["render"],
     ["render"]
   ]);
+});
+
+test("app-runtime state controller tracks startup gate ui state", () => {
+  const renders = [];
+  const uiState = {
+    loading: true,
+    error: ""
+  };
+  const controller = createAppRuntimeStateController({
+    uiState,
+    requestRender: () => renders.push("render")
+  });
+
+  controller.setStartupGateState({
+    active: true,
+    phase: "starting_sessions",
+    message: "Server is starting sessions.",
+    detail: "Waiting for quiet.",
+    canSkip: true
+  });
+  controller.clearStartupGateState();
+
+  assert.equal(uiState.startupGateActive, false);
+  assert.equal(uiState.startupGateMessage, "");
+  assert.equal(uiState.startupGateCanSkip, false);
+  assert.deepEqual(renders, ["render", "render"]);
 });

@@ -50,6 +50,7 @@ export function createApiClient(baseUrl, options = {}) {
   const onUnauthorized = typeof options.onUnauthorized === "function" ? options.onUnauthorized : null;
   let authToken = typeof options.authToken === "string" ? options.authToken.trim() : "";
   let unauthorizedRefreshPromise = null;
+  const readyUrl = new URL("/ready", baseUrl).toString();
 
   async function tryUnauthorizedRecovery(path) {
     if (!onUnauthorized) {
@@ -123,6 +124,56 @@ export function createApiClient(baseUrl, options = {}) {
     }
   }
 
+  async function requestAbsolute(url, fetchOptions = {}, { expectJson = true, retriedUnauthorized = false } = {}) {
+    const normalizedUrl = String(url || "");
+    const method = fetchOptions.method || "GET";
+    const startedAt = Date.now();
+    if (debug) {
+      log("api.request.start", { method, url: normalizedUrl });
+    }
+
+    try {
+      const headers = {
+        ...(fetchOptions.headers || {})
+      };
+      if (authToken && !headers.authorization) {
+        headers.authorization = `Bearer ${authToken}`;
+      }
+      const res = await fetch(normalizedUrl, {
+        ...fetchOptions,
+        headers
+      });
+      const data = await readResponse(res, { expectJson });
+      if (debug) {
+        log("api.request.ok", { method, url: normalizedUrl, status: res.status, durationMs: Date.now() - startedAt });
+      }
+      return data;
+    } catch (err) {
+      if (debug) {
+        log("api.request.error", {
+          method,
+          url: normalizedUrl,
+          durationMs: Date.now() - startedAt,
+          message: err instanceof Error ? err.message : String(err)
+        });
+      }
+      if (
+        err instanceof ApiClientError &&
+        err.status === 401 &&
+        retriedUnauthorized !== true
+      ) {
+        const recovered = await tryUnauthorizedRecovery(normalizedUrl);
+        if (recovered) {
+          if (debug) {
+            log("api.request.retry_after_unauthorized", { method, url: normalizedUrl });
+          }
+          return requestAbsolute(normalizedUrl, fetchOptions, { expectJson, retriedUnauthorized: true });
+        }
+      }
+      throw err;
+    }
+  }
+
   return {
     setAuthToken(token) {
       authToken = typeof token === "string" ? token.trim() : "";
@@ -130,6 +181,9 @@ export function createApiClient(baseUrl, options = {}) {
     /** @returns {Promise<Session[]>} */
     async listSessions() {
       return request("/sessions");
+    },
+    async getReadyStatus() {
+      return requestAbsolute(readyUrl);
     },
     async listDecks() {
       return request("/decks");

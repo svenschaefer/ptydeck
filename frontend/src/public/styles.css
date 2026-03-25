@@ -28,6 +28,7 @@ body {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  position: relative;
 }
 
 .app-shell.sidebar-collapsed {
@@ -36,6 +37,62 @@ body {
 
 .app-shell.sidebar-collapsed .sidebar {
   display: none;
+}
+
+.startup-warmup-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 13, 18, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.startup-warmup-gate[hidden] {
+  display: none !important;
+}
+
+.startup-warmup-card {
+  width: min(520px, 100%);
+  padding: 20px 22px;
+  border: 1px solid rgba(142, 192, 124, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(18, 25, 35, 0.98) 0%, rgba(10, 13, 18, 0.98) 100%);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
+}
+
+.startup-warmup-eyebrow {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--active);
+}
+
+.startup-warmup-message {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.startup-warmup-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.startup-warmup-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.startup-warmup-skip[hidden] {
+  display: none !important;
 }
 
 .sidebar {

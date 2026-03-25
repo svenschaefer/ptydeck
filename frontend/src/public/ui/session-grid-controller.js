@@ -113,6 +113,10 @@ export function createSessionGridController(options = {}) {
     workspaceRenderController?.renderStatus({
       connectionState: state.connectionState,
       loading: uiState.loading,
+      startupGateActive: uiState.startupGateActive,
+      startupGateMessage: uiState.startupGateMessage,
+      startupGateDetail: uiState.startupGateDetail,
+      startupGateCanSkip: uiState.startupGateCanSkip,
       error: uiState.error,
       commandFeedback: uiState.commandFeedback,
       commandInlineHint: uiState.commandInlineHint,

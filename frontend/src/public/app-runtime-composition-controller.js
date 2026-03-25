@@ -116,6 +116,10 @@ const commandFeedbackEl = document.getElementById("command-feedback");
 const commandInlineHintEl = document.getElementById("command-inline-hint");
 const commandPreviewEl = document.getElementById("command-preview");
 const commandSuggestionsEl = document.getElementById("command-suggestions");
+const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
+const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
+const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
+const startupWarmupSkipBtn = document.getElementById("startup-warmup-skip");
 const terminalSearchInputEl = document.getElementById("terminal-search-input");
 const terminalSearchPrevBtn = document.getElementById("terminal-search-prev");
 const terminalSearchNextBtn = document.getElementById("terminal-search-next");
@@ -362,7 +366,12 @@ const uiState = {
   commandInlineHintPrefixPx: 0,
   commandPreview: "",
   commandSuggestions: "",
-  commandSuggestionSelectedIndex: -1
+  commandSuggestionSelectedIndex: -1,
+  startupGateActive: false,
+  startupGatePhase: "",
+  startupGateMessage: "",
+  startupGateDetail: "",
+  startupGateCanSkip: false
 };
 const terminalSearchState = {
   query: "",
@@ -700,7 +709,11 @@ workspaceRenderController = createWorkspaceRenderController({
   commandFeedbackEl,
   commandInlineHintEl,
   commandPreviewEl,
-  commandSuggestionsEl
+  commandSuggestionsEl,
+  startupWarmupGateEl,
+  startupWarmupMessageEl,
+  startupWarmupDetailEl,
+  startupWarmupSkipBtn
 });
 
 terminalSearchController = createTerminalSearchController({
@@ -823,6 +836,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   deckCreateBtn,
   deckRenameBtn,
   deckDeleteBtn,
+  startupWarmupSkipBtn,
   sendBtn,
   layoutRuntimeController,
   terminalSearchController,

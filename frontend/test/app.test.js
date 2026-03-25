@@ -737,6 +737,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     const path = requestUrl.pathname;
     const method = options.method || "GET";
 
+    if (path === "/ready" && method === "GET") {
+      return makeJsonResponse(200, {
+        status: "ready",
+        phase: "ready",
+        warmup: {
+          enabled: false,
+          gateReleased: true,
+          quietPeriodMs: 1000,
+          activeSessionCount: 0,
+          quietMsRemaining: 0
+        }
+      });
+    }
+
     if (path === "/api/v1/decks" && method === "GET") {
       return makeJsonResponse(200, deckState);
     }
@@ -2682,6 +2696,20 @@ test("app search tracks active terminal matches across buffer growth and deck sw
     const requestUrl = new URL(url);
     const path = requestUrl.pathname;
     const method = options.method || "GET";
+
+    if (path === "/ready" && method === "GET") {
+      return makeJsonResponse(200, {
+        status: "ready",
+        phase: "ready",
+        warmup: {
+          enabled: false,
+          gateReleased: true,
+          quietPeriodMs: 1000,
+          activeSessionCount: 0,
+          quietMsRemaining: 0
+        }
+      });
+    }
 
     if (path === "/api/v1/decks" && method === "GET") {
       listDecksCalls += 1;

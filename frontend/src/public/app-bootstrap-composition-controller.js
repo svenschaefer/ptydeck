@@ -6,6 +6,7 @@ import { createCommandEngine as defaultCreateCommandEngine } from "./command-eng
 import { createCommandExecutor as defaultCreateCommandExecutor } from "./command-executor.js";
 import { interpretComposerInput as defaultInterpretComposerInput } from "./command-interpreter.js";
 import { createCommandTargetRuntimeController as defaultCreateCommandTargetRuntimeController } from "./command-target-runtime-controller.js";
+import { createStartupWarmupController as defaultCreateStartupWarmupController } from "./startup-warmup-controller.js";
 import { createWsClient as defaultCreateWsClient } from "./ws-client.js";
 import { createWsRuntimeController as defaultCreateWsRuntimeController } from "./ws-runtime-controller.js";
 import {
@@ -20,6 +21,10 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.createCommandTargetRuntimeController === "function"
       ? options.createCommandTargetRuntimeController
       : defaultCreateCommandTargetRuntimeController;
+  const createStartupWarmupController =
+    typeof options.createStartupWarmupController === "function"
+      ? options.createStartupWarmupController
+      : defaultCreateStartupWarmupController;
   const createCommandExecutor =
     typeof options.createCommandExecutor === "function" ? options.createCommandExecutor : defaultCreateCommandExecutor;
   const createAuthBootstrapRuntimeController =
@@ -82,6 +87,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const deckCreateBtn = options.deckCreateBtn || null;
   const deckRenameBtn = options.deckRenameBtn || null;
   const deckDeleteBtn = options.deckDeleteBtn || null;
+  const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
   const layoutRuntimeController = options.layoutRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
@@ -104,6 +110,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   let commandTargetRuntimeController = null;
   let commandExecutor = null;
   let authBootstrapRuntimeController = null;
+  let startupWarmupController = null;
   let wsRuntimeController = null;
   let commandComposerAutocompleteController = null;
   let commandComposerRuntimeController = null;
@@ -190,6 +197,15 @@ export function createAppBootstrapCompositionController(options = {}) {
       devAuthRetryDelayMs: options.devAuthRetryDelayMs
     });
 
+    startupWarmupController = createStartupWarmupController({
+      windowRef,
+      api,
+      setConnectionState: (value) => store?.setConnectionState?.(value),
+      setStartupGateState: (nextState) => appRuntimeStateController?.setStartupGateState?.(nextState),
+      clearStartupGateState: () => appRuntimeStateController?.clearStartupGateState?.(),
+      debugLog
+    });
+
     wsRuntimeController = createWsRuntimeController({
       createWsClient,
       wsUrl: config.wsUrl,
@@ -269,6 +285,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       deckCreateBtn,
       deckRenameBtn,
       deckDeleteBtn,
+      startupWarmupSkipBtn,
       sendBtn,
       api,
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
@@ -282,6 +299,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       renameDeckFlow: () => appLayoutDeckFacadeController?.renameDeckFlow?.(),
       deleteDeckFlow: () => appLayoutDeckFacadeController?.deleteDeckFlow?.(),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
+      waitForStartupWarmup: () => startupWarmupController?.waitForServerWarmup?.(),
+      skipStartupWarmupWait: () => startupWarmupController?.skipWait?.(),
       bootstrapDevAuthToken: (runtimeOptions) => appRuntimeStateController?.bootstrapDevAuthToken?.(runtimeOptions),
       startWsRuntime: () => wsRuntimeController?.start?.() || null,
       setWsClient: (client) => {
@@ -291,6 +310,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       scheduleGlobalResize: (runtimeOptions) => appLayoutDeckFacadeController?.scheduleGlobalResize?.(runtimeOptions),
       disposeAppRuntimeState: () => appRuntimeStateController?.dispose?.(),
       disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose?.(),
+      disposeStartupWarmup: () => startupWarmupController?.dispose?.(),
       disposeStreamDebugTrace,
       closeWsClient: () => wsStateRef.current?.close?.(),
       disposeAuthBootstrapRuntime: () => authBootstrapRuntimeController?.dispose?.(),
