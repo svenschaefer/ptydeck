@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
-- Active scoped tasks (`H2`): `ARC-010A`, `ARC-010B`, `ARC-010C`, `ARC-010D`, `ARC-011`, `ARC-012` (`ARC-009` completed; `ARC-010` remains the umbrella closeout block for `ARC-010A` ... `ARC-010D`).
+- Active scoped tasks (`H2`): `ARC-010B`, `ARC-010C`, `ARC-010D`, `ARC-011`, `ARC-012` (`ARC-009` and `ARC-010A` completed; `ARC-010` remains the umbrella closeout block for `ARC-010B` ... `ARC-010D`).
 - Queued next release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics) with `QLT-123`, `QLT-124`.
 - Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -686,10 +686,10 @@ Exit criteria:
 Completed in this milestone so far:
 
 - `ARC-009`
+- `ARC-010A`
 
 Remaining in this milestone:
 
-- `ARC-010A`
 - `ARC-010B`
 - `ARC-010C`
 - `ARC-010D`
@@ -698,7 +698,7 @@ Remaining in this milestone:
 
 Dependencies:
 
-- `ARC-010A` depends on `ARC-009` so the last app-level delegation glue is extracted on top of stabilized command/runtime boundaries.
+- `ARC-010A` depends on `ARC-009` and is completed; the last app-level command/UI delegation glue is now extracted on top of stabilized command/runtime boundaries.
 - `ARC-010B` depends on `ARC-010A` so bootstrap/composition extraction builds on the remaining delegation split instead of cutting across mixed responsibilities.
 - `ARC-010C` depends on `ARC-010A` and `ARC-010B` so final `app.js` cleanup happens only after the remaining orchestration has explicit homes.
 - `ARC-010D` depends on `ARC-010A`, `ARC-010B`, and `ARC-010C` so closeout coverage validates the actual final architecture shape rather than an in-progress split.
@@ -707,7 +707,7 @@ Dependencies:
 
 Exit criteria:
 
-- Remaining app-level command/UI delegation wrappers are extracted into explicit composition-facing controllers/facades.
+- App-level command/UI delegation wrappers are extracted into explicit composition-facing controllers/facades.
 - Remaining startup/bootstrap composition wiring is extracted so `app.js` no longer owns hidden orchestration clusters.
 - Remaining inline/dead orchestration logic is removed from `app.js`, leaving it as a bootstrap/composition boundary only.
 - Closeout regression coverage proves the final ARC-010 target shape instead of relying on informal interpretation.

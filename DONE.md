@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010A` is now completed: the remaining app-level command/UI delegation wrappers were extracted from `frontend/src/public/app.js` into `frontend/src/public/app-command-ui-facade-controller.js`.
+- [x] The new app command/UI facade centralizes custom-command state access, runtime error/feedback/preview helpers, active-terminal search delegation, command-suggestion scheduling, render delegation, control-command execution, and preview-submit glue that previously remained inline in `frontend/src/public/app.js`.
+- [x] Added focused regression coverage for the new command/UI facade in `frontend/test/app-command-ui-facade-controller.test.js`.
+- [x] Frontend build/lint script coverage was updated so `src/public/app-command-ui-facade-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 984 lines after the `ARC-010A` extraction step and no longer contains local function declarations.
+- [x] Validation for `ARC-010A` passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/app-command-ui-facade-controller.test.js frontend/test/app.test.js frontend/test/command-composer-runtime-controller.test.js frontend/test/runtime-event-controller.test.js`.
+- [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `95.78%` lines overall.
 - [x] `ARC-010` progress: extracted layout/deck/dialog/resize/deck-action adapter glue from `frontend/src/public/app.js` into `frontend/src/public/app-layout-deck-facade-controller.js`, centralizing composition-facing delegation to `layout-runtime-controller.js`, `deck-runtime-controller.js`, `ui/session-terminal-resize-controller.js`, `ui/session-settings-dialog-controller.js`, and `ui/deck-actions-controller.js`.
 - [x] App runtime now composes deck activation, deck-count/filter reads, terminal geometry helpers, settings-dialog flows, deck CRUD UI flows, and terminal-size/layout delegation through the dedicated app layout/deck facade instead of keeping those wrapper helpers inline in `frontend/src/public/app.js`.
 - [x] Added focused regression coverage for the new layout/deck facade in `frontend/test/app-layout-deck-facade-controller.test.js`.
