@@ -6,6 +6,7 @@ Completed and verified topics belong here.
 
 - [x] Session artifact rendering no longer displaces terminal content: `Summary` / `Result` / `Next Steps` artifacts are now shown as an overlay on top of the terminal surface instead of consuming permanent vertical space in the card layout.
 - [x] Session artifact overlays can now be dismissed explicitly per session via a close control; dismissal stays in effect for the current artifact payload and resets automatically when new artifact content arrives.
+- [x] Follow-up hardening completed for the artifact overlay: CSS now enforces the `hidden` attribute on the overlay and artifact body explicitly, preventing the dismiss button from rendering when no artifact is present.
 - [x] Focused regression coverage was added for artifact overlay rendering/dismiss semantics in `frontend/test/session-card-meta-controller.test.js`, `frontend/test/session-card-interactions-controller.test.js`, and `frontend/test/app.test.js`.
 - [x] Validation for the artifact-overlay change passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, plus targeted regression coverage via `node --test frontend/test/session-card-meta-controller.test.js frontend/test/session-card-interactions-controller.test.js frontend/test/session-card-factory-controller.test.js frontend/test/app.test.js`.
 - [x] `ARC-010A` is now completed: the remaining app-level command/UI delegation wrappers were extracted from `frontend/src/public/app.js` into `frontend/src/public/app-command-ui-facade-controller.js`.

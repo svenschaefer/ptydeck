@@ -725,6 +725,10 @@ button:hover {
   pointer-events: none;
 }
 
+.session-artifacts-overlay[hidden] {
+  display: none !important;
+}
+
 .session-artifacts-dismiss {
   flex: 0 0 auto;
   width: 26px;
@@ -756,6 +760,10 @@ button:hover {
   overflow: auto;
   max-height: calc(var(--ptydeck-terminal-mount-height, 172px) - 16px);
   flex: 1 1 auto;
+}
+
+.session-artifacts[hidden] {
+  display: none !important;
 }
 
 .terminal-card.unrestored {
