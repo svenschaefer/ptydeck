@@ -99,7 +99,7 @@ The deck model is a strict isolation boundary above sessions.
 - Backend `/ready` now exposes structured startup phase state (`booting`, `starting_sessions`, `ready`) with warmup metadata, and restart-recovery warmup is only held open when persisted sessions are being restored.
 - WebSocket upgrade requests now enforce the configured browser `Origin` allowlist; explicit allowlist mode rejects missing or disallowed origins with `UnauthorizedOrigin` before rate-limit and auth admission paths run.
 - Every top-level script under `scripts/` now emits one standardized startup log line to `stderr`, and the root lint gate enforces the presence of that declaration through `scripts/check-script-logging.sh`.
-- Generated script/runtime log files are intentionally gitignored via `backend/logs/`, `*.log`, and the existing `artifacts/` ignore rule.
+- Generated script/runtime log files are intentionally gitignored via `*.log`, while existing artifact output under `artifacts/` remains ignored by the repository-level artifact rule.
 - Runtime stop path is idempotent and safe for repeated shutdown calls.
 - Backend now includes OpenAPI contract conformance testing for route/method surface and status-code compatibility.
 - Frontend now supports injected runtime config override object with deterministic precedence for host/port and explicit URL values.

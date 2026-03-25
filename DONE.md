@@ -7,7 +7,7 @@ Completed and verified topics belong here.
 - [x] `QLT-128` is now completed: every top-level root script under `scripts/` now emits one standardized startup log line to `stderr`, making future script usage observable without changing each script's functional output contract.
 - [x] Shared script-start helpers now live in `scripts/lib/script-log.sh` and `scripts/lib/script-log.mjs`, and the top-level script checker `scripts/check-script-logging.sh` enforces that every `scripts/*.sh` and `scripts/*.mjs` file declares the startup log call near the top of the file.
 - [x] The script-log checker is now part of the normal local lint gate via the root `package.json` script `scripts:log:check`, so missing script-start logging fails fast before backend/frontend syntax checks continue.
-- [x] Generated script/runtime log files are now explicitly protected by `.gitignore` through `backend/logs/` and `*.log`, while existing artifact/log output under `artifacts/` remains ignored as before.
+- [x] Generated script/runtime log files are now explicitly protected by `.gitignore` through `*.log`, while existing artifact/log output under `artifacts/` remains ignored as before.
 - [x] Validation for `QLT-128` passed with the targeted checker run, `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
 - [x] Coverage after the `QLT-128` closeout step: backend `91.60%` lines, frontend `95.62%` lines overall.
 - [x] `v0.4.0-H8` is now fully completed: `QLT-128` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
