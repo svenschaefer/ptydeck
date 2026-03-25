@@ -1871,7 +1871,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
   assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
   ws.emit("message", {
-    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working(0s • esc to interrupt)\n" })
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working" })
+  });
+  await tick();
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: " (0s • esc to interrupt)" })
   });
   await tick();
   assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working (0s • esc to interrupt)");

@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] Session activity-status detection now applies explicit priority ordering so richer timer/progress patterns win over lower-value generic matches in the header (`Working (1m 32s • esc to interrupt)` beats `Working`; `Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s` beats the lower-detail variants).
+- [x] Activity-status parsing now reconstructs redraw lines across split chunk boundaries, so timer/progress statuses continue to upgrade correctly even when the terminal sends them in multiple partial chunks.
+- [x] Focused regressions were added for status-priority and split-chunk upgrades in `frontend/test/stream-builtins.test.js` and `frontend/test/app.test.js`.
+- [x] Validation for the status-priority hardening passed with `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, `npm run test:coverage:check`, plus targeted regression coverage via `node --test frontend/test/stream-builtins.test.js frontend/test/app.test.js`.
 - [x] Session artifact rendering no longer displaces terminal content: `Summary` / `Result` / `Next Steps` artifacts are now shown as an overlay on top of the terminal surface instead of consuming permanent vertical space in the card layout.
 - [x] Session artifact overlays can now be dismissed explicitly per session via a close control; dismissal stays in effect for the current artifact payload and resets automatically when new artifact content arrives.
 - [x] Follow-up hardening completed for the artifact overlay: CSS now enforces the `hidden` attribute on the overlay and artifact body explicitly, preventing the dismiss button from rendering when no artifact is present.
