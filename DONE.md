@@ -4,6 +4,9 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] Planning sync completed: promoted `QLT-125` into `TODO.md` as the next explicit frontend bugfix task for ignoring empty/no-op stream updates in activity tracking.
+- [x] Roadmap sync completed: `ROADMAP.md` now marks `v0.4.0-H5` as the active wave with `QLT-125` as the active scoped task and explicit exit criteria for stream-activity noise filtering.
+- [x] Context sync completed: `CODEX_CONTEXT.md` now reflects `v0.4.0-H5` as the active wave and records the new open-task focus on filtering semantically empty stream updates out of activity-state transitions.
 - [x] Activity-status interpretation no longer downgrades richer status patterns to weaker matches during the same active run: timed Codex-style statuses now remain authoritative over plain verbs such as `Working`, and byte/speed-aware `Completed files ...` progress now remains authoritative over lower-detail count-only fallbacks until idle/prompt reset clears the retained activity candidate.
 - [x] Prompt/idle recovery now clears retained activity-detection state explicitly, so a completed activity does not suppress fresh lower-detail status detection when a new run starts later in the same session.
 - [x] Session header live-duration rendering now preserves human-readable duration formatting (`Xm YYs`, and `Xh YYm ZZs` when needed) instead of collapsing upgraded timer statuses into raw total seconds.

@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H5`.
+- Active scoped tasks: `QLT-125`.
 - Latest completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
 - Previous completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
@@ -771,6 +771,28 @@ Exit criteria:
 - Help and validation-facing command surfaces derive from the same declarative contract and are protected by regression coverage.
 - The follow-up command-to-output correlation task can build on stable command identities and metadata instead of duplicated ad-hoc command definitions.
 - Command submissions now persist explicit per-session correlation records that are enriched by downstream output/activity/stream-interpretation actions for traceable operator context without re-coupling UI modules to stream internals.
+
+### v0.4.0-H5 - Stream Activity Noise Filtering
+
+- `QLT-125`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-125`
+
+Dependencies:
+
+- `QLT-125` runs after `DRV-004` so the existing stream-interpretation and command-correlation surfaces are available while tightening activity semantics around empty/no-op stream chunks.
+
+Exit criteria:
+
+- Inactive sessions are not marked as newly active by empty, redraw-only, transport-only, or otherwise semantically no-op stream updates.
+- Activity tracking continues to react to meaningful terminal output without regressing existing status/progress/plugin interpretation behavior.
+- Regression coverage demonstrates the difference between meaningful output chunks and ignorable no-op stream noise.
 
 ### Completed Items
 

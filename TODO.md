@@ -14,7 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- `QLT-125` Owner `FE`: Ignore empty or semantically no-op stream updates for session activity tracking so inactive sessions are not marked as "activity happened" again when the runtime emits transport-level or redraw-only chunks that carry no meaningful terminal output.
 
 ## Active Ownership Role
 
