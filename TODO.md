@@ -14,7 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `ARC-010B` Owner: `FE` Task: Extract the remaining startup/bootstrap composition wiring from `frontend/src/public/app.js` into explicit composition/bootstrap controllers so `app.js` no longer owns runtime-assembly details beyond top-level module wiring.
 - [ ] `ARC-010C` Owner: `FE` Task: Remove the remaining inline orchestration and dead helper logic from `frontend/src/public/app.js`, leaving only imports, constants, controller composition, subscriptions, and top-level startup/error-boundary code.
 - [ ] `ARC-010D` Owner: `FE` Task: Add explicit ARC-010 closeout regression coverage proving `frontend/src/public/app.js` is bootstrap/composition-only and that session/deck/search/settings/custom-command runtime behavior is exercised through dedicated modules instead of inline app logic.
 - [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
@@ -24,7 +23,7 @@ Completed work belongs in `DONE.md`.
 
 ARC-010 closure rule:
 - `ARC-010A` is completed and recorded in `DONE.md`.
-- `ARC-010` closes only when the remaining closeout tasks `ARC-010B` through `ARC-010D` are completed and validated.
+- `ARC-010` closes only when the remaining closeout tasks `ARC-010C` and `ARC-010D` are completed and validated.
 
 ## Active Ownership Role
 

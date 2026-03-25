@@ -1,21 +1,12 @@
 import { createApiClient } from "./api-client.js";
+import { createAppBootstrapCompositionController } from "./app-bootstrap-composition-controller.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
-import { createAppLifecycleController } from "./app-lifecycle-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
-import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
-import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
-import { createCommandEngine } from "./command-engine.js";
-import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
-import { createCommandExecutor } from "./command-executor.js";
-import { interpretComposerInput } from "./command-interpreter.js";
-import { createCommandTargetRuntimeController } from "./command-target-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
-import { createWsClient } from "./ws-client.js";
-import { createWsRuntimeController } from "./ws-runtime-controller.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
@@ -31,9 +22,7 @@ import {
   syncTerminalScrollArea
 } from "./terminal-compat.js";
 import {
-  createSessionStreamAdapter,
-  normalizeCustomCommandPayloadForShell,
-  sendInputWithConfiguredTerminator
+  createSessionStreamAdapter
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
@@ -268,7 +257,7 @@ let layoutRuntimeController = null;
 let terminalSettings = null;
 let sessionInputSettings = {};
 const sessionThemeDrafts = new Map();
-let wsClient = null;
+const wsStateRef = { current: null };
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
 let appLifecycleController = null;
@@ -469,11 +458,6 @@ if (typeof window.Terminal !== "function") {
   appRuntimeStateController.setError("Terminal library failed to load.");
   throw new Error("window.Terminal is not available.");
 }
-
-store.hydrateRuntimePreferences({
-  activeDeckId: deckRuntimeController.loadStoredActiveDeckId(),
-  sessionFilterText: appLayoutDeckFacadeController.loadStoredSessionFilterText()
-});
 
 sessionViewModel = createSessionViewModel({
   defaultDeckId: DEFAULT_DECK_ID,
@@ -768,217 +752,57 @@ sessionGridController = createSessionGridController({
   themeProfileKeys: THEME_PROFILE_KEYS,
   debugLog
 });
-
-commandEngine = createCommandEngine({
-  systemSlashCommands: SYSTEM_SLASH_COMMANDS,
-  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands() || [],
-  getSessions: () => store.getState().sessions,
-  getDecks: () => store.getState().decks,
-  getThemes: () => TERMINAL_THEME_PRESETS,
-  getActiveDeckId: () => store.getState().activeDeckId,
-  getActiveSessionId: () => store.getState().activeSessionId,
-  getSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
-  getSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
-  getSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session)
-});
-
-commandTargetRuntimeController = createCommandTargetRuntimeController({
-  commandEngine,
-  store,
-  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || ""
-});
-
-commandExecutor = createCommandExecutor({
+const appBootstrapCompositionController = createAppBootstrapCompositionController({
   store,
   api,
+  config,
+  debugLogs,
+  debugLog,
+  uiState,
+  commandInput,
+  terminals,
+  terminalObservers,
+  getTerminalSettings: () => terminalSettings,
   defaultDeckId: DEFAULT_DECK_ID,
   delayedSubmitMs: DELAYED_SUBMIT_MS,
-  resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
-  resolveFilterSelectors: commandTargetRuntimeController.resolveFilterSelectors,
-  resolveDeckToken: commandTargetRuntimeController.resolveDeckToken,
-  parseSizeCommandArgs: commandTargetRuntimeController.parseSizeCommandArgs,
-  applyTerminalSizeSettings: (nextCols, nextRows) => appLayoutDeckFacadeController?.applyTerminalSizeSettings(nextCols, nextRows),
-  setSessionFilterText: (value) => appLayoutDeckFacadeController?.setSessionFilterText(value),
-  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  getSessionCountForDeck: (deckId, sessions) => appLayoutDeckFacadeController?.getSessionCountForDeck(deckId, sessions) || 0,
-  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
-  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
-  getSessionRuntimeState: sessionUiFacadeController.getSessionRuntimeState,
-  isSessionExited: sessionUiFacadeController.isSessionExited,
-  isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
-  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
-  listCustomCommandState: () => appCommandUiFacadeController?.listCustomCommands() || [],
-  getCustomCommandState: (name) => appCommandUiFacadeController?.getCustomCommand(name),
-  removeCustomCommandState: (name) => appCommandUiFacadeController?.removeCustomCommand(name),
-  parseCustomDefinition: commandTargetRuntimeController.parseCustomDefinition,
-  upsertCustomCommandState: (command) => appCommandUiFacadeController?.upsertCustomCommand(command),
-  resolveSettingsTargets: commandTargetRuntimeController.resolveSettingsTargets,
-  parseSettingsPayload: commandTargetRuntimeController.parseSettingsPayload,
-  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
-  setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
-  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
-  sendInputWithConfiguredTerminator,
-  normalizeCustomCommandPayloadForShell,
-  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
-  normalizeThemeProfile: sessionUiFacadeController.normalizeThemeProfile,
-  getTerminalSettings: () => terminalSettings
-});
-
-authBootstrapRuntimeController = createAuthBootstrapRuntimeController({
-  windowRef: window,
-  api,
-  defaultDeckId: DEFAULT_DECK_ID,
-  getTerminalSettings: () => terminalSettings,
-  getPreferredActiveDeckId: () => store.getState().activeDeckId,
-  getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource() || "pending",
-  setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
-  setSessions: (sessions) => store.setSessions(sessions || []),
-  setUiError: (message) => appRuntimeStateController?.setUiError(message),
-  markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
-  debugLog,
-  devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
-  devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
-  devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
-});
-
-wsRuntimeController = createWsRuntimeController({
-  createWsClient,
-  wsUrl: config.wsUrl,
-  debug: debugLogs,
-  log: debugLog,
-  setConnectionState: (status) => store.setConnectionState(status),
-  getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource() || "pending",
-  onRuntimeConnected: () => appRuntimeStateController?.markRuntimeConnected(),
-  hasTerminal: (sessionId) => terminals.has(sessionId),
-  pushSessionData: (sessionId, data) => streamAdapter.push(sessionId, data),
-  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
-  getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
-  createWsTicket: () => api.createWsTicket(),
-  bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options)
-});
-
-store.subscribe(() => appCommandUiFacadeController?.render());
-appLayoutDeckFacadeController?.syncSettingsUi();
-appLayoutDeckFacadeController?.syncTerminalGeometryCss();
-appCommandUiFacadeController?.render();
-
-layoutRuntimeController?.bindUiEvents();
-terminalSearchController?.bindUiEvents();
-terminalSearchController?.updateUi();
-
-commandComposerAutocompleteController = createCommandComposerAutocompleteController({
+  systemSlashCommands: SYSTEM_SLASH_COMMANDS,
+  terminalThemePresets: TERMINAL_THEME_PRESETS,
   windowRef: window,
   documentRef: document,
-  commandInput,
-  uiState,
-  render: () => appCommandUiFacadeController?.render(),
-  scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview(),
-  parseAutocompleteContext: (rawInput, customCommands) =>
-    (commandEngine ? commandEngine.parseAutocompleteContext(rawInput, customCommands) : null),
-  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands() || [],
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
-  submitCommand: () => appCommandUiFacadeController?.submitCommand()
-});
-
-commandComposerRuntimeController = createCommandComposerRuntimeController({
-  windowRef: window,
-  getCommandValue: () => commandInput.value || "",
-  setCommandValue: (value) => {
-    commandInput.value = value;
-  },
-  resetCommandAutocompleteState: () => commandComposerAutocompleteController?.resetAutocompleteState(),
-  interpretComposerInput,
-  getState: () => store.getState(),
-  resolveQuickSwitchTarget: commandTargetRuntimeController.resolveQuickSwitchTarget,
-  activateSessionTarget: commandTargetRuntimeController.activateSessionTarget,
-  activateDeckTarget: commandTargetRuntimeController.activateDeckTarget,
-  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
-  setCommandPreview: (message) => appCommandUiFacadeController?.setCommandPreview(message),
-  clearCommandSuggestions: () => appCommandUiFacadeController?.clearCommandSuggestions(),
-  render: () => appCommandUiFacadeController?.render(),
-  debugLog,
-  executeControlCommand: (interpreted) => appCommandUiFacadeController?.executeControlCommand(interpreted),
-  recordSlashHistory: (rawCommand) => commandComposerAutocompleteController?.recordSlashHistory(rawCommand),
-  getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage(err, fallback) || fallback,
-  resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState(),
-  parseDirectTargetRoutingInput: commandTargetRuntimeController.parseDirectTargetRoutingInput,
-  resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
-  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
-  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
-  isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
-  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
-  apiSendInput: api.sendInput.bind(api),
-  sendInputWithConfiguredTerminator,
-  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
-  delayedSubmitMs: DELAYED_SUBMIT_MS,
-  setError: (message) => appCommandUiFacadeController?.setError(message),
-  clearError: () => appRuntimeStateController?.clearError(),
-  getCustomCommandState: (name) => appCommandUiFacadeController?.getCustomCommand(name),
-  formatQuickSwitchPreview: commandTargetRuntimeController.formatQuickSwitchPreview
-});
-
-commandComposerAutocompleteController?.bindUiEvents();
-
-appLifecycleController = createAppLifecycleController({
-  windowRef: window,
+  wsStateRef,
+  activityCompletionNotifier,
   createBtn,
   deckCreateBtn,
   deckRenameBtn,
   deckDeleteBtn,
   sendBtn,
-  api,
-  getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
-  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
-  setError: (message) => appCommandUiFacadeController?.setError(message),
-  clearUiError: () => appRuntimeStateController?.clearError(),
-  getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage(err, fallback) || fallback,
-  debugLog,
-  createDeckFlow: () => appLayoutDeckFacadeController?.createDeckFlow(),
-  renameDeckFlow: () => appLayoutDeckFacadeController?.renameDeckFlow(),
-  deleteDeckFlow: () => appLayoutDeckFacadeController?.deleteDeckFlow(),
-  submitCommand: () => appCommandUiFacadeController?.submitCommand(),
-  bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options),
-  startWsRuntime: () => wsRuntimeController?.start() || null,
-  setWsClient: (client) => {
-    wsClient = client;
-  },
-  scheduleBootstrapFallback: () => appCommandUiFacadeController?.scheduleBootstrapFallback(),
-  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
-  disposeAppRuntimeState: () => appRuntimeStateController?.dispose(),
-  disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose(),
-  closeWsClient: () => {
-    if (wsClient) {
-      wsClient.close();
-    }
-  },
-  disposeAuthBootstrapRuntime: () => authBootstrapRuntimeController?.dispose(),
-  disposeSessionTerminalResize: () => sessionTerminalResizeController?.dispose(),
-  disposeTerminalSearch: () => terminalSearchController?.dispose(),
-  disposeCommandComposerRuntime: () => commandComposerRuntimeController?.dispose(),
-  disposeCommandComposerAutocomplete: () => commandComposerAutocompleteController?.dispose(),
-  disconnectTerminalObservers: () => {
-    for (const observer of terminalObservers.values()) {
-      observer.disconnect();
-    }
-  },
-  disposeTerminals: () => {
-    for (const entry of terminals.values()) {
-      entry.terminal.dispose();
-    }
-  }
+  layoutRuntimeController,
+  terminalSearchController,
+  sessionTerminalResizeController,
+  appCommandUiFacadeController,
+  appLayoutDeckFacadeController,
+  appRuntimeStateController,
+  appSessionRuntimeFacadeController,
+  sessionUiFacadeController,
+  streamAdapter,
+  sessionViewModel,
+  runtimeEventController,
+  deckRuntimeController,
+  devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
+  devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
+  devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS
 });
-appLifecycleController.bindUiEvents();
-appLifecycleController.bindWindowEvents();
+({
+  commandEngine,
+  commandTargetRuntimeController,
+  commandExecutor,
+  authBootstrapRuntimeController,
+  wsRuntimeController,
+  commandComposerAutocompleteController,
+  commandComposerRuntimeController,
+  appLifecycleController
+} = appBootstrapCompositionController.composeControllers());
 
-appLifecycleController.initializeRuntime().catch(() => {
+appBootstrapCompositionController.bootstrapUiAndRuntime().catch(() => {
   appCommandUiFacadeController?.setError("Failed to initialize application runtime.");
 });

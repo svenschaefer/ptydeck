@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010B` is now completed: the remaining startup/bootstrap composition wiring was extracted from `frontend/src/public/app.js` into `frontend/src/public/app-bootstrap-composition-controller.js`.
+- [x] The new bootstrap composition controller now owns command-engine/target/executor startup assembly, auth bootstrap runtime assembly, WS runtime assembly, composer runtime assembly, lifecycle assembly, store hydration/subscription, and initial UI/runtime bootstrap sequencing.
+- [x] Added focused regression coverage for the new bootstrap composition controller in `frontend/test/app-bootstrap-composition-controller.test.js`, including composition-order and bootstrap-sequencing assertions.
+- [x] Frontend build/lint script coverage was updated so `src/public/app-bootstrap-composition-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 808 lines after the `ARC-010B` extraction step.
+- [x] Validation for `ARC-010B` passed with `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after the `ARC-010B` closeout step: backend `91.60%` lines, frontend `95.79%` lines overall.
 - [x] Session activity-status detection now applies explicit priority ordering so richer timer/progress patterns win over lower-value generic matches in the header (`Working (1m 32s • esc to interrupt)` beats `Working`; `Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s` beats the lower-detail variants).
 - [x] Activity-status parsing now reconstructs redraw lines across split chunk boundaries, so timer/progress statuses continue to upgrade correctly even when the terminal sends them in multiple partial chunks.
 - [x] Focused regressions were added for status-priority and split-chunk upgrades in `frontend/test/stream-builtins.test.js` and `frontend/test/app.test.js`.
