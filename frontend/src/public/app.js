@@ -12,6 +12,7 @@ import { createWsClient } from "./ws-client.js";
 import { createWsRuntimeController } from "./ws-runtime-controller.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
+import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
 import { createBuiltInStreamPlugins } from "./stream-builtins.js";
@@ -280,6 +281,7 @@ let commandComposerRuntimeController = null;
 let commandSuggestionsController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
+let sessionRuntimeController = null;
 let sessionDisposalController = null;
 let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
@@ -1371,29 +1373,15 @@ function applySettingsToAllTerminals(options = {}) {
 }
 
 function findNextQuickId() {
-  const used = new Set(sessionQuickIds.values());
-  for (const candidate of QUICK_ID_POOL) {
-    if (!used.has(candidate)) {
-      return candidate;
-    }
-  }
-  return "?";
+  return sessionRuntimeController?.findNextQuickId() || "?";
 }
 
 function ensureQuickId(sessionId) {
-  if (!sessionQuickIds.has(sessionId)) {
-    sessionQuickIds.set(sessionId, findNextQuickId());
-  }
-  return sessionQuickIds.get(sessionId);
+  return sessionRuntimeController?.ensureQuickId(sessionId) || "?";
 }
 
 function pruneQuickIds(activeSessionIds) {
-  const activeSet = new Set(activeSessionIds);
-  for (const sessionId of sessionQuickIds.keys()) {
-    if (!activeSet.has(sessionId)) {
-      sessionQuickIds.delete(sessionId);
-    }
-  }
+  sessionRuntimeController?.pruneQuickIds(activeSessionIds);
 }
 
 function applyResizeForSession(sessionId, options = {}) {
@@ -1550,100 +1538,43 @@ function render() {
 }
 
 function appendTerminalChunk(sessionId, data, options = {}) {
-  const entry = terminals.get(sessionId);
-  if (!entry || typeof data !== "string" || data.length === 0) {
-    return false;
-  }
-  if (entry.isVisible === false) {
-    entry.pendingViewportSync = true;
-  }
-  const terminal = entry.terminal;
-  terminal.write(data, () => {
-    entry.searchRevision = (Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0) + 1;
-    if (entry.isVisible !== false) {
-      syncTerminalScrollArea(terminal);
-    }
-    refreshTerminalViewport(terminal);
-    if (entry.isVisible !== false) {
-      syncTerminalScrollArea(terminal);
-    }
-    if (store.getState().activeSessionId === sessionId && terminalSearchState.query) {
-      syncActiveTerminalSearch({ preserveSelection: true });
-    }
-  });
-  if (options.markActivity !== false) {
-    markSessionActivity(sessionId);
-  }
-  return true;
+  return sessionRuntimeController?.appendTerminalChunk(sessionId, data, options) === true;
 }
 
 function replaySnapshotOutputs(outputs, attempt = 0) {
-  if (!Array.isArray(outputs) || outputs.length === 0) {
-    return;
-  }
-
-  let missing = 0;
-  for (const entry of outputs) {
-    if (!entry || typeof entry.sessionId !== "string" || typeof entry.data !== "string" || entry.data.length === 0) {
-      continue;
-    }
-    if (!terminals.has(entry.sessionId)) {
-      missing += 1;
-      continue;
-    }
-    appendTerminalChunk(entry.sessionId, entry.data, { markActivity: false });
-  }
-
-  if (missing > 0 && attempt < 4) {
-    setTimeout(() => replaySnapshotOutputs(outputs, attempt + 1), 80);
-  }
+  sessionRuntimeController?.replaySnapshotOutputs(outputs, attempt);
 }
 
 function upsertSession(nextSession) {
-  store.upsertSession(nextSession);
+  sessionRuntimeController?.upsertSession(nextSession);
 }
 
 function markSessionExited(sessionId, exitDetails = {}) {
-  const session = getSessionById(sessionId);
-  if (!session) {
-    return;
-  }
-  store.markSessionExited(sessionId, {
-    exitCode: exitDetails.exitCode,
-    signal: exitDetails.signal,
-    exitedAt: Date.now(),
-    updatedAt: Date.now()
-  });
-  streamAdapter.disposeSession(sessionId);
-  store.clearSessionActivity(sessionId);
-  const nextSession = getSessionById(sessionId);
-  if (store.getState().activeSessionId === sessionId) {
-    setCommandFeedback(getExitedSessionMessage(nextSession));
-  }
+  sessionRuntimeController?.markSessionExited(sessionId, exitDetails);
 }
 
 function removeSession(sessionId) {
-  store.removeSession(sessionId);
+  sessionRuntimeController?.removeSession(sessionId);
 }
 
 function markSessionClosed(sessionId) {
-  store.markSessionClosed(sessionId);
+  sessionRuntimeController?.markSessionClosed(sessionId);
 }
 
 function handleSessionTerminalInput(sessionId, data) {
-  runtimeEventController?.handleSessionTerminalInput(sessionId, data);
+  sessionRuntimeController?.handleSessionTerminalInput(sessionId, data);
 }
 
 function applyRuntimeEvent(event, options = {}) {
-  return runtimeEventController?.applyRuntimeEvent(event, options) === true;
+  return sessionRuntimeController?.applyRuntimeEvent(event, options) === true;
 }
 
 function formatSessionDisplayName(session) {
-  return sessionViewModel.formatSessionDisplayName(session);
+  return sessionRuntimeController?.formatSessionDisplayName(session) || String(session?.name || session?.id || "");
 }
 
 function formatSessionToken(sessionId) {
-  return sessionQuickIds.get(sessionId) || ensureQuickId(sessionId);
+  return sessionRuntimeController?.formatSessionToken(sessionId) || "?";
 }
 
 sessionViewModel = createSessionViewModel({
@@ -1654,6 +1585,26 @@ sessionViewModel = createSessionViewModel({
   sessionEnvKeyPattern: SESSION_ENV_KEY_PATTERN,
   sessionEnvMaxEntries: SESSION_ENV_MAX_ENTRIES,
   formatSessionToken
+});
+
+sessionRuntimeController = createSessionRuntimeController({
+  store,
+  terminals,
+  sessionQuickIds,
+  quickIdPool: QUICK_ID_POOL,
+  terminalSearchState,
+  refreshTerminalViewport,
+  syncTerminalScrollArea,
+  markSessionActivity,
+  syncActiveTerminalSearch,
+  getActiveSessionId: () => store.getState().activeSessionId,
+  getSessionById,
+  streamAdapter,
+  setCommandFeedback,
+  getExitedSessionMessage,
+  getRuntimeEventController: () => runtimeEventController,
+  getSessionViewModel: () => sessionViewModel,
+  windowRef: window
 });
 
 runtimeEventController = createRuntimeEventController({

@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted session runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/session-runtime-controller.js` (quick-id allocation/pruning, terminal chunk append/replay, session exit/close/remove store handoff, runtime-event delegation, and display-name/token helpers).
+- [x] App runtime now composes session runtime behavior through the dedicated session runtime controller while preserving existing store/reducer semantics, hidden-terminal replay handling, and runtime-event wiring.
+- [x] Added focused regression coverage for the new session runtime controller in `frontend/test/session-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/session-runtime-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/session-runtime-controller.test.js frontend/test/app.test.js frontend/test/session-grid-controller.test.js frontend/test/session-disposal-controller.test.js`.
 - [x] `ARC-010` progress: extracted deck runtime/state orchestration from `frontend/src/public/app.js` into `frontend/src/public/deck-runtime-controller.js` (active-deck persistence, deck normalization/upsert/remove flows, deck-scoped terminal geometry sync, sidebar render/count helpers, and active-deck switch orchestration).
 - [x] App runtime now composes deck-state behavior through the dedicated deck runtime controller while preserving existing store/reducer semantics and deck-scoped terminal sizing behavior.
 - [x] Added focused regression coverage for the new deck runtime controller in `frontend/test/deck-runtime-controller.test.js`.
