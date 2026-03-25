@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted active-terminal search/runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/ui/terminal-search-controller.js` (query normalization, active-session match collection, wrapped next/previous navigation, UI status/button synchronization, and search control event binding).
+- [x] App runtime now composes terminal-search behavior through the dedicated controller boundary while keeping `terminalSearchState` shared with existing render/disposal paths.
+- [x] Added focused regression coverage for the new terminal-search controller in `frontend/test/terminal-search-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/terminal-search-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/terminal-search-controller.test.js frontend/test/terminal-search.test.js frontend/test/app.test.js`.
 - [x] `ARC-010` progress: extracted auth/bootstrap runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/auth-bootstrap-runtime-controller.js` (REST snapshot fallback, dev-token acquisition/refresh scheduling, WebSocket bearer-token handoff, and bootstrap dedupe/guardrails).
 - [x] App runtime bootstrap order is now hardened so controller wiring completes before network bootstrap starts, preventing the WebSocket-snapshot vs REST-fallback race exercised by `frontend/test/app.test.js`.
 - [x] Runtime controller compatibility hardening completed: `frontend/src/public/command-composer-runtime-controller.js` and `frontend/src/public/ui/session-terminal-runtime-controller.js` now fall back to global timer / `ResizeObserver` primitives when injected `window` shims omit them.

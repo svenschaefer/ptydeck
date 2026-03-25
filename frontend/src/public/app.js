@@ -23,12 +23,6 @@ import {
   syncTerminalScrollArea
 } from "./terminal-compat.js";
 import {
-  applyTerminalSearchMatch,
-  collectTerminalSearchMatches,
-  formatTerminalSearchStatus,
-  normalizeTerminalSearchQuery
-} from "./terminal-search.js";
-import {
   createSessionStreamAdapter,
   normalizeCustomCommandPayloadForShell,
   sendInputWithConfiguredTerminator
@@ -47,6 +41,7 @@ import { createSessionCardRenderController } from "./ui/session-card-render-cont
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 import { createSessionTerminalResizeController } from "./ui/session-terminal-resize-controller.js";
 import { createSessionTerminalRuntimeController } from "./ui/session-terminal-runtime-controller.js";
+import { createTerminalSearchController } from "./ui/terminal-search-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
 
 const config = resolveRuntimeConfig(window);
@@ -291,6 +286,7 @@ let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
 let sessionTerminalResizeController = null;
 let sessionTerminalRuntimeController = null;
+let terminalSearchController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
@@ -400,194 +396,15 @@ function setCommandPreview(message) {
 }
 
 function clearTerminalSearchSelection(sessionId = terminalSearchState.selectedSessionId) {
-  const entry = terminals.get(sessionId);
-  if (entry && typeof entry.terminal?.clearSelection === "function") {
-    entry.terminal.clearSelection();
-  }
-  if (terminalSearchState.selectedSessionId === sessionId) {
-    terminalSearchState.selectedSessionId = "";
-  }
-}
-
-function updateTerminalSearchUi() {
-  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
-  const hasMatches = terminalSearchState.matches.length > 0;
-  const missingActiveSession = Boolean(query) && terminalSearchState.missingActiveSession;
-  const statusText = formatTerminalSearchStatus({
-    query,
-    matches: terminalSearchState.matches,
-    activeIndex: terminalSearchState.activeIndex,
-    wrapped: terminalSearchState.wrapped,
-    direction: terminalSearchState.direction,
-    missingActiveSession
-  });
-
-  if (terminalSearchInputEl && terminalSearchInputEl.value !== terminalSearchState.query) {
-    terminalSearchInputEl.value = terminalSearchState.query;
-  }
-  if (terminalSearchStatusEl) {
-    terminalSearchStatusEl.textContent = statusText;
-  }
-  if (terminalSearchPrevBtn) {
-    terminalSearchPrevBtn.disabled = !query || !hasMatches;
-  }
-  if (terminalSearchNextBtn) {
-    terminalSearchNextBtn.disabled = !query || !hasMatches;
-  }
-  if (terminalSearchClearBtn) {
-    terminalSearchClearBtn.disabled = !query;
-  }
-}
-
-function applyActiveTerminalSearchSelection() {
-  const activeSessionId = terminalSearchState.sessionId;
-  const entry = terminals.get(activeSessionId);
-  if (!entry || terminalSearchState.matches.length === 0 || terminalSearchState.activeIndex < 0) {
-    clearTerminalSearchSelection(activeSessionId);
-    updateTerminalSearchUi();
-    return;
-  }
-
-  if (terminalSearchState.selectedSessionId && terminalSearchState.selectedSessionId !== activeSessionId) {
-    clearTerminalSearchSelection(terminalSearchState.selectedSessionId);
-  }
-  applyTerminalSearchMatch(entry.terminal, terminalSearchState.matches[terminalSearchState.activeIndex]);
-  terminalSearchState.selectedSessionId = activeSessionId;
-  updateTerminalSearchUi();
-}
-
-function resetTerminalSearchState() {
-  clearTerminalSearchSelection();
-  terminalSearchState.sessionId = "";
-  terminalSearchState.matches = [];
-  terminalSearchState.activeIndex = -1;
-  terminalSearchState.revision = -1;
-  terminalSearchState.wrapped = false;
-  terminalSearchState.direction = "next";
-  terminalSearchState.missingActiveSession = false;
+  terminalSearchController?.clearSelection(sessionId);
 }
 
 function syncActiveTerminalSearch({ preserveSelection = true } = {}) {
-  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
-  terminalSearchState.query = query;
-
-  if (!query) {
-    resetTerminalSearchState();
-    updateTerminalSearchUi();
-    return;
-  }
-
-  const activeSessionId = store.getState().activeSessionId || "";
-  if (!activeSessionId) {
-    resetTerminalSearchState();
-    terminalSearchState.query = query;
-    terminalSearchState.missingActiveSession = true;
-    updateTerminalSearchUi();
-    return;
-  }
-
-  const entry = terminals.get(activeSessionId);
-  if (!entry) {
-    resetTerminalSearchState();
-    terminalSearchState.query = query;
-    terminalSearchState.sessionId = activeSessionId;
-    terminalSearchState.missingActiveSession = true;
-    updateTerminalSearchUi();
-    return;
-  }
-
-  const revision = Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0;
-  const previousSessionId = terminalSearchState.sessionId;
-  const previousMatch =
-    preserveSelection &&
-    previousSessionId === activeSessionId &&
-    terminalSearchState.activeIndex >= 0 &&
-    terminalSearchState.matches[terminalSearchState.activeIndex]
-      ? terminalSearchState.matches[terminalSearchState.activeIndex]
-      : null;
-  const matches = collectTerminalSearchMatches(entry.terminal, query);
-  let activeIndex = -1;
-
-  if (matches.length > 0) {
-    if (previousMatch) {
-      activeIndex = matches.findIndex(
-        (match) =>
-          match.row === previousMatch.row &&
-          match.column === previousMatch.column &&
-          match.length === previousMatch.length
-      );
-    }
-    if (activeIndex < 0) {
-      activeIndex = 0;
-    }
-  }
-
-  terminalSearchState.query = query;
-  terminalSearchState.sessionId = activeSessionId;
-  terminalSearchState.matches = matches;
-  terminalSearchState.activeIndex = activeIndex;
-  terminalSearchState.revision = revision;
-  terminalSearchState.wrapped = false;
-  terminalSearchState.direction = "next";
-  terminalSearchState.missingActiveSession = false;
-  applyActiveTerminalSearchSelection();
+  terminalSearchController?.syncActiveTerminalSearch({ preserveSelection });
 }
 
 function navigateActiveTerminalSearch(direction) {
-  const normalizedDirection = direction === "previous" ? "previous" : "next";
-  const query = normalizeTerminalSearchQuery(terminalSearchState.query);
-  if (!query) {
-    updateTerminalSearchUi();
-    return;
-  }
-
-  const activeSessionId = store.getState().activeSessionId || "";
-  const entry = terminals.get(activeSessionId);
-  if (!entry) {
-    terminalSearchState.query = query;
-    terminalSearchState.missingActiveSession = true;
-    updateTerminalSearchUi();
-    return;
-  }
-
-  const revision = Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0;
-  if (
-    terminalSearchState.sessionId !== activeSessionId ||
-    terminalSearchState.query !== query ||
-    terminalSearchState.revision !== revision
-  ) {
-    syncActiveTerminalSearch({ preserveSelection: true });
-  }
-
-  if (terminalSearchState.matches.length === 0) {
-    updateTerminalSearchUi();
-    return;
-  }
-
-  let nextIndex = terminalSearchState.activeIndex;
-  if (nextIndex < 0) {
-    nextIndex = 0;
-  } else if (normalizedDirection === "previous") {
-    nextIndex -= 1;
-  } else {
-    nextIndex += 1;
-  }
-
-  let wrapped = false;
-  if (nextIndex < 0) {
-    nextIndex = terminalSearchState.matches.length - 1;
-    wrapped = true;
-  }
-  if (nextIndex >= terminalSearchState.matches.length) {
-    nextIndex = 0;
-    wrapped = true;
-  }
-
-  terminalSearchState.activeIndex = nextIndex;
-  terminalSearchState.wrapped = wrapped;
-  terminalSearchState.direction = normalizedDirection;
-  terminalSearchState.missingActiveSession = false;
-  applyActiveTerminalSearchSelection();
+  terminalSearchController?.navigateActiveTerminalSearch(direction);
 }
 
 function resetCommandAutocompleteState() {
@@ -2091,6 +1908,17 @@ workspaceRenderController = createWorkspaceRenderController({
   commandSuggestionsEl
 });
 
+terminalSearchController = createTerminalSearchController({
+  terminalSearchState,
+  terminals,
+  inputEl: terminalSearchInputEl,
+  prevBtn: terminalSearchPrevBtn,
+  nextBtn: terminalSearchNextBtn,
+  clearBtn: terminalSearchClearBtn,
+  statusEl: terminalSearchStatusEl,
+  getActiveSessionId: () => store.getState().activeSessionId
+});
+
 deckActionsController = createDeckActionsController({
   windowRef: window,
   api,
@@ -2473,41 +2301,8 @@ if (settingsRowsEl) {
     }
   });
 }
-if (terminalSearchInputEl) {
-  terminalSearchInputEl.addEventListener("input", () => {
-    terminalSearchState.query = terminalSearchInputEl.value || "";
-    syncActiveTerminalSearch({ preserveSelection: false });
-  });
-  terminalSearchInputEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      navigateActiveTerminalSearch(event.shiftKey ? "previous" : "next");
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      terminalSearchState.query = "";
-      if (terminalSearchInputEl) {
-        terminalSearchInputEl.value = "";
-      }
-      syncActiveTerminalSearch({ preserveSelection: false });
-    }
-  });
-}
-if (terminalSearchPrevBtn) {
-  terminalSearchPrevBtn.addEventListener("click", () => navigateActiveTerminalSearch("previous"));
-}
-if (terminalSearchNextBtn) {
-  terminalSearchNextBtn.addEventListener("click", () => navigateActiveTerminalSearch("next"));
-}
-if (terminalSearchClearBtn) {
-  terminalSearchClearBtn.addEventListener("click", () => {
-    terminalSearchState.query = "";
-    if (terminalSearchInputEl) {
-      terminalSearchInputEl.value = "";
-    }
-    syncActiveTerminalSearch({ preserveSelection: false });
-  });
-}
+terminalSearchController?.bindUiEvents();
+terminalSearchController?.updateUi();
 async function submitCommand() {
   await commandComposerRuntimeController?.submitCommand();
 }
@@ -2639,6 +2434,7 @@ window.addEventListener("beforeunload", () => {
   }
   authBootstrapRuntimeController?.dispose();
   sessionTerminalResizeController?.dispose();
+  terminalSearchController?.dispose();
   commandComposerRuntimeController?.dispose();
   if (commandSuggestionsTimer) {
     clearTimeout(commandSuggestionsTimer);
