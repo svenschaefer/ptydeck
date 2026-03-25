@@ -829,6 +829,8 @@ Completed and verified topics belong here.
 - [x] Added focused frontend regression coverage for the new session/runtime facade in `frontend/test/app-session-runtime-facade-controller.test.js`, including delegation and safe-fallback behavior when downstream runtime/UI controllers are absent.
 - [x] Validation for the newest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after the newest `ARC-010` cycle: backend `91.60%` lines, frontend `95.62%` lines overall; `frontend/src/public/app.js` reduced to `1066` lines.
+- [x] Documentation governance audit after the latest `ARC-010` increment reconfirmed that `TODO.md` contains explicit open tasks only, `ROADMAP.md` contains ordering/version/dependency data only, and no backlog resequencing or promotion was required.
+- [x] Persistent project context was revalidated in `CODEX_CONTEXT.md` after the latest cycle; the authoritative open-task inventory remains `ARC-010`, `ARC-011`, `ARC-012`, `QLT-123`, and `QLT-124`.
 
 ## Maintenance Rules
 
