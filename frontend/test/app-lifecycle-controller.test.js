@@ -146,6 +146,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     scheduleGlobalResize: () => {
       resizeCalls += 1;
     },
+    disposeAppRuntimeState: () => cleanup.push("app-runtime"),
     disposeActivityCompletionNotifier: () => cleanup.push("activity"),
     closeWsClient: () => cleanup.push("ws"),
     disposeAuthBootstrapRuntime: () => cleanup.push("auth"),
@@ -177,5 +178,16 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   for (const handler of listeners.get("beforeunload") || []) {
     handler({ type: "beforeunload" });
   }
-  assert.deepEqual(cleanup, ["activity", "ws", "auth", "resize", "search", "composer", "autocomplete", "observers", "terminals"]);
+  assert.deepEqual(cleanup, [
+    "app-runtime",
+    "activity",
+    "ws",
+    "auth",
+    "resize",
+    "search",
+    "composer",
+    "autocomplete",
+    "observers",
+    "terminals"
+  ]);
 });

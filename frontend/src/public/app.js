@@ -1,6 +1,7 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createAppLifecycleController } from "./app-lifecycle-controller.js";
+import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
 import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
 import { createCommandEngine } from "./command-engine.js";
@@ -62,7 +63,7 @@ const api = createApiClient(config.apiBaseUrl, {
   debug: debugLogs,
   log: debugLog,
   async onUnauthorized() {
-    const refreshed = await bootstrapDevAuthToken();
+    const refreshed = await appRuntimeStateController?.bootstrapDevAuthToken();
     if (!refreshed) {
       debugLog("auth.recovery.failed", {});
     }
@@ -116,8 +117,6 @@ const terminalObservers = new Map();
 const resizeTimers = new Map();
 const terminalSizes = new Map();
 const sessionQuickIds = new Map();
-let bootstrapFallbackTimer = null;
-let runtimeBootstrapSource = "pending";
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const ACTIVE_DECK_STORAGE_KEY = "ptydeck.active-deck.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
@@ -269,6 +268,7 @@ let wsClient = null;
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
 let appLifecycleController = null;
+let appRuntimeStateController = null;
 let deckRuntimeController = null;
 let sessionViewModel = null;
 let runtimeEventController = null;
@@ -345,6 +345,19 @@ const startupPerf = {
 if (typeof window !== "undefined") {
   window.__PTYDECK_PERF__ = startupPerf;
 }
+
+appRuntimeStateController = createAppRuntimeStateController({
+  windowRef: window,
+  uiState,
+  startupPerf,
+  nowMs,
+  wsBootstrapFallbackMs: WS_BOOTSTRAP_FALLBACK_MS,
+  debugLog,
+  requestRender: () => render(),
+  hasBootstrapInFlight: () => authBootstrapRuntimeController?.hasBootstrapInFlight?.() === true,
+  runBootstrapFallback: () => authBootstrapRuntimeController?.bootstrapRuntimeFallback?.(),
+  runBootstrapDevAuthToken: (options) => authBootstrapRuntimeController?.bootstrapDevAuthToken?.(options) || false
+});
 
 layoutRuntimeController = createLayoutRuntimeController({
   windowRef: window,
@@ -429,31 +442,24 @@ function replaceCustomCommandState(commands) {
 }
 
 if (typeof window.Terminal !== "function") {
-  setError("Terminal library failed to load.");
+  appRuntimeStateController.setError("Terminal library failed to load.");
   throw new Error("window.Terminal is not available.");
 }
 
 function setError(message) {
-  debugLog("ui.error", { message });
-  uiState.error = message;
-  render();
+  appRuntimeStateController?.setError(message);
 }
 
 function setCommandFeedback(message) {
-  uiState.commandFeedback = message;
-  render();
+  appRuntimeStateController?.setCommandFeedback(message);
 }
 
 function getErrorMessage(err, fallback) {
-  if (err && typeof err.message === "string" && err.message.trim()) {
-    return err.message.trim();
-  }
-  return fallback;
+  return appRuntimeStateController?.getErrorMessage(err, fallback) || fallback;
 }
 
 function setCommandPreview(message) {
-  uiState.commandPreview = message;
-  render();
+  appRuntimeStateController?.setCommandPreview(message);
 }
 
 function clearTerminalSearchSelection(sessionId = terminalSearchState.selectedSessionId) {
@@ -480,33 +486,8 @@ function clampInt(value, fallback, min, max) {
   return layoutRuntimeController?.clampInt(value, fallback, min, max) ?? fallback;
 }
 
-function readStoredSettings() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
-      return null;
-    }
-    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
 function saveTerminalSettings() {
   layoutRuntimeController?.saveTerminalSettings();
-}
-
-function loadTerminalSettings() {
-  return (
-    layoutRuntimeController?.loadTerminalSettings() || {
-      cols: DEFAULT_TERMINAL_COLS,
-      rows: DEFAULT_TERMINAL_ROWS,
-      sidebarVisible: true
-    }
-  );
 }
 
 function getSessionFilterText() {
@@ -556,10 +537,6 @@ function normalizeSendTerminatorMode(value) {
   return layoutRuntimeController?.normalizeSendTerminatorMode(value) || "auto";
 }
 
-function loadSessionInputSettings() {
-  return layoutRuntimeController?.loadSessionInputSettings() || {};
-}
-
 function loadStoredSessionFilterText() {
   return layoutRuntimeController?.loadStoredSessionFilterText() || "";
 }
@@ -572,10 +549,6 @@ store.hydrateRuntimePreferences({
   activeDeckId: deckRuntimeController.loadStoredActiveDeckId(),
   sessionFilterText: loadStoredSessionFilterText()
 });
-
-function saveSessionInputSettings() {
-  layoutRuntimeController?.saveSessionInputSettings();
-}
 
 function getSessionSendTerminator(sessionId) {
   return layoutRuntimeController?.getSessionSendTerminator(sessionId) || "auto";
@@ -820,7 +793,7 @@ function readSettingsFromUi() {
 }
 
 async function applyTerminalSizeSettings(nextCols, nextRows) {
-  uiState.error = "";
+  appRuntimeStateController?.clearError();
   return layoutRuntimeController?.applyTerminalSizeSettings(nextCols, nextRows);
 }
 
@@ -877,59 +850,15 @@ function scheduleDeferredResizePasses(options = {}) {
 }
 
 function maybeReportStartupPerf() {
-  if (startupPerf.startupReported) {
-    return;
-  }
-  if (
-    startupPerf.bootstrapReadyAtMs === null ||
-    startupPerf.firstNonEmptyRenderAtMs === null ||
-    startupPerf.firstTerminalMountedAtMs === null
-  ) {
-    return;
-  }
-  startupPerf.startupReported = true;
-  debugLog("perf.startup.ready", {
-    bootstrapRequestCount: startupPerf.bootstrapRequestCount,
-    toBootstrapReadyMs: Math.round(startupPerf.bootstrapReadyAtMs - startupPerf.appStartAtMs),
-    toFirstNonEmptyRenderMs: Math.round(startupPerf.firstNonEmptyRenderAtMs - startupPerf.appStartAtMs),
-    toFirstTerminalMountedMs: Math.round(startupPerf.firstTerminalMountedAtMs - startupPerf.appStartAtMs)
-  });
-}
-
-function clearBootstrapFallbackTimer() {
-  if (!bootstrapFallbackTimer) {
-    return;
-  }
-  clearTimeout(bootstrapFallbackTimer);
-  bootstrapFallbackTimer = null;
+  appRuntimeStateController?.maybeReportStartupPerf();
 }
 
 function markRuntimeBootstrapReady(source) {
-  runtimeBootstrapSource = source;
-  clearBootstrapFallbackTimer();
-  uiState.loading = false;
-  if (startupPerf.bootstrapReadyAtMs === null) {
-    startupPerf.bootstrapReadyAtMs = nowMs();
-  }
-  maybeReportStartupPerf();
-  render();
+  appRuntimeStateController?.markRuntimeBootstrapReady(source);
 }
 
 function scheduleBootstrapFallback() {
-  if (
-    runtimeBootstrapSource !== "pending" ||
-    authBootstrapRuntimeController?.hasBootstrapInFlight?.() ||
-    bootstrapFallbackTimer
-  ) {
-    return;
-  }
-  bootstrapFallbackTimer = setTimeout(() => {
-    bootstrapFallbackTimer = null;
-    if (runtimeBootstrapSource !== "pending") {
-      return;
-    }
-    bootstrapRuntimeFallback().catch(() => {});
-  }, WS_BOOTSTRAP_FALLBACK_MS);
+  appRuntimeStateController?.scheduleBootstrapFallback();
 }
 
 function getSessionCountForDeck(deckId, sessions) {
@@ -1056,9 +985,7 @@ runtimeEventController = createRuntimeEventController({
   replaySnapshotOutputs,
   scheduleCommandPreview,
   scheduleCommandSuggestions,
-  clearError: () => {
-    uiState.error = "";
-  },
+  clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady,
   upsertSession,
   markSessionExited,
@@ -1292,9 +1219,7 @@ sessionGridController = createSessionGridController({
   formatSessionToken,
   formatSessionDisplayName,
   setError,
-  clearError: () => {
-    uiState.error = "";
-  },
+  clearError: () => appRuntimeStateController?.clearError(),
   applyRuntimeEvent,
   applyThemeForSession,
   getSessionThemeConfig,
@@ -1371,38 +1296,16 @@ async function executeControlCommand(interpreted) {
   return commandExecutor.execute(interpreted);
 }
 
-async function bootstrapRuntimeFallback() {
-  if (!authBootstrapRuntimeController || runtimeBootstrapSource !== "pending") {
-    return;
-  }
-  if (!authBootstrapRuntimeController.hasBootstrapInFlight()) {
-    startupPerf.bootstrapRequestCount += 1;
-    debugLog("sessions.bootstrap.request", {
-      bootstrapRequestCount: startupPerf.bootstrapRequestCount
-    });
-  }
-  return authBootstrapRuntimeController.bootstrapRuntimeFallback();
-}
-
-async function bootstrapDevAuthToken(options = {}) {
-  if (!authBootstrapRuntimeController) {
-    return false;
-  }
-  return authBootstrapRuntimeController.bootstrapDevAuthToken(options);
-}
-
 authBootstrapRuntimeController = createAuthBootstrapRuntimeController({
   windowRef: window,
   api,
   defaultDeckId: DEFAULT_DECK_ID,
   getTerminalSettings: () => terminalSettings,
   getPreferredActiveDeckId: () => store.getState().activeDeckId,
-  getRuntimeBootstrapSource: () => runtimeBootstrapSource,
+  getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource() || "pending",
   setDecks,
   setSessions: (sessions) => store.setSessions(sessions || []),
-  setUiError: (message) => {
-    uiState.error = message;
-  },
+  setUiError: (message) => appRuntimeStateController?.setUiError(message),
   markRuntimeBootstrapReady,
   debugLog,
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
@@ -1416,18 +1319,14 @@ wsRuntimeController = createWsRuntimeController({
   debug: debugLogs,
   log: debugLog,
   setConnectionState: (status) => store.setConnectionState(status),
-  getRuntimeBootstrapSource: () => runtimeBootstrapSource,
-  onRuntimeConnected: () => {
-    uiState.loading = false;
-    uiState.error = "";
-    render();
-  },
+  getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource() || "pending",
+  onRuntimeConnected: () => appRuntimeStateController?.markRuntimeConnected(),
   hasTerminal: (sessionId) => terminals.has(sessionId),
   pushSessionData: (sessionId, data) => streamAdapter.push(sessionId, data),
   applyRuntimeEvent,
   getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
   createWsTicket: () => api.createWsTicket(),
-  bootstrapDevAuthToken
+  bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options)
 });
 
 store.subscribe(render);
@@ -1498,9 +1397,7 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   normalizeSendTerminatorMode,
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   setError,
-  clearError: () => {
-    uiState.error = "";
-  },
+  clearError: () => appRuntimeStateController?.clearError(),
   getCustomCommandState,
   formatQuickSwitchPreview: commandTargetRuntimeController.formatQuickSwitchPreview
 });
@@ -1519,22 +1416,21 @@ appLifecycleController = createAppLifecycleController({
   resolveSessionDeckId,
   applyRuntimeEvent,
   setError,
-  clearUiError: () => {
-    uiState.error = "";
-  },
+  clearUiError: () => appRuntimeStateController?.clearError(),
   getErrorMessage,
   debugLog,
   createDeckFlow,
   renameDeckFlow,
   deleteDeckFlow,
   submitCommand,
-  bootstrapDevAuthToken,
+  bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options),
   startWsRuntime: () => wsRuntimeController?.start() || null,
   setWsClient: (client) => {
     wsClient = client;
   },
-  scheduleBootstrapFallback,
+  scheduleBootstrapFallback: () => appRuntimeStateController?.scheduleBootstrapFallback(),
   scheduleGlobalResize,
+  disposeAppRuntimeState: () => appRuntimeStateController?.dispose(),
   disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose(),
   closeWsClient: () => {
     if (wsClient) {

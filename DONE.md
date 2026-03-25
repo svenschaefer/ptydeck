@@ -4,6 +4,14 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted shared app runtime/bootstrap UI-state orchestration from `frontend/src/public/app.js` into `frontend/src/public/app-runtime-state-controller.js` (UI error/feedback/preview state, bootstrap fallback timer lifecycle, runtime-bootstrap source tracking, startup perf readiness reporting, and dev-auth bootstrap passthrough).
+- [x] App runtime now composes shared bootstrap/error/feedback state through the dedicated runtime-state controller instead of keeping those mutable globals and fallback helpers inline in `frontend/src/public/app.js`.
+- [x] `frontend/src/public/app-lifecycle-controller.js` now disposes app-runtime bootstrap timers/state during `beforeunload`, so the extracted controller lifecycle is cleaned up with the rest of the shell runtime.
+- [x] Added focused regression coverage for the new app runtime-state controller in `frontend/test/app-runtime-state-controller.test.js` and updated `frontend/test/app-lifecycle-controller.test.js` so lifecycle cleanup includes the new controller.
+- [x] Frontend build/lint script coverage updated so `src/public/app-runtime-state-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 1461 lines after the app runtime-state extraction step.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/app-runtime-state-controller.test.js frontend/test/app-lifecycle-controller.test.js frontend/test/auth-bootstrap-runtime-controller.test.js frontend/test/ws-runtime-controller.test.js frontend/test/app.test.js`.
+- [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `94.87%` lines overall.
 - [x] `ARC-010` progress: extracted app-shell lifecycle orchestration from `frontend/src/public/app.js` into `frontend/src/public/app-lifecycle-controller.js` (runtime bootstrap sequencing, create/deck/send button wiring, global resize binding, and beforeunload cleanup orchestration).
 - [x] App runtime now composes startup/shutdown and top-level shell-event behavior through the dedicated lifecycle controller instead of keeping those flows inline in `frontend/src/public/app.js`.
 - [x] Added focused regression coverage for the new lifecycle controller in `frontend/test/app-lifecycle-controller.test.js`.
