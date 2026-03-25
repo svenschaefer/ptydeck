@@ -825,6 +825,10 @@ Completed and verified topics belong here.
 - [x] Validation for the latest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `94.60%` lines overall; `frontend/src/public/app.js` reduced to `1565` lines.
 - [x] Governance/docs sync refreshed after the latest `ARC-010` increment: `ROADMAP.md` versioning language now matches the active `v0.4.x` release-wave series, and `CODEX_CONTEXT.md` records the clarification as persistent project context.
+- [x] `ARC-010` decomposition continued again: session/runtime adapter glue is now extracted to `frontend/src/public/app-session-runtime-facade-controller.js`, centralizing composition-facing delegation for session lookup, deck resolution, quick-ID lifecycle, terminal chunk replay/append, runtime-event application, session visibility sync, and display-name/token formatting outside `frontend/src/public/app.js`.
+- [x] Added focused frontend regression coverage for the new session/runtime facade in `frontend/test/app-session-runtime-facade-controller.test.js`, including delegation and safe-fallback behavior when downstream runtime/UI controllers are absent.
+- [x] Validation for the newest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after the newest `ARC-010` cycle: backend `91.60%` lines, frontend `95.62%` lines overall; `frontend/src/public/app.js` reduced to `1066` lines.
 
 ## Maintenance Rules
 

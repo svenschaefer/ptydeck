@@ -3,6 +3,7 @@ import { createActivityCompletionNotifier } from "./activity-completion-notifier
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppLifecycleController } from "./app-lifecycle-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
+import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
 import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
 import { createCommandEngine } from "./command-engine.js";
@@ -151,7 +152,7 @@ const ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS = (() => {
 })();
 const streamPluginEngine = createStreamPluginEngine({
   getSession(sessionId) {
-    return getSessionById(sessionId);
+    return appSessionRuntimeFacadeController?.getSessionById(sessionId);
   },
   onActions(sessionId, actions, meta) {
     const appliedActions = streamActionDispatcher.dispatch(sessionId, actions, meta);
@@ -174,7 +175,7 @@ const streamAdapter = createSessionStreamAdapter({
   idleMs: SESSION_ACTIVITY_QUIET_MS,
   onData(sessionId, chunk) {
     streamPluginEngine.handleData(sessionId, chunk);
-    appendTerminalChunk(sessionId, chunk);
+    appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);
   },
   onLine(sessionId, line) {
     streamPluginEngine.handleLine(sessionId, line);
@@ -272,6 +273,7 @@ let authBootstrapRuntimeController = null;
 let appLifecycleController = null;
 let appLayoutDeckFacadeController = null;
 let appRuntimeStateController = null;
+let appSessionRuntimeFacadeController = null;
 let deckRuntimeController = null;
 let sessionViewModel = null;
 let runtimeEventController = null;
@@ -297,11 +299,21 @@ let terminalSearchController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
+appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
+  store,
+  defaultDeckId: DEFAULT_DECK_ID,
+  getSessionViewModel: () => sessionViewModel,
+  getSessionRuntimeController: () => sessionRuntimeController,
+  getAppLayoutDeckFacadeController: () => appLayoutDeckFacadeController,
+  refreshTerminalViewport,
+  syncTerminalScrollArea,
+  windowRef: window
+});
 const activityCompletionNotifier = createActivityCompletionNotifier({
   windowRef: window,
   aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
-  formatSessionToken,
-  formatSessionDisplayName,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   resolveDeckName(deckId) {
     return appLayoutDeckFacadeController?.resolveDeckName(deckId) || String(deckId || "").trim();
   },
@@ -383,7 +395,7 @@ layoutRuntimeController = createLayoutRuntimeController({
   },
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   api,
-  applyRuntimeEvent,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   applySettingsToAllTerminals: (options) => appLayoutDeckFacadeController?.applySettingsToAllTerminals(options),
   scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   render,
@@ -417,8 +429,8 @@ deckRuntimeController = createDeckRuntimeController({
   scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
   getDeckSidebarController: () => deckSidebarController,
-  resolveSessionDeckId,
-  getSessionById
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId)
 });
 
 appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
@@ -506,59 +518,6 @@ store.hydrateRuntimePreferences({
   sessionFilterText: appLayoutDeckFacadeController.loadStoredSessionFilterText()
 });
 
-function getSessionById(sessionId) {
-  return store.getState().sessions.find((session) => session.id === sessionId) || null;
-}
-
-function resolveSessionDeckId(session) {
-  return sessionViewModel.resolveSessionDeckId(session);
-}
-
-function setSessionCardVisibility(node, visible) {
-  if (!node) {
-    return;
-  }
-  node.hidden = !visible;
-  node.style.display = visible ? "" : "none";
-}
-
-function markSessionActivity(sessionId) {
-  const timestamp = Date.now();
-  store.markSessionActivity(sessionId, { timestamp });
-}
-
-function syncTerminalViewportAfterShow(sessionId, entry) {
-  if (!entry || !entry.terminal) {
-    return;
-  }
-  const shouldFollow = entry.followOnShow !== false;
-  const runPass = () => {
-    appLayoutDeckFacadeController?.applyResizeForSession(sessionId, { force: true });
-    syncTerminalScrollArea(entry.terminal);
-    refreshTerminalViewport(entry.terminal);
-    if (shouldFollow && typeof entry.terminal.scrollToBottom === "function") {
-      entry.terminal.scrollToBottom();
-    }
-    syncTerminalScrollArea(entry.terminal);
-  };
-  runPass();
-  setTimeout(runPass, 80);
-  setTimeout(runPass, 220);
-  entry.pendingViewportSync = false;
-}
-
-function findNextQuickId() {
-  return sessionRuntimeController?.findNextQuickId() || "?";
-}
-
-function ensureQuickId(sessionId) {
-  return sessionRuntimeController?.ensureQuickId(sessionId) || "?";
-}
-
-function pruneQuickIds(activeSessionIds) {
-  sessionRuntimeController?.pruneQuickIds(activeSessionIds);
-}
-
 function maybeReportStartupPerf() {
   appRuntimeStateController?.maybeReportStartupPerf();
 }
@@ -583,46 +542,6 @@ function render() {
   });
 }
 
-function appendTerminalChunk(sessionId, data, options = {}) {
-  return sessionRuntimeController?.appendTerminalChunk(sessionId, data, options) === true;
-}
-
-function replaySnapshotOutputs(outputs, attempt = 0) {
-  sessionRuntimeController?.replaySnapshotOutputs(outputs, attempt);
-}
-
-function upsertSession(nextSession) {
-  sessionRuntimeController?.upsertSession(nextSession);
-}
-
-function markSessionExited(sessionId, exitDetails = {}) {
-  sessionRuntimeController?.markSessionExited(sessionId, exitDetails);
-}
-
-function removeSession(sessionId) {
-  sessionRuntimeController?.removeSession(sessionId);
-}
-
-function markSessionClosed(sessionId) {
-  sessionRuntimeController?.markSessionClosed(sessionId);
-}
-
-function handleSessionTerminalInput(sessionId, data) {
-  sessionRuntimeController?.handleSessionTerminalInput(sessionId, data);
-}
-
-function applyRuntimeEvent(event, options = {}) {
-  return sessionRuntimeController?.applyRuntimeEvent(event, options) === true;
-}
-
-function formatSessionDisplayName(session) {
-  return sessionRuntimeController?.formatSessionDisplayName(session) || String(session?.name || session?.id || "");
-}
-
-function formatSessionToken(sessionId) {
-  return sessionRuntimeController?.formatSessionToken(sessionId) || "?";
-}
-
 sessionViewModel = createSessionViewModel({
   defaultDeckId: DEFAULT_DECK_ID,
   sessionTagPattern: SESSION_TAG_PATTERN,
@@ -630,7 +549,7 @@ sessionViewModel = createSessionViewModel({
   sessionTagMaxLength: SESSION_TAG_MAX_LENGTH,
   sessionEnvKeyPattern: SESSION_ENV_KEY_PATTERN,
   sessionEnvMaxEntries: SESSION_ENV_MAX_ENTRIES,
-  formatSessionToken
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?"
 });
 
 sessionUiFacadeController = createSessionUiFacadeController({
@@ -649,10 +568,10 @@ sessionRuntimeController = createSessionRuntimeController({
   terminalSearchState,
   refreshTerminalViewport,
   syncTerminalScrollArea,
-  markSessionActivity,
+  markSessionActivity: (sessionId) => appSessionRuntimeFacadeController?.markSessionActivity(sessionId),
   syncActiveTerminalSearch,
   getActiveSessionId: () => store.getState().activeSessionId,
-  getSessionById,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   streamAdapter,
   setCommandFeedback,
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
@@ -667,20 +586,20 @@ runtimeEventController = createRuntimeEventController({
   setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
   replaceCustomCommandState,
   setSessions: (sessions) => store.setSessions(sessions),
-  replaySnapshotOutputs,
+  replaySnapshotOutputs: (outputs, attempt) => appSessionRuntimeFacadeController?.replaySnapshotOutputs(outputs, attempt),
   scheduleCommandPreview,
   scheduleCommandSuggestions,
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady,
-  upsertSession,
-  markSessionExited,
-  markSessionClosed,
+  upsertSession: (nextSession) => appSessionRuntimeFacadeController?.upsertSession(nextSession),
+  markSessionExited: (sessionId, exitDetails) => appSessionRuntimeFacadeController?.markSessionExited(sessionId, exitDetails),
+  markSessionClosed: (sessionId) => appSessionRuntimeFacadeController?.markSessionClosed(sessionId),
   upsertDeckInState: (nextDeck, options) => appLayoutDeckFacadeController?.upsertDeckInState(nextDeck, options),
   removeDeckFromState: (deckId, options) => appLayoutDeckFacadeController?.removeDeckFromState(deckId, options),
   upsertCustomCommandState,
   removeCustomCommandState,
   activityCompletionNotifier,
-  getSessionById,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   setActiveSession: (sessionId) => store.setActiveSession(sessionId),
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
   getUnrestoredSessionMessage: sessionUiFacadeController.getUnrestoredSessionMessage,
@@ -703,7 +622,7 @@ sessionDisposalController = createSessionDisposalController({
 });
 
 sessionCardFactoryController = createSessionCardFactoryController({
-  ensureQuickId,
+  ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
   getSessionStateBadgeText: sessionUiFacadeController.getSessionStateBadgeText,
   getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
@@ -712,7 +631,7 @@ sessionCardFactoryController = createSessionCardFactoryController({
   renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
   renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
   renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
-  setSessionCardVisibility
+  setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible)
 });
 
 sessionSettingsStateController = createSessionSettingsStateController({
@@ -723,7 +642,7 @@ sessionSettingsStateController = createSessionSettingsStateController({
   terminalThemePresets: TERMINAL_THEME_PRESETS,
   terminalThemeModeSet: TERMINAL_THEME_MODE_SET,
   sessionThemeDrafts,
-  getSessionById,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
   normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
   formatSessionEnv: sessionUiFacadeController.formatSessionEnv,
@@ -757,9 +676,9 @@ sessionCardRenderController = createSessionCardRenderController({
   getSessionStateBadgeText: sessionUiFacadeController.getSessionStateBadgeText,
   getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
   isTerminalAtBottom,
-  setSessionCardVisibility,
-  syncTerminalViewportAfterShow,
-  ensureQuickId,
+  setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible),
+  syncTerminalViewportAfterShow: (sessionId, entry) => appSessionRuntimeFacadeController?.syncTerminalViewportAfterShow(sessionId, entry),
+  ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
   renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
@@ -774,8 +693,8 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   terminals,
   resizeTimers,
   terminalSizes,
-  getSessionById,
-  resolveSessionDeckId,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   getSessionTerminalGeometry: (sessionOrId) => appLayoutDeckFacadeController?.getSessionTerminalGeometry(sessionOrId),
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
   computeFixedMountHeightPx: (rows) => appLayoutDeckFacadeController?.computeFixedMountHeightPx(rows),
@@ -841,7 +760,7 @@ deckActionsController = createDeckActionsController({
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   getDecks: () => store.getState().decks,
   getTerminalSettings: () => terminalSettings,
-  applyRuntimeEvent,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   setCommandFeedback,
   setError,
   defaultDeckId: DEFAULT_DECK_ID
@@ -850,9 +769,9 @@ deckActionsController = createDeckActionsController({
 deckSidebarController = createDeckSidebarController({
   containerEl: deckTabsEl,
   documentRef: document,
-  resolveSessionDeckId,
-  ensureQuickId,
-  formatSessionDisplayName,
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
+  ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
   onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session)
@@ -870,9 +789,9 @@ sessionGridController = createSessionGridController({
   template,
   gridEl,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  resolveSessionDeckId,
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText() || "",
-  pruneQuickIds,
+  pruneQuickIds: (activeSessionIds) => appSessionRuntimeFacadeController?.pruneQuickIds(activeSessionIds),
   renderDeckTabs: (sessions) => appLayoutDeckFacadeController?.renderDeckTabs(sessions),
   workspaceRenderController,
   syncStatusTicker: sessionUiFacadeController.syncStatusTicker,
@@ -889,7 +808,7 @@ sessionGridController = createSessionGridController({
   sessionTerminalRuntimeController,
   resolveInitialTheme: (sessionId) =>
     sessionUiFacadeController.buildThemeFromConfig(sessionUiFacadeController.getSessionThemeConfig(sessionId)),
-  handleSessionTerminalInput,
+  handleSessionTerminalInput: (sessionId, data) => appSessionRuntimeFacadeController?.handleSessionTerminalInput(sessionId, data),
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
@@ -897,16 +816,16 @@ sessionGridController = createSessionGridController({
   scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
   setActiveSession: (sessionId) => store.setActiveSession(sessionId),
-  getSessionById,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   toggleSettingsDialog: (dialog) => appLayoutDeckFacadeController?.toggleSettingsDialog(dialog),
   confirmSessionDelete: (session) => appLayoutDeckFacadeController?.confirmSessionDelete(session),
-  removeSession,
+  removeSession: (sessionId) => appSessionRuntimeFacadeController?.removeSession(sessionId),
   setCommandFeedback,
-  formatSessionToken,
-  formatSessionDisplayName,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   setError,
   clearError: () => appRuntimeStateController?.clearError(),
-  applyRuntimeEvent,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   applyThemeForSession: sessionUiFacadeController.applyThemeForSession,
   getSessionThemeConfig: sessionUiFacadeController.getSessionThemeConfig,
   setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
@@ -925,18 +844,18 @@ commandEngine = createCommandEngine({
   getThemes: () => TERMINAL_THEME_PRESETS,
   getActiveDeckId: () => store.getState().activeDeckId,
   getActiveSessionId: () => store.getState().activeSessionId,
-  getSessionToken: formatSessionToken,
-  getSessionDisplayName: formatSessionDisplayName,
-  getSessionDeckId: resolveSessionDeckId
+  getSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  getSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
+  getSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session)
 });
 
 commandTargetRuntimeController = createCommandTargetRuntimeController({
   commandEngine,
   store,
   setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
-  resolveSessionDeckId,
-  formatSessionToken,
-  formatSessionDisplayName
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || ""
 });
 
 commandExecutor = createCommandExecutor({
@@ -952,11 +871,11 @@ commandExecutor = createCommandExecutor({
   setSessionFilterText: (value) => appLayoutDeckFacadeController?.setSessionFilterText(value),
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   getSessionCountForDeck: (deckId, sessions) => appLayoutDeckFacadeController?.getSessionCountForDeck(deckId, sessions) || 0,
-  applyRuntimeEvent,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
-  resolveSessionDeckId,
-  formatSessionToken,
-  formatSessionDisplayName,
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   getSessionRuntimeState: sessionUiFacadeController.getSessionRuntimeState,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
@@ -1009,7 +928,7 @@ wsRuntimeController = createWsRuntimeController({
   onRuntimeConnected: () => appRuntimeStateController?.markRuntimeConnected(),
   hasTerminal: (sessionId) => terminals.has(sessionId),
   pushSessionData: (sessionId, data) => streamAdapter.push(sessionId, data),
-  applyRuntimeEvent,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
   createWsTicket: () => api.createWsTicket(),
   bootstrapDevAuthToken: (options) => appRuntimeStateController?.bootstrapDevAuthToken(options)
@@ -1073,8 +992,8 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   parseDirectTargetRoutingInput: commandTargetRuntimeController.parseDirectTargetRoutingInput,
   resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  formatSessionToken,
-  formatSessionDisplayName,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
   getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
@@ -1099,8 +1018,8 @@ appLifecycleController = createAppLifecycleController({
   sendBtn,
   api,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
-  resolveSessionDeckId,
-  applyRuntimeEvent,
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   setError,
   clearUiError: () => appRuntimeStateController?.clearError(),
   getErrorMessage,
