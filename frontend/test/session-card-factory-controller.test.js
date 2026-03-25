@@ -35,6 +35,7 @@ function createNodeStub() {
     ".session-quick-id",
     ".session-focus",
     ".session-state-badge",
+    ".terminal-toolbar-meta",
     ".session-plugin-badges",
     ".session-unrestored-hint",
     ".session-status-text",
@@ -118,6 +119,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.stateBadgeEl.textContent, "RUNNING");
   assert.equal(result.unrestoredHintEl.hidden, false);
   assert.equal(result.unrestoredHintEl.textContent, "hint");
+  assert.ok(result.sessionMetaRowEl);
   assert.equal(result.node.classList.contains("active"), true);
   assert.equal(result.node.classList.contains("attention"), true);
   assert.ok(result.themeInputs.brightRed);

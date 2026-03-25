@@ -45,13 +45,39 @@ export function createSessionCardMetaController(options = {}) {
     setSettingsStatus(entry, "Saved", "saved");
   }
 
+  function hasMetaContent(entry) {
+    const hasStatus =
+      Boolean(entry?.sessionStatusEl) &&
+      entry.sessionStatusEl.hidden !== true &&
+      String(entry.sessionStatusEl.textContent || "").trim().length > 0;
+    const hasBadges =
+      Boolean(entry?.pluginBadgesEl) &&
+      !entry.pluginBadgesEl.classList?.contains?.("empty") &&
+      String(entry.pluginBadgesEl.textContent || "").trim().length > 0;
+    const hasTags =
+      Boolean(entry?.tagListEl) &&
+      !entry.tagListEl.classList?.contains?.("empty") &&
+      String(entry.tagListEl.textContent || "").trim().length > 0;
+    return hasStatus || hasBadges || hasTags;
+  }
+
+  function syncMetaRowVisibility(entry) {
+    if (!entry?.sessionMetaRowEl) {
+      return;
+    }
+    entry.sessionMetaRowEl.hidden = !hasMetaContent(entry);
+  }
+
   function renderSessionTagList(entry, session) {
     if (!entry?.tagListEl) {
       return;
     }
     const tags = normalizeSessionTags(session?.tags);
-    entry.tagListEl.textContent = tags.map((tag) => `#${tag}`).join(" ");
+    const nextText = tags.map((tag) => `#${tag}`).join(" ");
+    entry.tagListEl.textContent = nextText;
+    entry.tagListEl.title = nextText;
     entry.tagListEl.classList.toggle("empty", tags.length === 0);
+    syncMetaRowVisibility(entry);
   }
 
   function renderSessionPluginBadges(entry, session) {
@@ -59,8 +85,11 @@ export function createSessionCardMetaController(options = {}) {
       return;
     }
     const badges = Array.isArray(session?.pluginBadges) ? session.pluginBadges.filter((badge) => badge && badge.text) : [];
-    entry.pluginBadgesEl.textContent = badges.map((badge) => badge.text).join(" · ");
+    const nextText = badges.map((badge) => badge.text).join(" · ");
+    entry.pluginBadgesEl.textContent = nextText;
+    entry.pluginBadgesEl.title = nextText;
     entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
+    syncMetaRowVisibility(entry);
   }
 
   function formatLiveSessionStatus(session) {
@@ -127,6 +156,8 @@ export function createSessionCardMetaController(options = {}) {
     const statusText = formatLiveSessionStatus(session);
     entry.sessionStatusEl.hidden = !statusText;
     entry.sessionStatusEl.textContent = statusText;
+    entry.sessionStatusEl.title = statusText;
+    syncMetaRowVisibility(entry);
   }
 
   function renderSessionArtifacts(entry, session) {
@@ -174,6 +205,7 @@ export function createSessionCardMetaController(options = {}) {
     renderSessionStatus,
     renderSessionArtifacts,
     syncStatusTicker,
-    clearSessionStatusAnchor
+    clearSessionStatusAnchor,
+    syncMetaRowVisibility
   };
 }

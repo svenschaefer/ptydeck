@@ -98,15 +98,23 @@
     <template id="terminal-card-template">
       <article class="terminal-card">
         <div class="terminal-toolbar">
-          <span class="session-quick-id"></span>
-          <button class="session-focus" type="button"></button>
-          <span class="session-state-badge" hidden></span>
-          <p class="session-plugin-badges empty"></p>
-          <p class="session-status-text" hidden></p>
-          <p class="session-tag-list empty"></p>
-          <button class="session-settings" type="button" aria-label="Session settings">
-            <span class="session-settings-icon" aria-hidden="true">&#9881;</span>
-          </button>
+          <div class="terminal-toolbar-main">
+            <div class="session-title-group">
+              <span class="session-quick-id"></span>
+              <button class="session-focus" type="button"></button>
+              <span class="session-state-badge" hidden></span>
+            </div>
+            <div class="session-toolbar-actions">
+              <button class="session-settings" type="button" aria-label="Session settings">
+                <span class="session-settings-icon" aria-hidden="true">&#9881;</span>
+              </button>
+            </div>
+          </div>
+          <div class="terminal-toolbar-meta" hidden>
+            <p class="session-status-text" hidden></p>
+            <p class="session-plugin-badges empty"></p>
+            <p class="session-tag-list empty"></p>
+          </div>
         </div>
         <p class="session-unrestored-hint" hidden></p>
         <dialog class="session-settings-dialog">

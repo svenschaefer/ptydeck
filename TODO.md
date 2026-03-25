@@ -14,7 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-124` Owner: `FE` Task: Refactor and optimize the terminal-session header layout/interaction implementation (keep existing semantic elements, but improve structure/usability/maintainability of the current historically grown header composition).
+- none currently
 
 ## Active Ownership Role
 

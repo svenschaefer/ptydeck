@@ -69,6 +69,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   });
 
   const entry = {
+    sessionMetaRowEl: { hidden: true },
     tagListEl: { textContent: "", classList: createClassList() },
     pluginBadgesEl: { textContent: "", classList: createClassList() },
     sessionStatusEl: { textContent: "", hidden: true },
@@ -93,6 +94,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   assert.equal(entry.pluginBadgesEl.textContent, "Working · GPU");
   assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
   assert.equal(entry.sessionStatusEl.hidden, false);
+  assert.equal(entry.sessionMetaRowEl.hidden, false);
   assert.equal(entry.sessionArtifactsEl.textContent, "Summary: Done");
   assert.equal(entry.sessionArtifactsEl.hidden, false);
   assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
@@ -105,6 +107,33 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   nowMs += 2_000;
   controller.renderSessionStatus(entry, session);
   assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
+});
+
+test("session-card-meta controller hides meta row when tags badges and status are empty", () => {
+  const controller = createSessionCardMetaController({
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    now: () => 0,
+    windowRef: { document: { hidden: false } }
+  });
+
+  const entry = {
+    sessionMetaRowEl: { hidden: false },
+    tagListEl: { textContent: "", classList: createClassList() },
+    pluginBadgesEl: { textContent: "", classList: createClassList() },
+    sessionStatusEl: { textContent: "", hidden: false }
+  };
+
+  controller.renderSessionTagList(entry, { tags: [] });
+  controller.renderSessionPluginBadges(entry, { pluginBadges: [] });
+  controller.renderSessionStatus(entry, { statusText: "", interpretationState: "idle" });
+  assert.equal(entry.sessionMetaRowEl.hidden, true);
+
+  controller.renderSessionStatus(entry, {
+    id: "s-1",
+    statusText: "Working (0s • esc to interrupt)",
+    interpretationState: "working"
+  });
+  assert.equal(entry.sessionMetaRowEl.hidden, false);
 });
 
 test("session-card-meta controller keeps artifacts dismissed until content changes", () => {

@@ -15,6 +15,7 @@ export function createSessionCardFactoryController(options = {}) {
     const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
     const stateBadgeEl = node.querySelector(".session-state-badge");
+    const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
     const pluginBadgesEl = node.querySelector(".session-plugin-badges");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const sessionStatusEl = node.querySelector(".session-status-text");
@@ -80,9 +81,9 @@ export function createSessionCardFactoryController(options = {}) {
       unrestoredHintEl.hidden = !stateHintText;
       unrestoredHintEl.textContent = stateHintText;
     }
-    renderSessionTagList({ tagListEl }, session);
-    renderSessionPluginBadges({ pluginBadgesEl }, session);
-    renderSessionStatus({ sessionStatusEl }, session);
+    renderSessionTagList({ sessionMetaRowEl, tagListEl }, session);
+    renderSessionPluginBadges({ sessionMetaRowEl, pluginBadgesEl }, session);
+    renderSessionStatus({ sessionMetaRowEl, sessionStatusEl }, session);
     renderSessionArtifacts({ sessionArtifactsOverlayEl, sessionArtifactsEl }, session);
     setSessionCardVisibility(node, visible);
 
@@ -91,6 +92,7 @@ export function createSessionCardFactoryController(options = {}) {
       quickIdEl,
       focusBtn,
       stateBadgeEl,
+      sessionMetaRowEl,
       pluginBadgesEl,
       unrestoredHintEl,
       sessionStatusEl,

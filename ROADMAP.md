@@ -12,9 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics).
-- Active scoped tasks (`H3`): `QLT-124`.
-- Completed in active wave so far: `QLT-123`.
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Previous completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -601,14 +601,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H2` (Layered Frontend Architecture Completion)
-- Next milestone in progress: `v0.4.0-H3` (Terminal Interaction Ergonomics)
+- Latest completed milestone: `v0.4.0-H3` (Terminal Interaction Ergonomics)
+- Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-124` Owner: `FE`
+- none currently
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -687,11 +687,12 @@ Completed in this milestone so far:
 - `ARC-010B`
 - `ARC-010C`
 - `ARC-010D`
+- `ARC-011`
+- `ARC-012`
 
 Remaining in this milestone:
 
-- `ARC-011`
-- `ARC-012`
+- none
 
 Dependencies:
 
@@ -719,15 +720,16 @@ Exit criteria:
 Completed in this milestone so far:
 
 - `QLT-123`
+- `QLT-124`
 
 Remaining in this milestone:
 
-- `QLT-124`
+- none
 
 Dependencies:
 
 - `QLT-123` ran after `ARC-010` so copy/paste interaction handling could be integrated on top of cleaner UI boundaries instead of deepening `app.js` coupling.
-- `QLT-124` should run after `QLT-123` so terminal-header UX/layout improvements align with the finalized interaction model and avoid duplicate churn in session-card wiring.
+- `QLT-124` ran after `QLT-123` so terminal-header UX/layout improvements aligned with the finalized interaction model and avoided duplicate churn in session-card wiring.
 
 Exit criteria:
 

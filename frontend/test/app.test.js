@@ -346,6 +346,11 @@ class MockWebSocket {
 function createTerminalCardTemplateNode() {
   const card = new FakeElement({ className: "terminal-card", tagName: "article" });
   const toolbar = new FakeElement({ className: "terminal-toolbar" });
+  const toolbarMain = new FakeElement({ className: "terminal-toolbar-main", tagName: "div" });
+  const titleGroup = new FakeElement({ className: "session-title-group", tagName: "div" });
+  const toolbarActions = new FakeElement({ className: "session-toolbar-actions", tagName: "div" });
+  const toolbarMeta = new FakeElement({ className: "terminal-toolbar-meta", tagName: "div" });
+  toolbarMeta.hidden = true;
   const quickId = new FakeElement({ className: "session-quick-id", tagName: "span" });
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
@@ -409,13 +414,17 @@ function createTerminalCardTemplateNode() {
   const settingsCancel = new FakeElement({ className: "session-settings-cancel", tagName: "button" });
   const settingsApply = new FakeElement({ className: "session-settings-apply", tagName: "button" });
   const mount = new FakeElement({ className: "terminal-mount", clientWidth: 920, clientHeight: 380 });
-  toolbar.appendChild(quickId);
-  toolbar.appendChild(focus);
-  toolbar.appendChild(stateBadge);
-  toolbar.appendChild(pluginBadges);
-  toolbar.appendChild(sessionStatus);
-  toolbar.appendChild(tagList);
-  toolbar.appendChild(settings);
+  titleGroup.appendChild(quickId);
+  titleGroup.appendChild(focus);
+  titleGroup.appendChild(stateBadge);
+  toolbarActions.appendChild(settings);
+  toolbarMain.appendChild(titleGroup);
+  toolbarMain.appendChild(toolbarActions);
+  toolbarMeta.appendChild(sessionStatus);
+  toolbarMeta.appendChild(pluginBadges);
+  toolbarMeta.appendChild(tagList);
+  toolbar.appendChild(toolbarMain);
+  toolbar.appendChild(toolbarMeta);
   settingsPanel.appendChild(settingsDismiss);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
@@ -2083,7 +2092,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondSettingsCancel = secondSettingsPanel.querySelector(".session-settings-cancel");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   const secondTagList = secondCard.querySelector(".session-tag-list");
+  const secondToolbarMeta = secondCard.querySelector(".terminal-toolbar-meta");
   assert.equal(secondTagList.textContent, "#beta #ops");
+  assert.equal(secondToolbarMeta.hidden, false);
   assert.equal(secondSettingsPanel.open, false);
   secondSettings.click();
   await tick();

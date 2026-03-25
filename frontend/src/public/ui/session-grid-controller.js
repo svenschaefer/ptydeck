@@ -217,6 +217,7 @@ export function createSessionGridController(options = {}) {
           focusBtn: refs.focusBtn,
           quickIdEl: refs.quickIdEl,
           stateBadgeEl: refs.stateBadgeEl,
+          sessionMetaRowEl: refs.sessionMetaRowEl,
           pluginBadgesEl: refs.pluginBadgesEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           sessionStatusEl: refs.sessionStatusEl,

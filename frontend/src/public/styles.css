@@ -580,13 +580,46 @@ button:hover {
 }
 
 .terminal-toolbar {
-  padding: 8px;
+  padding: 8px 10px;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   border-bottom: 1px solid var(--border);
-  align-items: center;
   background: #0f151f;
   min-width: 0;
+}
+
+.terminal-toolbar-main {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.session-title-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-toolbar-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.terminal-toolbar-meta[hidden] {
+  display: none !important;
 }
 
 .session-focus {
@@ -634,6 +667,9 @@ button:hover {
   line-height: 1.2;
   white-space: nowrap;
   flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
 }
 
 .session-plugin-badges.empty {
@@ -673,12 +709,13 @@ button:hover {
   color: #89aac8;
   font-size: 11px;
   line-height: 1;
-  flex: 0 1 38%;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
+  max-width: 16rem;
 }
 
 .session-tag-list.empty {
@@ -701,7 +738,7 @@ button:hover {
   color: #a9c1d8;
   font-size: 11px;
   line-height: 1.35;
-  flex: 0 1 42%;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
