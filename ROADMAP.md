@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
-- Active scoped tasks (`H2`): `ARC-010`, `ARC-011`, `ARC-012` (`ARC-009` completed).
+- Active scoped tasks (`H2`): `ARC-010A`, `ARC-010B`, `ARC-010C`, `ARC-010D`, `ARC-011`, `ARC-012` (`ARC-009` completed; `ARC-010` remains the umbrella closeout block for `ARC-010A` ... `ARC-010D`).
 - Queued next release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics) with `QLT-123`, `QLT-124`.
 - Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
@@ -676,7 +676,10 @@ Exit criteria:
 ### v0.4.0-H2 - Layered Frontend Architecture Completion
 
 - `ARC-009`
-- `ARC-010`
+- `ARC-010A`
+- `ARC-010B`
+- `ARC-010C`
+- `ARC-010D`
 - `ARC-011`
 - `ARC-012`
 
@@ -686,20 +689,28 @@ Completed in this milestone so far:
 
 Remaining in this milestone:
 
-- `ARC-010`
+- `ARC-010A`
+- `ARC-010B`
+- `ARC-010C`
+- `ARC-010D`
 - `ARC-011`
 - `ARC-012`
 
 Dependencies:
 
-- `ARC-010` depends on `ARC-009` so UI decomposition lands on top of stabilized command-layer boundaries.
-- `ARC-011` depends on `ARC-009` and `ARC-010` to enforce layer contracts after module extraction points are established.
-- `ARC-012` depends on `ARC-009`, `ARC-010`, and `ARC-011` so architecture-regression coverage validates the final boundary model.
+- `ARC-010A` depends on `ARC-009` so the last app-level delegation glue is extracted on top of stabilized command/runtime boundaries.
+- `ARC-010B` depends on `ARC-010A` so bootstrap/composition extraction builds on the remaining delegation split instead of cutting across mixed responsibilities.
+- `ARC-010C` depends on `ARC-010A` and `ARC-010B` so final `app.js` cleanup happens only after the remaining orchestration has explicit homes.
+- `ARC-010D` depends on `ARC-010A`, `ARC-010B`, and `ARC-010C` so closeout coverage validates the actual final architecture shape rather than an in-progress split.
+- `ARC-011` depends on `ARC-009` and completion of `ARC-010A` ... `ARC-010D` to enforce layer contracts after extraction points are final.
+- `ARC-012` depends on `ARC-009`, completion of `ARC-010A` ... `ARC-010D`, and `ARC-011` so architecture-regression coverage validates the final boundary model.
 
 Exit criteria:
 
-- Remaining `app.js` command orchestration logic is split into parser/registry/executor modules with stable contracts.
-- Remaining `app.js` UI orchestration logic is split into dedicated UI modules, leaving `app.js` as bootstrap/composition boundary.
+- Remaining app-level command/UI delegation wrappers are extracted into explicit composition-facing controllers/facades.
+- Remaining startup/bootstrap composition wiring is extracted so `app.js` no longer owns hidden orchestration clusters.
+- Remaining inline/dead orchestration logic is removed from `app.js`, leaving it as a bootstrap/composition boundary only.
+- Closeout regression coverage proves the final ARC-010 target shape instead of relying on informal interpretation.
 - Cross-layer shortcut paths are removed so stream/interpretation/state/UI boundaries are explicit and enforceable.
 - Regression coverage protects architectural boundaries against future monolith regressions.
 
