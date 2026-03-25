@@ -238,7 +238,16 @@ class MockTerminal {
     const lineBreaks = parts.length - 1;
     if (lineBreaks > 0) {
       this.buffer.active.baseY += lineBreaks;
-      if (this.mount?.parentNode?.hidden !== true) {
+      let currentNode = this.mount;
+      let hasHiddenAncestor = false;
+      while (currentNode) {
+        if (currentNode.hidden === true) {
+          hasHiddenAncestor = true;
+          break;
+        }
+        currentNode = currentNode.parentNode;
+      }
+      if (!hasHiddenAncestor) {
         this.scrollAreaBaseY = this.buffer.active.baseY;
         this.buffer.active.ydisp = this.buffer.active.baseY;
       }
@@ -350,8 +359,12 @@ function createTerminalCardTemplateNode() {
   unrestoredHint.hidden = true;
   const sessionStatus = new FakeElement({ className: "session-status-text", tagName: "p" });
   sessionStatus.hidden = true;
+  const terminalSurface = new FakeElement({ className: "terminal-surface", tagName: "div" });
+  const sessionArtifactsOverlay = new FakeElement({ className: "session-artifacts-overlay", tagName: "div" });
+  sessionArtifactsOverlay.hidden = true;
   const sessionArtifacts = new FakeElement({ className: "session-artifacts", tagName: "pre" });
   sessionArtifacts.hidden = true;
+  const sessionArtifactsDismiss = new FakeElement({ className: "session-artifacts-dismiss", tagName: "button" });
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
@@ -435,11 +448,14 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(rename);
   settingsPanel.appendChild(close);
   settingsPanel.appendChild(settingsFooter);
+  sessionArtifactsOverlay.appendChild(sessionArtifactsDismiss);
+  sessionArtifactsOverlay.appendChild(sessionArtifacts);
+  terminalSurface.appendChild(mount);
+  terminalSurface.appendChild(sessionArtifactsOverlay);
   card.appendChild(toolbar);
   card.appendChild(unrestoredHint);
-  card.appendChild(sessionArtifacts);
   card.appendChild(settingsPanel);
-  card.appendChild(mount);
+  card.appendChild(terminalSurface);
   return card;
 }
 

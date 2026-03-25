@@ -18,7 +18,9 @@ export function createSessionCardFactoryController(options = {}) {
     const pluginBadgesEl = node.querySelector(".session-plugin-badges");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const sessionStatusEl = node.querySelector(".session-status-text");
+    const sessionArtifactsOverlayEl = node.querySelector(".session-artifacts-overlay");
     const sessionArtifactsEl = node.querySelector(".session-artifacts");
+    const sessionArtifactsDismissBtn = node.querySelector(".session-artifacts-dismiss");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -81,7 +83,7 @@ export function createSessionCardFactoryController(options = {}) {
     renderSessionTagList({ tagListEl }, session);
     renderSessionPluginBadges({ pluginBadgesEl }, session);
     renderSessionStatus({ sessionStatusEl }, session);
-    renderSessionArtifacts({ sessionArtifactsEl }, session);
+    renderSessionArtifacts({ sessionArtifactsOverlayEl, sessionArtifactsEl }, session);
     setSessionCardVisibility(node, visible);
 
     return {
@@ -92,7 +94,9 @@ export function createSessionCardFactoryController(options = {}) {
       pluginBadgesEl,
       unrestoredHintEl,
       sessionStatusEl,
+      sessionArtifactsOverlayEl,
       sessionArtifactsEl,
+      sessionArtifactsDismissBtn,
       settingsBtn,
       renameBtn,
       closeBtn,

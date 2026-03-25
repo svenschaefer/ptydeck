@@ -51,7 +51,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
       pluginBadgesEl: refs.pluginBadgesEl,
       unrestoredHintEl: refs.unrestoredHintEl,
       sessionStatusEl: refs.sessionStatusEl,
+      sessionArtifactsOverlayEl: refs.sessionArtifactsOverlayEl,
       sessionArtifactsEl: refs.sessionArtifactsEl,
+      sessionArtifactsDismissBtn: refs.sessionArtifactsDismissBtn,
       settingsDialog: refs.settingsDialog,
       startCwdInput: refs.startCwdInput,
       startCommandInput: refs.startCommandInput,
@@ -73,7 +75,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
       isVisible: initialVisible,
       pendingViewportSync: !initialVisible,
       followOnShow: true,
-      searchRevision: 0
+      searchRevision: 0,
+      artifactRenderKey: "",
+      dismissedArtifactKey: ""
     };
     terminals.set(session.id, entry);
     afterEntryRegistered(entry, session);

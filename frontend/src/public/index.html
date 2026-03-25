@@ -109,7 +109,6 @@
           </button>
         </div>
         <p class="session-unrestored-hint" hidden></p>
-        <pre class="session-artifacts" hidden></pre>
         <dialog class="session-settings-dialog">
           <div class="session-settings-head">
             <p class="session-settings-title">Session Settings</p>
@@ -209,7 +208,13 @@
             </div>
           </div>
         </dialog>
-        <div class="terminal-mount"></div>
+        <div class="terminal-surface">
+          <div class="terminal-mount"></div>
+          <div class="session-artifacts-overlay" hidden>
+            <button class="session-artifacts-dismiss" type="button" aria-label="Dismiss session artifacts">x</button>
+            <pre class="session-artifacts" hidden></pre>
+          </div>
+        </div>
       </article>
     </template>
 

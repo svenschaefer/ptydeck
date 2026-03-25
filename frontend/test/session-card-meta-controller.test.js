@@ -72,6 +72,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
     tagListEl: { textContent: "", classList: createClassList() },
     pluginBadgesEl: { textContent: "", classList: createClassList() },
     sessionStatusEl: { textContent: "", hidden: true },
+    sessionArtifactsOverlayEl: { hidden: true },
     sessionArtifactsEl: { textContent: "", hidden: true }
   };
   const session = {
@@ -94,6 +95,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   assert.equal(entry.sessionStatusEl.hidden, false);
   assert.equal(entry.sessionArtifactsEl.textContent, "Summary: Done");
   assert.equal(entry.sessionArtifactsEl.hidden, false);
+  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
 
   nowMs += 2_000;
   controller.renderSessionStatus(entry, session);
@@ -103,4 +105,41 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   nowMs += 2_000;
   controller.renderSessionStatus(entry, session);
   assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
+});
+
+test("session-card-meta controller keeps artifacts dismissed until content changes", () => {
+  const controller = createSessionCardMetaController({
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    now: () => 0,
+    windowRef: { document: { hidden: false } }
+  });
+
+  const entry = {
+    sessionArtifactsOverlayEl: { hidden: true },
+    sessionArtifactsEl: { textContent: "", hidden: true },
+    artifactRenderKey: "",
+    dismissedArtifactKey: ""
+  };
+
+  controller.renderSessionArtifacts(entry, {
+    artifacts: [{ title: "Summary", text: "Initial" }]
+  });
+  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
+  assert.equal(entry.sessionArtifactsEl.hidden, false);
+  assert.equal(entry.artifactRenderKey, "Summary: Initial");
+
+  entry.dismissedArtifactKey = entry.artifactRenderKey;
+  controller.renderSessionArtifacts(entry, {
+    artifacts: [{ title: "Summary", text: "Initial" }]
+  });
+  assert.equal(entry.sessionArtifactsOverlayEl.hidden, true);
+  assert.equal(entry.sessionArtifactsEl.hidden, true);
+
+  controller.renderSessionArtifacts(entry, {
+    artifacts: [{ title: "Summary", text: "Updated" }]
+  });
+  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
+  assert.equal(entry.sessionArtifactsEl.hidden, false);
+  assert.equal(entry.dismissedArtifactKey, "");
+  assert.equal(entry.artifactRenderKey, "Summary: Updated");
 });

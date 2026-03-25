@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] Session artifact rendering no longer displaces terminal content: `Summary` / `Result` / `Next Steps` artifacts are now shown as an overlay on top of the terminal surface instead of consuming permanent vertical space in the card layout.
+- [x] Session artifact overlays can now be dismissed explicitly per session via a close control; dismissal stays in effect for the current artifact payload and resets automatically when new artifact content arrives.
+- [x] Focused regression coverage was added for artifact overlay rendering/dismiss semantics in `frontend/test/session-card-meta-controller.test.js`, `frontend/test/session-card-interactions-controller.test.js`, and `frontend/test/app.test.js`.
+- [x] Validation for the artifact-overlay change passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, plus targeted regression coverage via `node --test frontend/test/session-card-meta-controller.test.js frontend/test/session-card-interactions-controller.test.js frontend/test/session-card-factory-controller.test.js frontend/test/app.test.js`.
 - [x] `ARC-010A` is now completed: the remaining app-level command/UI delegation wrappers were extracted from `frontend/src/public/app.js` into `frontend/src/public/app-command-ui-facade-controller.js`.
 - [x] The new app command/UI facade centralizes custom-command state access, runtime error/feedback/preview helpers, active-terminal search delegation, command-suggestion scheduling, render delegation, control-command execution, and preview-submit glue that previously remained inline in `frontend/src/public/app.js`.
 - [x] Added focused regression coverage for the new command/UI facade in `frontend/test/app-command-ui-facade-controller.test.js`.

@@ -708,15 +708,54 @@ button:hover {
   text-overflow: ellipsis;
 }
 
+.terminal-surface {
+  position: relative;
+  min-width: 0;
+}
+
+.session-artifacts-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.session-artifacts-dismiss {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #b9cadb;
+  border-color: #314255;
+  background: #101924;
+  pointer-events: auto;
+}
+
 .session-artifacts {
   margin: 0;
   padding: 8px 10px;
-  border-bottom: 1px solid #223041;
+  border: 1px solid #223041;
+  border-radius: 8px;
   background: #0d131c;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
   color: #b9cadb;
   font-size: 11px;
   line-height: 1.4;
   white-space: pre-wrap;
+  pointer-events: auto;
+  overflow: auto;
+  max-height: calc(var(--ptydeck-terminal-mount-height, 172px) - 16px);
+  flex: 1 1 auto;
 }
 
 .terminal-card.unrestored {
@@ -752,7 +791,7 @@ button:hover {
 }
 
 .terminal-card.attention .session-artifacts {
-  border-bottom-color: #49371d;
+  border-color: #49371d;
 }
 
 .session-settings-dialog {

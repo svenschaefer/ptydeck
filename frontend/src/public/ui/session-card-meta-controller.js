@@ -134,8 +134,32 @@ export function createSessionCardMetaController(options = {}) {
       return;
     }
     const artifacts = Array.isArray(session?.artifacts) ? session.artifacts.filter((artifact) => artifact && artifact.title) : [];
-    entry.sessionArtifactsEl.hidden = artifacts.length === 0;
-    entry.sessionArtifactsEl.textContent = artifacts.map((artifact) => `${artifact.title}: ${artifact.text}`).join("\n\n");
+    const artifactText = artifacts.map((artifact) => `${artifact.title}: ${artifact.text}`).join("\n\n");
+    const nextKey = artifactText.trim();
+
+    if (!nextKey) {
+      entry.artifactRenderKey = "";
+      entry.dismissedArtifactKey = "";
+      entry.sessionArtifactsEl.hidden = true;
+      entry.sessionArtifactsEl.textContent = "";
+      if (entry.sessionArtifactsOverlayEl) {
+        entry.sessionArtifactsOverlayEl.hidden = true;
+      }
+      return;
+    }
+
+    const previousKey = typeof entry.artifactRenderKey === "string" ? entry.artifactRenderKey : "";
+    if (previousKey !== nextKey) {
+      entry.dismissedArtifactKey = "";
+    }
+    entry.artifactRenderKey = nextKey;
+
+    const hidden = entry.dismissedArtifactKey === nextKey;
+    entry.sessionArtifactsEl.hidden = hidden;
+    entry.sessionArtifactsEl.textContent = artifactText;
+    if (entry.sessionArtifactsOverlayEl) {
+      entry.sessionArtifactsOverlayEl.hidden = hidden;
+    }
   }
 
   function clearSessionStatusAnchor(sessionId) {
