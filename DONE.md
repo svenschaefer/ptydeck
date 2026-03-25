@@ -802,6 +802,7 @@ Completed and verified topics belong here.
 - [x] Added focused frontend regression coverage for command-target runtime orchestration in `frontend/test/command-target-runtime-controller.test.js` (command-engine delegation plus session/deck activation/noop/failure paths).
 - [x] Validation for the latest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `94.60%` lines overall; `frontend/src/public/app.js` reduced to `1565` lines.
+- [x] Governance/docs sync refreshed after the latest `ARC-010` increment: `ROADMAP.md` versioning language now matches the active `v0.4.x` release-wave series, and `CODEX_CONTEXT.md` records the clarification as persistent project context.
 
 ## Maintenance Rules
 

@@ -8,7 +8,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Roadmap owner: `CODY`
 - Release execution owners: `BE`, `FE`, `PLAT`, `QA`
 - Final decision authority: `SAS` (Sven A. Schaefer, `svenschaefer`, `sven.schaefer@gmail.com`)
-- Versioning scheme: compressed pre-1.0 milestones up to `v0.3.0`
+- Versioning scheme: compressed pre-1.0 milestones and wave-based follow-up releases through the active `v0.4.x` series
 
 ## Current Execution Status
 
