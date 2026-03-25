@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted deck runtime/state orchestration from `frontend/src/public/app.js` into `frontend/src/public/deck-runtime-controller.js` (active-deck persistence, deck normalization/upsert/remove flows, deck-scoped terminal geometry sync, sidebar render/count helpers, and active-deck switch orchestration).
+- [x] App runtime now composes deck-state behavior through the dedicated deck runtime controller while preserving existing store/reducer semantics and deck-scoped terminal sizing behavior.
+- [x] Added focused regression coverage for the new deck runtime controller in `frontend/test/deck-runtime-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/deck-runtime-controller.js` participates in syntax-check gates.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/deck-runtime-controller.test.js frontend/test/deck-actions-controller.test.js frontend/test/deck-sidebar-controller.test.js frontend/test/app.test.js`.
 - [x] `ARC-010` progress: extracted active-terminal search/runtime orchestration from `frontend/src/public/app.js` into `frontend/src/public/ui/terminal-search-controller.js` (query normalization, active-session match collection, wrapped next/previous navigation, UI status/button synchronization, and search control event binding).
 - [x] App runtime now composes terminal-search behavior through the dedicated controller boundary while keeping `terminalSearchState` shared with existing render/disposal paths.
 - [x] Added focused regression coverage for the new terminal-search controller in `frontend/test/terminal-search-controller.test.js`.

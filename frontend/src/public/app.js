@@ -6,6 +6,7 @@ import { createCommandComposerRuntimeController } from "./command-composer-runti
 import { createCommandExecutor } from "./command-executor.js";
 import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
+import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
 import { createWsRuntimeController } from "./ws-runtime-controller.js";
@@ -265,6 +266,7 @@ const sessionThemeDrafts = new Map();
 let wsClient = null;
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
+let deckRuntimeController = null;
 let commandAutocompleteRequestId = 0;
 const slashCommandHistory = [];
 let slashHistoryCursor = -1;
@@ -342,6 +344,28 @@ const startupPerf = {
 if (typeof window !== "undefined") {
   window.__PTYDECK_PERF__ = startupPerf;
 }
+
+deckRuntimeController = createDeckRuntimeController({
+  store,
+  windowRef: window,
+  activeDeckStorageKey: ACTIVE_DECK_STORAGE_KEY,
+  defaultDeckId: DEFAULT_DECK_ID,
+  defaultTerminalCols: DEFAULT_TERMINAL_COLS,
+  defaultTerminalRows: DEFAULT_TERMINAL_ROWS,
+  clampInt,
+  getTerminalSettings: () => terminalSettings,
+  setTerminalSettings: (nextSettings) => {
+    terminalSettings = nextSettings;
+  },
+  persistTerminalSettings: saveTerminalSettings,
+  syncSettingsUi,
+  applySettingsToAllTerminals,
+  scheduleGlobalResize,
+  scheduleDeferredResizePasses,
+  getDeckSidebarController: () => deckSidebarController,
+  resolveSessionDeckId,
+  getSessionById
+});
 
 function normalizeCustomCommandName(name) {
   return String(name || "").trim().toLowerCase();
@@ -686,36 +710,6 @@ function loadTerminalSettings() {
   };
 }
 
-function loadStoredActiveDeckId() {
-  try {
-    if (!window.localStorage || typeof window.localStorage.getItem !== "function") {
-      return "";
-    }
-    return String(window.localStorage.getItem(ACTIVE_DECK_STORAGE_KEY) || "").trim();
-  } catch {
-    return "";
-  }
-}
-
-function saveStoredActiveDeckId(deckId) {
-  try {
-    if (!window.localStorage) {
-      return;
-    }
-    if (!deckId) {
-      if (typeof window.localStorage.removeItem === "function") {
-        window.localStorage.removeItem(ACTIVE_DECK_STORAGE_KEY);
-      }
-      return;
-    }
-    if (typeof window.localStorage.setItem === "function") {
-      window.localStorage.setItem(ACTIVE_DECK_STORAGE_KEY, String(deckId));
-    }
-  } catch {
-    // ignore storage failures
-  }
-}
-
 function getSessionFilterText() {
   return store.getState().sessionFilterText || "";
 }
@@ -725,108 +719,38 @@ function setSessionFilterText(value) {
   saveStoredSessionFilterText(store.getState().sessionFilterText);
 }
 
-function normalizeDeckTerminalSettings(rawSettings) {
-  const terminal = rawSettings && typeof rawSettings === "object" ? rawSettings.terminal : null;
-  return {
-    cols: clampInt(terminal?.cols, DEFAULT_TERMINAL_COLS, 20, 400),
-    rows: clampInt(terminal?.rows, DEFAULT_TERMINAL_ROWS, 5, 120)
-  };
-}
-
-function normalizeDeckEntry(deck) {
-  const id = String(deck?.id || "").trim();
-  const fallbackName = id || "Deck";
-  const name = String(deck?.name || fallbackName).trim() || fallbackName;
-  return {
-    id,
-    name,
-    settings: deck && typeof deck.settings === "object" && !Array.isArray(deck.settings) ? deck.settings : {},
-    createdAt: Number(deck?.createdAt || 0),
-    updatedAt: Number(deck?.updatedAt || 0)
-  };
-}
-
 function getDeckById(deckId) {
-  return store.getState().decks.find((deck) => deck.id === deckId) || null;
+  return deckRuntimeController?.getDeckById(deckId) || null;
 }
 
 function getActiveDeck() {
-  const preferred = getDeckById(store.getState().activeDeckId);
-  if (preferred) {
-    return preferred;
-  }
-  const decks = store.getState().decks;
-  if (decks.length > 0) {
-    return decks[0];
-  }
-  return null;
+  return deckRuntimeController?.getActiveDeck() || null;
 }
 
 function getDeckTerminalGeometry(deckId) {
-  const deck = getDeckById(deckId);
-  return normalizeDeckTerminalSettings(deck?.settings);
+  return deckRuntimeController?.getDeckTerminalGeometry(deckId) || {
+    cols: DEFAULT_TERMINAL_COLS,
+    rows: DEFAULT_TERMINAL_ROWS
+  };
 }
 
 function getSessionTerminalGeometry(sessionOrId) {
-  const session =
-    typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId && typeof sessionOrId === "object" ? sessionOrId : null;
-  const deckId = resolveSessionDeckId(session);
-  return getDeckTerminalGeometry(deckId);
-}
-
-function syncActiveDeckGeometryFromState() {
-  const activeDeck = getActiveDeck();
-  if (!activeDeck) {
-    return;
-  }
-  const nextSize = normalizeDeckTerminalSettings(activeDeck.settings);
-  const changed = terminalSettings.cols !== nextSize.cols || terminalSettings.rows !== nextSize.rows;
-  terminalSettings = {
-    ...terminalSettings,
-    cols: nextSize.cols,
-    rows: nextSize.rows
+  return deckRuntimeController?.getSessionTerminalGeometry(sessionOrId) || {
+    cols: DEFAULT_TERMINAL_COLS,
+    rows: DEFAULT_TERMINAL_ROWS
   };
-  saveTerminalSettings();
-  syncSettingsUi();
-  if (changed) {
-    applySettingsToAllTerminals({ deckId: activeDeck.id, force: true });
-    scheduleGlobalResize({ deckId: activeDeck.id, force: true });
-  }
 }
 
 function setDecks(nextDecks, options = {}) {
-  const normalizedDecks = Array.isArray(nextDecks)
-    ? nextDecks.map(normalizeDeckEntry).filter((deck) => Boolean(deck.id))
-    : [];
-  const preferredActiveDeckId = String(options.preferredActiveDeckId || store.getState().activeDeckId || "").trim();
-  store.setDecks(normalizedDecks, { preferredActiveDeckId });
-  saveStoredActiveDeckId(store.getState().activeDeckId);
-  syncActiveDeckGeometryFromState();
+  deckRuntimeController?.setDecks(nextDecks, options);
 }
 
 function upsertDeckInState(nextDeck, options = {}) {
-  const normalizedDeck = normalizeDeckEntry(nextDeck);
-  if (!normalizedDeck.id) {
-    return;
-  }
-  store.upsertDeck(normalizedDeck, {
-    preferredActiveDeckId: options.preferredActiveDeckId || store.getState().activeDeckId || normalizedDeck.id
-  });
-  saveStoredActiveDeckId(store.getState().activeDeckId);
-  syncActiveDeckGeometryFromState();
+  deckRuntimeController?.upsertDeckInState(nextDeck, options);
 }
 
 function removeDeckFromState(deckId, options = {}) {
-  const normalizedDeckId = String(deckId || "").trim();
-  if (!normalizedDeckId) {
-    return;
-  }
-  store.removeDeck(normalizedDeckId, {
-    preferredActiveDeckId: options.preferredActiveDeckId,
-    fallbackDeckId: options.fallbackDeckId || DEFAULT_DECK_ID
-  });
-  saveStoredActiveDeckId(store.getState().activeDeckId);
-  syncActiveDeckGeometryFromState();
+  deckRuntimeController?.removeDeckFromState(deckId, options);
 }
 
 function normalizeSendTerminatorMode(value) {
@@ -889,7 +813,7 @@ function saveStoredSessionFilterText(value) {
 }
 
 store.hydrateRuntimePreferences({
-  activeDeckId: loadStoredActiveDeckId(),
+  activeDeckId: deckRuntimeController.loadStoredActiveDeckId(),
   sessionFilterText: loadStoredSessionFilterText()
 });
 
@@ -1581,46 +1505,15 @@ function scheduleBootstrapFallback() {
 }
 
 function getSessionCountForDeck(deckId, sessions) {
-  if (deckSidebarController) {
-    return deckSidebarController.getSessionCountForDeck(deckId, sessions);
-  }
-  return sessions.reduce((count, session) => (resolveSessionDeckId(session) === deckId ? count + 1 : count), 0);
+  return deckRuntimeController?.getSessionCountForDeck(deckId, sessions) || 0;
 }
 
 function renderDeckTabs(sessions) {
-  if (!deckSidebarController) {
-    return;
-  }
-  const state = store.getState();
-  deckSidebarController.render({
-    decks: state.decks,
-    sessions,
-    activeDeckId: state.activeDeckId,
-    activeSessionId: state.activeSessionId
-  });
+  deckRuntimeController?.renderDeckTabs(sessions);
 }
 
 function setActiveDeck(deckId) {
-  const normalized = String(deckId || "").trim();
-  if (!normalized) {
-    return false;
-  }
-  const target = getDeckById(normalized);
-  if (!target) {
-    return false;
-  }
-  if (store.getState().activeDeckId === normalized) {
-    return true;
-  }
-  const changed = store.setActiveDeck(normalized);
-  if (!changed) {
-    return true;
-  }
-  saveStoredActiveDeckId(normalized);
-  syncActiveDeckGeometryFromState();
-  scheduleGlobalResize({ deckId: normalized, force: true });
-  scheduleDeferredResizePasses({ deckId: normalized, force: true });
-  return true;
+  return deckRuntimeController?.setActiveDeck(deckId) === true;
 }
 
 async function createDeckFlow() {
