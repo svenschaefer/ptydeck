@@ -12,10 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H2` (Layered Frontend Architecture Completion).
-- Active scoped tasks (`H2`): `ARC-012` (`ARC-009`, `ARC-010`, and `ARC-011` are completed).
-- Queued next release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics) with `QLT-123`, `QLT-124`.
-- Previous completed wave: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+- Active release wave: `v0.4.0-H3` (Terminal Interaction Ergonomics).
+- Active scoped tasks (`H3`): `QLT-123`, `QLT-124`.
+- Previous completed wave: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
+- Previous completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Dependency Rules
 

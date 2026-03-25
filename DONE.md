@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-012` is now completed: dedicated layered-architecture regression coverage was added in `frontend/test/layered-architecture-boundaries.test.js`, locking module-level boundaries for stream/interpretation/state/UI and the composed websocket/stream/store flow.
+- [x] `v0.4.0-H2` is now fully completed: `ARC-009`, `ARC-010`, `ARC-011`, and `ARC-012` are all closed and the active roadmap wave moves forward to `v0.4.0-H3`.
+- [x] Validation for `ARC-012` passed with focused frontend architecture tests, `npm run lint`, `npm run test:coverage:check`, `npm --prefix backend run test`, and `npm --prefix frontend run test`; the root `npm run test` wrapper stalled again after partial backend output and was aborted immediately per execution-hygiene policy before using the deterministic per-workspace fallback.
+- [x] Coverage after the `ARC-012` closeout step: backend `91.60%` lines, frontend `95.82%` lines overall.
 - [x] `ARC-011` is now completed: session mount/dispose flow no longer exposes `streamPluginEngine` or `streamAdapter` directly to UI controllers; the boundary is now enforced through explicit session-runtime contracts (`ensureSessionRuntime()` / `disposeSessionRuntime()`) delegated through `app-session-runtime-facade-controller.js`.
 - [x] Architecture guard coverage for `ARC-011` was added in `frontend/test/app-architecture-closeout.test.js`, locking `ui/session-grid-controller.js`, `ui/session-terminal-runtime-controller.js`, and `ui/session-disposal-controller.js` away from direct stream/runtime markers and requiring the new contract methods in `session-runtime-controller.js`.
 - [x] Validation for `ARC-011` passed with focused frontend lint/tests, `npm run lint`, `npm run test:coverage:check`, `npm --prefix backend run test`, and `npm --prefix frontend run test`; the root `npm run test` wrapper stalled again after partial backend output and was aborted immediately per execution-hygiene policy before using the deterministic per-workspace fallback.
