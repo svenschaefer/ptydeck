@@ -782,6 +782,10 @@ Completed and verified topics belong here.
 - [x] Added focused frontend regression coverage for autocomplete cycling, inline-hint scheduling, and slash-history repeat guardrails in `frontend/test/command-composer-autocomplete-controller.test.js`.
 - [x] Validation for the latest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after the latest `ARC-010` cycle: frontend `93.43%` lines overall; `frontend/src/public/app.js` reduced to `2005` lines.
+- [x] `ARC-010` decomposition continued again: session theme/startup settings state orchestration is now extracted to `frontend/src/public/ui/session-settings-state-controller.js`, removing preset filtering, theme-draft resolution, startup-control synchronization, and dirty-state comparison logic from `frontend/src/public/app.js`.
+- [x] Added focused frontend regression coverage for session-settings state orchestration in `frontend/test/session-settings-state-controller.test.js` (theme control sync/apply plus startup/theme/terminator dirty-state detection).
+- [x] Validation for the newest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after the newest `ARC-010` cycle: frontend `93.81%` lines overall; `frontend/src/public/app.js` reduced to `1788` lines.
 
 ## Maintenance Rules
 
