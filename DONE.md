@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `DRV-003A` is now completed: slash-command metadata is centralized in `frontend/src/public/command-schema.js` as the single declarative source of truth for command names, labels, descriptions, examples, summaries, usage strings, subcommands, and argument-provider metadata.
+- [x] `DRV-003B` is now completed: command completion and command-engine parsing now consume the shared command schema/registry instead of duplicating slash-command definitions across local metadata tables and ad-hoc command lists.
+- [x] `DRV-003C` is now completed: help text and validation-facing command surfaces now derive from the shared declarative command contract, including executor usage responses and parser-facing `/size` and `/custom` usage errors, with regression coverage in `frontend/test/command-schema.test.js`, `frontend/test/command-engine.test.js`, and `frontend/test/command-executor.test.js`.
+- [x] Full validation for the `DRV-003A` ... `DRV-003C` closeout passed with `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover validation/background processes after completion.
+- [x] Coverage after the declarative command-contract closeout step: backend `91.60%` lines, frontend `95.85%` lines overall.
 - [x] `QLT-124` is now completed: the terminal-session header was refactored into an explicit two-level structure with a primary identity/action row and a conditional meta row for status, plugin badges, and tags, preserving the existing semantic header elements while reducing competition inside one historically grown toolbar line.
 - [x] Header metadata visibility is now explicit and deterministic: the new `.terminal-toolbar-meta` row stays hidden until at least one of session status, plugin badges, or tags is present, so the header only grows when it actually carries metadata.
 - [x] Session-card template/runtime wiring now carries the header meta-row through `ui/session-card-factory-controller.js`, `ui/session-grid-controller.js`, `ui/session-terminal-runtime-controller.js`, and `ui/session-card-meta-controller.js`, keeping the visibility contract inside the dedicated card-meta boundary instead of reintroducing ad-hoc app-level DOM glue.

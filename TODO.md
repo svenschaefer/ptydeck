@@ -14,7 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- [ ] `DRV-004` Owner: `FE` Task: Add a command-to-output correlation model linking command submissions to derived stream/plugin artifacts and status transitions for traceable operator context.
 
 ## Active Ownership Role
 

@@ -1,9 +1,9 @@
 import {
-  createSlashCommandSpecs,
   createSuggestionProviderRegistry,
   normalizeCompletionCandidate,
   normalizeCompletionCandidates
 } from "./command-completion.js";
+import { createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
 
 function normalizeCustomCommandName(name) {
   return String(name || "").trim().toLowerCase();
@@ -82,10 +82,8 @@ export function createCommandEngine(options = {}) {
       : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionDeckId =
     typeof options.getSessionDeckId === "function" ? options.getSessionDeckId : (session) => String(session?.deckId || "default");
-  const slashCommandSpecs = createSlashCommandSpecs(systemSlashCommands);
-  const slashCommandSpecMap = new Map(
-    slashCommandSpecs.map((spec) => [normalizeCustomCommandName(spec?.insertText), spec]).filter((entry) => Boolean(entry[0]))
-  );
+  const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
+  const slashCommandSpecs = normalizeCompletionCandidates(slashCommandRegistry.list(), { replacePrefix: "/" });
   const suggestionProviders = createSuggestionProviderRegistry({
     getSessions,
     getDecks,
@@ -124,31 +122,6 @@ export function createCommandEngine(options = {}) {
     };
   }
 
-  function buildCommandAutocompleteCandidates(customCommands) {
-    const ordered = [];
-    const seen = new Set();
-
-    for (const name of systemSlashCommands) {
-      const normalized = String(name || "").trim().toLowerCase();
-      if (!normalized || seen.has(normalized)) {
-        continue;
-      }
-      seen.add(normalized);
-      ordered.push(normalized);
-    }
-
-    for (const entry of Array.isArray(customCommands) ? customCommands : []) {
-      const normalized = String(entry?.name || "").trim().toLowerCase();
-      if (!normalized || seen.has(normalized)) {
-        continue;
-      }
-      seen.add(normalized);
-      ordered.push(normalized);
-    }
-
-    return ordered;
-  }
-
   function buildCustomCommandNameList(customCommands) {
     const ordered = [];
     const seen = new Set();
@@ -164,7 +137,7 @@ export function createCommandEngine(options = {}) {
   }
 
   function getSlashCommandSpec(commandName) {
-    return slashCommandSpecMap.get(normalizeCustomCommandName(commandName)) || null;
+    return slashCommandRegistry.get(commandName);
   }
 
   function deriveReplacePrefix(rawInput, token) {
@@ -852,8 +825,9 @@ export function createCommandEngine(options = {}) {
     const ROWS_MIN = 5;
     const ROWS_MAX = 120;
     const rawArgs = Array.isArray(args) ? args.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
+    const sizeUsage = `Usage: ${getSlashCommandUsage("size")}`;
     if (rawArgs.length === 0) {
-      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+      return { ok: false, error: sizeUsage };
     }
 
     let cols = currentCols;
@@ -906,11 +880,11 @@ export function createCommandEngine(options = {}) {
         updatedRows = true;
         continue;
       }
-      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+      return { ok: false, error: sizeUsage };
     }
 
     if (!updatedCols && !updatedRows) {
-      return { ok: false, error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>" };
+      return { ok: false, error: sizeUsage };
     }
     return { ok: true, cols, rows };
   }
@@ -936,6 +910,7 @@ export function createCommandEngine(options = {}) {
     const raw = String(rawInput || "").replaceAll("\r\n", "\n");
     const trimmedStart = raw.trimStart();
     const prefix = "/custom";
+    const customUsage = `Usage: ${getSlashCommandUsage("custom")}`;
     if (!trimmedStart.startsWith(prefix)) {
       return { ok: false, error: "Invalid /custom command input." };
     }
@@ -946,11 +921,11 @@ export function createCommandEngine(options = {}) {
     if (newlineIndex === -1) {
       const trimmed = afterPrefix.trim();
       if (!trimmed) {
-        return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+        return { ok: false, error: customUsage };
       }
       const firstWhitespace = trimmed.search(/\s/);
       if (firstWhitespace < 0) {
-        return { ok: false, error: "Usage: /custom <name> <text> or /custom <name> with block delimiters." };
+        return { ok: false, error: customUsage };
       }
       const name = trimmed.slice(0, firstWhitespace);
       const content = trimmed.slice(firstWhitespace).trimStart();

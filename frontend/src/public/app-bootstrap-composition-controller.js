@@ -133,6 +133,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       api,
       defaultDeckId,
       delayedSubmitMs,
+      systemSlashCommands,
       resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
       resolveFilterSelectors: commandTargetRuntimeController.resolveFilterSelectors,
       resolveDeckToken: commandTargetRuntimeController.resolveDeckToken,

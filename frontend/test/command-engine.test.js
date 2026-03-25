@@ -66,6 +66,20 @@ test("command engine parses custom block definitions", () => {
   });
 });
 
+test("command engine derives schema-backed size and custom usage errors", () => {
+  const engine = createEngineFixture();
+
+  assert.deepEqual(engine.parseSizeCommandArgs([], 80, 20), {
+    ok: false,
+    error: "Usage: /size <cols> <rows> | /size c<cols> | /size r<rows>"
+  });
+
+  assert.deepEqual(engine.parseCustomDefinition("/custom"), {
+    ok: false,
+    error: "Usage: /custom <name> <text> | /custom <name> + block"
+  });
+});
+
 test("command engine exposes declarative autocomplete context for slash commands", () => {
   const engine = createEngineFixture();
   const context = engine.parseAutocompleteContext("/custom sh");

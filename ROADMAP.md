@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H4` (Declarative Command Contract).
+- Active scoped tasks (`H4`): `DRV-004`.
 - Latest completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Previous completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
@@ -602,13 +602,13 @@ Exit criteria:
 ## Current Status
 
 - Latest completed milestone: `v0.4.0-H3` (Terminal Interaction Ergonomics)
-- Next milestone in progress: none currently
+- Next milestone in progress: `v0.4.0-H4` (Declarative Command Contract)
 - Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- none currently
+- `DRV-004` Owner: `FE`
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -737,6 +737,37 @@ Exit criteria:
 - No separate primary-selection clipboard model is introduced; behavior remains deterministic against system clipboard APIs.
 - Terminal-session header implementation is structurally simplified and UX-optimized without removing current semantic header elements.
 - Regression coverage protects copy/paste interaction behavior and header rendering/interaction stability.
+
+### v0.4.0-H4 - Declarative Command Contract
+
+- `DRV-003A`
+- `DRV-003B`
+- `DRV-003C`
+- `DRV-004`
+
+Completed in this milestone so far:
+
+- `DRV-003A`
+- `DRV-003B`
+- `DRV-003C`
+
+Remaining in this milestone:
+
+- `DRV-004`
+
+Dependencies:
+
+- `DRV-003A` should run first so command-definition metadata has one explicit source of truth before additional command-surface rewiring happens.
+- `DRV-003B` depends on `DRV-003A` so autocomplete and command-engine parsing consume the same declarative command contract instead of duplicating definitions.
+- `DRV-003C` depends on `DRV-003A` and `DRV-003B` so help text and validation-facing command surfaces can be proven to derive from the finalized schema/registry contract.
+- `DRV-004` depends on completion of `DRV-003A` through `DRV-003C` so command-to-output correlation can attach to stable command identities and declarative metadata instead of transient parser-side strings.
+
+Exit criteria:
+
+- Slash-command metadata lives in one explicit declarative schema/registry contract instead of being split across completion/runtime modules.
+- Command completion and command-engine parsing consume the shared schema contract for names, labels, subcommands, and argument-provider metadata.
+- Help and validation-facing command surfaces derive from the same declarative contract and are protected by regression coverage.
+- The follow-up command-to-output correlation task can build on stable command identities and metadata instead of duplicated ad-hoc command definitions.
 
 ### Completed Items
 

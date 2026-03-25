@@ -1,3 +1,5 @@
+import { createSlashCommandSchema } from "./command-schema.js";
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -567,146 +569,51 @@ export function createSuggestionProviderRegistry(options = {}) {
   };
 }
 
-const DEFAULT_SLASH_COMMAND_SPECS = Object.freeze({
-  new: freezeCandidate({
-    key: "slash:new",
-    insertText: "new",
-    label: "/new",
-    kind: "command",
-    description: "create a new session",
-    example: "/new bash"
-  }),
-  deck: {
-    key: "slash:deck",
-    insertText: "deck",
-    label: "/deck",
-    kind: "command",
-    description: "manage decks",
-    example: "/deck switch ops",
-    subcommands: Object.freeze({
-      list: freezeCandidate({ insertText: "list", label: "/deck list", kind: "subcommand", description: "list decks", example: "/deck list", key: "slash:deck:list" }),
-      new: freezeCandidate({ insertText: "new", label: "/deck new", kind: "subcommand", description: "create a deck", example: "/deck new ops", key: "slash:deck:new" }),
-      rename: freezeCandidate({ insertText: "rename", label: "/deck rename", kind: "subcommand", description: "rename the active deck", example: "/deck rename ops-main", key: "slash:deck:rename" }),
-      switch: Object.freeze({ insertText: "switch", label: "/deck switch", kind: "subcommand", description: "switch active deck", example: "/deck switch ops", key: "slash:deck:switch", args: Object.freeze([{ provider: "deck-selector" }]) }),
-      delete: Object.freeze({ insertText: "delete", label: "/deck delete", kind: "subcommand", description: "delete a deck", example: "/deck delete ops", key: "slash:deck:delete", args: Object.freeze([{ provider: "deck-selector" }]) })
-    })
-  },
-  move: Object.freeze({
-    key: "slash:move",
-    insertText: "move",
-    label: "/move",
-    kind: "command",
-    description: "move sessions to a deck",
-    example: "/move 1 ops",
-    args: Object.freeze([{ provider: "multi-target-selector" }, { provider: "deck-selector" }])
-  }),
-  size: freezeCandidate({
-    key: "slash:size",
-    insertText: "size",
-    label: "/size",
-    kind: "command",
-    description: "set deck terminal size",
-    example: "/size 80 40"
-  }),
-  filter: Object.freeze({
-    key: "slash:filter",
-    insertText: "filter",
-    label: "/filter",
-    kind: "command",
-    description: "filter visible terminals",
-    example: "/filter ops",
-    args: Object.freeze([{ provider: "filter-selector" }])
-  }),
-  close: Object.freeze({
-    key: "slash:close",
-    insertText: "close",
-    label: "/close",
-    kind: "command",
-    description: "delete sessions",
-    example: "/close 1",
-    args: Object.freeze([{ provider: "multi-target-selector" }])
-  }),
-  switch: Object.freeze({
-    key: "slash:switch",
-    insertText: "switch",
-    label: "/switch",
-    kind: "command",
-    description: "switch active session",
-    example: "/switch 1",
-    args: Object.freeze([{ provider: "session-selector" }])
-  }),
-  next: freezeCandidate({ key: "slash:next", insertText: "next", label: "/next", kind: "command", description: "focus next session", example: "/next" }),
-  prev: freezeCandidate({ key: "slash:prev", insertText: "prev", label: "/prev", kind: "command", description: "focus previous session", example: "/prev" }),
-  list: freezeCandidate({ key: "slash:list", insertText: "list", label: "/list", kind: "command", description: "list sessions", example: "/list" }),
-  rename: Object.freeze({
-    key: "slash:rename",
-    insertText: "rename",
-    label: "/rename",
-    kind: "command",
-    description: "rename a session",
-    example: "/rename 1 api",
-    args: Object.freeze([{ provider: "session-selector" }])
-  }),
-  restart: Object.freeze({
-    key: "slash:restart",
-    insertText: "restart",
-    label: "/restart",
-    kind: "command",
-    description: "restart sessions",
-    example: "/restart 1",
-    args: Object.freeze([{ provider: "multi-target-selector" }])
-  }),
-  settings: {
-    key: "slash:settings",
-    insertText: "settings",
-    label: "/settings",
-    kind: "command",
-    description: "inspect or apply session settings",
-    example: "/settings show 1",
-    subcommands: Object.freeze({
-      show: Object.freeze({ insertText: "show", label: "/settings show", kind: "subcommand", description: "show session settings", example: "/settings show 1", key: "slash:settings:show", args: Object.freeze([{ provider: "session-selector" }]) }),
-      apply: Object.freeze({ insertText: "apply", label: "/settings apply", kind: "subcommand", description: "apply JSON settings patch", example: "/settings apply 1 {\"startCwd\":\"~\"}", key: "slash:settings:apply", args: Object.freeze([{ provider: "session-selector" }]) })
-    })
-  },
-  custom: {
-    key: "slash:custom",
-    insertText: "custom",
-    label: "/custom",
-    kind: "command",
-    description: "manage custom commands",
-    example: "/custom show deploy",
-    subcommands: Object.freeze({
-      show: Object.freeze({ insertText: "show", label: "/custom show", kind: "subcommand", description: "show custom command", example: "/custom show deploy", key: "slash:custom:show", args: Object.freeze([{ provider: "custom-command-name" }]) }),
-      remove: Object.freeze({ insertText: "remove", label: "/custom remove", kind: "subcommand", description: "delete custom command", example: "/custom remove deploy", key: "slash:custom:remove", args: Object.freeze([{ provider: "custom-command-name" }]) })
-    })
-  },
-  help: freezeCandidate({ key: "slash:help", insertText: "help", label: "/help", kind: "command", description: "show command help", example: "/help" })
-});
+function normalizeSlashCommandArg(arg) {
+  if (!arg || typeof arg !== "object" || Array.isArray(arg)) {
+    return null;
+  }
+  const provider = normalizeText(arg.provider);
+  if (!provider) {
+    return null;
+  }
+  return Object.freeze({
+    provider,
+    optional: arg.optional === true
+  });
+}
 
-export function createSlashCommandSpecs(systemSlashCommands = []) {
-  const ordered = [];
-  const seen = new Set();
-  for (const entry of Array.isArray(systemSlashCommands) ? systemSlashCommands : []) {
-    const name = normalizeLower(entry);
-    if (!name || seen.has(name)) {
-      continue;
-    }
-    seen.add(name);
-    const spec = DEFAULT_SLASH_COMMAND_SPECS[name];
-    if (spec) {
-      ordered.push(spec);
-      continue;
-    }
-    ordered.push(
-      freezeCandidate({
-        key: `slash:${name}`,
-        insertText: name,
-        label: `/${name}`,
-        kind: "command",
-        description: "system command",
-        example: `/${name}`
-      })
+function normalizeSlashCommandSpec(definition) {
+  const normalized = normalizeCompletionCandidate(definition);
+  if (!normalized) {
+    return null;
+  }
+  const next = {
+    ...normalized
+  };
+  const args = Array.isArray(definition?.args) ? definition.args.map((entry) => normalizeSlashCommandArg(entry)).filter(Boolean) : [];
+  if (args.length > 0) {
+    next.args = Object.freeze(args);
+  }
+  if (definition?.subcommands && typeof definition.subcommands === "object" && !Array.isArray(definition.subcommands)) {
+    next.subcommands = Object.freeze(
+      Object.fromEntries(
+        Object.entries(definition.subcommands)
+          .map(([name, entry]) => [name, normalizeSlashCommandSpec(entry)])
+          .filter((entry) => Boolean(entry[1]))
+      )
     );
   }
-  return Object.freeze(ordered);
+  if (Array.isArray(definition?.usage) && definition.usage.length > 0) {
+    next.usage = Object.freeze(definition.usage.map((entry) => normalizeText(entry)).filter(Boolean));
+  }
+  return Object.freeze(next);
+}
+
+export function createSlashCommandSpecs(systemSlashCommands = []) {
+  return Object.freeze(
+    createSlashCommandSchema(systemSlashCommands)
+      .map((entry) => normalizeSlashCommandSpec(entry))
+      .filter(Boolean)
+  );
 }

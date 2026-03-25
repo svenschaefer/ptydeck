@@ -1,8 +1,11 @@
+import { createCommandHelpText, getSlashCommandUsage } from "./command-schema.js";
+
 export function createCommandExecutor(options = {}) {
   const store = options.store;
   const api = options.api;
   const defaultDeckId = options.defaultDeckId || "default";
   const delayedSubmitMs = Number.isInteger(options.delayedSubmitMs) ? options.delayedSubmitMs : 80;
+  const systemSlashCommands = Array.isArray(options.systemSlashCommands) ? options.systemSlashCommands : [];
 
   const resolveTargetSelectors = options.resolveTargetSelectors;
   const resolveDeckToken = options.resolveDeckToken;
@@ -37,6 +40,10 @@ export function createCommandExecutor(options = {}) {
   const getTerminalSettings =
     typeof options.getTerminalSettings === "function" ? options.getTerminalSettings : () => ({ cols: 80, rows: 20 });
 
+  function formatUsage(commandName, subcommandName = "") {
+    return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
+  }
+
   function formatSessionSettingsReport(session) {
     const token = formatSessionToken(session.id);
     const name = formatSessionDisplayName(session);
@@ -66,7 +73,7 @@ export function createCommandExecutor(options = {}) {
     const activeSessionId = state.activeSessionId;
 
     if (command === "help" || command === "") {
-      return "Commands: /new [shell], /deck list|new|rename|switch|delete, /move <sessionSelector> <deckSelector>, /size <cols> <rows> | /size c<cols> | /size r<rows>, /filter [id/tag[,id/tag...]], /close [selector[,selector...]], /switch <id>, /next, /prev, /list, /rename <name> | /rename <selector> <name>, /restart [selector[,selector...]], /settings show [selector], /settings apply <selector|active> <json>, /custom <name> <text>, /custom <name> + block, >selector, >deckSelector::sessionSelector, /help";
+      return createCommandHelpText(systemSlashCommands);
     }
 
     if (command === "deck") {
@@ -91,7 +98,7 @@ export function createCommandExecutor(options = {}) {
         const terminalSettings = getTerminalSettings();
         const name = rest.join(" ").trim();
         if (!name) {
-          return "Usage: /deck new <name>";
+          return formatUsage("deck", "new");
         }
         const created = await api.createDeck({
           name,
@@ -117,7 +124,7 @@ export function createCommandExecutor(options = {}) {
           return "No active deck to rename.";
         }
         if (rest.length === 0) {
-          return "Usage: /deck rename <name> | /deck rename <deckSelector> <name>";
+          return formatUsage("deck", "rename");
         }
 
         let targetDeck = activeDeck;
@@ -134,7 +141,7 @@ export function createCommandExecutor(options = {}) {
         }
 
         if (!name) {
-          return "Usage: /deck rename <name> | /deck rename <deckSelector> <name>";
+          return formatUsage("deck", "rename");
         }
         const updated = await api.updateDeck(targetDeck.id, { name });
         applyRuntimeEvent(
@@ -149,7 +156,7 @@ export function createCommandExecutor(options = {}) {
 
       if (subcommand === "switch") {
         if (rest.length !== 1) {
-          return "Usage: /deck switch <deckSelector>";
+          return formatUsage("deck", "switch");
         }
         const resolved = resolveDeckToken(rest[0], decks);
         if (!resolved.deck) {
@@ -167,7 +174,7 @@ export function createCommandExecutor(options = {}) {
           return "No active deck to delete.";
         }
         if (rest.length > 2) {
-          return "Usage: /deck delete [deckSelector] [force]";
+          return formatUsage("deck", "delete");
         }
         let force = false;
         let selector = "";
@@ -180,7 +187,7 @@ export function createCommandExecutor(options = {}) {
         } else if (rest.length === 2) {
           selector = rest[0];
           if (String(rest[1]).toLowerCase() !== "force") {
-            return "Usage: /deck delete [deckSelector] [force]";
+            return formatUsage("deck", "delete");
           }
           force = true;
         }
@@ -219,12 +226,12 @@ export function createCommandExecutor(options = {}) {
         return `Deleted deck [${targetDeck.id}] ${targetDeck.name}.`;
       }
 
-      return "Usage: /deck list | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]";
+      return formatUsage("deck");
     }
 
     if (command === "move") {
       if (args.length !== 2) {
-        return "Usage: /move <sessionSelector> <deckSelector>";
+        return formatUsage("move");
       }
       const sessionSelector = args[0];
       const deckSelector = args[1];
@@ -363,7 +370,7 @@ export function createCommandExecutor(options = {}) {
 
     if (command === "switch") {
       if (args.length === 0) {
-        return "Usage: /switch <id>";
+        return formatUsage("switch");
       }
       const activeDeckId = getActiveDeck()?.id || "";
       const resolvedTargets = resolveTargetSelectors(args[0], sessions, {
@@ -407,7 +414,7 @@ export function createCommandExecutor(options = {}) {
 
     if (command === "rename") {
       if (args.length === 0) {
-        return "Usage: /rename <name> | /rename <selector> <name>";
+        return formatUsage("rename");
       }
 
       if (args.length === 1) {
@@ -416,7 +423,7 @@ export function createCommandExecutor(options = {}) {
         }
         const name = args[0].trim();
         if (!name) {
-          return "Usage: /rename <name> | /rename <selector> <name>";
+          return formatUsage("rename");
         }
         const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
         if (isSessionExited(activeSession)) {
@@ -430,7 +437,7 @@ export function createCommandExecutor(options = {}) {
       const selectorText = args[0];
       const name = args.slice(1).join(" ").trim();
       if (!name) {
-        return "Usage: /rename <name> | /rename <selector> <name>";
+        return formatUsage("rename");
       }
       const resolvedTargets = resolveTargetSelectors(selectorText, sessions, { source: "slash" });
       if (resolvedTargets.error) {
@@ -501,7 +508,7 @@ export function createCommandExecutor(options = {}) {
       if (args[0] === "show") {
         const name = typeof args[1] === "string" ? args[1].trim() : "";
         if (!name) {
-          return "Usage: /custom show <name>";
+          return formatUsage("custom", "show");
         }
         const custom = getCustomCommandState(name);
         if (!custom) {
@@ -513,7 +520,7 @@ export function createCommandExecutor(options = {}) {
       if (args[0] === "remove") {
         const name = typeof args[1] === "string" ? args[1].trim() : "";
         if (!name) {
-          return "Usage: /custom remove <name>";
+          return formatUsage("custom", "remove");
         }
         try {
           await api.deleteCustomCommand(name);
@@ -549,7 +556,7 @@ export function createCommandExecutor(options = {}) {
 
       const applyMatch = /^\/settings\s+apply\s+([^\s]+)\s+([\s\S]+)$/i.exec(interpreted.raw || "");
       if (!applyMatch) {
-        return "Usage: /settings show [selector] | /settings apply <selector|active> <json>";
+        return formatUsage("settings");
       }
       const selectorText = applyMatch[1];
       const parsedPayload = parseSettingsPayload(applyMatch[2]);
