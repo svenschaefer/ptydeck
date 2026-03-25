@@ -1,10 +1,10 @@
 import { createApiClient } from "./api-client.js";
 import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createAuthBootstrapRuntimeController } from "./auth-bootstrap-runtime-controller.js";
+import { createCommandComposerAutocompleteController } from "./command-composer-autocomplete-controller.js";
 import { createCommandEngine } from "./command-engine.js";
 import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
 import { createCommandExecutor } from "./command-executor.js";
-import { areCompletionCandidateListsEqual, normalizeCompletionCandidate } from "./command-completion.js";
 import { interpretComposerInput } from "./command-interpreter.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
@@ -30,7 +30,6 @@ import {
   sendInputWithConfiguredTerminator
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
-import { createCommandSuggestionsController } from "./ui/components.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
@@ -115,9 +114,6 @@ const terminalSizes = new Map();
 const sessionQuickIds = new Map();
 let bootstrapFallbackTimer = null;
 let runtimeBootstrapSource = "pending";
-let commandPreviewRequestId = 0;
-let commandSuggestionsTimer = null;
-let commandSuggestionsRequestId = 0;
 const SETTINGS_STORAGE_KEY = "ptydeck.settings.v1";
 const ACTIVE_DECK_STORAGE_KEY = "ptydeck.active-deck.v1";
 const SESSION_INPUT_SETTINGS_STORAGE_KEY = "ptydeck.session-input-settings.v1";
@@ -268,17 +264,12 @@ let wsClient = null;
 let wsRuntimeController = null;
 let authBootstrapRuntimeController = null;
 let deckRuntimeController = null;
-let commandAutocompleteRequestId = 0;
-const slashCommandHistory = [];
-let slashHistoryCursor = -1;
-let slashHistoryDraft = "";
-let recalledSlashCommand = "";
 let sessionViewModel = null;
 let runtimeEventController = null;
 let commandEngine = null;
 let commandExecutor = null;
 let commandComposerRuntimeController = null;
-let commandSuggestionsController = null;
+let commandComposerAutocompleteController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
 let sessionRuntimeController = null;
@@ -433,240 +424,12 @@ function navigateActiveTerminalSearch(direction) {
   terminalSearchController?.navigateActiveTerminalSearch(direction);
 }
 
-function resetCommandAutocompleteState() {
-  commandSuggestionsController?.reset();
-}
-
-function setCommandSuggestions(replacePrefix, matches, index = 0) {
-  commandSuggestionsController?.set(replacePrefix, matches, index);
-}
-
 function clearCommandSuggestions() {
-  commandSuggestionsController?.clear();
-}
-
-function measureComposerPrefixWidthPx(text) {
-  return commandSuggestionsController ? commandSuggestionsController.measurePrefixWidthPx(text) : 0;
-}
-
-function applyCommandSuggestionSelection(index) {
-  return commandSuggestionsController ? commandSuggestionsController.applySelection(index) : false;
-}
-
-function moveCommandSuggestion(delta) {
-  return commandSuggestionsController ? commandSuggestionsController.move(delta) : false;
-}
-
-function acceptCommandSuggestion() {
-  return commandSuggestionsController ? commandSuggestionsController.accept() : false;
-}
-
-function isSingleLineSlashModeInput(value) {
-  return typeof value === "string" && value.startsWith("/") && !value.includes("\n");
-}
-
-function resetSlashHistoryNavigationState() {
-  slashHistoryCursor = -1;
-  slashHistoryDraft = "";
-  recalledSlashCommand = "";
-}
-
-function recordSlashHistory(rawCommand) {
-  const normalized = String(rawCommand || "").trim();
-  if (!isSingleLineSlashModeInput(normalized)) {
-    return;
-  }
-  if (slashCommandHistory[slashCommandHistory.length - 1] === normalized) {
-    return;
-  }
-  slashCommandHistory.push(normalized);
-  if (slashCommandHistory.length > 200) {
-    slashCommandHistory.splice(0, slashCommandHistory.length - 200);
-  }
-}
-
-function applySlashHistoryValue(value) {
-  commandInput.value = value;
-  recalledSlashCommand = value;
-  resetCommandAutocompleteState();
-  scheduleCommandPreview();
-}
-
-function navigateSlashHistory(direction) {
-  const current = commandInput.value || "";
-  if (!isSingleLineSlashModeInput(current)) {
-    return false;
-  }
-  if (slashCommandHistory.length === 0) {
-    return false;
-  }
-
-  if (direction === "up") {
-    if (slashHistoryCursor < 0) {
-      slashHistoryDraft = current;
-      slashHistoryCursor = slashCommandHistory.length - 1;
-    } else if (slashHistoryCursor > 0) {
-      slashHistoryCursor -= 1;
-    }
-    applySlashHistoryValue(slashCommandHistory[slashHistoryCursor]);
-    return true;
-  }
-
-  if (direction === "down") {
-    if (slashHistoryCursor < 0) {
-      return false;
-    }
-    if (slashHistoryCursor < slashCommandHistory.length - 1) {
-      slashHistoryCursor += 1;
-      applySlashHistoryValue(slashCommandHistory[slashHistoryCursor]);
-      return true;
-    }
-    commandInput.value = slashHistoryDraft;
-    resetSlashHistoryNavigationState();
-    resetCommandAutocompleteState();
-    scheduleCommandPreview();
-    return true;
-  }
-
-  return false;
-}
-
-function parseSlashInputForAutocomplete(rawInput) {
-  const value = typeof rawInput === "string" ? rawInput : "";
-  if (!value.startsWith("/")) {
-    return null;
-  }
-  if (value.includes("\n")) {
-    return null;
-  }
-  return {
-    value,
-    afterSlash: value.slice(1)
-  };
-}
-
-function parseQuickSwitchInputForAutocomplete(rawInput) {
-  const value = typeof rawInput === "string" ? rawInput : "";
-  if (!value.startsWith(">")) {
-    return null;
-  }
-  if (value.includes("\n")) {
-    return null;
-  }
-  return {
-    value,
-    afterMarker: value.slice(1)
-  };
-}
-
-function parseAutocompleteContext(rawInput, customCommands) {
-  return commandEngine ? commandEngine.parseAutocompleteContext(rawInput, customCommands) : null;
-}
-
-async function autocompleteComposerInput(reverse = false) {
-  const rawInput = commandInput.value || "";
-  const parsedSlash = parseSlashInputForAutocomplete(rawInput);
-  const parsedQuickSwitch = parseQuickSwitchInputForAutocomplete(rawInput);
-  if (!parsedSlash && !parsedQuickSwitch) {
-    resetCommandAutocompleteState();
-    return false;
-  }
-
-  const activeState = commandSuggestionsController ? commandSuggestionsController.getState() : null;
-  const canCycleExisting =
-    activeState &&
-    Array.isArray(activeState.matches) &&
-    activeState.matches.length > 0 &&
-    Number.isInteger(activeState.index) &&
-    activeState.index >= 0 &&
-    activeState.index < activeState.matches.length &&
-    typeof activeState.replacePrefix === "string" &&
-    commandInput.value ===
-      `${activeState.replacePrefix}${normalizeCompletionCandidate(activeState.matches[activeState.index], {
-        replacePrefix: activeState.replacePrefix
-      })?.insertText || ""}`;
-
-  let matches = [];
-  let replacePrefix = "/";
-  let nextIndex = reverse ? -1 : 0;
-
-  if (canCycleExisting) {
-    matches = activeState.matches;
-    replacePrefix = activeState.replacePrefix;
-    const delta = reverse ? -1 : 1;
-    nextIndex = (activeState.index + delta + matches.length) % matches.length;
-  } else {
-    const context = parseAutocompleteContext(rawInput, listCustomCommandState());
-    if (!context) {
-      resetCommandAutocompleteState();
-      return true;
-    }
-    replacePrefix = context.replacePrefix;
-    matches = context.matches;
-    if (matches.length === 0) {
-      resetCommandAutocompleteState();
-      return true;
-    }
-    nextIndex = reverse ? matches.length - 1 : 0;
-  }
-
-  if (matches.length === 0) {
-    clearCommandSuggestions();
-    render();
-    return true;
-  }
-
-  setCommandSuggestions(replacePrefix, matches, nextIndex);
-  return applyCommandSuggestionSelection(nextIndex);
-}
-
-async function refreshCommandSuggestions() {
-  const rawInput = commandInput.value || "";
-  const parsedSlash = parseSlashInputForAutocomplete(rawInput);
-  const parsedQuickSwitch = parseQuickSwitchInputForAutocomplete(rawInput);
-  if (!parsedSlash && !parsedQuickSwitch) {
-    clearCommandSuggestions();
-    render();
-    return;
-  }
-  const context = parseAutocompleteContext(rawInput, listCustomCommandState());
-  if (!context || !Array.isArray(context.matches) || context.matches.length === 0) {
-    clearCommandSuggestions();
-    render();
-    return;
-  }
-  let index = 0;
-  if (
-    commandSuggestionsController &&
-    commandSuggestionsController.getState() &&
-    commandSuggestionsController.getState().replacePrefix === context.replacePrefix &&
-    Array.isArray(commandSuggestionsController.getState().matches) &&
-    areCompletionCandidateListsEqual(commandSuggestionsController.getState().matches, context.matches)
-  ) {
-    index = Math.min(Math.max(commandSuggestionsController.getState().index, 0), context.matches.length - 1);
-  }
-  const selected = normalizeCompletionCandidate(context.matches[index], { replacePrefix: context.replacePrefix });
-  const inputValue = commandInput.value || "";
-  const prefix = context.replacePrefix || "";
-  const tokenPrefix = inputValue.startsWith(prefix) ? inputValue.slice(prefix.length) : "";
-  if (selected && tokenPrefix.length <= selected.insertText.length && selected.insertText.startsWith(tokenPrefix)) {
-    uiState.commandInlineHint = selected.insertText.slice(tokenPrefix.length);
-    uiState.commandInlineHintPrefixPx = measureComposerPrefixWidthPx(inputValue);
-  } else {
-    uiState.commandInlineHint = "";
-    uiState.commandInlineHintPrefixPx = 0;
-  }
-  setCommandSuggestions(context.replacePrefix, context.matches, index);
+  commandComposerAutocompleteController?.clearSuggestions();
 }
 
 function scheduleCommandSuggestions() {
-  if (commandSuggestionsTimer) {
-    clearTimeout(commandSuggestionsTimer);
-  }
-  commandSuggestionsTimer = setTimeout(() => {
-    commandSuggestionsTimer = null;
-    refreshCommandSuggestions();
-  }, 120);
+  commandComposerAutocompleteController?.scheduleSuggestions();
 }
 
 function clampInt(value, fallback, min, max) {
@@ -2159,13 +1922,18 @@ function scheduleCommandPreview() {
   commandComposerRuntimeController?.scheduleCommandPreview();
 }
 
-commandSuggestionsController = createCommandSuggestionsController({
+commandComposerAutocompleteController = createCommandComposerAutocompleteController({
+  windowRef: window,
+  documentRef: document,
   commandInput,
   uiState,
   render,
-  onSelectionApplied: scheduleCommandPreview,
-  documentRef: document,
-  windowRef: window
+  scheduleCommandPreview,
+  parseAutocompleteContext: (rawInput, customCommands) =>
+    (commandEngine ? commandEngine.parseAutocompleteContext(rawInput, customCommands) : null),
+  listCustomCommands: listCustomCommandState,
+  setCommandFeedback,
+  submitCommand
 });
 
 commandComposerRuntimeController = createCommandComposerRuntimeController({
@@ -2174,7 +1942,7 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   setCommandValue: (value) => {
     commandInput.value = value;
   },
-  resetCommandAutocompleteState,
+  resetCommandAutocompleteState: () => commandComposerAutocompleteController?.resetAutocompleteState(),
   interpretComposerInput,
   getState: () => store.getState(),
   resolveQuickSwitchTarget,
@@ -2186,9 +1954,9 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   render,
   debugLog,
   executeControlCommand,
-  recordSlashHistory,
+  recordSlashHistory: (rawCommand) => commandComposerAutocompleteController?.recordSlashHistory(rawCommand),
   getErrorMessage,
-  resetSlashHistoryNavigationState,
+  resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState(),
   parseDirectTargetRoutingInput,
   resolveTargetSelectors,
   getActiveDeck,
@@ -2210,62 +1978,7 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
 });
 
 sendBtn.addEventListener("click", submitCommand);
-commandInput.addEventListener("input", () => {
-  clearCommandSuggestions();
-  scheduleCommandPreview();
-  scheduleCommandSuggestions();
-});
-commandInput.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowUp") {
-    if (moveCommandSuggestion(-1)) {
-      event.preventDefault();
-      return;
-    }
-  }
-  if (event.key === "ArrowDown") {
-    if (moveCommandSuggestion(1)) {
-      event.preventDefault();
-      return;
-    }
-  }
-  if (event.key === "ArrowUp") {
-    if (navigateSlashHistory("up")) {
-      event.preventDefault();
-    }
-    return;
-  }
-  if (event.key === "ArrowDown") {
-    if (navigateSlashHistory("down")) {
-      event.preventDefault();
-    }
-    return;
-  }
-  if (event.key === "Tab") {
-    if (parseSlashInputForAutocomplete(commandInput.value || "") || parseQuickSwitchInputForAutocomplete(commandInput.value || "")) {
-      event.preventDefault();
-      autocompleteComposerInput(event.shiftKey).catch(() => {});
-    }
-    return;
-  }
-  if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
-    if (acceptCommandSuggestion()) {
-      event.preventDefault();
-      return;
-    }
-  }
-  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-    event.preventDefault();
-    if (slashHistoryCursor >= 0 && isSingleLineSlashModeInput(commandInput.value || "")) {
-      if (commandInput.value === recalledSlashCommand) {
-        submitCommand();
-      } else {
-        setCommandFeedback("Repeat blocked: recalled slash command was modified.");
-      }
-      return;
-    }
-    submitCommand();
-  }
-});
+commandComposerAutocompleteController?.bindUiEvents();
 
 initializeRuntime().catch(() => {
   setError("Failed to initialize application runtime.");
@@ -2280,9 +1993,7 @@ window.addEventListener("beforeunload", () => {
   sessionTerminalResizeController?.dispose();
   terminalSearchController?.dispose();
   commandComposerRuntimeController?.dispose();
-  if (commandSuggestionsTimer) {
-    clearTimeout(commandSuggestionsTimer);
-  }
+  commandComposerAutocompleteController?.dispose();
   for (const observer of terminalObservers.values()) {
     observer.disconnect();
   }

@@ -778,6 +778,10 @@ Completed and verified topics belong here.
 - [x] Added regression coverage for full-palette theme draft lifecycle: unsaved theme edits apply immediately for preview and are deterministically reverted by `Cancel` to persisted values in both controls and live terminal rendering.
 - [x] Existing persistence/reload/apply assertions remain active in the same integration path (saved profile survives session close/recreate and re-applies to reopened terminal render state).
 - [x] Validation for `QLT-068` cycle passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] `ARC-010` decomposition continued: command-composer autocomplete/history/input-event orchestration is now extracted to `frontend/src/public/command-composer-autocomplete-controller.js`, removing slash-history state, suggestion timers, and composer keydown/input wiring from `frontend/src/public/app.js`.
+- [x] Added focused frontend regression coverage for autocomplete cycling, inline-hint scheduling, and slash-history repeat guardrails in `frontend/test/command-composer-autocomplete-controller.test.js`.
+- [x] Validation for the latest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after the latest `ARC-010` cycle: frontend `93.43%` lines overall; `frontend/src/public/app.js` reduced to `2005` lines.
 
 ## Maintenance Rules
 

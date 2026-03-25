@@ -226,6 +226,7 @@ The deck model is a strict isolation boundary above sessions.
 - Active-terminal search/runtime orchestration is now extracted to `ui/terminal-search-controller.js` (query normalization, active-session match collection, wrapped navigation, UI status/button synchronization, and search control event binding), further reducing local UI/runtime state handling embedded directly in `app.js`.
 - Deck runtime/state orchestration is now extracted to `deck-runtime-controller.js` (active-deck persistence, deck normalization/upsert/remove flows, deck-scoped terminal geometry sync, sidebar render/count helpers, and active-deck switch orchestration), further reducing deck-scoped state and persistence handling embedded directly in `app.js`.
 - Session runtime orchestration is now extracted to `session-runtime-controller.js` (quick-id allocation/pruning, terminal chunk append/replay, session exit/close/remove store handoff, runtime-event delegation, and display-name/token helpers), further reducing session-scoped runtime handling embedded directly in `app.js`.
+- Command-composer autocomplete/history orchestration is now extracted to `command-composer-autocomplete-controller.js`, centralizing slash-history state, suggestion timers, inline-hint refresh, and composer input/keydown event binding outside `app.js`.
 - Frontend app initialization now completes controller wiring before runtime bootstrap/network startup begins, preventing WebSocket-snapshot vs REST-fallback races during startup integration paths.
 - Render-loop session cleanup/disposal logic is now extracted to `ui/session-disposal-controller.js`, reducing inline teardown responsibilities in `app.js`.
 - Frontend layout/settings synchronization is now extracted to `ui/layout-settings-controller.js` (sidebar visibility UI sync, terminal geometry CSS sizing, and settings-form read path), further reducing direct UI concerns embedded in `app.js`.
@@ -256,6 +257,7 @@ The deck model is a strict isolation boundary above sessions.
 - Frontend now renders slash autocomplete directly in the command-composer area, with deterministic keyboard cycling (`Tab`, `Shift+Tab`, arrows, `Enter`) and no implicit command execution.
 - Slash autocomplete now uses inline hinting (ghost suffix at the composer input) instead of a visible suggestion menu.
 - Inline hint positioning is now measured using composer font metrics so hinting remains visually aligned with the typed text.
+- Slash-history replay and `Ctrl/Cmd+Enter` repeat-guard behavior are now owned by the dedicated composer-autocomplete controller instead of inline `app.js` event handlers.
 - Command status and feedback messaging now render directly in the composer area (not in a separate top workspace strip) for a single, localized command UX region.
 - Composer layout now separates metadata and entry rows so the send button height follows the textarea row only.
 - Custom-command preview now renders inline as payload-only helper text inside the composer input area, without target/newline metadata.
