@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-010` progress: extracted session/view/theme/meta adapter glue from `frontend/src/public/app.js` into `frontend/src/public/ui/session-ui-facade-controller.js`, centralizing session-view-model delegation, session-theme/settings-state delegation, and session-card meta/render helper delegation behind one composition-facing facade.
+- [x] App runtime now composes session-card factory/render/interactions, runtime-event guards, command execution guards, and deck-sidebar activity state through the dedicated session UI facade instead of keeping those adapter wrappers inline in `frontend/src/public/app.js`.
+- [x] Added focused regression coverage for the new session UI facade in `frontend/test/session-ui-facade-controller.test.js`.
+- [x] Frontend build/lint script coverage updated so `src/public/ui/session-ui-facade-controller.js` participates in syntax-check gates.
+- [x] `frontend/src/public/app.js` was reduced further to 1307 lines after the session UI facade extraction step.
+- [x] Validation for this ARC-010 step passed with `npm run lint`, `npm run test`, `npm run test:coverage`, `npm run test:coverage:check`, and targeted regression coverage via `node --test frontend/test/session-ui-facade-controller.test.js frontend/test/session-settings-state-controller.test.js frontend/test/session-card-meta-controller.test.js frontend/test/session-card-interactions-controller.test.js frontend/test/session-card-render-controller.test.js frontend/test/session-card-factory-controller.test.js frontend/test/runtime-event-controller.test.js frontend/test/session-runtime-controller.test.js frontend/test/app.test.js`.
+- [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `95.12%` lines overall.
 - [x] `ARC-010` progress: extracted shared app runtime/bootstrap UI-state orchestration from `frontend/src/public/app.js` into `frontend/src/public/app-runtime-state-controller.js` (UI error/feedback/preview state, bootstrap fallback timer lifecycle, runtime-bootstrap source tracking, startup perf readiness reporting, and dev-auth bootstrap passthrough).
 - [x] App runtime now composes shared bootstrap/error/feedback state through the dedicated runtime-state controller instead of keeping those mutable globals and fallback helpers inline in `frontend/src/public/app.js`.
 - [x] `frontend/src/public/app-lifecycle-controller.js` now disposes app-runtime bootstrap timers/state during `beforeunload`, so the extracted controller lifecycle is cleaned up with the rest of the shell runtime.

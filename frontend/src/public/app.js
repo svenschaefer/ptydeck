@@ -45,6 +45,7 @@ import { createSessionCardInteractionsController } from "./ui/session-card-inter
 import { createSessionCardRenderController } from "./ui/session-card-render-controller.js";
 import { createSessionSettingsDialogController } from "./ui/session-settings-dialog-controller.js";
 import { createSessionSettingsStateController } from "./ui/session-settings-state-controller.js";
+import { createSessionUiFacadeController } from "./ui/session-ui-facade-controller.js";
 import { createSessionTerminalResizeController } from "./ui/session-terminal-resize-controller.js";
 import { createSessionTerminalRuntimeController } from "./ui/session-terminal-runtime-controller.js";
 import { createTerminalSearchController } from "./ui/terminal-search-controller.js";
@@ -287,6 +288,7 @@ let sessionGridController = null;
 let sessionCardInteractionsController = null;
 let sessionCardRenderController = null;
 let sessionSettingsStateController = null;
+let sessionUiFacadeController = null;
 let sessionTerminalResizeController = null;
 let sessionTerminalRuntimeController = null;
 let terminalSearchController = null;
@@ -558,125 +560,12 @@ function setSessionSendTerminator(sessionId, mode) {
   layoutRuntimeController?.setSessionSendTerminator(sessionId, mode);
 }
 
-function isValidHexColor(value) {
-  return sessionSettingsStateController?.isValidHexColor(value) === true;
-}
-
-function normalizeThemeProfile(themeProfile) {
-  return sessionSettingsStateController?.normalizeThemeProfile(themeProfile) || themeProfile || {};
-}
-
-function normalizeThemeFilterCategory(value) {
-  return sessionSettingsStateController?.normalizeThemeFilterCategory(value) || "all";
-}
-
-function getThemePresetById(presetId) {
-  return sessionSettingsStateController?.getThemePresetById(presetId) || null;
-}
-
-function detectThemePreset(themeProfile) {
-  return sessionSettingsStateController?.detectThemePreset(themeProfile) || "custom";
-}
-
 function getSessionById(sessionId) {
   return store.getState().sessions.find((session) => session.id === sessionId) || null;
 }
 
 function resolveSessionDeckId(session) {
   return sessionViewModel.resolveSessionDeckId(session);
-}
-
-function getSessionRuntimeState(session) {
-  return sessionViewModel.getSessionRuntimeState(session);
-}
-
-function isSessionUnrestored(session) {
-  return sessionViewModel.isSessionUnrestored(session);
-}
-
-function isSessionExited(session) {
-  return sessionViewModel.isSessionExited(session);
-}
-
-function isSessionActionBlocked(session) {
-  return sessionViewModel.isSessionActionBlocked(session);
-}
-
-function getSessionStateBadgeText(session) {
-  return sessionViewModel.getSessionStateBadgeText(session);
-}
-
-function getExitedSessionStatusSuffix(session) {
-  return sessionViewModel.getExitedSessionStatusSuffix(session);
-}
-
-function getSessionStateHintText(session) {
-  return sessionViewModel.getSessionStateHintText(session);
-}
-
-function getSessionActivityIndicatorState(session) {
-  return sessionViewModel.getSessionActivityIndicatorState(session);
-}
-
-function getUnrestoredSessionMessage(session) {
-  return sessionViewModel.getUnrestoredSessionMessage(session);
-}
-
-function getExitedSessionMessage(session) {
-  return sessionViewModel.getExitedSessionMessage(session);
-}
-
-function getBlockedSessionActionMessage(sessions, actionLabel) {
-  return sessionViewModel.getBlockedSessionActionMessage(sessions, actionLabel);
-}
-
-function getSessionThemeConfig(sessionId) {
-  return sessionSettingsStateController?.getSessionThemeConfig(sessionId) || {
-    preset: "custom",
-    profile: normalizeThemeProfile(null),
-    category: "all",
-    search: ""
-  };
-}
-
-function buildThemeFromConfig(config) {
-  return sessionSettingsStateController?.buildThemeFromConfig(config) || normalizeThemeProfile(config?.profile);
-}
-
-function applyThemeForSession(sessionId) {
-  sessionSettingsStateController?.applyThemeForSession(sessionId);
-}
-
-function readThemeProfileFromControls(entry) {
-  return sessionSettingsStateController?.readThemeProfileFromControls(entry) || normalizeThemeProfile(null);
-}
-
-function syncSessionThemeControls(entry, sessionId) {
-  sessionSettingsStateController?.syncSessionThemeControls(entry, sessionId);
-}
-
-function formatSessionEnv(env) {
-  return sessionViewModel.formatSessionEnv(env);
-}
-
-function normalizeSessionTags(tags) {
-  return sessionViewModel.normalizeSessionTags(tags);
-}
-
-function formatSessionTags(tags) {
-  return sessionViewModel.formatSessionTags(tags);
-}
-
-function parseSessionTags(rawText) {
-  return sessionViewModel.parseSessionTags(rawText);
-}
-
-function parseSessionEnv(rawText) {
-  return sessionViewModel.parseSessionEnv(rawText);
-}
-
-function setStartupSettingsFeedback(entry, message, isError = false) {
-  sessionSettingsStateController?.setStartupSettingsFeedback(entry, message, isError);
 }
 
 function setSessionCardVisibility(node, visible) {
@@ -710,58 +599,6 @@ function syncTerminalViewportAfterShow(sessionId, entry) {
   setTimeout(runPass, 80);
   setTimeout(runPass, 220);
   entry.pendingViewportSync = false;
-}
-
-function syncSessionStartupControls(entry, session) {
-  sessionSettingsStateController?.syncSessionStartupControls(entry, session);
-}
-
-function normalizeSessionStartupFromSession(session) {
-  return sessionViewModel.normalizeSessionStartupFromSession(session);
-}
-
-function readSessionStartupFromControls(entry) {
-  return (
-    sessionSettingsStateController?.readSessionStartupFromControls(entry) || {
-      startCwd: "",
-      startCommand: "",
-      envResult: { ok: true, env: {} },
-      sendTerminator: "auto",
-      tagResult: { ok: true, tags: [] }
-    }
-  );
-}
-
-function setSettingsStatus(entry, text, kind = "") {
-  sessionCardMetaController?.setSettingsStatus(entry, text, kind);
-}
-
-function setSettingsDirty(entry, dirty) {
-  sessionCardMetaController?.setSettingsDirty(entry, dirty);
-}
-
-function isSessionSettingsDirty(entry, session) {
-  return sessionSettingsStateController?.isSessionSettingsDirty(entry, session) === true;
-}
-
-function renderSessionTagList(entry, session) {
-  sessionCardMetaController?.renderSessionTagList(entry, session);
-}
-
-function renderSessionPluginBadges(entry, session) {
-  sessionCardMetaController?.renderSessionPluginBadges(entry, session);
-}
-
-function syncStatusTicker(sessions) {
-  sessionCardMetaController?.syncStatusTicker(sessions);
-}
-
-function renderSessionStatus(entry, session) {
-  sessionCardMetaController?.renderSessionStatus(entry, session);
-}
-
-function renderSessionArtifacts(entry, session) {
-  sessionCardMetaController?.renderSessionArtifacts(entry, session);
 }
 
 function measureTerminalCellWidthPx() {
@@ -956,6 +793,14 @@ sessionViewModel = createSessionViewModel({
   formatSessionToken
 });
 
+sessionUiFacadeController = createSessionUiFacadeController({
+  getSessionViewModel: () => sessionViewModel,
+  getSessionSettingsStateController: () => sessionSettingsStateController,
+  getSessionCardMetaController: () => sessionCardMetaController,
+  themeProfileKeys: THEME_PROFILE_KEYS,
+  defaultTerminalTheme: DEFAULT_TERMINAL_THEME
+});
+
 sessionRuntimeController = createSessionRuntimeController({
   store,
   terminals,
@@ -970,7 +815,7 @@ sessionRuntimeController = createSessionRuntimeController({
   getSessionById,
   streamAdapter,
   setCommandFeedback,
-  getExitedSessionMessage,
+  getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
   getRuntimeEventController: () => runtimeEventController,
   getSessionViewModel: () => sessionViewModel,
   windowRef: window
@@ -997,16 +842,16 @@ runtimeEventController = createRuntimeEventController({
   activityCompletionNotifier,
   getSessionById,
   setActiveSession: (sessionId) => store.setActiveSession(sessionId),
-  isSessionUnrestored,
-  getUnrestoredSessionMessage,
-  isSessionExited,
-  getExitedSessionMessage,
+  isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
+  getUnrestoredSessionMessage: sessionUiFacadeController.getUnrestoredSessionMessage,
+  isSessionExited: sessionUiFacadeController.isSessionExited,
+  getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
   setError,
   sendInput: (sessionId, data) => api.sendInput(sessionId, data)
 });
 
 sessionCardMetaController = createSessionCardMetaController({
-  normalizeSessionTags,
+  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
   onTick: () => render(),
   windowRef: window
 });
@@ -1019,14 +864,14 @@ sessionDisposalController = createSessionDisposalController({
 
 sessionCardFactoryController = createSessionCardFactoryController({
   ensureQuickId,
-  getSessionStateBadgeText,
-  getSessionStateHintText,
-  isSessionUnrestored,
-  isSessionExited,
-  renderSessionTagList,
-  renderSessionPluginBadges,
-  renderSessionStatus,
-  renderSessionArtifacts,
+  getSessionStateBadgeText: sessionUiFacadeController.getSessionStateBadgeText,
+  getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
+  isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
+  isSessionExited: sessionUiFacadeController.isSessionExited,
+  renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
+  renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
+  renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
+  renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   setSessionCardVisibility
 });
 
@@ -1041,11 +886,11 @@ sessionSettingsStateController = createSessionSettingsStateController({
   getSessionById,
   getSessionSendTerminator,
   normalizeSendTerminatorMode,
-  formatSessionEnv,
-  formatSessionTags,
-  parseSessionEnv,
-  parseSessionTags,
-  normalizeSessionStartupFromSession,
+  formatSessionEnv: sessionUiFacadeController.formatSessionEnv,
+  formatSessionTags: sessionUiFacadeController.formatSessionTags,
+  parseSessionEnv: sessionUiFacadeController.parseSessionEnv,
+  parseSessionTags: sessionUiFacadeController.parseSessionTags,
+  normalizeSessionStartupFromSession: sessionUiFacadeController.normalizeSessionStartupFromSession,
   terminals,
   documentRef: document
 });
@@ -1054,34 +899,34 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   windowRef: window,
   themeModeSet: TERMINAL_THEME_MODE_SET,
   themeProfileKeys: THEME_PROFILE_KEYS,
-  getThemePresetById,
-  normalizeThemeProfile,
-  normalizeThemeFilterCategory,
-  readThemeProfileFromControls,
-  readSessionStartupFromControls,
-  isValidHexColor,
-  detectThemePreset,
-  isSessionSettingsDirty,
-  isSessionExited,
-  getBlockedSessionActionMessage
+  getThemePresetById: sessionUiFacadeController.getThemePresetById,
+  normalizeThemeProfile: sessionUiFacadeController.normalizeThemeProfile,
+  normalizeThemeFilterCategory: sessionUiFacadeController.normalizeThemeFilterCategory,
+  readThemeProfileFromControls: sessionUiFacadeController.readThemeProfileFromControls,
+  readSessionStartupFromControls: sessionUiFacadeController.readSessionStartupFromControls,
+  isValidHexColor: sessionUiFacadeController.isValidHexColor,
+  detectThemePreset: sessionUiFacadeController.detectThemePreset,
+  isSessionSettingsDirty: sessionUiFacadeController.isSessionSettingsDirty,
+  isSessionExited: sessionUiFacadeController.isSessionExited,
+  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage
 });
 
 sessionCardRenderController = createSessionCardRenderController({
-  isSessionUnrestored,
-  isSessionExited,
-  getSessionStateBadgeText,
-  getSessionStateHintText,
+  isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
+  isSessionExited: sessionUiFacadeController.isSessionExited,
+  getSessionStateBadgeText: sessionUiFacadeController.getSessionStateBadgeText,
+  getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
   isTerminalAtBottom,
   setSessionCardVisibility,
   syncTerminalViewportAfterShow,
   ensureQuickId,
-  renderSessionTagList,
-  renderSessionPluginBadges,
-  renderSessionStatus,
-  renderSessionArtifacts,
-  syncSessionStartupControls,
-  syncSessionThemeControls,
-  setSettingsDirty
+  renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
+  renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
+  renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
+  renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
+  syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
+  syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
+  setSettingsDirty: sessionUiFacadeController.setSettingsDirty
 });
 
 sessionTerminalResizeController = createSessionTerminalResizeController({
@@ -1092,7 +937,7 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   getSessionById,
   resolveSessionDeckId,
   getSessionTerminalGeometry,
-  isSessionActionBlocked,
+  isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
   computeFixedMountHeightPx,
   computeFixedCardWidthPx,
   getTerminalCellHeightPx,
@@ -1168,7 +1013,7 @@ deckSidebarController = createDeckSidebarController({
   resolveSessionDeckId,
   ensureQuickId,
   formatSessionDisplayName,
-  getSessionActivityIndicatorState,
+  getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => setActiveDeck(deckId),
   onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session)
 });
@@ -1190,7 +1035,7 @@ sessionGridController = createSessionGridController({
   pruneQuickIds,
   renderDeckTabs,
   workspaceRenderController,
-  syncStatusTicker,
+  syncStatusTicker: sessionUiFacadeController.syncStatusTicker,
   syncActiveTerminalSearch,
   sessionDisposalController,
   closeSettingsDialog,
@@ -1202,11 +1047,12 @@ sessionGridController = createSessionGridController({
   sessionCardFactoryController,
   sessionCardInteractionsController,
   sessionTerminalRuntimeController,
-  resolveInitialTheme: (sessionId) => buildThemeFromConfig(getSessionThemeConfig(sessionId)),
+  resolveInitialTheme: (sessionId) =>
+    sessionUiFacadeController.buildThemeFromConfig(sessionUiFacadeController.getSessionThemeConfig(sessionId)),
   handleSessionTerminalInput,
-  syncSessionStartupControls,
-  syncSessionThemeControls,
-  setSettingsDirty,
+  syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
+  syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
+  setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
   applyResizeForSession,
   scheduleGlobalResize,
   scheduleDeferredResizePasses,
@@ -1221,10 +1067,10 @@ sessionGridController = createSessionGridController({
   setError,
   clearError: () => appRuntimeStateController?.clearError(),
   applyRuntimeEvent,
-  applyThemeForSession,
-  getSessionThemeConfig,
+  applyThemeForSession: sessionUiFacadeController.applyThemeForSession,
+  getSessionThemeConfig: sessionUiFacadeController.getSessionThemeConfig,
   setSessionSendTerminator,
-  setStartupSettingsFeedback,
+  setStartupSettingsFeedback: sessionUiFacadeController.setStartupSettingsFeedback,
   requestRender: () => render(),
   api,
   themeProfileKeys: THEME_PROFILE_KEYS,
@@ -1271,10 +1117,10 @@ commandExecutor = createCommandExecutor({
   resolveSessionDeckId,
   formatSessionToken,
   formatSessionDisplayName,
-  getSessionRuntimeState,
-  isSessionExited,
-  isSessionActionBlocked,
-  getBlockedSessionActionMessage,
+  getSessionRuntimeState: sessionUiFacadeController.getSessionRuntimeState,
+  isSessionExited: sessionUiFacadeController.isSessionExited,
+  isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
+  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
   listCustomCommandState,
   getCustomCommandState,
   removeCustomCommandState,
@@ -1287,8 +1133,8 @@ commandExecutor = createCommandExecutor({
   getSessionSendTerminator,
   sendInputWithConfiguredTerminator,
   normalizeCustomCommandPayloadForShell,
-  normalizeSessionTags,
-  normalizeThemeProfile,
+  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
+  normalizeThemeProfile: sessionUiFacadeController.normalizeThemeProfile,
   getTerminalSettings: () => terminalSettings
 });
 
@@ -1389,8 +1235,8 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   getActiveDeck,
   formatSessionToken,
   formatSessionDisplayName,
-  getBlockedSessionActionMessage,
-  isSessionActionBlocked,
+  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
+  isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
   getSessionSendTerminator,
   apiSendInput: api.sendInput.bind(api),
   sendInputWithConfiguredTerminator,
