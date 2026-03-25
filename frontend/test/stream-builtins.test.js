@@ -49,6 +49,16 @@ test("activity-status plugin upgrades split chunks to the richer timed status", 
   assert.equal(upgradedActions[1].value, "Working (1m 32s • esc to interrupt)");
 });
 
+test("activity-status plugin does not downgrade a richer timed status to a plain activity verb in later chunks", () => {
+  const plugin = getPlugin("activity-status");
+
+  const richerActions = plugin.onData({ id: "s1" }, "Working (1m 32s • esc to interrupt)\n");
+  const downgradedActions = plugin.onData({ id: "s1" }, "Working");
+
+  assert.equal(richerActions[1].value, "Working (1m 32s • esc to interrupt)");
+  assert.equal(downgradedActions, null);
+});
+
 test("activity-status plugin prefers richer timed status over generic working lines", () => {
   const plugin = getPlugin("activity-status");
   const actions = plugin.onData(
@@ -133,16 +143,31 @@ test("activity-status plugin supports completed-files count-only status and pref
   assert.equal(mixedPriorityActions[1].value, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s");
 });
 
+test("activity-status plugin does not downgrade richer completed-files progress during the same activity", () => {
+  const plugin = getPlugin("activity-status");
+
+  const richerActions = plugin.onData({ id: "s7" }, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s\n");
+  const downgradedActions = plugin.onData({ id: "s7" }, "Completed files 0/1\n");
+
+  assert.equal(richerActions[1].value, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s");
+  assert.equal(downgradedActions, null);
+});
+
 test("prompt-idle-recovery plugin clears working state on prompt or idle", () => {
-  const plugin = getPlugin("prompt-idle-recovery");
+  const plugins = createBuiltInStreamPlugins();
+  const activityPlugin = plugins.find((plugin) => plugin.id === "activity-status");
+  const plugin = plugins.find((entry) => entry.id === "prompt-idle-recovery");
   const session = {
+    id: "s8",
     interpretationState: "working",
     statusText: "Working on plan",
     pluginBadges: [{ id: "working", text: "Working" }]
   };
 
+  activityPlugin.onData(session, "Working (1m 32s • esc to interrupt)\n");
   const promptActions = plugin.onLine(session, "user@host:~/repo$ ");
   const idleActions = plugin.onIdle(session);
+  const nextActivityActions = activityPlugin.onData(session, "Working");
 
   assert.deepEqual(
     promptActions.map((action) => action.type),
@@ -151,6 +176,7 @@ test("prompt-idle-recovery plugin clears working state on prompt or idle", () =>
   assert.deepEqual(promptActions, idleActions);
   assert.equal(promptActions[0].value, "idle");
   assert.deepEqual(promptActions[2].badges, []);
+  assert.equal(nextActivityActions[1].value, "Working");
 });
 
 test("attention-errors plugin raises attention state and notification on error-like output", () => {

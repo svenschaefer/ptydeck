@@ -1892,7 +1892,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await sleep(1200);
   assert.match(
     recoveredHiddenCard.querySelector(".session-status-text").textContent,
-    /^Working \(([0-9]+)s • esc to interrupt\)$/
+    /^Working \((?:[0-9]+s|[0-9]+m [0-9]{2}s|[0-9]+h [0-9]{2}m [0-9]{2}s) • esc to interrupt\)$/
   );
 
   ws.emit("message", {

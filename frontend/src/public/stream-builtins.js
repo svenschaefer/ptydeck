@@ -46,9 +46,62 @@ function getOrCreateActivityState(activityStateBySession, sessionId) {
   if (state) {
     return state;
   }
-  state = { currentLine: "" };
+  state = { currentLine: "", retainedCandidate: null };
   activityStateBySession.set(sessionId, state);
   return state;
+}
+
+function cloneProgress(progress) {
+  if (!progress || typeof progress !== "object") {
+    return null;
+  }
+  return {
+    filesDone: progress.filesDone,
+    filesTotal: progress.filesTotal,
+    bytesDone: progress.bytesDone,
+    bytesTotal: progress.bytesTotal,
+    speed: progress.speed,
+    statusText: progress.statusText,
+    priority: progress.priority
+  };
+}
+
+function cloneCandidate(candidate) {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+  return {
+    lineIndex: candidate.lineIndex,
+    priority: candidate.priority,
+    statusText: candidate.statusText,
+    progress: cloneProgress(candidate.progress)
+  };
+}
+
+function sameProgress(left, right) {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function shouldReplaceRetainedCandidate(current, next) {
+  if (!next) {
+    return false;
+  }
+  if (!current) {
+    return true;
+  }
+  if (next.priority !== current.priority) {
+    return next.priority > current.priority;
+  }
+  if (next.statusText !== current.statusText) {
+    return true;
+  }
+  return !sameProgress(next.progress, current.progress);
 }
 
 function collectDetectionLines(activityState, chunk) {
@@ -195,7 +248,27 @@ function detectActivityStatus(activityStateBySession, sessionId, chunk) {
   lines.forEach((line, lineIndex) => {
     bestCandidate = pickHigherPriorityCandidate(bestCandidate, detectActivityCandidateForLine(line, lineIndex));
   });
-  return bestCandidate;
+  const previousRetainedCandidate = cloneCandidate(activityState.retainedCandidate);
+  let emittedCandidate = null;
+  if (shouldReplaceRetainedCandidate(activityState.retainedCandidate, bestCandidate)) {
+    activityState.retainedCandidate = cloneCandidate(bestCandidate);
+    emittedCandidate = cloneCandidate(activityState.retainedCandidate);
+  }
+  return {
+    lines,
+    detectedCandidate: cloneCandidate(bestCandidate),
+    emittedCandidate,
+    retainedCandidate: cloneCandidate(activityState.retainedCandidate),
+    previousRetainedCandidate
+  };
+}
+
+function clearActivityState(activityStateBySession, sessionId) {
+  const normalizedSessionId = normalizeText(sessionId);
+  if (!normalizedSessionId) {
+    return;
+  }
+  activityStateBySession.delete(normalizedSessionId);
 }
 
 function isPromptLikeLine(line) {
@@ -286,8 +359,10 @@ function createAttentionActions(message) {
   ];
 }
 
-export function createBuiltInStreamPlugins() {
+export function createBuiltInStreamPlugins(options = {}) {
   const activityStateBySession = new Map();
+  const traceActivityDetection =
+    typeof options.traceActivityDetection === "function" ? options.traceActivityDetection : () => {};
 
   return [
     {
@@ -302,12 +377,21 @@ export function createBuiltInStreamPlugins() {
       },
       onData(session, chunk) {
         const sessionId = normalizeText(session?.id) || "__activity-status__";
-        const candidate = detectActivityStatus(activityStateBySession, sessionId, chunk);
+        const detection = detectActivityStatus(activityStateBySession, sessionId, chunk);
+        traceActivityDetection({
+          sessionId,
+          chunk: String(chunk || ""),
+          lines: detection.lines,
+          detectedCandidate: detection.detectedCandidate,
+          emittedCandidate: detection.emittedCandidate,
+          retainedCandidate: detection.retainedCandidate,
+          previousRetainedCandidate: detection.previousRetainedCandidate
+        });
         const actions = [];
-        if (candidate?.statusText) {
-          actions.push(...createWorkingActions(candidate.statusText));
+        if (detection.emittedCandidate?.statusText) {
+          actions.push(...createWorkingActions(detection.emittedCandidate.statusText));
         }
-        actions.push(...createProgressMetaActions(candidate?.progress || null));
+        actions.push(...createProgressMetaActions(detection.emittedCandidate?.progress || null));
         return actions.length > 0 ? actions : null;
       }
     },
@@ -318,6 +402,7 @@ export function createBuiltInStreamPlugins() {
         if (!isPromptLikeLine(line)) {
           return null;
         }
+        clearActivityState(activityStateBySession, session?.id);
         if (
           session.interpretationState === "working" ||
           session.statusText ||
@@ -328,6 +413,7 @@ export function createBuiltInStreamPlugins() {
         return null;
       },
       onIdle(session) {
+        clearActivityState(activityStateBySession, session?.id);
         if (
           session.interpretationState === "working" ||
           session.statusText ||

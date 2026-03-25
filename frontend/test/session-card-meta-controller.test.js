@@ -104,7 +104,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
 
   nowMs += 2_000;
   controller.renderSessionStatus(entry, session);
-  assert.equal(entry.sessionStatusEl.textContent, "Working (426s • esc to interrupt)");
+  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 06s • esc to interrupt)");
 
   controller.clearSessionStatusAnchor("s-1");
   nowMs += 2_000;

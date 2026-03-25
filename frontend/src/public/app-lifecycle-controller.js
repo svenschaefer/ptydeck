@@ -29,6 +29,8 @@ export function createAppLifecycleController(options = {}) {
   const scheduleGlobalResize = typeof options.scheduleGlobalResize === "function" ? options.scheduleGlobalResize : () => {};
   const disposeActivityCompletionNotifier =
     typeof options.disposeActivityCompletionNotifier === "function" ? options.disposeActivityCompletionNotifier : () => {};
+  const disposeStreamDebugTrace =
+    typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const closeWsClient = typeof options.closeWsClient === "function" ? options.closeWsClient : () => {};
   const disposeAuthBootstrapRuntime =
     typeof options.disposeAuthBootstrapRuntime === "function" ? options.disposeAuthBootstrapRuntime : () => {};
@@ -96,6 +98,7 @@ export function createAppLifecycleController(options = {}) {
   function handleBeforeUnload() {
     disposeAppRuntimeState();
     disposeActivityCompletionNotifier();
+    disposeStreamDebugTrace();
     closeWsClient();
     disposeAuthBootstrapRuntime();
     disposeSessionTerminalResize();

@@ -12,6 +12,7 @@ import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
+import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
 import { createBuiltInStreamPlugins } from "./stream-builtins.js";
 import { createArtifactStreamPlugins } from "./stream-artifact-plugins.js";
@@ -74,6 +75,11 @@ const api = createApiClient(config.apiBaseUrl, {
 const clipboardRuntimeController = createClipboardRuntimeController({
   navigatorRef: window?.navigator || globalThis.navigator || null
 });
+const streamDebugTraceController = debugLogs
+  ? createStreamDebugTraceController({
+      windowRef: window
+    })
+  : { record() {}, dispose() {} };
 const store = createStore();
 const streamActionDispatcher = createStreamActionDispatcher({
   store,
@@ -157,6 +163,10 @@ const streamPluginEngine = createStreamPluginEngine({
   },
   onActions(sessionId, actions, meta) {
     const appliedActions = streamActionDispatcher.dispatch(sessionId, actions, meta);
+    streamDebugTraceController.record(sessionId, "plugin.actions", {
+      hook: meta?.hook || null,
+      actionTypes: appliedActions.map((action) => action.type)
+    });
     debugLog("stream-plugin.actions", {
       sessionId,
       hook: meta?.hook || null,
@@ -164,6 +174,11 @@ const streamPluginEngine = createStreamPluginEngine({
     });
   },
   onPluginError(details) {
+    streamDebugTraceController.record(details?.sessionId || "unknown", "plugin.error", {
+      pluginId: details?.pluginId || null,
+      hook: details?.hook || null,
+      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
+    });
     debugLog("stream-plugin.error", {
       pluginId: details?.pluginId || null,
       hook: details?.hook || null,
@@ -175,18 +190,32 @@ const streamPluginEngine = createStreamPluginEngine({
 const streamAdapter = createSessionStreamAdapter({
   idleMs: SESSION_ACTIVITY_QUIET_MS,
   onData(sessionId, chunk) {
+    streamDebugTraceController.record(sessionId, "stream.data", {
+      chunk
+    });
     streamPluginEngine.handleData(sessionId, chunk);
     appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);
   },
   onLine(sessionId, line) {
+    streamDebugTraceController.record(sessionId, "stream.line", {
+      line
+    });
     streamPluginEngine.handleLine(sessionId, line);
   },
   onIdle(sessionId) {
+    streamDebugTraceController.record(sessionId, "stream.idle", {});
     streamPluginEngine.handleIdle(sessionId);
     store.clearSessionActivity(sessionId);
   }
 });
-streamPluginEngine.replacePlugins([...createBuiltInStreamPlugins(), ...createArtifactStreamPlugins()]);
+streamPluginEngine.replacePlugins([
+  ...createBuiltInStreamPlugins({
+    traceActivityDetection(details) {
+      streamDebugTraceController.record(details.sessionId, "activity.detection", details);
+    }
+  }),
+  ...createArtifactStreamPlugins()
+]);
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -785,6 +814,11 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   documentRef: document,
   wsStateRef,
   activityCompletionNotifier,
+  observeSessionData: (sessionId, data) =>
+    streamDebugTraceController.record(sessionId, "ws.session.data", {
+      chunk: data,
+      hasTerminal: terminals.has(sessionId)
+    }),
   createBtn,
   deckCreateBtn,
   deckRenameBtn,
@@ -804,6 +838,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   deckRuntimeController,
   readClipboardText: () => clipboardRuntimeController.readText(),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  disposeStreamDebugTrace: () => streamDebugTraceController.dispose(),
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS

@@ -76,6 +76,8 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
   const writeClipboardText =
     typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
+  const disposeStreamDebugTrace =
+    typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const createBtn = options.createBtn || null;
   const deckCreateBtn = options.deckCreateBtn || null;
   const deckRenameBtn = options.deckRenameBtn || null;
@@ -95,6 +97,8 @@ export function createAppBootstrapCompositionController(options = {}) {
   const deckRuntimeController = options.deckRuntimeController || null;
   const getCustomCommands =
     typeof options.getCustomCommands === "function" ? options.getCustomCommands : () => [];
+  const observeSessionData =
+    typeof options.observeSessionData === "function" ? options.observeSessionData : () => {};
 
   let commandEngine = null;
   let commandTargetRuntimeController = null;
@@ -196,6 +200,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       onRuntimeConnected: () => appRuntimeStateController?.markRuntimeConnected?.(),
       hasTerminal: (sessionId) => terminals.has(sessionId),
       pushSessionData: (sessionId, data) => streamAdapter?.push?.(sessionId, data),
+      observeSessionData,
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
       createWsTicket: () => api?.createWsTicket?.(),
@@ -286,6 +291,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       scheduleGlobalResize: (runtimeOptions) => appLayoutDeckFacadeController?.scheduleGlobalResize?.(runtimeOptions),
       disposeAppRuntimeState: () => appRuntimeStateController?.dispose?.(),
       disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose?.(),
+      disposeStreamDebugTrace,
       closeWsClient: () => wsStateRef.current?.close?.(),
       disposeAuthBootstrapRuntime: () => authBootstrapRuntimeController?.dispose?.(),
       disposeSessionTerminalResize: () => sessionTerminalResizeController?.dispose?.(),

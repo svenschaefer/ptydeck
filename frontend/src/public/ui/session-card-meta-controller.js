@@ -12,6 +12,20 @@ function normalizeDurationStatus(statusText) {
   };
 }
 
+function formatDurationSeconds(totalSeconds) {
+  const safeTotalSeconds = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
+  const hours = Math.floor(safeTotalSeconds / 3600);
+  const minutes = Math.floor((safeTotalSeconds % 3600) / 60);
+  const seconds = safeTotalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  if (safeTotalSeconds >= 60) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  return `${seconds}s`;
+}
+
 function getLatestCommandCorrelation(session) {
   const correlations = Array.isArray(session?.commandCorrelations) ? session.commandCorrelations : [];
   return correlations.length > 0 ? correlations[correlations.length - 1] : null;
@@ -135,7 +149,7 @@ export function createSessionCardMetaController(options = {}) {
       return rawStatus;
     }
     const elapsedSeconds = Math.max(0, Math.floor((nowMs - existing.baseAtMs) / 1000));
-    return `${existing.prefix}${existing.baseSeconds + elapsedSeconds}s${existing.suffix}`;
+    return `${existing.prefix}${formatDurationSeconds(existing.baseSeconds + elapsedSeconds)}${existing.suffix}`;
   }
 
   function hasLiveDurationStatus(session) {

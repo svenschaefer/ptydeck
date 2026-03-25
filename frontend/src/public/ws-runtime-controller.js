@@ -8,6 +8,7 @@ export function createWsRuntimeController(options = {}) {
   const onRuntimeConnected = options.onRuntimeConnected || (() => {});
   const hasTerminal = options.hasTerminal || (() => false);
   const pushSessionData = options.pushSessionData || (() => {});
+  const observeSessionData = options.observeSessionData || (() => {});
   const applyRuntimeEvent = options.applyRuntimeEvent || (() => false);
   const getWsAuthToken = options.getWsAuthToken || (() => "");
   const createWsTicket = options.createWsTicket || (() => Promise.resolve({ ticket: "" }));
@@ -24,9 +25,12 @@ export function createWsRuntimeController(options = {}) {
       },
       onMessage(event) {
         log("ws.event", { type: event.type, sessionId: event.sessionId || null });
-        if (event.type === "session.data" && hasTerminal(event.sessionId)) {
-          pushSessionData(event.sessionId, event.data);
-          return;
+        if (event.type === "session.data") {
+          observeSessionData(event.sessionId, event.data);
+          if (hasTerminal(event.sessionId)) {
+            pushSessionData(event.sessionId, event.data);
+            return;
+          }
         }
         applyRuntimeEvent(event);
       }

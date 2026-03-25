@@ -148,6 +148,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     },
     disposeAppRuntimeState: () => cleanup.push("app-runtime"),
     disposeActivityCompletionNotifier: () => cleanup.push("activity"),
+    disposeStreamDebugTrace: () => cleanup.push("stream-debug"),
     closeWsClient: () => cleanup.push("ws"),
     disposeAuthBootstrapRuntime: () => cleanup.push("auth"),
     disposeSessionTerminalResize: () => cleanup.push("resize"),
@@ -181,6 +182,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   assert.deepEqual(cleanup, [
     "app-runtime",
     "activity",
+    "stream-debug",
     "ws",
     "auth",
     "resize",
