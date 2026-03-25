@@ -56,10 +56,22 @@ test("session-runtime controller appends chunks and retries replay for late term
 
   terminals.set("s1", { terminal, isVisible: true, searchRevision: 0 });
   assert.equal(controller.appendTerminalChunk("s1", "hello"), true);
-  assert.deepEqual(terminal.writes, ["hello"]);
-  assert.deepEqual(callbacks, ["scroll", "refresh", "scroll"]);
+  assert.equal(controller.appendTerminalChunk("s1", "\u001b[2J\u001b[H"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "\r\n\t "), true);
+  assert.deepEqual(terminal.writes, ["hello", "\u001b[2J\u001b[H", "\r\n\t "]);
+  assert.deepEqual(callbacks, [
+    "scroll",
+    "refresh",
+    "scroll",
+    "scroll",
+    "refresh",
+    "scroll",
+    "scroll",
+    "refresh",
+    "scroll"
+  ]);
   assert.deepEqual(marks, ["s1"]);
-  assert.deepEqual(searchCalls, [{ preserveSelection: true }]);
+  assert.deepEqual(searchCalls, [{ preserveSelection: true }, { preserveSelection: true }, { preserveSelection: true }]);
 
   const hiddenTerminal = createTerminal();
   terminals.set("s2", { terminal: hiddenTerminal, isVisible: false, pendingViewportSync: false, searchRevision: 0 });

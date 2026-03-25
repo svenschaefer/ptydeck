@@ -12,10 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H5`.
-- Active scoped tasks: `QLT-125`.
-- Queued next wave: `v0.4.0-H6` (`QLT-126`, `QLT-127`).
-- Latest completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
+- Active release wave: `v0.4.0-H6`.
+- Active scoped tasks: `QLT-126`, `QLT-127`.
+- Latest completed wave: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
+- Previous completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
 - Previous completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
@@ -779,11 +779,11 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
+- `QLT-125`
 
 Remaining in this milestone:
 
-- `QLT-125`
+- none
 
 Dependencies:
 

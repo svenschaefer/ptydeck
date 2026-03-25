@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `QLT-125` is now completed: semantically empty or no-op frontend stream updates no longer re-mark inactive sessions as active merely because the terminal runtime received ANSI-only redraw/control chunks or whitespace/control-only transport noise.
+- [x] Activity bumps for live terminal chunks are now gated through `frontend/src/public/terminal-stream.js` via `hasMeaningfulStreamActivity()`, and `frontend/src/public/session-runtime-controller.js` only marks session activity when the incoming chunk still contains meaningful visible content after ANSI/control/whitespace stripping.
+- [x] Regression coverage for `QLT-125` was added in `frontend/test/terminal-stream.test.js` and `frontend/test/session-runtime-controller.test.js`, explicitly distinguishing meaningful chunks from ANSI-only and control-only redraw noise.
+- [x] Validation for `QLT-125` passed with targeted regressions (`node --test frontend/test/terminal-stream.test.js frontend/test/session-runtime-controller.test.js`), `npm run lint`, `npm --prefix frontend run test`, `npm --prefix backend run test`, and `npm run test:coverage:check`; one initial backend WS activity test flaked under the first parallel full-gate attempt, so the backend suite was rerun serially and completed green per repo execution-hygiene rules.
+- [x] Coverage after the `QLT-125` closeout step: backend `91.60%` lines, frontend `95.68%` lines overall.
+- [x] `v0.4.0-H5` is now fully completed: `QLT-125` is closed and the active roadmap wave moves forward to `v0.4.0-H6`.
 - [x] Planning sync completed: promoted `QLT-126` and `QLT-127` into `TODO.md` for backend startup warmup-state reporting and frontend bootstrap deferral with explicit skip behavior.
 - [x] Roadmap sync completed: queued `v0.4.0-H6` after `v0.4.0-H5` with explicit dependency ordering between `QLT-125`, `QLT-126`, and `QLT-127`.
 - [x] Context sync completed: `CODEX_CONTEXT.md` now reflects the queued startup warmup gate follow-up and no longer claims that `TODO.md` has no open implementation tasks.

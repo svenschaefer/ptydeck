@@ -98,6 +98,13 @@ function stripAnsiCodes(value) {
   return String(value || "").replace(ANSI_ESCAPE_PATTERN, "");
 }
 
+export function hasMeaningfulStreamActivity(chunk) {
+  const normalized = stripAnsiCodes(String(chunk || ""))
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, "");
+  return normalized.length > 0;
+}
+
 function getSessionStreamState(sessionStates, sessionId) {
   let state = sessionStates.get(sessionId);
   if (state) {

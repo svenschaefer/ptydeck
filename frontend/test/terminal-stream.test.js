@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   createSessionStreamAdapter,
+  hasMeaningfulStreamActivity,
   normalizeCustomCommandPayloadForShell,
   sendInputWithConfiguredTerminator,
   withSingleTrailingNewline
@@ -40,6 +41,15 @@ test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mod
 test("normalizeCustomCommandPayloadForShell escapes only unmatched single quotes", () => {
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'unterminated"), "echo \\'unterminated");
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'ok'"), "echo 'ok'");
+});
+
+test("hasMeaningfulStreamActivity ignores ANSI-only and control-only redraw chunks", () => {
+  assert.equal(hasMeaningfulStreamActivity(""), false);
+  assert.equal(hasMeaningfulStreamActivity("\u001b[2J\u001b[H"), false);
+  assert.equal(hasMeaningfulStreamActivity("\r\n\t "), false);
+  assert.equal(hasMeaningfulStreamActivity("\u001b]0;title\u0007"), false);
+  assert.equal(hasMeaningfulStreamActivity("Working (1m 32s • esc to interrupt)"), true);
+  assert.equal(hasMeaningfulStreamActivity("Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s"), true);
 });
 
 test("createSessionStreamAdapter reconstructs lines across chunk boundaries", async () => {

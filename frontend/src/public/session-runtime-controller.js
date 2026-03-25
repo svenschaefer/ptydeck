@@ -1,3 +1,5 @@
+import { hasMeaningfulStreamActivity } from "./terminal-stream.js";
+
 export function createSessionRuntimeController(options = {}) {
   const store = options.store || null;
   const terminals = options.terminals || new Map();
@@ -81,7 +83,7 @@ export function createSessionRuntimeController(options = {}) {
         syncActiveTerminalSearch({ preserveSelection: true });
       }
     });
-    if (options.markActivity !== false) {
+    if (options.markActivity !== false && hasMeaningfulStreamActivity(data)) {
       markSessionActivity(sessionId);
     }
     return true;
