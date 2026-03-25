@@ -246,3 +246,77 @@ test("store applies interpretation actions into session-scoped status, meta, tag
   assert.equal(session.attentionActive, false);
   assert.deepEqual(session.artifacts, []);
 });
+
+test("store correlates submitted commands with output, interpretation, artifacts, notifications, and completion", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running" }]);
+
+  const submission = store.recordSessionCommandSubmission("s1", {
+    source: "custom-command",
+    commandName: "go",
+    label: "/go",
+    text: "echo hi\npwd\n"
+  });
+  assert.equal(submission?.label, "/go");
+  const activityAt = (submission?.submittedAt || Date.now()) + 100;
+  const completedAt = activityAt + 20;
+
+  store.applySessionInterpretationActions("s1", [
+    { type: "setSessionState", value: "working" },
+    { type: "setSessionStatus", value: "Working (0s • esc to interrupt)" },
+    {
+      type: "mergeSessionMeta",
+      patch: {
+        progress: {
+          filesDone: 1,
+          filesTotal: 4,
+          bytesDone: "12MiB",
+          bytesTotal: "48MiB",
+          speed: "2MiB/s"
+        }
+      }
+    },
+    {
+      type: "upsertSessionArtifact",
+      artifact: { id: "summary", kind: "summary", title: "Summary", text: "done" }
+    },
+    {
+      type: "pushSessionNotification",
+      notification: { id: "note-1", level: "info", message: "Command advanced." }
+    }
+  ]);
+  store.markSessionActivity("s1", { timestamp: activityAt });
+  store.clearSessionActivity("s1", { timestamp: completedAt });
+
+  const session = store.getState().sessions.find((entry) => entry.id === "s1");
+  assert.equal(session.commandCorrelations.length, 1);
+  assert.deepEqual(session.commandCorrelations[0], {
+    id: "cmd-1",
+    source: "custom-command",
+    label: "/go",
+    text: "echo hi\npwd",
+    commandName: "go",
+    submittedAt: session.commandCorrelations[0].submittedAt,
+    matchedAt: session.commandCorrelations[0].matchedAt,
+    firstOutputAt: session.commandCorrelations[0].firstOutputAt,
+    statusText: "Working (0s • esc to interrupt)",
+    interpretationState: "working",
+    progress: {
+      filesDone: 1,
+      filesTotal: 4,
+      bytesDone: "12MiB",
+      bytesTotal: "48MiB",
+      speed: "2MiB/s"
+    },
+    artifacts: [{ id: "summary", kind: "summary", title: "Summary" }],
+    notificationCount: 1,
+    lastNotificationMessage: "Command advanced.",
+    completedAt
+  });
+  assert.equal(typeof session.commandCorrelations[0].submittedAt, "number");
+  assert.equal(typeof session.commandCorrelations[0].matchedAt, "number");
+  assert.equal(typeof session.commandCorrelations[0].firstOutputAt, "number");
+  assert.ok(session.commandCorrelations[0].matchedAt >= session.commandCorrelations[0].submittedAt);
+  assert.ok(session.commandCorrelations[0].firstOutputAt >= session.commandCorrelations[0].matchedAt);
+  assert.ok(session.commandCorrelations[0].completedAt >= session.commandCorrelations[0].firstOutputAt);
+});

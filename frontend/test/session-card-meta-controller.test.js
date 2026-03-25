@@ -70,11 +70,11 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
 
   const entry = {
     sessionMetaRowEl: { hidden: true },
-    tagListEl: { textContent: "", classList: createClassList() },
-    pluginBadgesEl: { textContent: "", classList: createClassList() },
-    sessionStatusEl: { textContent: "", hidden: true },
+    tagListEl: { textContent: "", title: "", classList: createClassList() },
+    pluginBadgesEl: { textContent: "", title: "", classList: createClassList() },
+    sessionStatusEl: { textContent: "", title: "", hidden: true },
     sessionArtifactsOverlayEl: { hidden: true },
-    sessionArtifactsEl: { textContent: "", hidden: true }
+    sessionArtifactsEl: { textContent: "", title: "", hidden: true }
   };
   const session = {
     id: "s-1",
@@ -82,7 +82,8 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
     pluginBadges: [{ text: "Working" }, { text: "GPU" }],
     interpretationState: "working",
     statusText: "Working (7m 04s • esc to interrupt)",
-    artifacts: [{ title: "Summary", text: "Done" }]
+    artifacts: [{ title: "Summary", text: "Done" }],
+    commandCorrelations: [{ label: "/go" }]
   };
 
   controller.renderSessionTagList(entry, session);
@@ -93,9 +94,11 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   assert.equal(entry.tagListEl.textContent, "#alpha #beta");
   assert.equal(entry.pluginBadgesEl.textContent, "Working · GPU");
   assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
+  assert.equal(entry.sessionStatusEl.title, "Working (7m 04s • esc to interrupt)\nCommand: /go");
   assert.equal(entry.sessionStatusEl.hidden, false);
   assert.equal(entry.sessionMetaRowEl.hidden, false);
   assert.equal(entry.sessionArtifactsEl.textContent, "Summary: Done");
+  assert.equal(entry.sessionArtifactsEl.title, "Summary: Done\nCommand: /go");
   assert.equal(entry.sessionArtifactsEl.hidden, false);
   assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
 

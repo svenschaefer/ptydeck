@@ -35,6 +35,7 @@ export function createCommandComposerRuntimeController(options = {}) {
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "CR");
   const apiSendInput = options.apiSendInput || (() => Promise.resolve());
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator || (() => Promise.resolve());
+  const recordCommandSubmission = options.recordCommandSubmission || (() => null);
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode || ((mode) => mode);
   const delayedSubmitMs = Number(options.delayedSubmitMs) || 0;
   const setError = options.setError || (() => {});
@@ -158,6 +159,13 @@ export function createCommandComposerRuntimeController(options = {}) {
             });
           })
         );
+        for (const session of targetSessions) {
+          recordCommandSubmission(session.id, {
+            source: "input",
+            text: targetPayload,
+            submittedAt: Date.now()
+          });
+        }
       } else {
         const terminatorMode = getSessionSendTerminator(targetSessionId);
         debugLog("command.send.start", {
@@ -168,6 +176,11 @@ export function createCommandComposerRuntimeController(options = {}) {
         await sendInputWithConfiguredTerminator(apiSendInput, targetSessionId, targetPayload, terminatorMode, {
           normalizeMode: normalizeSendTerminatorMode,
           delayedSubmitMs
+        });
+        recordCommandSubmission(targetSessionId, {
+          source: "input",
+          text: targetPayload,
+          submittedAt: Date.now()
         });
       }
 

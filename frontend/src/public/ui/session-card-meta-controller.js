@@ -12,6 +12,21 @@ function normalizeDurationStatus(statusText) {
   };
 }
 
+function getLatestCommandCorrelation(session) {
+  const correlations = Array.isArray(session?.commandCorrelations) ? session.commandCorrelations : [];
+  return correlations.length > 0 ? correlations[correlations.length - 1] : null;
+}
+
+function buildCommandCorrelationTitle(baseTitle, session) {
+  const normalizedBaseTitle = String(baseTitle || "").trim();
+  const correlation = getLatestCommandCorrelation(session);
+  const label = String(correlation?.label || "").trim();
+  if (!label) {
+    return normalizedBaseTitle;
+  }
+  return normalizedBaseTitle ? `${normalizedBaseTitle}\nCommand: ${label}` : `Command: ${label}`;
+}
+
 export function createSessionCardMetaController(options = {}) {
   const normalizeSessionTags =
     typeof options.normalizeSessionTags === "function" ? options.normalizeSessionTags : (tags) => (Array.isArray(tags) ? tags : []);
@@ -156,7 +171,7 @@ export function createSessionCardMetaController(options = {}) {
     const statusText = formatLiveSessionStatus(session);
     entry.sessionStatusEl.hidden = !statusText;
     entry.sessionStatusEl.textContent = statusText;
-    entry.sessionStatusEl.title = statusText;
+    entry.sessionStatusEl.title = buildCommandCorrelationTitle(statusText, session);
     syncMetaRowVisibility(entry);
   }
 
@@ -173,6 +188,7 @@ export function createSessionCardMetaController(options = {}) {
       entry.dismissedArtifactKey = "";
       entry.sessionArtifactsEl.hidden = true;
       entry.sessionArtifactsEl.textContent = "";
+      entry.sessionArtifactsEl.title = "";
       if (entry.sessionArtifactsOverlayEl) {
         entry.sessionArtifactsOverlayEl.hidden = true;
       }
@@ -188,6 +204,7 @@ export function createSessionCardMetaController(options = {}) {
     const hidden = entry.dismissedArtifactKey === nextKey;
     entry.sessionArtifactsEl.hidden = hidden;
     entry.sessionArtifactsEl.textContent = artifactText;
+    entry.sessionArtifactsEl.title = buildCommandCorrelationTitle(artifactText, session);
     if (entry.sessionArtifactsOverlayEl) {
       entry.sessionArtifactsOverlayEl.hidden = hidden;
     }

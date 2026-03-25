@@ -34,6 +34,8 @@ export function createCommandExecutor(options = {}) {
   const setSessionSendTerminator = options.setSessionSendTerminator;
   const getSessionSendTerminator = options.getSessionSendTerminator;
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator;
+  const recordCommandSubmission =
+    typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
   const normalizeCustomCommandPayloadForShell = options.normalizeCustomCommandPayloadForShell;
   const normalizeSessionTags = options.normalizeSessionTags;
   const normalizeThemeProfile = options.normalizeThemeProfile;
@@ -675,6 +677,16 @@ export function createCommandExecutor(options = {}) {
           );
         })
       );
+      const normalizedPayload = normalizeCustomCommandPayloadForShell(custom.content);
+      for (const session of targetSessions) {
+        recordCommandSubmission(session.id, {
+          source: "custom-command",
+          commandName: custom.name,
+          label: `/${custom.name}`,
+          text: normalizedPayload,
+          submittedAt: Date.now()
+        });
+      }
       if (targetSessions.length === 1) {
         return `Executed /${custom.name} on [${formatSessionToken(targetSessions[0].id)}].`;
       }

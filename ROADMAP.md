@@ -12,11 +12,12 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H4` (Declarative Command Contract).
-- Active scoped tasks (`H4`): `DRV-004`.
-- Latest completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
-- Previous completed wave: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
-- Previous completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
+- Previous completed wave: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
+- Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
+- Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Dependency Rules
 
@@ -601,14 +602,14 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H3` (Terminal Interaction Ergonomics)
-- Next milestone in progress: `v0.4.0-H4` (Declarative Command Contract)
+- Latest completed milestone: `v0.4.0-H4` (Declarative Command Contract)
+- Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `DRV-004` Owner: `FE`
+- none currently
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -750,10 +751,11 @@ Completed in this milestone so far:
 - `DRV-003A`
 - `DRV-003B`
 - `DRV-003C`
+- `DRV-004`
 
 Remaining in this milestone:
 
-- `DRV-004`
+- none
 
 Dependencies:
 
@@ -768,6 +770,7 @@ Exit criteria:
 - Command completion and command-engine parsing consume the shared schema contract for names, labels, subcommands, and argument-provider metadata.
 - Help and validation-facing command surfaces derive from the same declarative contract and are protected by regression coverage.
 - The follow-up command-to-output correlation task can build on stable command identities and metadata instead of duplicated ad-hoc command definitions.
+- Command submissions now persist explicit per-session correlation records that are enriched by downstream output/activity/stream-interpretation actions for traceable operator context without re-coupling UI modules to stream internals.
 
 ### Completed Items
 

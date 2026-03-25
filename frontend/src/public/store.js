@@ -3,6 +3,9 @@ const DEFAULT_DECK_ID = "default";
 const SESSION_NOTIFICATION_LIMIT = 20;
 const SESSION_ARTIFACT_LIMIT = 20;
 const SESSION_BADGE_LIMIT = 8;
+const SESSION_COMMAND_CORRELATION_LIMIT = 8;
+const COMMAND_CORRELATION_ARTIFACT_LIMIT = 3;
+const COMMAND_CORRELATION_MATCH_WINDOW_MS = 30_000;
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -77,6 +80,17 @@ function cloneRecord(record) {
   return record && typeof record === "object" ? { ...record } : record;
 }
 
+function cloneCommandCorrelationRecord(record) {
+  if (!record || typeof record !== "object") {
+    return record;
+  }
+  return {
+    ...record,
+    progress: record.progress && typeof record.progress === "object" ? { ...record.progress } : record.progress,
+    artifacts: Array.isArray(record.artifacts) ? record.artifacts.map((artifact) => ({ ...artifact })) : []
+  };
+}
+
 function cloneSessionRecord(session) {
   if (!session || typeof session !== "object") {
     return session;
@@ -99,6 +113,9 @@ function cloneSessionRecord(session) {
           ...notification,
           data: notification?.data && typeof notification.data === "object" ? { ...notification.data } : notification?.data
         }))
+      : [],
+    commandCorrelations: Array.isArray(session.commandCorrelations)
+      ? session.commandCorrelations.map((record) => cloneCommandCorrelationRecord(record))
       : [],
     activityState: normalizeSessionActivityState(session.activityState),
     activityUpdatedAt: normalizeActivityTimestamp(session.activityUpdatedAt),
@@ -142,6 +159,107 @@ function normalizePluginSessionState(value) {
 
 function normalizeSessionStatusText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeCommandCorrelationText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.replace(/\r\n?/g, "\n").replace(/\n+$/g, "");
+}
+
+function summarizeCommandText(value, maxLength = 120) {
+  const normalized = normalizeCommandCorrelationText(value);
+  if (!normalized) {
+    return "";
+  }
+  const firstNonEmptyLine =
+    normalized
+      .split("\n")
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .find(Boolean) || "";
+  if (!firstNonEmptyLine) {
+    return "";
+  }
+  return firstNonEmptyLine.length > maxLength ? `${firstNonEmptyLine.slice(0, maxLength - 1)}…` : firstNonEmptyLine;
+}
+
+function normalizeCommandCorrelationSource(value) {
+  return normalizeText(value).toLowerCase() === "custom-command" ? "custom-command" : "input";
+}
+
+function normalizeCommandName(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function normalizeCommandCorrelationProgress(progress) {
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) {
+    return null;
+  }
+  const filesDone = Number.isInteger(progress.filesDone) ? progress.filesDone : Number.parseInt(progress.filesDone, 10);
+  const filesTotal = Number.isInteger(progress.filesTotal) ? progress.filesTotal : Number.parseInt(progress.filesTotal, 10);
+  const bytesDone = normalizeText(progress.bytesDone);
+  const bytesTotal = normalizeText(progress.bytesTotal);
+  const speed = normalizeText(progress.speed);
+  if (!Number.isFinite(filesDone) && !Number.isFinite(filesTotal) && !bytesDone && !bytesTotal && !speed) {
+    return null;
+  }
+  return {
+    filesDone: Number.isFinite(filesDone) ? filesDone : null,
+    filesTotal: Number.isFinite(filesTotal) ? filesTotal : null,
+    bytesDone,
+    bytesTotal,
+    speed
+  };
+}
+
+function normalizeCommandCorrelationArtifact(artifact) {
+  const normalized = normalizeArtifactRecord(artifact);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    id: normalized.id,
+    kind: normalized.kind,
+    title: normalized.title || normalized.kind
+  };
+}
+
+function normalizeCommandCorrelationRecord(record, options = {}) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return null;
+  }
+  const id = normalizeText(record.id) || normalizeText(options.fallbackId);
+  if (!id) {
+    return null;
+  }
+  const text = normalizeCommandCorrelationText(record.text);
+  const label = normalizeSessionStatusText(record.label) || summarizeCommandText(text);
+  if (!label && !text) {
+    return null;
+  }
+  const artifacts = Array.isArray(record.artifacts)
+    ? record.artifacts.map((artifact) => normalizeCommandCorrelationArtifact(artifact)).filter(Boolean).slice(-COMMAND_CORRELATION_ARTIFACT_LIMIT)
+    : [];
+  const notificationCount =
+    Number.isInteger(record.notificationCount) && record.notificationCount > 0 ? record.notificationCount : 0;
+  return {
+    id,
+    source: normalizeCommandCorrelationSource(record.source),
+    label,
+    text,
+    commandName: normalizeCommandName(record.commandName),
+    submittedAt: normalizeActivityTimestamp(record.submittedAt) ?? Date.now(),
+    matchedAt: normalizeActivityTimestamp(record.matchedAt),
+    firstOutputAt: normalizeActivityTimestamp(record.firstOutputAt),
+    statusText: normalizeSessionStatusText(record.statusText),
+    interpretationState: normalizePluginSessionState(record.interpretationState),
+    progress: normalizeCommandCorrelationProgress(record.progress),
+    artifacts,
+    notificationCount,
+    lastNotificationMessage: normalizeSessionStatusText(record.lastNotificationMessage),
+    completedAt: normalizeActivityTimestamp(record.completedAt)
+  };
 }
 
 function normalizeSessionMeta(record) {
@@ -291,6 +409,12 @@ function withSessionActivityDefaults(session) {
     notifications: Array.isArray(session.notifications)
       ? session.notifications.map((notification) => normalizeNotificationRecord(notification)).filter(Boolean).slice(-SESSION_NOTIFICATION_LIMIT)
       : [],
+    commandCorrelations: Array.isArray(session.commandCorrelations)
+      ? session.commandCorrelations
+          .map((record) => normalizeCommandCorrelationRecord(record))
+          .filter(Boolean)
+          .slice(-SESSION_COMMAND_CORRELATION_LIMIT)
+      : [],
     meta: normalizeSessionMeta(session.meta),
     tags: normalizeSessionTags(session.tags)
   };
@@ -334,6 +458,150 @@ function applySessionMetaPatch(currentMeta, patch) {
     nextMeta[key] = value;
   }
   return nextMeta;
+}
+
+function updateLatestCommandCorrelation(session, updater) {
+  const correlations = Array.isArray(session?.commandCorrelations) ? session.commandCorrelations : [];
+  if (correlations.length === 0 || typeof updater !== "function") {
+    return session;
+  }
+  const nextCorrelations = correlations.slice();
+  const lastIndex = nextCorrelations.length - 1;
+  const currentRecord = nextCorrelations[lastIndex];
+  const nextRecord = updater(currentRecord);
+  if (!nextRecord || nextRecord === currentRecord) {
+    return session;
+  }
+  const normalizedRecord = normalizeCommandCorrelationRecord(nextRecord, { fallbackId: currentRecord?.id });
+  if (!normalizedRecord) {
+    return session;
+  }
+  nextCorrelations[lastIndex] = normalizedRecord;
+  return { ...session, commandCorrelations: nextCorrelations };
+}
+
+function appendCommandCorrelation(session, submission) {
+  const normalizedSubmission = normalizeCommandCorrelationRecord(submission);
+  if (!normalizedSubmission) {
+    return session;
+  }
+  const correlations = Array.isArray(session?.commandCorrelations) ? session.commandCorrelations.slice() : [];
+  correlations.push(normalizedSubmission);
+  return {
+    ...session,
+    commandCorrelations: correlations.slice(-SESSION_COMMAND_CORRELATION_LIMIT)
+  };
+}
+
+function maybeMatchCommandCorrelation(record, timestamp) {
+  if (!record || normalizeActivityTimestamp(record.matchedAt) !== null) {
+    return record;
+  }
+  const submittedAt = normalizeActivityTimestamp(record.submittedAt);
+  const nextTimestamp = normalizeActivityTimestamp(timestamp) ?? Date.now();
+  if (submittedAt === null || nextTimestamp < submittedAt || nextTimestamp - submittedAt > COMMAND_CORRELATION_MATCH_WINDOW_MS) {
+    return record;
+  }
+  return {
+    ...record,
+    matchedAt: nextTimestamp,
+    firstOutputAt: normalizeActivityTimestamp(record.firstOutputAt) ?? nextTimestamp
+  };
+}
+
+function normalizeCorrelationArtifacts(artifacts) {
+  return Array.isArray(artifacts)
+    ? artifacts.map((artifact) => normalizeCommandCorrelationArtifact(artifact)).filter(Boolean).slice(-COMMAND_CORRELATION_ARTIFACT_LIMIT)
+    : [];
+}
+
+function upsertCorrelationArtifact(artifacts, artifact) {
+  const normalized = normalizeCommandCorrelationArtifact(artifact);
+  if (!normalized) {
+    return artifacts;
+  }
+  const nextArtifacts = Array.isArray(artifacts) ? artifacts.slice() : [];
+  const index = nextArtifacts.findIndex((entry) => entry.id === normalized.id);
+  if (index >= 0) {
+    nextArtifacts[index] = normalized;
+  } else {
+    nextArtifacts.push(normalized);
+  }
+  return nextArtifacts.slice(-COMMAND_CORRELATION_ARTIFACT_LIMIT);
+}
+
+function removeCorrelationArtifact(artifacts, artifactId) {
+  const normalizedArtifactId = normalizeText(artifactId).toLowerCase();
+  if (!normalizedArtifactId) {
+    return Array.isArray(artifacts) ? artifacts : [];
+  }
+  return Array.isArray(artifacts) ? artifacts.filter((artifact) => artifact.id !== normalizedArtifactId) : [];
+}
+
+function applyCommandCorrelationInterpretation(session, actions, timestamp = Date.now()) {
+  if (!session || !Array.isArray(actions) || actions.length === 0) {
+    return session;
+  }
+  return updateLatestCommandCorrelation(session, (record) => {
+    let nextRecord = maybeMatchCommandCorrelation(record, timestamp);
+    let changed = nextRecord !== record;
+    for (const action of actions) {
+      if (!action || typeof action !== "object") {
+        continue;
+      }
+      if (action.type === "upsertSessionArtifact") {
+        const nextArtifacts = upsertCorrelationArtifact(nextRecord.artifacts, action.artifact);
+        if (JSON.stringify(nextArtifacts) !== JSON.stringify(nextRecord.artifacts || [])) {
+          nextRecord = { ...nextRecord, artifacts: nextArtifacts };
+          changed = true;
+        }
+        continue;
+      }
+      if (action.type === "removeSessionArtifact") {
+        const nextArtifacts = removeCorrelationArtifact(nextRecord.artifacts, action.artifactId);
+        if (JSON.stringify(nextArtifacts) !== JSON.stringify(nextRecord.artifacts || [])) {
+          nextRecord = { ...nextRecord, artifacts: nextArtifacts };
+          changed = true;
+        }
+        continue;
+      }
+      if (action.type === "pushSessionNotification") {
+        const notification = normalizeNotificationRecord(action.notification);
+        if (!notification) {
+          continue;
+        }
+        nextRecord = {
+          ...nextRecord,
+          notificationCount: (Number.isInteger(nextRecord.notificationCount) ? nextRecord.notificationCount : 0) + 1,
+          lastNotificationMessage: notification.message
+        };
+        changed = true;
+      }
+    }
+
+    const nextInterpretationState = normalizePluginSessionState(session.interpretationState);
+    const nextStatusText = normalizeSessionStatusText(session.statusText);
+    const nextProgress = normalizeCommandCorrelationProgress(session.meta?.progress);
+    const nextArtifacts = normalizeCorrelationArtifacts(nextRecord.artifacts);
+
+    if (nextRecord.interpretationState !== nextInterpretationState) {
+      nextRecord = { ...nextRecord, interpretationState: nextInterpretationState };
+      changed = true;
+    }
+    if (nextRecord.statusText !== nextStatusText) {
+      nextRecord = { ...nextRecord, statusText: nextStatusText };
+      changed = true;
+    }
+    if (JSON.stringify(nextRecord.progress || null) !== JSON.stringify(nextProgress)) {
+      nextRecord = { ...nextRecord, progress: nextProgress };
+      changed = true;
+    }
+    if (JSON.stringify(nextRecord.artifacts || []) !== JSON.stringify(nextArtifacts)) {
+      nextRecord = { ...nextRecord, artifacts: nextArtifacts };
+      changed = true;
+    }
+    return changed ? nextRecord : record;
+  });
 }
 
 function applyInterpretationAction(session, action) {
@@ -486,6 +754,28 @@ export function reduceRuntimeState(state, action, options = {}) {
         activeSessionId: resolveActiveSessionId(runtimeState.activeSessionId, nextSessions, runtimeState.activeDeckId, defaultDeckId)
       };
     }
+    case "session.command.submitted": {
+      const sessionId = normalizeText(action.sessionId);
+      const submission = normalizeCommandCorrelationRecord(action.submission);
+      if (!sessionId || !submission) {
+        return runtimeState;
+      }
+      let changed = false;
+      const nextSessions = runtimeState.sessions.map((session) => {
+        if (session.id !== sessionId) {
+          return session;
+        }
+        changed = true;
+        return appendCommandCorrelation(session, submission);
+      });
+      if (!changed) {
+        return runtimeState;
+      }
+      return {
+        ...runtimeState,
+        sessions: nextSessions
+      };
+    }
     case "session.exit": {
       const sessionId = normalizeText(action.sessionId);
       if (!sessionId) {
@@ -573,20 +863,29 @@ export function reduceRuntimeState(state, action, options = {}) {
           return session;
         }
         const hasUnreadActivity = sessionId === runtimeState.activeSessionId ? false : true;
-        if (session.hasLiveActivity === true && session.hasUnreadActivity === hasUnreadActivity) {
-          return session;
+        let nextSession = session;
+        if (!(session.hasLiveActivity === true && session.hasUnreadActivity === hasUnreadActivity)) {
+          changed = true;
+          nextSession = {
+            ...nextSession,
+            activityState: "active",
+            activityUpdatedAt: activityTimestamp,
+            activityCompletedAt: null,
+            hasLiveActivity: true,
+            hasUnreadActivity,
+            lastOutputAt: activityTimestamp,
+            lifecycleState: "busy"
+          };
         }
-        changed = true;
-        return {
-          ...session,
-          activityState: "active",
-          activityUpdatedAt: activityTimestamp,
-          activityCompletedAt: null,
-          hasLiveActivity: true,
-          hasUnreadActivity,
-          lastOutputAt: activityTimestamp,
-          lifecycleState: "busy"
-        };
+        const matchedSession = updateLatestCommandCorrelation(nextSession, (record) => {
+          const nextRecord = maybeMatchCommandCorrelation(record, activityTimestamp);
+          return nextRecord === record ? record : nextRecord;
+        });
+        if (matchedSession !== nextSession) {
+          changed = true;
+          return matchedSession;
+        }
+        return nextSession;
       });
       if (!changed) {
         return runtimeState;
@@ -612,19 +911,30 @@ export function reduceRuntimeState(state, action, options = {}) {
           return session;
         }
         changed = true;
-        return {
+        const nextTimestamp = cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt);
+        const nextSession = {
           ...session,
           activityState: "inactive",
-          activityUpdatedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt),
-          activityCompletedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt),
+          activityUpdatedAt: nextTimestamp,
+          activityCompletedAt: nextTimestamp,
           hasLiveActivity: false,
           lifecycleState: deriveSessionLifecycleState(session.state, {
             ...session,
             hasLiveActivity: false,
             activityState: "inactive",
-            activityCompletedAt: cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt)
+            activityCompletedAt: nextTimestamp
           })
         };
+        return updateLatestCommandCorrelation(nextSession, (record) => {
+          const matchedAt = normalizeActivityTimestamp(record.matchedAt);
+          if (matchedAt === null || normalizeActivityTimestamp(record.completedAt) !== null) {
+            return record;
+          }
+          return {
+            ...record,
+            completedAt: nextTimestamp ?? Date.now()
+          };
+        });
       });
       if (!changed) {
         return runtimeState;
@@ -648,6 +958,7 @@ export function reduceRuntimeState(state, action, options = {}) {
         for (const interpretationAction of action.actions) {
           nextSession = applyInterpretationAction(nextSession, interpretationAction);
         }
+        nextSession = applyCommandCorrelationInterpretation(nextSession, action.actions);
         if (nextSession !== session) {
           changed = true;
           return withSessionActivityDefaults(nextSession);
@@ -808,6 +1119,12 @@ export function createStore(options = {}) {
   let state = createInitialRuntimeState(options);
   const listeners = new Set();
   const defaultDeckId = normalizeText(options.defaultDeckId) || DEFAULT_DECK_ID;
+  let commandCorrelationSequence = 0;
+
+  function nextCommandCorrelationId() {
+    commandCorrelationSequence += 1;
+    return `cmd-${commandCorrelationSequence}`;
+  }
 
   function publish() {
     const snapshot = createStateSnapshot(state);
@@ -942,6 +1259,25 @@ export function createStore(options = {}) {
     },
     setSessionFilterText(value) {
       dispatch({ type: "filter.set", value });
+    },
+    recordSessionCommandSubmission(sessionId, submission) {
+      const normalizedSubmission = normalizeCommandCorrelationRecord(submission, {
+        fallbackId: nextCommandCorrelationId()
+      });
+      if (!normalizedSubmission) {
+        return null;
+      }
+      const previous = state;
+      dispatch({
+        type: "session.command.submitted",
+        sessionId,
+        submission: normalizedSubmission
+      });
+      if (previous === state) {
+        return null;
+      }
+      const session = state.sessions.find((entry) => entry.id === normalizeText(sessionId));
+      return session?.commandCorrelations?.[session.commandCorrelations.length - 1] || null;
     },
     applySessionInterpretationActions(sessionId, actions) {
       dispatch({ type: "session.interpretation.apply", sessionId, actions });

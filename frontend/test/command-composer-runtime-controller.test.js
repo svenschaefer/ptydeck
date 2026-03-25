@@ -113,6 +113,7 @@ test("command-composer runtime controller sends command input via configured ter
     },
     normalizeSendTerminatorMode: (mode) => mode,
     delayedSubmitMs: 75,
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source, submission.text]),
     setCommandPreview: (message) => calls.push(["preview", message]),
     clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
     clearError: () => calls.push(["clearError"]),
@@ -127,6 +128,7 @@ test("command-composer runtime controller sends command input via configured ter
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "ls -al", "CRLF", 75],
     ["api", "s1", "ls -al"],
+    ["record", "s1", "input", "ls -al"],
     ["value", ""],
     ["preview", ""],
     ["clearSuggestions"],
@@ -134,5 +136,60 @@ test("command-composer runtime controller sends command input via configured ter
     ["historyReset"],
     ["debug", "command.send.ok", "s1"],
     ["render"]
+  ]);
+});
+
+test("command-composer runtime controller records one submission per direct-route target", async () => {
+  const calls = [];
+  let value = "@ops pwd";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "input", data: "@ops pwd" }),
+    getState: () => ({
+      sessions: [
+        { id: "s1", name: "one" },
+        { id: "s2", name: "two" }
+      ],
+      activeSessionId: "s1"
+    }),
+    parseDirectTargetRoutingInput: () => ({ matched: true, payload: "pwd", targetToken: "ops" }),
+    resolveTargetSelectors: () => ({
+      sessions: [
+        { id: "s1", name: "one" },
+        { id: "s2", name: "two" }
+      ],
+      error: ""
+    }),
+    getActiveDeck: () => ({ id: "default" }),
+    isSessionActionBlocked: () => false,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.text]),
+    formatSessionToken: (sessionId) => sessionId,
+    formatSessionDisplayName: (session) => session.name,
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    clearError: () => {},
+    resetSlashHistoryNavigationState: () => {},
+    render: () => {}
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["send", "s1", "pwd"],
+    ["send", "s2", "pwd"],
+    ["record", "s1", "pwd"],
+    ["record", "s2", "pwd"],
+    ["value", ""],
+    ["feedback", "Sent to 2 sessions."]
   ]);
 });

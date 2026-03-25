@@ -894,6 +894,12 @@ Completed and verified topics belong here.
 - [x] Documentation governance audit after the latest `ARC-010` increment reconfirmed that `TODO.md` contains explicit open tasks only, `ROADMAP.md` contains ordering/version/dependency data only, and no backlog resequencing or promotion was required.
 - [x] Persistent project context was revalidated in `CODEX_CONTEXT.md` after the latest cycle; the authoritative open-task inventory remains `ARC-010A` ... `ARC-010D`, `ARC-011`, `ARC-012`, `QLT-123`, and `QLT-124`.
 - [x] `ARC-010` close criteria are now explicit in planning docs: `TODO.md` splits the remaining work into `ARC-010A` ... `ARC-010D`, `ROADMAP.md` defines their ordering/dependencies, and `CODEX_CONTEXT.md` persists the clarified closure model to avoid fuzzy interpretation of when `ARC-010` is actually done.
+- [x] `DRV-004` completed: frontend runtime now records explicit per-session command-correlation entries for central composer sends and slash custom-command execution, linking submissions to later activity/output, interpretation state, status text, progress metadata, derived artifacts, and notifications.
+- [x] Command correlation state is now normalized and store-owned in `frontend/src/public/store.js`, preserving layered FE boundaries while keeping correlation history snapshot-safe and bounded per session.
+- [x] Minimal operator-context surfacing now augments session status/artifact hover titles with the most recent correlated command label, without consuming additional layout space or reintroducing terminal-header clutter.
+- [x] Added regression coverage for correlation state evolution and runtime wiring in `frontend/test/store.test.js`, `frontend/test/command-composer-runtime-controller.test.js`, `frontend/test/command-executor.test.js`, and `frontend/test/session-card-meta-controller.test.js`.
+- [x] Validation for `DRV-004` passed with deterministic workspace-level gates: `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`.
+- [x] Coverage after `DRV-004`: backend `91.60%` lines, frontend `95.74%` lines.
 
 ## Maintenance Rules
 

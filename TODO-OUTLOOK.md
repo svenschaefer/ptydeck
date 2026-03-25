@@ -72,8 +72,6 @@ Deferred from `docs/Codebase Review*.md` and `docs/Technical Alternatives Evalua
 
 - [ ] `DRV-001` Owner `BE`: Add shell-adapter abstraction for CWD tracking beyond bash (`PROMPT_COMMAND` baseline), with explicit per-shell capability matrix and deterministic fallback behavior when shell-specific tracking is unavailable.
 - [ ] `DRV-002` Owner `BE`: Add configurable terminal replay/scrollback retention policy (memory and optional persisted snapshot depth limits) with explicit product-level constraints for partial vs extended history recovery.
-- [ ] `DRV-003` Owner `FE`: Formalize the command system as a declarative command schema + registry contract (syntax/arguments/validation metadata as data), aligned with autocomplete and future workflow DSL integration.
-- [ ] `DRV-004` Owner `FE`: Add command-to-output correlation model (link command submissions to derived stream/plugin artifacts and status transitions) to support traceable automation and richer operator context.
 - [ ] `DRV-005` Owner `QA`: Add compatibility regression matrix for shell/runtime combinations (bash/zsh/fish where supported) covering CWD tracking, prompt detection, and replay/snapshot behavior under differing shell semantics.
 
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
