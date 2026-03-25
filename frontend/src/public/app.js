@@ -7,6 +7,7 @@ import { createCommandEngine } from "./command-engine.js";
 import { createCommandComposerRuntimeController } from "./command-composer-runtime-controller.js";
 import { createCommandExecutor } from "./command-executor.js";
 import { interpretComposerInput } from "./command-interpreter.js";
+import { createCommandTargetRuntimeController } from "./command-target-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
 import { createWsClient } from "./ws-client.js";
@@ -275,6 +276,7 @@ let commandEngine = null;
 let commandExecutor = null;
 let commandComposerRuntimeController = null;
 let commandComposerAutocompleteController = null;
+let commandTargetRuntimeController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
 let sessionRuntimeController = null;
@@ -971,7 +973,7 @@ function render() {
     startupPerf,
     nowMs,
     maybeReportStartupPerf,
-    resolveFilterSelectors
+    resolveFilterSelectors: commandTargetRuntimeController?.resolveFilterSelectors
   });
 }
 
@@ -1241,7 +1243,7 @@ deckSidebarController = createDeckSidebarController({
   formatSessionDisplayName,
   getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => setActiveDeck(deckId),
-  onActivateSession: (session) => activateSessionTarget(session)
+  onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session)
 });
 
 sessionGridController = createSessionGridController({
@@ -1317,15 +1319,24 @@ commandEngine = createCommandEngine({
   getSessionDeckId: resolveSessionDeckId
 });
 
+commandTargetRuntimeController = createCommandTargetRuntimeController({
+  commandEngine,
+  store,
+  setActiveDeck,
+  resolveSessionDeckId,
+  formatSessionToken,
+  formatSessionDisplayName
+});
+
 commandExecutor = createCommandExecutor({
   store,
   api,
   defaultDeckId: DEFAULT_DECK_ID,
   delayedSubmitMs: DELAYED_SUBMIT_MS,
-  resolveTargetSelectors,
-  resolveFilterSelectors,
-  resolveDeckToken,
-  parseSizeCommandArgs,
+  resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
+  resolveFilterSelectors: commandTargetRuntimeController.resolveFilterSelectors,
+  resolveDeckToken: commandTargetRuntimeController.resolveDeckToken,
+  parseSizeCommandArgs: commandTargetRuntimeController.parseSizeCommandArgs,
   applyTerminalSizeSettings,
   setSessionFilterText,
   getActiveDeck,
@@ -1342,10 +1353,10 @@ commandExecutor = createCommandExecutor({
   listCustomCommandState,
   getCustomCommandState,
   removeCustomCommandState,
-  parseCustomDefinition,
+  parseCustomDefinition: commandTargetRuntimeController.parseCustomDefinition,
   upsertCustomCommandState,
-  resolveSettingsTargets,
-  parseSettingsPayload,
+  resolveSettingsTargets: commandTargetRuntimeController.resolveSettingsTargets,
+  parseSettingsPayload: commandTargetRuntimeController.parseSettingsPayload,
   normalizeSendTerminatorMode,
   setSessionSendTerminator,
   getSessionSendTerminator,
@@ -1355,99 +1366,6 @@ commandExecutor = createCommandExecutor({
   normalizeThemeProfile,
   getTerminalSettings: () => terminalSettings
 });
-
-function resolveSessionToken(token, sessions) {
-  return commandEngine.resolveSessionToken(token, sessions);
-}
-
-function resolveDeckToken(token, decks) {
-  return commandEngine.resolveDeckToken(token, decks);
-}
-
-function resolveQuickSwitchTarget(selectorText, sessions) {
-  return commandEngine.resolveQuickSwitchTarget(selectorText, sessions);
-}
-
-function activateSessionTarget(session) {
-  if (!session || !session.id) {
-    return { ok: false, message: "Unknown session target." };
-  }
-  const beforeState = store.getState();
-  const previousActiveSessionId = beforeState.activeSessionId;
-  const previousActiveDeckId = beforeState.activeDeckId;
-  const targetDeckId = resolveSessionDeckId(session);
-  if (targetDeckId) {
-    setActiveDeck(targetDeckId);
-  }
-  const state = store.getState();
-  if (state.activeSessionId === session.id && previousActiveSessionId === session.id && previousActiveDeckId === targetDeckId) {
-    return {
-      ok: true,
-      message: `Session already active: [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`,
-      noop: true
-    };
-  }
-  store.setActiveSession(session.id);
-  return {
-    ok: true,
-    message: `Active session: [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`,
-    noop: false
-  };
-}
-
-function activateDeckTarget(deck) {
-  if (!deck || !deck.id) {
-    return { ok: false, message: "Unknown deck target." };
-  }
-  if (store.getState().activeDeckId === deck.id) {
-    return {
-      ok: true,
-      message: `Deck already active: [${deck.id}] ${deck.name}.`,
-      noop: true
-    };
-  }
-  const changed = setActiveDeck(deck.id);
-  if (!changed) {
-    return { ok: false, message: `Failed to switch deck: ${deck.id}` };
-  }
-  return {
-    ok: true,
-    message: `Active deck: [${deck.id}] ${deck.name}.`,
-    noop: false
-  };
-}
-
-function formatQuickSwitchPreview(selectorText, sessions) {
-  return commandEngine.formatQuickSwitchPreview(selectorText, sessions);
-}
-
-function resolveTargetSelectors(selectorText, sessions, options = {}) {
-  return commandEngine.resolveTargetSelectors(selectorText, sessions, options);
-}
-
-function resolveFilterSelectors(selectorText, sessions, options = {}) {
-  return commandEngine.resolveFilterSelectors(selectorText, sessions, options);
-}
-
-function resolveSettingsTargets(selectorText, sessions, activeSessionId) {
-  return commandEngine.resolveSettingsTargets(selectorText, sessions, activeSessionId);
-}
-
-function parseSettingsPayload(raw) {
-  return commandEngine.parseSettingsPayload(raw);
-}
-
-function parseSizeCommandArgs(args, currentCols, currentRows) {
-  return commandEngine.parseSizeCommandArgs(args, currentCols, currentRows);
-}
-
-function parseDirectTargetRoutingInput(rawInput) {
-  return commandEngine.parseDirectTargetRoutingInput(rawInput);
-}
-
-function parseCustomDefinition(rawInput) {
-  return commandEngine.parseCustomDefinition(rawInput);
-}
 
 async function executeControlCommand(interpreted) {
   return commandExecutor.execute(interpreted);
@@ -1555,9 +1473,9 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   resetCommandAutocompleteState: () => commandComposerAutocompleteController?.resetAutocompleteState(),
   interpretComposerInput,
   getState: () => store.getState(),
-  resolveQuickSwitchTarget,
-  activateSessionTarget,
-  activateDeckTarget,
+  resolveQuickSwitchTarget: commandTargetRuntimeController.resolveQuickSwitchTarget,
+  activateSessionTarget: commandTargetRuntimeController.activateSessionTarget,
+  activateDeckTarget: commandTargetRuntimeController.activateDeckTarget,
   setCommandFeedback,
   setCommandPreview,
   clearCommandSuggestions,
@@ -1567,8 +1485,8 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
   recordSlashHistory: (rawCommand) => commandComposerAutocompleteController?.recordSlashHistory(rawCommand),
   getErrorMessage,
   resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState(),
-  parseDirectTargetRoutingInput,
-  resolveTargetSelectors,
+  parseDirectTargetRoutingInput: commandTargetRuntimeController.parseDirectTargetRoutingInput,
+  resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
   getActiveDeck,
   formatSessionToken,
   formatSessionDisplayName,
@@ -1584,7 +1502,7 @@ commandComposerRuntimeController = createCommandComposerRuntimeController({
     uiState.error = "";
   },
   getCustomCommandState,
-  formatQuickSwitchPreview
+  formatQuickSwitchPreview: commandTargetRuntimeController.formatQuickSwitchPreview
 });
 
 commandComposerAutocompleteController?.bindUiEvents();

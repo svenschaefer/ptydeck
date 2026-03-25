@@ -798,6 +798,10 @@ Completed and verified topics belong here.
 - [x] Added focused frontend regression coverage for session-settings state orchestration in `frontend/test/session-settings-state-controller.test.js` (theme control sync/apply plus startup/theme/terminator dirty-state detection).
 - [x] Validation for the newest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
 - [x] Coverage after the newest `ARC-010` cycle: frontend `93.81%` lines overall; `frontend/src/public/app.js` reduced to `1788` lines.
+- [x] `ARC-010` decomposition continued again: command-target/session-deck activation orchestration is now extracted to `frontend/src/public/command-target-runtime-controller.js`, removing command-target resolver wrappers and active session/deck switching helpers from `frontend/src/public/app.js`.
+- [x] Added focused frontend regression coverage for command-target runtime orchestration in `frontend/test/command-target-runtime-controller.test.js` (command-engine delegation plus session/deck activation/noop/failure paths).
+- [x] Validation for the latest `ARC-010` cycle passed: `npm run lint`, `npm run test`, `npm run test:coverage`, and `npm run test:coverage:check`.
+- [x] Coverage after the latest `ARC-010` cycle: backend `91.60%` lines, frontend `94.60%` lines overall; `frontend/src/public/app.js` reduced to `1565` lines.
 
 ## Maintenance Rules
 
