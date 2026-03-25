@@ -81,6 +81,7 @@ test("session-runtime controller updates session lifecycle and delegates runtime
   store.markSessionActivity("s1", { timestamp: 10 });
 
   const disposed = [];
+  const pluginCalls = [];
   const feedback = [];
   const runtimeCalls = [];
   const controller = createSessionRuntimeController({
@@ -89,6 +90,14 @@ test("session-runtime controller updates session lifecycle and delegates runtime
     sessionQuickIds: new Map(),
     quickIdPool: ["1"],
     getSessionById: (sessionId) => store.getState().sessions.find((session) => session.id === sessionId) || null,
+    streamPluginEngine: {
+      ensureSession(session) {
+        pluginCalls.push(["ensure", session.id]);
+      },
+      disposeSession(sessionId) {
+        pluginCalls.push(["dispose", sessionId]);
+      }
+    },
     streamAdapter: {
       disposeSession(sessionId) {
         disposed.push(sessionId);
@@ -113,12 +122,14 @@ test("session-runtime controller updates session lifecycle and delegates runtime
     })
   });
 
+  assert.equal(controller.ensureSessionRuntime({ id: "s1" }), true);
+  assert.equal(controller.disposeSessionRuntime("s2"), true);
   controller.markSessionExited("s1", { exitCode: 7, signal: "TERM" });
   const exited = store.getState().sessions.find((session) => session.id === "s1");
   assert.equal(exited.state, "exited");
   assert.equal(exited.exitCode, 7);
   assert.equal(exited.exitSignal, "TERM");
-  assert.deepEqual(disposed, ["s1"]);
+  assert.deepEqual(disposed, ["s2", "s1"]);
   assert.deepEqual(feedback, ["Exited s1"]);
   assert.equal(exited.activityState, "inactive");
 
@@ -127,6 +138,11 @@ test("session-runtime controller updates session lifecycle and delegates runtime
   assert.deepEqual(runtimeCalls, [
     ["input", "s1", "ls\n"],
     ["event", "session.updated", "ws"]
+  ]);
+  assert.deepEqual(pluginCalls, [
+    ["ensure", "s1"],
+    ["dispose", "s2"],
+    ["dispose", "s1"]
   ]);
   assert.equal(controller.formatSessionDisplayName({ id: "s1", name: "Alpha" }), "vm:Alpha");
   assert.equal(controller.formatSessionToken("s1"), "1");

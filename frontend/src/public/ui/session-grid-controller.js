@@ -19,14 +19,14 @@ export function createSessionGridController(options = {}) {
   const syncActiveTerminalSearch = options.syncActiveTerminalSearch || (() => {});
   const sessionDisposalController = options.sessionDisposalController || null;
   const closeSettingsDialog = options.closeSettingsDialog || (() => {});
-  const streamPluginEngine = options.streamPluginEngine || null;
-  const streamAdapter = options.streamAdapter || null;
+  const onSessionDisposed = options.onSessionDisposed || (() => {});
   const terminalSearchState = options.terminalSearchState || {};
   const clearTerminalSearchSelection = options.clearTerminalSearchSelection || (() => {});
   const sessionCardRenderController = options.sessionCardRenderController || null;
   const sessionCardFactoryController = options.sessionCardFactoryController || null;
   const sessionCardInteractionsController = options.sessionCardInteractionsController || null;
   const sessionTerminalRuntimeController = options.sessionTerminalRuntimeController || null;
+  const onSessionMounted = options.onSessionMounted || (() => {});
   const resolveInitialTheme = options.resolveInitialTheme || (() => ({}));
   const handleSessionTerminalInput = options.handleSessionTerminalInput || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
@@ -129,8 +129,7 @@ export function createSessionGridController(options = {}) {
         terminals,
         terminalObservers,
         closeSettingsDialog,
-        streamPluginEngine,
-        streamAdapter,
+        onSessionDisposed,
         terminalSearchState,
         clearTerminalSearchSelection,
         resizeTimers,
@@ -247,7 +246,7 @@ export function createSessionGridController(options = {}) {
         terminals,
         terminalObservers,
         resolveInitialTheme,
-        streamPluginEngine,
+        onSessionMounted,
         onTerminalData: handleSessionTerminalInput,
         afterEntryRegistered: (entry, currentSession) => {
           syncSessionStartupControls(entry, currentSession);

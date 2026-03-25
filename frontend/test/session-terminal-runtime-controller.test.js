@@ -92,7 +92,7 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     terminals,
     terminalObservers,
     resolveInitialTheme: () => ({ background: "#000000" }),
-    streamPluginEngine: { ensureSession: (session) => calls.push(`ensure:${session.id}`) },
+    onSessionMounted: (session) => calls.push(`mounted:${session.id}`),
     onTerminalData: (sessionId, data) => calls.push(`data:${sessionId}:${data}`),
     afterEntryRegistered: (registeredEntry, session) => calls.push(`registered:${session.id}:${registeredEntry.isVisible}`),
     onFirstTerminalMounted: () => calls.push("first-mounted"),
@@ -108,7 +108,7 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [
     "debug:terminal.created:s1",
-    "ensure:s1",
+    "mounted:s1",
     "registered:s1:true",
     "first-mounted",
     "resize:s1",

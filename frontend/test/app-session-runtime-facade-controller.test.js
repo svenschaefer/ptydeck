@@ -42,6 +42,14 @@ test("app-session-runtime facade delegates session/runtime behavior and viewport
     upsertSession(nextSession) {
       calls.push(["upsert", nextSession.id]);
     },
+    ensureSessionRuntime(session) {
+      calls.push(["ensure-runtime", session.id]);
+      return true;
+    },
+    disposeSessionRuntime(sessionId) {
+      calls.push(["dispose-runtime", sessionId]);
+      return true;
+    },
     markSessionExited(sessionId, exitDetails) {
       calls.push(["exited", sessionId, exitDetails.exitCode]);
     },
@@ -111,6 +119,8 @@ test("app-session-runtime facade delegates session/runtime behavior and viewport
   assert.equal(controller.appendTerminalChunk("s1", "hi", { markActivity: false }), true);
   controller.replaySnapshotOutputs([{ sessionId: "s1", data: "hi" }], 2);
   controller.upsertSession({ id: "s2" });
+  assert.equal(controller.ensureSessionRuntime({ id: "s1" }), true);
+  assert.equal(controller.disposeSessionRuntime("s9"), true);
   controller.markSessionExited("s1", { exitCode: 1 });
   controller.removeSession("s1");
   controller.markSessionClosed("s1");
@@ -143,6 +153,8 @@ test("app-session-runtime facade delegates session/runtime behavior and viewport
     ["append", "s1", "hi", false],
     ["replay", 1, 2],
     ["upsert", "s2"],
+    ["ensure-runtime", "s1"],
+    ["dispose-runtime", "s9"],
     ["exited", "s1", 1],
     ["remove", "s1"],
     ["closed", "s1"],
@@ -174,6 +186,8 @@ test("app-session-runtime facade falls back safely without controllers", () => {
   assert.equal(controller.findNextQuickId(), "?");
   assert.equal(controller.ensureQuickId("s1"), "?");
   assert.equal(controller.appendTerminalChunk("s1", "x"), false);
+  assert.equal(controller.ensureSessionRuntime({ id: "s1" }), false);
+  assert.equal(controller.disposeSessionRuntime("s1"), false);
   assert.equal(controller.applyRuntimeEvent({ type: "x" }), false);
   assert.equal(controller.formatSessionDisplayName({ id: "s1" }), "s1");
   assert.equal(controller.formatSessionToken("s1"), "?");

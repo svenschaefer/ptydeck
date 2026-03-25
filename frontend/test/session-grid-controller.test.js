@@ -171,9 +171,11 @@ test("session-grid controller creates new cards and schedules resize passes", ()
     sessionCardInteractionsController: {
       bindSessionCardInteractions: ({ session }) => calls.push(["bind", session.id])
     },
+    onSessionMounted: (session) => calls.push(["mounted-contract", session.id]),
     sessionTerminalRuntimeController: {
-      mountSessionTerminalCard: ({ session, onFirstTerminalMounted, afterEntryRegistered }) => {
+      mountSessionTerminalCard: ({ session, onSessionMounted, onFirstTerminalMounted, afterEntryRegistered }) => {
         calls.push(["mount", session.id]);
+        onSessionMounted(session);
         afterEntryRegistered({ id: "entry" }, session);
         onFirstTerminalMounted();
       }
@@ -244,6 +246,7 @@ test("session-grid controller creates new cards and schedules resize passes", ()
     ["factory", "s2"],
     ["bind", "s2"],
     ["mount", "s2"],
+    ["mounted-contract", "s2"],
     "startup-sync",
     "theme-sync",
     "dirty",

@@ -91,6 +91,14 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     getSessionRuntimeController()?.upsertSession?.(nextSession);
   }
 
+  function ensureSessionRuntime(session) {
+    return getSessionRuntimeController()?.ensureSessionRuntime?.(session) === true;
+  }
+
+  function disposeSessionRuntime(sessionId) {
+    return getSessionRuntimeController()?.disposeSessionRuntime?.(sessionId) === true;
+  }
+
   function markSessionExited(sessionId, exitDetails = {}) {
     getSessionRuntimeController()?.markSessionExited?.(sessionId, exitDetails);
   }
@@ -131,6 +139,8 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     appendTerminalChunk,
     replaySnapshotOutputs,
     upsertSession,
+    ensureSessionRuntime,
+    disposeSessionRuntime,
     markSessionExited,
     removeSession,
     markSessionClosed,

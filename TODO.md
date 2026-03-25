@@ -14,7 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `ARC-011` Owner: `FE` Task: Enforce explicit cross-layer contracts (stream -> interpretation -> state -> UI) in code boundaries so UI modules no longer reach stream/runtime internals directly.
 - [ ] `ARC-012` Owner: `QA` Task: Add architecture regression coverage for layered FE boundaries (module-level contract tests plus integration assertions preventing cross-layer shortcut regressions).
 - [ ] `QLT-123` Owner: `FE` Task: Implement consistent copy/paste handling for terminal sessions and the command input box using one system-clipboard-only UX pattern: left-drag selection plus `Enter` copies to system clipboard, middle-click pastes from system clipboard, right-click keeps default system context-menu behavior, and no separate primary-selection clipboard model is introduced.
 - [ ] `QLT-124` Owner: `FE` Task: Refactor and optimize the terminal-session header layout/interaction implementation (keep existing semantic elements, but improve structure/usability/maintainability of the current historically grown header composition).

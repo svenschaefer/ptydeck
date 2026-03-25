@@ -57,8 +57,7 @@ test("session-disposal controller cleans removed sessions and related runtime st
     terminals,
     terminalObservers,
     closeSettingsDialog: () => calls.push("dialog.close"),
-    streamPluginEngine: { disposeSession: (sessionId) => calls.push(`plugin:${sessionId}`) },
-    streamAdapter: { disposeSession: (sessionId) => calls.push(`stream:${sessionId}`) },
+    onSessionDisposed: (sessionId) => calls.push(`disposed:${sessionId}`),
     terminalSearchState,
     clearTerminalSearchSelection: (sessionId) => calls.push(`search.clear:${sessionId}`),
     resizeTimers: timers,
@@ -78,4 +77,5 @@ test("session-disposal controller cleans removed sessions and related runtime st
   assert.deepEqual(calls.includes("terminal.dispose"), true);
   assert.deepEqual(calls.includes("search.clear:s1"), true);
   assert.deepEqual(calls.includes("status:s1"), true);
+  assert.deepEqual(calls.includes("disposed:s1"), true);
 });

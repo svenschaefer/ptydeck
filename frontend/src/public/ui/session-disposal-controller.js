@@ -6,8 +6,7 @@ export function createSessionDisposalController(options = {}) {
     const terminals = args.terminals;
     const terminalObservers = args.terminalObservers;
     const closeSettingsDialog = args.closeSettingsDialog || (() => {});
-    const streamPluginEngine = args.streamPluginEngine;
-    const streamAdapter = args.streamAdapter;
+    const onSessionDisposed = args.onSessionDisposed || (() => {});
     const terminalSearchState = args.terminalSearchState || {};
     const clearTerminalSearchSelection = args.clearTerminalSearchSelection || (() => {});
     const resizeTimers = args.resizeTimers;
@@ -33,8 +32,7 @@ export function createSessionDisposalController(options = {}) {
       terminals.delete(sessionId);
       terminalObservers.delete(sessionId);
       closeSettingsDialog(entry?.settingsDialog);
-      streamPluginEngine?.disposeSession?.(sessionId);
-      streamAdapter?.disposeSession?.(sessionId);
+      onSessionDisposed(sessionId);
 
       if (terminalSearchState.selectedSessionId === sessionId || terminalSearchState.sessionId === sessionId) {
         clearTerminalSearchSelection(sessionId);

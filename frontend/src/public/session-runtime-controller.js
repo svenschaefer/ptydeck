@@ -15,6 +15,7 @@ export function createSessionRuntimeController(options = {}) {
   const getActiveSessionId =
     typeof options.getActiveSessionId === "function" ? options.getActiveSessionId : () => "";
   const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
+  const streamPluginEngine = options.streamPluginEngine || { ensureSession() {}, disposeSession() {} };
   const streamAdapter = options.streamAdapter || { disposeSession() {} };
   const setCommandFeedback =
     typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
@@ -112,6 +113,23 @@ export function createSessionRuntimeController(options = {}) {
     store?.upsertSession(nextSession);
   }
 
+  function ensureSessionRuntime(session) {
+    if (!session) {
+      return false;
+    }
+    streamPluginEngine.ensureSession(session);
+    return true;
+  }
+
+  function disposeSessionRuntime(sessionId) {
+    if (typeof sessionId !== "string" || sessionId.length === 0) {
+      return false;
+    }
+    streamPluginEngine.disposeSession(sessionId);
+    streamAdapter.disposeSession(sessionId);
+    return true;
+  }
+
   function markSessionExited(sessionId, exitDetails = {}) {
     const session = getSessionById(sessionId);
     if (!session) {
@@ -123,7 +141,7 @@ export function createSessionRuntimeController(options = {}) {
       exitedAt: Date.now(),
       updatedAt: Date.now()
     });
-    streamAdapter.disposeSession(sessionId);
+    disposeSessionRuntime(sessionId);
     store?.clearSessionActivity(sessionId);
     const nextSession = getSessionById(sessionId);
     if (getActiveSessionId() === sessionId) {
@@ -162,6 +180,8 @@ export function createSessionRuntimeController(options = {}) {
     appendTerminalChunk,
     replaySnapshotOutputs,
     upsertSession,
+    ensureSessionRuntime,
+    disposeSessionRuntime,
     markSessionExited,
     removeSession,
     markSessionClosed,

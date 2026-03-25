@@ -19,7 +19,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const terminals = args.terminals;
     const terminalObservers = args.terminalObservers;
     const resolveInitialTheme = args.resolveInitialTheme || (() => ({}));
-    const streamPluginEngine = args.streamPluginEngine;
+    const onSessionMounted = args.onSessionMounted || (() => {});
     const onTerminalData = args.onTerminalData || (() => {});
     const afterEntryRegistered = args.afterEntryRegistered || (() => {});
     const onFirstTerminalMounted = args.onFirstTerminalMounted || (() => {});
@@ -34,7 +34,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       theme: resolveInitialTheme(session.id)
     });
     debugLog("terminal.created", { sessionId: session.id });
-    streamPluginEngine?.ensureSession?.(session);
+    onSessionMounted(session);
 
     gridEl.appendChild(refs.node);
     terminal.open(refs.mount);

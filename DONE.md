@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `ARC-011` is now completed: session mount/dispose flow no longer exposes `streamPluginEngine` or `streamAdapter` directly to UI controllers; the boundary is now enforced through explicit session-runtime contracts (`ensureSessionRuntime()` / `disposeSessionRuntime()`) delegated through `app-session-runtime-facade-controller.js`.
+- [x] Architecture guard coverage for `ARC-011` was added in `frontend/test/app-architecture-closeout.test.js`, locking `ui/session-grid-controller.js`, `ui/session-terminal-runtime-controller.js`, and `ui/session-disposal-controller.js` away from direct stream/runtime markers and requiring the new contract methods in `session-runtime-controller.js`.
+- [x] Validation for `ARC-011` passed with focused frontend lint/tests, `npm run lint`, `npm run test:coverage:check`, `npm --prefix backend run test`, and `npm --prefix frontend run test`; the root `npm run test` wrapper stalled again after partial backend output and was aborted immediately per execution-hygiene policy before using the deterministic per-workspace fallback.
+- [x] Coverage after the `ARC-011` closeout step: backend `91.60%` lines, frontend `95.81%` lines overall.
 - [x] Governance documents were revalidated after the `ARC-010` closeout: `TODO.md` still contains only the open tasks `ARC-011`, `ARC-012`, `QLT-123`, and `QLT-124`; `ROADMAP.md` still limits `v0.4.0-H2` to `ARC-011` and `ARC-012`, with `QLT-123` and `QLT-124` queued in `v0.4.0-H3`.
 - [x] Persistent coordination context was refreshed so `CODEX_CONTEXT.md` records the current post-`ARC-010` governance baseline and explicit ownership split (`CODY`, `FE`, `QA`, `BE`, `PLAT`, `SAS`) without re-opening already completed work.
 - [x] `ARC-010D` is now completed: explicit closeout regression coverage was added in `frontend/test/app-architecture-closeout.test.js` to lock `frontend/src/public/app.js` to a bootstrap-only entrypoint and guard runtime assembly ownership in `frontend/src/public/app-runtime-composition-controller.js`.
