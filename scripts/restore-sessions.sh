@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/restore-sessions.sh"
+
 TARGET_DATA_PATH="${TARGET_DATA_PATH:-./backend/data/sessions.json}"
 BACKUP_DIR="${BACKUP_DIR:-./backups/sessions}"
 BACKUP_FILE="${BACKUP_FILE:-}"

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/check-cert-expiry.sh"
+
 THRESHOLD_DAYS="${TLS_EXPIRY_THRESHOLD_DAYS:-30}"
 HOSTS_RAW="${TLS_EXPIRY_CHECK_HOSTS:-}"
 

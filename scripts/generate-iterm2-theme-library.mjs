@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { logScriptStart } from "./lib/script-log.mjs";
+
+logScriptStart("scripts/generate-iterm2-theme-library.mjs");
 
 const repoRoot = process.argv[2];
 const outFile = process.argv[3] || path.join(process.cwd(), "frontend/src/public/theme-library.js");

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/check-coverage.sh"
+
 BACKEND_MIN_LINES="${BACKEND_MIN_LINES:-90}"
 FRONTEND_MIN_LINES="${FRONTEND_MIN_LINES:-85}"
 

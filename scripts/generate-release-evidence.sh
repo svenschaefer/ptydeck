@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/generate-release-evidence.sh"
+
 OUT_DIR="${RELEASE_EVIDENCE_DIR:-artifacts/release-evidence}"
 QUALITY_DIR="${QUALITY_EVIDENCE_DIR:-artifacts/quality}"
 SECURITY_DIR="${SECURITY_EVIDENCE_DIR:-artifacts/security}"

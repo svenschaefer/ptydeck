@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-25
 
+- [x] `QLT-128` is now completed: every top-level root script under `scripts/` now emits one standardized startup log line to `stderr`, making future script usage observable without changing each script's functional output contract.
+- [x] Shared script-start helpers now live in `scripts/lib/script-log.sh` and `scripts/lib/script-log.mjs`, and the top-level script checker `scripts/check-script-logging.sh` enforces that every `scripts/*.sh` and `scripts/*.mjs` file declares the startup log call near the top of the file.
+- [x] The script-log checker is now part of the normal local lint gate via the root `package.json` script `scripts:log:check`, so missing script-start logging fails fast before backend/frontend syntax checks continue.
+- [x] Generated script/runtime log files are now explicitly protected by `.gitignore` through `backend/logs/` and `*.log`, while existing artifact/log output under `artifacts/` remains ignored as before.
+- [x] Validation for `QLT-128` passed with the targeted checker run, `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-128` closeout step: backend `91.60%` lines, frontend `95.62%` lines overall.
+- [x] `v0.4.0-H8` is now fully completed: `QLT-128` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
 - [x] `ENT-017` is now completed: WebSocket upgrade requests are now checked against the configured origin allowlist before acceptance, and missing or disallowed origins are rejected with an explicit `UnauthorizedOrigin` error contract instead of silently proceeding.
 - [x] WebSocket origin enforcement is applied early in the backend upgrade path in `backend/src/runtime.js`, before rate-limit and auth-ticket handling, so disallowed browser origins are rejected deterministically without consuming normal connection admission flow.
 - [x] Regression coverage for `ENT-017` was added in `backend/test/ws.integration.test.js`, covering missing-origin rejection, disallowed-origin rejection, allowed-origin acceptance, and the existing TLS-forwarded acceptance path under explicit origin requirements.

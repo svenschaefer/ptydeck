@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
-- Previous completed wave: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
+- Latest completed wave: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
+- Previous completed wave: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
+- Previous completed wave before that: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
 - Previous completed wave before that: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
 - Previous completed wave before that: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
@@ -605,7 +606,7 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement)
+- Latest completed milestone: `v0.4.0-H8` (Script Execution Traceability)
 - Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
@@ -846,6 +847,28 @@ Exit criteria:
 - Missing or disallowed upgrade origins are rejected with an explicit unauthorized-origin error contract instead of silently proceeding.
 - Explicitly allowed origins continue to connect successfully without regressing existing TLS, auth-ticket, or reconnect behavior.
 - Regression coverage demonstrates allowed, missing, and disallowed WebSocket origin behavior on the upgrade path.
+
+### v0.4.0-H8 - Script Execution Traceability
+
+- `QLT-128`
+
+Completed in this milestone so far:
+
+- `QLT-128`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `QLT-128` runs after `v0.4.0-H7` so the recent platform/security hardening baseline is already stable before adding root-script execution logging and enforcement into the local quality gate.
+
+Exit criteria:
+
+- Every top-level executable under `scripts/` emits one standardized startup log line so future runtime usage can be observed without inspecting implementation details.
+- One checker verifies that every top-level `scripts/*.sh` and `scripts/*.mjs` file declares that startup log line near the beginning of the file.
+- The checker is wired into the normal local lint gate so missing script logging cannot drift back in silently.
 
 ### Completed Items
 

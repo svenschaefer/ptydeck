@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/purge-retention.sh"
+
 PURGE_DRY_RUN="${PURGE_DRY_RUN:-1}"
 SESSION_BACKUP_DIR="${SESSION_BACKUP_DIR:-./backups/sessions}"
 SESSION_BACKUP_RETENTION_DAYS="${SESSION_BACKUP_RETENTION_DAYS:-14}"

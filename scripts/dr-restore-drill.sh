@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/script-log.sh
+source "${SCRIPT_DIR}/lib/script-log.sh"
+ptydeck_log_script_start "scripts/dr-restore-drill.sh"
+
 RTO_TARGET_SECONDS="${DR_RTO_TARGET_SECONDS:-120}"
 RPO_TARGET_SECONDS="${DR_RPO_TARGET_SECONDS:-60}"
 REPORT_DIR="${DR_REPORT_DIR:-artifacts/security}"
