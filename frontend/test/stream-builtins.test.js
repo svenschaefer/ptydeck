@@ -180,9 +180,9 @@ test("attention-errors plugin raises attention state and notification on error-l
 
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "markSessionAttention", "pushSessionNotification"]
+    ["setSessionState", "markSessionAttention", "pushSessionNotification"]
   );
   assert.equal(actions[0].value, "attention");
-  assert.equal(actions[2].active, true);
-  assert.match(actions[3].notification.message, /build failed/i);
+  assert.equal(actions[1].active, true);
+  assert.match(actions[2].notification.message, /build failed/i);
 });

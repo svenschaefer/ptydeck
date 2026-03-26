@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
-- Previous completed wave: `v0.4.0-H11` (Header Status Churn Suppression, `QLT-131`).
+- Latest completed wave: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
+- Previous completed wave: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
+- Previous completed wave before that: `v0.4.0-H11` (Header Status Churn Suppression, `QLT-131`).
 - Previous completed wave before that: `v0.4.0-H10` (Debug Query Override Hardening, `QLT-130`).
 - Previous completed wave before that: `v0.4.0-H9` (Invisible Stream Activity Filtering Hardening, `QLT-129`).
 - Previous completed wave before that: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
@@ -610,7 +611,7 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H8` (Script Execution Traceability)
+- Latest completed milestone: `v0.4.0-H13` (Attention Header Text Silence)
 - Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
@@ -896,6 +897,29 @@ Exit criteria:
 - Frontend activity filtering strips broader DEC/charset/DCS/OSC/C1/zero-width non-visible stream updates before emitting an activity bump.
 - Regression coverage proves invisible redraw/control chunks still render safely but do not produce new activity markers.
 
+### v0.4.0-H13 - Attention Header Text Silence
+
+- `QLT-133`
+
+Completed in this milestone so far:
+
+- `QLT-133`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `QLT-133` runs after `v0.4.0-H12` so the existing suppression of high-frequency activity-status header churn and the default-silent notification baseline remain intact while the last remaining attention/error status writer is removed from the session-header text path.
+
+Exit criteria:
+
+- Error/attention interpretation still marks the session as `attention`.
+- Browser notification behavior remains unchanged from `v0.4.0-H12` (default silent).
+- Arbitrary attention/error source lines no longer populate `.session-status-text`.
+- Regression coverage proves that attention styling survives while the session-header text remains empty for attention/error stream lines.
+
 ### Completed Items
 
 - `DOC-001`, `DOC-002`
@@ -984,5 +1008,11 @@ Exit criteria:
 - `QLT-093`
 - `QLT-095`
 - `QLT-096`
+- `QLT-128`
+- `QLT-129`
+- `QLT-130`
+- `QLT-131`
+- `QLT-132`
+- `QLT-133`
 - `PLAT-011`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`

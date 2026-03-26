@@ -1903,6 +1903,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
   assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
+  ws.emit("message", {
+    data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "31      - terminal failure paths now persist `error_det`\n" })
+  });
+  await tick();
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
+  assert.equal(recoveredHiddenCard.classList.contains("attention"), true);
   await sleep(1200);
   assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
 

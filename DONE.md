@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-26
 
+- [x] `QLT-133` is now completed: attention/error interpretation no longer writes arbitrary source text into `.session-status-text`, so stray stream lines such as `31      - terminal failure paths now persist \`error_det\`` no longer appear in the terminal-session header after refresh or later redraws.
+- [x] `frontend/src/public/stream-builtins.js` now keeps the `attention-errors` plugin limited to `setSessionState`, `markSessionAttention`, and `pushSessionNotification`; it no longer emits `setSessionStatus`, which was the last remaining direct header-text writer for free-form error lines.
+- [x] Regression coverage for `QLT-133` was updated in `frontend/test/stream-builtins.test.js` and `frontend/test/app.test.js`, explicitly proving that attention styling survives while session header status text stays empty for attention/error stream lines.
+- [x] Validation for `QLT-133` passed with targeted regressions (`node --test frontend/test/stream-builtins.test.js frontend/test/app.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-133` closeout step: backend `91.60%` lines, frontend `95.46%` lines overall.
+- [x] `v0.4.0-H13` is now fully completed: `QLT-133` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
 - [x] `QLT-132` is now completed: browser notification popups for activity-completed events are now disabled by default in the frontend, so session completion no longer produces Web Notifications unless the notifier is explicitly re-enabled in code.
 - [x] `frontend/src/public/activity-completion-notifier.js` now requires `enabled: true` before it will emit Notifications, preserving the aggregation/deduplication logic for future opt-in use while making the default runtime silent.
 - [x] Regression coverage for `QLT-132` was updated in `frontend/test/activity-completion-notifier.test.js` and `frontend/test/app.test.js`, explicitly proving that the default frontend path produces no browser notifications while the notifier still works when explicitly enabled in isolation tests.

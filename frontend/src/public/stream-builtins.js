@@ -346,7 +346,6 @@ function createAttentionActions(message) {
   }
   return [
     { type: "setSessionState", value: "attention", conflictKey: "session-state" },
-    { type: "setSessionStatus", value: statusText, conflictKey: "session-status" },
     { type: "markSessionAttention", active: true, conflictKey: "session-attention" },
     {
       type: "pushSessionNotification",
