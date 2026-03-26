@@ -16,6 +16,7 @@ function truncateList(entries, maxVisible = 4) {
 export function createActivityCompletionNotifier(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const NotificationCtor = windowRef?.Notification;
+  const enabled = options.enabled === true;
   const aggregationWindowMs = normalizePositiveInt(
     options.aggregationWindowMs,
     DEFAULT_AGGREGATION_WINDOW_MS
@@ -49,7 +50,7 @@ export function createActivityCompletionNotifier(options = {}) {
   }
 
   function canNotify() {
-    return typeof NotificationCtor === "function" && NotificationCtor.permission === "granted";
+    return enabled && typeof NotificationCtor === "function" && NotificationCtor.permission === "granted";
   }
 
   function buildEntry(session, completedAt) {

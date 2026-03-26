@@ -19,10 +19,27 @@ function createWindow(permission = "granted") {
   };
 }
 
-test("activity completion notifier emits one notification for a single completion", async () => {
+test("activity completion notifier is disabled by default and emits no notification", async () => {
   const windowRef = createWindow();
   const notifier = createActivityCompletionNotifier({
     windowRef,
+    aggregationWindowMs: 5,
+    formatSessionToken: () => "A",
+    formatSessionDisplayName: (session) => session.name,
+    resolveDeckName: () => "Default"
+  });
+
+  assert.equal(notifier.queueCompletion({ id: "s-1", name: "Build", deckId: "default" }, 100), false);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(windowRef.notifications.length, 0);
+});
+
+test("activity completion notifier emits one notification for a single completion when explicitly enabled", async () => {
+  const windowRef = createWindow();
+  const notifier = createActivityCompletionNotifier({
+    windowRef,
+    enabled: true,
     aggregationWindowMs: 5,
     formatSessionToken: () => "A",
     formatSessionDisplayName: (session) => session.name,
@@ -41,6 +58,7 @@ test("activity completion notifier aggregates multiple completions in one window
   const windowRef = createWindow();
   const notifier = createActivityCompletionNotifier({
     windowRef,
+    enabled: true,
     aggregationWindowMs: 5,
     formatSessionToken: (sessionId) => (sessionId === "s-1" ? "A" : "B"),
     formatSessionDisplayName: (session) => session.name,
@@ -61,6 +79,7 @@ test("activity completion notifier deduplicates repeated completion keys and no-
   const grantedWindow = createWindow();
   const notifier = createActivityCompletionNotifier({
     windowRef: grantedWindow,
+    enabled: true,
     aggregationWindowMs: 5,
     formatSessionToken: () => "A",
     formatSessionDisplayName: (session) => session.name,

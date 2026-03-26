@@ -299,9 +299,9 @@ function detectAttentionText(text) {
 }
 
 function createWorkingActions(statusText) {
+  void statusText;
   return [
     { type: "setSessionState", value: "working", conflictKey: "session-state" },
-    { type: "setSessionStatus", value: statusText, conflictKey: "session-status" },
     {
       type: "setSessionBadges",
       badges: [{ id: "working", text: "Working", tone: "active" }],

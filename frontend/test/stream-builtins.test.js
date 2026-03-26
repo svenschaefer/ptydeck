@@ -13,11 +13,10 @@ test("activity-status plugin detects active processing output from data chunks",
 
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+    ["setSessionState", "setSessionBadges"]
   );
   assert.equal(actions[0].value, "working");
-  assert.equal(actions[1].value, "Working");
-  assert.deepEqual(actions[2].badges, [{ id: "working", text: "Working", tone: "active" }]);
+  assert.deepEqual(actions[1].badges, [{ id: "working", text: "Working", tone: "active" }]);
 });
 
 test("activity-status plugin normalizes codex-style status lines with timer", () => {
@@ -26,9 +25,9 @@ test("activity-status plugin normalizes codex-style status lines with timer", ()
 
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+    ["setSessionState", "setSessionBadges"]
   );
-  assert.equal(actions[1].value, "Identifying a path issue (7m 04s • esc to interrupt)");
+  assert.equal(actions[0].value, "working");
 });
 
 test("activity-status plugin upgrades split chunks to the richer timed status", () => {
@@ -39,14 +38,13 @@ test("activity-status plugin upgrades split chunks to the richer timed status", 
 
   assert.deepEqual(
     initialActions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+    ["setSessionState", "setSessionBadges"]
   );
-  assert.equal(initialActions[1].value, "Working");
   assert.deepEqual(
     upgradedActions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+    ["setSessionState", "setSessionBadges"]
   );
-  assert.equal(upgradedActions[1].value, "Working (1m 32s • esc to interrupt)");
+  assert.equal(upgradedActions[0].value, "working");
 });
 
 test("activity-status plugin does not downgrade a richer timed status to a plain activity verb in later chunks", () => {
@@ -55,7 +53,7 @@ test("activity-status plugin does not downgrade a richer timed status to a plain
   const richerActions = plugin.onData({ id: "s1" }, "Working (1m 32s • esc to interrupt)\n");
   const downgradedActions = plugin.onData({ id: "s1" }, "Working");
 
-  assert.equal(richerActions[1].value, "Working (1m 32s • esc to interrupt)");
+  assert.equal(richerActions[0].value, "working");
   assert.equal(downgradedActions, null);
 });
 
@@ -68,9 +66,9 @@ test("activity-status plugin prefers richer timed status over generic working li
 
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges"]
+    ["setSessionState", "setSessionBadges"]
   );
-  assert.equal(actions[1].value, "Working (7m 04s • esc to interrupt)");
+  assert.equal(actions[0].value, "working");
 });
 
 test("activity-status plugin extracts completed-files progress with optional speed and uses it as the richer status", () => {
@@ -80,10 +78,9 @@ test("activity-status plugin extracts completed-files progress with optional spe
   assert.ok(Array.isArray(actions));
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges", "mergeSessionMeta"]
+    ["setSessionState", "setSessionBadges", "mergeSessionMeta"]
   );
-  assert.equal(actions[1].value, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s");
-  assert.deepEqual(actions[3].patch, {
+  assert.deepEqual(actions[2].patch, {
     progress: {
       filesDone: 0,
       filesTotal: 1,
@@ -101,10 +98,9 @@ test("activity-status plugin extracts completed-files progress without speed and
   assert.ok(Array.isArray(actions));
   assert.deepEqual(
     actions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges", "mergeSessionMeta"]
+    ["setSessionState", "setSessionBadges", "mergeSessionMeta"]
   );
-  assert.equal(actions[1].value, "Completed files 0/1 | 32.0MiB/279.5MiB");
-  assert.deepEqual(actions[3].patch, {
+  assert.deepEqual(actions[2].patch, {
     progress: {
       filesDone: 0,
       filesTotal: 1,
@@ -127,10 +123,9 @@ test("activity-status plugin supports completed-files count-only status and pref
 
   assert.deepEqual(
     countOnlyActions.map((action) => action.type),
-    ["setSessionState", "setSessionStatus", "setSessionBadges", "mergeSessionMeta"]
+    ["setSessionState", "setSessionBadges", "mergeSessionMeta"]
   );
-  assert.equal(countOnlyActions[1].value, "Completed files 0/1");
-  assert.deepEqual(countOnlyActions[3].patch, {
+  assert.deepEqual(countOnlyActions[2].patch, {
     progress: {
       filesDone: 0,
       filesTotal: 1,
@@ -139,8 +134,8 @@ test("activity-status plugin supports completed-files count-only status and pref
       speed: ""
     }
   });
-  assert.equal(richerActions[1].value, "Completed files 0/1 | 32.0MiB/279.5MiB | 6.8MiB/s");
-  assert.equal(mixedPriorityActions[1].value, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s");
+  assert.equal(richerActions[0].value, "working");
+  assert.equal(mixedPriorityActions[0].value, "working");
 });
 
 test("activity-status plugin does not downgrade richer completed-files progress during the same activity", () => {
@@ -149,7 +144,7 @@ test("activity-status plugin does not downgrade richer completed-files progress 
   const richerActions = plugin.onData({ id: "s7" }, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s\n");
   const downgradedActions = plugin.onData({ id: "s7" }, "Completed files 0/1\n");
 
-  assert.equal(richerActions[1].value, "Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s");
+  assert.equal(richerActions[0].value, "working");
   assert.equal(downgradedActions, null);
 });
 
@@ -176,7 +171,7 @@ test("prompt-idle-recovery plugin clears working state on prompt or idle", () =>
   assert.deepEqual(promptActions, idleActions);
   assert.equal(promptActions[0].value, "idle");
   assert.deepEqual(promptActions[2].badges, []);
-  assert.equal(nextActivityActions[1].value, "Working");
+  assert.equal(nextActivityActions[0].value, "working");
 });
 
 test("attention-errors plugin raises attention state and notification on error-like output", () => {

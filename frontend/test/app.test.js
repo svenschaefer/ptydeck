@@ -1891,23 +1891,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     (entry) => entry.hidden === false && entry.querySelector(".session-focus")?.textContent === "two"
   );
   assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
   assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working");
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: " (0s • esc to interrupt)" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "Working (0s • esc to interrupt)");
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
   await sleep(1200);
-  assert.match(
-    recoveredHiddenCard.querySelector(".session-status-text").textContent,
-    /^Working \((?:[0-9]+s|[0-9]+m [0-9]{2}s|[0-9]+h [0-9]{2}m [0-9]{2}s) • esc to interrupt\)$/
-  );
+  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1952,10 +1949,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await sleep(20);
-  assert.equal(browserNotifications.length, 1);
-  assert.equal(browserNotifications[0].title, "2 sessions completed activity");
-  assert.match(browserNotifications[0].options.body, /\[1\] one/);
-  assert.match(browserNotifications[0].options.body, /\[2\] two/);
+  assert.equal(browserNotifications.length, 0);
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1979,7 +1973,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await sleep(20);
-  assert.equal(browserNotifications.length, 1);
+  assert.equal(browserNotifications.length, 0);
   MockNotification.permission = "denied";
   ws.emit("message", {
     data: JSON.stringify({
@@ -2003,7 +1997,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await sleep(20);
-  assert.equal(browserNotifications.length, 1);
+  assert.equal(browserNotifications.length, 0);
 
   fixture.elements.commandInput.value = "/filter";
   fixture.elements.sendCommand.click();
