@@ -12,6 +12,7 @@ function now() {
 const MAX_OUTPUT_BUFFER_CHARS = 16 * 1024;
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const SESSION_NOTE_MAX_LENGTH = 512;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -126,6 +127,20 @@ function normalizeSessionTags(tags) {
     normalized.push(candidate);
   }
   normalized.sort((a, b) => a.localeCompare(b, "en-US", { sensitivity: "base" }));
+  return normalized;
+}
+
+function normalizeSessionNote(note) {
+  if (typeof note !== "string") {
+    return undefined;
+  }
+  const normalized = note.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.length > SESSION_NOTE_MAX_LENGTH) {
+    return normalized.slice(0, SESSION_NOTE_MAX_LENGTH);
+  }
   return normalized;
 }
 
@@ -269,6 +284,7 @@ export class SessionManager {
     startCwd,
     startCommand = "",
     env = {},
+    note,
     tags = [],
     themeProfile = {},
     createdAt,
@@ -293,6 +309,7 @@ export class SessionManager {
           : homedir();
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
+    const normalizedNote = normalizeSessionNote(note);
     const normalizedTags = normalizeSessionTags(tags);
     const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
@@ -318,6 +335,7 @@ export class SessionManager {
         startCwd: normalizedStartCwd,
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
+        ...(normalizedNote ? { note: normalizedNote } : {}),
         tags: normalizedTags,
         themeProfile: normalizedThemeProfile,
         state: SESSION_STATE_STARTING,
@@ -416,6 +434,14 @@ export class SessionManager {
     if (patch.env !== undefined) {
       session.meta.env = normalizeSessionEnv(patch.env);
     }
+    if (Object.prototype.hasOwnProperty.call(patch, "note")) {
+      const normalizedNote = normalizeSessionNote(patch.note);
+      if (normalizedNote) {
+        session.meta.note = normalizedNote;
+      } else {
+        delete session.meta.note;
+      }
+    }
     if (patch.tags !== undefined) {
       session.meta.tags = normalizeSessionTags(patch.tags);
     }
@@ -442,6 +468,7 @@ export class SessionManager {
       startCwd: snapshot.startCwd || snapshot.cwd,
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
+      note: snapshot.note,
       tags: snapshot.tags || [],
       themeProfile: snapshot.themeProfile || {},
       createdAt: snapshot.createdAt,

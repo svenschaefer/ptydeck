@@ -594,6 +594,8 @@ components:
           type: string
         name:
           type: string
+        note:
+          type: string
         startCwd:
           type: string
         startCommand:
@@ -667,6 +669,8 @@ components:
           type: string
         name:
           type: string
+        note:
+          type: string
         startCwd:
           type: string
         startCommand:
@@ -685,6 +689,8 @@ components:
       type: object
       properties:
         name:
+          type: string
+        note:
           type: string
         startCwd:
           type: string

@@ -21,6 +21,7 @@ const CUSTOM_COMMAND_RESERVED_NAMES = new Set([
   "list",
   "rename",
   "restart",
+  "note",
   "help",
   "custom"
 ]);
@@ -31,6 +32,7 @@ const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
 const CUSTOM_COMMAND_NAME_LOCALE = "en-US";
 const SESSION_START_CWD_MAX_LENGTH = 1024;
 const SESSION_START_COMMAND_MAX_LENGTH = 4096;
+const SESSION_NOTE_MAX_LENGTH = 512;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
 const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
@@ -406,6 +408,33 @@ function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
     normalized[key] = typeof input[key] === "string" ? input[key] : defaultValue;
   }
 
+  return normalized;
+}
+
+function normalizeSessionNote(input, { strict = true } = {}) {
+  if (input === undefined || input === null) {
+    return undefined;
+  }
+  if (typeof input !== "string") {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
+    }
+    return undefined;
+  }
+  const normalized = input.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.length > SESSION_NOTE_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'note' exceeds maximum length (${SESSION_NOTE_MAX_LENGTH}).`
+      );
+    }
+    return normalized.slice(0, SESSION_NOTE_MAX_LENGTH);
+  }
   return normalized;
 }
 
@@ -1384,16 +1413,17 @@ export function createRuntime(config) {
     throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
   }
 
-  function tryCreateRestoredSession({
-    session,
-    shell,
-    cwd,
-    startCwd,
-    startCommand,
-    env,
-    tags,
-    themeProfile
-  }) {
+function tryCreateRestoredSession({
+  session,
+  shell,
+  cwd,
+  startCwd,
+  startCommand,
+  env,
+  note,
+  tags,
+  themeProfile
+}) {
     return manager.create({
       id: session.id,
       cwd,
@@ -1402,6 +1432,7 @@ export function createRuntime(config) {
       startCwd,
       startCommand,
       env,
+      note,
       tags,
       themeProfile,
       createdAt: session.createdAt,
@@ -1777,6 +1808,7 @@ export function createRuntime(config) {
           { strict: true }
         );
         const themeProfile = normalizeSessionThemeProfile(body?.themeProfile, { strict: true });
+        const note = normalizeSessionNote(body?.note, { strict: true });
         const tags = normalizeSessionTags(body?.tags, { strict: true });
         const payload = manager.create({
           cwd: startupConfig.startCwd,
@@ -1785,6 +1817,7 @@ export function createRuntime(config) {
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
+          note,
           tags,
           themeProfile
         });
@@ -1836,6 +1869,9 @@ export function createRuntime(config) {
         }
         if (body?.themeProfile !== undefined) {
           patch.themeProfile = normalizeSessionThemeProfile(body.themeProfile, { strict: true });
+        }
+        if (body?.note !== undefined) {
+          patch.note = normalizeSessionNote(body.note, { strict: true });
         }
         if (body?.tags !== undefined) {
           patch.tags = normalizeSessionTags(body.tags, { strict: true });
@@ -2112,6 +2148,7 @@ export function createRuntime(config) {
           { strict: false }
         );
         const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
+        const note = normalizeSessionNote(session.note, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
         const requestedShell = typeof session.shell === "string" && session.shell.trim() ? session.shell : config.shell;
         const restoredCreatedAt = Number.isInteger(session.createdAt) ? session.createdAt : Date.now();
@@ -2127,6 +2164,7 @@ export function createRuntime(config) {
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
+          ...(note ? { note } : {}),
           tags,
           themeProfile,
           deckId: persistedDeckId,
@@ -2153,6 +2191,7 @@ export function createRuntime(config) {
               startCwd: attempt.startCwd,
               startCommand: startupConfig.startCommand,
               env: startupConfig.env,
+              note,
               tags,
               themeProfile
             });

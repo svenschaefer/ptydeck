@@ -360,6 +360,8 @@ function createTerminalCardTemplateNode() {
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
   tagList.classList.add("empty");
+  const sessionNote = new FakeElement({ className: "session-note-text", tagName: "p" });
+  sessionNote.hidden = true;
   const unrestoredHint = new FakeElement({ className: "session-unrestored-hint", tagName: "p" });
   unrestoredHint.hidden = true;
   const sessionStatus = new FakeElement({ className: "session-status-text", tagName: "p" });
@@ -420,6 +422,7 @@ function createTerminalCardTemplateNode() {
   toolbarActions.appendChild(settings);
   toolbarMain.appendChild(titleGroup);
   toolbarMain.appendChild(toolbarActions);
+  toolbarMeta.appendChild(sessionNote);
   toolbarMeta.appendChild(sessionStatus);
   toolbarMeta.appendChild(pluginBadges);
   toolbarMeta.appendChild(tagList);
@@ -859,18 +862,31 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       const sessionId = decodeURIComponent(patchMatch[1]);
       const payload = JSON.parse(options.body || "{}");
       updateSessionCalls.push({ sessionId, payload });
-      return makeJsonResponse(200, {
+      const baseSession = {
         id: sessionId,
+        deckId: sessionDeckById.get(sessionId) || "default",
         state: "active",
         shell: "bash",
         cwd: "~",
-        name: payload.name || "one",
-        startCwd: payload.startCwd || "~",
-        startCommand: payload.startCommand || "",
-        env: payload.env || {},
-        tags: Array.isArray(payload.tags) ? payload.tags : [],
-        themeProfile: payload.themeProfile || undefined,
+        name: sessionId === "s-2" ? "two" : sessionId === "ops" ? "ops-node" : "one",
+        note: undefined,
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: sessionId === "s-2" ? ["beta", "ops"] : sessionId === "ops" ? ["ops"] : [],
+        themeProfile: undefined,
         createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      return makeJsonResponse(200, {
+        ...baseSession,
+        name: payload.name || baseSession.name,
+        note: typeof payload.note === "string" && payload.note.trim() ? payload.note.trim() : undefined,
+        startCwd: payload.startCwd || baseSession.startCwd,
+        startCommand: payload.startCommand || baseSession.startCommand,
+        env: payload.env || baseSession.env,
+        tags: Array.isArray(payload.tags) ? payload.tags : baseSession.tags,
+        themeProfile: payload.themeProfile || baseSession.themeProfile,
         updatedAt: Date.now()
       });
     }
@@ -2123,6 +2139,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondSettingsCancel = secondSettingsPanel.querySelector(".session-settings-cancel");
   const secondStartFeedback = secondSettingsPanel.querySelector(".session-start-feedback");
   const secondTagList = secondCard.querySelector(".session-tag-list");
+  const secondNote = secondCard.querySelector(".session-note-text");
   const secondToolbarMeta = secondCard.querySelector(".terminal-toolbar-meta");
   assert.equal(secondTagList.textContent, "#beta #ops");
   assert.equal(secondToolbarMeta.hidden, false);
@@ -2260,6 +2277,18 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /sendTerminator=lf/);
   assert.match(fixture.elements.commandFeedback.textContent, /"slash"/);
+  fixture.elements.commandInput.value = "/note 1 needs review";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(secondNote.textContent, "needs review");
+  assert.equal(secondNote.hidden, false);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Updated note for [1] two.");
+  fixture.elements.commandInput.value = "/note 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(secondNote.textContent, "");
+  assert.equal(secondNote.hidden, true);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Cleared note for [1] two.");
   fixture.elements.commandInput.value = '/settings apply 1 {"unknown":1}';
   fixture.elements.sendCommand.click();
   await tick();

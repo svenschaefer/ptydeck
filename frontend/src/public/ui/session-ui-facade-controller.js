@@ -217,6 +217,10 @@ export function createSessionUiFacadeController(options = {}) {
     getSessionCardMetaController()?.renderSessionPluginBadges?.(entry, session);
   }
 
+  function renderSessionNote(entry, session) {
+    getSessionCardMetaController()?.renderSessionNote?.(entry, session);
+  }
+
   function syncStatusTicker(sessions) {
     getSessionCardMetaController()?.syncStatusTicker?.(sessions);
   }
@@ -264,6 +268,7 @@ export function createSessionUiFacadeController(options = {}) {
     isSessionSettingsDirty,
     renderSessionTagList,
     renderSessionPluginBadges,
+    renderSessionNote,
     syncStatusTicker,
     renderSessionStatus,
     renderSessionArtifacts

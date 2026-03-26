@@ -36,6 +36,7 @@ function createNodeStub() {
     ".session-focus",
     ".session-state-badge",
     ".terminal-toolbar-meta",
+    ".session-note-text",
     ".session-plugin-badges",
     ".session-unrestored-hint",
     ".session-status-text",
@@ -100,6 +101,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
     isSessionExited: () => false,
     renderSessionTagList: () => calls.push("tags"),
     renderSessionPluginBadges: () => calls.push("badges"),
+    renderSessionNote: () => calls.push("note"),
     renderSessionStatus: () => calls.push("status"),
     renderSessionArtifacts: () => calls.push("artifacts"),
     setSessionCardVisibility: (_node, visible) => calls.push(`visible:${visible}`)
@@ -120,8 +122,9 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.unrestoredHintEl.hidden, false);
   assert.equal(result.unrestoredHintEl.textContent, "hint");
   assert.ok(result.sessionMetaRowEl);
+  assert.ok(result.sessionNoteEl);
   assert.equal(result.node.classList.contains("active"), true);
   assert.equal(result.node.classList.contains("attention"), true);
   assert.ok(result.themeInputs.brightRed);
-  assert.deepEqual(calls, ["tags", "badges", "status", "artifacts", "visible:true"]);
+  assert.deepEqual(calls, ["tags", "badges", "note", "status", "artifacts", "visible:true"]);
 });

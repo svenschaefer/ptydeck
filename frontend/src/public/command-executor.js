@@ -533,6 +533,40 @@ export function createCommandExecutor(options = {}) {
       return `Restarted ${restartedSessions.length} sessions.`;
     }
 
+    if (command === "note") {
+      if (args.length === 0) {
+        return formatUsage("note");
+      }
+
+      let targetSession = null;
+      if (String(args[0] || "").toLowerCase() === "active") {
+        if (!activeSessionId) {
+          return "No active session for /note.";
+        }
+        targetSession = sessions.find((session) => session.id === activeSessionId) || null;
+        if (!targetSession) {
+          return "No active session for /note.";
+        }
+      } else {
+        const resolvedTargets = resolveTargetSelectors(args[0], sessions, { source: "slash" });
+        if (resolvedTargets.error) {
+          return resolvedTargets.error;
+        }
+        if (resolvedTargets.sessions.length !== 1) {
+          return "Note selector must resolve to exactly one session.";
+        }
+        targetSession = resolvedTargets.sessions[0];
+      }
+
+      const note = args.slice(1).join(" ").trim();
+      const updated = await api.updateSession(targetSession.id, { note });
+      applyRuntimeEvent({ type: "session.updated", session: updated });
+      if (updated?.note) {
+        return `Updated note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+      }
+      return `Cleared note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+    }
+
     if (command === "custom") {
       if (args[0] === "list") {
         const commands = listCustomCommandState();

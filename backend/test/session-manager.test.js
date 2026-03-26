@@ -49,6 +49,7 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(created.cwd, "/tmp");
   assert.equal(created.startCwd, "/tmp");
   assert.equal(created.startCommand, "");
+  assert.equal(created.note, undefined);
   assert.deepEqual(created.env, {});
   assert.deepEqual(created.tags, []);
   assert.equal(typeof created.themeProfile, "object");
@@ -283,6 +284,40 @@ test("SessionManager can rename sessions", () => {
   assert.equal(updated.name, "ops-shell");
 });
 
+test("SessionManager stores, normalizes, clears, and restarts session notes", () => {
+  const firstPty = createFakePty();
+  const secondPty = createFakePty();
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: () => {
+      spawnCount += 1;
+      return spawnCount === 1 ? firstPty : secondPty;
+    }
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    note: "  Needs   follow-up   "
+  });
+  assert.equal(created.note, "Needs follow-up");
+
+  const updated = manager.updateSession(created.id, {
+    note: "  capture logs before restart  "
+  });
+  assert.equal(updated.note, "capture logs before restart");
+
+  const cleared = manager.updateSession(created.id, {
+    note: ""
+  });
+  assert.equal(cleared.note, undefined);
+
+  manager.updateSession(created.id, {
+    note: "restart marker"
+  });
+  const restarted = manager.restart(created.id);
+  assert.equal(restarted.note, "restart marker");
+});
+
 test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
   const originalPromptCommand = process.env.PROMPT_COMMAND;
   const fakePty = createFakePty();
@@ -327,7 +362,8 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
     name: "ops-shell",
     startCwd: "/var/tmp",
     startCommand: "echo START",
-    env: { FOO: "BAR" }
+    env: { FOO: "BAR" },
+    note: "keep this"
   });
   const restarted = manager.restart(created.id);
 
@@ -338,6 +374,7 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.name, "ops-shell");
   assert.equal(restarted.startCwd, "/var/tmp");
   assert.equal(restarted.startCommand, "echo START");
+  assert.equal(restarted.note, "keep this");
   assert.deepEqual(restarted.env, { FOO: "BAR" });
   assert.deepEqual(restarted.tags, []);
   assert.equal(restarted.themeProfile.cursor, "#8ec07c");

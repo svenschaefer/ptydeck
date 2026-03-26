@@ -6,6 +6,7 @@ export function createSessionCardFactoryController(options = {}) {
   const isSessionExited = options.isSessionExited || (() => false);
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionPluginBadges = options.renderSessionPluginBadges || (() => {});
+  const renderSessionNote = options.renderSessionNote || (() => {});
   const renderSessionStatus = options.renderSessionStatus || (() => {});
   const renderSessionArtifacts = options.renderSessionArtifacts || (() => {});
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
@@ -16,6 +17,7 @@ export function createSessionCardFactoryController(options = {}) {
     const focusBtn = node.querySelector(".session-focus");
     const stateBadgeEl = node.querySelector(".session-state-badge");
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
+    const sessionNoteEl = node.querySelector(".session-note-text");
     const pluginBadgesEl = node.querySelector(".session-plugin-badges");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const sessionStatusEl = node.querySelector(".session-status-text");
@@ -81,9 +83,10 @@ export function createSessionCardFactoryController(options = {}) {
       unrestoredHintEl.hidden = !stateHintText;
       unrestoredHintEl.textContent = stateHintText;
     }
-    renderSessionTagList({ sessionMetaRowEl, tagListEl }, session);
+    renderSessionTagList({ sessionMetaRowEl, sessionNoteEl, tagListEl }, session);
     renderSessionPluginBadges({ sessionMetaRowEl, pluginBadgesEl }, session);
-    renderSessionStatus({ sessionMetaRowEl, sessionStatusEl }, session);
+    renderSessionNote({ sessionMetaRowEl, sessionNoteEl }, session);
+    renderSessionStatus({ sessionMetaRowEl, sessionNoteEl, sessionStatusEl }, session);
     renderSessionArtifacts({ sessionArtifactsOverlayEl, sessionArtifactsEl }, session);
     setSessionCardVisibility(node, visible);
 
@@ -93,6 +96,7 @@ export function createSessionCardFactoryController(options = {}) {
       focusBtn,
       stateBadgeEl,
       sessionMetaRowEl,
+      sessionNoteEl,
       pluginBadgesEl,
       unrestoredHintEl,
       sessionStatusEl,

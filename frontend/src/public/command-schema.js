@@ -277,6 +277,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     usage: "/restart [selector[,selector...]]",
     args: [{ provider: "multi-target-selector", optional: true }]
   }),
+  note: freezeCommandDefinition({
+    key: "slash:note",
+    insertText: "note",
+    label: "/note",
+    kind: "command",
+    description: "set or clear a persisted session note",
+    example: "/note 7 needs review",
+    usage: "/note <selector|active> [text...]",
+    args: [{ provider: "session-selector" }]
+  }),
   settings: freezeCommandDefinition({
     key: "slash:settings",
     insertText: "settings",

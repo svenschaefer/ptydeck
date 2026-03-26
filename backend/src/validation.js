@@ -74,6 +74,9 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body?.startCommand !== undefined && typeof body.startCommand !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
     }
+    if (body?.note !== undefined && typeof body.note !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
+    }
     if (body?.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
@@ -100,6 +103,7 @@ export function validateRequest({ method, pathname, params, body }) {
       body.name === undefined &&
       body.startCwd === undefined &&
       body.startCommand === undefined &&
+      body.note === undefined &&
       body.env === undefined &&
       body.tags === undefined &&
       body.themeProfile === undefined
@@ -114,6 +118,9 @@ export function validateRequest({ method, pathname, params, body }) {
     }
     if (body.startCommand !== undefined && typeof body.startCommand !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
+    }
+    if (body.note !== undefined && typeof body.note !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
     }
     if (body.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
@@ -279,6 +286,7 @@ function isSession(value) {
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&
+    (value.note === undefined || typeof value.note === "string") &&
     typeof value.startCwd === "string" &&
     typeof value.startCommand === "string" &&
     isObject(value.env) &&

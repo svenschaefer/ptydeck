@@ -70,6 +70,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
 
   const entry = {
     sessionMetaRowEl: { hidden: true },
+    sessionNoteEl: { textContent: "", title: "", hidden: true },
     tagListEl: { textContent: "", title: "", classList: createClassList() },
     pluginBadgesEl: { textContent: "", title: "", classList: createClassList() },
     sessionStatusEl: { textContent: "", title: "", hidden: true },
@@ -78,6 +79,7 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
   };
   const session = {
     id: "s-1",
+    note: "check metrics",
     tags: ["alpha", "beta"],
     pluginBadges: [{ text: "Working" }, { text: "GPU" }],
     interpretationState: "working",
@@ -86,11 +88,14 @@ test("session-card-meta controller renders tags, badges, status and artifacts", 
     commandCorrelations: [{ label: "/go" }]
   };
 
+  controller.renderSessionNote(entry, session);
   controller.renderSessionTagList(entry, session);
   controller.renderSessionPluginBadges(entry, session);
   controller.renderSessionStatus(entry, session);
   controller.renderSessionArtifacts(entry, session);
 
+  assert.equal(entry.sessionNoteEl.textContent, "check metrics");
+  assert.equal(entry.sessionNoteEl.hidden, false);
   assert.equal(entry.tagListEl.textContent, "#alpha #beta");
   assert.equal(entry.pluginBadgesEl.textContent, "Working · GPU");
   assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
@@ -121,11 +126,13 @@ test("session-card-meta controller hides meta row when tags badges and status ar
 
   const entry = {
     sessionMetaRowEl: { hidden: false },
+    sessionNoteEl: { textContent: "", hidden: false },
     tagListEl: { textContent: "", classList: createClassList() },
     pluginBadgesEl: { textContent: "", classList: createClassList() },
     sessionStatusEl: { textContent: "", hidden: false }
   };
 
+  controller.renderSessionNote(entry, { note: "" });
   controller.renderSessionTagList(entry, { tags: [] });
   controller.renderSessionPluginBadges(entry, { pluginBadges: [] });
   controller.renderSessionStatus(entry, { statusText: "", interpretationState: "idle" });
@@ -136,6 +143,10 @@ test("session-card-meta controller hides meta row when tags badges and status ar
     statusText: "Working (0s • esc to interrupt)",
     interpretationState: "working"
   });
+  assert.equal(entry.sessionMetaRowEl.hidden, false);
+
+  controller.renderSessionStatus(entry, { statusText: "", interpretationState: "idle" });
+  controller.renderSessionNote(entry, { note: "keep logs ready" });
   assert.equal(entry.sessionMetaRowEl.hidden, false);
 });
 

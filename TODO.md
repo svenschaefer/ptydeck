@@ -14,8 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-135` Owner `BE`: add a persisted per-session note field to the backend session contract so each terminal session can store exactly one optional text note, with empty-note writes deleting the stored note deterministically.
-- `QLT-136` Owner `FE`: add `/note` session-note management in the frontend command plane and render the persisted note in the terminal-session header using a compact small-font presentation; each session supports exactly one note or none, and submitting an empty note clears any existing note.
 - `QLT-138` Owner `BE`: add a persisted per-session input-safety profile contract to session settings so each terminal can configure which send-guard mechanisms are active (for example natural-language-to-shell confirmation, target confirmation, and related safety toggles).
 - `QLT-139` Owner `FE`: implement the first per-session send-safety mechanisms on top of the persisted profile, including clearer active-target presentation near the composer, a semantic checker for likely natural-language text sent to shell terminals, and configurable confirmation flows before risky sends.
 

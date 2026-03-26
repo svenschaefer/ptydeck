@@ -294,6 +294,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "list",
   "rename",
   "restart",
+  "note",
   "settings",
   "custom",
   "help"
@@ -597,6 +598,7 @@ sessionCardFactoryController = createSessionCardFactoryController({
   isSessionExited: sessionUiFacadeController.isSessionExited,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
+  renderSessionNote: sessionUiFacadeController.renderSessionNote,
   renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
   renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible)
@@ -649,6 +651,7 @@ sessionCardRenderController = createSessionCardRenderController({
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
+  renderSessionNote: sessionUiFacadeController.renderSessionNote,
   renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
   renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,

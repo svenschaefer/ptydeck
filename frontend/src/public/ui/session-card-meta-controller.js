@@ -75,6 +75,10 @@ export function createSessionCardMetaController(options = {}) {
   }
 
   function hasMetaContent(entry) {
+    const hasNote =
+      Boolean(entry?.sessionNoteEl) &&
+      entry.sessionNoteEl.hidden !== true &&
+      String(entry.sessionNoteEl.textContent || "").trim().length > 0;
     const hasStatus =
       Boolean(entry?.sessionStatusEl) &&
       entry.sessionStatusEl.hidden !== true &&
@@ -87,7 +91,7 @@ export function createSessionCardMetaController(options = {}) {
       Boolean(entry?.tagListEl) &&
       !entry.tagListEl.classList?.contains?.("empty") &&
       String(entry.tagListEl.textContent || "").trim().length > 0;
-    return hasStatus || hasBadges || hasTags;
+    return hasNote || hasStatus || hasBadges || hasTags;
   }
 
   function syncMetaRowVisibility(entry) {
@@ -118,6 +122,17 @@ export function createSessionCardMetaController(options = {}) {
     entry.pluginBadgesEl.textContent = nextText;
     entry.pluginBadgesEl.title = nextText;
     entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
+    syncMetaRowVisibility(entry);
+  }
+
+  function renderSessionNote(entry, session) {
+    if (!entry?.sessionNoteEl) {
+      return;
+    }
+    const note = typeof session?.note === "string" ? session.note.trim() : "";
+    entry.sessionNoteEl.hidden = !note;
+    entry.sessionNoteEl.textContent = note;
+    entry.sessionNoteEl.title = note;
     syncMetaRowVisibility(entry);
   }
 
@@ -233,6 +248,7 @@ export function createSessionCardMetaController(options = {}) {
     setSettingsDirty,
     renderSessionTagList,
     renderSessionPluginBadges,
+    renderSessionNote,
     renderSessionStatus,
     renderSessionArtifacts,
     syncStatusTicker,

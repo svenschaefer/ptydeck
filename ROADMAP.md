@@ -12,10 +12,11 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H15`.
-- Active scoped tasks: `QLT-135`, `QLT-136`.
-- Latest completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
-- Previous completed wave: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
+- Active release wave: `v0.4.0-H16`.
+- Active scoped tasks: `QLT-138`, `QLT-139`.
+- Latest completed wave: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
+- Previous completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
+- Previous completed wave before that: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
 - Previous completed wave before that: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
 - Previous completed wave before that: `v0.4.0-H11` (Header Status Churn Suppression, `QLT-131`).
 - Previous completed wave before that: `v0.4.0-H10` (Debug Query Override Hardening, `QLT-130`).
@@ -951,12 +952,12 @@ Exit criteria:
 
 Completed in this milestone so far:
 
-- none
+- `QLT-135`
+- `QLT-136`
 
 Remaining in this milestone:
 
-- `QLT-135`
-- `QLT-136`
+- none
 
 Dependencies:
 

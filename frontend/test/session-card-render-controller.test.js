@@ -56,6 +56,7 @@ test("session-card-render controller updates visibility and metadata", () => {
     ensureQuickId: () => "A",
     renderSessionTagList: () => calls.push("tags"),
     renderSessionPluginBadges: () => calls.push("badges"),
+    renderSessionNote: () => calls.push("note"),
     renderSessionStatus: () => calls.push("status"),
     renderSessionArtifacts: () => calls.push("artifacts"),
     syncSessionStartupControls: () => calls.push("startup"),
@@ -83,6 +84,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   assert.equal(entry.followOnShow, false);
   assert.deepEqual(calls.includes("sync:s1"), false);
   assert.deepEqual(calls.includes("tags"), true);
+  assert.deepEqual(calls.includes("note"), true);
   assert.deepEqual(calls.includes("theme"), true);
 });
 

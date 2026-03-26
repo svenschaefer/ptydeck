@@ -713,6 +713,22 @@ button:hover {
   letter-spacing: 0.03em;
 }
 
+.session-note-text {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #9fb0bf;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-note-text[hidden] {
+  display: none !important;
+}
+
 .session-plugin-badges {
   margin: 0;
   padding: 2px 8px;

@@ -58,6 +58,7 @@ test("validateResponse checks session list schema", () => {
           state: "running",
           cwd: "/tmp",
           shell: "bash",
+          note: "needs review",
           startCwd: "/tmp",
           startCommand: "",
           env: {},
@@ -114,11 +115,25 @@ test("validateRequest accepts valid session patch payload", () => {
       params: { sessionId: "abc" },
       body: {
         name: "renamed",
+        note: "needs review",
         startCwd: "/tmp",
         startCommand: "echo hi",
         env: { FOO: "BAR" },
         tags: ["ops", "prod"],
         themeProfile: THEME_PROFILE
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid note types", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        note: 123
       }
     });
   });

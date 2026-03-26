@@ -180,6 +180,7 @@ test("session startup settings persist through patch and apply on restart", asyn
       body: JSON.stringify({
         shell: "sh",
         name: "ops-shell",
+        note: "needs review",
         startCwd: "/tmp",
         startCommand: "echo BOOT",
         env: { APP_MODE: "dev" },
@@ -210,6 +211,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
     assert.equal(created.state, "running");
+    assert.equal(created.note, "needs review");
     assert.equal(created.startCwd, "/tmp");
     assert.equal(created.startCommand, "echo BOOT");
     assert.deepEqual(created.env, { APP_MODE: "dev" });
@@ -221,6 +223,7 @@ test("session startup settings persist through patch and apply on restart", asyn
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        note: "capture restart logs",
         startCwd: "/var/tmp",
         startCommand: "echo RESTART",
         env: { APP_MODE: "prod", FEATURE_X: "1" },
@@ -251,6 +254,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
     assert.equal(patched.state, "running");
+    assert.equal(patched.note, "capture restart logs");
     assert.equal(patched.startCwd, "/var/tmp");
     assert.equal(patched.startCommand, "echo RESTART");
     assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
@@ -265,6 +269,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
+    assert.equal(restarted.note, "capture restart logs");
     assert.equal(restarted.cwd, "/var/tmp");
     assert.equal(restarted.startCwd, "/var/tmp");
     assert.equal(restarted.startCommand, "echo RESTART");
@@ -272,6 +277,32 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.deepEqual(restarted.tags, ["critical", "ops"]);
     assert.equal(restarted.themeProfile.background, "#202020");
     assert.equal(restarted.themeProfile.cursor, "#aaffaa");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session notes normalize and clear through patch", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", note: "  keep   logs handy " })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.note, "keep logs handy");
+
+    const clearRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ note: "" })
+    });
+    assert.equal(clearRes.status, 200);
+    const cleared = await clearRes.json();
+    assert.equal(cleared.note, undefined);
   } finally {
     await runtime.stop();
   }

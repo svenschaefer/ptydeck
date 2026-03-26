@@ -163,6 +163,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       quickIdEl: refs.quickIdEl,
       stateBadgeEl: refs.stateBadgeEl,
       sessionMetaRowEl: refs.sessionMetaRowEl,
+      sessionNoteEl: refs.sessionNoteEl,
       pluginBadgesEl: refs.pluginBadgesEl,
       unrestoredHintEl: refs.unrestoredHintEl,
       sessionStatusEl: refs.sessionStatusEl,

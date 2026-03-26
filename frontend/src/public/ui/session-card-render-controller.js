@@ -9,6 +9,7 @@ export function createSessionCardRenderController(options = {}) {
   const ensureQuickId = options.ensureQuickId || ((sessionId) => String(sessionId || ""));
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionPluginBadges = options.renderSessionPluginBadges || (() => {});
+  const renderSessionNote = options.renderSessionNote || (() => {});
   const renderSessionStatus = options.renderSessionStatus || (() => {});
   const renderSessionArtifacts = options.renderSessionArtifacts || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
@@ -52,6 +53,7 @@ export function createSessionCardRenderController(options = {}) {
 
     renderSessionTagList(entry, session);
     renderSessionPluginBadges(entry, session);
+    renderSessionNote(entry, session);
     renderSessionStatus(entry, session);
     renderSessionArtifacts(entry, session);
 

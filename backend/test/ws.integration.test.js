@@ -59,6 +59,7 @@ function assertApiSessionShape(session) {
   assert.ok(session.state === "starting" || session.state === "running" || session.state === "unrestored");
   assert.equal(typeof session?.cwd, "string");
   assert.equal(typeof session?.shell, "string");
+  assert.ok(session?.note === undefined || typeof session.note === "string");
   assert.ok(Array.isArray(session?.tags));
   assert.ok(session?.activityState === "active" || session?.activityState === "inactive");
   assert.equal(typeof session?.activityUpdatedAt, "number");
