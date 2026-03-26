@@ -217,6 +217,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     usage: "/switch <id>",
     args: [{ provider: "session-selector" }]
   }),
+  swap: freezeCommandDefinition({
+    key: "slash:swap",
+    insertText: "swap",
+    label: "/swap",
+    kind: "command",
+    description: "swap quick ids between two sessions",
+    example: "/swap 7 8",
+    usage: "/swap <selectorA> <selectorB>",
+    args: [{ provider: "session-selector" }, { provider: "session-selector" }]
+  }),
   next: freezeCommandDefinition({
     key: "slash:next",
     insertText: "next",

@@ -1456,6 +1456,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2").querySelector(".session-quick-id").textContent,
     "2"
   );
+  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "1");
+  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "2");
+
+  fixture.elements.commandInput.value = "/swap 1 2";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Swapped quick IDs: [1] one <-> [2] two.");
+  assert.equal(
+    findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1").querySelector(".session-quick-id").textContent,
+    "2"
+  );
+  assert.equal(
+    findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2").querySelector(".session-quick-id").textContent,
+    "1"
+  );
+  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "2");
+  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "1");
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1667,12 +1684,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/switch default::s-1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [1] one.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [2] one.");
 
   fixture.elements.commandInput.value = "/move s-2 deck-new";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [1] to deck [deck-new] Ops.");
   assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "deck-new", sessionId: "s-2" });
   ws.emit("message", {
     data: JSON.stringify({
@@ -1694,13 +1711,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2"), null);
   assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2"));
 
-  fixture.elements.commandInput.value = ">2";
+  fixture.elements.commandInput.value = ">1";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
   await sleep(160);
-  assert.match(fixture.elements.commandPreview.textContent, /^Target session: \[2\] two deck \[deck-new\] Ops$/);
+  assert.match(fixture.elements.commandPreview.textContent, /^Target session: \[1\] two deck \[deck-new\] Ops$/);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [1] two.");
 
   fixture.elements.commandInput.value = ">deck-new";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1732,17 +1749,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
-  assert.equal(fixture.elements.commandInput.value, ">deck-new::2");
+  assert.equal(fixture.elements.commandInput.value, ">deck-new::1");
 
   fixture.elements.commandInput.value = ">default";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [default] Default.");
 
-  fixture.elements.commandInput.value = ">deck-new::2";
+  fixture.elements.commandInput.value = ">deck-new::1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Active session: [1] two.");
 
   fixture.elements.commandInput.value = ">default";
   fixture.elements.sendCommand.click();
@@ -1751,7 +1768,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   const deckNewSessionButton = findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2");
   assert.ok(deckNewSessionButton);
-  assert.equal(deckNewSessionButton.querySelector(".session-quick-id").textContent, "2");
+  assert.equal(deckNewSessionButton.querySelector(".session-quick-id").textContent, "1");
   ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-1\n" }) });
   ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-2\n" }) });
   ws.emit("message", { data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "ops-noise-3\n" }) });
@@ -1798,13 +1815,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/move s-2 default";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [default] Default.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [1] to deck [default] Default.");
   assert.deepEqual(moveSessionCalls[moveSessionCalls.length - 1], { deckId: "default", sessionId: "s-2" });
 
   fixture.elements.commandInput.value = "/move s-2 deck-new";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [2] to deck [deck-new] Ops.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Moved session [1] to deck [deck-new] Ops.");
   assert.ok(findDeckSessionButton(fixture.elements.deckTabs, "deck-new", "s-2"));
 
   fixture.elements.commandInput.value = "/deck switch deck-new";
@@ -2053,8 +2070,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   const firstQuickId = firstCard.querySelector(".session-quick-id");
   const secondQuickId = secondCard.querySelector(".session-quick-id");
-  assert.equal(firstQuickId.textContent, "1");
-  assert.equal(secondQuickId.textContent, "2");
+  assert.equal(firstQuickId.textContent, "2");
+  assert.equal(secondQuickId.textContent, "1");
   const resizeCountBeforeUnrestored = resizePayloads.length;
   ws.emit("message", {
     data: JSON.stringify({
@@ -2216,7 +2233,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     },
     sendTerminator: "lf"
   };
-  fixture.elements.commandInput.value = `/settings apply 2 ${JSON.stringify(slashSettingsPayload)}`;
+  fixture.elements.commandInput.value = `/settings apply 1 ${JSON.stringify(slashSettingsPayload)}`;
   fixture.elements.sendCommand.click();
   await tick();
   const latestSlashSettingsCall = updateSessionCalls[updateSessionCalls.length - 1];
@@ -2238,12 +2255,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     fixture.elements.commandFeedback.textContent,
     "Applied settings to 1 session(s): startCwd, startCommand, env, tags, themeProfile, sendTerminator."
   );
-  fixture.elements.commandInput.value = "/settings show 2";
+  fixture.elements.commandInput.value = "/settings show 1";
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /sendTerminator=lf/);
   assert.match(fixture.elements.commandFeedback.textContent, /"slash"/);
-  fixture.elements.commandInput.value = '/settings apply 2 {"unknown":1}';
+  fixture.elements.commandInput.value = '/settings apply 1 {"unknown":1}';
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown settings key(s): unknown");
@@ -2324,14 +2341,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.terminalGrid.children.length, 4);
 
   const routedBefore = inputPayloads.length;
-  fixture.elements.commandInput.value = "@1 echo routed";
+  fixture.elements.commandInput.value = "@2 echo routed";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(inputPayloads.length, routedBefore + 1);
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "echo routed\r" });
   assert.equal(secondCard.classList.contains("active"), false);
   assert.equal(unrestoredCard.classList.contains("active"), true);
-  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [1] one.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [2] one.");
 
   fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"crlf"}';
   fixture.elements.sendCommand.click();
@@ -2453,36 +2470,36 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /exit code 17/i);
   assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /SIGTERM/i);
 
-  fixture.elements.commandInput.value = "/rename 2 renamed-exited";
+  fixture.elements.commandInput.value = "/rename 1 renamed-exited";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Rename blocked for exited session [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Rename blocked for exited session [1] two.");
 
-  fixture.elements.commandInput.value = "/restart 2";
+  fixture.elements.commandInput.value = "/restart 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Restart blocked for exited session [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Restart blocked for exited session [1] two.");
 
-  fixture.elements.commandInput.value = '/settings apply 2 {"sendTerminator":"lf"}';
+  fixture.elements.commandInput.value = '/settings apply 1 {"sendTerminator":"lf"}';
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Settings apply blocked for exited session [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Settings apply blocked for exited session [1] two.");
   assert.equal(updateSessionCalls.length, updateCallsBeforeExit);
 
-  fixture.elements.commandInput.value = "@2 echo blocked-exit";
+  fixture.elements.commandInput.value = "@1 echo blocked-exit";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for exited session [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for exited session [1] two.");
   assert.equal(inputPayloads.length, inputPayloadsBeforeExit);
 
   reopenedSecondTerminal.dataHandler("echo blocked-terminal");
   await tick();
-  assert.match(fixture.elements.statusMessage.textContent, /Session \[2\] two has exited/i);
+  assert.match(fixture.elements.statusMessage.textContent, /Session \[1\] two has exited/i);
 
-  fixture.elements.commandInput.value = "/close 2";
+  fixture.elements.commandInput.value = "/close 1";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "Removed exited session [2] two.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Removed exited session [1] two.");
   assert.equal(
     fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "two"),
     false

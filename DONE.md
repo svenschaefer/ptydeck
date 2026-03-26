@@ -4,6 +4,13 @@ Completed and verified topics belong here.
 
 ## 2026-03-26
 
+- [x] `QLT-134` is now completed: the frontend command plane now supports `/swap <selectorA> <selectorB>` to swap the current quick IDs of exactly two resolved sessions without touching backend persistence.
+- [x] `frontend/src/public/session-runtime-controller.js` and `frontend/src/public/app-session-runtime-facade-controller.js` now expose explicit `swapSessionTokens()` support so quick-ID swaps stay scoped to the existing frontend-local quick-ID model.
+- [x] `frontend/src/public/command-schema.js`, `frontend/src/public/command-executor.js`, and `README.md` now document and execute `/swap <selectorA> <selectorB>` with the same selector semantics already used by `/switch` and `/rename`.
+- [x] Regression coverage for `QLT-134` was added/updated in `frontend/test/session-runtime-controller.test.js`, `frontend/test/command-schema.test.js`, `frontend/test/command-executor.test.js`, and `frontend/test/app.test.js`, explicitly proving runtime swap behavior, schema/help exposure, executor feedback, and live UI rerendering of swapped quick IDs.
+- [x] Validation for `QLT-134` passed with targeted regressions (`node --test frontend/test/session-runtime-controller.test.js frontend/test/command-schema.test.js frontend/test/command-executor.test.js frontend/test/app.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-134` closeout step: backend `91.60%` lines, frontend `95.45%` lines overall.
+- [x] `v0.4.0-H14` is now fully completed: `QLT-134` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
 - [x] `QLT-133` is now completed: attention/error interpretation no longer writes arbitrary source text into `.session-status-text`, so stray stream lines such as `31      - terminal failure paths now persist \`error_det\`` no longer appear in the terminal-session header after refresh or later redraws.
 - [x] `frontend/src/public/stream-builtins.js` now keeps the `attention-errors` plugin limited to `setSessionState`, `markSessionAttention`, and `pushSessionNotification`; it no longer emits `setSessionStatus`, which was the last remaining direct header-text writer for free-form error lines.
 - [x] Regression coverage for `QLT-133` was updated in `frontend/test/stream-builtins.test.js` and `frontend/test/app.test.js`, explicitly proving that attention styling survives while session header status text stays empty for attention/error stream lines.

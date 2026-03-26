@@ -19,6 +19,8 @@ export function createCommandExecutor(options = {}) {
   const resolveSessionDeckId = options.resolveSessionDeckId;
   const formatSessionToken = options.formatSessionToken;
   const formatSessionDisplayName = options.formatSessionDisplayName;
+  const swapSessionTokens =
+    typeof options.swapSessionTokens === "function" ? options.swapSessionTokens : () => false;
   const getSessionRuntimeState = options.getSessionRuntimeState;
   const isSessionExited = options.isSessionExited;
   const isSessionActionBlocked = options.isSessionActionBlocked;
@@ -41,6 +43,7 @@ export function createCommandExecutor(options = {}) {
   const normalizeThemeProfile = options.normalizeThemeProfile;
   const getTerminalSettings =
     typeof options.getTerminalSettings === "function" ? options.getTerminalSettings : () => ({ cols: 80, rows: 20 });
+  const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -393,6 +396,38 @@ export function createCommandExecutor(options = {}) {
       }
       store.setActiveSession(target.id);
       return `Active session: [${formatSessionToken(target.id)}] ${formatSessionDisplayName(target)}.`;
+    }
+
+    if (command === "swap") {
+      if (args.length !== 2 || !args[0] || !args[1]) {
+        return formatUsage("swap");
+      }
+      const leftResolved = resolveTargetSelectors(args[0], sessions, { source: "slash" });
+      if (leftResolved.error) {
+        return leftResolved.error;
+      }
+      if (leftResolved.sessions.length !== 1) {
+        return "Swap selector A must resolve to exactly one session.";
+      }
+      const rightResolved = resolveTargetSelectors(args[1], sessions, { source: "slash" });
+      if (rightResolved.error) {
+        return rightResolved.error;
+      }
+      if (rightResolved.sessions.length !== 1) {
+        return "Swap selector B must resolve to exactly one session.";
+      }
+      const leftSession = leftResolved.sessions[0];
+      const rightSession = rightResolved.sessions[0];
+      if (leftSession.id === rightSession.id) {
+        return "Swap targets resolve to the same session.";
+      }
+      const leftTokenBefore = formatSessionToken(leftSession.id);
+      const rightTokenBefore = formatSessionToken(rightSession.id);
+      if (!swapSessionTokens(leftSession.id, rightSession.id)) {
+        return "Failed to swap session quick IDs.";
+      }
+      requestRender();
+      return `Swapped quick IDs: [${leftTokenBefore}] ${formatSessionDisplayName(leftSession)} <-> [${rightTokenBefore}] ${formatSessionDisplayName(rightSession)}.`;
     }
 
     if (command === "next" || command === "prev") {

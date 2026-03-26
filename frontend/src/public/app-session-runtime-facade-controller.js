@@ -123,6 +123,10 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     return getSessionRuntimeController()?.formatSessionDisplayName?.(session) || String(session?.name || session?.id || "");
   }
 
+  function swapSessionTokens(sessionIdA, sessionIdB) {
+    return getSessionRuntimeController()?.swapSessionTokens?.(sessionIdA, sessionIdB) === true;
+  }
+
   function formatSessionToken(sessionId) {
     return getSessionRuntimeController()?.formatSessionToken?.(sessionId) || "?";
   }
@@ -147,6 +151,7 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     handleSessionTerminalInput,
     applyRuntimeEvent,
     formatSessionDisplayName,
+    swapSessionTokens,
     formatSessionToken
   };
 }

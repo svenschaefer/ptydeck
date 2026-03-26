@@ -30,6 +30,20 @@ test("session-runtime controller assigns and prunes quick ids deterministically"
   assert.equal(controller.ensureQuickId("s3"), "1");
 });
 
+test("session-runtime controller swaps quick ids deterministically", () => {
+  const controller = createSessionRuntimeController({
+    sessionQuickIds: new Map(),
+    quickIdPool: ["1", "2", "3"]
+  });
+
+  assert.equal(controller.ensureQuickId("s1"), "1");
+  assert.equal(controller.ensureQuickId("s2"), "2");
+  assert.equal(controller.swapSessionTokens("s1", "s2"), true);
+  assert.equal(controller.formatSessionToken("s1"), "2");
+  assert.equal(controller.formatSessionToken("s2"), "1");
+  assert.equal(controller.swapSessionTokens("s1", "s1"), false);
+});
+
 test("session-runtime controller appends chunks and retries replay for late terminal mounts", () => {
   const terminals = new Map();
   const terminal = createTerminal();

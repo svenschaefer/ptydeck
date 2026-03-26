@@ -288,6 +288,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "filter",
   "close",
   "switch",
+  "swap",
   "next",
   "prev",
   "list",

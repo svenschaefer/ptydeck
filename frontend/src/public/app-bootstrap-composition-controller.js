@@ -158,6 +158,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
       formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
       formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+      swapSessionTokens: (sessionIdA, sessionIdB) => appSessionRuntimeFacadeController?.swapSessionTokens?.(sessionIdA, sessionIdB) === true,
       getSessionRuntimeState: sessionUiFacadeController?.getSessionRuntimeState,
       isSessionExited: sessionUiFacadeController?.isSessionExited,
       isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
@@ -177,7 +178,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       normalizeCustomCommandPayloadForShell,
       normalizeSessionTags: sessionUiFacadeController?.normalizeSessionTags,
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,
-      getTerminalSettings: terminalSettings
+      getTerminalSettings: terminalSettings,
+      requestRender: () => appCommandUiFacadeController?.render()
     });
 
     authBootstrapRuntimeController = createAuthBootstrapRuntimeController({

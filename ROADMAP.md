@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
-- Previous completed wave: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
+- Latest completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
+- Previous completed wave: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
+- Previous completed wave before that: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
 - Previous completed wave before that: `v0.4.0-H11` (Header Status Churn Suppression, `QLT-131`).
 - Previous completed wave before that: `v0.4.0-H10` (Debug Query Override Hardening, `QLT-130`).
 - Previous completed wave before that: `v0.4.0-H9` (Invisible Stream Activity Filtering Hardening, `QLT-129`).
@@ -611,7 +612,7 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H13` (Attention Header Text Silence)
+- Latest completed milestone: `v0.4.0-H14` (Frontend Quick-ID Swap Command)
 - Next milestone in progress: none currently
 - Queued next milestone: none currently
 - Blockers: none currently
@@ -920,6 +921,29 @@ Exit criteria:
 - Arbitrary attention/error source lines no longer populate `.session-status-text`.
 - Regression coverage proves that attention styling survives while the session-header text remains empty for attention/error stream lines.
 
+### v0.4.0-H14 - Frontend Quick-ID Swap Command
+
+- `QLT-134`
+
+Completed in this milestone so far:
+
+- `QLT-134`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `QLT-134` runs after `v0.4.0-H13` so the session-header silence baseline is already stable before reintroducing any quick-ID-focused operator ergonomics in the frontend command plane.
+
+Exit criteria:
+
+- `/swap <selectorA> <selectorB>` is available in the frontend slash-command plane.
+- Both selectors must resolve to exactly one session each using existing selector semantics.
+- Quick-ID swaps remain frontend-local and are not persisted to the backend.
+- Regression coverage proves runtime swap behavior, schema/help exposure, executor feedback, and live UI rerendering.
+
 ### Completed Items
 
 - `DOC-001`, `DOC-002`
@@ -1014,5 +1038,6 @@ Exit criteria:
 - `QLT-131`
 - `QLT-132`
 - `QLT-133`
+- `QLT-134`
 - `PLAT-011`
 - `ENT-001`, `ENT-004`, `ENT-005`, `ENT-006`, `ENT-007`, `ENT-008`, `ENT-009`, `ENT-011`, `ENT-012`, `ENT-013`, `ENT-014`, `ENT-015`, `ENT-016`, `ENT-018`, `ENT-019`, `ENT-020`, `ENT-021`, `ENT-022`, `ENT-023`, `ENT-024`

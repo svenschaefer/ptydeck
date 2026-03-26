@@ -171,6 +171,19 @@ export function createSessionRuntimeController(options = {}) {
     return getSessionViewModel()?.formatSessionDisplayName(session) || String(session?.name || session?.id || "");
   }
 
+  function swapSessionTokens(sessionIdA, sessionIdB) {
+    const leftId = String(sessionIdA || "").trim();
+    const rightId = String(sessionIdB || "").trim();
+    if (!leftId || !rightId || leftId === rightId) {
+      return false;
+    }
+    const leftToken = formatSessionToken(leftId);
+    const rightToken = formatSessionToken(rightId);
+    sessionQuickIds.set(leftId, rightToken);
+    sessionQuickIds.set(rightId, leftToken);
+    return true;
+  }
+
   function formatSessionToken(sessionId) {
     return sessionQuickIds.get(sessionId) || ensureQuickId(sessionId);
   }
@@ -190,6 +203,7 @@ export function createSessionRuntimeController(options = {}) {
     handleSessionTerminalInput,
     applyRuntimeEvent,
     formatSessionDisplayName,
+    swapSessionTokens,
     formatSessionToken
   };
 }
