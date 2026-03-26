@@ -1,5 +1,4 @@
-export function createSessionDisposalController(options = {}) {
-  const onClearSessionStatusAnchor = options.onClearSessionStatusAnchor || (() => {});
+export function createSessionDisposalController() {
 
   function cleanupRemovedSessions(args = {}) {
     const activeSessionIds = args.activeSessionIds instanceof Set ? args.activeSessionIds : new Set();
@@ -50,7 +49,6 @@ export function createSessionDisposalController(options = {}) {
       resizeTimers.delete(sessionId);
       terminalSizes.delete(sessionId);
       sessionThemeDrafts.delete(sessionId);
-      onClearSessionStatusAnchor(sessionId);
       shouldRunResizePass = true;
     }
     return shouldRunResizePass;

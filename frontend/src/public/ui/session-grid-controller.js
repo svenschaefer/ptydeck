@@ -16,7 +16,6 @@ export function createSessionGridController(options = {}) {
   const renderDeckTabs = options.renderDeckTabs || (() => {});
   const workspaceRenderController = options.workspaceRenderController || null;
   const getCommandTargetSummary = options.getCommandTargetSummary || (() => "");
-  const syncStatusTicker = options.syncStatusTicker || (() => {});
   const syncActiveTerminalSearch = options.syncActiveTerminalSearch || (() => {});
   const sessionDisposalController = options.sessionDisposalController || null;
   const closeSettingsDialog = options.closeSettingsDialog || (() => {});
@@ -105,7 +104,6 @@ export function createSessionGridController(options = {}) {
       hasError: Boolean(uiState.error)
     });
 
-    syncStatusTicker(state.sessions);
     workspaceRenderController?.renderEmptyState({
       sessions: state.sessions,
       deckSessions,
@@ -178,7 +176,6 @@ export function createSessionGridController(options = {}) {
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
           closeBtn: refs.closeBtn,
-          sessionArtifactsDismissBtn: refs.sessionArtifactsDismissBtn,
           settingsDialog: refs.settingsDialog,
           settingsDismissBtn: refs.settingsDismissBtn,
           startCwdInput: refs.startCwdInput,
@@ -231,12 +228,7 @@ export function createSessionGridController(options = {}) {
           stateBadgeEl: refs.stateBadgeEl,
           sessionMetaRowEl: refs.sessionMetaRowEl,
           sessionNoteEl: refs.sessionNoteEl,
-          pluginBadgesEl: refs.pluginBadgesEl,
           unrestoredHintEl: refs.unrestoredHintEl,
-          sessionStatusEl: refs.sessionStatusEl,
-          sessionArtifactsOverlayEl: refs.sessionArtifactsOverlayEl,
-          sessionArtifactsEl: refs.sessionArtifactsEl,
-          sessionArtifactsDismissBtn: refs.sessionArtifactsDismissBtn,
           settingsDialog: refs.settingsDialog,
           startCwdInput: refs.startCwdInput,
           startCommandInput: refs.startCommandInput,

@@ -225,24 +225,8 @@ export function createSessionUiFacadeController(options = {}) {
     getSessionCardMetaController()?.renderSessionTagList?.(entry, session);
   }
 
-  function renderSessionPluginBadges(entry, session) {
-    getSessionCardMetaController()?.renderSessionPluginBadges?.(entry, session);
-  }
-
   function renderSessionNote(entry, session) {
     getSessionCardMetaController()?.renderSessionNote?.(entry, session);
-  }
-
-  function syncStatusTicker(sessions) {
-    getSessionCardMetaController()?.syncStatusTicker?.(sessions);
-  }
-
-  function renderSessionStatus(entry, session) {
-    getSessionCardMetaController()?.renderSessionStatus?.(entry, session);
-  }
-
-  function renderSessionArtifacts(entry, session) {
-    getSessionCardMetaController()?.renderSessionArtifacts?.(entry, session);
   }
 
   return {
@@ -281,10 +265,6 @@ export function createSessionUiFacadeController(options = {}) {
     setSettingsDirty,
     isSessionSettingsDirty,
     renderSessionTagList,
-    renderSessionPluginBadges,
-    renderSessionNote,
-    syncStatusTicker,
-    renderSessionStatus,
-    renderSessionArtifacts
+    renderSessionNote
   };
 }

@@ -1,6 +1,5 @@
 import { createApiClient } from "./api-client.js";
 import { createAppBootstrapCompositionController } from "./app-bootstrap-composition-controller.js";
-import { createActivityCompletionNotifier } from "./activity-completion-notifier.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
@@ -13,10 +12,6 @@ import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
-import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";
-import { createBuiltInStreamPlugins } from "./stream-builtins.js";
-import { createArtifactStreamPlugins } from "./stream-artifact-plugins.js";
-import { createStreamPluginEngine } from "./stream-plugin-engine.js";
 import {
   getTerminalCellHeightPx,
   isTerminalAtBottom,
@@ -81,17 +76,6 @@ const streamDebugTraceController = debugLogs
     })
   : { record() {}, dispose() {} };
 const store = createStore();
-const streamActionDispatcher = createStreamActionDispatcher({
-  store,
-  onError(details) {
-    debugLog("stream-plugin.action-error", {
-      sessionId: details?.sessionId || null,
-      hook: details?.meta?.hook || null,
-      actionType: details?.action?.type || null,
-      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
-    });
-  }
-});
 
 const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
 const stateEl = document.getElementById("connection-state");
@@ -163,70 +147,19 @@ const SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEV_AUTH_REFRESH_SAFETY_MS = 60_000;
 const DEV_AUTH_RETRY_DELAY_MS = 30_000;
 const DEV_AUTH_REFRESH_MIN_DELAY_MS = 15_000;
-const ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS = (() => {
-  const injectedValue = window?.__PTYDECK_CONFIG__?.activityCompletionNotificationWindowMs;
-  const parsed = Number(injectedValue);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 5000;
-})();
-const streamPluginEngine = createStreamPluginEngine({
-  getSession(sessionId) {
-    return appSessionRuntimeFacadeController?.getSessionById(sessionId);
-  },
-  onActions(sessionId, actions, meta) {
-    const appliedActions = streamActionDispatcher.dispatch(sessionId, actions, meta);
-    streamDebugTraceController.record(sessionId, "plugin.actions", {
-      hook: meta?.hook || null,
-      actionTypes: appliedActions.map((action) => action.type)
-    });
-    debugLog("stream-plugin.actions", {
-      sessionId,
-      hook: meta?.hook || null,
-      actionTypes: appliedActions.map((action) => action.type)
-    });
-  },
-  onPluginError(details) {
-    streamDebugTraceController.record(details?.sessionId || "unknown", "plugin.error", {
-      pluginId: details?.pluginId || null,
-      hook: details?.hook || null,
-      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
-    });
-    debugLog("stream-plugin.error", {
-      pluginId: details?.pluginId || null,
-      hook: details?.hook || null,
-      sessionId: details?.sessionId || null,
-      message: details?.error instanceof Error ? details.error.message : String(details?.error || "")
-    });
-  }
-});
 const streamAdapter = createSessionStreamAdapter({
   idleMs: SESSION_ACTIVITY_QUIET_MS,
   onData(sessionId, chunk) {
     streamDebugTraceController.record(sessionId, "stream.data", {
       chunk
     });
-    streamPluginEngine.handleData(sessionId, chunk);
     appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);
-  },
-  onLine(sessionId, line) {
-    streamDebugTraceController.record(sessionId, "stream.line", {
-      line
-    });
-    streamPluginEngine.handleLine(sessionId, line);
   },
   onIdle(sessionId) {
     streamDebugTraceController.record(sessionId, "stream.idle", {});
-    streamPluginEngine.handleIdle(sessionId);
     store.clearSessionActivity(sessionId);
   }
 });
-streamPluginEngine.replacePlugins([
-  ...createBuiltInStreamPlugins({
-    traceActivityDetection(details) {
-      streamDebugTraceController.record(details.sessionId, "activity.detection", details);
-    }
-  }),
-  ...createArtifactStreamPlugins()
-]);
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -352,20 +285,6 @@ appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   refreshTerminalViewport,
   syncTerminalScrollArea,
   windowRef: window
-});
-const activityCompletionNotifier = createActivityCompletionNotifier({
-  windowRef: window,
-  aggregationWindowMs: ACTIVITY_COMPLETION_NOTIFICATION_WINDOW_MS,
-  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
-  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
-  resolveDeckName(deckId) {
-    return appLayoutDeckFacadeController?.resolveDeckName(deckId) || String(deckId || "").trim();
-  },
-  onError(error) {
-    debugLog("activity-notification.error", {
-      message: error instanceof Error ? error.message : String(error || "")
-    });
-  }
 });
 const uiState = {
   loading: true,
@@ -551,7 +470,6 @@ sessionRuntimeController = createSessionRuntimeController({
   syncActiveTerminalSearch: (options) => appCommandUiFacadeController?.syncActiveTerminalSearch(options),
   getActiveSessionId: () => store.getState().activeSessionId,
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
-  streamPluginEngine,
   streamAdapter,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
@@ -578,7 +496,6 @@ runtimeEventController = createRuntimeEventController({
   removeDeckFromState: (deckId, options) => appLayoutDeckFacadeController?.removeDeckFromState(deckId, options),
   upsertCustomCommandState: (command) => appCommandUiFacadeController?.upsertCustomCommand(command),
   removeCustomCommandState: (name) => appCommandUiFacadeController?.removeCustomCommand(name),
-  activityCompletionNotifier,
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   setActiveSession: (sessionId) => store.setActiveSession(sessionId),
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
@@ -590,16 +507,10 @@ runtimeEventController = createRuntimeEventController({
 });
 
 sessionCardMetaController = createSessionCardMetaController({
-  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
-  onTick: () => appCommandUiFacadeController?.render(),
-  windowRef: window
+  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags
 });
 
-sessionDisposalController = createSessionDisposalController({
-  onClearSessionStatusAnchor(sessionId) {
-    sessionCardMetaController?.clearSessionStatusAnchor(sessionId);
-  }
-});
+sessionDisposalController = createSessionDisposalController();
 
 sessionCardFactoryController = createSessionCardFactoryController({
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
@@ -608,10 +519,7 @@ sessionCardFactoryController = createSessionCardFactoryController({
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
-  renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
-  renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
-  renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible)
 });
 
@@ -662,10 +570,7 @@ sessionCardRenderController = createSessionCardRenderController({
   syncTerminalViewportAfterShow: (sessionId, entry) => appSessionRuntimeFacadeController?.syncTerminalViewportAfterShow(sessionId, entry),
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
-  renderSessionPluginBadges: sessionUiFacadeController.renderSessionPluginBadges,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
-  renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
-  renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
@@ -790,7 +695,6 @@ sessionGridController = createSessionGridController({
   renderDeckTabs: (sessions) => appLayoutDeckFacadeController?.renderDeckTabs(sessions),
   workspaceRenderController,
   getCommandTargetSummary: () => commandTargetRuntimeController?.formatActiveTargetSummary?.() || "",
-  syncStatusTicker: sessionUiFacadeController.syncStatusTicker,
   syncActiveTerminalSearch: (options) => appCommandUiFacadeController?.syncActiveTerminalSearch(options),
   sessionDisposalController,
   closeSettingsDialog: (dialog) => appLayoutDeckFacadeController?.closeSettingsDialog(dialog),
@@ -852,7 +756,6 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   windowRef: window,
   documentRef: document,
   wsStateRef,
-  activityCompletionNotifier,
   observeSessionData: (sessionId, data) =>
     streamDebugTraceController.record(sessionId, "ws.session.data", {
       chunk: data,

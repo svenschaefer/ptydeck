@@ -76,6 +76,20 @@ test("session-runtime controller appends chunks and retries replay for late term
   assert.equal(controller.appendTerminalChunk("s1", "\u001b(B\u001b)0\u001b#8"), true);
   assert.equal(controller.appendTerminalChunk("s1", "\u001bP1$r0 q\u001b\\"), true);
   assert.equal(controller.appendTerminalChunk("s1", "\u200b\u200c\u200d\ufeff"), true);
+  assert.equal(
+    controller.appendTerminalChunk(
+      "s1",
+      "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l"
+    ),
+    true
+  );
+  assert.equal(
+    controller.appendTerminalChunk(
+      "s1",
+      "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[42;92H\u001b[2m1\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l"
+    ),
+    true
+  );
   assert.deepEqual(terminal.writes, [
     "hello",
     "\u001b[2J\u001b[H",
@@ -83,11 +97,15 @@ test("session-runtime controller appends chunks and retries replay for late term
     "\u001b7\u001b8\u001b=\u001b>",
     "\u001b(B\u001b)0\u001b#8",
     "\u001bP1$r0 q\u001b\\",
-    "\u200b\u200c\u200d\ufeff"
+    "\u200b\u200c\u200d\ufeff",
+    "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l",
+    "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[42;92H\u001b[2m1\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l"
   ]);
-  assert.deepEqual(callbacks, Array.from({ length: 7 }, () => ["scroll", "refresh", "scroll"]).flat());
-  assert.deepEqual(marks, ["s1"]);
+  assert.deepEqual(callbacks, Array.from({ length: 9 }, () => ["scroll", "refresh", "scroll"]).flat());
+  assert.deepEqual(marks, ["s1", "s1"]);
   assert.deepEqual(searchCalls, [
+    { preserveSelection: true },
+    { preserveSelection: true },
     { preserveSelection: true },
     { preserveSelection: true },
     { preserveSelection: true },
@@ -117,7 +135,6 @@ test("session-runtime controller updates session lifecycle and delegates runtime
   store.markSessionActivity("s1", { timestamp: 10 });
 
   const disposed = [];
-  const pluginCalls = [];
   const feedback = [];
   const runtimeCalls = [];
   const controller = createSessionRuntimeController({
@@ -126,14 +143,6 @@ test("session-runtime controller updates session lifecycle and delegates runtime
     sessionQuickIds: new Map(),
     quickIdPool: ["1"],
     getSessionById: (sessionId) => store.getState().sessions.find((session) => session.id === sessionId) || null,
-    streamPluginEngine: {
-      ensureSession(session) {
-        pluginCalls.push(["ensure", session.id]);
-      },
-      disposeSession(sessionId) {
-        pluginCalls.push(["dispose", sessionId]);
-      }
-    },
     streamAdapter: {
       disposeSession(sessionId) {
         disposed.push(sessionId);
@@ -174,11 +183,6 @@ test("session-runtime controller updates session lifecycle and delegates runtime
   assert.deepEqual(runtimeCalls, [
     ["input", "s1", "ls\n"],
     ["event", "session.updated", "ws"]
-  ]);
-  assert.deepEqual(pluginCalls, [
-    ["ensure", "s1"],
-    ["dispose", "s2"],
-    ["dispose", "s1"]
   ]);
   assert.equal(controller.formatSessionDisplayName({ id: "s1", name: "Alpha" }), "vm:Alpha");
   assert.equal(controller.formatSessionToken("s1"), "1");

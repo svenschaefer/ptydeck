@@ -65,19 +65,6 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
     refs.settingsBtn?.addEventListener("click", () => toggleSettingsDialog(refs.settingsDialog));
     refs.settingsDismissBtn?.addEventListener("click", () => closeSettingsDialog(refs.settingsDialog));
-    refs.sessionArtifactsDismissBtn?.addEventListener("click", () => {
-      const entry = getEntry();
-      if (!entry) {
-        return;
-      }
-      entry.dismissedArtifactKey = entry.artifactRenderKey || "";
-      if (entry.sessionArtifactsOverlayEl) {
-        entry.sessionArtifactsOverlayEl.hidden = true;
-      }
-      if (entry.sessionArtifactsEl) {
-        entry.sessionArtifactsEl.hidden = true;
-      }
-    });
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {
       refs.settingsDialog.addEventListener("cancel", (event) => {
         if (event && typeof event.preventDefault === "function") {

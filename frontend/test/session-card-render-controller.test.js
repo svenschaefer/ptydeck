@@ -55,17 +55,14 @@ test("session-card-render controller updates visibility and metadata", () => {
     syncTerminalViewportAfterShow: (sessionId) => calls.push(`sync:${sessionId}`),
     ensureQuickId: () => "A",
     renderSessionTagList: () => calls.push("tags"),
-    renderSessionPluginBadges: () => calls.push("badges"),
     renderSessionNote: () => calls.push("note"),
-    renderSessionStatus: () => calls.push("status"),
-    renderSessionArtifacts: () => calls.push("artifacts"),
     syncSessionStartupControls: () => calls.push("startup"),
     syncSessionThemeControls: () => calls.push("theme"),
     setSettingsDirty: () => calls.push("dirty:false")
   });
 
   const entry = createEntry();
-  const session = { id: "s1", name: "alpha", attentionActive: true };
+  const session = { id: "s1", name: "alpha" };
 
   controller.updateExistingSessionCard({
     entry,
@@ -75,7 +72,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   });
 
   assert.equal(entry.element.classList.contains("active"), true);
-  assert.equal(entry.element.classList.contains("attention"), true);
+  assert.equal(entry.element.classList.contains("attention"), false);
   assert.equal(entry.stateBadgeEl.hidden, false);
   assert.equal(entry.stateBadgeEl.textContent, "RUNNING");
   assert.equal(entry.focusBtn.textContent, "alpha");

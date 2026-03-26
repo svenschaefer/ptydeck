@@ -5,9 +5,7 @@ import { createSessionDisposalController } from "../src/public/ui/session-dispos
 
 test("session-disposal controller cleans removed sessions and related runtime state", () => {
   const calls = [];
-  const controller = createSessionDisposalController({
-    onClearSessionStatusAnchor: (sessionId) => calls.push(`status:${sessionId}`)
-  });
+  const controller = createSessionDisposalController();
 
   const timers = new Map();
   const timerToken = setTimeout(() => {}, 1);
@@ -78,6 +76,5 @@ test("session-disposal controller cleans removed sessions and related runtime st
   assert.deepEqual(calls.includes("clipboard.dispose"), true);
   assert.deepEqual(calls.includes("terminal.dispose"), true);
   assert.deepEqual(calls.includes("search.clear:s1"), true);
-  assert.deepEqual(calls.includes("status:s1"), true);
   assert.deepEqual(calls.includes("disposed:s1"), true);
 });

@@ -87,9 +87,6 @@ test("runtime-event controller applies representative runtime updates and deck f
     scheduleCommandPreview: () => calls.push(["preview"]),
     scheduleCommandSuggestions: () => calls.push(["suggestions"]),
     clearError: () => calls.push(["clearError"]),
-    activityCompletionNotifier: {
-      queueCompletion: (session, completedAt) => calls.push(["completion", session.id, completedAt])
-    },
     getSessionById: (sessionId) => sessions.get(sessionId)
   });
 
@@ -112,7 +109,6 @@ test("runtime-event controller applies representative runtime updates and deck f
     ["clearError"],
     ["exit", "s1", 7],
     ["clearError"],
-    ["completion", "s2", 42],
     ["clearError"],
     ["closed", "s1"],
     ["preview"],

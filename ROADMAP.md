@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
+- Latest completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
+- Previous completed wave: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
 - Previous completed wave: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
 - Previous completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
 - Previous completed wave before that: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).

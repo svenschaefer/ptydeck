@@ -76,7 +76,6 @@ export function createAppBootstrapCompositionController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const wsStateRef = options.wsStateRef || { current: null };
-  const activityCompletionNotifier = options.activityCompletionNotifier || { dispose() {} };
   const readClipboardText =
     typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
   const writeClipboardText =
@@ -321,7 +320,6 @@ export function createAppBootstrapCompositionController(options = {}) {
       scheduleBootstrapFallback: () => appCommandUiFacadeController?.scheduleBootstrapFallback?.(),
       scheduleGlobalResize: (runtimeOptions) => appLayoutDeckFacadeController?.scheduleGlobalResize?.(runtimeOptions),
       disposeAppRuntimeState: () => appRuntimeStateController?.dispose?.(),
-      disposeActivityCompletionNotifier: () => activityCompletionNotifier.dispose?.(),
       disposeStartupWarmup: () => startupWarmupController?.dispose?.(),
       disposeStreamDebugTrace,
       closeWsClient: () => wsStateRef.current?.close?.(),

@@ -48,33 +48,6 @@ test("session-card-interactions controller wires focus and settings dialog contr
   assert.deepEqual(calls, ["focus:s1", "toggle", "close", "prevent", "close"]);
 });
 
-test("session-card-interactions controller dismisses artifact overlays without mutating session state", async () => {
-  const controller = createSessionCardInteractionsController({});
-  const refs = {
-    focusBtn: createEventTarget(),
-    sessionArtifactsDismissBtn: createEventTarget()
-  };
-  const entry = {
-    artifactRenderKey: "Summary: Initial",
-    dismissedArtifactKey: "",
-    sessionArtifactsOverlayEl: { hidden: false },
-    sessionArtifactsEl: { hidden: false }
-  };
-
-  controller.bindSessionCardInteractions({
-    session: { id: "s1" },
-    refs,
-    api: {},
-    getEntry: () => entry
-  });
-
-  await refs.sessionArtifactsDismissBtn.emit("click");
-
-  assert.equal(entry.dismissedArtifactKey, "Summary: Initial");
-  assert.equal(entry.sessionArtifactsOverlayEl.hidden, true);
-  assert.equal(entry.sessionArtifactsEl.hidden, true);
-});
-
 test("session-card-interactions controller handles theme select changes through injected callbacks", async () => {
   const calls = [];
   const sessionThemeDrafts = new Map();

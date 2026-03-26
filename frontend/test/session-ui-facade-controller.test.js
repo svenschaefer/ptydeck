@@ -236,17 +236,8 @@ test("session-ui facade controller delegates meta rendering and falls back safel
     renderSessionTagList(entry, session) {
       calls.push(["tags", entry.id, session.id]);
     },
-    renderSessionPluginBadges(entry, session) {
-      calls.push(["plugins", entry.id, session.id]);
-    },
-    syncStatusTicker(sessions) {
-      calls.push(["ticker", sessions.length]);
-    },
-    renderSessionStatus(entry, session) {
-      calls.push(["status", entry.id, session.id]);
-    },
-    renderSessionArtifacts(entry, session) {
-      calls.push(["artifacts", entry.id, session.id]);
+    renderSessionNote(entry, session) {
+      calls.push(["note", entry.id, session.id]);
     }
   };
   const controller = createSessionUiFacadeController({
@@ -259,18 +250,12 @@ test("session-ui facade controller delegates meta rendering and falls back safel
 
   controller.setSettingsDirty(entry, true);
   controller.renderSessionTagList(entry, session);
-  controller.renderSessionPluginBadges(entry, session);
-  controller.syncStatusTicker([session]);
-  controller.renderSessionStatus(entry, session);
-  controller.renderSessionArtifacts(entry, session);
+  controller.renderSessionNote(entry, session);
 
   assert.deepEqual(calls, [
     ["dirty", "entry-1", true],
     ["tags", "entry-1", "s1"],
-    ["plugins", "entry-1", "s1"],
-    ["ticker", 1],
-    ["status", "entry-1", "s1"],
-    ["artifacts", "entry-1", "s1"]
+    ["note", "entry-1", "s1"]
   ]);
 
   const fallbackController = createSessionUiFacadeController({

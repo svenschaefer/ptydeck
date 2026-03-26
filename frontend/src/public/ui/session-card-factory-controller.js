@@ -5,10 +5,7 @@ export function createSessionCardFactoryController(options = {}) {
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const renderSessionTagList = options.renderSessionTagList || (() => {});
-  const renderSessionPluginBadges = options.renderSessionPluginBadges || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
-  const renderSessionStatus = options.renderSessionStatus || (() => {});
-  const renderSessionArtifacts = options.renderSessionArtifacts || (() => {});
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
 
   function createSessionCardView({ template, session, themeProfileKeys = [], activeSessionId = "", visible = true }) {
@@ -18,12 +15,7 @@ export function createSessionCardFactoryController(options = {}) {
     const stateBadgeEl = node.querySelector(".session-state-badge");
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
     const sessionNoteEl = node.querySelector(".session-note-text");
-    const pluginBadgesEl = node.querySelector(".session-plugin-badges");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
-    const sessionStatusEl = node.querySelector(".session-status-text");
-    const sessionArtifactsOverlayEl = node.querySelector(".session-artifacts-overlay");
-    const sessionArtifactsEl = node.querySelector(".session-artifacts");
-    const sessionArtifactsDismissBtn = node.querySelector(".session-artifacts-dismiss");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -74,7 +66,6 @@ export function createSessionCardFactoryController(options = {}) {
     }
     node.classList.toggle("unrestored", isSessionUnrestored(session));
     node.classList.toggle("exited", isSessionExited(session));
-    node.classList.toggle("attention", session?.attentionActive === true);
     node.classList.toggle("active", activeSessionId === session.id);
     if (stateBadgeEl) {
       stateBadgeEl.hidden = !stateBadgeText;
@@ -85,10 +76,7 @@ export function createSessionCardFactoryController(options = {}) {
       unrestoredHintEl.textContent = stateHintText;
     }
     renderSessionTagList({ sessionMetaRowEl, sessionNoteEl, tagListEl }, session);
-    renderSessionPluginBadges({ sessionMetaRowEl, pluginBadgesEl }, session);
-    renderSessionNote({ sessionMetaRowEl, sessionNoteEl }, session);
-    renderSessionStatus({ sessionMetaRowEl, sessionNoteEl, sessionStatusEl }, session);
-    renderSessionArtifacts({ sessionArtifactsOverlayEl, sessionArtifactsEl }, session);
+    renderSessionNote({ sessionMetaRowEl, sessionNoteEl, tagListEl }, session);
     setSessionCardVisibility(node, visible);
 
     return {
@@ -98,12 +86,7 @@ export function createSessionCardFactoryController(options = {}) {
       stateBadgeEl,
       sessionMetaRowEl,
       sessionNoteEl,
-      pluginBadgesEl,
       unrestoredHintEl,
-      sessionStatusEl,
-      sessionArtifactsOverlayEl,
-      sessionArtifactsEl,
-      sessionArtifactsDismissBtn,
       settingsBtn,
       renameBtn,
       closeBtn,

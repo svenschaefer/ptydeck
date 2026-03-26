@@ -8,10 +8,7 @@ export function createSessionCardRenderController(options = {}) {
   const syncTerminalViewportAfterShow = options.syncTerminalViewportAfterShow || (() => {});
   const ensureQuickId = options.ensureQuickId || ((sessionId) => String(sessionId || ""));
   const renderSessionTagList = options.renderSessionTagList || (() => {});
-  const renderSessionPluginBadges = options.renderSessionPluginBadges || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
-  const renderSessionStatus = options.renderSessionStatus || (() => {});
-  const renderSessionArtifacts = options.renderSessionArtifacts || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
@@ -28,8 +25,6 @@ export function createSessionCardRenderController(options = {}) {
     entry.element.classList.toggle("active", activeSessionId === session.id);
     entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
     entry.element.classList.toggle("exited", isSessionExited(session));
-    entry.element.classList.toggle("attention", session?.attentionActive === true);
-
     if (wasVisible && !nextVisible) {
       entry.followOnShow = isTerminalAtBottom(entry.terminal);
     }
@@ -53,10 +48,7 @@ export function createSessionCardRenderController(options = {}) {
     }
 
     renderSessionTagList(entry, session);
-    renderSessionPluginBadges(entry, session);
     renderSessionNote(entry, session);
-    renderSessionStatus(entry, session);
-    renderSessionArtifacts(entry, session);
 
     if (!entry.settingsDirty) {
       syncSessionStartupControls(entry, session);

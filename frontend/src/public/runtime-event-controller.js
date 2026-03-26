@@ -16,7 +16,6 @@ export function createRuntimeEventController(options = {}) {
   const removeDeckFromState = options.removeDeckFromState || (() => {});
   const upsertCustomCommandState = options.upsertCustomCommandState || (() => {});
   const removeCustomCommandState = options.removeCustomCommandState || (() => {});
-  const activityCompletionNotifier = options.activityCompletionNotifier;
   const getSessionById = options.getSessionById || (() => null);
   const setActiveSession = options.setActiveSession || (() => {});
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
@@ -82,14 +81,12 @@ export function createRuntimeEventController(options = {}) {
       case "session.activity.completed":
         if (event.session) {
           upsertSession(event.session);
-          activityCompletionNotifier?.queueCompletion?.(event.session, event.activityCompletedAt);
           clearError();
           return true;
         }
         if (event.sessionId) {
           const session = getSessionById(event.sessionId);
           if (session) {
-            activityCompletionNotifier?.queueCompletion?.(session, event.activityCompletedAt);
             clearError();
             return true;
           }

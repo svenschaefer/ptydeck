@@ -698,11 +698,6 @@ button:hover {
   box-shadow: 0 0 0 1px rgba(142, 192, 124, 0.35);
 }
 
-.terminal-card.attention {
-  border-color: var(--border);
-  box-shadow: none;
-}
-
 .terminal-toolbar {
   padding: 8px 10px;
   display: flex;
@@ -796,26 +791,6 @@ button:hover {
   display: none !important;
 }
 
-.session-plugin-badges {
-  margin: 0;
-  padding: 2px 8px;
-  border: 1px solid #2f4a3f;
-  border-radius: 999px;
-  color: #a5d68a;
-  background: #17231c;
-  font-size: 10px;
-  line-height: 1.2;
-  white-space: nowrap;
-  flex: 0 0 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 16rem;
-}
-
-.session-plugin-badges.empty {
-  display: none;
-}
-
 .session-rename {
   flex: 0 0 auto;
   margin-left: 0;
@@ -872,75 +847,9 @@ button:hover {
   line-height: 1.35;
 }
 
-.session-status-text {
-  margin: 0;
-  padding: 0;
-  color: #a9c1d8;
-  font-size: 11px;
-  line-height: 1.35;
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .terminal-surface {
   position: relative;
   min-width: 0;
-}
-
-.session-artifacts-overlay {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.session-artifacts-overlay[hidden] {
-  display: none !important;
-}
-
-.session-artifacts-dismiss {
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-  color: #b9cadb;
-  border-color: #314255;
-  background: #101924;
-  pointer-events: auto;
-}
-
-.session-artifacts {
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid #223041;
-  border-radius: 8px;
-  background: #0d131c;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
-  color: #b9cadb;
-  font-size: 11px;
-  line-height: 1.4;
-  white-space: pre-wrap;
-  pointer-events: auto;
-  overflow: auto;
-  max-height: calc(var(--ptydeck-terminal-mount-height, 172px) - 16px);
-  flex: 1 1 auto;
-}
-
-.session-artifacts[hidden] {
-  display: none !important;
 }
 
 .terminal-card.unrestored {
@@ -969,14 +878,6 @@ button:hover {
   border-bottom-color: #4a315d;
   background: #1f1728;
   color: #d8c1f0;
-}
-
-.terminal-card.attention .session-status-text {
-  color: #ffd89a;
-}
-
-.terminal-card.attention .session-artifacts {
-  border-color: #49371d;
 }
 
 .session-settings-dialog {

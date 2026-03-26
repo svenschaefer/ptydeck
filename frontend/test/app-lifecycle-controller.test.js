@@ -167,7 +167,6 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
       resizeCalls += 1;
     },
     disposeAppRuntimeState: () => cleanup.push("app-runtime"),
-    disposeActivityCompletionNotifier: () => cleanup.push("activity"),
     disposeStartupWarmup: () => cleanup.push("startup-warmup"),
     disposeStreamDebugTrace: () => cleanup.push("stream-debug"),
     closeWsClient: () => cleanup.push("ws"),
@@ -208,7 +207,6 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   assert.deepEqual(cleanup, [
     "skip-warmup",
     "app-runtime",
-    "activity",
     "startup-warmup",
     "stream-debug",
     "ws",

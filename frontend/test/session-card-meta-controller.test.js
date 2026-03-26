@@ -42,9 +42,7 @@ test("session-card-meta controller updates dirty/saved state", () => {
     settingsDirty: false
   };
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
-    now: () => 0,
-    windowRef: { document: { hidden: false } }
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
   });
 
   controller.setSettingsDirty(entry, true);
@@ -60,129 +58,46 @@ test("session-card-meta controller updates dirty/saved state", () => {
   assert.equal(entry.settingsStatus.classList.contains("saved"), true);
 });
 
-test("session-card-meta controller renders tags, badges, status and artifacts", () => {
-  let nowMs = 1_000;
+test("session-card-meta controller renders notes and tags", () => {
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
-    now: () => nowMs,
-    windowRef: { document: { hidden: false } }
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
   });
 
   const entry = {
     sessionMetaRowEl: { hidden: true },
     sessionNoteEl: { textContent: "", title: "", hidden: true },
-    tagListEl: { textContent: "", title: "", classList: createClassList() },
-    pluginBadgesEl: { textContent: "", title: "", classList: createClassList() },
-    sessionStatusEl: { textContent: "", title: "", hidden: true },
-    sessionArtifactsOverlayEl: { hidden: true },
-    sessionArtifactsEl: { textContent: "", title: "", hidden: true }
+    tagListEl: { textContent: "", title: "", classList: createClassList() }
   };
   const session = {
     id: "s-1",
     note: "check metrics",
-    tags: ["alpha", "beta"],
-    pluginBadges: [{ text: "Working" }, { text: "GPU" }],
-    interpretationState: "working",
-    statusText: "Working (7m 04s • esc to interrupt)",
-    artifacts: [{ title: "Summary", text: "Done" }],
-    commandCorrelations: [{ label: "/go" }]
+    tags: ["alpha", "beta"]
   };
 
   controller.renderSessionNote(entry, session);
   controller.renderSessionTagList(entry, session);
-  controller.renderSessionPluginBadges(entry, session);
-  controller.renderSessionStatus(entry, session);
-  controller.renderSessionArtifacts(entry, session);
 
   assert.equal(entry.sessionNoteEl.textContent, "check metrics");
   assert.equal(entry.sessionNoteEl.hidden, false);
   assert.equal(entry.tagListEl.textContent, "#alpha #beta");
-  assert.equal(entry.pluginBadgesEl.textContent, "Working · GPU");
-  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
-  assert.equal(entry.sessionStatusEl.title, "Working (7m 04s • esc to interrupt)\nCommand: /go");
-  assert.equal(entry.sessionStatusEl.hidden, false);
   assert.equal(entry.sessionMetaRowEl.hidden, false);
-  assert.equal(entry.sessionArtifactsEl.textContent, "Summary: Done");
-  assert.equal(entry.sessionArtifactsEl.title, "Summary: Done\nCommand: /go");
-  assert.equal(entry.sessionArtifactsEl.hidden, false);
-  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
-
-  nowMs += 2_000;
-  controller.renderSessionStatus(entry, session);
-  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 06s • esc to interrupt)");
-
-  controller.clearSessionStatusAnchor("s-1");
-  nowMs += 2_000;
-  controller.renderSessionStatus(entry, session);
-  assert.equal(entry.sessionStatusEl.textContent, "Working (7m 04s • esc to interrupt)");
 });
 
-test("session-card-meta controller hides meta row when tags badges and status are empty", () => {
+test("session-card-meta controller hides meta row when note and tags are empty", () => {
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
-    now: () => 0,
-    windowRef: { document: { hidden: false } }
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
   });
 
   const entry = {
     sessionMetaRowEl: { hidden: false },
     sessionNoteEl: { textContent: "", hidden: false },
-    tagListEl: { textContent: "", classList: createClassList() },
-    pluginBadgesEl: { textContent: "", classList: createClassList() },
-    sessionStatusEl: { textContent: "", hidden: false }
+    tagListEl: { textContent: "", classList: createClassList() }
   };
 
   controller.renderSessionNote(entry, { note: "" });
   controller.renderSessionTagList(entry, { tags: [] });
-  controller.renderSessionPluginBadges(entry, { pluginBadges: [] });
-  controller.renderSessionStatus(entry, { statusText: "", interpretationState: "idle" });
   assert.equal(entry.sessionMetaRowEl.hidden, true);
 
-  controller.renderSessionStatus(entry, {
-    id: "s-1",
-    statusText: "Working (0s • esc to interrupt)",
-    interpretationState: "working"
-  });
-  assert.equal(entry.sessionMetaRowEl.hidden, false);
-
-  controller.renderSessionStatus(entry, { statusText: "", interpretationState: "idle" });
   controller.renderSessionNote(entry, { note: "keep logs ready" });
   assert.equal(entry.sessionMetaRowEl.hidden, false);
-});
-
-test("session-card-meta controller keeps artifacts dismissed until content changes", () => {
-  const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
-    now: () => 0,
-    windowRef: { document: { hidden: false } }
-  });
-
-  const entry = {
-    sessionArtifactsOverlayEl: { hidden: true },
-    sessionArtifactsEl: { textContent: "", hidden: true },
-    artifactRenderKey: "",
-    dismissedArtifactKey: ""
-  };
-
-  controller.renderSessionArtifacts(entry, {
-    artifacts: [{ title: "Summary", text: "Initial" }]
-  });
-  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
-  assert.equal(entry.sessionArtifactsEl.hidden, false);
-  assert.equal(entry.artifactRenderKey, "Summary: Initial");
-
-  entry.dismissedArtifactKey = entry.artifactRenderKey;
-  controller.renderSessionArtifacts(entry, {
-    artifacts: [{ title: "Summary", text: "Initial" }]
-  });
-  assert.equal(entry.sessionArtifactsOverlayEl.hidden, true);
-  assert.equal(entry.sessionArtifactsEl.hidden, true);
-
-  controller.renderSessionArtifacts(entry, {
-    artifacts: [{ title: "Summary", text: "Updated" }]
-  });
-  assert.equal(entry.sessionArtifactsOverlayEl.hidden, false);
-  assert.equal(entry.sessionArtifactsEl.hidden, false);
-  assert.equal(entry.dismissedArtifactKey, "");
-  assert.equal(entry.artifactRenderKey, "Summary: Updated");
 });

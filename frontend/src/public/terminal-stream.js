@@ -130,10 +130,11 @@ function clearSessionIdleTimer(state) {
 export function createSessionStreamAdapter(options = {}) {
   const sessionStates = new Map();
   const onData = typeof options.onData === "function" ? options.onData : () => {};
-  const onLine = typeof options.onLine === "function" ? options.onLine : () => {};
+  const hasLineConsumer = typeof options.onLine === "function";
+  const onLine = hasLineConsumer ? options.onLine : () => {};
   const onIdle = typeof options.onIdle === "function" ? options.onIdle : () => {};
   const idleMs = Number.isFinite(options.idleMs) ? Math.max(0, Number(options.idleMs)) : null;
-  const stripAnsiForLines = options.stripAnsiForLines === true;
+  const stripAnsiForLines = hasLineConsumer && options.stripAnsiForLines === true;
 
   function emitLine(sessionId, pendingLine) {
     const line = stripAnsiForLines ? stripAnsiCodes(pendingLine) : pendingLine;
@@ -157,6 +158,10 @@ export function createSessionStreamAdapter(options = {}) {
     }
     const state = getSessionStreamState(sessionStates, sessionId);
     onData(sessionId, chunk);
+    if (!hasLineConsumer) {
+      scheduleIdle(sessionId, state);
+      return true;
+    }
     for (let index = 0; index < chunk.length; index += 1) {
       const char = chunk[index];
       const nextChar = chunk[index + 1];

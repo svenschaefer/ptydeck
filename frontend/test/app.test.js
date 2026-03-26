@@ -355,8 +355,6 @@ function createTerminalCardTemplateNode() {
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
   stateBadge.hidden = true;
-  const pluginBadges = new FakeElement({ className: "session-plugin-badges", tagName: "p" });
-  pluginBadges.classList.add("empty");
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
   tagList.classList.add("empty");
@@ -364,14 +362,7 @@ function createTerminalCardTemplateNode() {
   sessionNote.hidden = true;
   const unrestoredHint = new FakeElement({ className: "session-unrestored-hint", tagName: "p" });
   unrestoredHint.hidden = true;
-  const sessionStatus = new FakeElement({ className: "session-status-text", tagName: "p" });
-  sessionStatus.hidden = true;
   const terminalSurface = new FakeElement({ className: "terminal-surface", tagName: "div" });
-  const sessionArtifactsOverlay = new FakeElement({ className: "session-artifacts-overlay", tagName: "div" });
-  sessionArtifactsOverlay.hidden = true;
-  const sessionArtifacts = new FakeElement({ className: "session-artifacts", tagName: "pre" });
-  sessionArtifacts.hidden = true;
-  const sessionArtifactsDismiss = new FakeElement({ className: "session-artifacts-dismiss", tagName: "button" });
   const rename = new FakeElement({ className: "session-rename", tagName: "button" });
   const close = new FakeElement({ className: "session-close", tagName: "button" });
   const settingsPanel = new FakeElement({ className: "session-settings-dialog", tagName: "dialog" });
@@ -426,8 +417,6 @@ function createTerminalCardTemplateNode() {
   toolbarMain.appendChild(titleGroup);
   toolbarMain.appendChild(toolbarActions);
   toolbarMeta.appendChild(sessionNote);
-  toolbarMeta.appendChild(sessionStatus);
-  toolbarMeta.appendChild(pluginBadges);
   toolbarMeta.appendChild(tagList);
   toolbar.appendChild(toolbarMain);
   toolbar.appendChild(toolbarMeta);
@@ -465,10 +454,7 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(rename);
   settingsPanel.appendChild(close);
   settingsPanel.appendChild(settingsFooter);
-  sessionArtifactsOverlay.appendChild(sessionArtifactsDismiss);
-  sessionArtifactsOverlay.appendChild(sessionArtifacts);
   terminalSurface.appendChild(mount);
-  terminalSurface.appendChild(sessionArtifactsOverlay);
   card.appendChild(toolbar);
   card.appendChild(unrestoredHint);
   card.appendChild(settingsPanel);
@@ -1950,27 +1936,20 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const recoveredHiddenCard = fixture.elements.terminalGrid.children.find(
     (entry) => entry.hidden === false && entry.querySelector(".session-focus")?.textContent === "two"
   );
-  assert.equal(recoveredHiddenCard.querySelector(".session-plugin-badges").textContent, "Working");
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
-  assert.match(recoveredHiddenCard.querySelector(".session-artifacts").textContent, /Summary: hidden deck output recovered/i);
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "Working" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: " (0s • esc to interrupt)" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
   ws.emit("message", {
     data: JSON.stringify({ type: "session.data", sessionId: "s-2", data: "31      - terminal failure paths now persist `error_det`\n" })
   });
   await tick();
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
-  assert.equal(recoveredHiddenCard.classList.contains("attention"), true);
+  assert.equal(recoveredHiddenCard.classList.contains("attention"), false);
   await sleep(1200);
-  assert.equal(recoveredHiddenCard.querySelector(".session-status-text").textContent, "");
 
   ws.emit("message", {
     data: JSON.stringify({

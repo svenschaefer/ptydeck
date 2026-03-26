@@ -1,54 +1,6 @@
-function normalizeDurationStatus(statusText) {
-  const match = String(statusText || "").match(/^(.*\()(?:(\d+)m\s*)?(\d{1,2})s([^)]+\))$/);
-  if (!match) {
-    return null;
-  }
-  const minutes = match[2] ? Number.parseInt(match[2], 10) : 0;
-  const secondsPart = Number.parseInt(match[3], 10);
-  return {
-    prefix: match[1],
-    seconds: minutes * 60 + secondsPart,
-    suffix: match[4]
-  };
-}
-
-function formatDurationSeconds(totalSeconds) {
-  const safeTotalSeconds = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
-  const hours = Math.floor(safeTotalSeconds / 3600);
-  const minutes = Math.floor((safeTotalSeconds % 3600) / 60);
-  const seconds = safeTotalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
-  }
-  if (safeTotalSeconds >= 60) {
-    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-  }
-  return `${seconds}s`;
-}
-
-function getLatestCommandCorrelation(session) {
-  const correlations = Array.isArray(session?.commandCorrelations) ? session.commandCorrelations : [];
-  return correlations.length > 0 ? correlations[correlations.length - 1] : null;
-}
-
-function buildCommandCorrelationTitle(baseTitle, session) {
-  const normalizedBaseTitle = String(baseTitle || "").trim();
-  const correlation = getLatestCommandCorrelation(session);
-  const label = String(correlation?.label || "").trim();
-  if (!label) {
-    return normalizedBaseTitle;
-  }
-  return normalizedBaseTitle ? `${normalizedBaseTitle}\nCommand: ${label}` : `Command: ${label}`;
-}
-
 export function createSessionCardMetaController(options = {}) {
   const normalizeSessionTags =
     typeof options.normalizeSessionTags === "function" ? options.normalizeSessionTags : (tags) => (Array.isArray(tags) ? tags : []);
-  const onTick = typeof options.onTick === "function" ? options.onTick : () => {};
-  const now = typeof options.now === "function" ? options.now : () => Date.now();
-  const win = options.windowRef || (typeof window !== "undefined" ? window : null);
-  const durationAnchors = new Map();
-  let statusTickerTimer = null;
 
   function setSettingsStatus(entry, text, kind = "") {
     if (!entry?.settingsStatus) {
@@ -79,19 +31,11 @@ export function createSessionCardMetaController(options = {}) {
       Boolean(entry?.sessionNoteEl) &&
       entry.sessionNoteEl.hidden !== true &&
       String(entry.sessionNoteEl.textContent || "").trim().length > 0;
-    const hasStatus =
-      Boolean(entry?.sessionStatusEl) &&
-      entry.sessionStatusEl.hidden !== true &&
-      String(entry.sessionStatusEl.textContent || "").trim().length > 0;
-    const hasBadges =
-      Boolean(entry?.pluginBadgesEl) &&
-      !entry.pluginBadgesEl.classList?.contains?.("empty") &&
-      String(entry.pluginBadgesEl.textContent || "").trim().length > 0;
     const hasTags =
       Boolean(entry?.tagListEl) &&
       !entry.tagListEl.classList?.contains?.("empty") &&
       String(entry.tagListEl.textContent || "").trim().length > 0;
-    return hasNote || hasStatus || hasBadges || hasTags;
+    return hasNote || hasTags;
   }
 
   function syncMetaRowVisibility(entry) {
@@ -113,18 +57,6 @@ export function createSessionCardMetaController(options = {}) {
     syncMetaRowVisibility(entry);
   }
 
-  function renderSessionPluginBadges(entry, session) {
-    if (!entry?.pluginBadgesEl) {
-      return;
-    }
-    const badges = Array.isArray(session?.pluginBadges) ? session.pluginBadges.filter((badge) => badge && badge.text) : [];
-    const nextText = badges.map((badge) => badge.text).join(" · ");
-    entry.pluginBadgesEl.textContent = nextText;
-    entry.pluginBadgesEl.title = nextText;
-    entry.pluginBadgesEl.classList.toggle("empty", badges.length === 0);
-    syncMetaRowVisibility(entry);
-  }
-
   function renderSessionNote(entry, session) {
     if (!entry?.sessionNoteEl) {
       return;
@@ -136,123 +68,11 @@ export function createSessionCardMetaController(options = {}) {
     syncMetaRowVisibility(entry);
   }
 
-  function formatLiveSessionStatus(session) {
-    const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
-    if (!rawStatus) {
-      durationAnchors.delete(session?.id);
-      return "";
-    }
-    const parsed = normalizeDurationStatus(rawStatus);
-    if (!parsed || !Number.isFinite(parsed.seconds) || session?.interpretationState !== "working") {
-      durationAnchors.delete(session?.id);
-      return rawStatus;
-    }
-    const sessionId = String(session?.id || "");
-    if (!sessionId) {
-      return rawStatus;
-    }
-    const nowMs = now();
-    const existing = durationAnchors.get(sessionId);
-    if (!existing || existing.rawStatus !== rawStatus) {
-      durationAnchors.set(sessionId, {
-        rawStatus,
-        baseSeconds: parsed.seconds,
-        baseAtMs: nowMs,
-        prefix: parsed.prefix,
-        suffix: parsed.suffix
-      });
-      return rawStatus;
-    }
-    const elapsedSeconds = Math.max(0, Math.floor((nowMs - existing.baseAtMs) / 1000));
-    return `${existing.prefix}${formatDurationSeconds(existing.baseSeconds + elapsedSeconds)}${existing.suffix}`;
-  }
-
-  function hasLiveDurationStatus(session) {
-    const rawStatus = typeof session?.statusText === "string" ? session.statusText.trim() : "";
-    if (!rawStatus || session?.interpretationState !== "working") {
-      return false;
-    }
-    const parsed = normalizeDurationStatus(rawStatus);
-    return Boolean(parsed && Number.isFinite(parsed.seconds));
-  }
-
-  function syncStatusTicker(sessions) {
-    const shouldTick = Array.isArray(sessions) && sessions.some((session) => hasLiveDurationStatus(session));
-    if (shouldTick && statusTickerTimer === null) {
-      statusTickerTimer = setInterval(() => {
-        if (win?.document?.hidden === true) {
-          return;
-        }
-        onTick();
-      }, 1000);
-      return;
-    }
-    if (!shouldTick && statusTickerTimer !== null) {
-      clearInterval(statusTickerTimer);
-      statusTickerTimer = null;
-    }
-  }
-
-  function renderSessionStatus(entry, session) {
-    if (!entry?.sessionStatusEl) {
-      return;
-    }
-    const statusText = formatLiveSessionStatus(session);
-    entry.sessionStatusEl.hidden = !statusText;
-    entry.sessionStatusEl.textContent = statusText;
-    entry.sessionStatusEl.title = buildCommandCorrelationTitle(statusText, session);
-    syncMetaRowVisibility(entry);
-  }
-
-  function renderSessionArtifacts(entry, session) {
-    if (!entry?.sessionArtifactsEl) {
-      return;
-    }
-    const artifacts = Array.isArray(session?.artifacts) ? session.artifacts.filter((artifact) => artifact && artifact.title) : [];
-    const artifactText = artifacts.map((artifact) => `${artifact.title}: ${artifact.text}`).join("\n\n");
-    const nextKey = artifactText.trim();
-
-    if (!nextKey) {
-      entry.artifactRenderKey = "";
-      entry.dismissedArtifactKey = "";
-      entry.sessionArtifactsEl.hidden = true;
-      entry.sessionArtifactsEl.textContent = "";
-      entry.sessionArtifactsEl.title = "";
-      if (entry.sessionArtifactsOverlayEl) {
-        entry.sessionArtifactsOverlayEl.hidden = true;
-      }
-      return;
-    }
-
-    const previousKey = typeof entry.artifactRenderKey === "string" ? entry.artifactRenderKey : "";
-    if (previousKey !== nextKey) {
-      entry.dismissedArtifactKey = "";
-    }
-    entry.artifactRenderKey = nextKey;
-
-    const hidden = entry.dismissedArtifactKey === nextKey;
-    entry.sessionArtifactsEl.hidden = hidden;
-    entry.sessionArtifactsEl.textContent = artifactText;
-    entry.sessionArtifactsEl.title = buildCommandCorrelationTitle(artifactText, session);
-    if (entry.sessionArtifactsOverlayEl) {
-      entry.sessionArtifactsOverlayEl.hidden = hidden;
-    }
-  }
-
-  function clearSessionStatusAnchor(sessionId) {
-    durationAnchors.delete(sessionId);
-  }
-
   return {
     setSettingsStatus,
     setSettingsDirty,
     renderSessionTagList,
-    renderSessionPluginBadges,
     renderSessionNote,
-    renderSessionStatus,
-    renderSessionArtifacts,
-    syncStatusTicker,
-    clearSessionStatusAnchor,
     syncMetaRowVisibility
   };
 }

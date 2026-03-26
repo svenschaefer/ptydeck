@@ -37,12 +37,7 @@ function createNodeStub() {
     ".session-state-badge",
     ".terminal-toolbar-meta",
     ".session-note-text",
-    ".session-plugin-badges",
     ".session-unrestored-hint",
-    ".session-status-text",
-    ".session-artifacts-overlay",
-    ".session-artifacts",
-    ".session-artifacts-dismiss",
     ".session-settings",
     ".session-rename",
     ".session-close",
@@ -100,16 +95,13 @@ test("session-card-factory controller builds refs and applies initial UI state",
     isSessionUnrestored: () => false,
     isSessionExited: () => false,
     renderSessionTagList: () => calls.push("tags"),
-    renderSessionPluginBadges: () => calls.push("badges"),
     renderSessionNote: () => calls.push("note"),
-    renderSessionStatus: () => calls.push("status"),
-    renderSessionArtifacts: () => calls.push("artifacts"),
     setSessionCardVisibility: (_node, visible) => calls.push(`visible:${visible}`)
   });
 
   const result = controller.createSessionCardView({
     template,
-    session: { id: "s1", name: "alpha", attentionActive: true },
+    session: { id: "s1", name: "alpha" },
     themeProfileKeys: ["brightRed"],
     activeSessionId: "s1",
     visible: true
@@ -124,7 +116,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
   assert.equal(result.node.classList.contains("active"), true);
-  assert.equal(result.node.classList.contains("attention"), true);
+  assert.equal(result.node.classList.contains("attention"), false);
   assert.ok(result.themeInputs.brightRed);
-  assert.deepEqual(calls, ["tags", "badges", "note", "status", "artifacts", "visible:true"]);
+  assert.deepEqual(calls, ["tags", "note", "visible:true"]);
 });

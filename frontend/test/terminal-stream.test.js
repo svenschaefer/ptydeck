@@ -56,6 +56,38 @@ test("hasMeaningfulStreamActivity ignores ANSI-only and control-only redraw chun
   assert.equal(hasMeaningfulStreamActivity("Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s"), true);
 });
 
+test("hasMeaningfulStreamActivity treats real micro redraw glyphs as activity but ignores pure invisible redraws", () => {
+  const invisibleRedraw =
+    "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l";
+  const microVisibleRedraw =
+    "\u001b[?2026h\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;28H\u001b[0m\u001b[49m\u001b[K\u001b[41;2H\u001b[0m\u001b[49m\u001b[K\u001b[42;92H\u001b[2m1\u001b[39m\u001b[49m\u001b[0m\u001b[?25h\u001b[40;3H\u001b[?2026l";
+
+  assert.equal(hasMeaningfulStreamActivity(invisibleRedraw), false);
+  assert.equal(hasMeaningfulStreamActivity(microVisibleRedraw), true);
+});
+
+test("createSessionStreamAdapter skips line reconstruction when no line consumer is configured", async () => {
+  const events = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    onData(sessionId, chunk) {
+      events.push(["data", sessionId, chunk]);
+    },
+    onIdle(sessionId) {
+      events.push(["idle", sessionId]);
+    }
+  });
+
+  adapter.push("s1", "alpha\nbeta");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(events, [
+    ["data", "s1", "alpha\nbeta"],
+    ["idle", "s1"]
+  ]);
+  assert.equal(adapter.getPendingLine("s1"), "");
+});
+
 test("createSessionStreamAdapter reconstructs lines across chunk boundaries", async () => {
   const events = [];
   const adapter = createSessionStreamAdapter({

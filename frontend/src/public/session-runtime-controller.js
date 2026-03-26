@@ -17,7 +17,6 @@ export function createSessionRuntimeController(options = {}) {
   const getActiveSessionId =
     typeof options.getActiveSessionId === "function" ? options.getActiveSessionId : () => "";
   const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
-  const streamPluginEngine = options.streamPluginEngine || { ensureSession() {}, disposeSession() {} };
   const streamAdapter = options.streamAdapter || { disposeSession() {} };
   const setCommandFeedback =
     typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
@@ -119,7 +118,6 @@ export function createSessionRuntimeController(options = {}) {
     if (!session) {
       return false;
     }
-    streamPluginEngine.ensureSession(session);
     return true;
   }
 
@@ -127,7 +125,6 @@ export function createSessionRuntimeController(options = {}) {
     if (typeof sessionId !== "string" || sessionId.length === 0) {
       return false;
     }
-    streamPluginEngine.disposeSession(sessionId);
     streamAdapter.disposeSession(sessionId);
     return true;
   }

@@ -59,7 +59,6 @@ test("session-grid controller updates existing cards without creating new termin
       renderStatus: () => calls.push("status")
     },
     pruneQuickIds: () => calls.push("prune"),
-    syncStatusTicker: () => calls.push("ticker"),
     syncActiveTerminalSearch: () => calls.push("search"),
     sessionDisposalController: {
       cleanupRemovedSessions: () => false
@@ -97,7 +96,6 @@ test("session-grid controller updates existing cards without creating new termin
     "prune",
     "perf",
     "debug",
-    "ticker",
     "empty",
     "status",
     "search",
@@ -128,7 +126,6 @@ test("session-grid controller creates new cards and schedules resize passes", ()
       renderStatus: () => calls.push("status")
     },
     pruneQuickIds: () => calls.push("prune"),
-    syncStatusTicker: () => calls.push("ticker"),
     syncActiveTerminalSearch: () => calls.push("search"),
     sessionDisposalController: { cleanupRemovedSessions: () => false },
     sessionCardFactoryController: {
@@ -139,10 +136,7 @@ test("session-grid controller creates new cards and schedules resize passes", ()
           focusBtn: {},
           quickIdEl: {},
           stateBadgeEl: {},
-          pluginBadgesEl: {},
           unrestoredHintEl: {},
-          sessionStatusEl: {},
-          sessionArtifactsEl: {},
           settingsBtn: {},
           renameBtn: {},
           closeBtn: {},
@@ -239,7 +233,6 @@ test("session-grid controller creates new cards and schedules resize passes", ()
     "prune",
     "perf",
     "debug",
-    "ticker",
     "empty",
     "status",
     "search",

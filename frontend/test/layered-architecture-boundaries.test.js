@@ -13,12 +13,8 @@ async function readSources(relativePaths) {
   return Promise.all(relativePaths.map((relativePath) => readFile(sourcePath(relativePath), "utf8")));
 }
 
-test("stream, interpretation, and state modules stay free of UI and DOM shortcuts", async () => {
-  const [streamPluginEngineSource, streamActionDispatcherSource, storeSource] = await readSources([
-    "stream-plugin-engine.js",
-    "stream-action-dispatcher.js",
-    "store.js"
-  ]);
+test("stream and state modules stay free of UI and DOM shortcuts", async () => {
+  const [terminalStreamSource, storeSource] = await readSources(["terminal-stream.js", "store.js"]);
 
   const forbiddenMarkers = [
     "document.",
@@ -31,16 +27,11 @@ test("stream, interpretation, and state modules stay free of UI and DOM shortcut
     'from "../ui/'
   ];
 
-  for (const source of [streamPluginEngineSource, streamActionDispatcherSource, storeSource]) {
+  for (const source of [terminalStreamSource, storeSource]) {
     for (const marker of forbiddenMarkers) {
       assert.equal(source.includes(marker), false, `did not expect cross-layer marker ${marker}`);
     }
   }
-
-  assert.match(
-    streamActionDispatcherSource,
-    /store\.applySessionInterpretationActions\(normalizedSessionId, normalizedActions\);/
-  );
 });
 
 test("ui controllers stay free of store and interpretation internals", async () => {
@@ -81,25 +72,34 @@ test("ui controllers stay free of store and interpretation internals", async () 
   }
 });
 
-test("runtime composition preserves the plugin-engine to dispatcher to store contract", async () => {
+test("runtime composition keeps raw stream data on the terminal path and activity clearing on the idle path", async () => {
   const source = await readFile(sourcePath("app-runtime-composition-controller.js"), "utf8");
 
   const requiredMarkers = [
     'import { createStore } from "./store.js";',
-    'import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";',
-    'import { createStreamPluginEngine } from "./stream-plugin-engine.js";',
     "const store = createStore();",
-    "const streamActionDispatcher = createStreamActionDispatcher({",
-    "const streamPluginEngine = createStreamPluginEngine({",
-    "const appliedActions = streamActionDispatcher.dispatch(sessionId, actions, meta);",
-    "streamPluginEngine.handleData(sessionId, chunk);",
-    "streamPluginEngine.handleLine(sessionId, line);",
-    "streamPluginEngine.handleIdle(sessionId);",
+    'streamDebugTraceController.record(sessionId, "stream.data", {',
+    "appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);",
+    'streamDebugTraceController.record(sessionId, "stream.idle", {});',
     "store.clearSessionActivity(sessionId);"
   ];
 
   for (const marker of requiredMarkers) {
     assert.ok(source.includes(marker), `expected runtime composition marker ${marker}`);
+  }
+
+  const forbiddenMarkers = [
+    'import { createStreamActionDispatcher } from "./stream-action-dispatcher.js";',
+    'import { createStreamPluginEngine } from "./stream-plugin-engine.js";',
+    "streamPluginEngine.handleData(",
+    "streamPluginEngine.handleLine(",
+    "streamPluginEngine.handleIdle(",
+    "createBuiltInStreamPlugins(",
+    "createArtifactStreamPlugins("
+  ];
+
+  for (const marker of forbiddenMarkers) {
+    assert.equal(source.includes(marker), false, `did not expect runtime stream-interpretation marker ${marker}`);
   }
 });
 
