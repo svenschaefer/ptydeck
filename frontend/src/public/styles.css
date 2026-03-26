@@ -632,8 +632,8 @@ button:hover {
 }
 
 .terminal-card.attention {
-  border-color: #d98b2b;
-  box-shadow: 0 0 0 1px rgba(217, 139, 43, 0.25);
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 .terminal-toolbar {

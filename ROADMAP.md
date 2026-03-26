@@ -973,17 +973,16 @@ Exit criteria:
 
 ### v0.4.0-H16 - Target Clarity and Send Safety
 
-- `QLT-137`
 - `QLT-138`
 - `QLT-139`
+- `QLT-137`
 
 Completed in this milestone so far:
 
-- none
+- `QLT-137`
 
 Remaining in this milestone:
 
-- `QLT-137`
 - `QLT-138`
 - `QLT-139`
 
@@ -995,7 +994,7 @@ Dependencies:
 
 Exit criteria:
 
-- Active target and attention/unread state are visually distinct and can be understood simultaneously on cards and in the deck list.
+- Active target and attention/unread state are visually distinct and can be understood simultaneously on cards and in the deck list; the session-card border is reserved for active green only, and attention no longer claims its own orange border state.
 - Each session can persist a per-terminal input-safety profile instead of relying on one global guard policy.
 - The first frontend safety mechanisms are configurable per terminal, including at least a semantic checker for likely natural-language-to-shell sends and confirmation flows for risky sends.
 - Regression coverage proves the clarified target semantics and the first per-session send-safety flows.

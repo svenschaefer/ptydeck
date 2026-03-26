@@ -4,6 +4,10 @@ Completed and verified topics belong here.
 
 ## 2026-03-26
 
+- [x] `QLT-137` is now completed: terminal-card border semantics are now unambiguous again because active targeting owns the only colored border state (`green`), while `attention` no longer introduces an orange card frame.
+- [x] `frontend/src/public/styles.css` now keeps the terminal-card border styling reserved for `active` only; the `.terminal-card.attention` state no longer changes the card frame color or adds its own border glow.
+- [x] Validation for `QLT-137` passed with `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-137` closeout step: backend `91.60%` lines, frontend `95.45%` lines overall.
 - [x] `QLT-134` is now completed: the frontend command plane now supports `/swap <selectorA> <selectorB>` to swap the current quick IDs of exactly two resolved sessions without touching backend persistence.
 - [x] `frontend/src/public/session-runtime-controller.js` and `frontend/src/public/app-session-runtime-facade-controller.js` now expose explicit `swapSessionTokens()` support so quick-ID swaps stay scoped to the existing frontend-local quick-ID model.
 - [x] `frontend/src/public/command-schema.js`, `frontend/src/public/command-executor.js`, and `README.md` now document and execute `/swap <selectorA> <selectorB>` with the same selector semantics already used by `/switch` and `/rename`.
