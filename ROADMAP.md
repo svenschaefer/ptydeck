@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H9` (Invisible Stream Activity Filtering Hardening, `QLT-129`).
-- Previous completed wave: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
+- Latest completed wave: `v0.4.0-H10` (Debug Query Override Hardening, `QLT-130`).
+- Previous completed wave: `v0.4.0-H9` (Invisible Stream Activity Filtering Hardening, `QLT-129`).
+- Previous completed wave before that: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
 - Previous completed wave before that: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
 - Previous completed wave before that: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
 - Previous completed wave before that: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).

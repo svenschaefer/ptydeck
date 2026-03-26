@@ -30,19 +30,24 @@ function buildUrl(protocol, host, port, path) {
 }
 
 function parseDebugFlag(win, injected) {
+  const rawSearch = typeof win.location?.search === "string" ? win.location.search : "";
+  const params = new URLSearchParams(rawSearch);
+  const value = params.get("debug");
+  if (typeof value === "string" && value.trim().length > 0) {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+      return true;
+    }
+    if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+      return false;
+    }
+  }
+
   if (typeof injected.debugLogs === "boolean") {
     return injected.debugLogs;
   }
 
-  const rawSearch = typeof win.location?.search === "string" ? win.location.search : "";
-  const params = new URLSearchParams(rawSearch);
-  const value = params.get("debug");
-  if (!value) {
-    return false;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+  return false;
 }
 
 export function resolveRuntimeConfig(win = window) {

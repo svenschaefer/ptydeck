@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-26
 
+- [x] `QLT-130` is now completed: explicit frontend debug query flags now override injected default runtime config, so `?debug=1` reliably enables persisted stream-debug tracing and exposes `window.__PTYDECK_STREAM_DEBUG__` as documented even when the dev/proxy HTML injects `debugLogs: false`.
+- [x] `frontend/src/public/runtime-config.js` now gives explicit `?debug=` query values precedence over injected config defaults, supports both explicit enable (`1`, `true`, `yes`, `on`) and explicit disable (`0`, `false`, `no`, `off`) values, and only falls back to injected `debugLogs` when no explicit query override is present.
+- [x] Regression coverage for `QLT-130` was added in `frontend/test/runtime-config.test.js` and `frontend/test/app.test.js`, explicitly proving that query-driven debug mode still activates the stream-debug trace API even when injected runtime config would otherwise disable it.
+- [x] Validation for `QLT-130` passed with targeted regressions (`node frontend/test/runtime-config.test.js` and `node frontend/test/app.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-130` closeout step: backend `91.60%` lines, frontend `95.51%` lines overall.
+- [x] `v0.4.0-H10` is now fully completed: `QLT-130` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
 - [x] `QLT-129` is now completed: invisible terminal-control and formatting-only stream chunks no longer re-mark inactive sessions as active merely because the frontend received transport updates containing no user-visible output.
 - [x] `frontend/src/public/terminal-stream.js` now strips a broader family of non-visible terminal sequences before activity detection, including DEC save/restore and keypad toggles (`ESC 7`, `ESC 8`, `ESC =`, `ESC >`), charset-designation escapes (for example `ESC ( B`, `ESC ) 0`, `ESC # 8`), DCS/OSC/C1 control sequences, and zero-width/formatting characters.
 - [x] Regression coverage for `QLT-129` was added in `frontend/test/terminal-stream.test.js` and `frontend/test/session-runtime-controller.test.js`, explicitly proving that invisible redraw/control-only chunks still flow through terminal rendering without generating new session-activity bumps.

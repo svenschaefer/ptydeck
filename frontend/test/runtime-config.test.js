@@ -91,3 +91,29 @@ test("runtime config enables debug logs via query string", () => {
 
   assert.equal(config.debugLogs, true);
 });
+
+test("runtime config lets an explicit debug query override injected debugLogs defaults", () => {
+  const enabled = resolveRuntimeConfig({
+    location: {
+      protocol: "https:",
+      hostname: "example.local",
+      search: "?debug=1"
+    },
+    __PTYDECK_CONFIG__: {
+      debugLogs: false
+    }
+  });
+  const disabled = resolveRuntimeConfig({
+    location: {
+      protocol: "https:",
+      hostname: "example.local",
+      search: "?debug=off"
+    },
+    __PTYDECK_CONFIG__: {
+      debugLogs: true
+    }
+  });
+
+  assert.equal(enabled.debugLogs, true);
+  assert.equal(disabled.debugLogs, false);
+});

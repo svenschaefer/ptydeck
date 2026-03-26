@@ -2852,3 +2852,80 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   assert.equal(listDecksCalls, 0);
   assert.equal(listSessionsCalls, 0);
 });
+
+test("app runtime composition exposes stream debug trace API when query debug overrides injected defaults", async (t) => {
+  const previousDocument = global.document;
+  const previousWindow = global.window;
+  const previousResizeObserver = global.ResizeObserver;
+  const previousWebSocket = global.WebSocket;
+
+  const fixture = createDocumentFixture();
+  MockWebSocket.instances = [];
+  MockTerminal.instances = [];
+
+  const listeners = new Map();
+  const localStorageData = new Map();
+
+  const win = {
+    document: fixture.document,
+    location: {
+      protocol: "http:",
+      hostname: "127.0.0.1",
+      search: "?debug=1"
+    },
+    __PTYDECK_CONFIG__: {
+      apiBaseUrl: "http://127.0.0.1:18080/api/v1",
+      wsUrl: "ws://127.0.0.1:18080/ws",
+      debugLogs: false
+    },
+    localStorage: {
+      getItem(key) {
+        return localStorageData.has(key) ? localStorageData.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageData.set(key, String(value));
+      }
+    },
+    Terminal: MockTerminal,
+    FitAddon: {
+      FitAddon: MockFitAddon
+    },
+    prompt() {
+      return null;
+    },
+    addEventListener(type, handler) {
+      const list = listeners.get(type) || [];
+      list.push(handler);
+      listeners.set(type, list);
+    },
+    dispatchEvent(event) {
+      const list = listeners.get(event.type) || [];
+      for (const handler of list) {
+        handler(event);
+      }
+    }
+  };
+
+  global.window = win;
+  global.document = fixture.document;
+  global.ResizeObserver = MockResizeObserver;
+  global.WebSocket = MockWebSocket;
+
+  t.after(() => {
+    global.document = previousDocument;
+    global.window = previousWindow;
+    global.ResizeObserver = previousResizeObserver;
+    global.WebSocket = previousWebSocket;
+  });
+
+  const { createAppRuntimeCompositionController } = await import(
+    "../src/public/app-runtime-composition-controller.js?app-debug-query-test"
+  );
+  createAppRuntimeCompositionController({
+    windowRef: win,
+    documentRef: fixture.document
+  });
+
+  assert.equal(typeof win.__PTYDECK_STREAM_DEBUG__?.getSessionTrace, "function");
+  assert.equal(typeof win.__PTYDECK_STREAM_DEBUG__?.listSessionIds, "function");
+});
