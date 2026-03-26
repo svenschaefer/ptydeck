@@ -992,12 +992,15 @@ Dependencies:
 - `QLT-137` runs first so active-target visibility and attention-state visibility stop competing for the same primary border signal before more send-safety UX depends on those cues.
 - `QLT-138` runs after `QLT-137` and establishes the persisted per-session safety-profile contract that the frontend guardrails can rely on.
 - `QLT-139` depends on `QLT-137` and `QLT-138` so composer-side send guardrails use both the clarified target visuals and the persisted per-session safety-profile source of truth.
+- Parser-backed shell-syntax validation in `QLT-139` is scoped to opt-in shell profiles only; syntax validation is a send-gating signal, but not a replacement for separate dangerous-command or target-switch confirmation rules.
 
 Exit criteria:
 
 - Active target and attention/unread state are visually distinct and can be understood simultaneously on cards and in the deck list; the session-card border is reserved for active green only, and attention no longer claims its own orange border state.
-- Each session can persist a per-terminal input-safety profile instead of relying on one global guard policy.
-- The first frontend safety mechanisms are configurable per terminal, including at least a semantic checker for likely natural-language-to-shell sends and confirmation flows for risky sends.
+- Each session can persist a per-terminal input-safety profile instead of relying on one global guard policy, with explicit fields for shell-syntax gating, incomplete-shell confirmation, natural-language confirmation, dangerous-command confirmation, multiline confirmation, recent-target-switch confirmation, and supporting timing/size thresholds.
+- The frontend exposes at least the presets `off`, `shell_syntax_gated`, `shell_balanced`, `shell_strict`, and `agent`, with deterministic mappings onto the persisted profile fields.
+- The first frontend safety mechanisms are configurable per terminal and include all of the following: parser-backed valid-shell-syntax gating for opted-in shell sessions, explicit confirmation for incomplete shell constructs, confirmation for likely natural-language input sent to shell sessions, confirmation for dangerous shell commands, confirmation for multiline or oversized pasted input, and confirmation after a recent target switch.
+- Invalid or incomplete shell syntax does not hard-block input forever; the user can still send once after an explicit confirmation so interactive shell continuation workflows remain possible.
 - Regression coverage proves the clarified target semantics and the first per-session send-safety flows.
 
 ### Completed Items

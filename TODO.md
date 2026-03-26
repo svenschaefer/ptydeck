@@ -14,8 +14,8 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-138` Owner `BE`: add a persisted per-session input-safety profile contract to session settings so each terminal can configure which send-guard mechanisms are active (for example natural-language-to-shell confirmation, target confirmation, and related safety toggles).
-- `QLT-139` Owner `FE`: implement the first per-session send-safety mechanisms on top of the persisted profile, including clearer active-target presentation near the composer, a semantic checker for likely natural-language text sent to shell terminals, and configurable confirmation flows before risky sends.
+- `QLT-138` Owner `BE`: add a persisted per-session input-safety profile contract to session settings so each terminal can configure which send-guard mechanisms are active, including explicit profile fields for `requireValidShellSyntax`, `confirmOnIncompleteShellConstruct`, `confirmOnNaturalLanguageInput`, `confirmOnDangerousShellCommand`, `confirmOnMultilineInput`, `confirmOnRecentTargetSwitch`, and supporting timing/size thresholds used by the frontend guardrails.
+- `QLT-139` Owner `FE`: implement the first per-session send-safety mechanisms on top of the persisted profile, including a clear active-target surface near the composer, parser-backed valid-shell-syntax gating for opted-in shell sessions, explicit confirmation reasons for incomplete shell constructs, likely natural-language shell input, dangerous shell commands, multiline/oversized input, and recent target switches, plus preset mappings for at least `off`, `shell_syntax_gated`, `shell_balanced`, `shell_strict`, and `agent`.
 
 ## Active Ownership Role
 
