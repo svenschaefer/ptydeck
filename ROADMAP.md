@@ -971,6 +971,35 @@ Exit criteria:
 - The terminal-session header renders the note in a compact small-font presentation without changing the existing one-note-per-session rule.
 - Regression coverage proves backend persistence/transport behavior and frontend command/header rendering behavior.
 
+### v0.4.0-H16 - Target Clarity and Send Safety
+
+- `QLT-137`
+- `QLT-138`
+- `QLT-139`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-137`
+- `QLT-138`
+- `QLT-139`
+
+Dependencies:
+
+- `QLT-137` runs first so active-target visibility and attention-state visibility stop competing for the same primary border signal before more send-safety UX depends on those cues.
+- `QLT-138` runs after `QLT-137` and establishes the persisted per-session safety-profile contract that the frontend guardrails can rely on.
+- `QLT-139` depends on `QLT-137` and `QLT-138` so composer-side send guardrails use both the clarified target visuals and the persisted per-session safety-profile source of truth.
+
+Exit criteria:
+
+- Active target and attention/unread state are visually distinct and can be understood simultaneously on cards and in the deck list.
+- Each session can persist a per-terminal input-safety profile instead of relying on one global guard policy.
+- The first frontend safety mechanisms are configurable per terminal, including at least a semantic checker for likely natural-language-to-shell sends and confirmation flows for risky sends.
+- Regression coverage proves the clarified target semantics and the first per-session send-safety flows.
+
 ### Completed Items
 
 - `DOC-001`, `DOC-002`
