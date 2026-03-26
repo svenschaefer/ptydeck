@@ -48,6 +48,10 @@ test("hasMeaningfulStreamActivity ignores ANSI-only and control-only redraw chun
   assert.equal(hasMeaningfulStreamActivity("\u001b[2J\u001b[H"), false);
   assert.equal(hasMeaningfulStreamActivity("\r\n\t "), false);
   assert.equal(hasMeaningfulStreamActivity("\u001b]0;title\u0007"), false);
+  assert.equal(hasMeaningfulStreamActivity("\u001b7\u001b8\u001b=\u001b>"), false);
+  assert.equal(hasMeaningfulStreamActivity("\u001b(B\u001b)0\u001b#8"), false);
+  assert.equal(hasMeaningfulStreamActivity("\u001bP1$r0 q\u001b\\"), false);
+  assert.equal(hasMeaningfulStreamActivity("\u200b\u200c\u200d\ufeff"), false);
   assert.equal(hasMeaningfulStreamActivity("Working (1m 32s • esc to interrupt)"), true);
   assert.equal(hasMeaningfulStreamActivity("Completed files 0/1 | 94.5MiB/279.5MiB | 6.8MiB/s"), true);
 });

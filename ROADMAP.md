@@ -14,8 +14,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
-- Previous completed wave: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
+- Latest completed wave: `v0.4.0-H9` (Invisible Stream Activity Filtering Hardening, `QLT-129`).
+- Previous completed wave: `v0.4.0-H8` (Script Execution Traceability, `QLT-128`).
+- Previous completed wave before that: `v0.4.0-H7` (WebSocket Origin Allowlist Enforcement, `ENT-017`).
 - Previous completed wave before that: `v0.4.0-H6` (Startup Warmup Gate and Bootstrap Deferral, `QLT-126`, `QLT-127`).
 - Previous completed wave before that: `v0.4.0-H5` (Stream Activity Noise Filtering, `QLT-125`).
 - Previous completed wave before that: `v0.4.0-H4` (Declarative Command Contract, `DRV-003A` ... `DRV-004`).
@@ -869,6 +870,28 @@ Exit criteria:
 - Every top-level executable under `scripts/` emits one standardized startup log line so future runtime usage can be observed without inspecting implementation details.
 - One checker verifies that every top-level `scripts/*.sh` and `scripts/*.mjs` file declares that startup log line near the beginning of the file.
 - The checker is wired into the normal local lint gate so missing script logging cannot drift back in silently.
+
+### v0.4.0-H9 - Invisible Stream Activity Filtering Hardening
+
+- `QLT-129`
+
+Completed in this milestone so far:
+
+- `QLT-129`
+
+Remaining in this milestone:
+
+- none
+
+Dependencies:
+
+- `QLT-129` runs after `v0.4.0-H8` so the script-traceability baseline remains intact while the frontend activity detector is hardened against invisible control-sequence noise.
+
+Exit criteria:
+
+- Invisible terminal-control-only or formatting-only stream updates no longer re-mark inactive sessions as active.
+- Frontend activity filtering strips broader DEC/charset/DCS/OSC/C1/zero-width non-visible stream updates before emitting an activity bump.
+- Regression coverage proves invisible redraw/control chunks still render safely but do not produce new activity markers.
 
 ### Completed Items
 

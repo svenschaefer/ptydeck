@@ -92,7 +92,9 @@ export function normalizeCustomCommandPayloadForShell(value) {
   return normalized.join("\n");
 }
 
-const ANSI_ESCAPE_PATTERN = /\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\))/g;
+const ANSI_ESCAPE_PATTERN =
+  /(?:\u001b\][\s\S]*?(?:\u0007|\u001b\\)|\u001b[P^_X][\s\S]*?\u001b\\|[\u0090\u0098\u009e\u009f][\s\S]*?\u009c|\u009d[\s\S]*?(?:\u0007|\u009c)|\u001b\[[0-?]*[ -/]*[@-~]|\u009b[0-?]*[ -/]*[@-~]|\u001b[()#%][ -~]|\u001b[78=>]|\u001b[@-Z\\-_])/g;
+const NON_VISIBLE_PATTERN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}]/gu;
 
 function stripAnsiCodes(value) {
   return String(value || "").replace(ANSI_ESCAPE_PATTERN, "");
@@ -100,8 +102,7 @@ function stripAnsiCodes(value) {
 
 export function hasMeaningfulStreamActivity(chunk) {
   const normalized = stripAnsiCodes(String(chunk || ""))
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .replace(/\s+/g, "");
+    .replace(NON_VISIBLE_PATTERN, "");
   return normalized.length > 0;
 }
 

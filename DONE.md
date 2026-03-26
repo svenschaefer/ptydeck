@@ -2,6 +2,15 @@
 
 Completed and verified topics belong here.
 
+## 2026-03-26
+
+- [x] `QLT-129` is now completed: invisible terminal-control and formatting-only stream chunks no longer re-mark inactive sessions as active merely because the frontend received transport updates containing no user-visible output.
+- [x] `frontend/src/public/terminal-stream.js` now strips a broader family of non-visible terminal sequences before activity detection, including DEC save/restore and keypad toggles (`ESC 7`, `ESC 8`, `ESC =`, `ESC >`), charset-designation escapes (for example `ESC ( B`, `ESC ) 0`, `ESC # 8`), DCS/OSC/C1 control sequences, and zero-width/formatting characters.
+- [x] Regression coverage for `QLT-129` was added in `frontend/test/terminal-stream.test.js` and `frontend/test/session-runtime-controller.test.js`, explicitly proving that invisible redraw/control-only chunks still flow through terminal rendering without generating new session-activity bumps.
+- [x] Validation for `QLT-129` passed with targeted regressions (`node frontend/test/terminal-stream.test.js` and `node frontend/test/session-runtime-controller.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `QLT-129` closeout step: backend `91.60%` lines, frontend `95.63%` lines overall.
+- [x] `v0.4.0-H9` is now fully completed: `QLT-129` is closed and there is currently no active open delivery wave in `ROADMAP.md`.
+
 ## 2026-03-25
 
 - [x] `QLT-128` is now completed: every top-level root script under `scripts/` now emits one standardized startup log line to `stderr`, making future script usage observable without changing each script's functional output contract.

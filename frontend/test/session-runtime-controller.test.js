@@ -58,20 +58,30 @@ test("session-runtime controller appends chunks and retries replay for late term
   assert.equal(controller.appendTerminalChunk("s1", "hello"), true);
   assert.equal(controller.appendTerminalChunk("s1", "\u001b[2J\u001b[H"), true);
   assert.equal(controller.appendTerminalChunk("s1", "\r\n\t "), true);
-  assert.deepEqual(terminal.writes, ["hello", "\u001b[2J\u001b[H", "\r\n\t "]);
-  assert.deepEqual(callbacks, [
-    "scroll",
-    "refresh",
-    "scroll",
-    "scroll",
-    "refresh",
-    "scroll",
-    "scroll",
-    "refresh",
-    "scroll"
+  assert.equal(controller.appendTerminalChunk("s1", "\u001b7\u001b8\u001b=\u001b>"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "\u001b(B\u001b)0\u001b#8"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "\u001bP1$r0 q\u001b\\"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "\u200b\u200c\u200d\ufeff"), true);
+  assert.deepEqual(terminal.writes, [
+    "hello",
+    "\u001b[2J\u001b[H",
+    "\r\n\t ",
+    "\u001b7\u001b8\u001b=\u001b>",
+    "\u001b(B\u001b)0\u001b#8",
+    "\u001bP1$r0 q\u001b\\",
+    "\u200b\u200c\u200d\ufeff"
   ]);
+  assert.deepEqual(callbacks, Array.from({ length: 7 }, () => ["scroll", "refresh", "scroll"]).flat());
   assert.deepEqual(marks, ["s1"]);
-  assert.deepEqual(searchCalls, [{ preserveSelection: true }, { preserveSelection: true }, { preserveSelection: true }]);
+  assert.deepEqual(searchCalls, [
+    { preserveSelection: true },
+    { preserveSelection: true },
+    { preserveSelection: true },
+    { preserveSelection: true },
+    { preserveSelection: true },
+    { preserveSelection: true },
+    { preserveSelection: true }
+  ]);
 
   const hiddenTerminal = createTerminal();
   terminals.set("s2", { terminal: hiddenTerminal, isVisible: false, pendingViewportSync: false, searchRevision: 0 });
