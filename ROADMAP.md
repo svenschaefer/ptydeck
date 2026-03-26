@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H15`.
+- Active scoped tasks: `QLT-135`, `QLT-136`.
 - Latest completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
 - Previous completed wave: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
 - Previous completed wave before that: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
@@ -943,6 +943,33 @@ Exit criteria:
 - Both selectors must resolve to exactly one session each using existing selector semantics.
 - Quick-ID swaps remain frontend-local and are not persisted to the backend.
 - Regression coverage proves runtime swap behavior, schema/help exposure, executor feedback, and live UI rerendering.
+
+### v0.4.0-H15 - Persistent Session Notes
+
+- `QLT-135`
+- `QLT-136`
+
+Completed in this milestone so far:
+
+- none
+
+Remaining in this milestone:
+
+- `QLT-135`
+- `QLT-136`
+
+Dependencies:
+
+- `QLT-135` runs first so the persisted session-note field exists in the backend REST/WS/session contract before any frontend note-management UX depends on it.
+- `QLT-136` depends on `QLT-135` so `/note` command behavior and header rendering operate on an authoritative persisted note source instead of a frontend-local shadow state.
+
+Exit criteria:
+
+- Every session supports exactly one persisted note or none.
+- Empty note writes clear an existing note deterministically.
+- The frontend command plane exposes `/note` for session-note set/clear behavior using existing selector semantics.
+- The terminal-session header renders the note in a compact small-font presentation without changing the existing one-note-per-session rule.
+- Regression coverage proves backend persistence/transport behavior and frontend command/header rendering behavior.
 
 ### Completed Items
 
