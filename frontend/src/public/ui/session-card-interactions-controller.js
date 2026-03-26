@@ -7,6 +7,7 @@ export function createSessionCardInteractionsController(options = {}) {
   const normalizeThemeFilterCategory = options.normalizeThemeFilterCategory || ((value) => value);
   const readThemeProfileFromControls = options.readThemeProfileFromControls || (() => ({}));
   const readSessionStartupFromControls = options.readSessionStartupFromControls || (() => ({}));
+  const readSessionInputSafetyFromControls = options.readSessionInputSafetyFromControls || ((_, session) => session?.inputSafetyProfile || {});
   const isValidHexColor = options.isValidHexColor || (() => true);
   const detectThemePreset = options.detectThemePreset || (() => "custom");
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
@@ -32,6 +33,7 @@ export function createSessionCardInteractionsController(options = {}) {
     const applyRuntimeEvent = args.applyRuntimeEvent || (() => {});
     const syncSessionThemeControls = args.syncSessionThemeControls || (() => {});
     const syncSessionStartupControls = args.syncSessionStartupControls || (() => {});
+    const syncSessionInputSafetyControls = args.syncSessionInputSafetyControls || (() => {});
     const applyThemeForSession = args.applyThemeForSession || (() => {});
     const getSessionThemeConfig = args.getSessionThemeConfig || (() => ({}));
     const sessionThemeDrafts = args.sessionThemeDrafts;
@@ -51,6 +53,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
+          inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
           themeInputs: refs.themeInputs
         },
@@ -136,6 +139,7 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.startEnvInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionTagsInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionSendTerminatorSelect?.addEventListener("change", markDirtyFromControls);
+    refs.inputSafetyPresetSelect?.addEventListener("change", markDirtyFromControls);
 
     refs.themeSelect?.addEventListener("change", () => {
       const nextPreset = themeModeSet.has(refs.themeSelect.value) ? refs.themeSelect.value : "custom";
@@ -218,6 +222,12 @@ export function createSessionCardInteractionsController(options = {}) {
         sessionTagsInput: refs.sessionTagsInput,
         sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect
       });
+      const inputSafetyProfile = readSessionInputSafetyFromControls(
+        {
+          inputSafetyPresetSelect: refs.inputSafetyPresetSelect
+        },
+        currentSession
+      );
       if (!startupDraft.startCwd) {
         setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, "Working Directory cannot be empty.", true);
         return;
@@ -259,7 +269,8 @@ export function createSessionCardInteractionsController(options = {}) {
           startCommand: startupDraft.startCommand,
           env: startupDraft.envResult.env,
           tags: startupDraft.tagResult.tags,
-          themeProfile: profile
+          themeProfile: profile,
+          inputSafetyProfile
         });
         applyRuntimeEvent({ type: "session.updated", session: updated });
         sessionThemeDrafts.delete(session.id);
@@ -282,10 +293,12 @@ export function createSessionCardInteractionsController(options = {}) {
             startCommandInput: refs.startCommandInput,
             startEnvInput: refs.startEnvInput,
             sessionTagsInput: refs.sessionTagsInput,
-            sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect
+            sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
+            inputSafetyPresetSelect: refs.inputSafetyPresetSelect
           },
           freshSession
         );
+        syncSessionInputSafetyControls(refs, freshSession);
         syncSessionThemeControls(refs, session.id);
       }
       applyThemeForSession(session.id);

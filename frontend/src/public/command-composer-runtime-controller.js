@@ -1,3 +1,5 @@
+import { evaluateSendSafety as defaultEvaluateSendSafety } from "./command-send-safety-controller.js";
+
 export function createCommandComposerRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const setTimeoutFn =
@@ -18,6 +20,8 @@ export function createCommandComposerRuntimeController(options = {}) {
   const activateDeckTarget = options.activateDeckTarget || (() => ({ message: "" }));
   const setCommandFeedback = options.setCommandFeedback || (() => {});
   const setCommandPreview = options.setCommandPreview || (() => {});
+  const setCommandGuardState = options.setCommandGuardState || (() => {});
+  const clearCommandGuardState = options.clearCommandGuardState || (() => {});
   const clearCommandSuggestions = options.clearCommandSuggestions || (() => {});
   const render = options.render || (() => {});
   const debugLog = options.debugLog || (() => {});
@@ -30,6 +34,10 @@ export function createCommandComposerRuntimeController(options = {}) {
   const getActiveDeck = options.getActiveDeck || (() => null);
   const formatSessionToken = options.formatSessionToken || ((sessionId) => String(sessionId || ""));
   const formatSessionDisplayName = options.formatSessionDisplayName || ((session) => String(session?.name || ""));
+  const evaluateSendSafety =
+    typeof options.evaluateSendSafety === "function" ? options.evaluateSendSafety : defaultEvaluateSendSafety;
+  const getLastActiveSessionSwitchAt =
+    typeof options.getLastActiveSessionSwitchAt === "function" ? options.getLastActiveSessionSwitchAt : () => 0;
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "CR");
@@ -44,6 +52,7 @@ export function createCommandComposerRuntimeController(options = {}) {
   const formatQuickSwitchPreview = options.formatQuickSwitchPreview || (() => "");
 
   let commandPreviewTimer = null;
+  let pendingSend = null;
 
   function clearPreviewTimer() {
     if (commandPreviewTimer !== null) {
@@ -52,12 +61,120 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
   }
 
+  function clearPendingSend({ renderAfterClear = false } = {}) {
+    pendingSend = null;
+    clearCommandGuardState({ render: renderAfterClear });
+  }
+
+  function formatCommandGuardReasons(reasonEntries = []) {
+    return reasonEntries
+      .map((entry) => {
+        const targets = Array.isArray(entry.targets) && entry.targets.length > 0 ? ` (${entry.targets.join(", ")})` : "";
+        return `- ${entry.label}${targets}`;
+      })
+      .join("\n");
+  }
+
+  function resolveSendPlan(interpreted) {
+    const state = getState();
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    const directRouting = parseDirectTargetRoutingInput(interpreted.data);
+
+    let targetSessions = [];
+    let targetPayload = interpreted.data;
+    let routeFeedback = "";
+
+    if (directRouting.matched) {
+      const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, {
+        source: "direct-route",
+        scopeMode: "active-deck",
+        activeDeckId: getActiveDeck()?.id || ""
+      });
+      if (resolvedTargets.error) {
+        return { error: resolvedTargets.error };
+      }
+      targetSessions = resolvedTargets.sessions;
+      targetPayload = directRouting.payload;
+      if (targetSessions.length === 1) {
+        routeFeedback = `Sent to [${formatSessionToken(targetSessions[0].id)}] ${formatSessionDisplayName(targetSessions[0])}.`;
+      } else {
+        routeFeedback = `Sent to ${targetSessions.length} sessions.`;
+      }
+    } else {
+      const activeSession = sessions.find((session) => session.id === state.activeSessionId) || null;
+      if (!activeSession) {
+        return null;
+      }
+      targetSessions = [activeSession];
+    }
+
+    if (targetSessions.length === 0) {
+      return null;
+    }
+
+    const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
+    if (blockedSessions.length > 0) {
+      return { error: getBlockedSessionActionMessage(blockedSessions, "Command send") };
+    }
+
+    return {
+      targetSessions,
+      targetPayload,
+      routeFeedback,
+      directRouteMatched: directRouting.matched === true
+    };
+  }
+
+  async function executeSendPlan(plan) {
+    if (!plan || !Array.isArray(plan.targetSessions) || plan.targetSessions.length === 0) {
+      return;
+    }
+
+    for (const session of plan.targetSessions) {
+      const terminatorMode = getSessionSendTerminator(session.id);
+      debugLog("command.send.start", {
+        activeSessionId: session.id,
+        mode: terminatorMode,
+        directRoute: plan.directRouteMatched === true
+      });
+      await sendInputWithConfiguredTerminator(apiSendInput, session.id, plan.targetPayload, terminatorMode, {
+        normalizeMode: normalizeSendTerminatorMode,
+        delayedSubmitMs
+      });
+    }
+
+    const submittedAt = Date.now();
+    for (const session of plan.targetSessions) {
+      recordCommandSubmission(session.id, {
+        source: "input",
+        text: plan.targetPayload,
+        submittedAt
+      });
+    }
+
+    clearPendingSend({ renderAfterClear: false });
+    setCommandValue("");
+    setCommandPreview("");
+    clearCommandSuggestions();
+    clearError();
+    if (plan.routeFeedback) {
+      setCommandFeedback(plan.routeFeedback);
+    }
+    resetSlashHistoryNavigationState();
+    debugLog("command.send.ok", {
+      activeSessionId: plan.targetSessions[0]?.id || "",
+      directRoute: plan.directRouteMatched === true
+    });
+    render();
+  }
+
   async function submitCommand() {
     resetCommandAutocompleteState();
     const command = getCommandValue();
     if (!command.trim()) {
       return;
     }
+    clearPendingSend({ renderAfterClear: false });
 
     const interpreted = interpretComposerInput(command);
     if (interpreted.kind === "quick-switch") {
@@ -98,105 +215,68 @@ export function createCommandComposerRuntimeController(options = {}) {
       return;
     }
 
-    const state = getState();
-    const sessions = state.sessions;
-    const directRouting = parseDirectTargetRoutingInput(interpreted.data);
-
-    let targetSessionId = state.activeSessionId;
-    let targetSessions = [];
-    let targetPayload = interpreted.data;
-    let routeFeedback = "";
-
-    if (directRouting.matched) {
-      const resolvedTargets = resolveTargetSelectors(directRouting.targetToken, sessions, {
-        source: "direct-route",
-        scopeMode: "active-deck",
-        activeDeckId: getActiveDeck()?.id || ""
-      });
-      if (resolvedTargets.error) {
-        setCommandFeedback(resolvedTargets.error);
-        return;
-      }
-      targetSessions = resolvedTargets.sessions;
-      targetSessionId = targetSessions[0]?.id || "";
-      targetPayload = directRouting.payload;
-      if (targetSessions.length === 1) {
-        routeFeedback = `Sent to [${formatSessionToken(targetSessions[0].id)}] ${formatSessionDisplayName(targetSessions[0])}.`;
-      } else {
-        routeFeedback = `Sent to ${targetSessions.length} sessions.`;
-      }
-    }
-
-    if (!targetSessionId) {
+    const plan = resolveSendPlan(interpreted);
+    if (!plan) {
       return;
     }
-    if (!directRouting.matched) {
-      const activeSession = sessions.find((session) => session.id === targetSessionId) || null;
-      if (isSessionActionBlocked(activeSession)) {
-        setCommandFeedback(getBlockedSessionActionMessage([activeSession], "Command send"));
-        return;
-      }
+    if (plan.error) {
+      setCommandFeedback(plan.error);
+      return;
+    }
+
+    const guardResult = evaluateSendSafety({
+      sessions: plan.targetSessions,
+      text: plan.targetPayload,
+      directRoute: plan.directRouteMatched === true,
+      recentTargetSwitchAt: getLastActiveSessionSwitchAt(),
+      formatSessionToken,
+      formatSessionDisplayName
+    });
+
+    if (guardResult.requiresConfirmation) {
+      pendingSend = {
+        command,
+        plan,
+        guardResult
+      };
+      setCommandGuardState({
+        active: true,
+        summary: guardResult.summary,
+        reasons: formatCommandGuardReasons(guardResult.reasons),
+        preview: plan.targetPayload
+      });
+      render();
+      return;
     }
 
     try {
-      if (directRouting.matched && targetSessions.length > 0) {
-        const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
-        if (blockedSessions.length > 0) {
-          setCommandFeedback(getBlockedSessionActionMessage(blockedSessions, "Command send"));
-          return;
-        }
-        await Promise.all(
-          targetSessions.map((session) => {
-            const terminatorMode = getSessionSendTerminator(session.id);
-            debugLog("command.send.start", {
-              activeSessionId: session.id,
-              mode: terminatorMode,
-              directRoute: directRouting.matched
-            });
-            return sendInputWithConfiguredTerminator(apiSendInput, session.id, targetPayload, terminatorMode, {
-              normalizeMode: normalizeSendTerminatorMode,
-              delayedSubmitMs
-            });
-          })
-        );
-        for (const session of targetSessions) {
-          recordCommandSubmission(session.id, {
-            source: "input",
-            text: targetPayload,
-            submittedAt: Date.now()
-          });
-        }
-      } else {
-        const terminatorMode = getSessionSendTerminator(targetSessionId);
-        debugLog("command.send.start", {
-          activeSessionId: targetSessionId,
-          mode: terminatorMode,
-          directRoute: directRouting.matched
-        });
-        await sendInputWithConfiguredTerminator(apiSendInput, targetSessionId, targetPayload, terminatorMode, {
-          normalizeMode: normalizeSendTerminatorMode,
-          delayedSubmitMs
-        });
-        recordCommandSubmission(targetSessionId, {
-          source: "input",
-          text: targetPayload,
-          submittedAt: Date.now()
-        });
-      }
-
-      setCommandValue("");
-      setCommandPreview("");
-      clearCommandSuggestions();
-      clearError();
-      if (routeFeedback) {
-        setCommandFeedback(routeFeedback);
-      }
-      resetSlashHistoryNavigationState();
-      debugLog("command.send.ok", { activeSessionId: targetSessionId, directRoute: directRouting.matched });
-      render();
+      await executeSendPlan(plan);
     } catch {
       setError("Failed to send command.");
     }
+  }
+
+  async function confirmPendingSend() {
+    if (!pendingSend?.plan) {
+      return false;
+    }
+    const plan = pendingSend.plan;
+    try {
+      await executeSendPlan(plan);
+      return true;
+    } catch {
+      setError("Failed to send command.");
+      return false;
+    }
+  }
+
+  function cancelPendingSend() {
+    if (!pendingSend) {
+      return false;
+    }
+    clearPendingSend({ renderAfterClear: true });
+    setCommandFeedback("Command send cancelled.");
+    return true;
   }
 
   async function refreshCommandPreview() {
@@ -241,10 +321,14 @@ export function createCommandComposerRuntimeController(options = {}) {
 
   function dispose() {
     clearPreviewTimer();
+    clearPendingSend({ renderAfterClear: false });
   }
 
   return {
     submitCommand,
+    confirmPendingSend,
+    cancelPendingSend,
+    clearPendingSend,
     refreshCommandPreview,
     scheduleCommandPreview,
     dispose

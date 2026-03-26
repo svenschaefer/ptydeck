@@ -193,3 +193,69 @@ test("command-composer runtime controller records one submission per direct-rout
     ["feedback", "Sent to 2 sessions."]
   ]);
 });
+
+test("command-composer runtime controller guards risky sends until confirmed or cancelled", async () => {
+  const calls = [];
+  let value = "please fix the tests";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "input", data: value }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "ops" }],
+      activeSessionId: "s1"
+    }),
+    evaluateSendSafety: () => ({
+      requiresConfirmation: true,
+      summary: "Confirmation required before sending to [7] ops.",
+      reasons: [{ label: "Input looks like natural-language text.", targets: ["[7] ops"] }]
+    }),
+    setCommandGuardState: (nextState) => calls.push(["guard", nextState.summary, nextState.reasons, nextState.preview]),
+    clearCommandGuardState: ({ render } = {}) => calls.push(["clear-guard", render === true]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => calls.push(["send", sessionId, payload]),
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.text]),
+    clearCommandSuggestions: () => calls.push(["clear-suggestions"]),
+    clearError: () => calls.push(["clear-error"]),
+    resetSlashHistoryNavigationState: () => calls.push(["history-reset"]),
+    render: () => calls.push(["render"])
+  });
+
+  await controller.submitCommand();
+  assert.deepEqual(calls, [
+    ["clear-guard", false],
+    [
+      "guard",
+      "Confirmation required before sending to [7] ops.",
+      "- Input looks like natural-language text. ([7] ops)",
+      "please fix the tests"
+    ],
+    ["render"]
+  ]);
+
+  calls.length = 0;
+  const confirmed = await controller.confirmPendingSend();
+  assert.equal(confirmed, true);
+  assert.deepEqual(calls, [
+    ["send", "s1", "please fix the tests"],
+    ["record", "s1", "please fix the tests"],
+    ["clear-guard", false],
+    ["value", ""],
+    ["clear-suggestions"],
+    ["clear-error"],
+    ["history-reset"],
+    ["render"]
+  ]);
+
+  value = "please fix the tests";
+  await controller.submitCommand();
+  calls.length = 0;
+  assert.equal(controller.cancelPendingSend(), true);
+  assert.deepEqual(calls, [
+    ["clear-guard", true],
+    ["feedback", "Command send cancelled."]
+  ]);
+});

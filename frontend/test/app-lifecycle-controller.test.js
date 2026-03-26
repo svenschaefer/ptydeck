@@ -117,11 +117,15 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   const deckDeleteBtn = createEventTarget();
   const startupWarmupSkipBtn = createEventTarget();
   const sendBtn = createEventTarget();
+  const commandGuardSendOnceBtn = createEventTarget();
+  const commandGuardCancelBtn = createEventTarget();
   const errors = [];
   const cleanup = [];
   let clearCalls = 0;
   let resizeCalls = 0;
   let sendCalls = 0;
+  let confirmCalls = 0;
+  let cancelCalls = 0;
 
   const controller = createAppLifecycleController({
     windowRef: {
@@ -136,6 +140,8 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     deckDeleteBtn,
     startupWarmupSkipBtn,
     sendBtn,
+    commandGuardSendOnceBtn,
+    commandGuardCancelBtn,
     createDeckFlow: async () => {},
     renameDeckFlow: async () => {
       throw new Error("rename failed");
@@ -143,6 +149,13 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     deleteDeckFlow: async () => {},
     submitCommand: async () => {
       sendCalls += 1;
+    },
+    confirmPendingCommandSend: async () => {
+      confirmCalls += 1;
+      return true;
+    },
+    cancelPendingCommandSend: () => {
+      cancelCalls += 1;
     },
     skipStartupWarmupWait: () => cleanup.push("skip-warmup"),
     setError: (message) => errors.push(message),
@@ -175,9 +188,13 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   await deckDeleteBtn.dispatch("click");
   await startupWarmupSkipBtn.dispatch("click");
   await sendBtn.dispatch("click");
+  await commandGuardSendOnceBtn.dispatch("click");
+  await commandGuardCancelBtn.dispatch("click");
 
   assert.equal(clearCalls, 2);
   assert.equal(sendCalls, 1);
+  assert.equal(confirmCalls, 1);
+  assert.equal(cancelCalls, 1);
   assert.deepEqual(errors, ["rename failed"]);
 
   for (const handler of listeners.get("resize") || []) {

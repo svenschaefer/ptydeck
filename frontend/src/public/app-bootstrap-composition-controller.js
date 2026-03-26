@@ -239,6 +239,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
       setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.()
+      ,
+      onInputChange: () => commandComposerRuntimeController?.clearPendingSend?.({ renderAfterClear: true })
     });
 
     commandComposerRuntimeController = createCommandComposerRuntimeController({
@@ -255,6 +257,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       activateDeckTarget: commandTargetRuntimeController.activateDeckTarget,
       setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
       setCommandPreview: (message) => appCommandUiFacadeController?.setCommandPreview?.(message),
+      setCommandGuardState: (nextState) => appCommandUiFacadeController?.setCommandGuardState?.(nextState),
+      clearCommandGuardState: (runtimeOptions) => appCommandUiFacadeController?.clearCommandGuardState?.(runtimeOptions),
       clearCommandSuggestions: () => appCommandUiFacadeController?.clearCommandSuggestions?.(),
       render: () => appCommandUiFacadeController?.render?.(),
       debugLog,
@@ -267,6 +271,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
       formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
       formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+      evaluateSendSafety: options.evaluateSendSafety,
+      getLastActiveSessionSwitchAt: () => commandTargetRuntimeController?.getLastActiveSessionSwitchAt?.() || 0,
       getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
       isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
       getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
@@ -289,6 +295,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       deckDeleteBtn,
       startupWarmupSkipBtn,
       sendBtn,
+      commandGuardSendOnceBtn: options.commandGuardSendOnceBtn,
+      commandGuardCancelBtn: options.commandGuardCancelBtn,
       api,
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
@@ -301,6 +309,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       renameDeckFlow: () => appLayoutDeckFacadeController?.renameDeckFlow?.(),
       deleteDeckFlow: () => appLayoutDeckFacadeController?.deleteDeckFlow?.(),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
+      confirmPendingCommandSend: () => commandComposerRuntimeController?.confirmPendingSend?.(),
+      cancelPendingCommandSend: () => commandComposerRuntimeController?.cancelPendingSend?.(),
       waitForStartupWarmup: () => startupWarmupController?.waitForServerWarmup?.(),
       skipStartupWarmupWait: () => startupWarmupController?.skipWait?.(),
       bootstrapDevAuthToken: (runtimeOptions) => appRuntimeStateController?.bootstrapDevAuthToken?.(runtimeOptions),

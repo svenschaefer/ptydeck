@@ -23,6 +23,7 @@ export function createCommandComposerAutocompleteController(options = {}) {
   const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
+  const onInputChange = typeof options.onInputChange === "function" ? options.onInputChange : () => {};
   const writeClipboardText =
     typeof options.writeClipboardText === "function"
       ? options.writeClipboardText
@@ -394,6 +395,7 @@ export function createCommandComposerAutocompleteController(options = {}) {
   }
 
   function handleInput() {
+    onInputChange();
     clearSuggestions();
     scheduleCommandPreview();
     scheduleSuggestions();

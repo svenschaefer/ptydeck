@@ -1,6 +1,9 @@
+import { detectSessionInputSafetyPreset, getSessionInputSafetyPresetLabel } from "./input-safety-profile.js";
+
 export function createCommandTargetRuntimeController(options = {}) {
   const commandEngine = options.commandEngine || {};
   const store = options.store || null;
+  const nowMs = typeof options.nowMs === "function" ? options.nowMs : () => Date.now();
   const setActiveDeck = typeof options.setActiveDeck === "function" ? options.setActiveDeck : () => false;
   const resolveSessionDeckId =
     typeof options.resolveSessionDeckId === "function" ? options.resolveSessionDeckId : (session) => String(session?.deckId || "");
@@ -10,6 +13,20 @@ export function createCommandTargetRuntimeController(options = {}) {
     typeof options.formatSessionDisplayName === "function"
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "");
+  let lastActiveSessionId = String(store?.getState?.().activeSessionId || "");
+  let lastActiveSessionSwitchAt = 0;
+
+  if (typeof store?.subscribe === "function") {
+    store.subscribe((snapshot) => {
+      const nextActiveSessionId = String(snapshot?.activeSessionId || "");
+      if (nextActiveSessionId !== lastActiveSessionId) {
+        if (lastActiveSessionId && nextActiveSessionId) {
+          lastActiveSessionSwitchAt = nowMs();
+        }
+        lastActiveSessionId = nextActiveSessionId;
+      }
+    });
+  }
 
   function resolveSessionToken(token, sessions) {
     return typeof commandEngine.resolveSessionToken === "function"
@@ -126,6 +143,26 @@ export function createCommandTargetRuntimeController(options = {}) {
     };
   }
 
+  function getLastActiveSessionSwitchAt() {
+    return lastActiveSessionSwitchAt;
+  }
+
+  function getActiveSessionTarget() {
+    const state = store?.getState?.() || {};
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    return sessions.find((session) => session.id === state.activeSessionId) || null;
+  }
+
+  function formatActiveTargetSummary() {
+    const activeSession = getActiveSessionTarget();
+    if (!activeSession) {
+      return "Target: no active session.";
+    }
+    const preset = detectSessionInputSafetyPreset(activeSession.inputSafetyProfile);
+    const presetLabel = getSessionInputSafetyPresetLabel(preset);
+    return `Target: [${formatSessionToken(activeSession.id)}] ${formatSessionDisplayName(activeSession)} · ${presetLabel}`;
+  }
+
   return {
     resolveSessionToken,
     resolveDeckToken,
@@ -139,6 +176,9 @@ export function createCommandTargetRuntimeController(options = {}) {
     parseDirectTargetRoutingInput,
     parseCustomDefinition,
     activateSessionTarget,
-    activateDeckTarget
+    activateDeckTarget,
+    getLastActiveSessionSwitchAt,
+    getActiveSessionTarget,
+    formatActiveTargetSummary
   };
 }

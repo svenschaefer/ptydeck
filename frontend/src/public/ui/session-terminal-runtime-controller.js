@@ -175,6 +175,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       startCommandInput: refs.startCommandInput,
       startEnvInput: refs.startEnvInput,
       sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
+      inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
       sessionTagsInput: refs.sessionTagsInput,
       startFeedback: refs.startFeedback,
       tagListEl: refs.tagListEl,

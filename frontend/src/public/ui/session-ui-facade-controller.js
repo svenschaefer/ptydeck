@@ -201,6 +201,18 @@ export function createSessionUiFacadeController(options = {}) {
     return createDefaultStartupReadResult();
   }
 
+  function syncSessionInputSafetyControls(entry, session) {
+    getSessionSettingsStateController()?.syncSessionInputSafetyControls?.(entry, session);
+  }
+
+  function readSessionInputSafetyFromControls(entry, session) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.readSessionInputSafetyFromControls === "function") {
+      return settingsStateController.readSessionInputSafetyFromControls(entry, session);
+    }
+    return session?.inputSafetyProfile || {};
+  }
+
   function setSettingsDirty(entry, dirty) {
     getSessionCardMetaController()?.setSettingsDirty?.(entry, dirty);
   }
@@ -262,8 +274,10 @@ export function createSessionUiFacadeController(options = {}) {
     parseSessionEnv,
     setStartupSettingsFeedback,
     syncSessionStartupControls,
+    syncSessionInputSafetyControls,
     normalizeSessionStartupFromSession,
     readSessionStartupFromControls,
+    readSessionInputSafetyFromControls,
     setSettingsDirty,
     isSessionSettingsDirty,
     renderSessionTagList,

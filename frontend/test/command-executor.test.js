@@ -250,6 +250,102 @@ test("command executor swaps quick ids between two resolved sessions and request
   ]);
 });
 
+test("command executor applies input safety presets through settings payloads", async () => {
+  const calls = [];
+  const sessions = [{ id: "s1", name: "one", deckId: "default" }];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload.inputSafetyProfile]);
+        return { ...sessions[0], ...payload };
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.inputSafetyProfile]),
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions, error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions, error: "" }),
+    parseSettingsPayload: () => ({ ok: true, payload: { inputSafetyPreset: "shell_strict" } }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  const feedback = await executor.execute({
+    command: "settings",
+    args: ["apply", "active"],
+    raw: "/settings apply active {\"inputSafetyPreset\":\"shell_strict\"}"
+  });
+
+  assert.equal(feedback, "Applied settings to 1 session(s): inputSafetyProfile.");
+  assert.deepEqual(calls, [
+    [
+      "patch",
+      "s1",
+      {
+        requireValidShellSyntax: true,
+        confirmOnIncompleteShellConstruct: true,
+        confirmOnNaturalLanguageInput: true,
+        confirmOnDangerousShellCommand: true,
+        confirmOnMultilineInput: true,
+        confirmOnRecentTargetSwitch: true,
+        targetSwitchGraceMs: 6000,
+        pasteLengthConfirmThreshold: 200,
+        pasteLineConfirmThreshold: 3
+      }
+    ],
+    [
+      "event",
+      "session.updated",
+      {
+        requireValidShellSyntax: true,
+        confirmOnIncompleteShellConstruct: true,
+        confirmOnNaturalLanguageInput: true,
+        confirmOnDangerousShellCommand: true,
+        confirmOnMultilineInput: true,
+        confirmOnRecentTargetSwitch: true,
+        targetSwitchGraceMs: 6000,
+        pasteLengthConfirmThreshold: 200,
+        pasteLineConfirmThreshold: 3
+      }
+    ]
+  ]);
+});
+
 test("command executor records correlated custom-command submissions per target session", async () => {
   const calls = [];
   const executor = createCommandExecutor({

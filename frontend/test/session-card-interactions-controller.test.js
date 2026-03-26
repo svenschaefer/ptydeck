@@ -137,6 +137,9 @@ test("session-card-interactions controller blocks settings apply when startCwd i
       startCommand: "",
       sendTerminator: "auto"
     }),
+    readSessionInputSafetyFromControls: () => ({
+      requireValidShellSyntax: true
+    }),
     readThemeProfileFromControls: () => ({ background: "#000000" }),
     isValidHexColor: () => true,
     detectThemePreset: () => "custom"
@@ -144,6 +147,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
     startFeedback: {}
   };
 
@@ -241,6 +245,10 @@ test("session-card-interactions controller applies valid settings and persists s
       startCommand: "echo hi",
       sendTerminator: "crlf"
     }),
+    readSessionInputSafetyFromControls: () => ({
+      requireValidShellSyntax: true,
+      confirmOnIncompleteShellConstruct: true
+    }),
     readThemeProfileFromControls: () => ({ background: "#000000" }),
     isValidHexColor: () => true,
     detectThemePreset: () => "custom",
@@ -249,6 +257,7 @@ test("session-card-interactions controller applies valid settings and persists s
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
     themeSelect: createEventTarget("custom"),
     themeCategory: createEventTarget("all"),
     themeSearch: createEventTarget(""),
@@ -269,6 +278,7 @@ test("session-card-interactions controller applies valid settings and persists s
     api: {
       async updateSession(sessionId, payload) {
         calls.push(`api:${sessionId}:${payload.startCwd}:${payload.startCommand}`);
+        calls.push(payload.inputSafetyProfile);
         return { id: sessionId, ...payload };
       }
     },
@@ -292,6 +302,10 @@ test("session-card-interactions controller applies valid settings and persists s
     "sync-theme",
     "clear-error",
     "api:s1:/tmp:echo hi",
+    {
+      requireValidShellSyntax: true,
+      confirmOnIncompleteShellConstruct: true
+    },
     "event:session.updated",
     "terminator:s1:crlf",
     "feedback:Settings saved.:false",
@@ -306,6 +320,7 @@ test("session-card-interactions controller restores draft state on settings canc
   const refs = {
     focusBtn: createEventTarget(),
     settingsCancelBtn: createEventTarget(),
+    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
     startCwdInput: createEventTarget("/tmp"),
     startCommandInput: createEventTarget(""),
     startEnvInput: createEventTarget(""),
@@ -327,6 +342,7 @@ test("session-card-interactions controller restores draft state on settings canc
     getSession: () => ({ id: "s1", startCwd: "/tmp" }),
     sessionThemeDrafts: drafts,
     syncSessionStartupControls: () => calls.push("sync-startup"),
+    syncSessionInputSafetyControls: () => calls.push("sync-input-safety"),
     syncSessionThemeControls: () => calls.push("sync-theme"),
     applyThemeForSession: (sessionId) => calls.push(`theme:${sessionId}`),
     setStartupSettingsFeedback: (_entry, message) => calls.push(`feedback:${message}`),
@@ -337,5 +353,5 @@ test("session-card-interactions controller restores draft state on settings canc
   await refs.settingsCancelBtn.emit("click");
 
   assert.equal(drafts.has("s1"), false);
-  assert.deepEqual(calls, ["sync-startup", "sync-theme", "theme:s1", "feedback:", "dirty:false"]);
+  assert.deepEqual(calls, ["sync-startup", "sync-input-safety", "sync-theme", "theme:s1", "feedback:", "dirty:false"]);
 });

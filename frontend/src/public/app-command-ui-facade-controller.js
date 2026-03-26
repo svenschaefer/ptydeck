@@ -59,6 +59,14 @@ export function createAppCommandUiFacadeController(options = {}) {
     getAppRuntimeStateController()?.setCommandPreview?.(message);
   }
 
+  function setCommandGuardState(nextState) {
+    getAppRuntimeStateController()?.setCommandGuardState?.(nextState);
+  }
+
+  function clearCommandGuardState(options) {
+    getAppRuntimeStateController()?.clearCommandGuardState?.(options);
+  }
+
   function clearTerminalSearchSelection(sessionId = terminalSearchState?.selectedSessionId || "") {
     getTerminalSearchController()?.clearSelection?.(sessionId);
   }
@@ -136,6 +144,8 @@ export function createAppCommandUiFacadeController(options = {}) {
     setCommandFeedback,
     getErrorMessage,
     setCommandPreview,
+    setCommandGuardState,
+    clearCommandGuardState,
     clearTerminalSearchSelection,
     syncActiveTerminalSearch,
     navigateActiveTerminalSearch,

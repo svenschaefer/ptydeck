@@ -112,10 +112,17 @@ const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
 const emptyStateEl = document.getElementById("empty-state");
 const statusMessageEl = document.getElementById("status-message");
+const commandTargetEl = document.getElementById("command-target");
 const commandFeedbackEl = document.getElementById("command-feedback");
 const commandInlineHintEl = document.getElementById("command-inline-hint");
 const commandPreviewEl = document.getElementById("command-preview");
 const commandSuggestionsEl = document.getElementById("command-suggestions");
+const commandGuardEl = document.getElementById("command-guard");
+const commandGuardSummaryEl = document.getElementById("command-guard-summary");
+const commandGuardReasonsEl = document.getElementById("command-guard-reasons");
+const commandGuardPreviewEl = document.getElementById("command-guard-preview");
+const commandGuardSendOnceBtn = document.getElementById("command-guard-send-once");
+const commandGuardCancelBtn = document.getElementById("command-guard-cancel");
 const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
 const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
@@ -368,6 +375,10 @@ const uiState = {
   commandInlineHintPrefixPx: 0,
   commandPreview: "",
   commandSuggestions: "",
+  commandGuardActive: false,
+  commandGuardSummary: "",
+  commandGuardReasons: "",
+  commandGuardPreview: "",
   commandSuggestionSelectedIndex: -1,
   startupGateActive: false,
   startupGatePhase: "",
@@ -633,6 +644,7 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   normalizeThemeFilterCategory: sessionUiFacadeController.normalizeThemeFilterCategory,
   readThemeProfileFromControls: sessionUiFacadeController.readThemeProfileFromControls,
   readSessionStartupFromControls: sessionUiFacadeController.readSessionStartupFromControls,
+  readSessionInputSafetyFromControls: sessionUiFacadeController.readSessionInputSafetyFromControls,
   isValidHexColor: sessionUiFacadeController.isValidHexColor,
   detectThemePreset: sessionUiFacadeController.detectThemePreset,
   isSessionSettingsDirty: sessionUiFacadeController.isSessionSettingsDirty,
@@ -655,6 +667,7 @@ sessionCardRenderController = createSessionCardRenderController({
   renderSessionStatus: sessionUiFacadeController.renderSessionStatus,
   renderSessionArtifacts: sessionUiFacadeController.renderSessionArtifacts,
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
+  syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty
 });
@@ -710,10 +723,15 @@ workspaceRenderController = createWorkspaceRenderController({
   stateEl,
   emptyStateEl,
   statusMessageEl,
+  commandTargetEl,
   commandFeedbackEl,
   commandInlineHintEl,
   commandPreviewEl,
   commandSuggestionsEl,
+  commandGuardEl,
+  commandGuardSummaryEl,
+  commandGuardReasonsEl,
+  commandGuardPreviewEl,
   startupWarmupGateEl,
   startupWarmupMessageEl,
   startupWarmupDetailEl,
@@ -771,6 +789,7 @@ sessionGridController = createSessionGridController({
   pruneQuickIds: (activeSessionIds) => appSessionRuntimeFacadeController?.pruneQuickIds(activeSessionIds),
   renderDeckTabs: (sessions) => appLayoutDeckFacadeController?.renderDeckTabs(sessions),
   workspaceRenderController,
+  getCommandTargetSummary: () => commandTargetRuntimeController?.formatActiveTargetSummary?.() || "",
   syncStatusTicker: sessionUiFacadeController.syncStatusTicker,
   syncActiveTerminalSearch: (options) => appCommandUiFacadeController?.syncActiveTerminalSearch(options),
   sessionDisposalController,
@@ -787,6 +806,7 @@ sessionGridController = createSessionGridController({
     sessionUiFacadeController.buildThemeFromConfig(sessionUiFacadeController.getSessionThemeConfig(sessionId)),
   handleSessionTerminalInput: (sessionId, data) => appSessionRuntimeFacadeController?.handleSessionTerminalInput(sessionId, data),
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
+  syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
   applyResizeForSession: (sessionId, options) => appLayoutDeckFacadeController?.applyResizeForSession(sessionId, options),
@@ -827,6 +847,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
   terminalThemePresets: TERMINAL_THEME_PRESETS,
+  commandGuardSendOnceBtn,
+  commandGuardCancelBtn,
   windowRef: window,
   documentRef: document,
   wsStateRef,

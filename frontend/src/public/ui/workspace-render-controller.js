@@ -2,10 +2,15 @@ export function createWorkspaceRenderController(options = {}) {
   const stateEl = options.stateEl || null;
   const emptyStateEl = options.emptyStateEl || null;
   const statusMessageEl = options.statusMessageEl || null;
+  const commandTargetEl = options.commandTargetEl || null;
   const commandFeedbackEl = options.commandFeedbackEl || null;
   const commandInlineHintEl = options.commandInlineHintEl || null;
   const commandPreviewEl = options.commandPreviewEl || null;
   const commandSuggestionsEl = options.commandSuggestionsEl || null;
+  const commandGuardEl = options.commandGuardEl || null;
+  const commandGuardSummaryEl = options.commandGuardSummaryEl || null;
+  const commandGuardReasonsEl = options.commandGuardReasonsEl || null;
+  const commandGuardPreviewEl = options.commandGuardPreviewEl || null;
   const startupWarmupGateEl = options.startupWarmupGateEl || null;
   const startupWarmupMessageEl = options.startupWarmupMessageEl || null;
   const startupWarmupDetailEl = options.startupWarmupDetailEl || null;
@@ -87,11 +92,16 @@ export function createWorkspaceRenderController(options = {}) {
     startupGateDetail = "",
     startupGateCanSkip = false,
     error = "",
+    commandTargetText = "",
     commandFeedback = "",
     commandInlineHint = "",
     commandInlineHintPrefixPx = 0,
     commandPreview = "",
-    commandSuggestions = ""
+    commandSuggestions = "",
+    commandGuardActive = false,
+    commandGuardSummary = "",
+    commandGuardReasons = "",
+    commandGuardPreview = ""
   }) {
     if (stateEl) {
       stateEl.textContent = connectionState;
@@ -112,6 +122,9 @@ export function createWorkspaceRenderController(options = {}) {
     if (commandFeedbackEl) {
       commandFeedbackEl.textContent = commandFeedback || "";
     }
+    if (commandTargetEl) {
+      commandTargetEl.textContent = commandTargetText || "";
+    }
     if (commandInlineHintEl) {
       commandInlineHintEl.textContent = commandInlineHint || "";
       commandInlineHintEl.style.setProperty("--hint-prefix-px", `${commandInlineHintPrefixPx || 0}px`);
@@ -121,6 +134,18 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (commandSuggestionsEl) {
       commandSuggestionsEl.textContent = commandSuggestions || "";
+    }
+    if (commandGuardEl) {
+      commandGuardEl.hidden = commandGuardActive !== true;
+    }
+    if (commandGuardSummaryEl) {
+      commandGuardSummaryEl.textContent = commandGuardSummary || "";
+    }
+    if (commandGuardReasonsEl) {
+      commandGuardReasonsEl.textContent = commandGuardReasons || "";
+    }
+    if (commandGuardPreviewEl) {
+      commandGuardPreviewEl.textContent = commandGuardPreview || "";
     }
     if (startupWarmupGateEl) {
       startupWarmupGateEl.hidden = startupGateActive !== true;

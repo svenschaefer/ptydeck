@@ -6,6 +6,8 @@ export function createAppLifecycleController(options = {}) {
   const deckDeleteBtn = options.deckDeleteBtn || null;
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
+  const commandGuardSendOnceBtn = options.commandGuardSendOnceBtn || null;
+  const commandGuardCancelBtn = options.commandGuardCancelBtn || null;
   const api = options.api || null;
   const getActiveDeck = typeof options.getActiveDeck === "function" ? options.getActiveDeck : () => null;
   const resolveSessionDeckId =
@@ -19,6 +21,10 @@ export function createAppLifecycleController(options = {}) {
   const renameDeckFlow = typeof options.renameDeckFlow === "function" ? options.renameDeckFlow : () => Promise.resolve();
   const deleteDeckFlow = typeof options.deleteDeckFlow === "function" ? options.deleteDeckFlow : () => Promise.resolve();
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
+  const confirmPendingCommandSend =
+    typeof options.confirmPendingCommandSend === "function" ? options.confirmPendingCommandSend : () => Promise.resolve(false);
+  const cancelPendingCommandSend =
+    typeof options.cancelPendingCommandSend === "function" ? options.cancelPendingCommandSend : () => {};
   const bootstrapDevAuthToken =
     typeof options.bootstrapDevAuthToken === "function" ? options.bootstrapDevAuthToken : () => Promise.resolve(false);
   const waitForStartupWarmup =
@@ -103,6 +109,18 @@ export function createAppLifecycleController(options = {}) {
         submitCommand().catch(() => {
           setError("Failed to send command.");
         });
+      });
+    }
+    if (commandGuardSendOnceBtn && typeof commandGuardSendOnceBtn.addEventListener === "function") {
+      commandGuardSendOnceBtn.addEventListener("click", () => {
+        confirmPendingCommandSend().catch(() => {
+          setError("Failed to send guarded command.");
+        });
+      });
+    }
+    if (commandGuardCancelBtn && typeof commandGuardCancelBtn.addEventListener === "function") {
+      commandGuardCancelBtn.addEventListener("click", () => {
+        cancelPendingCommandSend();
       });
     }
   }

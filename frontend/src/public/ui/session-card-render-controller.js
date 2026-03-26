@@ -13,6 +13,7 @@ export function createSessionCardRenderController(options = {}) {
   const renderSessionStatus = options.renderSessionStatus || (() => {});
   const renderSessionArtifacts = options.renderSessionArtifacts || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
+  const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
 
@@ -59,6 +60,7 @@ export function createSessionCardRenderController(options = {}) {
 
     if (!entry.settingsDirty) {
       syncSessionStartupControls(entry, session);
+      syncSessionInputSafetyControls(entry, session);
       syncSessionThemeControls(entry, session.id);
       setSettingsDirty(entry, false);
     }

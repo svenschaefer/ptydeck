@@ -55,10 +55,15 @@ test("workspace-render controller renders empty-state and status fields", () => 
   const stateEl = createTextEl();
   const emptyStateEl = createTextEl();
   const statusMessageEl = createTextEl();
+  const commandTargetEl = createTextEl();
   const commandFeedbackEl = createTextEl();
   const commandInlineHintEl = createTextEl();
   const commandPreviewEl = createTextEl();
   const commandSuggestionsEl = createTextEl();
+  const commandGuardSummaryEl = createTextEl();
+  const commandGuardReasonsEl = createTextEl();
+  const commandGuardPreviewEl = createTextEl();
+  const commandGuardEl = { hidden: true };
   const startupWarmupGateEl = { hidden: true };
   const startupWarmupMessageEl = createTextEl();
   const startupWarmupDetailEl = createTextEl();
@@ -68,10 +73,15 @@ test("workspace-render controller renders empty-state and status fields", () => 
     stateEl,
     emptyStateEl,
     statusMessageEl,
+    commandTargetEl,
     commandFeedbackEl,
     commandInlineHintEl,
     commandPreviewEl,
     commandSuggestionsEl,
+    commandGuardEl,
+    commandGuardSummaryEl,
+    commandGuardReasonsEl,
+    commandGuardPreviewEl,
     startupWarmupGateEl,
     startupWarmupMessageEl,
     startupWarmupDetailEl,
@@ -99,20 +109,30 @@ test("workspace-render controller renders empty-state and status fields", () => 
     connectionState: "connecting",
     loading: false,
     error: "",
+    commandTargetText: "Target: [7] Ops · Shell Balanced",
     commandFeedback: "ok",
     commandInlineHint: " /help",
     commandInlineHintPrefixPx: 24,
     commandPreview: "preview",
-    commandSuggestions: "suggestions"
+    commandSuggestions: "suggestions",
+    commandGuardActive: true,
+    commandGuardSummary: "Confirmation required.",
+    commandGuardReasons: "- risky",
+    commandGuardPreview: "rm -rf ./tmp"
   });
 
   assert.equal(stateEl.textContent, "connecting");
   assert.equal(statusMessageEl.textContent, "Connection state: connecting");
+  assert.equal(commandTargetEl.textContent, "Target: [7] Ops · Shell Balanced");
   assert.equal(commandFeedbackEl.textContent, "ok");
   assert.equal(commandInlineHintEl.textContent, " /help");
   assert.equal(commandInlineHintEl.style.getPropertyValue("--hint-prefix-px"), "24px");
   assert.equal(commandPreviewEl.textContent, "preview");
   assert.equal(commandSuggestionsEl.textContent, "suggestions");
+  assert.equal(commandGuardEl.hidden, false);
+  assert.equal(commandGuardSummaryEl.textContent, "Confirmation required.");
+  assert.equal(commandGuardReasonsEl.textContent, "- risky");
+  assert.equal(commandGuardPreviewEl.textContent, "rm -rf ./tmp");
 
   controller.renderStatus({
     connectionState: "starting sessions",
@@ -128,4 +148,5 @@ test("workspace-render controller renders empty-state and status fields", () => 
   assert.equal(startupWarmupMessageEl.textContent, "Server is starting sessions.");
   assert.equal(startupWarmupDetailEl.textContent, "Waiting for quiet.");
   assert.equal(startupWarmupSkipBtn.hidden, false);
+  assert.equal(commandGuardEl.hidden, true);
 });

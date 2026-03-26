@@ -83,6 +83,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Central command input targeting the active session
 - Command-plane controls via slash commands: `/new [shell]`, `/size <cols> <rows>` or `/size c<cols>` or `/size r<rows>`, `/filter [id/tag[,id/tag...]]`, `/close [selector[,selector...]]`, `/switch <id>`, `/swap <selectorA> <selectorB>`, `/next`, `/prev`, `/list`, `/rename <name>` (active) or `/rename <selector> <name>`, `/restart [selector[,selector...]]`, `/note <selector|active> [text...]`, `/settings show [selector]`, `/settings apply <selector|active> <json>`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - Sessions support one optional persisted note; `/note <selector|active>` clears the note, and a non-empty note is rendered in compact form inside the session header
+- Sessions also support one persisted per-terminal input-safety preset/profile; shell-oriented sessions can opt into syntax-gated or stricter guarded-send behavior with inline confirmation before risky sends
 - `/custom` block mode supports escaped delimiter payload lines (`\---`) for literal `---` content and returns explicit guidance for unescaped delimiter edge cases
 - Non-blocking custom-command inline preview before execution (`/<customName>`): exact payload text only, semi-transparent helper rendering, and deterministic truncation feedback for very large payloads
 - Slash-command name autocomplete via `Tab`/`Shift+Tab` with deterministic cycling and system-command precedence
@@ -92,6 +93,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Re-run recalled slash command via `Ctrl/Cmd+Enter` with guardrail feedback when recalled content was modified
 - Direct target routing for terminal-plane input via `@<target> <text>` without switching active session
 - Dedicated command feedback area for command-plane output (success/help/errors), separated from terminal PTY streams
+- Composer target summary and guarded-send banner keep the active target visible and explain why a send needs confirmation (`invalid/incomplete shell syntax`, `likely natural-language shell input`, `dangerous shell command`, `multiline or oversized input`, `recent target switch`)
 - Startup performance guardrails: deduplicated bootstrap request path plus startup latency telemetry available through `window.__PTYDECK_PERF__` and debug logs
 - Fail-fast startup config validation for critical env fields (port bounds, URL protocol checks, production CORS requirement)
 - Optional local auth baseline via `AUTH_MODE=dev` with automatic frontend dev-token acquisition (`/api/v1/auth/dev-token`)

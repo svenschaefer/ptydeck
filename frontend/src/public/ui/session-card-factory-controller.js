@@ -33,6 +33,7 @@ export function createSessionCardFactoryController(options = {}) {
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
+    const inputSafetyPresetSelect = node.querySelector(".session-input-safety-preset");
     const sessionTagsInput = node.querySelector(".session-tags-input");
     const startFeedback = node.querySelector(".session-start-feedback");
     const tagListEl = node.querySelector(".session-tag-list");
@@ -112,6 +113,7 @@ export function createSessionCardFactoryController(options = {}) {
       startCommandInput,
       startEnvInput,
       sessionSendTerminatorSelect,
+      inputSafetyPresetSelect,
       sessionTagsInput,
       startFeedback,
       tagListEl,

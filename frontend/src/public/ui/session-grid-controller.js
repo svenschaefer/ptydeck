@@ -15,6 +15,7 @@ export function createSessionGridController(options = {}) {
   const pruneQuickIds = options.pruneQuickIds || (() => {});
   const renderDeckTabs = options.renderDeckTabs || (() => {});
   const workspaceRenderController = options.workspaceRenderController || null;
+  const getCommandTargetSummary = options.getCommandTargetSummary || (() => "");
   const syncStatusTicker = options.syncStatusTicker || (() => {});
   const syncActiveTerminalSearch = options.syncActiveTerminalSearch || (() => {});
   const sessionDisposalController = options.sessionDisposalController || null;
@@ -30,6 +31,7 @@ export function createSessionGridController(options = {}) {
   const resolveInitialTheme = options.resolveInitialTheme || (() => ({}));
   const handleSessionTerminalInput = options.handleSessionTerminalInput || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
+  const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
   const applyResizeForSession = options.applyResizeForSession || (() => {});
@@ -118,11 +120,16 @@ export function createSessionGridController(options = {}) {
       startupGateDetail: uiState.startupGateDetail,
       startupGateCanSkip: uiState.startupGateCanSkip,
       error: uiState.error,
+      commandTargetText: getCommandTargetSummary(),
       commandFeedback: uiState.commandFeedback,
       commandInlineHint: uiState.commandInlineHint,
       commandInlineHintPrefixPx: uiState.commandInlineHintPrefixPx,
       commandPreview: uiState.commandPreview,
-      commandSuggestions: uiState.commandSuggestions
+      commandSuggestions: uiState.commandSuggestions,
+      commandGuardActive: uiState.commandGuardActive,
+      commandGuardSummary: uiState.commandGuardSummary,
+      commandGuardReasons: uiState.commandGuardReasons,
+      commandGuardPreview: uiState.commandGuardPreview
     });
     syncActiveTerminalSearch({ preserveSelection: true });
 
@@ -178,6 +185,7 @@ export function createSessionGridController(options = {}) {
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
+          inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
           startFeedback: refs.startFeedback,
           themeCategory: refs.themeCategory,
@@ -234,6 +242,7 @@ export function createSessionGridController(options = {}) {
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
+          inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
           startFeedback: refs.startFeedback,
           tagListEl: refs.tagListEl,
@@ -256,6 +265,7 @@ export function createSessionGridController(options = {}) {
         onTerminalData: handleSessionTerminalInput,
         afterEntryRegistered: (entry, currentSession) => {
           syncSessionStartupControls(entry, currentSession);
+          syncSessionInputSafetyControls(entry, currentSession);
           syncSessionThemeControls(entry, currentSession.id);
           setSettingsDirty(entry, false);
         },

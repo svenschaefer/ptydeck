@@ -56,6 +56,29 @@ export function createAppRuntimeStateController(options = {}) {
     requestRender();
   }
 
+  function setCommandGuardState(nextState = {}) {
+    uiState.commandGuardActive = nextState.active === true;
+    uiState.commandGuardSummary = typeof nextState.summary === "string" ? nextState.summary : "";
+    uiState.commandGuardReasons = typeof nextState.reasons === "string" ? nextState.reasons : "";
+    uiState.commandGuardPreview = typeof nextState.preview === "string" ? nextState.preview : "";
+    requestRender();
+  }
+
+  function clearCommandGuardState({ render = true } = {}) {
+    const hadState =
+      uiState.commandGuardActive === true ||
+      Boolean(uiState.commandGuardSummary) ||
+      Boolean(uiState.commandGuardReasons) ||
+      Boolean(uiState.commandGuardPreview);
+    uiState.commandGuardActive = false;
+    uiState.commandGuardSummary = "";
+    uiState.commandGuardReasons = "";
+    uiState.commandGuardPreview = "";
+    if (render && hadState) {
+      requestRender();
+    }
+  }
+
   function setStartupGateState(nextState = {}) {
     uiState.startupGateActive = nextState.active === true;
     uiState.startupGatePhase = typeof nextState.phase === "string" ? nextState.phase : "";
@@ -179,6 +202,8 @@ export function createAppRuntimeStateController(options = {}) {
     setError,
     setCommandFeedback,
     setCommandPreview,
+    setCommandGuardState,
+    clearCommandGuardState,
     setStartupGateState,
     clearStartupGateState,
     getErrorMessage,

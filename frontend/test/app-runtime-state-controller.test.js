@@ -26,7 +26,8 @@ test("app-runtime state controller updates ui state and formats errors", () => {
     loading: true,
     error: "",
     commandFeedback: "",
-    commandPreview: ""
+    commandPreview: "",
+    commandGuardActive: false
   };
   const controller = createAppRuntimeStateController({
     uiState,
@@ -37,15 +38,26 @@ test("app-runtime state controller updates ui state and formats errors", () => {
   controller.setError("Broken");
   controller.setCommandFeedback("ok");
   controller.setCommandPreview("preview");
+  controller.setCommandGuardState({
+    active: true,
+    summary: "Confirm",
+    reasons: "- risky",
+    preview: "rm -rf ./tmp"
+  });
+  controller.clearCommandGuardState();
   controller.clearError();
 
   assert.equal(uiState.error, "");
   assert.equal(uiState.commandFeedback, "ok");
   assert.equal(uiState.commandPreview, "preview");
+  assert.equal(uiState.commandGuardActive, false);
+  assert.equal(uiState.commandGuardSummary, "");
   assert.equal(controller.getErrorMessage(new Error("Boom"), "fallback"), "Boom");
   assert.equal(controller.getErrorMessage({}, "fallback"), "fallback");
   assert.deepEqual(calls, [
     ["log", "ui.error", "Broken"],
+    ["render"],
+    ["render"],
     ["render"],
     ["render"],
     ["render"]

@@ -1,3 +1,10 @@
+import {
+  buildSessionInputSafetyProfileFromPreset,
+  detectSessionInputSafetyPreset,
+  listSessionInputSafetyPresetOptions,
+  normalizeSessionInputSafetyProfile
+} from "../input-safety-profile.js";
+
 export function createSessionSettingsStateController(options = {}) {
   const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys.slice() : [];
   const defaultTerminalTheme = options.defaultTerminalTheme && typeof options.defaultTerminalTheme === "object"
@@ -18,6 +25,9 @@ export function createSessionSettingsStateController(options = {}) {
   const normalizeSessionStartupFromSession = options.normalizeSessionStartupFromSession || (() => ({}));
   const terminals = options.terminals || new Map();
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
+  const inputSafetyPresetOptions = Array.isArray(options.inputSafetyPresetOptions)
+    ? options.inputSafetyPresetOptions
+    : listSessionInputSafetyPresetOptions();
 
   function isValidHexColor(value) {
     return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
@@ -237,6 +247,17 @@ export function createSessionSettingsStateController(options = {}) {
     }
   }
 
+  function syncSessionInputSafetyControls(entry, session) {
+    if (!entry?.inputSafetyPresetSelect) {
+      return;
+    }
+    setSelectOptions(
+      entry.inputSafetyPresetSelect,
+      inputSafetyPresetOptions,
+      detectSessionInputSafetyPreset(session?.inputSafetyProfile)
+    );
+  }
+
   function readSessionStartupFromControls(entry) {
     const startCwd = String(entry?.startCwdInput?.value || "").trim();
     const startCommand = String(entry?.startCommandInput?.value || "");
@@ -250,6 +271,14 @@ export function createSessionSettingsStateController(options = {}) {
       sendTerminator,
       tagResult
     };
+  }
+
+  function readSessionInputSafetyFromControls(entry, session) {
+    const selectedPreset = String(entry?.inputSafetyPresetSelect?.value || "").trim() || "off";
+    if (selectedPreset === "custom") {
+      return normalizeSessionInputSafetyProfile(session?.inputSafetyProfile);
+    }
+    return buildSessionInputSafetyProfileFromPreset(selectedPreset);
   }
 
   function areStringMapsEqual(left, right) {
@@ -316,6 +345,12 @@ export function createSessionSettingsStateController(options = {}) {
     if (getSessionSendTerminator(session.id) !== draftStartup.sendTerminator) {
       return true;
     }
+    if (
+      JSON.stringify(normalizeSessionInputSafetyProfile(session?.inputSafetyProfile)) !==
+      JSON.stringify(readSessionInputSafetyFromControls(entry, session))
+    ) {
+      return true;
+    }
     return false;
   }
 
@@ -332,7 +367,9 @@ export function createSessionSettingsStateController(options = {}) {
     syncSessionThemeControls,
     setStartupSettingsFeedback,
     syncSessionStartupControls,
+    syncSessionInputSafetyControls,
     readSessionStartupFromControls,
+    readSessionInputSafetyFromControls,
     isSessionSettingsDirty
   };
 }

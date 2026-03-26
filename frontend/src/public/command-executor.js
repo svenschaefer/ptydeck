@@ -1,4 +1,10 @@
 import { createCommandHelpText, getSlashCommandUsage } from "./command-schema.js";
+import {
+  buildSessionInputSafetyProfileFromPreset,
+  detectSessionInputSafetyPreset,
+  normalizeSessionInputSafetyProfile,
+  SESSION_INPUT_SAFETY_PRESET_ORDER
+} from "./input-safety-profile.js";
 
 export function createCommandExecutor(options = {}) {
   const store = options.store;
@@ -58,6 +64,8 @@ export function createCommandExecutor(options = {}) {
     const tags = normalizeSessionTags(session.tags);
     const themeProfile = normalizeThemeProfile(session.themeProfile);
     const sendTerminator = getSessionSendTerminator(session.id);
+    const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile);
+    const inputSafetyPreset = detectSessionInputSafetyPreset(inputSafetyProfile);
     return [
       `[${token}] ${name}`,
       `startCwd=${JSON.stringify(startCwd)}`,
@@ -65,7 +73,9 @@ export function createCommandExecutor(options = {}) {
       `env=${JSON.stringify(env)}`,
       `tags=${JSON.stringify(tags)}`,
       `sendTerminator=${sendTerminator}`,
-      `themeProfile=${JSON.stringify(themeProfile)}`
+      `themeProfile=${JSON.stringify(themeProfile)}`,
+      `inputSafetyPreset=${inputSafetyPreset}`,
+      `inputSafetyProfile=${JSON.stringify(inputSafetyProfile)}`
     ].join("\n");
   }
 
@@ -649,7 +659,16 @@ export function createCommandExecutor(options = {}) {
       }
 
       const payload = parsedPayload.payload;
-      const allowedKeys = new Set(["startCwd", "startCommand", "env", "tags", "themeProfile", "sendTerminator"]);
+      const allowedKeys = new Set([
+        "startCwd",
+        "startCommand",
+        "env",
+        "tags",
+        "themeProfile",
+        "sendTerminator",
+        "inputSafetyProfile",
+        "inputSafetyPreset"
+      ]);
       const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
       if (unknownKeys.length > 0) {
         return `Unknown settings key(s): ${unknownKeys.join(", ")}`;
@@ -670,6 +689,22 @@ export function createCommandExecutor(options = {}) {
       }
       if (Object.prototype.hasOwnProperty.call(payload, "themeProfile")) {
         patch.themeProfile = payload.themeProfile;
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(payload, "inputSafetyProfile") &&
+        Object.prototype.hasOwnProperty.call(payload, "inputSafetyPreset")
+      ) {
+        return "Specify either inputSafetyProfile or inputSafetyPreset, not both.";
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "inputSafetyProfile")) {
+        patch.inputSafetyProfile = normalizeSessionInputSafetyProfile(payload.inputSafetyProfile);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "inputSafetyPreset")) {
+        const presetKey = String(payload.inputSafetyPreset || "").trim();
+        if (!SESSION_INPUT_SAFETY_PRESET_ORDER.includes(presetKey) || presetKey === "custom") {
+          return "Invalid inputSafetyPreset. Allowed values: off, shell_syntax_gated, shell_balanced, shell_strict, agent.";
+        }
+        patch.inputSafetyProfile = buildSessionInputSafetyProfileFromPreset(presetKey);
       }
 
       let sendTerminatorMode = null;

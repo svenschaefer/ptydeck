@@ -394,6 +394,9 @@ function createTerminalCardTemplateNode() {
   const startSendTerminatorLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startSendTerminator = new FakeElement({ className: "session-send-terminator", tagName: "select" });
   startSendTerminator.value = "auto";
+  const inputSafetyLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const inputSafetyPreset = new FakeElement({ className: "session-input-safety-preset", tagName: "select" });
+  inputSafetyPreset.value = "off";
   const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
   const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
   const themeCategoryLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
@@ -441,6 +444,8 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startTags);
   startControls.appendChild(startSendTerminatorLabel);
   startControls.appendChild(startSendTerminator);
+  startControls.appendChild(inputSafetyLabel);
+  startControls.appendChild(inputSafetyPreset);
   startControls.appendChild(startFeedback);
   settingsPanel.appendChild(startControls);
   themeControls.appendChild(themeCategoryLabel);
@@ -494,6 +499,7 @@ function createDocumentFixture() {
   const sendCommand = new FakeElement({ id: "send-command", tagName: "button" });
   const emptyState = new FakeElement({ id: "empty-state" });
   const statusMessage = new FakeElement({ id: "status-message" });
+  const commandTarget = new FakeElement({ id: "command-target", tagName: "p" });
   const commandFeedback = new FakeElement({ id: "command-feedback" });
   const terminalSearchInput = new FakeElement({ id: "terminal-search-input", tagName: "input" });
   const terminalSearchPrev = new FakeElement({ id: "terminal-search-prev", tagName: "button" });
@@ -503,6 +509,13 @@ function createDocumentFixture() {
   const commandInlineHint = new FakeElement({ id: "command-inline-hint" });
   const commandPreview = new FakeElement({ id: "command-preview", tagName: "p" });
   const commandSuggestions = new FakeElement({ id: "command-suggestions", tagName: "pre" });
+  const commandGuard = new FakeElement({ id: "command-guard", tagName: "div" });
+  commandGuard.hidden = true;
+  const commandGuardSummary = new FakeElement({ id: "command-guard-summary", tagName: "p" });
+  const commandGuardReasons = new FakeElement({ id: "command-guard-reasons", tagName: "pre" });
+  const commandGuardPreview = new FakeElement({ id: "command-guard-preview", tagName: "pre" });
+  const commandGuardSendOnce = new FakeElement({ id: "command-guard-send-once", tagName: "button" });
+  const commandGuardCancel = new FakeElement({ id: "command-guard-cancel", tagName: "button" });
   const template = {
     id: "terminal-card-template",
     content: {
@@ -532,6 +545,7 @@ function createDocumentFixture() {
     sendCommand,
     emptyState,
     statusMessage,
+    commandTarget,
     commandFeedback,
     terminalSearchInput,
     terminalSearchPrev,
@@ -540,7 +554,13 @@ function createDocumentFixture() {
     terminalSearchStatus,
     commandInlineHint,
     commandPreview,
-    commandSuggestions
+    commandSuggestions,
+    commandGuard,
+    commandGuardSummary,
+    commandGuardReasons,
+    commandGuardPreview,
+    commandGuardSendOnce,
+    commandGuardCancel
   ]) {
     byId.set(element.id, element);
   }
@@ -565,6 +585,7 @@ function createDocumentFixture() {
       sendCommand,
       emptyState,
       statusMessage,
+      commandTarget,
       commandFeedback,
       terminalSearchInput,
       terminalSearchPrev,
@@ -573,7 +594,13 @@ function createDocumentFixture() {
       terminalSearchStatus,
       commandInlineHint,
       commandPreview,
-      commandSuggestions
+      commandSuggestions,
+      commandGuard,
+      commandGuardSummary,
+      commandGuardReasons,
+      commandGuardPreview,
+      commandGuardSendOnce,
+      commandGuardCancel
     },
     document: {
       getElementById(id) {
@@ -2211,6 +2238,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         FEATURE_X: "1"
       },
       tags: ["ops", "prod"],
+      inputSafetyProfile: {
+        requireValidShellSyntax: false,
+        confirmOnIncompleteShellConstruct: false,
+        confirmOnNaturalLanguageInput: false,
+        confirmOnDangerousShellCommand: false,
+        confirmOnMultilineInput: false,
+        confirmOnRecentTargetSwitch: false,
+        targetSwitchGraceMs: 4000,
+        pasteLengthConfirmThreshold: 400,
+        pasteLineConfirmThreshold: 5
+      },
       themeProfile: {
         background: "#101010",
         foreground: "#e0e0e0",

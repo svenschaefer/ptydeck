@@ -144,6 +144,9 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     id: "s1",
     startCwd: "/workspace",
     startCommand: "npm run dev",
+    inputSafetyProfile: {
+      requireValidShellSyntax: false
+    },
     themeProfile: {
       background: "#111111",
       foreground: "#eeeeee"
@@ -179,6 +182,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     startEnvInput: createInput("FOO=bar"),
     sessionTagsInput: createInput("ops"),
     sessionSendTerminatorSelect: createInput("crlf"),
+    inputSafetyPresetSelect: createInput("off"),
     themeInputs: {
       background: createInput("#111111"),
       foreground: createInput("#eeeeee")
@@ -190,8 +194,37 @@ test("session-settings state controller detects startup/theme/terminator dirtine
 
   entry.sessionSendTerminatorSelect.value = "lf";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+  entry.sessionSendTerminatorSelect.value = "crlf";
+  entry.inputSafetyPresetSelect.value = "shell_strict";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
 
   controller.setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
   assert.equal(startFeedback.textContent, "Failed to save settings.");
   assert.equal(startFeedback.classList.contains("error"), true);
+});
+
+test("session-settings state controller syncs and reads input safety presets", () => {
+  const controller = createSessionSettingsStateController({
+    documentRef: createFakeDocument()
+  });
+  const entry = {
+    inputSafetyPresetSelect: new FakeSelect()
+  };
+  const session = {
+    id: "s1",
+    inputSafetyProfile: {
+      requireValidShellSyntax: true,
+      confirmOnIncompleteShellConstruct: true
+    }
+  };
+
+  controller.syncSessionInputSafetyControls(entry, session);
+  assert.equal(entry.inputSafetyPresetSelect.value, "shell_syntax_gated");
+  assert.equal(entry.inputSafetyPresetSelect.children.length, 6);
+
+  entry.inputSafetyPresetSelect.value = "shell_balanced";
+  const profile = controller.readSessionInputSafetyFromControls(entry, session);
+  assert.equal(profile.requireValidShellSyntax, true);
+  assert.equal(profile.confirmOnDangerousShellCommand, true);
+  assert.equal(profile.confirmOnRecentTargetSwitch, true);
 });

@@ -85,6 +85,7 @@
           <div class="command-input-column">
             <div class="command-meta">
               <p id="status-message" class="status-message"></p>
+              <p id="command-target" class="command-target"></p>
               <p id="command-feedback" class="command-feedback"></p>
             </div>
             <div class="command-entry-row">
@@ -99,6 +100,15 @@
               </div>
               <button id="send-command" type="button">Send</button>
             </div>
+            <section id="command-guard" class="command-guard" hidden>
+              <p id="command-guard-summary" class="command-guard-summary"></p>
+              <pre id="command-guard-reasons" class="command-guard-reasons"></pre>
+              <pre id="command-guard-preview" class="command-guard-preview"></pre>
+              <div class="command-guard-actions">
+                <button id="command-guard-send-once" type="button">Send once</button>
+                <button id="command-guard-cancel" type="button">Cancel</button>
+              </div>
+            </section>
             <pre id="command-suggestions" class="command-suggestions" hidden></pre>
           </div>
         </section>
@@ -158,6 +168,18 @@
                 <option value="cr2">CR2 (\\r\\r)</option>
                 <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
               </select>
+              <label class="session-startup-label">Send Safety Preset</label>
+              <select class="session-input-safety-preset">
+                <option value="off">Off</option>
+                <option value="shell_syntax_gated">Shell Syntax Gated</option>
+                <option value="shell_balanced">Shell Balanced</option>
+                <option value="shell_strict">Shell Strict</option>
+                <option value="agent">Agent</option>
+                <option value="custom">Custom</option>
+              </select>
+              <p class="session-settings-inline-hint">
+                Safety presets control parser-backed shell validation and confirmation rules per session.
+              </p>
               <p class="session-start-feedback"></p>
             </section>
             <section class="session-settings-section session-theme-controls">
