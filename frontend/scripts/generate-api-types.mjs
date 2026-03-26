@@ -16,6 +16,7 @@ const requiredMarkers = [
   "Session:",
   "CreateSessionRequest:",
   "UpdateSessionRequest:",
+  "SessionInputSafetyProfile:",
   "SessionThemeProfile:",
   "CustomCommand:",
   "UpsertCustomCommandRequest:",
@@ -33,6 +34,18 @@ for (const marker of requiredMarkers) {
 const types = `/* Auto-generated from backend/openapi/openapi.yaml. Do not edit manually. */
 
 export type DeckSettings = Record<string, unknown>;
+
+export type SessionInputSafetyProfile = {
+  requireValidShellSyntax: boolean;
+  confirmOnIncompleteShellConstruct: boolean;
+  confirmOnNaturalLanguageInput: boolean;
+  confirmOnDangerousShellCommand: boolean;
+  confirmOnMultilineInput: boolean;
+  confirmOnRecentTargetSwitch: boolean;
+  targetSwitchGraceMs: number;
+  pasteLengthConfirmThreshold: number;
+  pasteLineConfirmThreshold: number;
+};
 
 export type SessionThemeProfile = {
   background: string;
@@ -84,6 +97,7 @@ export type Session = {
   cwd: string;
   shell: string;
   tags: string[];
+  inputSafetyProfile: SessionInputSafetyProfile;
   name?: string;
   startCwd?: string;
   startCommand?: string;
@@ -102,6 +116,7 @@ export type CreateSessionRequest = {
   cwd?: string;
   shell?: string;
   name?: string;
+  inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
   startCommand?: string;
   env?: Record<string, string>;
@@ -111,6 +126,7 @@ export type CreateSessionRequest = {
 
 export type UpdateSessionRequest = {
   name?: string;
+  inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
   startCommand?: string;
   env?: Record<string, string>;

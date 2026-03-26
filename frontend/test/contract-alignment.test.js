@@ -20,9 +20,11 @@ test("generated frontend api types stay aligned with backend openapi markers", a
     "Deck:",
     "Session:",
     "CustomCommand:",
+    "SessionInputSafetyProfile:",
     "SessionThemeProfile:",
     "deckId:",
     "tags:",
+    "inputSafetyProfile:",
     "themeProfile:"
   ];
   for (const marker of requiredOpenApiMarkers) {
@@ -31,11 +33,13 @@ test("generated frontend api types stay aligned with backend openapi markers", a
 
   const requiredGeneratedTypeMarkers = [
     "export type DeckSettings = Record<string, unknown>;",
+    "export type SessionInputSafetyProfile = {",
     "export type SessionThemeProfile = {",
     "export type Deck = {",
     "settings: DeckSettings;",
     "export type Session = {",
     "deckId: string;",
+    "inputSafetyProfile: SessionInputSafetyProfile;",
     "state: \"starting\" | \"running\" | \"unrestored\";",
     "startedAt?: number | null;",
     "exitCode?: number | null;",

@@ -1,4 +1,9 @@
 import { ApiError } from "./errors.js";
+import {
+  SESSION_INPUT_SAFETY_PROFILE_BOOLEAN_KEYS,
+  SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS,
+  SESSION_INPUT_SAFETY_PROFILE_KEYS
+} from "./session-input-safety-profile.js";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -43,6 +48,27 @@ function isThemeProfile(value) {
   return keys.every((key) => THEME_PROFILE_KEYS.includes(key));
 }
 
+function isInputSafetyProfile(value) {
+  if (!isObject(value)) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  if (keys.length !== SESSION_INPUT_SAFETY_PROFILE_KEYS.length) {
+    return false;
+  }
+  for (const key of SESSION_INPUT_SAFETY_PROFILE_BOOLEAN_KEYS) {
+    if (typeof value[key] !== "boolean") {
+      return false;
+    }
+  }
+  for (const [key, limits] of Object.entries(SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS)) {
+    if (!Number.isInteger(value[key]) || value[key] < limits.min || value[key] > limits.max) {
+      return false;
+    }
+  }
+  return keys.every((key) => SESSION_INPUT_SAFETY_PROFILE_KEYS.includes(key));
+}
+
 function isDeck(value) {
   return (
     isObject(value) &&
@@ -77,6 +103,9 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body?.note !== undefined && typeof body.note !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
     }
+    if (body?.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
+    }
     if (body?.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
@@ -104,6 +133,7 @@ export function validateRequest({ method, pathname, params, body }) {
       body.startCwd === undefined &&
       body.startCommand === undefined &&
       body.note === undefined &&
+      body.inputSafetyProfile === undefined &&
       body.env === undefined &&
       body.tags === undefined &&
       body.themeProfile === undefined
@@ -121,6 +151,9 @@ export function validateRequest({ method, pathname, params, body }) {
     }
     if (body.note !== undefined && typeof body.note !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
+    }
+    if (body.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
     }
     if (body.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
@@ -291,6 +324,7 @@ function isSession(value) {
     typeof value.startCommand === "string" &&
     isObject(value.env) &&
     Object.values(value.env).every((entry) => typeof entry === "string") &&
+    isInputSafetyProfile(value.inputSafetyProfile) &&
     Array.isArray(value.tags) &&
     value.tags.every((entry) => typeof entry === "string") &&
     isThemeProfile(value.themeProfile) &&

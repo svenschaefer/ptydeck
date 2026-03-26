@@ -3,6 +3,18 @@ import assert from "node:assert/strict";
 import { homedir } from "node:os";
 import { SessionManager } from "../src/session-manager.js";
 
+const INPUT_SAFETY_PROFILE = {
+  requireValidShellSyntax: true,
+  confirmOnIncompleteShellConstruct: true,
+  confirmOnNaturalLanguageInput: true,
+  confirmOnDangerousShellCommand: false,
+  confirmOnMultilineInput: true,
+  confirmOnRecentTargetSwitch: true,
+  targetSwitchGraceMs: 2500,
+  pasteLengthConfirmThreshold: 320,
+  pasteLineConfirmThreshold: 4
+};
+
 function createFakePty() {
   let lastExitHandler = null;
   let lastDataHandler = null;
@@ -51,6 +63,9 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(created.startCommand, "");
   assert.equal(created.note, undefined);
   assert.deepEqual(created.env, {});
+  assert.equal(typeof created.inputSafetyProfile, "object");
+  assert.equal(created.inputSafetyProfile.requireValidShellSyntax, false);
+  assert.equal(created.inputSafetyProfile.targetSwitchGraceMs, 4000);
   assert.deepEqual(created.tags, []);
   assert.equal(typeof created.themeProfile, "object");
   assert.equal(created.themeProfile.background, "#0a0d12");
@@ -318,6 +333,44 @@ test("SessionManager stores, normalizes, clears, and restarts session notes", ()
   assert.equal(restarted.note, "restart marker");
 });
 
+test("SessionManager stores, updates, and restarts session input safety profiles", () => {
+  const firstPty = createFakePty();
+  const secondPty = createFakePty();
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: () => {
+      spawnCount += 1;
+      return spawnCount === 1 ? firstPty : secondPty;
+    }
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    inputSafetyProfile: {
+      requireValidShellSyntax: true,
+      confirmOnIncompleteShellConstruct: true,
+      confirmOnNaturalLanguageInput: false,
+      confirmOnDangerousShellCommand: true,
+      confirmOnMultilineInput: false,
+      confirmOnRecentTargetSwitch: true,
+      targetSwitchGraceMs: 2500,
+      pasteLengthConfirmThreshold: 320,
+      pasteLineConfirmThreshold: 4
+    }
+  });
+  assert.equal(created.inputSafetyProfile.requireValidShellSyntax, true);
+  assert.equal(created.inputSafetyProfile.confirmOnNaturalLanguageInput, false);
+  assert.equal(created.inputSafetyProfile.pasteLineConfirmThreshold, 4);
+
+  const updated = manager.updateSession(created.id, {
+    inputSafetyProfile: INPUT_SAFETY_PROFILE
+  });
+  assert.deepEqual(updated.inputSafetyProfile, INPUT_SAFETY_PROFILE);
+
+  const restarted = manager.restart(created.id);
+  assert.deepEqual(restarted.inputSafetyProfile, INPUT_SAFETY_PROFILE);
+});
+
 test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
   const originalPromptCommand = process.env.PROMPT_COMMAND;
   const fakePty = createFakePty();
@@ -363,7 +416,8 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
     startCwd: "/var/tmp",
     startCommand: "echo START",
     env: { FOO: "BAR" },
-    note: "keep this"
+    note: "keep this",
+    inputSafetyProfile: INPUT_SAFETY_PROFILE
   });
   const restarted = manager.restart(created.id);
 
@@ -376,6 +430,7 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.startCommand, "echo START");
   assert.equal(restarted.note, "keep this");
   assert.deepEqual(restarted.env, { FOO: "BAR" });
+  assert.deepEqual(restarted.inputSafetyProfile, INPUT_SAFETY_PROFILE);
   assert.deepEqual(restarted.tags, []);
   assert.equal(restarted.themeProfile.cursor, "#8ec07c");
   assert.equal(restarted.createdAt, created.createdAt);

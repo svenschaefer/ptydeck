@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H16`.
-- Active scoped tasks: `QLT-138`, `QLT-139`.
+- Active scoped tasks: `QLT-139`.
 - Latest completed wave: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
 - Previous completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
 - Previous completed wave before that: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
@@ -620,7 +620,7 @@ Exit criteria:
 
 ### Active Open Tasks (Execution Queue)
 
-- none currently
+- `QLT-139`
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 
@@ -974,17 +974,16 @@ Exit criteria:
 
 ### v0.4.0-H16 - Target Clarity and Send Safety
 
-- `QLT-138`
 - `QLT-139`
 - `QLT-137`
 
 Completed in this milestone so far:
 
 - `QLT-137`
+- `QLT-138`
 
 Remaining in this milestone:
 
-- `QLT-138`
 - `QLT-139`
 
 Dependencies:

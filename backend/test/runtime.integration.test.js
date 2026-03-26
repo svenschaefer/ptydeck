@@ -181,6 +181,17 @@ test("session startup settings persist through patch and apply on restart", asyn
         shell: "sh",
         name: "ops-shell",
         note: "needs review",
+        inputSafetyProfile: {
+          requireValidShellSyntax: true,
+          confirmOnIncompleteShellConstruct: true,
+          confirmOnNaturalLanguageInput: false,
+          confirmOnDangerousShellCommand: true,
+          confirmOnMultilineInput: false,
+          confirmOnRecentTargetSwitch: true,
+          targetSwitchGraceMs: 2500,
+          pasteLengthConfirmThreshold: 320,
+          pasteLineConfirmThreshold: 4
+        },
         startCwd: "/tmp",
         startCommand: "echo BOOT",
         env: { APP_MODE: "dev" },
@@ -212,6 +223,8 @@ test("session startup settings persist through patch and apply on restart", asyn
     const created = await createRes.json();
     assert.equal(created.state, "running");
     assert.equal(created.note, "needs review");
+    assert.equal(created.inputSafetyProfile.requireValidShellSyntax, true);
+    assert.equal(created.inputSafetyProfile.confirmOnNaturalLanguageInput, false);
     assert.equal(created.startCwd, "/tmp");
     assert.equal(created.startCommand, "echo BOOT");
     assert.deepEqual(created.env, { APP_MODE: "dev" });
@@ -224,6 +237,17 @@ test("session startup settings persist through patch and apply on restart", asyn
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         note: "capture restart logs",
+        inputSafetyProfile: {
+          requireValidShellSyntax: false,
+          confirmOnIncompleteShellConstruct: true,
+          confirmOnNaturalLanguageInput: true,
+          confirmOnDangerousShellCommand: true,
+          confirmOnMultilineInput: true,
+          confirmOnRecentTargetSwitch: true,
+          targetSwitchGraceMs: 5000,
+          pasteLengthConfirmThreshold: 512,
+          pasteLineConfirmThreshold: 8
+        },
         startCwd: "/var/tmp",
         startCommand: "echo RESTART",
         env: { APP_MODE: "prod", FEATURE_X: "1" },
@@ -255,6 +279,9 @@ test("session startup settings persist through patch and apply on restart", asyn
     const patched = await patchRes.json();
     assert.equal(patched.state, "running");
     assert.equal(patched.note, "capture restart logs");
+    assert.equal(patched.inputSafetyProfile.requireValidShellSyntax, false);
+    assert.equal(patched.inputSafetyProfile.confirmOnMultilineInput, true);
+    assert.equal(patched.inputSafetyProfile.targetSwitchGraceMs, 5000);
     assert.equal(patched.startCwd, "/var/tmp");
     assert.equal(patched.startCommand, "echo RESTART");
     assert.deepEqual(patched.env, { APP_MODE: "prod", FEATURE_X: "1" });
@@ -270,6 +297,8 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
     assert.equal(restarted.note, "capture restart logs");
+    assert.equal(restarted.inputSafetyProfile.requireValidShellSyntax, false);
+    assert.equal(restarted.inputSafetyProfile.confirmOnRecentTargetSwitch, true);
     assert.equal(restarted.cwd, "/var/tmp");
     assert.equal(restarted.startCwd, "/var/tmp");
     assert.equal(restarted.startCommand, "echo RESTART");
@@ -303,6 +332,59 @@ test("session notes normalize and clear through patch", async () => {
     assert.equal(clearRes.status, 200);
     const cleared = await clearRes.json();
     assert.equal(cleared.note, undefined);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session input safety profile normalizes defaults and rejects invalid payloads", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.inputSafetyProfile.requireValidShellSyntax, false);
+    assert.equal(created.inputSafetyProfile.targetSwitchGraceMs, 4000);
+
+    const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        inputSafetyProfile: {
+          requireValidShellSyntax: true,
+          confirmOnIncompleteShellConstruct: true,
+          confirmOnNaturalLanguageInput: true,
+          confirmOnDangerousShellCommand: true,
+          confirmOnMultilineInput: true,
+          confirmOnRecentTargetSwitch: true,
+          targetSwitchGraceMs: 3000,
+          pasteLengthConfirmThreshold: 256,
+          pasteLineConfirmThreshold: 3
+        }
+      })
+    });
+    assert.equal(patchRes.status, 200);
+    const patched = await patchRes.json();
+    assert.equal(patched.inputSafetyProfile.requireValidShellSyntax, true);
+    assert.equal(patched.inputSafetyProfile.pasteLineConfirmThreshold, 3);
+
+    const invalidRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        inputSafetyProfile: {
+          requireValidShellSyntax: "yes"
+        }
+      })
+    });
+    assert.equal(invalidRes.status, 400);
+    const invalidBody = await invalidRes.json();
+    assert.equal(invalidBody.error, "ValidationError");
   } finally {
     await runtime.stop();
   }

@@ -24,6 +24,18 @@ const THEME_PROFILE = {
   brightWhite: "#f5f7fa"
 };
 
+const INPUT_SAFETY_PROFILE = {
+  requireValidShellSyntax: true,
+  confirmOnIncompleteShellConstruct: true,
+  confirmOnNaturalLanguageInput: true,
+  confirmOnDangerousShellCommand: true,
+  confirmOnMultilineInput: false,
+  confirmOnRecentTargetSwitch: true,
+  targetSwitchGraceMs: 4000,
+  pasteLengthConfirmThreshold: 400,
+  pasteLineConfirmThreshold: 5
+};
+
 test("validateRequest accepts valid input body", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -59,6 +71,7 @@ test("validateResponse checks session list schema", () => {
           cwd: "/tmp",
           shell: "bash",
           note: "needs review",
+          inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",
           startCommand: "",
           env: {},
@@ -116,6 +129,7 @@ test("validateRequest accepts valid session patch payload", () => {
       body: {
         name: "renamed",
         note: "needs review",
+        inputSafetyProfile: INPUT_SAFETY_PROFILE,
         startCwd: "/tmp",
         startCommand: "echo hi",
         env: { FOO: "BAR" },
@@ -134,6 +148,19 @@ test("validateRequest rejects invalid note types", () => {
       params: { sessionId: "abc" },
       body: {
         note: 123
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid input safety profile type", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        inputSafetyProfile: "strict"
       }
     });
   });

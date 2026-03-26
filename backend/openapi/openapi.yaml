@@ -568,6 +568,7 @@ components:
         - activityState
         - cwd
         - shell
+        - inputSafetyProfile
         - tags
         - createdAt
         - updatedAt
@@ -596,6 +597,8 @@ components:
           type: string
         note:
           type: string
+        inputSafetyProfile:
+          $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
           type: string
         startCommand:
@@ -671,6 +674,8 @@ components:
           type: string
         note:
           type: string
+        inputSafetyProfile:
+          $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
           type: string
         startCommand:
@@ -692,6 +697,8 @@ components:
           type: string
         note:
           type: string
+        inputSafetyProfile:
+          $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
           type: string
         startCommand:
@@ -706,6 +713,43 @@ components:
             type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
+    SessionInputSafetyProfile:
+      type: object
+      required:
+        - requireValidShellSyntax
+        - confirmOnIncompleteShellConstruct
+        - confirmOnNaturalLanguageInput
+        - confirmOnDangerousShellCommand
+        - confirmOnMultilineInput
+        - confirmOnRecentTargetSwitch
+        - targetSwitchGraceMs
+        - pasteLengthConfirmThreshold
+        - pasteLineConfirmThreshold
+      properties:
+        requireValidShellSyntax:
+          type: boolean
+        confirmOnIncompleteShellConstruct:
+          type: boolean
+        confirmOnNaturalLanguageInput:
+          type: boolean
+        confirmOnDangerousShellCommand:
+          type: boolean
+        confirmOnMultilineInput:
+          type: boolean
+        confirmOnRecentTargetSwitch:
+          type: boolean
+        targetSwitchGraceMs:
+          type: integer
+          minimum: 0
+          maximum: 60000
+        pasteLengthConfirmThreshold:
+          type: integer
+          minimum: 0
+          maximum: 20000
+        pasteLineConfirmThreshold:
+          type: integer
+          minimum: 0
+          maximum: 1000
     SessionThemeProfile:
       type: object
       required:

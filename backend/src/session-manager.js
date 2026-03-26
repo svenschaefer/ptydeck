@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
 import { basename } from "node:path";
 import { ApiError } from "./errors.js";
+import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 
 function now() {
   return Date.now();
@@ -285,6 +286,7 @@ export class SessionManager {
     startCommand = "",
     env = {},
     note,
+    inputSafetyProfile,
     tags = [],
     themeProfile = {},
     createdAt,
@@ -310,6 +312,7 @@ export class SessionManager {
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
     const normalizedNote = normalizeSessionNote(note);
+    const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
     const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
@@ -336,6 +339,7 @@ export class SessionManager {
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
         ...(normalizedNote ? { note: normalizedNote } : {}),
+        inputSafetyProfile: normalizedInputSafetyProfile,
         tags: normalizedTags,
         themeProfile: normalizedThemeProfile,
         state: SESSION_STATE_STARTING,
@@ -442,6 +446,9 @@ export class SessionManager {
         delete session.meta.note;
       }
     }
+    if (patch.inputSafetyProfile !== undefined) {
+      session.meta.inputSafetyProfile = normalizeSessionInputSafetyProfile(patch.inputSafetyProfile, { strict: false });
+    }
     if (patch.tags !== undefined) {
       session.meta.tags = normalizeSessionTags(patch.tags);
     }
@@ -469,6 +476,7 @@ export class SessionManager {
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
       note: snapshot.note,
+      inputSafetyProfile: snapshot.inputSafetyProfile,
       tags: snapshot.tags || [],
       themeProfile: snapshot.themeProfile || {},
       createdAt: snapshot.createdAt,
