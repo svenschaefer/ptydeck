@@ -14,9 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `SWF-001` Owner `FE`: Define a strict line-oriented slash-workflow DSL grammar and AST schema (no loops, variables, or general scripting features), including explicit parse errors for invalid regex, missing timeout, unknown workflow directives, and malformed block-payload boundaries.
-- `SWF-002` Owner `FE`: Implement a deterministic workflow execution engine (`ready -> running -> waiting -> succeeded|failed|stopped|cancelled`) with sequential step evaluation, explicit failure/time-out abort semantics, and no second slash-command dispatch path beside the existing command registry/executor.
-- `SWF-003` Owner `FE`: Add abortable wait-step primitives (`wait delay`, `wait idle`, `wait until <source> <pattern> timeout`) using `AbortController`-style cancellation so each in-flight workflow step can be interrupted immediately without leaking listeners or timers.
+- none currently
 
 ## Active Ownership Role
 

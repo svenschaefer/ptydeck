@@ -98,7 +98,7 @@ Promoted and completed in `v0.4.0-H19`:
 
 - `REP-001`, `REP-002`, `REP-003`
 
-Promoted to active delivery (`v0.4.0-H34` in `TODO.md` / `ROADMAP.md`):
+Promoted and completed in `v0.4.0-H34`:
 
 - `SWF-001`, `SWF-002`, `SWF-003`
 

@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H34` (Slash Workflow Foundation, `SWF-001`, `SWF-002`, `SWF-003`).
-- Active scoped tasks: `SWF-001`, `SWF-002`, `SWF-003`.
-- Latest completed wave: `v0.4.0-H33` (Command Namespaces and Scriptability, `CMD-010`, `CMD-011`, `CMD-012`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H34` (Slash Workflow Foundation, `SWF-001`, `SWF-002`, `SWF-003`).
+- Previous completed wave: `v0.4.0-H33` (Command Namespaces and Scriptability, `CMD-010`, `CMD-011`, `CMD-012`).
 - Previous completed wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
 - Earlier completed wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
 - Earlier completed wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
@@ -48,17 +49,17 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave
+## Latest Completed Wave
 
-### v0.4.0-H34 - Slash Workflow Foundation (Active)
+### v0.4.0-H34 - Slash Workflow Foundation (Completed)
 
-- Active scoped tasks: `SWF-001`, `SWF-002`, `SWF-003`
+- Completed scoped tasks: `SWF-001`, `SWF-002`, `SWF-003`
 
 Dependencies:
 
-- `SWF-001` lands first so workflow submissions have one strict grammar and AST contract before any runtime execution or wait semantics are layered on top.
-- `SWF-002` follows `SWF-001` and reuses the finalized workflow AST plus the existing slash-command registry/executor instead of inventing a second command-dispatch path for workflow steps.
-- `SWF-003` closes after `SWF-001` and `SWF-002`, so wait-step cancellation semantics are implemented against the real workflow state machine and can share one abort/cleanup contract across all in-flight step types.
+- `SWF-001` landed first so workflow submissions have one strict grammar and AST contract before any runtime execution or wait semantics are layered on top.
+- `SWF-002` followed `SWF-001` and reuses the finalized workflow AST plus the existing slash-command registry/executor instead of inventing a second command-dispatch path for workflow steps.
+- `SWF-003` closed after `SWF-001` and `SWF-002`, so wait-step cancellation semantics are implemented against the real workflow state machine and can share one abort/cleanup contract across all in-flight step types.
 
 Exit criteria:
 
@@ -67,7 +68,7 @@ Exit criteria:
 - Wait-step primitives exist for delay-based and observable-condition-based waits, and each in-flight wait can be cancelled immediately without leaving orphan timers or subscriptions behind.
 - Regression coverage exists for workflow parsing, execution state transitions, and abortable wait semantics.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H33 - Command Namespaces and Scriptability (Completed)
 
@@ -85,8 +86,6 @@ Exit criteria:
 - Help, autocomplete, and the command palette expose the new namespaced command forms deterministically while keeping short forms available.
 - The frontend can execute a deterministic sequential command-plane script from one composer submission, short-circuiting on failure and reporting concise aggregated results without mixing slash-command scripting with PTY input semantics.
 - Regression coverage exists for alias resolution, backward compatibility, and command-script execution behavior.
-
-## Previous Completed Wave
 
 ### v0.4.0-H32 - Scoped Custom-Command Sets (Completed)
 
