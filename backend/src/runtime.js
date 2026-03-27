@@ -308,6 +308,21 @@ function route(pathname, method) {
     return { kind: "restart", params: { sessionId: restartMatch[1] } };
   }
 
+  const interruptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/interrupt$/);
+  if (interruptMatch && method === "POST") {
+    return { kind: "interrupt", params: { sessionId: interruptMatch[1] } };
+  }
+
+  const terminateMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/terminate$/);
+  if (terminateMatch && method === "POST") {
+    return { kind: "terminate", params: { sessionId: terminateMatch[1] } };
+  }
+
+  const killMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/kill$/);
+  if (killMatch && method === "POST") {
+    return { kind: "kill", params: { sessionId: killMatch[1] } };
+  }
+
   return { kind: "notFound" };
 }
 
@@ -338,6 +353,15 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/restart";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/interrupt$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/interrupt";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/terminate$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/terminate";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/kill$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/kill";
   }
   if (/^\/api\/v1\/sessions\/[^/]+$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}";
@@ -2098,7 +2122,15 @@ export function createRuntime(config) {
     if (kind === "deleteSession") {
       return "sessions:delete";
     }
-    if (kind === "updateSession" || kind === "input" || kind === "resize" || kind === "restart") {
+    if (
+      kind === "updateSession" ||
+      kind === "input" ||
+      kind === "resize" ||
+      kind === "restart" ||
+      kind === "interrupt" ||
+      kind === "terminate" ||
+      kind === "kill"
+    ) {
       return "sessions:write";
     }
     return "";
@@ -3709,6 +3741,24 @@ function tryCreateRestoredSession({
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.restart");
         writeJson(req, res, 200, apiPayload);
+        return;
+      }
+
+      if (match.kind === "interrupt") {
+        manager.interrupt(match.params.sessionId);
+        writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "terminate") {
+        manager.terminate(match.params.sessionId);
+        writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "kill") {
+        manager.kill(match.params.sessionId);
+        writeJson(req, res, 204);
         return;
       }
 

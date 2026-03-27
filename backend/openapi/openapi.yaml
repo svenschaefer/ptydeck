@@ -758,6 +758,57 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/interrupt:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: interruptSession
+      summary: Send SIGINT to the session PTY process.
+      responses:
+        '204':
+          description: Interrupt accepted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/terminate:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: terminateSession
+      summary: Send SIGTERM to the session PTY process.
+      responses:
+        '204':
+          description: Terminate accepted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/kill:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: killSession
+      summary: Send SIGKILL to the session PTY process.
+      responses:
+        '204':
+          description: Kill accepted
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
 components:
   parameters:
     sessionId:

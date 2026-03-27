@@ -102,10 +102,13 @@ Promoted and completed in `v0.4.0-H34`:
 
 - `SWF-001`, `SWF-002`, `SWF-003`
 
+Promoted and completed in `v0.4.0-H35`:
+
+- `SWF-005`
+
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 
 - [ ] `SWF-004` Owner `FE`: Add workflow data-source adapters (`line`, `visible-line`, `status`, `summary`, `exit-code`, `session-state`) over the existing stream/interpretation layer with deterministic source contracts and no hidden heuristic side effects in the execution layer.
-- [ ] `SWF-005` Owner `BE`: Add explicit PTY control endpoints for runtime interruption/escalation (`POST /api/v1/sessions/{sessionId}/interrupt`, `.../terminate`, `.../kill`) with OpenAPI/runtime validation, authz checks, and deterministic error contracts for already-exited sessions.
 - [ ] `SWF-006` Owner `FE`: Add independent workflow control-plane UI/actions (`Stop Workflow`, `Interrupt`, `Kill Session`) that remain available while workflows are running/waiting and are not encoded as ordinary DSL steps.
 - [ ] `SWF-007` Owner `BE`: Define and enforce workflow safety guardrails (max workflow steps, max wait timeout, max capture size, and explicit cancellation cleanup of listeners/subscriptions) to prevent runaway client/runtime behavior.
 - [ ] `SWF-008` Owner `QA`: Add regression coverage for workflow determinism and control-plane safety (cancel while waiting, ignored `SIGINT` escalation path, PTY exit during wait, timeout behavior, and exact-once cancel/stop semantics).

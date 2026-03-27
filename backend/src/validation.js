@@ -342,6 +342,18 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (
+    method === "POST" &&
+    (pathname.endsWith("/interrupt") || pathname.endsWith("/terminate") || pathname.endsWith("/kill"))
+  ) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
+
   if (method === "POST" && pathname === "/api/v1/auth/dev-token") {
     if (body !== undefined && !isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");

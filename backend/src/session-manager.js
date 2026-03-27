@@ -453,6 +453,26 @@ export class SessionManager {
     session.meta.updatedAt = timestamp;
   }
 
+  signal(sessionId, signal) {
+    const session = this.get(sessionId);
+    session.ptyProcess.kill(signal);
+    const timestamp = this.nowFn();
+    session.lastActivityAt = timestamp;
+    session.meta.updatedAt = timestamp;
+  }
+
+  interrupt(sessionId) {
+    this.signal(sessionId, "SIGINT");
+  }
+
+  terminate(sessionId) {
+    this.signal(sessionId, "SIGTERM");
+  }
+
+  kill(sessionId) {
+    this.signal(sessionId, "SIGKILL");
+  }
+
   updateSession(sessionId, patch = {}) {
     const session = this.get(sessionId);
     if (patch.name !== undefined) {

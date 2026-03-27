@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H34` (Slash Workflow Foundation, `SWF-001`, `SWF-002`, `SWF-003`).
+- Latest completed wave: `v0.4.0-H35` (PTY Control Endpoints, `SWF-005`).
+- Previous completed wave: `v0.4.0-H34` (Slash Workflow Foundation, `SWF-001`, `SWF-002`, `SWF-003`).
 - Previous completed wave: `v0.4.0-H33` (Command Namespaces and Scriptability, `CMD-010`, `CMD-011`, `CMD-012`).
 - Previous completed wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
 - Earlier completed wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
@@ -50,6 +51,23 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H35 - PTY Control Endpoints (Completed)
+
+- Completed scoped tasks: `SWF-005`
+
+Dependencies:
+
+- `SWF-005` follows the completed H34 workflow foundation so terminal interruption/escalation is available through explicit backend runtime controls before any later frontend workflow-control surface is added.
+
+Exit criteria:
+
+- Backend exposes deterministic `POST /api/v1/sessions/{sessionId}/interrupt`, `/terminate`, and `/kill` endpoints with OpenAPI coverage, runtime routing, request validation, and `sessions:write` authz handling.
+- PTY control endpoints dispatch explicit `SIGINT`, `SIGTERM`, and `SIGKILL` signals through one backend session-manager path instead of inventing one-off route-specific signal logic.
+- Missing-session and already-removed-session paths fail with deterministic `404 SessionNotFound` behavior instead of hanging or silently succeeding.
+- Regression coverage exists for route/contract conformance, request validation, and end-to-end runtime signal behavior.
+
+## Previous Completed Wave
 
 ### v0.4.0-H34 - Slash Workflow Foundation (Completed)
 

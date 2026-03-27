@@ -58,6 +58,29 @@ test("validateRequest rejects invalid resize payload", () => {
   });
 });
 
+test("validateRequest accepts valid PTY control requests without a body", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/interrupt",
+      params: { sessionId: "abc" },
+      body: undefined
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/terminate",
+      params: { sessionId: "abc" },
+      body: undefined
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/kill",
+      params: { sessionId: "abc" },
+      body: undefined
+    });
+  });
+});
+
 test("validateResponse checks session list schema", () => {
   assert.doesNotThrow(() => {
     validateResponse({

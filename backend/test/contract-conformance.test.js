@@ -79,7 +79,10 @@ function runtimeOperationKeys() {
     "DELETE /sessions/{sessionId}",
     "POST /sessions/{sessionId}/input",
     "POST /sessions/{sessionId}/resize",
-    "POST /sessions/{sessionId}/restart"
+    "POST /sessions/{sessionId}/restart",
+    "POST /sessions/{sessionId}/interrupt",
+    "POST /sessions/{sessionId}/terminate",
+    "POST /sessions/{sessionId}/kill"
   ]);
 }
 
@@ -338,6 +341,24 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/restart").has(restartMissingRes.status));
+
+    const interruptMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/interrupt`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/interrupt").has(interruptMissingRes.status));
+
+    const terminateMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/terminate`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/terminate").has(terminateMissingRes.status));
+
+    const killMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/kill`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/kill").has(killMissingRes.status));
 
     const moveMissingSessionRes = await contractFetch(`${baseUrl}/decks/ops/sessions/missing-id:move`, {
       method: "POST",

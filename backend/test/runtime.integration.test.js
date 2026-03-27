@@ -170,6 +170,63 @@ test("REST lifecycle endpoints work end-to-end", async () => {
   }
 });
 
+test("session PTY control endpoints send deterministic signals and remove killed sessions", async () => {
+  const killSignals = [];
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty() {
+      let exitHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData() {},
+        write() {},
+        resize() {},
+        kill(signal) {
+          killSignals.push(signal || "SIGHUP");
+          if (signal === "SIGKILL" && exitHandler) {
+            exitHandler({ exitCode: 137, signal: "SIGKILL" });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const interruptRes = await fetch(`${baseUrl}/sessions/${created.id}/interrupt`, {
+      method: "POST"
+    });
+    assert.equal(interruptRes.status, 204);
+
+    const terminateRes = await fetch(`${baseUrl}/sessions/${created.id}/terminate`, {
+      method: "POST"
+    });
+    assert.equal(terminateRes.status, 204);
+
+    const killRes = await fetch(`${baseUrl}/sessions/${created.id}/kill`, {
+      method: "POST"
+    });
+    assert.equal(killRes.status, 204);
+
+    assert.deepEqual(killSignals, ["SIGINT", "SIGTERM", "SIGKILL"]);
+
+    const missingAfterKillRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(missingAfterKillRes.status, 404);
+    const missingAfterKillBody = await missingAfterKillRes.json();
+    assert.equal(missingAfterKillBody.error, "SessionNotFound");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session startup settings persist through patch and apply on restart", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
@@ -1575,6 +1632,27 @@ test("REST negative routes return expected error responses", async () => {
     assert.equal(unknownRestartRes.status, 404);
     const unknownRestartBody = await unknownRestartRes.json();
     assert.equal(unknownRestartBody.error, "SessionNotFound");
+
+    const unknownInterruptRes = await fetch(`${baseUrl}/sessions/unknown/interrupt`, {
+      method: "POST"
+    });
+    assert.equal(unknownInterruptRes.status, 404);
+    const unknownInterruptBody = await unknownInterruptRes.json();
+    assert.equal(unknownInterruptBody.error, "SessionNotFound");
+
+    const unknownTerminateRes = await fetch(`${baseUrl}/sessions/unknown/terminate`, {
+      method: "POST"
+    });
+    assert.equal(unknownTerminateRes.status, 404);
+    const unknownTerminateBody = await unknownTerminateRes.json();
+    assert.equal(unknownTerminateBody.error, "SessionNotFound");
+
+    const unknownKillRes = await fetch(`${baseUrl}/sessions/unknown/kill`, {
+      method: "POST"
+    });
+    assert.equal(unknownKillRes.status, 404);
+    const unknownKillBody = await unknownKillRes.json();
+    assert.equal(unknownKillBody.error, "SessionNotFound");
 
     const invalidCustomCommandPutRes = await fetch(`${baseUrl}/custom-commands/docu`, {
       method: "PUT",
