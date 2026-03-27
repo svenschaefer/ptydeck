@@ -14,6 +14,8 @@ export function createSessionGridController(options = {}) {
   const getSessionFilterText = options.getSessionFilterText || (() => "");
   const sortSessionsByQuickId =
     typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
+  const resolveDeckSessions =
+    typeof options.resolveDeckSessions === "function" ? options.resolveDeckSessions : (_deckId, sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
   const pruneQuickIds = options.pruneQuickIds || (() => {});
   const renderDeckTabs = options.renderDeckTabs || (() => {});
   const workspaceRenderController = options.workspaceRenderController || null;
@@ -116,9 +118,13 @@ export function createSessionGridController(options = {}) {
     const activeDeck = getActiveDeck();
     const activeDeckId = activeDeck ? activeDeck.id : "";
     const orderedSessions = sortSessionsByQuickId(state.sessions);
-    const deckSessions = activeDeckId
+    const activeDeckSessions = activeDeckId
       ? orderedSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
       : orderedSessions.slice();
+    const deckSessions = resolveDeckSessions(activeDeckId, activeDeckSessions, {
+      activeDeck,
+      sessions: orderedSessions
+    });
 
     renderDeckTabs(orderedSessions);
     const hasDecks = state.decks.length > 0;

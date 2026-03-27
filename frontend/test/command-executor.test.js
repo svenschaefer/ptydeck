@@ -15,7 +15,7 @@ function createExecutor() {
       }
     },
     api: {},
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "replay", "settings", "custom", "help"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "replay", "settings", "custom", "help"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -50,7 +50,13 @@ function createExecutor() {
     normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
     normalizeThemeProfile: (profile) => profile || {},
     getTerminalSettings: () => ({ cols: 80, rows: 20 }),
-    requestRender: () => {}
+    requestRender: () => {},
+    listWorkspacePresets: () => [],
+    resolveWorkspacePreset: () => ({ preset: null, error: "Unknown workspace preset." }),
+    createWorkspacePresetFromCurrent: async () => "",
+    applyWorkspacePreset: async () => "",
+    renameWorkspacePreset: async () => "",
+    deleteWorkspacePreset: async () => ""
   });
 }
 
@@ -60,7 +66,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: > / new deck move size filter close switch swap next prev list rename restart note layout replay settings custom help"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace replay settings custom help"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -90,6 +96,12 @@ test("command executor help and usage strings derive from declarative schema met
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
   assert.equal(layoutUsage, "Usage: /layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+
+  const workspaceUsage = await executor.execute({ command: "workspace", args: ["wat"], raw: "/workspace wat" });
+  assert.equal(
+    workspaceUsage,
+    "Usage: /workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>"
+  );
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(replayUsage, "Usage: /replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
@@ -209,6 +221,118 @@ test("command executor manages layout profiles through shared runtime hooks", as
     ["apply", "focus"],
     ["rename", "focus", "New Name"],
     ["delete", "focus"]
+  ]);
+});
+
+test("command executor manages workspace presets through shared runtime hooks", async () => {
+  const calls = [];
+  const presets = [
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: {
+        activeDeckId: "default",
+        layoutProfileId: "focus",
+        deckGroups: {
+          default: {
+            activeGroupId: "ops",
+            groups: [{ id: "ops", name: "Ops", sessionIds: ["s1"] }]
+          }
+        }
+      }
+    }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: ""
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["workspace", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 0,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => String(id || ""),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    listWorkspacePresets: () => presets,
+    resolveWorkspacePreset: (selector) =>
+      selector === "ops" ? { preset: presets[0], error: "" } : { preset: null, error: `Unknown workspace preset: ${selector}` },
+    createWorkspacePresetFromCurrent: async (name) => {
+      calls.push(["save", name]);
+      return `Saved workspace preset [ops] ${name}.`;
+    },
+    applyWorkspacePreset: async (presetId) => {
+      calls.push(["apply", presetId]);
+      return `Applied workspace preset [${presetId}] Ops Workspace.`;
+    },
+    renameWorkspacePreset: async (presetId, name) => {
+      calls.push(["rename", presetId, name]);
+      return `Renamed workspace preset [${presetId}] to ${name}.`;
+    },
+    deleteWorkspacePreset: async (presetId) => {
+      calls.push(["delete", presetId]);
+      return `Deleted workspace preset [${presetId}] Ops Workspace.`;
+    }
+  });
+
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["list"], raw: "/workspace list" }),
+    "[ops] Ops Workspace -> deck=default layout=focus decks=1"
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["save", "Ops", "Workspace"], raw: "/workspace save Ops Workspace" }),
+    "Saved workspace preset [ops] Ops Workspace."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["apply", "ops"], raw: "/workspace apply ops" }),
+    "Applied workspace preset [ops] Ops Workspace."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["rename", "ops", "New", "Name"], raw: "/workspace rename ops New Name" }),
+    "Renamed workspace preset [ops] to New Name."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["delete", "ops"], raw: "/workspace delete ops" }),
+    "Deleted workspace preset [ops] Ops Workspace."
+  );
+  assert.deepEqual(calls, [
+    ["save", "Ops Workspace"],
+    ["apply", "ops"],
+    ["rename", "ops", "New Name"],
+    ["delete", "ops"]
   ]);
 });
 

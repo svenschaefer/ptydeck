@@ -430,6 +430,69 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  workspace: freezeCommandDefinition({
+    key: "slash:workspace",
+    insertText: "workspace",
+    label: "/workspace",
+    kind: "command",
+    description: "manage persisted workspace presets",
+    example: "/workspace apply ops",
+    summary: "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>",
+    usage: [
+      "/workspace list",
+      "/workspace save <name>",
+      "/workspace apply <preset>",
+      "/workspace rename <preset> <name>",
+      "/workspace delete <preset>"
+    ],
+    subcommands: {
+      list: {
+        insertText: "list",
+        label: "/workspace list",
+        kind: "subcommand",
+        description: "list saved workspace presets",
+        example: "/workspace list",
+        key: "slash:workspace:list",
+        usage: "/workspace list"
+      },
+      save: {
+        insertText: "save",
+        label: "/workspace save",
+        kind: "subcommand",
+        description: "save the current deck/layout/group workspace state as a named preset",
+        example: "/workspace save ops",
+        key: "slash:workspace:save",
+        usage: "/workspace save <name>"
+      },
+      apply: {
+        insertText: "apply",
+        label: "/workspace apply",
+        kind: "subcommand",
+        description: "apply a saved workspace preset",
+        example: "/workspace apply ops",
+        key: "slash:workspace:apply",
+        usage: "/workspace apply <preset>"
+      },
+      rename: {
+        insertText: "rename",
+        label: "/workspace rename",
+        kind: "subcommand",
+        description: "rename a saved workspace preset",
+        example: "/workspace rename ops ops-focus",
+        key: "slash:workspace:rename",
+        usage: "/workspace rename <preset> <name>"
+      },
+      delete: {
+        insertText: "delete",
+        label: "/workspace delete",
+        kind: "subcommand",
+        description: "delete a saved workspace preset",
+        example: "/workspace delete ops",
+        key: "slash:workspace:delete",
+        usage: "/workspace delete <preset>"
+      }
+    }
+  }),
   custom: freezeCommandDefinition({
     key: "slash:custom",
     insertText: "custom",
@@ -579,10 +642,14 @@ export function createCommandTopicHelpText(commandName, subcommandName = "", sys
 
 export function createCommandHelpText(systemSlashCommands = [], options = {}) {
   const includeQuickSwitch = options.includeQuickSwitch !== false;
+  const includeDirectRouting = options.includeDirectRouting !== false;
   const commandNames = createSlashCommandSchema(systemSlashCommands)
     .map((command) => normalizeText(command?.insertText))
     .filter(Boolean);
   const parts = [];
+  if (includeDirectRouting) {
+    parts.push("@");
+  }
   if (includeQuickSwitch) {
     parts.push(">");
   }

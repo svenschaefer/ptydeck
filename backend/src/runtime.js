@@ -27,6 +27,7 @@ const CUSTOM_COMMAND_RESERVED_NAMES = new Set([
   "restart",
   "note",
   "layout",
+  "workspace",
   "help",
   "custom"
 ]);
@@ -55,6 +56,10 @@ const DECK_NAME_MAX_LENGTH = 64;
 const LAYOUT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const LAYOUT_PROFILE_NAME_MAX_LENGTH = 64;
 const LAYOUT_PROFILE_FILTER_MAX_LENGTH = 256;
+const WORKSPACE_PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const WORKSPACE_PRESET_NAME_MAX_LENGTH = 64;
+const WORKSPACE_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const WORKSPACE_GROUP_NAME_MAX_LENGTH = 64;
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
@@ -180,6 +185,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/layout-profiles" && method === "POST") {
     return { kind: "createLayoutProfile" };
   }
+  if (pathname === "/api/v1/workspace-presets" && method === "GET") {
+    return { kind: "listWorkspacePresets" };
+  }
+  if (pathname === "/api/v1/workspace-presets" && method === "POST") {
+    return { kind: "createWorkspacePreset" };
+  }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
   if (customCommandMatch && method === "GET") {
@@ -231,6 +242,17 @@ function route(pathname, method) {
     return { kind: "deleteLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
   }
 
+  const workspacePresetMatch = pathname.match(/^\/api\/v1\/workspace-presets\/([^/]+)$/);
+  if (workspacePresetMatch && method === "GET") {
+    return { kind: "getWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
+  }
+  if (workspacePresetMatch && method === "PATCH") {
+    return { kind: "updateWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
+  }
+  if (workspacePresetMatch && method === "DELETE") {
+    return { kind: "deleteWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
+  }
+
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
   if (getSessionMatch && method === "GET") {
     return { kind: "getSession", params: { sessionId: getSessionMatch[1] } };
@@ -274,6 +296,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/layout-profiles\/[^/]+$/.test(pathname)) {
     return "/api/v1/layout-profiles/{profileId}";
+  }
+  if (/^\/api\/v1\/workspace-presets\/[^/]+$/.test(pathname)) {
+    return "/api/v1/workspace-presets/{presetId}";
   }
   if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
     return "/api/v1/custom-commands/{commandName}";
@@ -677,6 +702,98 @@ function slugifyLayoutProfileId(name) {
   return root.slice(0, maxLength).replace(/-+$/g, "") || "layout";
 }
 
+function normalizeWorkspacePresetName(name) {
+  if (typeof name !== "string") {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+  }
+  if (trimmed.length > WORKSPACE_PRESET_NAME_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'name' exceeds maximum length (${WORKSPACE_PRESET_NAME_MAX_LENGTH}).`
+    );
+  }
+  return trimmed;
+}
+
+function normalizeWorkspacePresetIdInput(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !WORKSPACE_PRESET_ID_PATTERN.test(normalized)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'id' must match pattern ^[a-z0-9][a-z0-9-]{0,31}$."
+    );
+  }
+  return normalized;
+}
+
+function slugifyWorkspacePresetId(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const root = base || "workspace";
+  const maxLength = 32;
+  return root.slice(0, maxLength).replace(/-+$/g, "") || "workspace";
+}
+
+function normalizeWorkspaceGroupName(name) {
+  if (typeof name !== "string") {
+    throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups.*.groups.*.name' must be a string.");
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'workspace.deckGroups.*.groups.*.name' must be a non-empty string."
+    );
+  }
+  if (trimmed.length > WORKSPACE_GROUP_NAME_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'workspace.deckGroups.*.groups.*.name' exceeds maximum length (${WORKSPACE_GROUP_NAME_MAX_LENGTH}).`
+    );
+  }
+  return trimmed;
+}
+
+function normalizeWorkspaceGroupIdInput(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !WORKSPACE_GROUP_ID_PATTERN.test(normalized)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'workspace.deckGroups.*.groups.*.id' must match pattern ^[a-z0-9][a-z0-9-]{0,31}$."
+    );
+  }
+  return normalized;
+}
+
+function slugifyWorkspaceGroupId(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const root = base || "group";
+  const maxLength = 32;
+  return root.slice(0, maxLength).replace(/-+$/g, "") || "group";
+}
+
 function normalizeLayoutProfileSessionFilterText(value, { strict = true } = {}) {
   if (value === undefined) {
     return "";
@@ -871,6 +988,7 @@ export function createRuntime(config) {
   let persistedReplayOutputs = new Map();
   const decks = new Map();
   const layoutProfiles = new Map();
+  const workspacePresets = new Map();
   const sessionDeckAssignments = new Map();
   const metrics = {
     httpRequestsTotal: 0,
@@ -1295,6 +1413,12 @@ export function createRuntime(config) {
     if (kind === "createDeck" || kind === "updateDeck" || kind === "deleteDeck" || kind === "moveSessionToDeck") {
       return "sessions:write";
     }
+    if (kind === "listWorkspacePresets" || kind === "getWorkspacePreset") {
+      return "sessions:read";
+    }
+    if (kind === "createWorkspacePreset" || kind === "updateWorkspacePreset" || kind === "deleteWorkspacePreset") {
+      return "sessions:write";
+    }
     if (kind === "listCustomCommands" || kind === "getCustomCommand") {
       return "sessions:read";
     }
@@ -1546,6 +1670,7 @@ export function createRuntime(config) {
       reassignDeckSessions(deckId, DEFAULT_DECK_ID);
     }
     decks.delete(deckId);
+    cleanupWorkspacePresets();
     return {
       deckId,
       fallbackDeckId: DEFAULT_DECK_ID,
@@ -1631,7 +1756,372 @@ export function createRuntime(config) {
   function deleteLayoutProfile(profileId) {
     const profile = getLayoutProfileOrThrow(profileId);
     layoutProfiles.delete(profileId);
+    cleanupWorkspacePresets();
     return toApiLayoutProfile(profile);
+  }
+
+  function hasKnownSession(sessionId) {
+    try {
+      manager.get(sessionId);
+      return true;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    return unrestoredSessions.has(sessionId);
+  }
+
+  function normalizeWorkspacePresetLayoutProfileId(value, { strict = true } = {}) {
+    if (value === undefined || value === null || String(value).trim() === "") {
+      return "";
+    }
+    let normalizedId = "";
+    try {
+      normalizedId = normalizeLayoutProfileIdInput(value);
+    } catch (error) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'workspace.layoutProfileId' must be a valid layout profile id.");
+      }
+      return "";
+    }
+    if (!layoutProfiles.has(normalizedId)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Layout profile '${normalizedId}' was not found.`);
+      }
+      return "";
+    }
+    return normalizedId;
+  }
+
+  function normalizeWorkspacePresetGroupSessionIds(sessionIds, deckId, { strict = true } = {}) {
+    if (sessionIds === undefined) {
+      return [];
+    }
+    if (!Array.isArray(sessionIds)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups.*.groups.*.sessionIds' must be an array.");
+      }
+      return [];
+    }
+    const normalized = [];
+    const seen = new Set();
+    for (const rawSessionId of sessionIds) {
+      if (typeof rawSessionId !== "string") {
+        if (strict) {
+          throw new ApiError(
+            400,
+            "ValidationError",
+            "Field 'workspace.deckGroups.*.groups.*.sessionIds' must contain only strings."
+          );
+        }
+        continue;
+      }
+      const sessionId = rawSessionId.trim();
+      if (!sessionId || seen.has(sessionId)) {
+        continue;
+      }
+      const exists = hasKnownSession(sessionId);
+      const matchesDeck = exists && resolveSessionDeckId(sessionId) === deckId;
+      if (!exists || !matchesDeck) {
+        if (strict) {
+          throw new ApiError(
+            400,
+            "ValidationError",
+            `Session '${sessionId}' is not available in deck '${deckId}' for workspace group membership.`
+          );
+        }
+        continue;
+      }
+      seen.add(sessionId);
+      normalized.push(sessionId);
+    }
+    return normalized;
+  }
+
+  function normalizeWorkspacePresetDeckGroup(deckId, deckGroup, { strict = true } = {}) {
+    if (!isPlainObject(deckGroup)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Each 'workspace.deckGroups' entry must be an object.");
+      }
+      return {
+        activeGroupId: "",
+        groups: []
+      };
+    }
+    const rawGroups = deckGroup.groups === undefined ? [] : deckGroup.groups;
+    if (!Array.isArray(rawGroups)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups.*.groups' must be an array.");
+      }
+      return {
+        activeGroupId: "",
+        groups: []
+      };
+    }
+    const groups = [];
+    const seenGroupIds = new Set();
+    for (const rawGroup of rawGroups) {
+      if (!isPlainObject(rawGroup)) {
+        if (strict) {
+          throw new ApiError(400, "ValidationError", "Each workspace group must be an object.");
+        }
+        continue;
+      }
+      const name = strict ? normalizeWorkspaceGroupName(rawGroup.name) : String(rawGroup.name || rawGroup.id || "").trim();
+      if (!name) {
+        continue;
+      }
+      let groupId = "";
+      try {
+        groupId = normalizeWorkspaceGroupIdInput(rawGroup.id);
+      } catch (error) {
+        if (strict) {
+          throw error;
+        }
+      }
+      if (!groupId) {
+        groupId = slugifyWorkspaceGroupId(name);
+      }
+      if (seenGroupIds.has(groupId)) {
+        continue;
+      }
+      const sessionIds = normalizeWorkspacePresetGroupSessionIds(rawGroup.sessionIds, deckId, { strict });
+      seenGroupIds.add(groupId);
+      groups.push({
+        id: groupId,
+        name: strict ? name : name.slice(0, WORKSPACE_GROUP_NAME_MAX_LENGTH) || groupId,
+        sessionIds
+      });
+    }
+
+    let activeGroupId = "";
+    if (deckGroup.activeGroupId !== undefined && deckGroup.activeGroupId !== null && String(deckGroup.activeGroupId).trim()) {
+      try {
+        activeGroupId = normalizeWorkspaceGroupIdInput(deckGroup.activeGroupId);
+      } catch (error) {
+        if (strict) {
+          throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups.*.activeGroupId' must be a valid group id.");
+        }
+      }
+      if (activeGroupId && !groups.some((group) => group.id === activeGroupId)) {
+        if (strict) {
+          throw new ApiError(
+            400,
+            "ValidationError",
+            `Active workspace group '${activeGroupId}' does not exist in deck '${deckId}'.`
+          );
+        }
+        activeGroupId = "";
+      }
+    }
+
+    return {
+      activeGroupId,
+      groups
+    };
+  }
+
+  function normalizeWorkspacePresetWorkspace(workspace, { strict = true } = {}) {
+    if (workspace === undefined) {
+      return {
+        activeDeckId: DEFAULT_DECK_ID,
+        layoutProfileId: "",
+        deckGroups: {}
+      };
+    }
+    if (!isPlainObject(workspace)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'workspace' must be an object.");
+      }
+      return {
+        activeDeckId: DEFAULT_DECK_ID,
+        layoutProfileId: "",
+        deckGroups: {}
+      };
+    }
+
+    let activeDeckId = DEFAULT_DECK_ID;
+    try {
+      activeDeckId =
+        workspace.activeDeckId === undefined ? DEFAULT_DECK_ID : normalizeDeckIdInput(workspace.activeDeckId) || DEFAULT_DECK_ID;
+    } catch (error) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'workspace.activeDeckId' must be a valid deck id.");
+      }
+    }
+    if (!decks.has(activeDeckId)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Deck '${activeDeckId}' was not found for workspace preset.`);
+      }
+      activeDeckId = decks.has(DEFAULT_DECK_ID) ? DEFAULT_DECK_ID : Array.from(decks.keys())[0] || DEFAULT_DECK_ID;
+    }
+
+    const layoutProfileId = normalizeWorkspacePresetLayoutProfileId(workspace.layoutProfileId, { strict });
+    const deckGroups = {};
+    if (workspace.deckGroups !== undefined) {
+      if (!isPlainObject(workspace.deckGroups)) {
+        if (strict) {
+          throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups' must be an object.");
+        }
+      } else {
+        for (const [rawDeckId, rawDeckGroup] of Object.entries(workspace.deckGroups)) {
+          let deckId = "";
+          try {
+            deckId = normalizeDeckIdInput(rawDeckId);
+          } catch (error) {
+            if (strict) {
+              throw new ApiError(400, "ValidationError", "Field 'workspace.deckGroups' contains an invalid deck id.");
+            }
+            continue;
+          }
+          if (!decks.has(deckId)) {
+            if (strict) {
+              throw new ApiError(400, "ValidationError", `Deck '${deckId}' was not found for workspace preset groups.`);
+            }
+            continue;
+          }
+          deckGroups[deckId] = normalizeWorkspacePresetDeckGroup(deckId, rawDeckGroup, { strict });
+        }
+      }
+    }
+
+    return {
+      activeDeckId,
+      layoutProfileId,
+      deckGroups
+    };
+  }
+
+  function normalizeWorkspacePresetEntity(input, { strict = true } = {}) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return null;
+    }
+    const id = typeof input.id === "string" ? input.id.trim() : "";
+    if (!id || !WORKSPACE_PRESET_ID_PATTERN.test(id)) {
+      return null;
+    }
+    const now = Date.now();
+    const createdAt = Number.isInteger(input.createdAt) ? input.createdAt : now;
+    const updatedAt = Number.isInteger(input.updatedAt) ? input.updatedAt : createdAt;
+    return {
+      id,
+      name:
+        typeof input.name === "string" && input.name.trim()
+          ? input.name.trim().slice(0, WORKSPACE_PRESET_NAME_MAX_LENGTH)
+          : id,
+      createdAt,
+      updatedAt,
+      workspace: normalizeWorkspacePresetWorkspace(input.workspace, { strict })
+    };
+  }
+
+  function compareWorkspacePresetEntries(a, b) {
+    const nameCompare = a.name.localeCompare(b.name, "en-US", { sensitivity: "base" });
+    if (nameCompare !== 0) {
+      return nameCompare;
+    }
+    if (a.createdAt !== b.createdAt) {
+      return a.createdAt - b.createdAt;
+    }
+    return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
+  }
+
+  function toApiWorkspacePreset(preset) {
+    return {
+      id: preset.id,
+      name: preset.name,
+      createdAt: preset.createdAt,
+      updatedAt: preset.updatedAt,
+      workspace: {
+        activeDeckId: preset.workspace.activeDeckId,
+        layoutProfileId: preset.workspace.layoutProfileId || undefined,
+        deckGroups: JSON.parse(JSON.stringify(preset.workspace.deckGroups))
+      }
+    };
+  }
+
+  function listWorkspacePresets() {
+    return Array.from(workspacePresets.values()).sort(compareWorkspacePresetEntries).map(toApiWorkspacePreset);
+  }
+
+  function getWorkspacePresetOrThrow(presetId) {
+    const preset = workspacePresets.get(presetId);
+    if (!preset) {
+      throw new ApiError(404, "WorkspacePresetNotFound", `Workspace preset '${presetId}' was not found.`);
+    }
+    return preset;
+  }
+
+  function createWorkspacePreset(body) {
+    const name = normalizeWorkspacePresetName(body?.name);
+    const requestedId = normalizeWorkspacePresetIdInput(body?.id);
+    let presetId = requestedId;
+    if (!presetId) {
+      const slug = slugifyWorkspacePresetId(name);
+      presetId = slug;
+      let suffix = 2;
+      while (workspacePresets.has(presetId)) {
+        const suffixText = `-${suffix}`;
+        const rootMaxLength = 32 - suffixText.length;
+        const rooted = slug.slice(0, rootMaxLength).replace(/-+$/g, "") || "workspace";
+        presetId = `${rooted}${suffixText}`;
+        suffix += 1;
+      }
+    }
+    if (workspacePresets.has(presetId)) {
+      throw new ApiError(409, "WorkspacePresetAlreadyExists", `Workspace preset '${presetId}' already exists.`);
+    }
+    const now = Date.now();
+    const preset = {
+      id: presetId,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      workspace: normalizeWorkspacePresetWorkspace(body?.workspace, { strict: true })
+    };
+    workspacePresets.set(preset.id, preset);
+    return toApiWorkspacePreset(preset);
+  }
+
+  function updateWorkspacePreset(presetId, body) {
+    const existing = getWorkspacePresetOrThrow(presetId);
+    const hasName = body?.name !== undefined;
+    const hasWorkspace = body?.workspace !== undefined;
+    if (!hasName && !hasWorkspace) {
+      throw new ApiError(400, "ValidationError", "At least one updatable workspace preset field is required.");
+    }
+    const next = {
+      ...existing,
+      name: hasName ? normalizeWorkspacePresetName(body.name) : existing.name,
+      workspace: hasWorkspace ? normalizeWorkspacePresetWorkspace(body.workspace, { strict: true }) : existing.workspace,
+      updatedAt: Date.now()
+    };
+    workspacePresets.set(presetId, next);
+    return toApiWorkspacePreset(next);
+  }
+
+  function deleteWorkspacePreset(presetId) {
+    const preset = getWorkspacePresetOrThrow(presetId);
+    workspacePresets.delete(presetId);
+    return toApiWorkspacePreset(preset);
+  }
+
+  function cleanupWorkspacePresets() {
+    let changed = false;
+    for (const [presetId, preset] of workspacePresets.entries()) {
+      const nextWorkspace = normalizeWorkspacePresetWorkspace(preset.workspace, { strict: false });
+      if (JSON.stringify(nextWorkspace) === JSON.stringify(preset.workspace)) {
+        continue;
+      }
+      workspacePresets.set(presetId, {
+        ...preset,
+        workspace: nextWorkspace,
+        updatedAt: Date.now()
+      });
+      changed = true;
+    }
+    return changed;
   }
 
   function ensureSessionExistsOrThrow(sessionId) {
@@ -1657,6 +2147,7 @@ export function createRuntime(config) {
       return false;
     }
     sessionDeckAssignments.set(sessionId, deckId);
+    cleanupWorkspacePresets();
     return true;
   }
 
@@ -1707,7 +2198,8 @@ export function createRuntime(config) {
       sessionOutputs: snapshot.outputs,
       customCommands: listCustomCommands(),
       decks: Array.from(decks.values()),
-      layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile)
+      layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile),
+      workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset)
     };
   }
 
@@ -1844,14 +2336,16 @@ function tryCreateRestoredSession({
         reason,
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
-        deckCount: state.decks.length
+        deckCount: state.decks.length,
+        workspacePresetCount: state.workspacePresets.length
       });
       await persistence.saveState(state);
       logDebug("persist.save.ok", {
         reason,
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
-        deckCount: state.decks.length
+        deckCount: state.decks.length,
+        workspacePresetCount: state.workspacePresets.length
       });
     };
 
@@ -2215,6 +2709,43 @@ function tryCreateRestoredSession({
         return;
       }
 
+      if (match.kind === "listWorkspacePresets") {
+        const payload = listWorkspacePresets();
+        validateResponse({ statusCode: 200, body: payload, expect: "workspacePresetList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createWorkspacePreset") {
+        const payload = createWorkspacePreset(body);
+        validateResponse({ statusCode: 201, body: payload, expect: "workspacePreset" });
+        await persistNow("workspace-preset.create");
+        writeJson(req, res, 201, payload);
+        return;
+      }
+
+      if (match.kind === "getWorkspacePreset") {
+        const payload = toApiWorkspacePreset(getWorkspacePresetOrThrow(match.params.presetId));
+        validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "updateWorkspacePreset") {
+        const payload = updateWorkspacePreset(match.params.presetId, body);
+        validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
+        await persistNow("workspace-preset.update");
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "deleteWorkspacePreset") {
+        deleteWorkspacePreset(match.params.presetId);
+        await persistNow("workspace-preset.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
       if (match.kind === "listSessions") {
         const requestedDeckId = parsedUrl.searchParams.get("deckId");
         const deckIdFilter = typeof requestedDeckId === "string" && requestedDeckId.trim() ? requestedDeckId.trim() : "";
@@ -2286,6 +2817,7 @@ function tryCreateRestoredSession({
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
+        cleanupWorkspacePresets();
         await persistNow("session.delete");
         writeJson(req, res, 204);
         return;
@@ -2602,6 +3134,7 @@ function tryCreateRestoredSession({
     startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
     decks.clear();
     layoutProfiles.clear();
+    workspacePresets.clear();
     sessionDeckAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
       const normalizedDeck = normalizeDeckEntity(persistedDeck);
@@ -2622,7 +3155,8 @@ function tryCreateRestoredSession({
       persistedSessionCount: persistedState.sessions.length,
       persistedCustomCommandCount: persistedState.customCommands.length,
       persistedDeckCount: persistedState.decks.length,
-      persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0
+      persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0,
+      persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0
     });
     for (const session of persistedState.sessions) {
       try {
@@ -2774,11 +3308,20 @@ function tryCreateRestoredSession({
       }
       customCommands.set(candidate.name, candidate);
     }
+    for (const persistedWorkspacePreset of Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets : []) {
+      const normalizedPreset = normalizeWorkspacePresetEntity(persistedWorkspacePreset, { strict: false });
+      if (!normalizedPreset) {
+        continue;
+      }
+      workspacePresets.set(normalizedPreset.id, normalizedPreset);
+    }
+    cleanupWorkspacePresets();
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,
       unrestoredSessionCount: unrestoredSessions.size,
       restoredCustomCommandCount: customCommands.size,
-      restoredDeckCount: decks.size
+      restoredDeckCount: decks.size,
+      restoredWorkspacePresetCount: workspacePresets.size
     });
 
     await new Promise((resolve) => {

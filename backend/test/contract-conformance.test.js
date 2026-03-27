@@ -66,6 +66,11 @@ function runtimeOperationKeys() {
     "GET /layout-profiles/{profileId}",
     "PATCH /layout-profiles/{profileId}",
     "DELETE /layout-profiles/{profileId}",
+    "GET /workspace-presets",
+    "POST /workspace-presets",
+    "GET /workspace-presets/{presetId}",
+    "PATCH /workspace-presets/{presetId}",
+    "DELETE /workspace-presets/{presetId}",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -244,6 +249,51 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       body: JSON.stringify({ name: "Focus Layout Updated" })
     });
     assert.ok(operations.get("PATCH /layout-profiles/{profileId}").has(patchLayoutProfileRes.status));
+
+    const listWorkspacePresetsRes = await contractFetch(`${baseUrl}/workspace-presets`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /workspace-presets").has(listWorkspacePresetsRes.status));
+
+    const createWorkspacePresetRes = await contractFetch(`${baseUrl}/workspace-presets`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: "Ops Workspace",
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: createdLayoutProfile.id,
+          deckGroups: {}
+        }
+      })
+    });
+    assert.ok(operations.get("POST /workspace-presets").has(createWorkspacePresetRes.status));
+    const createdWorkspacePreset = await createWorkspacePresetRes.json();
+
+    const getWorkspacePresetRes = await contractFetch(`${baseUrl}/workspace-presets/${createdWorkspacePreset.id}`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /workspace-presets/{presetId}").has(getWorkspacePresetRes.status));
+
+    const patchWorkspacePresetRes = await contractFetch(`${baseUrl}/workspace-presets/${createdWorkspacePreset.id}`, {
+      method: "PATCH",
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: "Ops Workspace Updated",
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: createdLayoutProfile.id,
+          deckGroups: {}
+        }
+      })
+    });
+    assert.ok(operations.get("PATCH /workspace-presets/{presetId}").has(patchWorkspacePresetRes.status));
+
+    const deleteWorkspacePresetRes = await contractFetch(`${baseUrl}/workspace-presets/${createdWorkspacePreset.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("DELETE /workspace-presets/{presetId}").has(deleteWorkspacePresetRes.status));
 
     const deleteLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
       method: "DELETE",

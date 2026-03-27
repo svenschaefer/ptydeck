@@ -135,6 +135,30 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
           }
         }
       }
+    ],
+    workspacePresets: [
+      {
+        id: "focus",
+        name: "Focus Workspace",
+        createdAt: 8,
+        updatedAt: 9,
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: "ops",
+          deckGroups: {
+            default: {
+              activeGroupId: "core",
+              groups: [
+                {
+                  id: "core",
+                  name: "Core",
+                  sessionIds: ["a"]
+                }
+              ]
+            }
+          }
+        }
+      }
     ]
   };
 
@@ -154,5 +178,12 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
 
   await writeFile(file, JSON.stringify(legacySessions, null, 2), "utf8");
   const loadedState = await persistence.loadState();
-  assert.deepEqual(loadedState, { sessions: legacySessions, sessionOutputs: [], customCommands: [], decks: [], layoutProfiles: [] });
+  assert.deepEqual(loadedState, {
+    sessions: legacySessions,
+    sessionOutputs: [],
+    customCommands: [],
+    decks: [],
+    layoutProfiles: [],
+    workspacePresets: []
+  });
 });

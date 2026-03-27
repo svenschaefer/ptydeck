@@ -137,7 +137,8 @@ body {
 }
 
 .settings-panel,
-.layout-profile-panel {
+.layout-profile-panel,
+.workspace-preset-panel {
   margin-top: 8px;
   padding: 10px;
   border: 1px solid var(--border);
@@ -157,7 +158,8 @@ body {
 }
 
 .settings-panel h2,
-.layout-profile-panel h2 {
+.layout-profile-panel h2,
+.workspace-preset-panel h2 {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
@@ -222,6 +224,10 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.workspace-group-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .workspace {

@@ -183,3 +183,39 @@ test("deck-sidebar controller renders sessions in quick-id order", () => {
     ["s-2", "s-1"]
   );
 });
+
+test("deck-sidebar controller applies deck session group resolution before rendering session buttons", () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => String(sessionId || ""),
+    formatSessionDisplayName: (session) => session.name,
+    resolveDeckSessions: (_deckId, sessions) => sessions.filter((session) => session.id !== "s-1")
+  });
+
+  controller.render({
+    decks: [{ id: "default", name: "Default" }],
+    sessions: [
+      { id: "s-1", name: "One", deckId: "default" },
+      { id: "s-2", name: "Two", deckId: "default" }
+    ],
+    activeDeckId: "default",
+    activeSessionId: "s-2"
+  });
+
+  const group = findFirst(container, (el) => el.getAttribute?.("data-deck-id") === "default");
+  const sessionList = findFirst(group, (el) => el.className === "deck-session-list");
+  assert.ok(sessionList);
+  assert.deepEqual(
+    sessionList.children.map((entry) => entry.getAttribute("data-session-id")),
+    ["s-2"]
+  );
+});

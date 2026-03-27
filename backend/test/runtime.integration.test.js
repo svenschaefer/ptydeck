@@ -878,6 +878,219 @@ test("layout profile lifecycle persists and restores across restart", async () =
   }
 });
 
+test("workspace preset lifecycle persists, restores, and cleans up deleted references", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-workspace-presets-"));
+  const dataPath = join(dir, "sessions.json");
+  const firstRuntime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await firstRuntime.start();
+  const firstPort = firstRuntime.getAddress().port;
+  const firstBaseUrl = `http://127.0.0.1:${firstPort}/api/v1`;
+
+  let defaultSessionId = "";
+  let opsSessionId = "";
+  let workspacePresetId = "";
+
+  try {
+    const createDefaultSessionRes = await fetch(`${firstBaseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", name: "default-shell" })
+    });
+    assert.equal(createDefaultSessionRes.status, 201);
+    defaultSessionId = (await createDefaultSessionRes.json()).id;
+
+    const createOpsSessionRes = await fetch(`${firstBaseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", name: "ops-shell" })
+    });
+    assert.equal(createOpsSessionRes.status, 201);
+    opsSessionId = (await createOpsSessionRes.json()).id;
+
+    const createDeckRes = await fetch(`${firstBaseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Ops", settings: { terminal: { cols: 100, rows: 32 } } })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const moveRes = await fetch(`${firstBaseUrl}/decks/ops/sessions/${opsSessionId}:move`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    });
+    assert.equal(moveRes.status, 204);
+
+    const createLayoutProfileRes = await fetch(`${firstBaseUrl}/layout-profiles`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "focus",
+        name: "Focus Layout",
+        layout: {
+          activeDeckId: "ops",
+          sidebarVisible: true,
+          sessionFilterText: "",
+          deckTerminalSettings: {
+            default: { cols: 96, rows: 24 },
+            ops: { cols: 132, rows: 40 }
+          }
+        }
+      })
+    });
+    assert.equal(createLayoutProfileRes.status, 201);
+
+    const createWorkspacePresetRes = await fetch(`${firstBaseUrl}/workspace-presets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Ops Workspace",
+        workspace: {
+          activeDeckId: "ops",
+          layoutProfileId: "focus",
+          deckGroups: {
+            default: {
+              activeGroupId: "primary",
+              groups: [
+                {
+                  id: "primary",
+                  name: "Primary",
+                  sessionIds: [defaultSessionId]
+                }
+              ]
+            },
+            ops: {
+              activeGroupId: "runner",
+              groups: [
+                {
+                  id: "runner",
+                  name: "Runner",
+                  sessionIds: [opsSessionId]
+                }
+              ]
+            }
+          }
+        }
+      })
+    });
+    assert.equal(createWorkspacePresetRes.status, 201);
+    const createdPreset = await createWorkspacePresetRes.json();
+    workspacePresetId = createdPreset.id;
+    assert.equal(createdPreset.workspace.activeDeckId, "ops");
+    assert.equal(createdPreset.workspace.layoutProfileId, "focus");
+
+    const patchWorkspacePresetRes = await fetch(`${firstBaseUrl}/workspace-presets/${workspacePresetId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Ops Workspace Updated",
+        workspace: {
+          activeDeckId: "ops",
+          layoutProfileId: "focus",
+          deckGroups: {
+            default: {
+              activeGroupId: "primary",
+              groups: [
+                {
+                  id: "primary",
+                  name: "Primary",
+                  sessionIds: [defaultSessionId]
+                }
+              ]
+            },
+            ops: {
+              activeGroupId: "runner",
+              groups: [
+                {
+                  id: "runner",
+                  name: "Runner",
+                  sessionIds: [opsSessionId]
+                }
+              ]
+            }
+          }
+        }
+      })
+    });
+    assert.equal(patchWorkspacePresetRes.status, 200);
+    const updatedPreset = await patchWorkspacePresetRes.json();
+    assert.equal(updatedPreset.name, "Ops Workspace Updated");
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    assert.ok(Array.isArray(persistedRaw.workspacePresets));
+    assert.equal(persistedRaw.workspacePresets.length, 1);
+    assert.equal(persistedRaw.workspacePresets[0].name, "Ops Workspace Updated");
+  } finally {
+    await firstRuntime.stop();
+  }
+
+  const secondRuntime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await secondRuntime.start();
+  const secondPort = secondRuntime.getAddress().port;
+  const secondBaseUrl = `http://127.0.0.1:${secondPort}/api/v1`;
+
+  try {
+    const listWorkspacePresetsRes = await fetch(`${secondBaseUrl}/workspace-presets`);
+    assert.equal(listWorkspacePresetsRes.status, 200);
+    const restoredPresets = await listWorkspacePresetsRes.json();
+    assert.equal(restoredPresets.length, 1);
+    assert.equal(restoredPresets[0].id, workspacePresetId);
+    assert.equal(restoredPresets[0].name, "Ops Workspace Updated");
+    assert.equal(restoredPresets[0].workspace.layoutProfileId, "focus");
+
+    const deleteDefaultSessionRes = await fetch(`${secondBaseUrl}/sessions/${defaultSessionId}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteDefaultSessionRes.status, 204);
+
+    const deleteLayoutProfileRes = await fetch(`${secondBaseUrl}/layout-profiles/focus`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteLayoutProfileRes.status, 204);
+
+    const deleteDeckRes = await fetch(`${secondBaseUrl}/decks/ops?force=true`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteDeckRes.status, 204);
+
+    const getWorkspacePresetRes = await fetch(`${secondBaseUrl}/workspace-presets/${workspacePresetId}`);
+    assert.equal(getWorkspacePresetRes.status, 200);
+    const cleanedPreset = await getWorkspacePresetRes.json();
+    assert.equal(cleanedPreset.workspace.activeDeckId, "default");
+    assert.equal(cleanedPreset.workspace.layoutProfileId, undefined);
+    assert.equal(cleanedPreset.workspace.deckGroups.ops, undefined);
+    assert.deepEqual(cleanedPreset.workspace.deckGroups.default.groups[0].sessionIds, []);
+
+    const deleteWorkspacePresetRes = await fetch(`${secondBaseUrl}/workspace-presets/${workspacePresetId}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteWorkspacePresetRes.status, 204);
+
+    const emptyWorkspacePresetListRes = await fetch(`${secondBaseUrl}/workspace-presets`);
+    assert.equal(emptyWorkspacePresetListRes.status, 200);
+    const emptyPresets = await emptyWorkspacePresetListRes.json();
+    assert.deepEqual(emptyPresets, []);
+  } finally {
+    await secondRuntime.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 

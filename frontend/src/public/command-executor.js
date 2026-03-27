@@ -65,6 +65,16 @@ export function createCommandExecutor(options = {}) {
   const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
   const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
   const deleteLayoutProfile = typeof options.deleteLayoutProfile === "function" ? options.deleteLayoutProfile : async () => "";
+  const listWorkspacePresets = typeof options.listWorkspacePresets === "function" ? options.listWorkspacePresets : () => [];
+  const resolveWorkspacePreset =
+    typeof options.resolveWorkspacePreset === "function"
+      ? options.resolveWorkspacePreset
+      : () => ({ preset: null, error: "Unknown workspace preset." });
+  const createWorkspacePresetFromCurrent =
+    typeof options.createWorkspacePresetFromCurrent === "function" ? options.createWorkspacePresetFromCurrent : async () => "";
+  const applyWorkspacePreset = typeof options.applyWorkspacePreset === "function" ? options.applyWorkspacePreset : async () => "";
+  const renameWorkspacePreset = typeof options.renameWorkspacePreset === "function" ? options.renameWorkspacePreset : async () => "";
+  const deleteWorkspacePreset = typeof options.deleteWorkspacePreset === "function" ? options.deleteWorkspacePreset : async () => "";
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -701,6 +711,67 @@ export function createCommandExecutor(options = {}) {
       }
 
       return formatUsage("layout");
+    }
+
+    if (command === "workspace") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const rest = args.slice(1);
+      if (!subcommand || subcommand === "list") {
+        const presets = listWorkspacePresets();
+        if (!Array.isArray(presets) || presets.length === 0) {
+          return "No workspace presets available.";
+        }
+        return presets
+          .map((preset) => `[${preset.id}] ${preset.name} -> deck=${preset.workspace?.activeDeckId || "default"} layout=${preset.workspace?.layoutProfileId || "-"} decks=${Object.keys(preset.workspace?.deckGroups || {}).length}`)
+          .join("\n");
+      }
+
+      if (subcommand === "save") {
+        const name = rest.join(" ").trim();
+        if (!name) {
+          return formatUsage("workspace", "save");
+        }
+        return createWorkspacePresetFromCurrent(name);
+      }
+
+      if (subcommand === "apply") {
+        if (rest.length !== 1) {
+          return formatUsage("workspace", "apply");
+        }
+        const resolved = resolveWorkspacePreset(rest[0]);
+        if (!resolved.preset) {
+          return resolved.error;
+        }
+        return applyWorkspacePreset(resolved.preset.id);
+      }
+
+      if (subcommand === "rename") {
+        if (rest.length < 2) {
+          return formatUsage("workspace", "rename");
+        }
+        const resolved = resolveWorkspacePreset(rest[0]);
+        if (!resolved.preset) {
+          return resolved.error;
+        }
+        const name = rest.slice(1).join(" ").trim();
+        if (!name) {
+          return formatUsage("workspace", "rename");
+        }
+        return renameWorkspacePreset(resolved.preset.id, name);
+      }
+
+      if (subcommand === "delete") {
+        if (rest.length !== 1) {
+          return formatUsage("workspace", "delete");
+        }
+        const resolved = resolveWorkspacePreset(rest[0]);
+        if (!resolved.preset) {
+          return resolved.error;
+        }
+        return deleteWorkspacePreset(resolved.preset.id);
+      }
+
+      return formatUsage("workspace");
     }
 
     if (command === "custom") {

@@ -166,6 +166,10 @@ export function createLayoutProfileRuntimeController(options = {}) {
     return profiles.find((entry) => entry.id === selectedProfileId) || null;
   }
 
+  function getSelectedProfileId() {
+    return selectedProfileId;
+  }
+
   function syncSelection() {
     if (!selectedProfileId || !profiles.some((entry) => entry.id === selectedProfileId)) {
       selectedProfileId = profiles[0]?.id || "";
@@ -467,6 +471,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
   return {
     listProfiles,
     getProfile,
+    getSelectedProfileId,
     replaceProfiles,
     upsertProfile,
     removeProfile,

@@ -141,6 +141,47 @@ test("api client calls layout profile lifecycle endpoints", async () => {
   assert.equal(calls[3].options.method, "DELETE");
 });
 
+test("api client calls workspace preset lifecycle endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    if (method === "DELETE") {
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: method === "POST" ? 201 : 200,
+      json: async () => ({
+        id: "ops",
+        name: "Ops Workspace",
+        createdAt: 1,
+        updatedAt: 2,
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: "focus",
+          deckGroups: {}
+        }
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listWorkspacePresets();
+  await api.createWorkspacePreset({ name: "Ops Workspace" });
+  await api.updateWorkspacePreset("ops", { name: "Ops Updated" });
+  await api.deleteWorkspacePreset("ops");
+
+  assert.equal(calls.length, 4);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/workspace-presets");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/workspace-presets");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/workspace-presets/ops");
+  assert.equal(calls[2].options.method, "PATCH");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/workspace-presets/ops");
+  assert.equal(calls[3].options.method, "DELETE");
+});
+
 test("api client includes bearer auth header when token is set", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

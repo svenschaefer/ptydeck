@@ -481,3 +481,62 @@ test("session-grid controller does not reappend active-deck cards when global DO
   assert.equal(result.aborted, false);
   assert.deepEqual(gridEl.appendCalls, []);
 });
+
+test("session-grid controller applies deck session group resolution before filter visibility", () => {
+  const calls = [];
+  const controller = createSessionGridController({
+    defaultDeckId: "default",
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    sessionThemeDrafts: new Map(),
+    getActiveDeck: () => ({ id: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionFilterText: () => "",
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    resolveDeckSessions: (_deckId, sessions) => sessions.filter((session) => session.id !== "s1"),
+    renderDeckTabs: () => calls.push("tabs"),
+    workspaceRenderController: {
+      resolveVisibleSessions: ({ deckSessions }) => {
+        calls.push(["deck-sessions", deckSessions.map((session) => session.id)]);
+        return { visibleSessionIds: new Set(deckSessions.map((session) => session.id)), filterActive: false, switchedActiveSession: false };
+      },
+      renderEmptyState: () => calls.push("empty"),
+      renderStatus: () => calls.push("status")
+    },
+    pruneQuickIds: () => calls.push("prune"),
+    syncActiveTerminalSearch: () => calls.push("search"),
+    sessionDisposalController: {
+      cleanupRemovedSessions: () => false
+    },
+    debugLog: () => calls.push("debug")
+  });
+
+  const result = controller.renderWorkspace({
+    state: {
+      sessions: [
+        { id: "s1", deckId: "d1" },
+        { id: "s2", deckId: "d1" }
+      ],
+      decks: [{ id: "d1" }],
+      activeSessionId: "s2",
+      connectionState: "connected"
+    },
+    uiState: {
+      loading: false,
+      error: "",
+      commandFeedback: "",
+      commandInlineHint: "",
+      commandInlineHintPrefixPx: 0,
+      commandPreview: "",
+      commandSuggestions: ""
+    },
+    startupPerf: { firstNonEmptyRenderAtMs: null, firstTerminalMountedAtMs: null },
+    nowMs: () => 42,
+    maybeReportStartupPerf: () => calls.push("perf")
+  });
+
+  assert.equal(result.aborted, false);
+  assert.deepEqual(calls[1], ["deck-sessions", ["s2"]]);
+});

@@ -6,6 +6,8 @@ export function createDeckSidebarController(options = {}) {
   const ensureQuickId = typeof options.ensureQuickId === "function" ? options.ensureQuickId : (sessionId) => String(sessionId || "");
   const sortSessionsByQuickId =
     typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
+  const resolveDeckSessions =
+    typeof options.resolveDeckSessions === "function" ? options.resolveDeckSessions : (_deckId, sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
   const formatSessionDisplayName =
     typeof options.formatSessionDisplayName === "function" ? options.formatSessionDisplayName : (session) => String(session?.name || session?.id || "");
   const getSessionActivityIndicatorState =
@@ -68,7 +70,11 @@ export function createDeckSidebarController(options = {}) {
       tab.addEventListener("click", () => onActivateDeck(deck.id));
       group.appendChild(tab);
 
-      const deckSessions = sessions.filter((session) => resolveSessionDeckId(session) === deck.id);
+      const allDeckSessions = sessions.filter((session) => resolveSessionDeckId(session) === deck.id);
+      const deckSessions = resolveDeckSessions(deck.id, allDeckSessions, {
+        deck,
+        sessions
+      });
       if (deckSessions.length > 0) {
         const sessionList = documentRef.createElement("div");
         sessionList.className = "deck-session-list";

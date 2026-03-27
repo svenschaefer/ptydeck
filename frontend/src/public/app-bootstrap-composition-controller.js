@@ -90,6 +90,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const sendBtn = options.sendBtn || null;
   const layoutRuntimeController = options.layoutRuntimeController || null;
   const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
+  const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
   const sessionTerminalResizeController = options.sessionTerminalResizeController || null;
   const appCommandUiFacadeController = options.appCommandUiFacadeController || null;
@@ -194,6 +195,13 @@ export function createAppBootstrapCompositionController(options = {}) {
       applyLayoutProfile: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
       renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       deleteLayoutProfile: (profileId) => layoutProfileRuntimeController?.deleteProfileById?.(profileId) || "",
+      listWorkspacePresets: () => workspacePresetRuntimeController?.listPresets?.() || [],
+      resolveWorkspacePreset: (selectorText) =>
+        workspacePresetRuntimeController?.resolvePreset?.(selectorText) || { preset: null, error: "Unknown workspace preset." },
+      createWorkspacePresetFromCurrent: (name) => workspacePresetRuntimeController?.createPresetFromCurrentWorkspace?.(name) || "",
+      applyWorkspacePreset: (presetId) => workspacePresetRuntimeController?.applyPresetById?.(presetId) || "",
+      renameWorkspacePreset: (presetId, name) => workspacePresetRuntimeController?.renamePresetById?.(presetId, name) || "",
+      deleteWorkspacePreset: (presetId) => workspacePresetRuntimeController?.deletePresetById?.(presetId) || "",
       openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy
@@ -385,6 +393,7 @@ export function createAppBootstrapCompositionController(options = {}) {
     appCommandUiFacadeController?.render?.();
     layoutRuntimeController?.bindUiEvents?.();
     layoutProfileRuntimeController?.bindUiEvents?.();
+    workspacePresetRuntimeController?.bindUiEvents?.();
     terminalSearchController?.bindUiEvents?.();
     terminalSearchController?.updateUi?.();
     commandComposerAutocompleteController.bindUiEvents?.();
@@ -392,6 +401,7 @@ export function createAppBootstrapCompositionController(options = {}) {
     appLifecycleController.bindWindowEvents?.();
     const initializationResult = await appLifecycleController.initializeRuntime?.();
     await layoutProfileRuntimeController?.loadProfiles?.();
+    await workspacePresetRuntimeController?.loadPresets?.();
     return initializationResult;
   }
 

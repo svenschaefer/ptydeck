@@ -405,6 +405,116 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /workspace-presets:
+    get:
+      operationId: listWorkspacePresets
+      summary: List persisted workspace presets.
+      responses:
+        '200':
+          description: Workspace preset list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkspacePreset'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createWorkspacePreset
+      summary: Create a persisted workspace preset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspacePresetRequest'
+      responses:
+        '201':
+          description: Workspace preset created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePreset'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Workspace preset id already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /workspace-presets/{presetId}:
+    parameters:
+      - $ref: '#/components/parameters/presetId'
+    get:
+      operationId: getWorkspacePreset
+      summary: Get workspace preset by id.
+      responses:
+        '200':
+          description: Workspace preset found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePreset'
+        '404':
+          description: Workspace preset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    patch:
+      operationId: updateWorkspacePreset
+      summary: Update persisted workspace preset metadata/workspace.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspacePresetRequest'
+      responses:
+        '200':
+          description: Workspace preset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePreset'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Workspace preset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    delete:
+      operationId: deleteWorkspacePreset
+      summary: Delete persisted workspace preset by id.
+      responses:
+        '204':
+          description: Workspace preset deleted
+        '404':
+          description: Workspace preset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -653,6 +763,12 @@ components:
       required: true
       schema:
         type: string
+    presetId:
+      name: presetId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Deck:
       type: object
@@ -767,6 +883,85 @@ components:
           type: string
         layout:
           $ref: '#/components/schemas/LayoutProfileLayout'
+    WorkspacePreset:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+        - workspace
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+        workspace:
+          $ref: '#/components/schemas/WorkspacePresetWorkspace'
+    WorkspacePresetWorkspace:
+      type: object
+      required:
+        - activeDeckId
+        - deckGroups
+      properties:
+        activeDeckId:
+          type: string
+        layoutProfileId:
+          type: string
+        deckGroups:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/WorkspacePresetDeckGroups'
+    WorkspacePresetDeckGroups:
+      type: object
+      required:
+        - groups
+      properties:
+        activeGroupId:
+          type: string
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspacePresetGroup'
+    WorkspacePresetGroup:
+      type: object
+      required:
+        - id
+        - name
+        - sessionIds
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sessionIds:
+          type: array
+          items:
+            type: string
+    CreateWorkspacePresetRequest:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        workspace:
+          $ref: '#/components/schemas/WorkspacePresetWorkspace'
+    UpdateWorkspacePresetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        workspace:
+          $ref: '#/components/schemas/WorkspacePresetWorkspace'
     Session:
       type: object
       required:

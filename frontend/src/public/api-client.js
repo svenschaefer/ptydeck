@@ -218,6 +218,22 @@ export function createApiClient(baseUrl, options = {}) {
     async deleteLayoutProfile(profileId) {
       await request(`/layout-profiles/${encodeURIComponent(profileId)}`, { method: "DELETE" }, { expectJson: false });
     },
+    async listWorkspacePresets() {
+      return request("/workspace-presets");
+    },
+    async createWorkspacePreset(payload) {
+      return request("/workspace-presets", withJson(payload || {}));
+    },
+    async updateWorkspacePreset(presetId, payload) {
+      return request(`/workspace-presets/${encodeURIComponent(presetId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    },
+    async deleteWorkspacePreset(presetId) {
+      await request(`/workspace-presets/${encodeURIComponent(presetId)}`, { method: "DELETE" }, { expectJson: false });
+    },
     async moveSessionToDeck(deckId, sessionId) {
       await request(
         `/decks/${encodeURIComponent(deckId)}/sessions/${encodeURIComponent(sessionId)}:move`,

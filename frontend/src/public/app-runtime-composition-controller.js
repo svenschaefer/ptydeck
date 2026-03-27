@@ -14,6 +14,7 @@ import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
+import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
   getTerminalCellHeightPx,
   isTerminalAtBottom,
@@ -110,6 +111,18 @@ const layoutProfileApplyBtn = document.getElementById("layout-profile-apply");
 const layoutProfileRenameBtn = document.getElementById("layout-profile-rename");
 const layoutProfileDeleteBtn = document.getElementById("layout-profile-delete");
 const layoutProfileStatusEl = document.getElementById("layout-profile-status");
+const workspacePresetSelectEl = document.getElementById("workspace-preset-select");
+const workspacePresetSaveBtn = document.getElementById("workspace-preset-save");
+const workspacePresetApplyBtn = document.getElementById("workspace-preset-apply");
+const workspacePresetRenameBtn = document.getElementById("workspace-preset-rename");
+const workspacePresetDeleteBtn = document.getElementById("workspace-preset-delete");
+const workspacePresetGroupSelectEl = document.getElementById("workspace-group-select");
+const workspacePresetGroupSaveBtn = document.getElementById("workspace-group-save");
+const workspacePresetGroupApplyBtn = document.getElementById("workspace-group-apply");
+const workspacePresetGroupRenameBtn = document.getElementById("workspace-group-rename");
+const workspacePresetGroupDeleteBtn = document.getElementById("workspace-group-delete");
+const workspacePresetGroupClearBtn = document.getElementById("workspace-group-clear");
+const workspacePresetStatusEl = document.getElementById("workspace-preset-status");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
@@ -270,6 +283,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "restart",
   "note",
   "layout",
+  "workspace",
   "replay",
   "settings",
   "custom",
@@ -315,6 +329,7 @@ let workspaceRenderController = null;
 let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
 let layoutProfileRuntimeController = null;
+let workspacePresetRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -398,6 +413,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getCommandComposerRuntimeController: () => commandComposerRuntimeController,
   getCommandTargetRuntimeController: () => commandTargetRuntimeController,
   getSessionGridController: () => sessionGridController,
+  getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getCommandExecutor: () => commandExecutor
 });
 
@@ -497,6 +513,43 @@ layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   setSidebarVisible: (visible) => appLayoutDeckFacadeController?.setSidebarVisible?.(visible),
   setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
   applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, options) === true,
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  requestRender: () => appCommandUiFacadeController?.render?.()
+});
+
+workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  api,
+  presetSelectEl: workspacePresetSelectEl,
+  presetSaveBtn: workspacePresetSaveBtn,
+  presetApplyBtn: workspacePresetApplyBtn,
+  presetRenameBtn: workspacePresetRenameBtn,
+  presetDeleteBtn: workspacePresetDeleteBtn,
+  groupSelectEl: workspacePresetGroupSelectEl,
+  groupSaveBtn: workspacePresetGroupSaveBtn,
+  groupApplyBtn: workspacePresetGroupApplyBtn,
+  groupRenameBtn: workspacePresetGroupRenameBtn,
+  groupDeleteBtn: workspacePresetGroupDeleteBtn,
+  groupClearBtn: workspacePresetGroupClearBtn,
+  statusEl: workspacePresetStatusEl,
+  getDecks: () => store.getState().decks || [],
+  getSessions: () => store.getState().sessions || [],
+  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
+  getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText?.() || "",
+  resolveFilterSelectors: (selectorText, sessions, resolveOptions) =>
+    commandTargetRuntimeController?.resolveFilterSelectors?.(selectorText, sessions, resolveOptions) || {
+      sessions: Array.isArray(sessions) ? sessions.slice() : [],
+      error: ""
+    },
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID,
+  sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId?.(sessions) || [],
+  getSelectedLayoutProfileId: () => layoutProfileRuntimeController?.getSelectedProfileId?.() || "",
+  listLayoutProfiles: () => layoutProfileRuntimeController?.listProfiles?.() || [],
+  applyLayoutProfileById: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
+  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
@@ -764,6 +817,9 @@ deckSidebarController = createDeckSidebarController({
   resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
   sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId(sessions) || [],
+  resolveDeckSessions: (deckId, sessions, resolveOptions) =>
+    workspacePresetRuntimeController?.resolveDeckSessions?.(deckId, sessions, resolveOptions) ||
+    (Array.isArray(sessions) ? sessions.slice() : []),
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
@@ -785,6 +841,9 @@ sessionGridController = createSessionGridController({
   resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText() || "",
   sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId(sessions) || [],
+  resolveDeckSessions: (deckId, sessions, resolveOptions) =>
+    workspacePresetRuntimeController?.resolveDeckSessions?.(deckId, sessions, resolveOptions) ||
+    (Array.isArray(sessions) ? sessions.slice() : []),
   pruneQuickIds: (activeSessionIds) => appSessionRuntimeFacadeController?.pruneQuickIds(activeSessionIds),
   renderDeckTabs: (sessions) => appLayoutDeckFacadeController?.renderDeckTabs(sessions),
   workspaceRenderController,
@@ -870,6 +929,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   layoutRuntimeController,
   terminalSearchController,
   layoutProfileRuntimeController,
+  workspacePresetRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,
   appLayoutDeckFacadeController,

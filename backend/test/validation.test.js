@@ -352,6 +352,104 @@ test("validateResponse accepts layout profile payloads", () => {
   });
 });
 
+test("validateRequest accepts valid workspace preset create and patch payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/workspace-presets",
+      params: {},
+      body: {
+        id: "focus",
+        name: "Focus Workspace",
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: "ops",
+          deckGroups: {
+            default: {
+              activeGroupId: "core",
+              groups: [
+                {
+                  id: "core",
+                  name: "Core Sessions",
+                  sessionIds: ["s-1", "s-2"]
+                }
+              ]
+            }
+          }
+        }
+      }
+    });
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/workspace-presets/focus",
+      params: { presetId: "focus" },
+      body: {
+        name: "Focus Workspace Updated",
+        workspace: {
+          activeDeckId: "default",
+          deckGroups: {}
+        }
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid workspace preset payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/workspace-presets",
+      params: {},
+      body: { name: "", workspace: {} }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/workspace-presets/focus",
+      params: { presetId: "focus" },
+      body: {}
+    });
+  });
+});
+
+test("validateResponse accepts workspace preset payloads", () => {
+  const body = {
+    id: "focus",
+    name: "Focus Workspace",
+    createdAt: 1,
+    updatedAt: 2,
+    workspace: {
+      activeDeckId: "default",
+      layoutProfileId: "ops",
+      deckGroups: {
+        default: {
+          activeGroupId: "core",
+          groups: [
+            {
+              id: "core",
+              name: "Core Sessions",
+              sessionIds: ["s-1", "s-2"]
+            }
+          ]
+        }
+      }
+    }
+  };
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "workspacePreset",
+      body
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "workspacePresetList",
+      body: [body]
+    });
+  });
+});
+
 test("validateRequest accepts valid deck create/patch and move payloads", () => {
   assert.doesNotThrow(() => {
     validateRequest({

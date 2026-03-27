@@ -114,6 +114,46 @@ function isLayoutProfile(value) {
   );
 }
 
+function isWorkspacePresetGroup(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Array.isArray(value.sessionIds) &&
+    value.sessionIds.every((entry) => typeof entry === "string")
+  );
+}
+
+function isWorkspacePresetDeckGroups(value) {
+  return (
+    isObject(value) &&
+    (value.activeGroupId === undefined || typeof value.activeGroupId === "string") &&
+    Array.isArray(value.groups) &&
+    value.groups.every((entry) => isWorkspacePresetGroup(entry))
+  );
+}
+
+function isWorkspacePresetWorkspace(value) {
+  return (
+    isObject(value) &&
+    typeof value.activeDeckId === "string" &&
+    (value.layoutProfileId === undefined || typeof value.layoutProfileId === "string") &&
+    isObject(value.deckGroups) &&
+    Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry))
+  );
+}
+
+function isWorkspacePreset(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt) &&
+    isWorkspacePresetWorkspace(value.workspace)
+  );
+}
+
 export function validateRequest({ method, pathname, params, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -407,6 +447,51 @@ export function validateRequest({ method, pathname, params, body }) {
       throw new ApiError(400, "ValidationError", "Missing profileId path parameter.");
     }
   }
+
+  if (method === "GET" && pathname.match(/^\/api\/v1\/workspace-presets\/[^/]+$/)) {
+    if (!params.presetId || typeof params.presetId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing presetId path parameter.");
+    }
+  }
+
+  if (method === "POST" && pathname === "/api/v1/workspace-presets") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.id !== undefined && typeof body.id !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'id' must be a string.");
+    }
+    if (body.workspace !== undefined && !isObject(body.workspace)) {
+      throw new ApiError(400, "ValidationError", "Field 'workspace' must be an object.");
+    }
+  }
+
+  if (method === "PATCH" && pathname.match(/^\/api\/v1\/workspace-presets\/[^/]+$/)) {
+    if (!params.presetId || typeof params.presetId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing presetId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.name === undefined && body.workspace === undefined) {
+      throw new ApiError(400, "ValidationError", "At least one updatable workspace preset field is required.");
+    }
+    if (body.name !== undefined && (typeof body.name !== "string" || !body.name.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.workspace !== undefined && !isObject(body.workspace)) {
+      throw new ApiError(400, "ValidationError", "Field 'workspace' must be an object.");
+    }
+  }
+
+  if (method === "DELETE" && pathname.match(/^\/api\/v1\/workspace-presets\/[^/]+$/)) {
+    if (!params.presetId || typeof params.presetId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing presetId path parameter.");
+    }
+  }
 }
 
 function isSession(value) {
@@ -542,6 +627,16 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "layoutProfileList") {
     if (!Array.isArray(body) || !body.every((item) => isLayoutProfile(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match LayoutProfile[] schema.");
+    }
+  }
+
+  if (expect === "workspacePreset" && !isWorkspacePreset(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match WorkspacePreset schema.");
+  }
+
+  if (expect === "workspacePresetList") {
+    if (!Array.isArray(body) || !body.every((item) => isWorkspacePreset(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match WorkspacePreset[] schema.");
     }
   }
 }

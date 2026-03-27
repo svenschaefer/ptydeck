@@ -7,7 +7,7 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 - [ ] Add split-based layout model (horizontal/vertical) with drag/resize behavior.
 - [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
 
-Promoted to active delivery (`v0.4.0-H26` in `TODO.md` / `ROADMAP.md`):
+Promoted and completed in `v0.4.0-H26`:
 
 - `UX-005`, `UX-006`, `UX-007`
 

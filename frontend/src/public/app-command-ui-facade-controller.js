@@ -20,6 +20,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     typeof options.getCommandTargetRuntimeController === "function" ? options.getCommandTargetRuntimeController : () => null;
   const getSessionGridController =
     typeof options.getSessionGridController === "function" ? options.getSessionGridController : () => null;
+  const getWorkspacePresetRuntimeController =
+    typeof options.getWorkspacePresetRuntimeController === "function"
+      ? options.getWorkspacePresetRuntimeController
+      : () => null;
   const getCommandExecutor =
     typeof options.getCommandExecutor === "function" ? options.getCommandExecutor : () => null;
 
@@ -116,6 +120,7 @@ export function createAppCommandUiFacadeController(options = {}) {
       maybeReportStartupPerf,
       resolveFilterSelectors: getCommandTargetRuntimeController()?.resolveFilterSelectors
     });
+    getWorkspacePresetRuntimeController()?.render?.();
   }
 
   async function executeControlCommand(interpreted) {

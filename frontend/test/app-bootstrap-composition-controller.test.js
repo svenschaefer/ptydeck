@@ -98,6 +98,13 @@ function createBaseOptions(overrides = {}) {
   const layoutRuntimeController = {
     bindUiEvents: () => calls.push(["layout-bind"])
   };
+  const workspacePresetRuntimeController = {
+    bindUiEvents: () => calls.push(["workspace-bind"]),
+    loadPresets: async () => {
+      calls.push(["workspace-load"]);
+      return [];
+    }
+  };
   const terminalSearchController = {
     bindUiEvents: () => calls.push(["search-bind"]),
     updateUi: () => calls.push(["search-update"]),
@@ -163,6 +170,7 @@ function createBaseOptions(overrides = {}) {
       deckDeleteBtn: {},
       sendBtn: {},
       layoutRuntimeController,
+      workspacePresetRuntimeController,
       terminalSearchController,
       sessionTerminalResizeController,
       appCommandUiFacadeController,
@@ -336,12 +344,14 @@ test("app bootstrap composition controller hydrates UI bindings and starts runti
         "sync-geometry",
         "render",
         "layout-bind",
+        "workspace-bind",
         "search-bind",
         "search-update",
         "autocomplete-bind",
         "lifecycle-bind-ui",
         "lifecycle-bind-window",
-        "lifecycle-init"
+        "lifecycle-init",
+        "workspace-load"
       ].includes(entry[0])
     ),
     [
@@ -351,12 +361,14 @@ test("app bootstrap composition controller hydrates UI bindings and starts runti
       ["sync-geometry"],
       ["render"],
       ["layout-bind"],
+      ["workspace-bind"],
       ["search-bind"],
       ["search-update"],
       ["autocomplete-bind"],
       ["lifecycle-bind-ui"],
       ["lifecycle-bind-window"],
-      ["lifecycle-init"]
+      ["lifecycle-init"],
+      ["workspace-load"]
     ]
   );
 });

@@ -10,11 +10,12 @@ import {
 } from "../src/public/command-schema.js";
 
 test("command schema exposes declarative command metadata and distinct help/usage surfaces", () => {
-  const schema = createSlashCommandSchema(["deck", "swap", "note", "layout", "replay", "settings", "help"]);
+  const schema = createSlashCommandSchema(["deck", "swap", "note", "layout", "workspace", "replay", "settings", "help"]);
   const deck = schema.find((entry) => entry.insertText === "deck");
   const swap = schema.find((entry) => entry.insertText === "swap");
   const note = schema.find((entry) => entry.insertText === "note");
   const layout = schema.find((entry) => entry.insertText === "layout");
+  const workspace = schema.find((entry) => entry.insertText === "workspace");
   const replay = schema.find((entry) => entry.insertText === "replay");
   const settings = schema.find((entry) => entry.insertText === "settings");
 
@@ -22,10 +23,12 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(swap);
   assert.ok(note);
   assert.ok(layout);
+  assert.ok(workspace);
   assert.ok(replay);
   assert.ok(settings);
   assert.equal(deck.summary, "/deck list|new|rename|switch|delete");
   assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+  assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.deepEqual(
     swap.args,
     [{ provider: "session-selector", optional: false }, { provider: "session-selector", optional: false }]
@@ -41,15 +44,16 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("swap"), "/swap <selectorA> <selectorB>");
   assert.equal(getSlashCommandUsage("note"), "/note <selector|active> [text...]");
   assert.equal(getSlashCommandUsage("layout"), "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+  assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(getSlashCommandUsage("replay"), "/replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
 });
 
 test("command schema formats command help text from declarative command summaries", () => {
-  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "layout", "replay", "custom", "help"]);
+  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "layout", "workspace", "replay", "custom", "help"]);
   assert.match(helpText, /^Commands: /);
   assert.equal(
     helpText,
-    "Commands: > / new deck swap note layout replay custom help"
+    "Commands: @ > / new deck swap note layout workspace replay custom help"
   );
 });
 
@@ -64,9 +68,10 @@ test("command schema formats topic help text for commands and subcommands", () =
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
-  const registry = createSlashCommandRegistry(["deck", "layout", "settings", "help"]);
+  const registry = createSlashCommandRegistry(["deck", "layout", "workspace", "settings", "help"]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);
+  assert.deepEqual(registry.get("workspace")?.subcommands?.apply?.usage, ["/workspace apply <preset>"]);
   assert.equal(registry.get("settings")?.subcommands?.apply?.args?.[0]?.provider, "session-selector");
   assert.equal(registry.get("unknown"), null);
 });
