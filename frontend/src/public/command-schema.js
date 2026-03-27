@@ -57,6 +57,14 @@ function freezeUsage(usage, insertText) {
   return Object.freeze([normalized || `/${normalizeText(insertText)}`]);
 }
 
+function freezeStringList(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return undefined;
+  }
+  const normalized = values.map((entry) => normalizeText(entry)).filter(Boolean);
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
 function freezeCommandDefinition(definition, keyPrefix = "slash") {
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
     return null;
@@ -71,6 +79,10 @@ function freezeCommandDefinition(definition, keyPrefix = "slash") {
   const example = normalizeText(definition.example);
   const summary = normalizeText(definition.summary);
   const key = normalizeText(definition.key) || `${keyPrefix}:${normalizeLower(insertText)}`;
+  const canonicalCommand = normalizeLower(definition.canonicalCommand);
+  const canonicalSubcommand = normalizeLower(definition.canonicalSubcommand);
+  const aliasOf = normalizeText(definition.aliasOf);
+  const argsPrefix = freezeStringList(definition.argsPrefix);
   return Object.freeze({
     key,
     insertText,
@@ -81,7 +93,12 @@ function freezeCommandDefinition(definition, keyPrefix = "slash") {
     summary: summary || undefined,
     usage: freezeUsage(definition.usage, insertText),
     args: freezeArgs(definition.args),
-    subcommands: freezeSubcommands(definition.subcommands)
+    subcommands: freezeSubcommands(definition.subcommands),
+    canonicalCommand: canonicalCommand || undefined,
+    canonicalSubcommand: canonicalSubcommand || undefined,
+    aliasOf: aliasOf || undefined,
+    argsPrefix,
+    isAlias: Boolean(canonicalCommand)
   });
 }
 
@@ -592,8 +609,104 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/help <topic>",
       "/help <topic> <subcommand>"
     ]
+  }),
+  run: freezeCommandDefinition({
+    key: "slash:run",
+    insertText: "run",
+    label: "/run",
+    kind: "command",
+    description: "run a newline-separated slash-command script",
+    example: "/run",
+    usage: [
+      "/run + newline-separated slash commands",
+      "/cmd1 + newline + /cmd2"
+    ]
   })
 });
+
+const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
+  { alias: "session.new", command: "new" },
+  { alias: "session.close", command: "close" },
+  { alias: "session.switch", command: "switch" },
+  { alias: "session.swap", command: "swap" },
+  { alias: "session.next", command: "next" },
+  { alias: "session.prev", command: "prev" },
+  { alias: "session.list", command: "list" },
+  { alias: "session.rename", command: "rename" },
+  { alias: "session.restart", command: "restart" },
+  { alias: "session.note", command: "note" },
+  { alias: "deck.list", command: "deck", subcommand: "list" },
+  { alias: "deck.new", command: "deck", subcommand: "new" },
+  { alias: "deck.rename", command: "deck", subcommand: "rename" },
+  { alias: "deck.switch", command: "deck", subcommand: "switch" },
+  { alias: "deck.delete", command: "deck", subcommand: "delete" },
+  { alias: "layout.list", command: "layout", subcommand: "list" },
+  { alias: "layout.save", command: "layout", subcommand: "save" },
+  { alias: "layout.apply", command: "layout", subcommand: "apply" },
+  { alias: "layout.rename", command: "layout", subcommand: "rename" },
+  { alias: "layout.delete", command: "layout", subcommand: "delete" },
+  { alias: "workspace.list", command: "workspace", subcommand: "list" },
+  { alias: "workspace.save", command: "workspace", subcommand: "save" },
+  { alias: "workspace.apply", command: "workspace", subcommand: "apply" },
+  { alias: "workspace.rename", command: "workspace", subcommand: "rename" },
+  { alias: "workspace.delete", command: "workspace", subcommand: "delete" },
+  { alias: "replay.view", command: "replay", subcommand: "view" },
+  { alias: "replay.export", command: "replay", subcommand: "export" },
+  { alias: "replay.copy", command: "replay", subcommand: "copy" },
+  { alias: "settings.show", command: "settings", subcommand: "show" },
+  { alias: "settings.apply", command: "settings", subcommand: "apply" },
+  { alias: "broadcast.status", command: "broadcast", subcommand: "status" },
+  { alias: "broadcast.off", command: "broadcast", subcommand: "off" },
+  { alias: "broadcast.group", command: "broadcast", subcommand: "group" },
+  { alias: "custom.show", command: "custom", subcommand: "show" },
+  { alias: "custom.preview", command: "custom", subcommand: "preview" },
+  { alias: "custom.remove", command: "custom", subcommand: "remove" }
+]);
+
+function rewriteAliasUsage(alias, commandName, subcommandName, usage) {
+  const sourcePrefix = subcommandName ? `/${commandName} ${subcommandName}` : `/${commandName}`;
+  const aliasPrefix = `/${alias}`;
+  const normalizedUsage = normalizeText(usage);
+  if (!normalizedUsage) {
+    return aliasPrefix;
+  }
+  return normalizedUsage.startsWith(sourcePrefix) ? `${aliasPrefix}${normalizedUsage.slice(sourcePrefix.length)}` : aliasPrefix;
+}
+
+function rewriteAliasExample(alias, commandName, subcommandName, example) {
+  return rewriteAliasUsage(alias, commandName, subcommandName, example);
+}
+
+function createAliasCommandDefinition(aliasSource, canonicalCommand) {
+  const commandName = normalizeLower(aliasSource?.command);
+  const subcommandName = normalizeLower(aliasSource?.subcommand);
+  const alias = normalizeText(aliasSource?.alias);
+  if (!commandName || !alias || !canonicalCommand) {
+    return null;
+  }
+  const target = subcommandName ? canonicalCommand.subcommands?.[subcommandName] || null : canonicalCommand;
+  if (!target) {
+    return null;
+  }
+  const usage = Array.isArray(target.usage)
+    ? target.usage.map((entry) => rewriteAliasUsage(alias, commandName, subcommandName, entry))
+    : [`/${alias}`];
+  return freezeCommandDefinition({
+    key: `slash:alias:${normalizeLower(alias)}`,
+    insertText: alias,
+    label: `/${alias}`,
+    kind: "command",
+    description: target.description,
+    example: rewriteAliasExample(alias, commandName, subcommandName, target.example),
+    summary: `Alias for ${target.label}`,
+    usage,
+    args: target.args,
+    canonicalCommand: commandName,
+    canonicalSubcommand: subcommandName,
+    aliasOf: target.label,
+    argsPrefix: subcommandName ? [subcommandName] : []
+  });
+}
 
 function createGenericSlashCommandDefinition(name) {
   const normalizedName = normalizeLower(name);
@@ -611,7 +724,8 @@ function createGenericSlashCommandDefinition(name) {
   });
 }
 
-export function createSlashCommandSchema(systemSlashCommands = []) {
+export function createSlashCommandSchema(systemSlashCommands = [], options = {}) {
+  const includeAliases = options.includeAliases !== false;
   const ordered = [];
   const seen = new Set();
   for (const entry of Array.isArray(systemSlashCommands) ? systemSlashCommands : []) {
@@ -622,7 +736,14 @@ export function createSlashCommandSchema(systemSlashCommands = []) {
     seen.add(name);
     ordered.push(DEFAULT_SLASH_COMMAND_SCHEMA[name] || createGenericSlashCommandDefinition(name));
   }
-  return Object.freeze(ordered.filter(Boolean));
+  if (!includeAliases) {
+    return Object.freeze(ordered.filter(Boolean));
+  }
+  const aliases = DEFAULT_SLASH_COMMAND_ALIAS_SOURCES.map((aliasSource) => {
+    const canonical = ordered.find((entry) => entry?.insertText === aliasSource.command);
+    return createAliasCommandDefinition(aliasSource, canonical);
+  }).filter(Boolean);
+  return Object.freeze([...ordered.filter(Boolean), ...aliases]);
 }
 
 export function createSlashCommandRegistry(systemSlashCommands = []) {
@@ -632,18 +753,56 @@ export function createSlashCommandRegistry(systemSlashCommands = []) {
       .map((entry) => [normalizeLower(entry?.insertText), entry])
       .filter((entry) => Boolean(entry[0]) && Boolean(entry[1]))
   );
+  const aliasesByTarget = new Map();
+  for (const entry of schema) {
+    if (!entry?.isAlias || !entry.canonicalCommand) {
+      continue;
+    }
+    const targetKey = `${entry.canonicalCommand}:${entry.canonicalSubcommand || ""}`;
+    const list = aliasesByTarget.get(targetKey) || [];
+    list.push(entry);
+    aliasesByTarget.set(targetKey, Object.freeze(list));
+  }
   return Object.freeze({
     list() {
       return schema;
     },
+    listCanonical() {
+      return schema.filter((entry) => entry?.isAlias !== true);
+    },
     get(commandName) {
       return byName.get(normalizeLower(commandName)) || null;
+    },
+    resolve(commandName) {
+      const entry = byName.get(normalizeLower(commandName)) || null;
+      if (!entry) {
+        return null;
+      }
+      const canonicalCommand = entry.canonicalCommand || normalizeLower(entry.insertText);
+      const canonicalSubcommand = entry.canonicalSubcommand || "";
+      const canonicalEntry = byName.get(canonicalCommand) || null;
+      const canonicalTarget = canonicalSubcommand ? canonicalEntry?.subcommands?.[canonicalSubcommand] || null : canonicalEntry;
+      return Object.freeze({
+        entry,
+        canonicalCommand,
+        canonicalSubcommand,
+        canonicalEntry: canonicalTarget || entry,
+        argsPrefix: Array.isArray(entry.argsPrefix) ? [...entry.argsPrefix] : []
+      });
+    },
+    listAliasesFor(commandName, subcommandName = "") {
+      return aliasesByTarget.get(`${normalizeLower(commandName)}:${normalizeLower(subcommandName)}`) || Object.freeze([]);
     }
   });
 }
 
-export function getSlashCommandUsage(commandName, subcommandName = "") {
-  const command = DEFAULT_SLASH_COMMAND_SCHEMA[normalizeLower(commandName)];
+export function getSlashCommandUsage(commandName, subcommandName = "", systemSlashCommands = Object.keys(DEFAULT_SLASH_COMMAND_SCHEMA)) {
+  const registry = createSlashCommandRegistry(systemSlashCommands);
+  const resolved = registry.resolve(subcommandName ? commandName : normalizeLower(commandName));
+  if (!subcommandName && resolved?.entry?.usage?.length) {
+    return resolved.entry.usage.join(" | ");
+  }
+  const command = resolved?.entry && !resolved.entry.isAlias ? resolved.entry : DEFAULT_SLASH_COMMAND_SCHEMA[normalizeLower(commandName)];
   if (!command) {
     return "";
   }
@@ -668,7 +827,19 @@ export function createCommandTopicHelpText(commandName, subcommandName = "", sys
     if (!subcommand) {
       return "";
     }
-    return [subcommand.label, `Usage: ${subcommand.usage.join(" | ")}`, subcommand.description]
+    const aliases = registry.listAliasesFor(normalizeLower(commandName), normalizeLower(subcommandName));
+    return [
+      subcommand.label,
+      `Usage: ${subcommand.usage.join(" | ")}`,
+      subcommand.description,
+      aliases.length > 0 ? `Aliases: ${aliases.map((entry) => entry.label).join(" ")}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (command.isAlias) {
+    return [command.label, `Usage: ${command.usage.join(" | ")}`, command.description, `Alias for: ${command.aliasOf}`]
       .filter(Boolean)
       .join("\n");
   }
@@ -690,13 +861,19 @@ export function createCommandTopicHelpText(commandName, subcommandName = "", sys
         .join(" ")}`
     );
   }
+  const aliases = registry.listAliasesFor(command.insertText, "");
+  if (aliases.length > 0) {
+    sections.push(`Aliases: ${aliases.map((entry) => entry.label).join(" ")}`);
+  }
   return sections.filter(Boolean).join("\n");
 }
 
 export function createCommandHelpText(systemSlashCommands = [], options = {}) {
   const includeQuickSwitch = options.includeQuickSwitch !== false;
   const includeDirectRouting = options.includeDirectRouting !== false;
-  const commandNames = createSlashCommandSchema(systemSlashCommands)
+  const registry = createSlashCommandRegistry(systemSlashCommands);
+  const commandNames = registry
+    .listCanonical()
     .map((command) => normalizeText(command?.insertText))
     .filter(Boolean);
   const parts = [];

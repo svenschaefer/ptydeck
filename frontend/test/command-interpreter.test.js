@@ -56,3 +56,29 @@ test("interpretComposerInput keeps later-line quick-switch input in terminal pla
     data: "echo hi\n>abc"
   });
 });
+
+test("interpretComposerInput routes newline-separated slash commands to the control-script plane", () => {
+  const result = interpretComposerInput("/deck switch ops\n/switch 1");
+  assert.deepEqual(result, {
+    kind: "control-script",
+    mode: "multiline",
+    commands: [
+      { kind: "control", command: "deck", args: ["switch", "ops"], raw: "/deck switch ops" },
+      { kind: "control", command: "switch", args: ["1"], raw: "/switch 1" }
+    ],
+    raw: "/deck switch ops\n/switch 1"
+  });
+});
+
+test("interpretComposerInput routes explicit /run blocks to the control-script plane", () => {
+  const result = interpretComposerInput("/run\n/deck switch ops\n/switch 1");
+  assert.deepEqual(result, {
+    kind: "control-script",
+    mode: "run-block",
+    commands: [
+      { kind: "control", command: "deck", args: ["switch", "ops"], raw: "/deck switch ops" },
+      { kind: "control", command: "switch", args: ["1"], raw: "/switch 1" }
+    ],
+    raw: "/run\n/deck switch ops\n/switch 1"
+  });
+});

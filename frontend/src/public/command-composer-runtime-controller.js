@@ -32,6 +32,10 @@ export function createCommandComposerRuntimeController(options = {}) {
   const render = options.render || (() => {});
   const debugLog = options.debugLog || (() => {});
   const executeControlCommand = options.executeControlCommand || (() => Promise.resolve(""));
+  const executeControlCommandDetailed =
+    typeof options.executeControlCommandDetailed === "function"
+      ? options.executeControlCommandDetailed
+      : async (interpreted) => ({ ok: true, feedback: await executeControlCommand(interpreted) });
   const recordSlashHistory = options.recordSlashHistory || (() => {});
   const getErrorMessage = options.getErrorMessage || (() => "Failed to execute control command.");
   const resetSlashHistoryNavigationState = options.resetSlashHistoryNavigationState || (() => {});
@@ -74,6 +78,25 @@ export function createCommandComposerRuntimeController(options = {}) {
   function clearPendingSend({ renderAfterClear = false } = {}) {
     pendingSend = null;
     clearCommandGuardState({ render: renderAfterClear });
+  }
+
+  function formatControlScriptFeedback(results, { stopped = false, total = 0 } = {}) {
+    const completed = Array.isArray(results) ? results.length : 0;
+    const lines = [];
+    if (completed === 0) {
+      return "No slash commands executed.";
+    }
+    lines.push(stopped ? `Command script stopped after ${completed}/${total} step(s).` : `Command script executed ${completed}/${total} step(s).`);
+    for (let index = 0; index < completed; index += 1) {
+      const result = results[index];
+      const raw = String(result?.raw || "").trim();
+      const feedback = String(result?.feedback || "").trim();
+      lines.push(`[${index + 1}] ${raw || "/"}`);
+      if (feedback) {
+        lines.push(feedback);
+      }
+    }
+    return lines.join("\n");
   }
 
   function formatCommandGuardReasons(reasonEntries = []) {
@@ -259,6 +282,40 @@ export function createCommandComposerRuntimeController(options = {}) {
         render();
       } catch (err) {
         setCommandFeedback(getErrorMessage(err, "Failed to execute control command."));
+      }
+      return;
+    }
+
+    if (interpreted.kind === "control-script") {
+      debugLog("command.control-script.start", {
+        steps: Array.isArray(interpreted.commands) ? interpreted.commands.length : 0,
+        mode: interpreted.mode || "multiline"
+      });
+      try {
+        const commands = Array.isArray(interpreted.commands) ? interpreted.commands : [];
+        const results = [];
+        let stopped = false;
+        for (const step of commands) {
+          const result = await executeControlCommandDetailed(step);
+          results.push({
+            raw: step?.raw || "",
+            feedback: result?.feedback || "",
+            ok: result?.ok === true
+          });
+          if (result?.ok !== true) {
+            stopped = true;
+            break;
+          }
+        }
+        setCommandFeedback(formatControlScriptFeedback(results, { stopped, total: commands.length }));
+        recordSlashHistory(command);
+        setCommandValue("");
+        setCommandPreview("");
+        clearCommandSuggestions();
+        resetSlashHistoryNavigationState();
+        render();
+      } catch (err) {
+        setCommandFeedback(getErrorMessage(err, "Failed to execute command script."));
       }
       return;
     }

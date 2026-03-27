@@ -130,6 +130,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     return getCommandExecutor()?.execute?.(interpreted);
   }
 
+  async function executeControlCommandDetailed(interpreted) {
+    return getCommandExecutor()?.executeDetailed?.(interpreted) || { ok: true, feedback: "" };
+  }
+
   async function submitCommand() {
     return getCommandComposerRuntimeController()?.submitCommand?.();
   }
@@ -164,6 +168,7 @@ export function createAppCommandUiFacadeController(options = {}) {
     scheduleBootstrapFallback,
     render,
     executeControlCommand,
+    executeControlCommandDetailed,
     submitCommand,
     refreshCommandPreview,
     scheduleCommandPreview

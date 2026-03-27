@@ -1,4 +1,4 @@
-import { createCommandHelpText, createCommandTopicHelpText, getSlashCommandUsage } from "./command-schema.js";
+import { createCommandHelpText, createCommandTopicHelpText, createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
 import {
   buildSessionInputSafetyProfileFromPreset,
   detectSessionInputSafetyPreset,
@@ -90,9 +90,59 @@ export function createCommandExecutor(options = {}) {
   const getBroadcastStatus = typeof options.getBroadcastStatus === "function" ? options.getBroadcastStatus : () => "Broadcast: off.";
   const enableGroupBroadcast = typeof options.enableGroupBroadcast === "function" ? options.enableGroupBroadcast : async () => "";
   const disableBroadcast = typeof options.disableBroadcast === "function" ? options.disableBroadcast : async () => "";
+  const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
+
+  function buildCommandExecutionResult(ok, feedback) {
+    return Object.freeze({
+      ok: ok === true,
+      feedback: typeof feedback === "string" ? feedback : String(feedback || "")
+    });
+  }
+
+  function isCommandExecutionFailure(feedback) {
+    const text = String(feedback || "").trim();
+    if (!text) {
+      return false;
+    }
+    return [
+      /^Usage: /,
+      /^Unknown command: /,
+      /^No /,
+      /^Unknown /,
+      /^Ambiguous /,
+      /^Missing /,
+      /^Failed /,
+      /^Display filter failed/i,
+      /must resolve to exactly one session/i,
+      /^Default deck cannot be deleted\./,
+      /^Deck '.+' is not empty\./,
+      /^Scoped custom command /,
+      /^Custom command not found:/,
+      /^Multiple scoped custom commands share /,
+      /^Field '.+'/
+    ].some((pattern) => pattern.test(text));
+  }
 
   function formatUsage(commandName, subcommandName = "") {
-    return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
+    return `Usage: ${getSlashCommandUsage(commandName, subcommandName, systemSlashCommands)}`;
+  }
+
+  function resolveSlashCommand(interpreted) {
+    const resolved = slashCommandRegistry.resolve(interpreted?.command);
+    if (!resolved) {
+      return Object.freeze({
+        commandRaw: String(interpreted?.command || ""),
+        command: String(interpreted?.command || "").toLowerCase(),
+        args: Array.isArray(interpreted?.args) ? interpreted.args.slice() : [],
+        matchedAlias: null
+      });
+    }
+    return Object.freeze({
+      commandRaw: String(interpreted?.command || ""),
+      command: resolved.canonicalCommand || String(interpreted?.command || "").toLowerCase(),
+      args: [...resolved.argsPrefix, ...(Array.isArray(interpreted?.args) ? interpreted.args : [])],
+      matchedAlias: resolved.entry?.isAlias === true ? resolved.entry : null
+    });
   }
 
   function formatSessionSettingsReport(session) {
@@ -290,9 +340,10 @@ export function createCommandExecutor(options = {}) {
   }
 
   async function execute(interpreted) {
-    const commandRaw = interpreted.command;
-    const command = commandRaw.toLowerCase();
-    const args = interpreted.args;
+    const resolvedSlashCommand = resolveSlashCommand(interpreted);
+    const commandRaw = resolvedSlashCommand.commandRaw;
+    const command = resolvedSlashCommand.command;
+    const args = resolvedSlashCommand.args;
     const state = store.getState();
     const sessions = sortSessionsByQuickId(state.sessions);
     const decks = Array.isArray(state.decks) ? state.decks : [];
@@ -307,6 +358,10 @@ export function createCommandExecutor(options = {}) {
         return topicHelp;
       }
       return createCommandHelpText(systemSlashCommands);
+    }
+
+    if (command === "run") {
+      return formatUsage("run");
     }
 
     if (command === "deck") {
@@ -1279,7 +1334,13 @@ export function createCommandExecutor(options = {}) {
     return `Unknown command: /${commandRaw}`;
   }
 
+  async function executeDetailed(interpreted) {
+    const feedback = await execute(interpreted);
+    return buildCommandExecutionResult(!isCommandExecutionFailure(feedback), feedback);
+  }
+
   return Object.freeze({
-    execute
+    execute,
+    executeDetailed
   });
 }

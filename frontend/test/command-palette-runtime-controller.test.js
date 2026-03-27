@@ -140,6 +140,8 @@ test("buildCommandPaletteEntries keeps deterministic command-session-deck orderi
       ["commands", "/new"],
       ["commands", "/switch"],
       ["commands", "/help"],
+      ["commands", "/session.new"],
+      ["commands", "/session.switch"],
       ["commands", "/deploy"],
       ["sessions", "[1] alpha"],
       ["sessions", "[2] beta"],

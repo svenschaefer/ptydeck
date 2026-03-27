@@ -72,7 +72,11 @@ export function createCommandEngine(options = {}) {
   const getDiscoveryUsageScore =
     typeof options.getDiscoveryUsageScore === "function" ? options.getDiscoveryUsageScore : () => 0;
   const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
-  const slashCommandSpecs = normalizeCompletionCandidates(slashCommandRegistry.list(), { replacePrefix: "/" });
+  const slashCommandSpecs = normalizeCompletionCandidates(slashCommandRegistry.listCanonical(), { replacePrefix: "/" });
+  const slashCommandAliasSpecs = normalizeCompletionCandidates(
+    slashCommandRegistry.list().filter((entry) => entry?.isAlias === true),
+    { replacePrefix: "/" }
+  );
   const suggestionProviders = createSuggestionProviderRegistry({
     getSessions,
     getDecks,
@@ -175,6 +179,7 @@ export function createCommandEngine(options = {}) {
         example: `/${name} 1`
       });
     }
+    candidates.push(...slashCommandAliasSpecs);
     return normalizeCompletionCandidates(candidates, { replacePrefix: "/" });
   }
 

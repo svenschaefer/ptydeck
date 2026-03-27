@@ -14,9 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `CMD-010` Owner `FE`: Add deterministic command namespaces so the slash-command plane supports explicit domain-prefixed aliases such as `/session.new`, `/session.close`, `/deck.switch`, `/custom.show`, `/layout.apply`, `/workspace.apply`, and `/replay.export`, while keeping the existing short command names fully backward-compatible.
-- `CMD-011` Owner `FE`: Add a scriptable command-plane execution mode for deterministic sequential slash-command runs from one composer submission, using newline-separated slash commands or an explicit `/run` block, with stop-on-failure behavior, concise aggregated feedback, and no loops, variables, or PTY-stream interpretation side effects.
-- `CMD-012` Owner `QA`: Add regression coverage for namespaced command resolution, help/autocomplete/command-palette visibility, backward compatibility with existing short command names, and deterministic multi-command script execution plus failure-short-circuit behavior.
+- `SWF-001` Owner `FE`: Define a strict line-oriented slash-workflow DSL grammar and AST schema (no loops, variables, or general scripting features), including explicit parse errors for invalid regex, missing timeout, unknown workflow directives, and malformed block-payload boundaries.
+- `SWF-002` Owner `FE`: Implement a deterministic workflow execution engine (`ready -> running -> waiting -> succeeded|failed|stopped|cancelled`) with sequential step evaluation, explicit failure/time-out abort semantics, and no second slash-command dispatch path beside the existing command registry/executor.
+- `SWF-003` Owner `FE`: Add abortable wait-step primitives (`wait delay`, `wait idle`, `wait until <source> <pattern> timeout`) using `AbortController`-style cancellation so each in-flight workflow step can be interrupted immediately without leaking listeners or timers.
 
 ## Active Ownership Role
 

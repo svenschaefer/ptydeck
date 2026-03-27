@@ -73,7 +73,7 @@ Promoted and completed in `v0.4.0-H21`:
 - [ ] Add plugin interface for project-specific automations.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
-- Promoted to active delivery (`v0.4.0-H33` in `TODO.md` / `ROADMAP.md`):
+- Promoted and completed in `v0.4.0-H33`:
   - `CMD-010`, `CMD-011`, `CMD-012`
 - Promoted and completed in `v0.4.0-H30`:
   - `CMD-001`, `CMD-002`, `CMD-003`
@@ -98,11 +98,12 @@ Promoted and completed in `v0.4.0-H19`:
 
 - `REP-001`, `REP-002`, `REP-003`
 
+Promoted to active delivery (`v0.4.0-H34` in `TODO.md` / `ROADMAP.md`):
+
+- `SWF-001`, `SWF-002`, `SWF-003`
+
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 
-- [ ] `SWF-001` Owner `FE`: Define a strict line-oriented slash-workflow DSL grammar and AST schema (no loops/variables/scripting features), including explicit parse errors for invalid regex, missing timeout, unknown workflow directives, and malformed block payload boundaries.
-- [ ] `SWF-002` Owner `FE`: Implement a deterministic workflow execution engine (`ready -> running -> waiting -> succeeded|failed|stopped|cancelled`) with sequential step evaluation and explicit failure/time-out abort semantics.
-- [ ] `SWF-003` Owner `FE`: Add abortable wait-step primitives (`wait delay`, `wait idle`, `wait until <source> <pattern> timeout`) using `AbortController`-style cancellation so each in-flight step can be interrupted immediately.
 - [ ] `SWF-004` Owner `FE`: Add workflow data-source adapters (`line`, `visible-line`, `status`, `summary`, `exit-code`, `session-state`) over the existing stream/interpretation layer with deterministic source contracts and no hidden heuristic side effects in the execution layer.
 - [ ] `SWF-005` Owner `BE`: Add explicit PTY control endpoints for runtime interruption/escalation (`POST /api/v1/sessions/{sessionId}/interrupt`, `.../terminate`, `.../kill`) with OpenAPI/runtime validation, authz checks, and deterministic error contracts for already-exited sessions.
 - [ ] `SWF-006` Owner `FE`: Add independent workflow control-plane UI/actions (`Stop Workflow`, `Interrupt`, `Kill Session`) that remain available while workflows are running/waiting and are not encoded as ordinary DSL steps.

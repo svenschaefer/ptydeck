@@ -88,6 +88,60 @@ test("command-composer runtime controller handles control submit and preview sch
   ]);
 });
 
+test("command-composer runtime controller executes control scripts sequentially and stops on failure", async () => {
+  const calls = [];
+  let value = "/deck.switch ops\n/session.close";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({
+      kind: "control-script",
+      mode: "multiline",
+      raw: value,
+      commands: [
+        { kind: "control", command: "deck.switch", args: ["ops"], raw: "/deck.switch ops" },
+        { kind: "control", command: "session.close", args: [], raw: "/session.close" },
+        { kind: "control", command: "session.list", args: [], raw: "/session.list" }
+      ]
+    }),
+    executeControlCommandDetailed: async (interpreted) => {
+      if (interpreted.command === "deck.switch") {
+        return { ok: true, feedback: "Active deck: [ops] Ops." };
+      }
+      if (interpreted.command === "session.close") {
+        return { ok: false, feedback: "No sessions available." };
+      }
+      return { ok: true, feedback: "should not run" };
+    },
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: (message) => calls.push(["preview", message]),
+    clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
+    recordSlashHistory: (raw) => calls.push(["history", raw]),
+    resetSlashHistoryNavigationState: () => calls.push(["historyReset"]),
+    render: () => calls.push(["render"]),
+    debugLog: (event, payload) => calls.push(["debug", event, payload.steps || payload.mode || ""])
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["debug", "command.control-script.start", 3],
+    [
+      "feedback",
+      "Command script stopped after 2/3 step(s).\n[1] /deck.switch ops\nActive deck: [ops] Ops.\n[2] /session.close\nNo sessions available."
+    ],
+    ["history", "/deck.switch ops\n/session.close"],
+    ["value", ""],
+    ["preview", ""],
+    ["clearSuggestions"],
+    ["historyReset"],
+    ["render"]
+  ]);
+});
+
 test("command-composer runtime controller previews rendered template custom commands for the active session", async () => {
   const calls = [];
   let value = "/deploy env=prod";

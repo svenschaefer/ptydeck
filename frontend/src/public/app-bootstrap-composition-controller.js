@@ -299,6 +299,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       render: () => appCommandUiFacadeController?.render?.(),
       debugLog,
       executeControlCommand: (interpreted) => appCommandUiFacadeController?.executeControlCommand?.(interpreted),
+      executeControlCommandDetailed: (interpreted) =>
+        appCommandUiFacadeController?.executeControlCommandDetailed?.(interpreted) || { ok: true, feedback: "" },
       recordSlashHistory: (rawCommand) => commandComposerAutocompleteController?.recordSlashHistory?.(rawCommand),
       getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage?.(err, fallback) || fallback,
       resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState?.(),

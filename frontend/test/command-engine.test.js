@@ -134,6 +134,22 @@ test("command engine exposes declarative autocomplete context for slash commands
   assert.match(context.matches[0].description, /show custom command/i);
 });
 
+test("command engine exposes namespaced alias autocomplete through the shared slash registry", () => {
+  const engine = createEngineFixture({
+    systemSlashCommands: ["new", "deck", "switch", "replay", "help", "run"]
+  });
+
+  const context = engine.parseAutocompleteContext("/deck.");
+  assert.equal(context.replacePrefix, "/");
+  assert.deepEqual(
+    context.matches.map((candidate) => candidate.insertText).slice(0, 3),
+    ["deck.list", "deck.new", "deck.rename"]
+  );
+
+  const runContext = engine.parseAutocompleteContext("/ru");
+  assert.equal(runContext.matches[0].insertText, "run");
+});
+
 test("command engine keeps exact-prefix results ahead of fuzzy slash matches and can personalize ties", () => {
   const engine = createEngineFixture({
     systemSlashCommands: ["stack", "haystack"]

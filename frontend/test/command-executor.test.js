@@ -14,8 +14,12 @@ function createExecutor() {
         };
       }
     },
-    api: {},
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help"],
+    api: {
+      async createSession(payload) {
+        return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
+      }
+    },
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help", "run"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -69,7 +73,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace broadcast replay settings custom help"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace broadcast replay settings custom help run"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -77,7 +81,16 @@ test("command executor help and usage strings derive from declarative schema met
   assert.match(topicHelp, /Subcommands: list new rename switch delete/);
 
   const subcommandHelp = await executor.execute({ command: "help", args: ["deck", "switch"], raw: "/help deck switch" });
-  assert.equal(subcommandHelp, ["/deck switch", "Usage: /deck switch <deckSelector>", "switch active deck"].join("\n"));
+  assert.equal(
+    subcommandHelp,
+    ["/deck switch", "Usage: /deck switch <deckSelector>", "switch active deck", "Aliases: /deck.switch"].join("\n")
+  );
+
+  const aliasHelp = await executor.execute({ command: "help", args: ["deck.switch"], raw: "/help deck.switch" });
+  assert.equal(
+    aliasHelp,
+    ["/deck.switch", "Usage: /deck.switch <deckSelector>", "switch active deck", "Alias for: /deck switch"].join("\n")
+  );
 
   const deckUsage = await executor.execute({ command: "deck", args: ["wat"], raw: "/deck wat" });
   assert.equal(
@@ -126,6 +139,89 @@ test("command executor help and usage strings derive from declarative schema met
     customPreviewUsage,
     "Usage: /custom preview [@global|@project|@session:<selector>] <name> [key=value ...] [-- <targetSelector>]"
   );
+
+  const runUsage = await executor.execute({ command: "run", args: [], raw: "/run" });
+  assert.equal(runUsage, "Usage: /run + newline-separated slash commands | /cmd1 + newline + /cmd2");
+});
+
+test("command executor resolves namespaced aliases through the canonical command path", async () => {
+  const deckCalls = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [],
+          decks: [
+            { id: "default", name: "Default" },
+            { id: "ops", name: "Ops" }
+          ],
+          activeSessionId: ""
+        };
+      },
+      setActiveSession(sessionId) {
+        deckCalls.push(["setActiveSession", sessionId]);
+      }
+    },
+    api: {
+      async createSession(payload) {
+        return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
+      }
+    },
+    systemSlashCommands: ["new", "deck", "close", "help", "run"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 0,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: (deckId) => {
+      deckCalls.push(["setActiveDeck", deckId]);
+      return true;
+    },
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => String(id || ""),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: (token, decks) => ({ deck: decks.find((deck) => deck.id === token) || null, error: `Unknown deck: ${token}` }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  assert.equal(
+    await executor.execute({ command: "deck.switch", args: ["ops"], raw: "/deck.switch ops" }),
+    "Active deck: [ops] Ops."
+  );
+  assert.equal(
+    await executor.execute({ command: "session.new", args: ["bash"], raw: "/session.new bash" }),
+    "Created session [s-new] bash."
+  );
+  assert.equal(
+    await executor.execute({ command: "session.close", args: [], raw: "/session.close" }),
+    "No sessions available."
+  );
+  assert.deepEqual(deckCalls, [
+    ["setActiveDeck", "ops"],
+    ["setActiveSession", "s-new"]
+  ]);
 });
 
 test("command executor manages layout profiles through shared runtime hooks", async () => {

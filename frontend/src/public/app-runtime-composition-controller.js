@@ -303,7 +303,8 @@ const SYSTEM_SLASH_COMMANDS = [
   "replay",
   "settings",
   "custom",
-  "help"
+  "help",
+  "run"
 ];
 let layoutRuntimeController = null;
 let terminalSettings = null;
