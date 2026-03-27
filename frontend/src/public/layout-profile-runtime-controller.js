@@ -7,11 +7,28 @@ function normalizeLower(value) {
 }
 
 function clearChildren(element) {
-  if (!element || !Array.isArray(element.children)) {
+  if (!element || typeof element.removeChild !== "function") {
     return;
   }
-  while (element.children.length > 0) {
-    element.removeChild(element.children[0]);
+
+  if (element.firstChild) {
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+    return;
+  }
+
+  const children = element.children;
+  if (!children || typeof children.length !== "number") {
+    return;
+  }
+
+  while (children.length > 0) {
+    const firstChild = children[0] || (typeof children.item === "function" ? children.item(0) : null);
+    if (!firstChild) {
+      break;
+    }
+    element.removeChild(firstChild);
   }
 }
 

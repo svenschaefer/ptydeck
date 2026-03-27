@@ -51,6 +51,49 @@ function createDocumentRef() {
   };
 }
 
+function createDomLikeSelectElement() {
+  const nodes = [];
+  const children = {};
+  Object.defineProperty(children, "length", {
+    get() {
+      return nodes.length;
+    }
+  });
+  Object.defineProperty(children, "0", {
+    get() {
+      return nodes[0];
+    }
+  });
+  children.item = (index) => nodes[index] || null;
+
+  return {
+    tagName: "SELECT",
+    value: "",
+    textContent: "",
+    disabled: false,
+    selected: false,
+    hidden: false,
+    children,
+    get firstChild() {
+      return nodes[0] || null;
+    },
+    appendChild(child) {
+      nodes.push(child);
+      return child;
+    },
+    removeChild(child) {
+      const index = nodes.indexOf(child);
+      if (index >= 0) {
+        nodes.splice(index, 1);
+      }
+      return child;
+    },
+    addEventListener() {},
+    dispatch() {},
+    click() {}
+  };
+}
+
 test("resolveLayoutProfileToken matches exact and unique prefix selectors", () => {
   const profiles = [
     { id: "focus", name: "Focus Layout", createdAt: 1, updatedAt: 1, layout: { activeDeckId: "default", sidebarVisible: true, sessionFilterText: "", deckTerminalSettings: {} } },
@@ -157,6 +200,44 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
   const deleteFeedback = await controller.deleteProfileById("layout-1");
   assert.equal(deleteFeedback, "Deleted layout profile [layout-1] Ops Focus Updated.");
   assert.equal(controller.listProfiles().length, 1);
+});
+
+test("layout profile runtime controller clears DOM-like select children before rerender", async () => {
+  const selectEl = createDomLikeSelectElement();
+  const statusEl = createElement("p");
+  const controller = createLayoutProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl,
+    statusEl,
+    api: {
+      async listLayoutProfiles() {
+        return [
+          {
+            id: "focus",
+            name: "Focus Layout",
+            createdAt: 1,
+            updatedAt: 2,
+            layout: {
+              activeDeckId: "default",
+              sidebarVisible: true,
+              sessionFilterText: "",
+              deckTerminalSettings: {
+                default: { cols: 80, rows: 20 }
+              }
+            }
+          }
+        ];
+      }
+    }
+  });
+
+  await controller.loadProfiles();
+  assert.equal(selectEl.children.length, 1);
+
+  await controller.loadProfiles();
+  assert.equal(selectEl.children.length, 1);
+  assert.equal(selectEl.children.item(0)?.value, "focus");
+  assert.equal(statusEl.textContent, "1 profile(s)");
 });
 
 test("layout profile runtime controller applies persisted layout state through shared runtime hooks", async () => {

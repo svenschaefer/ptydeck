@@ -4,6 +4,11 @@ Completed and verified topics belong here.
 
 ## 2026-03-27
 
+- [x] Fixed a frontend layout-profile duplication bug in `frontend/src/public/layout-profile-runtime-controller.js`: repeated profile loads no longer append duplicate `<option>` entries to the layout-profile selector when running against a real browser DOM `HTMLCollection`.
+- [x] Root cause was a DOM-clearing helper that only removed children when `element.children` was a plain array; real browser `SELECT` elements expose collection-like children instead, so stale layout-profile entries remained visible after reloads, saves, renames, and deletes even though the backend profile state itself was not duplicated.
+- [x] Added a focused regression in `frontend/test/layout-profile-runtime-controller.test.js` that simulates a DOM-like select element and proves rerendering the same backend-backed layout-profile list twice keeps the selector length stable instead of multiplying visible entries.
+- [x] Validation for the layout-profile duplication hotfix passed with targeted frontend regressions (`node --test frontend/test/layout-profile-runtime-controller.test.js frontend/test/api-client.test.js frontend/test/command-executor.test.js`) plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation processes after completion.
+
 - [x] `QLT-142` is now completed: `/swap <selectorA> <selectorB>` no longer only swaps displayed quick-ID labels; quick-ID order is now authoritative for deck-sidebar session buttons, workspace terminal-card ordering, and selector-driven frontend navigation paths such as `/list`, `/next`, and `/prev`.
 - [x] Frontend session ordering now flows through the shared `sortSessionsByQuickId()` contract exposed by `frontend/src/public/session-runtime-controller.js` and `frontend/src/public/app-session-runtime-facade-controller.js`, and that ordering is now consumed by `frontend/src/public/ui/deck-sidebar-controller.js`, `frontend/src/public/ui/session-grid-controller.js`, and `frontend/src/public/command-executor.js`.
 - [x] Existing terminal cards are now re-appended in quick-ID order during workspace renders, so swapping quick IDs visibly reorders already-mounted session cards instead of only affecting future mounts.
