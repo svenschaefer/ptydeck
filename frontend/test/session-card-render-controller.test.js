@@ -29,9 +29,21 @@ class ClassList {
 }
 
 function createEntry() {
+  const mount = {
+    contains(element) {
+      return element === this.child;
+    },
+    child: null
+  };
+  const terminal = {
+    focusCalls: 0,
+    focus() {
+      this.focusCalls += 1;
+    }
+  };
   return {
     element: { classList: new ClassList() },
-    terminal: {},
+    terminal,
     focusBtn: { textContent: "" },
     quickIdEl: { textContent: "" },
     stateBadgeEl: { hidden: true, textContent: "" },
@@ -39,7 +51,8 @@ function createEntry() {
     settingsDirty: false,
     isVisible: true,
     pendingViewportSync: false,
-    followOnShow: true
+    followOnShow: true,
+    mount
   };
 }
 
@@ -127,4 +140,24 @@ test("session-card-render controller only syncs settings controls while dialog i
   });
 
   assert.deepEqual(calls, ["startup", "input-safety", "theme", "dirty:false"]);
+});
+
+test("session-card-render controller restores terminal focus when a render interrupts a focused terminal", () => {
+  const entry = createEntry();
+  const focusedTextarea = { className: "xterm-helper-textarea" };
+  entry.mount.child = focusedTextarea;
+
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {},
+    getActiveElement: () => focusedTextarea
+  });
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s4", name: "gamma" },
+    activeSessionId: "s4",
+    nextVisible: true
+  });
+
+  assert.equal(entry.terminal.focusCalls, 1);
 });

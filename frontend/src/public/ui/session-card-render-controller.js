@@ -1,4 +1,5 @@
 export function createSessionCardRenderController(options = {}) {
+  const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
@@ -13,11 +14,31 @@ export function createSessionCardRenderController(options = {}) {
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
+  const getActiveElement =
+    typeof options.getActiveElement === "function" ? options.getActiveElement : () => documentRef?.activeElement || null;
+  const refocusTerminal =
+    typeof options.refocusTerminal === "function" ? options.refocusTerminal : (entry) => entry?.terminal?.focus?.();
+
+  function isTerminalMountFocused(entry, activeElement) {
+    if (!entry?.mount || !activeElement) {
+      return false;
+    }
+    if (activeElement === entry.mount) {
+      return true;
+    }
+    if (typeof entry.mount.contains === "function" && entry.mount.contains(activeElement)) {
+      return true;
+    }
+    return false;
+  }
 
   function updateExistingSessionCard({ entry, session, activeSessionId, nextVisible }) {
     if (!entry || !session) {
       return;
     }
+    const activeElementBeforeUpdate = getActiveElement();
+    const shouldRestoreTerminalFocus =
+      activeSessionId === session.id && nextVisible !== false && isTerminalMountFocused(entry, activeElementBeforeUpdate);
     const stateBadgeText = getSessionStateBadgeText(session);
     const stateHintText = getSessionStateHintText(session);
     const wasVisible = entry.isVisible !== false;
@@ -55,6 +76,10 @@ export function createSessionCardRenderController(options = {}) {
       syncSessionInputSafetyControls(entry, session);
       syncSessionThemeControls(entry, session.id);
       setSettingsDirty(entry, false);
+    }
+
+    if (shouldRestoreTerminalFocus) {
+      refocusTerminal(entry, activeElementBeforeUpdate);
     }
   }
 
