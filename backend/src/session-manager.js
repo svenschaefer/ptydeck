@@ -201,14 +201,24 @@ export class SessionManager {
     return Array.from(this.sessions.values()).map((session) => session.meta);
   }
 
-  trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
-    if (typeof value !== "string" || value.length === 0 || !Number.isInteger(maxChars) || maxChars <= 0) {
-      return "";
+  buildReplayRetentionResult(value, maxChars = this.sessionReplayMemoryMaxChars) {
+    if (typeof value !== "string" || value.length === 0) {
+      return { value: "", truncated: false };
     }
-    return value.length > maxChars ? value.slice(-maxChars) : value;
+    if (!Number.isInteger(maxChars) || maxChars <= 0) {
+      return { value: "", truncated: true };
+    }
+    if (value.length > maxChars) {
+      return { value: value.slice(-maxChars), truncated: true };
+    }
+    return { value, truncated: false };
   }
 
-  getSnapshot({ outputMaxChars } = {}) {
+  trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
+    return this.buildReplayRetentionResult(value, maxChars).value;
+  }
+
+  getSnapshot({ outputMaxChars, includeTruncationMetadata = false, includeEmptyOutputs = false } = {}) {
     const effectiveOutputMaxChars =
       Number.isInteger(outputMaxChars) && outputMaxChars >= 0
         ? Math.min(outputMaxChars, this.sessionReplayMemoryMaxChars)
@@ -217,12 +227,28 @@ export class SessionManager {
     const outputs = [];
     for (const session of this.sessions.values()) {
       sessions.push(session.meta);
-      const replayOutput = this.trimReplayOutput(session.outputBuffer, effectiveOutputMaxChars);
-      if (replayOutput) {
-        outputs.push({ sessionId: session.id, data: replayOutput });
+      const retainedReplayOutput = this.buildReplayRetentionResult(session.outputBuffer, effectiveOutputMaxChars);
+      const replayOutputTruncated = session.outputTruncated === true || retainedReplayOutput.truncated === true;
+      if (retainedReplayOutput.value || (includeEmptyOutputs && replayOutputTruncated)) {
+        outputs.push({
+          sessionId: session.id,
+          data: retainedReplayOutput.value,
+          ...(includeTruncationMetadata ? { truncated: replayOutputTruncated } : {})
+        });
       }
     }
     return { sessions, outputs };
+  }
+
+  getReplayExport(sessionId) {
+    const session = this.get(sessionId);
+    return {
+      sessionId: session.id,
+      data: session.outputBuffer,
+      retainedChars: session.outputBuffer.length,
+      retentionLimitChars: this.sessionReplayMemoryMaxChars,
+      truncated: session.outputTruncated === true
+    };
   }
 
   get(sessionId) {
@@ -259,6 +285,7 @@ export class SessionManager {
     startCommand = "",
     env = {},
     replayOutput = "",
+    replayOutputTruncated = false,
     note,
     inputSafetyProfile,
     tags = [],
@@ -298,12 +325,14 @@ export class SessionManager {
     });
     const ptyProcess = this.createPty({ shell, cwd: spawnCwd, cols: 80, rows: 24, env: ptyEnv });
 
+    const initialReplayOutput = this.buildReplayRetentionResult(replayOutput);
     const session = {
       id,
       ptyProcess,
       shellAdapter,
       cwdTrackingBuffer: "",
-      outputBuffer: this.trimReplayOutput(replayOutput),
+      outputBuffer: initialReplayOutput.value,
+      outputTruncated: replayOutputTruncated === true || initialReplayOutput.truncated,
       activityTimer: null,
       lastActivityAt: initialActivityTimestamp,
       meta: {
@@ -338,7 +367,9 @@ export class SessionManager {
         } else {
           session.meta.updatedAt = timestamp;
         }
-        session.outputBuffer = this.trimReplayOutput(`${session.outputBuffer}${cleaned}`);
+        const replayOutput = this.buildReplayRetentionResult(`${session.outputBuffer}${cleaned}`);
+        session.outputBuffer = replayOutput.value;
+        session.outputTruncated = session.outputTruncated === true || replayOutput.truncated === true;
         this.scheduleSessionActivityCompletion(session);
         this.events.emit("session.data", { sessionId: id, data: cleaned });
       }

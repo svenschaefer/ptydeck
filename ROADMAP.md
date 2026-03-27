@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H19`.
-- Active scoped tasks: `REP-001`, `REP-002`, `REP-003`.
+- Active scoped tasks: `REP-002`, `REP-003`.
 - Latest completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
 - Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
 - Previous completed wave before that: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
@@ -37,13 +37,13 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ### v0.4.0-H19 - Session Replay Export Baseline
 
-- `REP-001`, `REP-002`, `REP-003`
+- `REP-002`, `REP-003`
 
 Dependencies:
 
-- `REP-001` establishes the backend export contract first so frontend delivery and QA coverage can rely on one deterministic replay-export source.
-- `REP-002` follows `REP-001` so the frontend workflow reuses the finalized export format, truncation metadata, and empty-session semantics.
-- `REP-003` follows `REP-001` and closes after `REP-002` so regression coverage spans both the backend export contract and the frontend operator workflow.
+- `REP-001` is completed and establishes the backend export contract so frontend delivery and QA coverage can rely on one deterministic replay-export source.
+- `REP-002` follows completed `REP-001` so the frontend workflow reuses the finalized export format, truncation metadata, and empty-session semantics.
+- `REP-003` follows completed `REP-001` and closes after `REP-002` so regression coverage spans both the backend export contract and the frontend operator workflow.
 
 Exit criteria:
 

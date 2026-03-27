@@ -284,6 +284,41 @@ test("SessionManager can seed replay output for restored sessions", () => {
   assert.equal(snapshot.outputs[0].data, "line-2\r\n");
 });
 
+test("SessionManager exposes replay export metadata including truncation state", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionReplayMemoryMaxChars: 5
+  });
+  const created = manager.create({ cwd: "/tmp" });
+
+  fakePty.write("hello world\r\n");
+
+  const replayExport = manager.getReplayExport(created.id);
+  assert.equal(replayExport.sessionId, created.id);
+  assert.equal(replayExport.data, "rld\r\n");
+  assert.equal(replayExport.retainedChars, 5);
+  assert.equal(replayExport.retentionLimitChars, 5);
+  assert.equal(replayExport.truncated, true);
+});
+
+test("SessionManager replay export reports truncation when replay retention is disabled", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionReplayMemoryMaxChars: 0
+  });
+  const created = manager.create({ cwd: "/tmp" });
+
+  fakePty.write("output that cannot be retained");
+
+  const replayExport = manager.getReplayExport(created.id);
+  assert.equal(replayExport.data, "");
+  assert.equal(replayExport.retainedChars, 0);
+  assert.equal(replayExport.retentionLimitChars, 0);
+  assert.equal(replayExport.truncated, true);
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()

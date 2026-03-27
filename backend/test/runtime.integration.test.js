@@ -1285,7 +1285,7 @@ test("runtime persists bounded replay output when configured and restores it int
 
   const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
   assert.ok(Array.isArray(persistedRaw.sessionOutputs));
-  assert.deepEqual(persistedRaw.sessionOutputs, [{ sessionId: createdId, data: "567890" }]);
+  assert.deepEqual(persistedRaw.sessionOutputs, [{ sessionId: createdId, data: "567890", truncated: true }]);
 
   const runtimeB = createRuntime({
     port: 0,
@@ -1308,7 +1308,7 @@ test("runtime persists bounded replay output when configured and restores it int
   }
 });
 
-test("runtime leaves persisted replay output disabled when persist depth is zero", async () => {
+test("runtime persists an empty truncated replay marker when persist depth is zero", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
   const runtime = createRuntime({
@@ -1350,7 +1350,245 @@ test("runtime leaves persisted replay output disabled when persist depth is zero
 
   const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
   assert.ok(Array.isArray(persistedRaw.sessionOutputs));
-  assert.deepEqual(persistedRaw.sessionOutputs, []);
+  assert.deepEqual(persistedRaw.sessionOutputs, [{ sessionId: createdId, data: "", truncated: true }]);
+});
+
+test("session replay export endpoint returns deterministic empty-tail metadata for a new session", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const exportRes = await fetch(`${baseUrl}/sessions/${created.id}/replay-export`);
+    assert.equal(exportRes.status, 200);
+    const payload = await exportRes.json();
+
+    assert.equal(payload.sessionId, created.id);
+    assert.equal(payload.sessionState, created.state);
+    assert.equal(payload.scope, "retained_replay_tail");
+    assert.equal(payload.format, "text");
+    assert.equal(payload.contentType, "text/plain; charset=utf-8");
+    assert.equal(payload.fileName, `ptydeck-session-${created.id}-replay.txt`);
+    assert.equal(payload.data, "");
+    assert.equal(payload.retainedChars, 0);
+    assert.equal(payload.retentionLimitChars, 12);
+    assert.equal(payload.truncated, false);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session replay export endpoint reports truncation for active retained tails", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 5
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "1234567890" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    const exportRes = await fetch(`${baseUrl}/sessions/${created.id}/replay-export`);
+    assert.equal(exportRes.status, 200);
+    const payload = await exportRes.json();
+
+    assert.equal(payload.sessionId, created.id);
+    assert.equal(payload.sessionState, "running");
+    assert.equal(payload.data, "67890");
+    assert.equal(payload.retainedChars, 5);
+    assert.equal(payload.retentionLimitChars, 5);
+    assert.equal(payload.truncated, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session replay export endpoint preserves truncation metadata across restart-restored replay tails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6
+  });
+
+  let createdId = "";
+  try {
+    await runtimeA.start();
+    const { port } = runtimeA.getAddress();
+    const baseUrlA = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const inputRes = await fetch(`${baseUrlA}/sessions/${createdId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "1234567890" })
+    });
+    assert.equal(inputRes.status, 204);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6
+  });
+
+  try {
+    await runtimeB.start();
+    const { port } = runtimeB.getAddress();
+    const baseUrlB = `http://127.0.0.1:${port}/api/v1`;
+
+    const exportRes = await fetch(`${baseUrlB}/sessions/${createdId}/replay-export`);
+    assert.equal(exportRes.status, 200);
+    const payload = await exportRes.json();
+
+    assert.equal(payload.sessionId, createdId);
+    assert.equal(payload.sessionState, "running");
+    assert.equal(payload.data, "567890");
+    assert.equal(payload.retainedChars, 6);
+    assert.equal(payload.retentionLimitChars, 12);
+    assert.equal(payload.truncated, true);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("session replay export endpoint serves retained persisted tails for unrestored sessions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const activeSessionId = "restore-active";
+  const unrestoredSessionId = "restore-unrestored";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: activeSessionId,
+            cwd: homedir(),
+            shell: "sh",
+            name: "active",
+            startCwd: homedir(),
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          },
+          {
+            id: unrestoredSessionId,
+            cwd: homedir(),
+            shell: "sh",
+            name: "unrestored",
+            startCwd: homedir(),
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        sessionOutputs: [{ sessionId: unrestoredSessionId, data: "567890", truncated: true }],
+        customCommands: [],
+        decks: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    sessionMaxConcurrent: 1,
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6,
+    startupWarmupQuietMs: 20
+  });
+
+  try {
+    await runtime.start();
+    const { port } = runtime.getAddress();
+    const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+    const exportRes = await fetch(`${baseUrl}/sessions/${unrestoredSessionId}/replay-export`);
+    assert.equal(exportRes.status, 200);
+    const payload = await exportRes.json();
+
+    assert.equal(payload.sessionId, unrestoredSessionId);
+    assert.equal(payload.sessionState, "unrestored");
+    assert.equal(payload.data, "567890");
+    assert.equal(payload.retainedChars, 6);
+    assert.equal(payload.retentionLimitChars, 6);
+    assert.equal(payload.truncated, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session replay export endpoint returns not found for unknown sessions", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory()
+  });
+
+  try {
+    const exportRes = await fetch(`${baseUrl}/sessions/does-not-exist/replay-export`);
+    assert.equal(exportRes.status, 404);
+    const payload = await exportRes.json();
+    assert.equal(payload.error, "SessionNotFound");
+  } finally {
+    await runtime.stop();
+  }
 });
 
 test("session create persists immediately before response completes", async () => {

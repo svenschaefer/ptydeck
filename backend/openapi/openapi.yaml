@@ -417,6 +417,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/replay-export:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    get:
+      operationId: getSessionReplayExport
+      summary: Export the currently retained replay tail for a session.
+      responses:
+        '200':
+          description: Replay export payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionReplayExport'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/input:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -640,6 +661,51 @@ components:
           type: integer
           format: int64
           nullable: true
+    SessionReplayExport:
+      type: object
+      required:
+        - sessionId
+        - sessionState
+        - scope
+        - format
+        - contentType
+        - fileName
+        - data
+        - retainedChars
+        - retentionLimitChars
+        - truncated
+      properties:
+        sessionId:
+          type: string
+        sessionState:
+          type: string
+          enum:
+            - starting
+            - running
+            - exited
+            - unrestored
+        scope:
+          type: string
+          enum:
+            - retained_replay_tail
+        format:
+          type: string
+          enum:
+            - text
+        contentType:
+          type: string
+        fileName:
+          type: string
+        data:
+          type: string
+        retainedChars:
+          type: integer
+          minimum: 0
+        retentionLimitChars:
+          type: integer
+          minimum: 0
+        truncated:
+          type: boolean
     CustomCommand:
       type: object
       required:

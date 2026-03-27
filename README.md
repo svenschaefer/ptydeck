@@ -287,6 +287,25 @@ Product constraint:
 - Persisted replay depth must be less than or equal to the in-memory replay depth.
 - Recovery remains partial by design; `ptydeck` does not attempt full shell history or TUI state reconstruction.
 
+### Replay Export Contract
+
+The backend now exposes a deterministic replay-export contract for the currently retained tail:
+
+- Route: `GET /api/v1/sessions/{sessionId}/replay-export`
+- Response format: JSON metadata plus text payload
+- Export scope: `retained_replay_tail`
+- Export format marker: `text`
+- Content-type marker: `text/plain; charset=utf-8`
+
+The payload includes:
+
+- `data`: the currently retained replay tail
+- `retainedChars`: current retained tail size
+- `retentionLimitChars`: retention cap relevant to the exported tail
+- `truncated`: whether older replay content has been dropped before export
+
+This export does not imply full shell-state recovery. It is an explicit operator-facing view of the bounded replay tail only.
+
 ## Working Directory Tracking
 
 PTY does not expose the current working directory directly.

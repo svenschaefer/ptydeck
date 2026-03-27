@@ -52,6 +52,9 @@ const DEFAULT_STARTUP_WARMUP_QUIET_MS = 1000;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
+const SESSION_REPLAY_EXPORT_FORMAT = "text";
+const SESSION_REPLAY_EXPORT_CONTENT_TYPE = "text/plain; charset=utf-8";
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -223,6 +226,11 @@ function route(pathname, method) {
     return { kind: "input", params: { sessionId: inputMatch[1] } };
   }
 
+  const replayExportMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);
+  if (replayExportMatch && method === "GET") {
+    return { kind: "getSessionReplayExport", params: { sessionId: replayExportMatch[1] } };
+  }
+
   const resizeMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
   if (resizeMatch && method === "POST") {
     return { kind: "resize", params: { sessionId: resizeMatch[1] } };
@@ -248,6 +256,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/input$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/input";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/replay-export$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/replay-export";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/resize$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/resize";
@@ -625,6 +636,7 @@ export function createRuntime(config) {
   const sockets = new Set();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
+  let persistedReplayOutputs = new Map();
   const decks = new Map();
   const sessionDeckAssignments = new Map();
   const metrics = {
@@ -1059,6 +1071,9 @@ export function createRuntime(config) {
     if (kind === "listSessions" || kind === "getSession") {
       return "sessions:read";
     }
+    if (kind === "getSessionReplayExport") {
+      return "sessions:read";
+    }
     if (kind === "createSession") {
       return "sessions:create";
     }
@@ -1359,7 +1374,9 @@ export function createRuntime(config) {
 
   function snapshotRuntimeState() {
     const snapshot = manager.getSnapshot({
-      outputMaxChars: sessionReplayPersistMaxChars
+      outputMaxChars: sessionReplayPersistMaxChars,
+      includeTruncationMetadata: true,
+      includeEmptyOutputs: true
     });
     const sessionMap = new Map();
     for (const session of snapshot.sessions) {
@@ -1424,6 +1441,51 @@ export function createRuntime(config) {
       return toApiSession(unrestored, "unrestored");
     }
     throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+  }
+
+  function buildSessionReplayExportFilename(sessionId) {
+    return `ptydeck-session-${String(sessionId || "").trim() || "unknown"}-replay.txt`;
+  }
+
+  function buildSessionReplayExportOrThrow(sessionId) {
+    const apiSession = getApiSessionOrThrow(sessionId);
+    let replayExport = null;
+    try {
+      replayExport = manager.getReplayExport(sessionId);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const persistedReplayOutput = persistedReplayOutputs.get(sessionId) || null;
+    const data =
+      typeof replayExport?.data === "string"
+        ? replayExport.data
+        : typeof persistedReplayOutput?.data === "string"
+          ? persistedReplayOutput.data
+          : "";
+    const retainedChars = Number.isInteger(replayExport?.retainedChars)
+      ? replayExport.retainedChars
+      : Number.isInteger(persistedReplayOutput?.retainedChars)
+        ? persistedReplayOutput.retainedChars
+        : data.length;
+    const retentionLimitChars = Number.isInteger(replayExport?.retentionLimitChars)
+      ? replayExport.retentionLimitChars
+      : Number.isInteger(persistedReplayOutput?.retentionLimitChars)
+        ? persistedReplayOutput.retentionLimitChars
+        : manager.sessionReplayMemoryMaxChars;
+    return {
+      sessionId: apiSession.id,
+      sessionState: apiSession.state,
+      scope: SESSION_REPLAY_EXPORT_SCOPE,
+      format: SESSION_REPLAY_EXPORT_FORMAT,
+      contentType: SESSION_REPLAY_EXPORT_CONTENT_TYPE,
+      fileName: buildSessionReplayExportFilename(apiSession.id),
+      data,
+      retainedChars,
+      retentionLimitChars,
+      truncated: replayExport?.truncated === true || persistedReplayOutput?.truncated === true
+    };
   }
 
 function tryCreateRestoredSession({
@@ -1855,6 +1917,13 @@ function tryCreateRestoredSession({
         return;
       }
 
+      if (match.kind === "getSessionReplayExport") {
+        const payload = buildSessionReplayExportOrThrow(match.params.sessionId);
+        validateResponse({ statusCode: 200, body: payload, expect: "sessionReplayExport" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
@@ -2137,11 +2206,25 @@ function tryCreateRestoredSession({
     });
 
     const persistedState = await persistence.loadState();
-    const persistedReplayOutputs = new Map(
+    persistedReplayOutputs = new Map(
       Array.isArray(persistedState.sessionOutputs)
         ? persistedState.sessionOutputs
-            .filter((entry) => entry && typeof entry.sessionId === "string" && typeof entry.data === "string")
-            .map((entry) => [entry.sessionId, entry.data])
+            .filter(
+              (entry) =>
+                entry &&
+                typeof entry.sessionId === "string" &&
+                typeof entry.data === "string" &&
+                (entry.truncated === undefined || typeof entry.truncated === "boolean")
+            )
+            .map((entry) => [
+              entry.sessionId,
+              {
+                data: entry.data,
+                retainedChars: entry.data.length,
+                retentionLimitChars: sessionReplayPersistMaxChars,
+                truncated: entry.truncated === true
+              }
+            ])
         : []
     );
     startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
@@ -2221,7 +2304,8 @@ function tryCreateRestoredSession({
               cwd: attempt.cwd,
               startCwd: attempt.startCwd,
               startCommand: startupConfig.startCommand,
-              replayOutput: persistedReplayOutputs.get(session.id) || "",
+              replayOutput: persistedReplayOutputs.get(session.id)?.data || "",
+              replayOutputTruncated: persistedReplayOutputs.get(session.id)?.truncated === true,
               env: startupConfig.env,
               note,
               inputSafetyProfile,

@@ -234,6 +234,12 @@ export function validateRequest({ method, pathname, params, body }) {
     }
   }
 
+  if (method === "GET" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/replay-export$/)) {
+    if (!params.sessionId || typeof params.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+  }
+
   if (method === "PUT" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
     if (!params.commandName || typeof params.commandName !== "string") {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
@@ -362,6 +368,29 @@ function isCustomCommand(value) {
   );
 }
 
+function isSessionReplayExport(value) {
+  return (
+    isObject(value) &&
+    typeof value.sessionId === "string" &&
+    (
+      value.sessionState === "starting" ||
+      value.sessionState === "running" ||
+      value.sessionState === "exited" ||
+      value.sessionState === "unrestored"
+    ) &&
+    value.scope === "retained_replay_tail" &&
+    value.format === "text" &&
+    typeof value.contentType === "string" &&
+    typeof value.fileName === "string" &&
+    typeof value.data === "string" &&
+    Number.isInteger(value.retainedChars) &&
+    value.retainedChars >= 0 &&
+    Number.isInteger(value.retentionLimitChars) &&
+    value.retentionLimitChars >= 0 &&
+    typeof value.truncated === "boolean"
+  );
+}
+
 export function validateResponse({ statusCode, body, expect }) {
   if (expect === "session" && !isSession(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match Session schema.");
@@ -385,6 +414,10 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "wsTicket" && !isWsTicket(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match WsTicketResponse schema.");
+  }
+
+  if (expect === "sessionReplayExport" && !isSessionReplayExport(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SessionReplayExport schema.");
   }
 
   if (expect === "customCommand" && !isCustomCommand(body)) {

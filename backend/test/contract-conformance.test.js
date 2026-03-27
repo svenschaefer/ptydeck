@@ -64,6 +64,7 @@ function runtimeOperationKeys() {
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
+    "GET /sessions/{sessionId}/replay-export",
     "PATCH /sessions/{sessionId}",
     "DELETE /sessions/{sessionId}",
     "POST /sessions/{sessionId}/input",
@@ -138,6 +139,7 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       body: JSON.stringify({})
     });
     assert.ok(operations.get("POST /sessions").has(createRes.status));
+    const createdSession = await createRes.json();
 
     const createInvalidRes = await contractFetch(`${baseUrl}/sessions`, {
       method: "POST",
@@ -150,6 +152,11 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /sessions").has(listRes.status));
+
+    const replayExportRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/replay-export`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /sessions/{sessionId}/replay-export").has(replayExportRes.status));
 
     const listCustomCommandsRes = await contractFetch(`${baseUrl}/custom-commands`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
