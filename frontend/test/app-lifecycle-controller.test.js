@@ -119,13 +119,20 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   const sendBtn = createEventTarget();
   const commandGuardSendOnceBtn = createEventTarget();
   const commandGuardCancelBtn = createEventTarget();
+  const workflowStopBtn = createEventTarget();
+  const workflowInterruptBtn = createEventTarget();
+  const workflowKillBtn = createEventTarget();
   const errors = [];
+  const feedback = [];
   const cleanup = [];
   let clearCalls = 0;
   let resizeCalls = 0;
   let sendCalls = 0;
   let confirmCalls = 0;
   let cancelCalls = 0;
+  let stopCalls = 0;
+  let interruptCalls = 0;
+  let killCalls = 0;
 
   const controller = createAppLifecycleController({
     windowRef: {
@@ -142,6 +149,9 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     sendBtn,
     commandGuardSendOnceBtn,
     commandGuardCancelBtn,
+    workflowStopBtn,
+    workflowInterruptBtn,
+    workflowKillBtn,
     createDeckFlow: async () => {},
     renameDeckFlow: async () => {
       throw new Error("rename failed");
@@ -157,8 +167,21 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     cancelPendingCommandSend: () => {
       cancelCalls += 1;
     },
+    stopWorkflow: () => {
+      stopCalls += 1;
+      return true;
+    },
+    interruptWorkflowSession: async () => {
+      interruptCalls += 1;
+      return "Interrupted workflow session [7] ops.";
+    },
+    killWorkflowSession: async () => {
+      killCalls += 1;
+      return "Killed workflow session [7] ops.";
+    },
     skipStartupWarmupWait: () => cleanup.push("skip-warmup"),
     setError: (message) => errors.push(message),
+    setCommandFeedback: (message) => feedback.push(message),
     clearUiError: () => {
       clearCalls += 1;
     },
@@ -175,6 +198,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     disposeTerminalSearch: () => cleanup.push("search"),
     disposeCommandComposerRuntime: () => cleanup.push("composer"),
     disposeCommandComposerAutocomplete: () => cleanup.push("autocomplete"),
+    disposeWorkflowRuntime: () => cleanup.push("workflow"),
     disconnectTerminalObservers: () => cleanup.push("observers"),
     disposeTerminals: () => cleanup.push("terminals")
   });
@@ -189,12 +213,23 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   await sendBtn.dispatch("click");
   await commandGuardSendOnceBtn.dispatch("click");
   await commandGuardCancelBtn.dispatch("click");
+  await workflowStopBtn.dispatch("click");
+  await workflowInterruptBtn.dispatch("click");
+  await workflowKillBtn.dispatch("click");
 
-  assert.equal(clearCalls, 2);
+  assert.equal(clearCalls, 5);
   assert.equal(sendCalls, 1);
   assert.equal(confirmCalls, 1);
   assert.equal(cancelCalls, 1);
+  assert.equal(stopCalls, 1);
+  assert.equal(interruptCalls, 1);
+  assert.equal(killCalls, 1);
   assert.deepEqual(errors, ["rename failed"]);
+  assert.deepEqual(feedback, [
+    "Workflow stop requested.",
+    "Interrupted workflow session [7] ops.",
+    "Killed workflow session [7] ops."
+  ]);
 
   for (const handler of listeners.get("resize") || []) {
     handler({ type: "resize" });
@@ -215,6 +250,7 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     "search",
     "composer",
     "autocomplete",
+    "workflow",
     "observers",
     "terminals"
   ]);

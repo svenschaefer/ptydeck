@@ -30,6 +30,20 @@ test("slash workflow engine executes action steps sequentially and succeeds dete
   assert.deepEqual(calls, ["docu", "go"]);
 });
 
+test("slash workflow engine fails deterministically when the workflow exceeds the step guardrail", async () => {
+  const workflow = parseSlashWorkflow("/one\n/two\n/three");
+  const engine = createSlashWorkflowEngine({
+    maxSteps: 2,
+    executeActionStep() {
+      throw new Error("should not execute");
+    }
+  });
+  const finalState = await engine.run(workflow);
+  assert.equal(finalState.status, "failed");
+  assert.equal(finalState.completedSteps, 0);
+  assert.equal(finalState.failure.code, "workflow.guardrail_steps_exceeded");
+});
+
 test("slash workflow engine enters waiting for wait steps and returns to running on success", async () => {
   const workflow = parseSlashWorkflow("/wait delay 1s\n/docu");
   const deferred = createDeferred();

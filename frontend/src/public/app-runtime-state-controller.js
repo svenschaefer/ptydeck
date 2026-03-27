@@ -64,6 +64,41 @@ export function createAppRuntimeStateController(options = {}) {
     requestRender();
   }
 
+  function setWorkflowRunState(nextState = {}) {
+    uiState.workflowStatus = typeof nextState.workflowStatus === "string" ? nextState.workflowStatus : "Workflow: ready.";
+    uiState.workflowTarget = typeof nextState.workflowTarget === "string" ? nextState.workflowTarget : "Target: no workflow session.";
+    uiState.workflowProgress = typeof nextState.workflowProgress === "string" ? nextState.workflowProgress : "Progress: 0/0.";
+    uiState.workflowDetail = typeof nextState.workflowDetail === "string" ? nextState.workflowDetail : "Detail: no workflow running.";
+    uiState.workflowResult = typeof nextState.workflowResult === "string" ? nextState.workflowResult : "";
+    uiState.workflowCanStop = nextState.workflowCanStop === true;
+    uiState.workflowCanInterrupt = nextState.workflowCanInterrupt === true;
+    uiState.workflowCanKill = nextState.workflowCanKill === true;
+    requestRender();
+  }
+
+  function clearWorkflowRunState({ render = true } = {}) {
+    const hadState =
+      Boolean(uiState.workflowResult) ||
+      uiState.workflowCanStop === true ||
+      uiState.workflowCanInterrupt === true ||
+      uiState.workflowCanKill === true ||
+      uiState.workflowStatus !== "Workflow: ready." ||
+      uiState.workflowDetail !== "Detail: no workflow running." ||
+      uiState.workflowTarget !== "Target: no workflow session." ||
+      uiState.workflowProgress !== "Progress: 0/0.";
+    uiState.workflowStatus = "Workflow: ready.";
+    uiState.workflowTarget = "Target: no workflow session.";
+    uiState.workflowProgress = "Progress: 0/0.";
+    uiState.workflowDetail = "Detail: no workflow running.";
+    uiState.workflowResult = "";
+    uiState.workflowCanStop = false;
+    uiState.workflowCanInterrupt = false;
+    uiState.workflowCanKill = false;
+    if (render && hadState) {
+      requestRender();
+    }
+  }
+
   function clearCommandGuardState({ render = true } = {}) {
     const hadState =
       uiState.commandGuardActive === true ||
@@ -203,7 +238,9 @@ export function createAppRuntimeStateController(options = {}) {
     setCommandFeedback,
     setCommandPreview,
     setCommandGuardState,
+    setWorkflowRunState,
     clearCommandGuardState,
+    clearWorkflowRunState,
     setStartupGateState,
     clearStartupGateState,
     getErrorMessage,

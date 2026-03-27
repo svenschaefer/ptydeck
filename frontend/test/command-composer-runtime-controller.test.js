@@ -142,6 +142,52 @@ test("command-composer runtime controller executes control scripts sequentially 
   ]);
 });
 
+test("command-composer runtime controller routes control scripts through workflow runtime when available", async () => {
+  const calls = [];
+  let value = "/run\n/list\n/next";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({
+      kind: "control-script",
+      mode: "run-block",
+      raw: value,
+      commands: [
+        { kind: "control", command: "list", args: [], raw: "/list" },
+        { kind: "control", command: "next", args: [], raw: "/next" }
+      ]
+    }),
+    runWorkflowDetailed: async (interpreted) => {
+      calls.push(["workflow", interpreted.mode, interpreted.raw]);
+      return { ok: true, feedback: "Workflow succeeded after 2/2 step(s)." };
+    },
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: (message) => calls.push(["preview", message]),
+    clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
+    recordSlashHistory: (raw) => calls.push(["history", raw]),
+    resetSlashHistoryNavigationState: () => calls.push(["historyReset"]),
+    render: () => calls.push(["render"]),
+    debugLog: (event, payload) => calls.push(["debug", event, payload.steps || payload.mode || ""])
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["debug", "command.control-script.start", 2],
+    ["workflow", "run-block", "/run\n/list\n/next"],
+    ["feedback", "Workflow succeeded after 2/2 step(s)."],
+    ["history", "/run\n/list\n/next"],
+    ["value", ""],
+    ["preview", ""],
+    ["clearSuggestions"],
+    ["historyReset"],
+    ["render"]
+  ]);
+});
+
 test("command-composer runtime controller previews rendered template custom commands for the active session", async () => {
   const calls = [];
   let value = "/deploy env=prod";

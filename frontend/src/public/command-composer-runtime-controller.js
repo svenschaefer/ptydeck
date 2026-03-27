@@ -32,6 +32,8 @@ export function createCommandComposerRuntimeController(options = {}) {
   const render = options.render || (() => {});
   const debugLog = options.debugLog || (() => {});
   const executeControlCommand = options.executeControlCommand || (() => Promise.resolve(""));
+  const runWorkflowDetailed =
+    typeof options.runWorkflowDetailed === "function" ? options.runWorkflowDetailed : null;
   const executeControlCommandDetailed =
     typeof options.executeControlCommandDetailed === "function"
       ? options.executeControlCommandDetailed
@@ -291,6 +293,21 @@ export function createCommandComposerRuntimeController(options = {}) {
         steps: Array.isArray(interpreted.commands) ? interpreted.commands.length : 0,
         mode: interpreted.mode || "multiline"
       });
+      if (runWorkflowDetailed) {
+        try {
+          const result = await runWorkflowDetailed(interpreted);
+          setCommandFeedback(result?.feedback || "");
+          recordSlashHistory(command);
+          setCommandValue("");
+          setCommandPreview("");
+          clearCommandSuggestions();
+          resetSlashHistoryNavigationState();
+          render();
+        } catch (err) {
+          setCommandFeedback(getErrorMessage(err, "Failed to execute command script."));
+        }
+        return;
+      }
       try {
         const commands = Array.isArray(interpreted.commands) ? interpreted.commands : [];
         const results = [];

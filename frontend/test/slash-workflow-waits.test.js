@@ -119,6 +119,79 @@ test("waitUntilMatch resolves on pattern match, times out, and aborts", async ()
   await assert.rejects(abortPending, (error) => error.code === "workflow.aborted");
 });
 
+test("workflow wait guardrails cap wait timeouts and bound captured source text", async () => {
+  assert.throws(
+    () =>
+      waitDelay(200, {
+        maxDurationMs: 100
+      }),
+    (error) => error.code === "workflow.guardrail_wait_timeout_exceeded"
+  );
+
+  assert.throws(
+    () =>
+      waitIdle(200, {
+        maxDurationMs: 100,
+        subscribeActivity() {
+          return () => {};
+        }
+      }),
+    (error) => error.code === "workflow.guardrail_wait_timeout_exceeded"
+  );
+
+  assert.throws(
+    () =>
+      waitUntilMatch(/done/, 200, {
+        maxDurationMs: 100,
+        subscribe() {
+          return () => {};
+        }
+      }),
+    (error) => error.code === "workflow.guardrail_wait_timeout_exceeded"
+  );
+
+  const listeners = [];
+  const matched = waitUntilMatch(/done/i, 30, {
+    maxCaptureChars: 4,
+    subscribe(listener) {
+      listeners.push(listener);
+      return () => {};
+    }
+  });
+  listeners[0]("done and more");
+  const result = await matched;
+  assert.equal(result.value, "done");
+  assert.equal(result.truncated, true);
+  assert.equal(result.capturedChars, 4);
+  assert.equal(result.totalChars, 13);
+});
+
+test("workflow wait primitives clean up timers and subscriptions exactly once", async () => {
+  const timers = createManualTimeouts();
+  let unsubscribeCalls = 0;
+  let clearCalls = 0;
+  const controller = new AbortController();
+  const listeners = [];
+  const pending = waitUntilMatch(/done/i, 30, {
+    signal: controller.signal,
+    setTimeoutFn: timers.setTimeoutFn,
+    clearTimeoutFn(id) {
+      clearCalls += 1;
+      timers.clearTimeoutFn(id);
+    },
+    subscribe(listener) {
+      listeners.push(listener);
+      return () => {
+        unsubscribeCalls += 1;
+      };
+    }
+  });
+  controller.abort();
+  await assert.rejects(pending, (error) => error.code === "workflow.aborted");
+  assert.equal(unsubscribeCalls, 1);
+  assert.equal(clearCalls, 1);
+});
+
 test("wait step runner maps parsed wait steps to the correct primitive", async () => {
   const calls = [];
   const runner = createSlashWorkflowWaitStepRunner({
@@ -157,6 +230,46 @@ test("wait step runner maps parsed wait steps to the correct primitive", async (
     ["delay", 10],
     ["idle", 20],
     ["until", "done", "i", 30]
+  ]);
+});
+
+test("wait step runner forwards timeout and capture guardrails to wait primitives", async () => {
+  const calls = [];
+  const runner = createSlashWorkflowWaitStepRunner({
+    maxWaitTimeoutMs: 50,
+    maxCaptureChars: 12,
+    waitDelay(durationMs, options) {
+      calls.push(["delay", durationMs, options.maxDurationMs]);
+      return Promise.resolve("delay");
+    },
+    waitIdle(durationMs, options) {
+      calls.push(["idle", durationMs, options.maxDurationMs]);
+      return Promise.resolve("idle");
+    },
+    waitUntilMatch(pattern, timeoutMs, options) {
+      calls.push(["until", pattern.source, timeoutMs, options.maxDurationMs, options.maxCaptureChars]);
+      return Promise.resolve("until");
+    },
+    resolveSourceSubscription() {
+      return () => () => {};
+    },
+    subscribeActivity() {
+      return () => {};
+    }
+  });
+  await runner.execute({ type: "wait", mode: "delay", duration: { ms: 10 } });
+  await runner.execute({ type: "wait", mode: "idle", duration: { ms: 20 } });
+  await runner.execute({
+    type: "wait",
+    mode: "until",
+    pattern: { source: "done", flags: "" },
+    timeout: { ms: 30 },
+    source: "status"
+  });
+  assert.deepEqual(calls, [
+    ["delay", 10, 50],
+    ["idle", 20, 50],
+    ["until", "done", 30, 50, 12]
   ]);
 });
 

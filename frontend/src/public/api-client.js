@@ -299,6 +299,27 @@ export function createApiClient(baseUrl, options = {}) {
         body: "{}"
       });
     },
+    async interruptSession(sessionId) {
+      await request(`/sessions/${sessionId}/interrupt`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      }, { expectJson: false });
+    },
+    async terminateSession(sessionId) {
+      await request(`/sessions/${sessionId}/terminate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      }, { expectJson: false });
+    },
+    async killSession(sessionId) {
+      await request(`/sessions/${sessionId}/kill`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      }, { expectJson: false });
+    },
     async createDevToken(payload = {}) {
       return request("/auth/dev-token", withJson(payload));
     },

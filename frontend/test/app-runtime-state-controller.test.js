@@ -189,3 +189,34 @@ test("app-runtime state controller tracks startup gate ui state", () => {
   assert.equal(uiState.startupGateCanSkip, false);
   assert.deepEqual(renders, ["render", "render"]);
 });
+
+test("app-runtime state controller tracks workflow control-pane state", () => {
+  const renders = [];
+  const uiState = {};
+  const controller = createAppRuntimeStateController({
+    uiState,
+    requestRender: () => renders.push("render")
+  });
+
+  controller.setWorkflowRunState({
+    workflowStatus: "Workflow: waiting.",
+    workflowTarget: "Target: [7] Ops",
+    workflowProgress: "Progress: 1/3 completed · step 2/3.",
+    workflowDetail: "Detail: waiting on /wait idle 10s",
+    workflowResult: "Workflow stopped after 1/3 step(s).",
+    workflowCanStop: true,
+    workflowCanInterrupt: true,
+    workflowCanKill: false
+  });
+  controller.clearWorkflowRunState();
+
+  assert.equal(uiState.workflowStatus, "Workflow: ready.");
+  assert.equal(uiState.workflowTarget, "Target: no workflow session.");
+  assert.equal(uiState.workflowProgress, "Progress: 0/0.");
+  assert.equal(uiState.workflowDetail, "Detail: no workflow running.");
+  assert.equal(uiState.workflowResult, "");
+  assert.equal(uiState.workflowCanStop, false);
+  assert.equal(uiState.workflowCanInterrupt, false);
+  assert.equal(uiState.workflowCanKill, false);
+  assert.deepEqual(renders, ["render", "render"]);
+});

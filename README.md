@@ -338,6 +338,17 @@ Frontend operator workflow:
   - `/replay copy [selector|active]`
 - Frontend feedback surfaces retained-size and truncation state explicitly, for example `18/32 chars retained, truncated`.
 
+## Slash Workflows
+
+- Multiline slash workflows entered through the central composer now run through the explicit frontend workflow runtime rather than falling back to ad hoc sequential command handling.
+- The control pane shows the current workflow state, bound terminal target, step progress, detail, and final result while a workflow is running.
+- Workflow control actions are explicit and separate:
+  - `Stop Workflow`
+  - `Interrupt`
+  - `Kill Session`
+- Live workflow waits remain intentionally constrained to deterministic runtime signals that do not reintroduce the removed stream-interpretation layer.
+- The workflow runtime now enforces deterministic guardrails for workflow step count, maximum wait duration, and bounded captured source text instead of allowing unbounded waits or oversized observed values.
+
 ## Working Directory Tracking
 
 PTY does not expose the current working directory directly.

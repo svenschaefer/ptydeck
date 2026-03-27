@@ -392,6 +392,33 @@ test("api client calls restart session endpoint", async () => {
   assert.equal(calls[0].options.headers["content-type"], "application/json");
 });
 
+test("api client calls session signal control endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 204,
+      json: async () => ({})
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.interruptSession("abc");
+  await api.terminateSession("abc");
+  await api.killSession("abc");
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/interrupt");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/sessions/abc/terminate");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/sessions/abc/kill");
+  for (const call of calls) {
+    assert.equal(call.options.method, "POST");
+    assert.equal(call.options.headers["content-type"], "application/json");
+    assert.equal(call.options.body, "{}");
+  }
+});
+
 test("api client calls create dev token endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

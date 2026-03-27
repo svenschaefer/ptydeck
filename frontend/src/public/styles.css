@@ -829,6 +829,76 @@ body {
   flex-wrap: wrap;
 }
 
+.workflow-runtime-panel {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(139, 182, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(16, 25, 36, 0.74);
+}
+
+.workflow-runtime-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.workflow-runtime-title {
+  margin: 0;
+  color: #8bb6ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-runtime-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workflow-runtime-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.workflow-runtime-status,
+.workflow-runtime-target,
+.workflow-runtime-progress,
+.workflow-runtime-detail,
+.workflow-runtime-result {
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workflow-runtime-status {
+  color: #d8dee9;
+}
+
+.workflow-runtime-target,
+.workflow-runtime-progress {
+  color: #8bb6ff;
+}
+
+.workflow-runtime-detail {
+  color: #92a4bb;
+}
+
+.workflow-runtime-result {
+  color: #8ec07c;
+  white-space: pre-wrap;
+}
+
+.workflow-runtime-result:empty {
+  display: none;
+}
+
 .command-preview {
   position: absolute;
   top: calc(

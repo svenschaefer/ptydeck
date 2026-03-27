@@ -16,6 +16,7 @@ import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
+import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
@@ -146,6 +147,14 @@ const commandGuardReasonsEl = document.getElementById("command-guard-reasons");
 const commandGuardPreviewEl = document.getElementById("command-guard-preview");
 const commandGuardSendOnceBtn = document.getElementById("command-guard-send-once");
 const commandGuardCancelBtn = document.getElementById("command-guard-cancel");
+const workflowStatusEl = document.getElementById("workflow-status");
+const workflowTargetEl = document.getElementById("workflow-target");
+const workflowProgressEl = document.getElementById("workflow-progress");
+const workflowDetailEl = document.getElementById("workflow-detail");
+const workflowResultEl = document.getElementById("workflow-result");
+const workflowStopBtn = document.getElementById("workflow-stop");
+const workflowInterruptBtn = document.getElementById("workflow-interrupt");
+const workflowKillBtn = document.getElementById("workflow-kill");
 const replayViewerDialogEl = document.getElementById("replay-viewer-dialog");
 const replayViewerTitleEl = document.getElementById("replay-viewer-title");
 const replayViewerMetaEl = document.getElementById("replay-viewer-meta");
@@ -350,6 +359,7 @@ let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
 let broadcastInputRuntimeController = null;
 let splitLayoutRuntimeController = null;
+let slashWorkflowRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -372,6 +382,14 @@ const uiState = {
   commandGuardSummary: "",
   commandGuardReasons: "",
   commandGuardPreview: "",
+  workflowStatus: "Workflow: ready.",
+  workflowTarget: "Target: no workflow session.",
+  workflowProgress: "Progress: 0/0.",
+  workflowDetail: "Detail: no workflow running.",
+  workflowResult: "",
+  workflowCanStop: false,
+  workflowCanInterrupt: false,
+  workflowCanKill: false,
   commandSuggestionSelectedIndex: -1,
   startupGateActive: false,
   startupGatePhase: "",
@@ -831,6 +849,14 @@ workspaceRenderController = createWorkspaceRenderController({
   commandGuardSummaryEl,
   commandGuardReasonsEl,
   commandGuardPreviewEl,
+  workflowStatusEl,
+  workflowTargetEl,
+  workflowProgressEl,
+  workflowDetailEl,
+  workflowResultEl,
+  workflowStopBtn,
+  workflowInterruptBtn,
+  workflowKillBtn,
   startupWarmupGateEl,
   startupWarmupMessageEl,
   startupWarmupDetailEl,
@@ -1016,6 +1042,11 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
+  runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),
+  stopWorkflow: () => slashWorkflowRuntimeController?.stopActiveWorkflow?.() === true,
+  interruptWorkflowSession: () => slashWorkflowRuntimeController?.interruptWorkflowSession?.() || Promise.resolve(""),
+  killWorkflowSession: () => slashWorkflowRuntimeController?.killWorkflowSession?.() || Promise.resolve(""),
+  disposeWorkflowRuntime: () => slashWorkflowRuntimeController?.dispose?.(),
   disposeStreamDebugTrace: () => streamDebugTraceController.dispose(),
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
@@ -1031,6 +1062,20 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   commandComposerRuntimeController,
   appLifecycleController
 } = appBootstrapCompositionController.composeControllers());
+
+slashWorkflowRuntimeController = createSlashWorkflowRuntimeController({
+  store,
+  executeControlCommandDetailed: (interpreted) =>
+    appCommandUiFacadeController?.executeControlCommandDetailed?.(interpreted) || { ok: true, feedback: "" },
+  setWorkflowRunState: (nextState) => appRuntimeStateController?.setWorkflowRunState?.(nextState),
+  clearWorkflowRunState: (runtimeOptions) => appRuntimeStateController?.clearWorkflowRunState?.(runtimeOptions),
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  apiInterruptSession: (sessionId) => api.interruptSession(sessionId),
+  apiKillSession: (sessionId) => api.killSession(sessionId),
+  debugLog
+});
 
 commandPaletteRuntimeController = createCommandPaletteRuntimeController({
   windowRef: window,

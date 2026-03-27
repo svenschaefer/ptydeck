@@ -32,11 +32,20 @@ function createSnapshot(state) {
   return deepFreeze({ ...state });
 }
 
+function createGuardrailError(code, message) {
+  const error = new Error(message);
+  error.name = "SlashWorkflowGuardrailError";
+  error.code = code;
+  return error;
+}
+
 export function createSlashWorkflowEngine(options = {}) {
   const executeActionStep =
     typeof options.executeActionStep === "function" ? options.executeActionStep : async () => undefined;
   const executeWaitStep = typeof options.executeWaitStep === "function" ? options.executeWaitStep : async () => undefined;
   const now = typeof options.now === "function" ? options.now : () => Date.now();
+  const maxSteps =
+    Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : Number.POSITIVE_INFINITY;
   const listeners = new Set();
 
   let state = createSnapshot({
@@ -97,6 +106,26 @@ export function createSlashWorkflowEngine(options = {}) {
     stopRequested = false;
     cancelRequested = false;
     const startedAt = now();
+    if (steps.length > maxSteps) {
+      return publish({
+        status: "failed",
+        workflow,
+        currentStepIndex: null,
+        currentStep: null,
+        completedSteps: 0,
+        lastStepResult: null,
+        startedAt,
+        finishedAt: now(),
+        failure: serializeFailure(
+          createGuardrailError(
+            "workflow.guardrail_steps_exceeded",
+            `Workflow exceeds the maximum step count (${steps.length}/${maxSteps}).`
+          ),
+          null,
+          null
+        )
+      });
+    }
     publish({
       status: "running",
       workflow,

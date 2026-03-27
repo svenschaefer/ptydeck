@@ -63,6 +63,14 @@ test("workspace-render controller renders empty-state and status fields", () => 
   const commandGuardSummaryEl = createTextEl();
   const commandGuardReasonsEl = createTextEl();
   const commandGuardPreviewEl = createTextEl();
+  const workflowStatusEl = createTextEl();
+  const workflowTargetEl = createTextEl();
+  const workflowProgressEl = createTextEl();
+  const workflowDetailEl = createTextEl();
+  const workflowResultEl = createTextEl();
+  const workflowStopBtn = { disabled: true };
+  const workflowInterruptBtn = { disabled: true };
+  const workflowKillBtn = { disabled: true };
   const commandGuardEl = { hidden: true };
   const startupWarmupGateEl = { hidden: true };
   const startupWarmupMessageEl = createTextEl();
@@ -82,6 +90,14 @@ test("workspace-render controller renders empty-state and status fields", () => 
     commandGuardSummaryEl,
     commandGuardReasonsEl,
     commandGuardPreviewEl,
+    workflowStatusEl,
+    workflowTargetEl,
+    workflowProgressEl,
+    workflowDetailEl,
+    workflowResultEl,
+    workflowStopBtn,
+    workflowInterruptBtn,
+    workflowKillBtn,
     startupWarmupGateEl,
     startupWarmupMessageEl,
     startupWarmupDetailEl,
@@ -118,7 +134,15 @@ test("workspace-render controller renders empty-state and status fields", () => 
     commandGuardActive: true,
     commandGuardSummary: "Confirmation required.",
     commandGuardReasons: "- risky",
-    commandGuardPreview: "rm -rf ./tmp"
+    commandGuardPreview: "rm -rf ./tmp",
+    workflowStatus: "Workflow: waiting.",
+    workflowTarget: "Target: [7] Ops",
+    workflowProgress: "Progress: 1/3 completed · step 2/3.",
+    workflowDetail: "Detail: waiting on /wait idle 10s",
+    workflowResult: "Workflow stopped after 1/3 step(s).",
+    workflowCanStop: true,
+    workflowCanInterrupt: true,
+    workflowCanKill: false
   });
 
   assert.equal(stateEl.textContent, "connecting");
@@ -133,6 +157,14 @@ test("workspace-render controller renders empty-state and status fields", () => 
   assert.equal(commandGuardSummaryEl.textContent, "Confirmation required.");
   assert.equal(commandGuardReasonsEl.textContent, "- risky");
   assert.equal(commandGuardPreviewEl.textContent, "rm -rf ./tmp");
+  assert.equal(workflowStatusEl.textContent, "Workflow: waiting.");
+  assert.equal(workflowTargetEl.textContent, "Target: [7] Ops");
+  assert.equal(workflowProgressEl.textContent, "Progress: 1/3 completed · step 2/3.");
+  assert.equal(workflowDetailEl.textContent, "Detail: waiting on /wait idle 10s");
+  assert.equal(workflowResultEl.textContent, "Workflow stopped after 1/3 step(s).");
+  assert.equal(workflowStopBtn.disabled, false);
+  assert.equal(workflowInterruptBtn.disabled, false);
+  assert.equal(workflowKillBtn.disabled, true);
 
   controller.renderStatus({
     connectionState: "starting sessions",

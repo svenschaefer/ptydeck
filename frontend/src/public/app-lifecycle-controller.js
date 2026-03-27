@@ -8,12 +8,16 @@ export function createAppLifecycleController(options = {}) {
   const sendBtn = options.sendBtn || null;
   const commandGuardSendOnceBtn = options.commandGuardSendOnceBtn || null;
   const commandGuardCancelBtn = options.commandGuardCancelBtn || null;
+  const workflowStopBtn = options.workflowStopBtn || null;
+  const workflowInterruptBtn = options.workflowInterruptBtn || null;
+  const workflowKillBtn = options.workflowKillBtn || null;
   const api = options.api || null;
   const getActiveDeck = typeof options.getActiveDeck === "function" ? options.getActiveDeck : () => null;
   const resolveSessionDeckId =
     typeof options.resolveSessionDeckId === "function" ? options.resolveSessionDeckId : (session) => String(session?.deckId || "");
   const applyRuntimeEvent = typeof options.applyRuntimeEvent === "function" ? options.applyRuntimeEvent : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
+  const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const clearUiError = typeof options.clearUiError === "function" ? options.clearUiError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
   const debugLog = typeof options.debugLog === "function" ? options.debugLog : () => {};
@@ -25,6 +29,11 @@ export function createAppLifecycleController(options = {}) {
     typeof options.confirmPendingCommandSend === "function" ? options.confirmPendingCommandSend : () => Promise.resolve(false);
   const cancelPendingCommandSend =
     typeof options.cancelPendingCommandSend === "function" ? options.cancelPendingCommandSend : () => {};
+  const stopWorkflow = typeof options.stopWorkflow === "function" ? options.stopWorkflow : () => false;
+  const interruptWorkflowSession =
+    typeof options.interruptWorkflowSession === "function" ? options.interruptWorkflowSession : () => Promise.resolve("");
+  const killWorkflowSession =
+    typeof options.killWorkflowSession === "function" ? options.killWorkflowSession : () => Promise.resolve("");
   const bootstrapDevAuthToken =
     typeof options.bootstrapDevAuthToken === "function" ? options.bootstrapDevAuthToken : () => Promise.resolve(false);
   const waitForStartupWarmup =
@@ -52,6 +61,8 @@ export function createAppLifecycleController(options = {}) {
     typeof options.disposeCommandComposerRuntime === "function" ? options.disposeCommandComposerRuntime : () => {};
   const disposeCommandComposerAutocomplete =
     typeof options.disposeCommandComposerAutocomplete === "function" ? options.disposeCommandComposerAutocomplete : () => {};
+  const disposeWorkflowRuntime =
+    typeof options.disposeWorkflowRuntime === "function" ? options.disposeWorkflowRuntime : () => {};
   const disconnectTerminalObservers =
     typeof options.disconnectTerminalObservers === "function" ? options.disconnectTerminalObservers : () => {};
   const disposeTerminals = typeof options.disposeTerminals === "function" ? options.disposeTerminals : () => {};
@@ -121,6 +132,41 @@ export function createAppLifecycleController(options = {}) {
         cancelPendingCommandSend();
       });
     }
+    if (workflowStopBtn && typeof workflowStopBtn.addEventListener === "function") {
+      workflowStopBtn.addEventListener("click", () => {
+        try {
+          const stopped = stopWorkflow();
+          clearUiError();
+          setCommandFeedback(stopped ? "Workflow stop requested." : "No workflow is currently running.");
+        } catch (error) {
+          setError(getErrorMessage(error, "Failed to stop workflow."));
+        }
+      });
+    }
+    if (workflowInterruptBtn && typeof workflowInterruptBtn.addEventListener === "function") {
+      workflowInterruptBtn.addEventListener("click", () => {
+        interruptWorkflowSession()
+          .then((message) => {
+            clearUiError();
+            setCommandFeedback(message || "Workflow session interrupted.");
+          })
+          .catch((error) => {
+            setError(getErrorMessage(error, "Failed to interrupt workflow session."));
+          });
+      });
+    }
+    if (workflowKillBtn && typeof workflowKillBtn.addEventListener === "function") {
+      workflowKillBtn.addEventListener("click", () => {
+        killWorkflowSession()
+          .then((message) => {
+            clearUiError();
+            setCommandFeedback(message || "Workflow session killed.");
+          })
+          .catch((error) => {
+            setError(getErrorMessage(error, "Failed to kill workflow session."));
+          });
+      });
+    }
   }
 
   function handleBeforeUnload() {
@@ -133,6 +179,7 @@ export function createAppLifecycleController(options = {}) {
     disposeTerminalSearch();
     disposeCommandComposerRuntime();
     disposeCommandComposerAutocomplete();
+    disposeWorkflowRuntime();
     disconnectTerminalObservers();
     disposeTerminals();
   }

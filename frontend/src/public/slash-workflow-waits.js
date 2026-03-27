@@ -12,6 +12,14 @@ function createTimeoutError(message = "Workflow wait timed out.") {
   return error;
 }
 
+function createGuardrailError(message, details = {}) {
+  const error = new Error(message);
+  error.name = "SlashWorkflowGuardrailError";
+  error.code = "workflow.guardrail_wait_timeout_exceeded";
+  Object.assign(error, details);
+  return error;
+}
+
 function addAbortListener(signal, onAbort) {
   if (!signal) {
     return () => {};
@@ -39,8 +47,16 @@ export function waitDelay(durationMs, options = {}) {
   const signal = options.signal || null;
   const setTimeoutFn = typeof options.setTimeoutFn === "function" ? options.setTimeoutFn : setTimeout;
   const clearTimeoutFn = typeof options.clearTimeoutFn === "function" ? options.clearTimeoutFn : clearTimeout;
+  const maxDurationMs =
+    Number.isFinite(options.maxDurationMs) && options.maxDurationMs > 0 ? Number(options.maxDurationMs) : Number.POSITIVE_INFINITY;
   if (!Number.isFinite(durationMs) || durationMs <= 0) {
     throw new TypeError("Workflow delay must be a positive duration.");
+  }
+  if (durationMs > maxDurationMs) {
+    throw createGuardrailError(`Workflow wait duration exceeds the maximum timeout (${durationMs}/${maxDurationMs} ms).`, {
+      durationMs,
+      maxDurationMs
+    });
   }
   return new Promise((resolve, reject) => {
     let finished = false;
@@ -66,8 +82,16 @@ export function waitIdle(durationMs, options = {}) {
   const subscribeActivity = options.subscribeActivity;
   const setTimeoutFn = typeof options.setTimeoutFn === "function" ? options.setTimeoutFn : setTimeout;
   const clearTimeoutFn = typeof options.clearTimeoutFn === "function" ? options.clearTimeoutFn : clearTimeout;
+  const maxDurationMs =
+    Number.isFinite(options.maxDurationMs) && options.maxDurationMs > 0 ? Number(options.maxDurationMs) : Number.POSITIVE_INFINITY;
   if (!Number.isFinite(durationMs) || durationMs <= 0) {
     throw new TypeError("Workflow idle wait must be a positive duration.");
+  }
+  if (durationMs > maxDurationMs) {
+    throw createGuardrailError(`Workflow wait duration exceeds the maximum timeout (${durationMs}/${maxDurationMs} ms).`, {
+      durationMs,
+      maxDurationMs
+    });
   }
   if (typeof subscribeActivity !== "function") {
     throw new TypeError("waitIdle requires subscribeActivity().");
@@ -111,8 +135,18 @@ export function waitUntilMatch(pattern, timeoutMs, options = {}) {
   const subscribe = options.subscribe;
   const setTimeoutFn = typeof options.setTimeoutFn === "function" ? options.setTimeoutFn : setTimeout;
   const clearTimeoutFn = typeof options.clearTimeoutFn === "function" ? options.clearTimeoutFn : clearTimeout;
+  const maxDurationMs =
+    Number.isFinite(options.maxDurationMs) && options.maxDurationMs > 0 ? Number(options.maxDurationMs) : Number.POSITIVE_INFINITY;
+  const maxCaptureChars =
+    Number.isInteger(options.maxCaptureChars) && options.maxCaptureChars > 0 ? options.maxCaptureChars : Number.POSITIVE_INFINITY;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new TypeError("Workflow wait timeout must be a positive duration.");
+  }
+  if (timeoutMs > maxDurationMs) {
+    throw createGuardrailError(`Workflow wait duration exceeds the maximum timeout (${timeoutMs}/${maxDurationMs} ms).`, {
+      durationMs: timeoutMs,
+      maxDurationMs
+    });
   }
   if (typeof subscribe !== "function") {
     throw new TypeError("waitUntilMatch requires subscribe().");
@@ -143,7 +177,19 @@ export function waitUntilMatch(pattern, timeoutMs, options = {}) {
       if (!match) {
         return;
       }
-      finish(() => resolve(Object.freeze({ value: text, match: Array.from(match) })));
+      const truncated = text.length > maxCaptureChars;
+      const capturedValue = truncated ? text.slice(0, maxCaptureChars) : text;
+      finish(() =>
+        resolve(
+          Object.freeze({
+            value: capturedValue,
+            match: Array.from(match),
+            truncated,
+            capturedChars: capturedValue.length,
+            totalChars: text.length
+          })
+        )
+      );
     });
     const removeAbortListener = addAbortListener(signal, () => finish(() => reject(createAbortError())));
     timer = setTimeoutFn(() => finish(() => reject(createTimeoutError())), timeoutMs);
@@ -157,6 +203,14 @@ export function createSlashWorkflowWaitStepRunner(options = {}) {
   const subscribeActivity = typeof options.subscribeActivity === "function" ? options.subscribeActivity : null;
   const resolveSourceSubscription =
     typeof options.resolveSourceSubscription === "function" ? options.resolveSourceSubscription : () => null;
+  const maxWaitTimeoutMs =
+    Number.isFinite(options.maxWaitTimeoutMs) && options.maxWaitTimeoutMs > 0
+      ? Number(options.maxWaitTimeoutMs)
+      : Number.POSITIVE_INFINITY;
+  const maxCaptureChars =
+    Number.isInteger(options.maxCaptureChars) && options.maxCaptureChars > 0
+      ? options.maxCaptureChars
+      : Number.POSITIVE_INFINITY;
 
   return Object.freeze({
     async execute(step, context = {}) {
@@ -165,14 +219,19 @@ export function createSlashWorkflowWaitStepRunner(options = {}) {
       }
       const signal = context.signal || null;
       if (step.mode === "delay") {
-        return waitDelayFn(step.duration.ms, { signal });
+        return waitDelayFn(step.duration.ms, { signal, maxDurationMs: maxWaitTimeoutMs });
       }
       if (step.mode === "idle") {
-        return waitIdleFn(step.duration.ms, { signal, subscribeActivity });
+        return waitIdleFn(step.duration.ms, { signal, subscribeActivity, maxDurationMs: maxWaitTimeoutMs });
       }
       if (step.mode === "until") {
         const subscribe = resolveSourceSubscription(step.source);
-        return waitUntilMatchFn(step.pattern, step.timeout.ms, { signal, subscribe });
+        return waitUntilMatchFn(step.pattern, step.timeout.ms, {
+          signal,
+          subscribe,
+          maxDurationMs: maxWaitTimeoutMs,
+          maxCaptureChars
+        });
       }
       throw new Error(`Unknown workflow wait mode '${step.mode}'.`);
     }

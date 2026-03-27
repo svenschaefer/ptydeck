@@ -106,22 +106,27 @@ Promoted and completed in `v0.4.0-H35`:
 
 - `SWF-005`
 
+Promoted and completed in `v0.4.0-H36`:
+
+- `SWF-006`
+
+Promoted and completed in `v0.4.0-H37`:
+
+- `SWF-007`, `SWF-008`
+
+Promoted to active delivery in `v0.4.0-H38`:
+
+- `REM-001`, `REM-002`, `REM-003`, `REM-009`
+
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 
 - [ ] `SWF-004` Owner `FE`: Add workflow data-source adapters (`line`, `visible-line`, `status`, `summary`, `exit-code`, `session-state`) over the existing stream/interpretation layer with deterministic source contracts and no hidden heuristic side effects in the execution layer.
-- [ ] `SWF-006` Owner `FE`: Add independent workflow control-plane UI/actions (`Stop Workflow`, `Interrupt`, `Kill Session`) that remain available while workflows are running/waiting and are not encoded as ordinary DSL steps.
-- [ ] `SWF-007` Owner `BE`: Define and enforce workflow safety guardrails (max workflow steps, max wait timeout, max capture size, and explicit cancellation cleanup of listeners/subscriptions) to prevent runaway client/runtime behavior.
-- [ ] `SWF-008` Owner `QA`: Add regression coverage for workflow determinism and control-plane safety (cancel while waiting, ignored `SIGINT` escalation path, PTY exit during wait, timeout behavior, and exact-once cancel/stop semantics).
 
 Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current scope):
 
 - Inspiration source: [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
-- [ ] `REM-001` Owner `BE`: Add remote session kind support (`local`, `ssh`) with persisted non-secret connection metadata and deterministic launch/reconnect semantics.
-- [ ] `REM-002` Owner `BE`: Add SSH authentication matrix for remote sessions (password, private key, keyboard-interactive) with secure secret handling and explicit forwarding/proxy guardrails.
-- [ ] `REM-003` Owner `BE`: Add SSH host-key trust-store workflow (`known_hosts` semantics, first-connect trust contract, changed-host-key rejection path).
 - [ ] `REM-004` Owner `FE`: Add saved connection profiles and reusable launch presets for local shells and SSH targets (`host`, `port`, `username`, `shell`, `cwd`, `env`, `tags`, `deck`, `theme`).
 - [ ] `REM-005` Owner `BE`: Add remote-session disconnect/reconnect contract for SSH-backed sessions, including explicit degraded/offline state, retry policy, and deterministic user-visible recovery semantics.
 - [ ] `REM-006` Owner `BE`: Add controlled session file-transfer support with explicit upload/download permission model, progress reporting, and large-transfer guardrails.
 - [ ] `REM-007` Owner `FE`: Add session/deck sharing UX with explicit read-only spectator mode and visible control/write-permission state.
 - [ ] `REM-008` Owner `FE`: Add terminal theme import/export compatibility for external theme catalogs/formats (for example iTerm2, Windows Terminal, or Xresources-style payloads) with deterministic mapping and validation.
-- [ ] `REM-009` Owner `QA`: Add integration/security coverage for remote-session auth, host-key verification, transfer guardrails, and read-only sharing semantics.

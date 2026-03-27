@@ -152,6 +152,21 @@
                       <button id="command-guard-cancel" type="button">Cancel</button>
                     </div>
                   </section>
+                  <section class="workflow-runtime-panel">
+                    <div class="workflow-runtime-head">
+                      <p class="workflow-runtime-title">Workflow</p>
+                      <div class="workflow-runtime-actions">
+                        <button id="workflow-stop" type="button">Stop Workflow</button>
+                        <button id="workflow-interrupt" type="button">Interrupt</button>
+                        <button id="workflow-kill" type="button">Kill Session</button>
+                      </div>
+                    </div>
+                    <p id="workflow-status" class="workflow-runtime-status">Workflow: ready.</p>
+                    <p id="workflow-target" class="workflow-runtime-target">Target: no workflow session.</p>
+                    <p id="workflow-progress" class="workflow-runtime-progress">Progress: 0/0.</p>
+                    <p id="workflow-detail" class="workflow-runtime-detail">Detail: no workflow running.</p>
+                    <p id="workflow-result" class="workflow-runtime-result"></p>
+                  </section>
                   <pre id="command-suggestions" class="command-suggestions" hidden></pre>
                 </div>
               </section>

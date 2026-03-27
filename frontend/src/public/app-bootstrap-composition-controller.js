@@ -88,6 +88,9 @@ export function createAppBootstrapCompositionController(options = {}) {
   const deckDeleteBtn = options.deckDeleteBtn || null;
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
+  const workflowStopBtn = options.workflowStopBtn || null;
+  const workflowInterruptBtn = options.workflowInterruptBtn || null;
+  const workflowKillBtn = options.workflowKillBtn || null;
   const layoutRuntimeController = options.layoutRuntimeController || null;
   const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
   const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
@@ -117,6 +120,15 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
+  const runWorkflowDetailed =
+    typeof options.runWorkflowDetailed === "function" ? options.runWorkflowDetailed : null;
+  const stopWorkflow = typeof options.stopWorkflow === "function" ? options.stopWorkflow : () => false;
+  const interruptWorkflowSession =
+    typeof options.interruptWorkflowSession === "function" ? options.interruptWorkflowSession : () => Promise.resolve("");
+  const killWorkflowSession =
+    typeof options.killWorkflowSession === "function" ? options.killWorkflowSession : () => Promise.resolve("");
+  const disposeWorkflowRuntime =
+    typeof options.disposeWorkflowRuntime === "function" ? options.disposeWorkflowRuntime : () => {};
 
   let commandEngine = null;
   let commandTargetRuntimeController = null;
@@ -301,6 +313,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       executeControlCommand: (interpreted) => appCommandUiFacadeController?.executeControlCommand?.(interpreted),
       executeControlCommandDetailed: (interpreted) =>
         appCommandUiFacadeController?.executeControlCommandDetailed?.(interpreted) || { ok: true, feedback: "" },
+      runWorkflowDetailed: (interpreted) => runWorkflowDetailed?.(interpreted),
       recordSlashHistory: (rawCommand) => commandComposerAutocompleteController?.recordSlashHistory?.(rawCommand),
       getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage?.(err, fallback) || fallback,
       resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState?.(),
@@ -334,6 +347,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       deckDeleteBtn,
       startupWarmupSkipBtn,
       sendBtn,
+      workflowStopBtn,
+      workflowInterruptBtn,
+      workflowKillBtn,
       commandGuardSendOnceBtn: options.commandGuardSendOnceBtn,
       commandGuardCancelBtn: options.commandGuardCancelBtn,
       api,
@@ -350,6 +366,10 @@ export function createAppBootstrapCompositionController(options = {}) {
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
       confirmPendingCommandSend: () => commandComposerRuntimeController?.confirmPendingSend?.(),
       cancelPendingCommandSend: () => commandComposerRuntimeController?.cancelPendingSend?.(),
+      stopWorkflow: () => stopWorkflow(),
+      interruptWorkflowSession: () => interruptWorkflowSession(),
+      killWorkflowSession: () => killWorkflowSession(),
+      setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
       waitForStartupWarmup: () => startupWarmupController?.waitForServerWarmup?.(),
       skipStartupWarmupWait: () => startupWarmupController?.skipWait?.(),
       bootstrapDevAuthToken: (runtimeOptions) => appRuntimeStateController?.bootstrapDevAuthToken?.(runtimeOptions),
@@ -368,6 +388,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       disposeTerminalSearch: () => terminalSearchController?.dispose?.(),
       disposeCommandComposerRuntime: () => commandComposerRuntimeController?.dispose?.(),
       disposeCommandComposerAutocomplete: () => commandComposerAutocompleteController?.dispose?.(),
+      disposeWorkflowRuntime,
       disconnectTerminalObservers: () => {
         for (const observer of terminalObservers.values()) {
           observer.disconnect?.();

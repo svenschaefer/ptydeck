@@ -12,9 +12,11 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H35` (PTY Control Endpoints, `SWF-005`).
+- Active release wave: `v0.4.0-H38`.
+- Active scoped tasks: `REM-001`, `REM-002`, `REM-003`, `REM-009`.
+- Latest completed wave: `v0.4.0-H37` (Workflow Safety Guardrails, `SWF-007`, `SWF-008`).
+- Previous completed wave: `v0.4.0-H36` (Workflow Control-Plane Runtime, `SWF-006`).
+- Previous completed wave: `v0.4.0-H35` (PTY Control Endpoints, `SWF-005`).
 - Previous completed wave: `v0.4.0-H34` (Slash Workflow Foundation, `SWF-001`, `SWF-002`, `SWF-003`).
 - Previous completed wave: `v0.4.0-H33` (Command Namespaces and Scriptability, `CMD-010`, `CMD-011`, `CMD-012`).
 - Previous completed wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
@@ -50,7 +52,59 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
+## Active Wave
+
+### v0.4.0-H38 - Remote SSH Session Foundation (Active)
+
+- Active scoped tasks: `REM-001`, `REM-002`, `REM-003`, `REM-009`
+
+Dependencies:
+
+- `REM-001` lands first so remote-session identity, persistence, and launch semantics exist before any SSH credential or trust-path logic is layered on top.
+- `REM-002` and `REM-003` both build directly on `REM-001`, so authentication and host-key trust reuse one backend-owned SSH session contract instead of diverging into separate launch paths.
+- `REM-009` closes after `REM-001`, `REM-002`, and `REM-003`, so regression coverage exercises the real remote-session runtime, trust-store, and authentication behavior end to end.
+
+Exit criteria:
+
+- Backend supports deterministic `local` and `ssh` session kinds through one persisted session contract with normalized non-secret remote metadata and reconnect-safe restore behavior.
+- SSH-backed sessions support the initial authentication matrix and explicit host-key trust-store flow without storing secrets in plaintext persistence or bypassing changed-host-key rejection.
+- Regression coverage exists for remote launch/auth/trust flows and the associated guardrail failures.
+
 ## Latest Completed Wave
+
+### v0.4.0-H37 - Workflow Safety Guardrails (Completed)
+
+- Completed scoped tasks: `SWF-007`, `SWF-008`
+
+Dependencies:
+
+- `SWF-007` followed the completed H36 control-plane delivery and hardened that same frontend workflow runtime with deterministic limits and exact-once cleanup rather than inventing a second backend-owned workflow safety path.
+- `SWF-008` closed after `SWF-007`, so regression coverage exercises the actual guarded runtime behavior and workflow-control semantics end to end.
+
+Exit criteria:
+
+- The frontend workflow runtime enforces deterministic guardrails for workflow step count, maximum wait timeout, and bounded captured source text instead of allowing unbounded workflow payload growth.
+- Guardrail failures are explicit and deterministic, and cancelling or stopping a waiting workflow leaves no orphan subscriptions or timers behind.
+- Regression coverage exists for guardrail enforcement, timeout/cancel behavior, PTY-exit waits, and control-plane workflow safety semantics.
+
+## Previous Completed Wave
+
+### v0.4.0-H36 - Workflow Control-Plane Runtime (Completed)
+
+- Completed scoped tasks: `SWF-006`
+
+Dependencies:
+
+- `SWF-006` builds directly on the completed H34 frontend workflow foundation and the completed H35 backend PTY control endpoints, so workflow execution and workflow control reuse existing parser/engine and backend signal contracts instead of inventing a second runtime path.
+
+Exit criteria:
+
+- The existing multiline slash-command composer can start deterministic slash workflows through the completed H34 parser/engine path instead of keeping that foundation disconnected from the operator surface.
+- The control pane renders explicit workflow run state (`running`, `waiting`, terminal target, current step progress, and failure outcome) without reviving the removed stream-interpretation/notification runtime.
+- Separate control-plane actions exist for `Stop Workflow`, `Interrupt`, and `Kill Session`, with the terminal signal actions reusing the completed H35 backend endpoints instead of being encoded as ordinary workflow DSL steps.
+- Regression coverage exists for workflow start/stop behavior, explicit PTY control actions, and UI/control-plane state transitions in the frontend runtime.
+
+## Previous Completed Wave
 
 ### v0.4.0-H35 - PTY Control Endpoints (Completed)
 

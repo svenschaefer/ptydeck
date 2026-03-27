@@ -11,6 +11,14 @@ export function createWorkspaceRenderController(options = {}) {
   const commandGuardSummaryEl = options.commandGuardSummaryEl || null;
   const commandGuardReasonsEl = options.commandGuardReasonsEl || null;
   const commandGuardPreviewEl = options.commandGuardPreviewEl || null;
+  const workflowStatusEl = options.workflowStatusEl || null;
+  const workflowTargetEl = options.workflowTargetEl || null;
+  const workflowProgressEl = options.workflowProgressEl || null;
+  const workflowDetailEl = options.workflowDetailEl || null;
+  const workflowResultEl = options.workflowResultEl || null;
+  const workflowStopBtn = options.workflowStopBtn || null;
+  const workflowInterruptBtn = options.workflowInterruptBtn || null;
+  const workflowKillBtn = options.workflowKillBtn || null;
   const startupWarmupGateEl = options.startupWarmupGateEl || null;
   const startupWarmupMessageEl = options.startupWarmupMessageEl || null;
   const startupWarmupDetailEl = options.startupWarmupDetailEl || null;
@@ -101,7 +109,15 @@ export function createWorkspaceRenderController(options = {}) {
     commandGuardActive = false,
     commandGuardSummary = "",
     commandGuardReasons = "",
-    commandGuardPreview = ""
+    commandGuardPreview = "",
+    workflowStatus = "Workflow: ready.",
+    workflowTarget = "Target: no workflow session.",
+    workflowProgress = "Progress: 0/0.",
+    workflowDetail = "Detail: no workflow running.",
+    workflowResult = "",
+    workflowCanStop = false,
+    workflowCanInterrupt = false,
+    workflowCanKill = false
   }) {
     if (stateEl) {
       stateEl.textContent = connectionState;
@@ -146,6 +162,30 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (commandGuardPreviewEl) {
       commandGuardPreviewEl.textContent = commandGuardPreview || "";
+    }
+    if (workflowStatusEl) {
+      workflowStatusEl.textContent = workflowStatus || "Workflow: ready.";
+    }
+    if (workflowTargetEl) {
+      workflowTargetEl.textContent = workflowTarget || "Target: no workflow session.";
+    }
+    if (workflowProgressEl) {
+      workflowProgressEl.textContent = workflowProgress || "Progress: 0/0.";
+    }
+    if (workflowDetailEl) {
+      workflowDetailEl.textContent = workflowDetail || "Detail: no workflow running.";
+    }
+    if (workflowResultEl) {
+      workflowResultEl.textContent = workflowResult || "";
+    }
+    if (workflowStopBtn) {
+      workflowStopBtn.disabled = workflowCanStop !== true;
+    }
+    if (workflowInterruptBtn) {
+      workflowInterruptBtn.disabled = workflowCanInterrupt !== true;
+    }
+    if (workflowKillBtn) {
+      workflowKillBtn.disabled = workflowCanKill !== true;
     }
     if (startupWarmupGateEl) {
       startupWarmupGateEl.hidden = startupGateActive !== true;
