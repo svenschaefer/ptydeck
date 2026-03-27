@@ -60,6 +60,59 @@ export function createSessionGridController(options = {}) {
   const themeProfileKeys = options.themeProfileKeys || [];
   const debugLog = options.debugLog || (() => {});
 
+  function getCollectionLength(collection) {
+    return collection && typeof collection.length === "number" ? collection.length : 0;
+  }
+
+  function getCollectionItem(collection, index) {
+    if (!collection) {
+      return null;
+    }
+    if (typeof collection.item === "function") {
+      return collection.item(index);
+    }
+    return collection[index] || null;
+  }
+
+  function reorderExistingSessionCardsIfNeeded(sessions) {
+    if (!gridEl || typeof gridEl.appendChild !== "function" || !Array.isArray(sessions) || sessions.length === 0) {
+      return;
+    }
+
+    const desiredNodes = sessions
+      .map((session) => terminals.get(session.id)?.element || null)
+      .filter(Boolean);
+    if (desiredNodes.length === 0) {
+      return;
+    }
+
+    const children = gridEl.children;
+    if (!children || getCollectionLength(children) === 0) {
+      for (const node of desiredNodes) {
+        gridEl.appendChild(node);
+      }
+      return;
+    }
+
+    let needsReorder = getCollectionLength(children) < desiredNodes.length;
+    if (!needsReorder) {
+      for (let index = 0; index < desiredNodes.length; index += 1) {
+        if (getCollectionItem(children, index) !== desiredNodes[index]) {
+          needsReorder = true;
+          break;
+        }
+      }
+    }
+
+    if (!needsReorder) {
+      return;
+    }
+
+    for (const node of desiredNodes) {
+      gridEl.appendChild(node);
+    }
+  }
+
   function renderWorkspace({ state, uiState, startupPerf, nowMs, maybeReportStartupPerf, resolveFilterSelectors }) {
     const activeDeck = getActiveDeck();
     const activeDeckId = activeDeck ? activeDeck.id : "";
@@ -161,9 +214,6 @@ export function createSessionGridController(options = {}) {
           activeSessionId: state.activeSessionId,
           nextVisible
         });
-        if (gridEl && entry?.element && typeof gridEl.appendChild === "function") {
-          gridEl.appendChild(entry.element);
-        }
         continue;
       }
 
@@ -283,6 +333,8 @@ export function createSessionGridController(options = {}) {
       });
       shouldRunResizePass = true;
     }
+
+    reorderExistingSessionCardsIfNeeded(deckSessions);
 
     syncActiveTerminalSearch({ preserveSelection: true });
 

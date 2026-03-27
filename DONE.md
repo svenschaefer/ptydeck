@@ -4,6 +4,12 @@ Completed and verified topics belong here.
 
 ## 2026-03-27
 
+- [x] Fixed a frontend direct-terminal-input regression introduced by the quick-ID ordering hotfix: `frontend/src/public/ui/session-grid-controller.js` no longer re-appends already ordered terminal cards on every workspace render, so xterm focus stays stable while typing directly into the terminal surface.
+- [x] Root cause was unconditional `gridEl.appendChild(entry.element)` calls for every existing terminal card during each render pass; that kept the H24 quick-ID ordering visible, but it also moved focused DOM nodes repeatedly and made direct terminal typing unreliable even though the input box path still worked.
+- [x] Existing session cards are now reordered only when the desired quick-ID order actually differs from the current DOM order, preserving visible `/swap`-driven reordering while avoiding unnecessary DOM moves during normal activity/render cycles.
+- [x] Added focused regression coverage in `frontend/test/session-grid-controller.test.js` to prove both behaviors: cards still reorder when quick-ID order changes, and cards are not re-appended when the DOM order already matches the desired order.
+- [x] Validation for the terminal-focus/render hotfix passed with targeted frontend regressions (`node --test frontend/test/session-grid-controller.test.js frontend/test/app.test.js`) plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation processes after completion.
+
 - [x] Fixed a frontend layout-profile duplication bug in `frontend/src/public/layout-profile-runtime-controller.js`: repeated profile loads no longer append duplicate `<option>` entries to the layout-profile selector when running against a real browser DOM `HTMLCollection`.
 - [x] Root cause was a DOM-clearing helper that only removed children when `element.children` was a plain array; real browser `SELECT` elements expose collection-like children instead, so stale layout-profile entries remained visible after reloads, saves, renames, and deletes even though the backend profile state itself was not duplicated.
 - [x] Added a focused regression in `frontend/test/layout-profile-runtime-controller.test.js` that simulates a DOM-like select element and proves rerendering the same backend-backed layout-profile list twice keeps the selector length stable instead of multiplying visible entries.

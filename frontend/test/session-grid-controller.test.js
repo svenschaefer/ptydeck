@@ -3,6 +3,30 @@ import assert from "node:assert/strict";
 
 import { createSessionGridController } from "../src/public/ui/session-grid-controller.js";
 
+function createDomLikeGridElement(initialNodes = []) {
+  const nodes = initialNodes.slice();
+  const children = {};
+  Object.defineProperty(children, "length", {
+    get() {
+      return nodes.length;
+    }
+  });
+  children.item = (index) => nodes[index] || null;
+  return {
+    children,
+    appendCalls: [],
+    appendChild(node) {
+      const existingIndex = nodes.indexOf(node);
+      if (existingIndex >= 0) {
+        nodes.splice(existingIndex, 1);
+      }
+      nodes.push(node);
+      this.appendCalls.push(node.id);
+      return node;
+    }
+  };
+}
+
 test("session-grid controller aborts render when filter handling switches active session", () => {
   const calls = [];
   const controller = createSessionGridController({
@@ -318,4 +342,70 @@ test("session-grid controller reorders existing cards by quick-id order", () => 
 
   assert.equal(result.aborted, false);
   assert.deepEqual(appended, ["node-s2", "node-s1"]);
+});
+
+test("session-grid controller does not reappend existing cards when DOM order already matches quick-id order", () => {
+  const calls = [];
+  const entryOne = { element: { id: "node-s1" } };
+  const entryTwo = { element: { id: "node-s2" } };
+  const terminals = new Map([
+    ["s1", entryOne],
+    ["s2", entryTwo]
+  ]);
+  const gridEl = createDomLikeGridElement([entryOne.element, entryTwo.element]);
+  const controller = createSessionGridController({
+    defaultDeckId: "default",
+    terminals,
+    terminalObservers: new Map(),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    sessionThemeDrafts: new Map(),
+    gridEl,
+    getActiveDeck: () => ({ id: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionFilterText: () => "",
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    renderDeckTabs: () => calls.push("tabs"),
+    workspaceRenderController: {
+      resolveVisibleSessions: () => ({ visibleSessionIds: new Set(["s1", "s2"]), filterActive: false, switchedActiveSession: false }),
+      renderEmptyState: () => calls.push("empty"),
+      renderStatus: () => calls.push("status")
+    },
+    pruneQuickIds: () => calls.push("prune"),
+    syncActiveTerminalSearch: () => calls.push("search"),
+    sessionDisposalController: {
+      cleanupRemovedSessions: () => false
+    },
+    sessionCardRenderController: {
+      updateExistingSessionCard: (payload) => calls.push(["update", payload.session.id, payload.nextVisible])
+    },
+    debugLog: () => calls.push("debug")
+  });
+
+  const result = controller.renderWorkspace({
+    state: {
+      sessions: [
+        { id: "s1", deckId: "d1" },
+        { id: "s2", deckId: "d1" }
+      ],
+      decks: [{ id: "d1" }],
+      activeSessionId: "s1",
+      connectionState: "connected"
+    },
+    uiState: {
+      loading: false,
+      error: "",
+      commandFeedback: "",
+      commandInlineHint: "",
+      commandInlineHintPrefixPx: 0,
+      commandPreview: "",
+      commandSuggestions: ""
+    },
+    startupPerf: { firstNonEmptyRenderAtMs: null, firstTerminalMountedAtMs: null },
+    nowMs: () => 42,
+    maybeReportStartupPerf: () => calls.push("perf")
+  });
+
+  assert.equal(result.aborted, false);
+  assert.deepEqual(gridEl.appendCalls, []);
 });
