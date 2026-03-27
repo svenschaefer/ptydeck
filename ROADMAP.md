@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H41` (Theme Import/Export Compatibility).
-- Active scoped tasks: `REM-008A`, `REM-008B`, `REM-008C`.
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
 - Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -54,24 +54,6 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
-
-## Active Wave
-
-### v0.4.0-H41 - Theme Import/Export Compatibility (Active)
-
-- Active scoped tasks: `REM-008A`, `REM-008B`, `REM-008C`
-
-Dependencies:
-
-- `REM-008A` lands first so external theme-format parsing and export mapping are defined against one deterministic adapter layer before any slash-command or settings-UI flow is built on top.
-- `REM-008B` follows `REM-008A` and reuses that adapter layer for session-settings and slash-command import/export workflows instead of inventing per-surface parsing rules.
-- `REM-008C` closes after `REM-008A` and `REM-008B`, so regression coverage locks parsing, validation, slot mapping, and roundtrip behavior against the actual supported formats.
-
-Exit criteria:
-
-- Frontend can deterministically parse and emit the supported external theme formats against the existing `activeThemeProfile` / `inactiveThemeProfile` contract.
-- Operators can import/export theme payloads through discoverable UI and slash-command workflows with explicit validation and apply feedback.
-- Regression coverage exists for invalid payload handling, slot assignment, supported-format mapping, and roundtrip fidelity.
 
 ## Latest Completed Wave
 

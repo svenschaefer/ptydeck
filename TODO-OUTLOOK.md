@@ -122,9 +122,11 @@ Promoted and completed in `v0.4.0-H40`:
 
 - `REM-004A`, `REM-004B`, `REM-004C`
 
-Promoted to active delivery in `v0.4.0-H41`:
+Deferred out of current near-term scope after `v0.4.0-H40` reprioritization:
 
-- `REM-008A`, `REM-008B`, `REM-008C`
+- [ ] `REM-008A` Owner `FE`: Add a deterministic terminal theme import/export compatibility layer that can parse and emit normalized theme payloads for the existing per-session `activeThemeProfile` / `inactiveThemeProfile` model, starting with explicit adapters for iTerm2 JSON, Windows Terminal JSON fragments, and Xresources-style key/value payloads.
+- [ ] `REM-008B` Owner `FE`: Add frontend operator workflows for theme import/export, including slash-command entry points plus session-settings UI for importing a supported external theme payload into the active or inactive theme slot and exporting the current slot in a selected external format with explicit validation feedback.
+- [ ] `REM-008C` Owner `QA`: Add regression coverage for theme import/export parsing, invalid payload rejection, deterministic slot mapping, and roundtrip fidelity across the supported external theme formats.
 
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 
