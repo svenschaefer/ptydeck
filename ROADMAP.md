@@ -12,8 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H18`.
+- Active scoped tasks: `DRV-002`, `DRV-005`.
+- Latest completed scoped task in the active wave: `DRV-001` (Shell CWD Adapter Baseline).
 - Latest completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
 - Previous completed wave: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
 - Previous completed wave: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
@@ -31,6 +32,25 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave Plan
+
+### v0.4.0-H18 - Shell Runtime Compatibility Foundation
+
+- `DRV-001`, `DRV-002`, `DRV-005`
+
+Dependencies:
+
+- `DRV-001` establishes the shell-adapter/CWD-tracking baseline first.
+- `DRV-002` follows `DRV-001` so replay/scrollback policy can build on explicit shell/runtime contracts.
+- `DRV-005` follows `DRV-001` and closes after `DRV-002` so the compatibility matrix covers both shell-adapter behavior and replay/snapshot retention semantics.
+
+Exit criteria:
+
+- Backend shell handling uses an explicit shell-adapter abstraction instead of bash-only inline wiring.
+- Supported vs unsupported shell CWD-tracking behavior is explicit and regression-tested.
+- Replay/scrollback retention policy is configurable and documented.
+- Compatibility regression coverage exists for the supported shell/runtime matrix.
 
 ## Dependency Rules
 

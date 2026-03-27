@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import pty from "node-pty";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
-import { basename } from "node:path";
 import { ApiError } from "./errors.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
+import { createShellAdapter } from "./shell-adapter.js";
 
 function now() {
   return Date.now();
@@ -41,50 +41,6 @@ const SESSION_STATE_EXITED = "exited";
 const SESSION_ACTIVITY_STATE_ACTIVE = "active";
 const SESSION_ACTIVITY_STATE_INACTIVE = "inactive";
 const DEFAULT_SESSION_ACTIVITY_QUIET_MS = 1400;
-
-function consumeCwdMarkers(session, chunk) {
-  const markerStart = "__CWD__";
-  const markerEnd = "__";
-  const combined = `${session.cwdMarkerBuffer || ""}${chunk}`;
-  let dataForScan = combined;
-  session.cwdMarkerBuffer = "";
-
-  const lastStart = dataForScan.lastIndexOf(markerStart);
-  if (lastStart >= 0) {
-    const endFromLast = dataForScan.indexOf(markerEnd, lastStart + markerStart.length);
-    if (endFromLast < 0) {
-      session.cwdMarkerBuffer = dataForScan.slice(lastStart);
-      dataForScan = dataForScan.slice(0, lastStart);
-    }
-  }
-
-  const markerRegex = /__CWD__(.*?)__/g;
-  let match = markerRegex.exec(dataForScan);
-  let lastCwdCandidate = "";
-  while (match) {
-    lastCwdCandidate = String(match[1] || "").trim();
-    match = markerRegex.exec(dataForScan);
-  }
-  if (lastCwdCandidate) {
-    session.meta.cwd = lastCwdCandidate;
-  }
-
-  return dataForScan.replace(/__CWD__(.*?)__\r?\n?/g, "");
-}
-
-function withCwdMarkerPromptCommand(shell, env) {
-  const shellName = basename(shell || "").toLowerCase();
-  if (!shellName.includes("bash")) {
-    return env;
-  }
-
-  const markerCommand = 'printf "__CWD__%s__\\n" "$PWD"';
-  const existing = typeof env.PROMPT_COMMAND === "string" ? env.PROMPT_COMMAND.trim() : "";
-  return {
-    ...env,
-    PROMPT_COMMAND: existing ? `${markerCommand};${existing}` : markerCommand
-  };
-}
 
 function normalizeSessionEnv(env) {
   if (!env || typeof env !== "object" || Array.isArray(env)) {
@@ -316,8 +272,9 @@ export class SessionManager {
     const normalizedTags = normalizeSessionTags(tags);
     const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
+    const shellAdapter = createShellAdapter(shell);
 
-    const ptyEnv = withCwdMarkerPromptCommand(shell, {
+    const ptyEnv = shellAdapter.prepareSpawnEnv({
       ...process.env,
       ...normalizedEnv
     });
@@ -326,7 +283,8 @@ export class SessionManager {
     const session = {
       id,
       ptyProcess,
-      cwdMarkerBuffer: "",
+      shellAdapter,
+      cwdTrackingBuffer: "",
       outputBuffer: "",
       activityTimer: null,
       lastActivityAt: initialActivityTimestamp,
@@ -353,7 +311,7 @@ export class SessionManager {
     };
 
     ptyProcess.onData((data) => {
-      const cleaned = consumeCwdMarkers(session, data);
+      const cleaned = session.shellAdapter.consumeOutput(session, data);
       if (cleaned) {
         const timestamp = this.nowFn();
         session.lastActivityAt = timestamp;

@@ -14,7 +14,8 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- `DRV-002` Owner `BE`: Add configurable terminal replay/scrollback retention policy (memory and optional persisted snapshot depth limits) with explicit product-level constraints for partial vs extended history recovery.
+- `DRV-005` Owner `QA`: Add compatibility regression matrix for shell/runtime combinations (bash/zsh/fish where supported) covering CWD tracking, prompt detection, and replay/snapshot behavior under differing shell semantics.
 
 ## Active Ownership Role
 

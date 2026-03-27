@@ -273,17 +273,31 @@ pty.spawn(shell, [], {
 
 PTY does not expose the current working directory directly.
 
-Recommended approach:
+Current capability matrix:
 
 ```bash
-PROMPT_COMMAND='echo "__CWD__$(pwd)__"'
+bash -> PROMPT_COMMAND marker injection
+zsh  -> no live cwd tracking yet; retain last known cwd
+fish -> no live cwd tracking yet; retain last known cwd
+sh/dash/ash/busybox -> no live cwd tracking yet; retain last known cwd
 ```
 
-Backend extracts:
+Current bash marker implementation:
+
+```bash
+PROMPT_COMMAND='printf "__CWD__%s__\n" "$PWD"'
+```
+
+Backend extracts live cwd updates from bash marker output:
 
 ```text
 __CWD__/home/user/project__
 ```
+
+Deterministic fallback for unsupported shells:
+
+- Session startup and restart still use the persisted or configured `cwd`.
+- If the shell family does not support the current adapter hook, backend keeps that last known cwd unchanged until an explicit future shell adapter adds live tracking support.
 
 ## Mouse Behavior
 

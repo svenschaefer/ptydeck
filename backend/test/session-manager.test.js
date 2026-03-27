@@ -398,6 +398,25 @@ test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
   }
 });
 
+test("SessionManager leaves unsupported shells on deterministic cwd fallback without prompt injection", () => {
+  const fakePty = createFakePty();
+  let capturedEnv = null;
+  const manager = new SessionManager({
+    createPty: ({ env }) => {
+      capturedEnv = env;
+      return fakePty;
+    }
+  });
+
+  const created = manager.create({ shell: "zsh", cwd: "/tmp/project" });
+  assert.ok(capturedEnv);
+  assert.equal(capturedEnv.PROMPT_COMMAND, process.env.PROMPT_COMMAND);
+
+  fakePty.write("pwd\r\n/tmp/runtime\r\n");
+
+  assert.equal(manager.get(created.id).meta.cwd, "/tmp/project");
+});
+
 test("SessionManager restart preserves identity and restarts PTY", () => {
   const firstPty = createFakePty();
   const secondPty = createFakePty();

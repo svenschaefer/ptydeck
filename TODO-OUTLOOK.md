@@ -67,11 +67,9 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
 - [ ] Add broadcast input modes for explicit session groups.
 
-Deferred from `docs/Codebase Review*.md` and `docs/Technical Alternatives Evaluation for Current Stack.md`:
+Promoted to active delivery (`v0.4.0-H18` in `TODO.md` / `ROADMAP.md`):
 
-- [ ] `DRV-001` Owner `BE`: Add shell-adapter abstraction for CWD tracking beyond bash (`PROMPT_COMMAND` baseline), with explicit per-shell capability matrix and deterministic fallback behavior when shell-specific tracking is unavailable.
-- [ ] `DRV-002` Owner `BE`: Add configurable terminal replay/scrollback retention policy (memory and optional persisted snapshot depth limits) with explicit product-level constraints for partial vs extended history recovery.
-- [ ] `DRV-005` Owner `QA`: Add compatibility regression matrix for shell/runtime combinations (bash/zsh/fish where supported) covering CWD tracking, prompt detection, and replay/snapshot behavior under differing shell semantics.
+- `DRV-001`, `DRV-002`, `DRV-005`
 
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 
