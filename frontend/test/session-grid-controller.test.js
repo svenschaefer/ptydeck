@@ -409,3 +409,75 @@ test("session-grid controller does not reappend existing cards when DOM order al
   assert.equal(result.aborted, false);
   assert.deepEqual(gridEl.appendCalls, []);
 });
+
+test("session-grid controller does not reappend active-deck cards when global DOM order already matches all sessions", () => {
+  const calls = [];
+  const entryZero = { element: { id: "node-s0" } };
+  const entryOne = { element: { id: "node-s1" } };
+  const entryTwo = { element: { id: "node-s2" } };
+  const entryThree = { element: { id: "node-s3" } };
+  const terminals = new Map([
+    ["s0", entryZero],
+    ["s1", entryOne],
+    ["s2", entryTwo],
+    ["s3", entryThree]
+  ]);
+  const gridEl = createDomLikeGridElement([entryZero.element, entryOne.element, entryTwo.element, entryThree.element]);
+  const controller = createSessionGridController({
+    defaultDeckId: "default",
+    terminals,
+    terminalObservers: new Map(),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    sessionThemeDrafts: new Map(),
+    gridEl,
+    getActiveDeck: () => ({ id: "d2" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionFilterText: () => "",
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    renderDeckTabs: () => calls.push("tabs"),
+    workspaceRenderController: {
+      resolveVisibleSessions: () => ({ visibleSessionIds: new Set(["s2", "s3"]), filterActive: false, switchedActiveSession: false }),
+      renderEmptyState: () => calls.push("empty"),
+      renderStatus: () => calls.push("status")
+    },
+    pruneQuickIds: () => calls.push("prune"),
+    syncActiveTerminalSearch: () => calls.push("search"),
+    sessionDisposalController: {
+      cleanupRemovedSessions: () => false
+    },
+    sessionCardRenderController: {
+      updateExistingSessionCard: (payload) => calls.push(["update", payload.session.id, payload.nextVisible])
+    },
+    debugLog: () => calls.push("debug")
+  });
+
+  const result = controller.renderWorkspace({
+    state: {
+      sessions: [
+        { id: "s0", deckId: "d1" },
+        { id: "s1", deckId: "d1" },
+        { id: "s2", deckId: "d2" },
+        { id: "s3", deckId: "d2" }
+      ],
+      decks: [{ id: "d1" }, { id: "d2" }],
+      activeSessionId: "s2",
+      connectionState: "connected"
+    },
+    uiState: {
+      loading: false,
+      error: "",
+      commandFeedback: "",
+      commandInlineHint: "",
+      commandInlineHintPrefixPx: 0,
+      commandPreview: "",
+      commandSuggestions: ""
+    },
+    startupPerf: { firstNonEmptyRenderAtMs: null, firstTerminalMountedAtMs: null },
+    nowMs: () => 42,
+    maybeReportStartupPerf: () => calls.push("perf")
+  });
+
+  assert.equal(result.aborted, false);
+  assert.deepEqual(gridEl.appendCalls, []);
+});

@@ -334,7 +334,7 @@ export function createSessionGridController(options = {}) {
       shouldRunResizePass = true;
     }
 
-    reorderExistingSessionCardsIfNeeded(deckSessions);
+    reorderExistingSessionCardsIfNeeded(orderedSessions);
 
     syncActiveTerminalSearch({ preserveSelection: true });
 
