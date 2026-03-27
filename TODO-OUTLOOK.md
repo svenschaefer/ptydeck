@@ -57,7 +57,6 @@ Deferred from `TODO.md` scope (explicit backlog items):
 
 - [ ] Add optional controlled mouse forwarding.
 - [ ] Add plugin interface for project-specific automations.
-- [ ] Add session replay/export capabilities.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
@@ -70,6 +69,10 @@ Deferred from `TODO.md` scope (explicit backlog items):
 Promoted and completed in `v0.4.0-H18`:
 
 - `DRV-001`, `DRV-002`, `DRV-005`
+
+Promoted to active delivery (`v0.4.0-H19` in `TODO.md` / `ROADMAP.md`):
+
+- `REP-001`, `REP-002`, `REP-003`
 
 Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
 

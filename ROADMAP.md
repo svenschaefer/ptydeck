@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H19`.
+- Active scoped tasks: `REP-001`, `REP-002`, `REP-003`.
 - Latest completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
 - Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
 - Previous completed wave before that: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
@@ -32,6 +32,24 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave Plan
+
+### v0.4.0-H19 - Session Replay Export Baseline
+
+- `REP-001`, `REP-002`, `REP-003`
+
+Dependencies:
+
+- `REP-001` establishes the backend export contract first so frontend delivery and QA coverage can rely on one deterministic replay-export source.
+- `REP-002` follows `REP-001` so the frontend workflow reuses the finalized export format, truncation metadata, and empty-session semantics.
+- `REP-003` follows `REP-001` and closes after `REP-002` so regression coverage spans both the backend export contract and the frontend operator workflow.
+
+Exit criteria:
+
+- Backend exposes a deterministic replay export contract for the retained replay tail rather than implying full process-state export.
+- Frontend provides an explicit replay-export workflow that surfaces truncation state clearly.
+- Regression coverage exists for replay export across reconnect, restart-restored replay, truncation, and empty-session paths.
 
 ## Latest Completed Wave
 
