@@ -1,0 +1,17 @@
+export function __FACTORY_NAME__(options = {}) {
+  const normalizeValue =
+    typeof options.normalizeValue === "function"
+      ? options.normalizeValue
+      : (value) => String(value || "").trim();
+
+  function render(target, value) {
+    if (!target) {
+      return;
+    }
+    target.textContent = normalizeValue(value);
+  }
+
+  return {
+    render
+  };
+}

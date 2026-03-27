@@ -4,6 +4,14 @@ Completed and verified topics belong here.
 
 ## 2026-03-27
 
+- [x] `DPR-001` is now completed: the repository now has an explicit ADR process in `docs/adr/README.md` with deterministic numbering, required section rules, a reusable template in `docs/adr/0000-template.md`, a creation helper in `scripts/new-adr.sh`, a structure checker in `scripts/check-adr-process.sh`, and an initial accepted ADR in `docs/adr/0001-local-validation-is-the-authoritative-quality-gate.md`.
+- [x] `DPR-002` is now completed: repository-local starter templates now exist in `templates/backend-endpoint/` and `templates/frontend-ui-module/`, and `scripts/scaffold-ui-module.mjs` can generate a frontend controller/test pair aligned with the current `create...Controller()` module pattern.
+- [x] Root validation now includes repository tooling coverage: `package.json` adds `./scripts/check-adr-process.sh` to `npm run lint` and `node --test test/*.test.js` to `npm run test`, while `test/adr-process.test.js` and `test/scaffolding.test.js` cover the ADR generator/checker and the frontend UI-module scaffold helper.
+- [x] `README.md` and `LOCAL_QUALITY_GATE.md` now document the new ADR/template workflow so the contributor path is explicit instead of implied.
+- [x] Validation for the `v0.4.0-H21` closeout passed with targeted tooling regressions (`node --test test/*.test.js`), `npm run lint`, `npm run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `v0.4.0-H21` closeout step: backend `91.68%` lines and frontend `95.31%` lines on the final validated tree.
+- [x] `v0.4.0-H21` is now fully completed: `DPR-001` and `DPR-002` are closed, and there is currently no active open delivery wave in `ROADMAP.md`.
+
 - [x] `REP-004` is now completed: the frontend exposes an explicit replay reading mode for retained replay tails through both `/replay view [selector|active]` and a discoverable per-session `View` toolbar action, without introducing a second replay source beyond the existing backend replay-export contract.
 - [x] Added `frontend/src/public/replay-viewer-runtime-controller.js`, which now owns the replay-viewer dialog lifecycle, retained-tail loading, local truncation/empty-tail messaging, and in-view `Refresh` / `Download` / `Copy` actions.
 - [x] `frontend/src/public/replay-export-runtime-controller.js`, `frontend/src/public/command-schema.js`, `frontend/src/public/command-executor.js`, `frontend/src/public/app-bootstrap-composition-controller.js`, and `frontend/src/public/app-runtime-composition-controller.js` now expose `/replay view` and share one retained-tail fetch/export path across slash commands, toolbar actions, and the reading viewer.

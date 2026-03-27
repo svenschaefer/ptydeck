@@ -1,0 +1,13 @@
+test("__ROUTE_KIND__ returns deterministic response shape", async () => {
+  const runtime = createRuntime({ config: createTestConfig() });
+  await runtime.start();
+
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/v1/__RESOURCE_PATH__`);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.ok, true);
+  } finally {
+    await runtime.stop();
+  }
+});

@@ -34,8 +34,9 @@ Deferred from `TODO.md` scope (explicit backlog items):
 
 ## Developer Productivity
 
-- [ ] Add ADR process for architecture decisions.
-- [ ] Add templates for new endpoints and UI modules.
+Promoted and completed in `v0.4.0-H21`:
+
+- `DPR-001`, `DPR-002`
 
 ## Technical Alternatives and Stack Evolution
 

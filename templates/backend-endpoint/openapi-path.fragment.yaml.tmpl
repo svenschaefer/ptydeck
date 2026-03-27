@@ -1,0 +1,18 @@
+/api/v1/__RESOURCE_PATH__:
+  __HTTP_METHOD_LOWER__:
+    operationId: __OPERATION_ID__
+    summary: __SUMMARY__
+    parameters:
+      - in: path
+        name: __PATH_PARAM_NAME__
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: __SUCCESS_DESCRIPTION__
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true

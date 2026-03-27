@@ -1,0 +1,15 @@
+requestSchemas.__REQUEST_KEY__ = {
+  type: "object",
+  additionalProperties: false,
+  properties: {}
+};
+
+responseSchemas.__RESPONSE_KEY__ = {
+  type: "object",
+  required: ["ok", "__PATH_PARAM_NAME__"],
+  additionalProperties: false,
+  properties: {
+    ok: { type: "boolean" },
+    __PATH_PARAM_NAME__: { type: "string" }
+  }
+};

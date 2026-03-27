@@ -1,0 +1,9 @@
+const __ROUTE_MATCH_NAME__ = pathname.match(/^\/api\/v1\/__RESOURCE_PATH_REGEX__$/);
+if (__ROUTE_MATCH_NAME__ && method === "__HTTP_METHOD_UPPER__") {
+  return {
+    kind: "__ROUTE_KIND__",
+    params: {
+      __PATH_PARAM_NAME__: decodePathParam(__ROUTE_MATCH_NAME__[1], "__PATH_PARAM_NAME__")
+    }
+  };
+}

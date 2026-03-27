@@ -32,6 +32,18 @@ npm run test
 npm run test:coverage
 ```
 
+## Delivery Helpers
+
+- Create the next ADR from the repository template:
+  - `./scripts/new-adr.sh "Short decision title"`
+- Validate ADR structure locally:
+  - `./scripts/check-adr-process.sh`
+- Scaffold a new frontend UI controller/test pair:
+  - `node ./scripts/scaffold-ui-module.mjs example-widget-controller`
+- Reusable repository templates live in:
+  - `docs/adr/`
+  - `templates/`
+
 ## Deployment
 
 See `DEPLOYMENT.md` for production build, runtime configuration, smoke checks, and rollback steps.

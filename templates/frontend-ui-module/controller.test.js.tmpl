@@ -1,0 +1,14 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { __FACTORY_NAME__ } from "../src/public/ui/__MODULE_FILE__";
+
+test("__MODULE_BASENAME__ renders normalized text", () => {
+  const controller = __FACTORY_NAME__({
+    normalizeValue: (value) => `value:${String(value || "").trim()}`
+  });
+  const target = { textContent: "" };
+
+  controller.render(target, " demo ");
+  assert.equal(target.textContent, "value:demo");
+});

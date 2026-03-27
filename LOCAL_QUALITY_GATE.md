@@ -16,6 +16,11 @@ npm run security:sca
 npm run security:sbom
 ```
 
+Notes:
+
+- `npm run lint` now includes the ADR-process structure check (`./scripts/check-adr-process.sh`) in addition to the existing script-log and workspace lint gates.
+- `npm run test` now includes root-level tooling regression checks for the ADR generator/checker and frontend UI scaffold generator before the backend/frontend workspace suites.
+
 ## Optional Extended Local Validation
 
 Use these checks when changing backup/retention/runtime-profile areas:

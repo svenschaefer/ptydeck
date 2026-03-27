@@ -1,7 +1,11 @@
 # Docs Review Index
 
-This directory currently contains architecture-review and strategy notes.
-These documents are useful inputs, but they are not the authoritative source of implementation status.
+This directory now contains two document classes:
+
+- imported architecture-review and strategy notes
+- repository-native ADR process material under `docs/adr/`
+
+The imported review notes are useful inputs, but they are not the authoritative source of implementation status.
 
 Authoritative repository documents remain:
 
@@ -10,6 +14,7 @@ Authoritative repository documents remain:
 - `DONE.md` for completed work
 - `TODO-OUTLOOK.md` for deferred mid/long-term items
 - `CODEX_CONTEXT.md` for persistent project context
+- `docs/adr/` for durable architecture/development decisions that require ADR treatment
 
 ## Inventory and Current Relevance
 

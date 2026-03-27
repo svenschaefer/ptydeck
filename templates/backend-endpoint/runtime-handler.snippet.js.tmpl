@@ -1,0 +1,10 @@
+if (match.kind === "__ROUTE_KIND__") {
+  const __PATH_PARAM_NAME__ = match.params.__PATH_PARAM_NAME__;
+  const responseBody = {
+    ok: true,
+    __PATH_PARAM_NAME__
+  };
+  validateResponse("__RESPONSE_KEY__", responseBody);
+  sendJson(res, 200, responseBody);
+  return;
+}

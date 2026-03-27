@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
+- Latest completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
+- Previous completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
 - Previous completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
 - Previous completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
 - Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
@@ -36,6 +37,21 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H21 - Developer Productivity Templates and ADR Process (Completed)
+
+- `DPR-001`, `DPR-002`
+
+Dependencies:
+
+- `DPR-001` established the ADR process, template, numbering rules, and repo-level structure checker first so subsequent durable decisions can be recorded consistently.
+- `DPR-002` then added reusable repository templates and a frontend UI-module scaffold helper aligned with the current backend/runtime and frontend-controller patterns, while root tooling regression coverage verifies the new helpers mechanically.
+
+Exit criteria:
+
+- Durable repository decisions can be recorded through an explicit ADR workflow with template, creation helper, and structure check.
+- Repository-local templates exist for backend endpoint work and frontend UI modules.
+- Root validation includes regression coverage for the new ADR/scaffold tooling so the workflow does not silently drift.
 
 ### v0.4.0-H20 - Replay Reading Mode (Completed)
 
