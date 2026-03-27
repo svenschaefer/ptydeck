@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H26`.
+- Active scoped tasks: `UX-005`, `UX-006`, `UX-007`.
 - Latest completed wave: `v0.4.0-H25` (Session Theme Dual-Scheme and Composer/Help Simplification, `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`).
 - Previous completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
 - Previous completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
@@ -39,6 +39,25 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave
+
+### v0.4.0-H26 - Session Grouping and Workspace Presets (Active)
+
+- `UX-005`, `UX-006`, `UX-007`
+
+Dependencies:
+
+- `UX-005` establishes the persisted workspace-preset contract first so session-group and preset state have one authoritative backend source instead of being split across ad hoc frontend storage and layout-profile side channels.
+- `UX-006` follows `UX-005` and reuses that contract for session-group switching plus preset create/apply/rename/delete flows, while consuming the already completed layout-profile workflow instead of duplicating layout persistence.
+- `UX-007` closes after `UX-005` and `UX-006` so regression coverage spans normalization, restart persistence, session-delete cleanup, invalid payload handling, and frontend apply behavior end to end.
+
+Exit criteria:
+
+- Backend exposes persisted workspace presets with deterministic `activeDeckId`, optional linked `layoutProfileId`, and explicit per-deck ordered session-group definitions.
+- Frontend can create, rename, delete, list, and apply workspace presets, and can switch between persisted session groups inside the active deck without inventing a second local-only grouping model.
+- Applying a workspace preset restores its linked deck/layout context and session-group state consistently from the persisted contract.
+- Regression coverage exists for backend contract behavior, frontend preset/group flows, restart persistence, and deleted-session cleanup.
 
 ## Latest Completed Wave
 

@@ -14,7 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- `UX-005` Owner `BE`: add a persisted workspace-preset contract that stores a named preset with deterministic `activeDeckId`, optional linked `layoutProfileId`, and explicit per-deck session-group definitions as ordered `sessionId` lists plus one optional active-group marker, with normalization, validation, and restart persistence.
+- `UX-006` Owner `FE`: add session-group and workspace-preset workflows in the frontend so operators can create, rename, delete, and apply persisted workspace presets, switch deck-local active groups, and reuse the linked layout-profile/deck state from the backend contract.
+- `UX-007` Owner `QA`: add regression coverage for workspace-preset persistence, session-group normalization, invalid payload handling, deleted-session cleanup, apply behavior, and restart consistency.
 
 ## Active Ownership Role
 
