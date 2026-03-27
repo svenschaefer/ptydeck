@@ -12,8 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
-- Active scoped tasks: `CMD-004`, `CMD-005`, `CMD-006`.
+- Active release wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
+- Active scoped tasks: `CMD-007`, `CMD-008`, `CMD-009`.
+- Latest completed wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
 - Latest completed wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
 - Latest completed wave: `v0.4.0-H29` (Control-Plane and Execution-Plane Separation, `UX-014`, `UX-015`, `UX-016`).
 - Previous completed wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
@@ -47,15 +48,33 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H31 - Fuzzy and Personalized Command Suggestions (Active)
+### v0.4.0-H32 - Scoped Custom-Command Sets (Active)
 
-- Active scoped tasks: `CMD-004`, `CMD-005`, `CMD-006`
+- Active scoped tasks: `CMD-007`, `CMD-008`, `CMD-009`
 
 Dependencies:
 
-- `CMD-004` establishes deterministic fuzzy ranking first so the suggestion surfaces gain broader recall without sacrificing exact-prefix predictability or stable ordering guarantees.
-- `CMD-005` follows `CMD-004` and layers browser-local recency personalization on top of the deterministic fuzzy baseline instead of inventing a separate ranking path for the command palette and composer autocomplete.
-- `CMD-006` closes after `CMD-004` and `CMD-005`, so regression coverage spans exact-prefix priority, fuzzy fallback ordering, recency weighting, and stable no-history behavior end to end.
+- `CMD-007` establishes the persisted scoped-command contract first so command scope and precedence are stored in the backend custom-command model instead of becoming a second frontend-only overlay.
+- `CMD-008` follows `CMD-007` and reuses that contract for slash-command, preview, autocomplete, and command-palette behavior, while keeping backward-compatible unscoped commands deterministic under the new precedence rules.
+- `CMD-009` closes after `CMD-007` and `CMD-008`, so regression coverage spans migration, scope visibility, precedence ordering, session binding, and execution behavior end to end.
+
+Exit criteria:
+
+- Backend-exposed custom commands can persist explicit `global`, `project`, and `session` scopes with deterministic normalization, optional session binding, and backward-compatible handling of legacy commands.
+- Frontend command surfaces can create, show, list, preview, autocomplete, and execute scoped custom commands while exposing scope clearly and resolving precedence deterministically.
+- Regression coverage exists for migration/backward compatibility, scope visibility, precedence resolution, and execution-time behavior across REST and frontend command flows.
+
+## Latest Completed Wave
+
+### v0.4.0-H31 - Fuzzy and Personalized Command Suggestions (Completed)
+
+- `CMD-004`, `CMD-005`, `CMD-006`
+
+Dependencies:
+
+- `CMD-004` established deterministic fuzzy ranking first so the suggestion surfaces gain broader recall without sacrificing exact-prefix predictability or stable ordering guarantees.
+- `CMD-005` followed `CMD-004` and layered browser-local recency personalization on top of the deterministic fuzzy baseline instead of inventing a separate ranking path for the command palette and composer autocomplete.
+- `CMD-006` closed after `CMD-004` and `CMD-005`, so regression coverage now spans exact-prefix priority, fuzzy fallback ordering, recency weighting, and stable no-history behavior end to end.
 
 Exit criteria:
 
@@ -63,7 +82,7 @@ Exit criteria:
 - Browser-local recency can personalize ranking when multiple fuzzy matches are otherwise comparable, while deterministic fallback order still applies when history is absent or tied.
 - Regression coverage exists for exact-prefix priority, fuzzy recall, personalized ranking, and no-history fallback behavior.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H30 - Parameterized Custom Command Templates (Completed)
 

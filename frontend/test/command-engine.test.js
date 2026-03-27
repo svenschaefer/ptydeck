@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createCommandEngine, createCustomCommandRegistry } from "../src/public/command-engine.js";
 
-function createEngineFixture() {
+function createEngineFixture(options = {}) {
   const registry = createCustomCommandRegistry();
   registry.upsert({ name: "Docu", content: "sync docs" });
   const sessions = [
@@ -34,8 +34,11 @@ function createEngineFixture() {
     { id: "ptydeck-default", name: "Ptydeck Default", category: "dark" },
     { id: "solarized-light", name: "Solarized Light", category: "light" }
   ];
+  const systemSlashCommands = Array.isArray(options.systemSlashCommands)
+    ? options.systemSlashCommands
+    : ["switch", "custom", "deck", "move", "settings", "filter", "close", "restart"];
   return createCommandEngine({
-    systemSlashCommands: ["switch", "custom", "deck", "move", "settings", "filter", "close", "restart"],
+    systemSlashCommands,
     listCustomCommands: () => registry.list(),
     getSessions: () => sessions,
     getDecks: () => decks,
@@ -44,7 +47,9 @@ function createEngineFixture() {
     getActiveSessionId: () => "sess-1-abcdef",
     getSessionToken: (id) => (id === "sess-1-abcdef" ? "1" : "2"),
     getSessionDisplayName: (session) => session.name,
-    getSessionDeckId: (session) => session.deckId
+    getSessionDeckId: (session) => session.deckId,
+    getDiscoveryUsageScore: (key) =>
+      typeof options.getDiscoveryUsageScore === "function" ? options.getDiscoveryUsageScore(key) : 0
   });
 }
 
@@ -122,6 +127,28 @@ test("command engine exposes declarative autocomplete context for slash commands
   );
   assert.equal(context.matches[0].kind, "subcommand");
   assert.match(context.matches[0].description, /show custom command/i);
+});
+
+test("command engine keeps exact-prefix results ahead of fuzzy slash matches and can personalize ties", () => {
+  const engine = createEngineFixture({
+    systemSlashCommands: ["stack", "haystack"]
+  });
+
+  const fuzzyContext = engine.parseAutocompleteContext("/st");
+  assert.equal(fuzzyContext.replacePrefix, "/");
+  assert.deepEqual(
+    fuzzyContext.matches.map((candidate) => candidate.insertText),
+    ["stack", "haystack"]
+  );
+
+  const personalizedEngine = createEngineFixture({
+    systemSlashCommands: ["close", "custom"],
+    getDiscoveryUsageScore: (key) => (key === "slash:custom" ? 10 : 0)
+  });
+
+  const exactPrefixContext = personalizedEngine.parseAutocompleteContext("/c");
+  assert.equal(exactPrefixContext.matches[0].insertText, "custom");
+  assert.equal(exactPrefixContext.matches[1].insertText, "close");
 });
 
 test("command engine resolves declarative provider autocomplete for command arguments", () => {

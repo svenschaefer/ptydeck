@@ -152,6 +152,29 @@ test("buildCommandPaletteEntries keeps deterministic command-session-deck orderi
   assert.deepEqual(filtered.map((entry) => entry.title), ["[2] beta"]);
 });
 
+test("command palette filtering keeps group order, supports fuzzy matches, and personalizes equal matches", () => {
+  const entries = buildCommandPaletteEntries({
+    systemSlashCommands: ["restart", "rename", "switch"],
+    customCommands: [{ name: "deploy", content: "./deploy.sh" }, { name: "destroy", content: "./destroy.sh" }],
+    sessions: [
+      { id: "s-1", name: "alpha", deckId: "default" },
+      { id: "s-2", name: "beta", deckId: "default", tags: ["api"] }
+    ],
+    decks: [{ id: "default", name: "Default" }]
+  });
+
+  const fuzzyFiltered = filterCommandPaletteEntries(entries, "rstrt");
+  assert.equal(fuzzyFiltered[0]?.title, "/restart");
+
+  const personalized = filterCommandPaletteEntries(entries, "d", {
+    getUsageScore: (key) => (key === "palette-custom:destroy" ? 5 : 0)
+  });
+  assert.deepEqual(
+    personalized.filter((entry) => entry.group === "commands").slice(0, 2).map((entry) => entry.title),
+    ["/destroy", "/deploy"]
+  );
+});
+
 test("command palette opens from the global shortcut and fills the composer for command picks", () => {
   const win = createWindowStub();
   const dialogEl = createElement("dialog");
@@ -272,13 +295,8 @@ test("command palette can switch sessions and decks directly", () => {
   assert.equal(controller.isOpen(), false);
 
   controller.openPalette();
-  searchInputEl.value = "ops";
+  searchInputEl.value = "[ops]";
   searchInputEl.dispatchEvent({ type: "input" });
-  searchInputEl.dispatchEvent({
-    type: "keydown",
-    key: "ArrowDown",
-    preventDefault() {}
-  });
   searchInputEl.dispatchEvent({
     type: "keydown",
     key: "Enter",
@@ -290,4 +308,42 @@ test("command palette can switch sessions and decks directly", () => {
     ["deck", "ops"]
   ]);
   assert.deepEqual(feedback, ["Active session: s-2", "Active deck: ops"]);
+});
+
+test("command palette records usage for explicit selections", () => {
+  const win = createWindowStub();
+  const dialogEl = createElement("dialog");
+  const searchInputEl = createElement("input");
+  const resultsEl = createElement("div");
+  const emptyEl = createElement("p");
+  const metaEl = createElement("p");
+  const closeBtn = createElement("button");
+  const commandInput = createElement("textarea");
+  const usage = [];
+
+  const controller = createCommandPaletteRuntimeController({
+    windowRef: win,
+    documentRef: createDocumentStub(),
+    dialogEl,
+    searchInputEl,
+    resultsEl,
+    emptyEl,
+    metaEl,
+    closeBtn,
+    commandInput,
+    systemSlashCommands: ["help"],
+    getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" }),
+    recordUsage: (key) => usage.push(key)
+  });
+
+  controller.openPalette("help");
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "Enter",
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  });
+
+  assert.deepEqual(usage, ["slash:help"]);
 });

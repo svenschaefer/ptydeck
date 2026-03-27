@@ -6,6 +6,7 @@ import { createAppRuntimeStateController } from "./app-runtime-state-controller.
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
+import { createCommandDiscoveryUsageStore } from "./command-discovery-ranking.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
@@ -77,6 +78,9 @@ const api = createApiClient(config.apiBaseUrl, {
 });
 const clipboardRuntimeController = createClipboardRuntimeController({
   navigatorRef: window?.navigator || globalThis.navigator || null
+});
+const commandDiscoveryUsageStore = createCommandDiscoveryUsageStore({
+  storageRef: window?.localStorage || null
 });
 const replayExportRuntimeController = createReplayExportRuntimeController({
   api,
@@ -1004,6 +1008,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   sessionViewModel,
   runtimeEventController,
   deckRuntimeController,
+  getDiscoveryUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
+  recordDiscoveryUsage: (key) => commandDiscoveryUsageStore.record(key),
   readClipboardText: () => clipboardRuntimeController.readText(),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
@@ -1037,6 +1043,8 @@ commandPaletteRuntimeController = createCommandPaletteRuntimeController({
   commandInput,
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
   getState: () => store.getState(),
+  getUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
+  recordUsage: (key) => commandDiscoveryUsageStore.record(key),
   listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",

@@ -1,7 +1,8 @@
 import {
   createSuggestionProviderRegistry,
   normalizeCompletionCandidate,
-  normalizeCompletionCandidates
+  normalizeCompletionCandidates,
+  rankCompletionCandidates
 } from "./command-completion.js";
 import { createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
 import {
@@ -68,6 +69,8 @@ export function createCommandEngine(options = {}) {
       : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionDeckId =
     typeof options.getSessionDeckId === "function" ? options.getSessionDeckId : (session) => String(session?.deckId || "default");
+  const getDiscoveryUsageScore =
+    typeof options.getDiscoveryUsageScore === "function" ? options.getDiscoveryUsageScore : () => 0;
   const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
   const slashCommandSpecs = normalizeCompletionCandidates(slashCommandRegistry.list(), { replacePrefix: "/" });
   const suggestionProviders = createSuggestionProviderRegistry({
@@ -77,7 +80,8 @@ export function createCommandEngine(options = {}) {
     listCustomCommands,
     getSessionToken,
     getSessionDisplayName,
-    getSessionDeckId
+    getSessionDeckId,
+    getUsageScore: getDiscoveryUsageScore
   });
 
   function parseSlashInputForAutocomplete(rawInput) {
@@ -136,21 +140,11 @@ export function createCommandEngine(options = {}) {
   }
 
   function filterCompletionCandidates(candidates, prefix = "") {
-    const normalizedPrefix = normalizeCustomCommandName(prefix);
-    const normalizedCandidates = normalizeCompletionCandidates(candidates);
-    if (!normalizedPrefix) {
-      return normalizedCandidates;
-    }
-    return normalizedCandidates.filter((candidate) => {
-      const normalized = normalizeCompletionCandidate(candidate);
-      if (!normalized) {
-        return false;
-      }
-      return (
-        normalized.insertText.toLowerCase().startsWith(normalizedPrefix) ||
-        normalized.label.toLowerCase().startsWith(`/${normalizedPrefix}`) ||
-        normalized.label.toLowerCase().startsWith(normalizedPrefix)
-      );
+    const normalizedCandidates = normalizeCompletionCandidates(candidates, { replacePrefix: "/" });
+    return rankCompletionCandidates(normalizedCandidates, prefix, {
+      replacePrefix: "/",
+      limit: normalizedCandidates.length || 0,
+      getUsageScore: getDiscoveryUsageScore
     });
   }
 

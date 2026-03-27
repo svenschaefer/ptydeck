@@ -76,8 +76,9 @@ Promoted and completed in `v0.4.0-H21`:
 - [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
 - Promoted and completed in `v0.4.0-H30`:
   - `CMD-001`, `CMD-002`, `CMD-003`
-- [ ] Add scoped custom-command sets (global, project, session scopes) with deterministic precedence.
-- Promoted to active delivery (`v0.4.0-H31` in `TODO.md` / `ROADMAP.md`):
+- Promoted to active delivery (`v0.4.0-H32` in `TODO.md` / `ROADMAP.md`):
+  - `CMD-007`, `CMD-008`, `CMD-009`
+- Promoted and completed in `v0.4.0-H31`:
   - `CMD-004`, `CMD-005`, `CMD-006`
 
 Promoted and completed in `v0.4.0-H18`:

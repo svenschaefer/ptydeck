@@ -24,6 +24,8 @@ export function createCommandComposerAutocompleteController(options = {}) {
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
   const onInputChange = typeof options.onInputChange === "function" ? options.onInputChange : () => {};
+  const recordDiscoveryUsage =
+    typeof options.recordDiscoveryUsage === "function" ? options.recordDiscoveryUsage : () => {};
   const writeClipboardText =
     typeof options.writeClipboardText === "function"
       ? options.writeClipboardText
@@ -93,7 +95,25 @@ export function createCommandComposerAutocompleteController(options = {}) {
   }
 
   function acceptSuggestion() {
-    return commandSuggestionsController?.accept?.() === true;
+    const accepted = commandSuggestionsController?.accept?.() === true;
+    if (!accepted) {
+      return false;
+    }
+    const state = commandSuggestionsController?.getState?.() || null;
+    const candidate =
+      state &&
+      Array.isArray(state.matches) &&
+      Number.isInteger(state.index) &&
+      state.index >= 0 &&
+      state.index < state.matches.length
+        ? normalizeCompletionCandidate(state.matches[state.index], {
+            replacePrefix: state.replacePrefix
+          })
+        : null;
+    if (candidate?.key) {
+      recordDiscoveryUsage(candidate.key);
+    }
+    return true;
   }
 
   function isSingleLineSlashModeInput(value) {
@@ -338,7 +358,25 @@ export function createCommandComposerAutocompleteController(options = {}) {
     }
 
     commandSuggestionsController?.set?.(replacePrefix, matches, nextIndex);
-    return applySuggestionSelection(nextIndex);
+    const applied = applySuggestionSelection(nextIndex);
+    if (!applied) {
+      return false;
+    }
+    const nextState = commandSuggestionsController?.getState?.() || null;
+    const candidate =
+      nextState &&
+      Array.isArray(nextState.matches) &&
+      Number.isInteger(nextState.index) &&
+      nextState.index >= 0 &&
+      nextState.index < nextState.matches.length
+        ? normalizeCompletionCandidate(nextState.matches[nextState.index], {
+            replacePrefix: nextState.replacePrefix
+          })
+        : null;
+    if (candidate?.key) {
+      recordDiscoveryUsage(candidate.key);
+    }
+    return true;
   }
 
   async function refreshSuggestions() {

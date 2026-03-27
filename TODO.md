@@ -14,9 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `CMD-004` Owner `FE`: Add deterministic fuzzy slash-suggestion ranking across slash commands, saved custom commands, sessions, and decks while preserving exact-prefix priority and stable fallback ordering when fuzzy scores tie.
-- `CMD-005` Owner `FE`: Add browser-local recency personalization for slash suggestions and command-palette results with explicit deterministic fallback behavior when no history exists or fuzzy matches tie.
-- `CMD-006` Owner `QA`: Add regression coverage for exact-prefix priority, fuzzy-match ordering, recency-based personalization, and stable no-history fallback behavior across composer autocomplete and command-palette flows.
+- `CMD-007` Owner `BE`: Extend the persisted custom-command contract so commands can be scoped as `global`, `project`, or `session`, with deterministic normalization, optional `sessionId` binding for session-scoped commands, backward-compatible migration for existing unscoped commands, and explicit precedence metadata that the frontend can consume without inventing a local-only override model.
+- `CMD-008` Owner `FE`: Add scoped custom-command workflows in the frontend so operators can create, list, show, remove, autocomplete, preview, and execute global/project/session-scoped commands with deterministic precedence and clear scope visibility in slash help, autocomplete, and command-palette surfaces.
+- `CMD-009` Owner `QA`: Add regression coverage for scoped custom-command normalization, backward-compatible restore/migration, precedence resolution, session-scoped visibility, and deterministic no-ambiguity behavior across REST, autocomplete, command-palette, preview, and execution flows.
 
 ## Active Ownership Role
 

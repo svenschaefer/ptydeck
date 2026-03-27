@@ -1,4 +1,5 @@
 import { createSlashCommandSchema } from "./command-schema.js";
+import { rankDiscoveryItems } from "./command-discovery-ranking.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -66,6 +67,25 @@ export function normalizeCompletionCandidates(candidates, defaults = {}) {
     normalized.push(normalizedCandidate);
   }
   return normalized;
+}
+
+export function rankCompletionCandidates(candidates, query = "", options = {}) {
+  const normalized = normalizeCompletionCandidates(candidates, { replacePrefix: options.replacePrefix || "" });
+  return rankDiscoveryItems(normalized, query, {
+    limit: Number.isInteger(options.limit) && options.limit > 0 ? options.limit : normalized.length || 0,
+    getKey: (candidate) => normalizeCompletionCandidate(candidate)?.key || "",
+    getTexts: (candidate) => {
+      const normalizedCandidate = normalizeCompletionCandidate(candidate);
+      if (!normalizedCandidate) {
+        return [];
+      }
+      return [
+        normalizedCandidate.insertText,
+        normalizedCandidate.label
+      ];
+    },
+    getUsageScore: typeof options.getUsageScore === "function" ? options.getUsageScore : () => 0
+  });
 }
 
 export function areCompletionCandidateListsEqual(left, right) {
@@ -205,6 +225,7 @@ export function createSuggestionProviderRegistry(options = {}) {
       ? options.getSessionDisplayName
       : (session) => normalizeText(session?.name) || normalizeText(session?.id).slice(0, 8);
   const getSessionDeckId = typeof options.getSessionDeckId === "function" ? options.getSessionDeckId : (session) => normalizeText(session?.deckId);
+  const getUsageScore = typeof options.getUsageScore === "function" ? options.getUsageScore : () => 0;
   const cache = createStableCache();
 
   function getScopedSessions(context = {}) {
@@ -231,7 +252,6 @@ export function createSuggestionProviderRegistry(options = {}) {
     const includeNamesWithWhitespace = context.includeNamesWithWhitespace === true;
     const candidates = [];
     const seen = new Set();
-    const normalizedPrefix = normalizeLower(prefix);
     for (const session of sessions) {
       const displayName = getSessionDisplayName(session);
       const deckId = getSessionDeckId(session);
@@ -241,7 +261,7 @@ export function createSuggestionProviderRegistry(options = {}) {
       const deckLabel = deckId ? `deck ${deckId}` : "session";
       const description = `${displayName}${deckId ? ` in ${deckLabel}` : ""}`;
       const example = sessionId && sessionId !== quickToken ? sessionId : "";
-      if (quickToken && (!normalizedPrefix || normalizeLower(quickToken).startsWith(normalizedPrefix))) {
+      if (quickToken) {
         pushCandidate(candidates, seen, {
           insertText: quickToken,
           label: quickToken,
@@ -252,7 +272,7 @@ export function createSuggestionProviderRegistry(options = {}) {
           key: `session-token:${normalizeLower(quickToken)}`
         });
       }
-      if (sessionName && (includeNamesWithWhitespace || !/\s/.test(sessionName)) && (!normalizedPrefix || normalizeLower(sessionName).startsWith(normalizedPrefix))) {
+      if (sessionName && (includeNamesWithWhitespace || !/\s/.test(sessionName))) {
         pushCandidate(candidates, seen, {
           insertText: sessionName,
           label: sessionName,
@@ -263,7 +283,7 @@ export function createSuggestionProviderRegistry(options = {}) {
           key: `session-name:${normalizeLower(sessionName)}`
         });
       }
-      if (sessionId && (!normalizedPrefix || normalizeLower(sessionId).startsWith(normalizedPrefix))) {
+      if (sessionId) {
         pushCandidate(candidates, seen, {
           insertText: sessionId,
           label: sessionId,
@@ -275,7 +295,7 @@ export function createSuggestionProviderRegistry(options = {}) {
         });
       }
     }
-    return candidates.slice(0, 48);
+    return candidates;
   }
 
   function buildDeckCandidates(prefix = "", context = {}) {
@@ -283,12 +303,11 @@ export function createSuggestionProviderRegistry(options = {}) {
     const includeExplicitPrefix = context.includeExplicitPrefix === true;
     const candidates = [];
     const seen = new Set();
-    const normalizedPrefix = normalizeLower(prefix);
     for (const deck of decks) {
       const deckId = normalizeText(deck?.id);
       const deckName = normalizeText(deck?.name);
       const description = deckName ? `${deckName} deck` : "Deck selector";
-      if (deckId && (!normalizedPrefix || normalizeLower(deckId).startsWith(normalizedPrefix))) {
+      if (deckId) {
         pushCandidate(candidates, seen, {
           insertText: deckId,
           label: deckId,
@@ -299,7 +318,7 @@ export function createSuggestionProviderRegistry(options = {}) {
           key: `deck-id:${normalizeLower(deckId)}`
         });
       }
-      if (deckName && (!normalizedPrefix || normalizeLower(deckName).startsWith(normalizedPrefix))) {
+      if (deckName) {
         pushCandidate(candidates, seen, {
           insertText: deckName,
           label: deckName,
@@ -313,7 +332,7 @@ export function createSuggestionProviderRegistry(options = {}) {
       if (includeExplicitPrefix) {
         const explicitId = deckId ? `deck:${deckId}` : "";
         const explicitName = deckName ? `deck:${deckName}` : "";
-        if (explicitId && (!normalizedPrefix || normalizeLower(explicitId).startsWith(normalizedPrefix))) {
+        if (explicitId) {
           pushCandidate(candidates, seen, {
             insertText: explicitId,
             label: explicitId,
@@ -324,7 +343,7 @@ export function createSuggestionProviderRegistry(options = {}) {
             key: `deck-explicit-id:${normalizeLower(explicitId)}`
           });
         }
-        if (explicitName && (!normalizedPrefix || normalizeLower(explicitName).startsWith(normalizedPrefix))) {
+        if (explicitName) {
           pushCandidate(candidates, seen, {
             insertText: explicitName,
             label: explicitName,
@@ -337,17 +356,16 @@ export function createSuggestionProviderRegistry(options = {}) {
         }
       }
     }
-    return candidates.slice(0, 48);
+    return candidates;
   }
 
   function buildCustomCommandCandidates(prefix = "") {
     const commands = listCustomCommands();
     const candidates = [];
     const seen = new Set();
-    const normalizedPrefix = normalizeLower(prefix);
     for (const command of commands) {
       const name = normalizeText(command?.name);
-      if (!name || (normalizedPrefix && !normalizeLower(name).startsWith(normalizedPrefix))) {
+      if (!name) {
         continue;
       }
       pushCandidate(candidates, seen, {
@@ -360,18 +378,17 @@ export function createSuggestionProviderRegistry(options = {}) {
         key: `custom-command:${normalizeLower(name)}`
       });
     }
-    return candidates.slice(0, 48);
+    return candidates;
   }
 
   function buildTagCandidates(prefix = "", context = {}) {
     const sessions = getScopedSessions(context);
-    const normalizedPrefix = normalizeLower(prefix);
     const candidates = [];
     const seen = new Set();
     for (const session of sessions) {
       for (const tag of Array.isArray(session?.tags) ? session.tags : []) {
         const token = normalizeText(tag);
-        if (!token || (normalizedPrefix && !normalizeLower(token).startsWith(normalizedPrefix))) {
+        if (!token) {
           continue;
         }
         pushCandidate(candidates, seen, {
@@ -385,18 +402,17 @@ export function createSuggestionProviderRegistry(options = {}) {
         });
       }
     }
-    return candidates.slice(0, 32);
+    return candidates;
   }
 
   function buildPathCandidates(prefix = "", context = {}) {
     const sessions = getScopedSessions(context);
-    const normalizedPrefix = normalizeLower(prefix);
     const candidates = [];
     const seen = new Set();
     for (const session of sessions) {
       for (const pathToken of [session?.cwd, session?.startCwd]) {
         const token = normalizeText(pathToken);
-        if (!token || (normalizedPrefix && !normalizeLower(token).startsWith(normalizedPrefix))) {
+        if (!token) {
           continue;
         }
         pushCandidate(candidates, seen, {
@@ -410,19 +426,18 @@ export function createSuggestionProviderRegistry(options = {}) {
         });
       }
     }
-    return candidates.slice(0, 32);
+    return candidates;
   }
 
   function buildEnvKeyCandidates(prefix = "", context = {}) {
     const sessions = getScopedSessions(context);
-    const normalizedPrefix = normalizeLower(prefix);
     const candidates = [];
     const seen = new Set();
     for (const session of sessions) {
       const env = session?.env && typeof session.env === "object" && !Array.isArray(session.env) ? session.env : {};
       for (const key of Object.keys(env)) {
         const token = normalizeText(key);
-        if (!token || (normalizedPrefix && !normalizeLower(token).startsWith(normalizedPrefix))) {
+        if (!token) {
           continue;
         }
         pushCandidate(candidates, seen, {
@@ -436,19 +451,18 @@ export function createSuggestionProviderRegistry(options = {}) {
         });
       }
     }
-    return candidates.slice(0, 32);
+    return candidates;
   }
 
   function buildThemeCandidates(prefix = "") {
     const themes = getThemes();
-    const normalizedPrefix = normalizeLower(prefix);
     const candidates = [];
     const seen = new Set();
     for (const theme of themes) {
       const themeId = normalizeText(theme?.id);
       const themeName = normalizeText(theme?.name);
       const category = normalizeText(theme?.category || "theme");
-      if (themeId && (!normalizedPrefix || normalizeLower(themeId).startsWith(normalizedPrefix))) {
+      if (themeId) {
         pushCandidate(candidates, seen, {
           insertText: themeId,
           label: themeId,
@@ -459,7 +473,7 @@ export function createSuggestionProviderRegistry(options = {}) {
           key: `theme-id:${normalizeLower(themeId)}`
         });
       }
-      if (themeName && (!normalizedPrefix || normalizeLower(themeName).startsWith(normalizedPrefix))) {
+      if (themeName) {
         pushCandidate(candidates, seen, {
           insertText: themeName,
           label: themeName,
@@ -471,7 +485,29 @@ export function createSuggestionProviderRegistry(options = {}) {
         });
       }
     }
-    return candidates.slice(0, 48);
+    return candidates;
+  }
+
+  function limitForProvider(providerName) {
+    switch (providerName) {
+      case "multi-target-selector":
+      case "quick-switch-target":
+        return 64;
+      case "tag-selector":
+      case "path-selector":
+      case "env-key":
+        return 32;
+      default:
+        return 48;
+    }
+  }
+
+  function rankProviderCandidates(providerName, prefix, candidates, context = {}) {
+    return rankCompletionCandidates(candidates, prefix, {
+      replacePrefix: context.replacePrefix || "",
+      limit: limitForProvider(providerName),
+      getUsageScore
+    });
   }
 
   function provide(providerName, prefix = "", context = {}) {
@@ -494,13 +530,13 @@ export function createSuggestionProviderRegistry(options = {}) {
     return readCached(providerName, prefix, signatureParts, () => {
       try {
         if (typeof providerOverrides[providerName] === "function") {
-          return normalizeCompletionCandidates(providerOverrides[providerName](prefix, context), {
-            replacePrefix: context.replacePrefix || ""
-          });
+          return rankProviderCandidates(providerName, prefix, providerOverrides[providerName](prefix, context), context);
         }
+        let candidates = [];
         switch (providerName) {
           case "session-selector":
-            return buildSessionCandidates(prefix, context);
+            candidates = buildSessionCandidates(prefix, context);
+            break;
           case "multi-target-selector": {
             const candidates = [];
             const seen = new Set();
@@ -522,24 +558,31 @@ export function createSuggestionProviderRegistry(options = {}) {
             for (const candidate of buildDeckCandidates(prefix, { ...context, includeExplicitPrefix: true })) {
               pushCandidate(candidates, seen, candidate);
             }
-            return candidates.slice(0, 64);
+            return rankProviderCandidates(providerName, prefix, candidates, context);
           }
           case "filter-selector":
             return provide("multi-target-selector", prefix, { ...context, commandName: "filter" });
           case "deck-selector":
-            return buildDeckCandidates(prefix, context);
+            candidates = buildDeckCandidates(prefix, context);
+            break;
           case "deck-selector-explicit":
-            return buildDeckCandidates(prefix, { ...context, includeExplicitPrefix: true });
+            candidates = buildDeckCandidates(prefix, { ...context, includeExplicitPrefix: true });
+            break;
           case "custom-command-name":
-            return buildCustomCommandCandidates(prefix);
+            candidates = buildCustomCommandCandidates(prefix);
+            break;
           case "tag-selector":
-            return buildTagCandidates(prefix, context);
+            candidates = buildTagCandidates(prefix, context);
+            break;
           case "path-selector":
-            return buildPathCandidates(prefix, context);
+            candidates = buildPathCandidates(prefix, context);
+            break;
           case "env-key":
-            return buildEnvKeyCandidates(prefix, context);
+            candidates = buildEnvKeyCandidates(prefix, context);
+            break;
           case "theme-selector":
-            return buildThemeCandidates(prefix);
+            candidates = buildThemeCandidates(prefix);
+            break;
           case "quick-switch-target": {
             const candidates = [];
             const seen = new Set();
@@ -549,15 +592,18 @@ export function createSuggestionProviderRegistry(options = {}) {
             for (const candidate of buildDeckCandidates(prefix, { ...context, includeExplicitPrefix: true })) {
               pushCandidate(candidates, seen, candidate);
             }
-            return candidates.slice(0, 64);
+            return rankProviderCandidates(providerName, prefix, candidates, context);
           }
           case "quick-switch-session":
-            return buildSessionCandidates(prefix, { ...context, includeNamesWithWhitespace: true });
+            candidates = buildSessionCandidates(prefix, { ...context, includeNamesWithWhitespace: true });
+            break;
           case "quick-switch-deck":
-            return buildDeckCandidates(prefix, context);
+            candidates = buildDeckCandidates(prefix, context);
+            break;
           default:
             return [];
         }
+        return rankProviderCandidates(providerName, prefix, candidates, context);
       } catch {
         return [];
       }

@@ -1,4 +1,5 @@
 import { createSlashCommandSchema } from "./command-schema.js";
+import { rankDiscoveryItems } from "./command-discovery-ranking.js";
 import { formatCustomCommandDetail, normalizeCustomCommandRecord } from "./custom-command-model.js";
 
 function normalizeText(value) {
@@ -7,10 +8,6 @@ function normalizeText(value) {
 
 function normalizeLower(value) {
   return normalizeText(value).toLowerCase();
-}
-
-function splitQueryTokens(query) {
-  return normalizeLower(query).split(/\s+/).filter(Boolean);
 }
 
 function getPrimaryUsage(definition) {
@@ -185,16 +182,22 @@ export function buildCommandPaletteEntries(options = {}) {
   return Object.freeze([...commandEntries, ...customEntries, ...sessionEntries, ...deckEntries]);
 }
 
-export function filterCommandPaletteEntries(entries = [], query = "") {
-  const tokens = splitQueryTokens(query);
+export function filterCommandPaletteEntries(entries = [], query = "", options = {}) {
   const normalizedEntries = Array.isArray(entries) ? entries : [];
-  if (tokens.length === 0) {
-    return normalizedEntries.slice();
-  }
-  return normalizedEntries.filter((entry) => {
-    const haystack = normalizeLower(entry?.searchText || entry?.title || "");
-    return tokens.every((token) => haystack.includes(token));
-  });
+  const getUsageScore = typeof options.getUsageScore === "function" ? options.getUsageScore : () => 0;
+  const groupOrder = ["commands", "sessions", "decks"];
+  return groupOrder.flatMap((group) =>
+    rankDiscoveryItems(
+      normalizedEntries.filter((entry) => entry?.group === group),
+      query,
+      {
+        limit: normalizedEntries.length || 0,
+        getKey: (entry) => normalizeText(entry?.key),
+        getTexts: (entry) => [entry?.title, entry?.subtitle, entry?.detail, entry?.searchText],
+        getUsageScore
+      }
+    )
+  );
 }
 
 function setDialogOpen(dialogEl, open) {
@@ -306,6 +309,8 @@ export function createCommandPaletteRuntimeController(options = {}) {
   const activateDeckTarget =
     typeof options.activateDeckTarget === "function" ? options.activateDeckTarget : () => ({ ok: false, message: "" });
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
+  const getUsageScore = typeof options.getUsageScore === "function" ? options.getUsageScore : () => 0;
+  const recordUsage = typeof options.recordUsage === "function" ? options.recordUsage : () => {};
   const setComposerValue =
     typeof options.setComposerValue === "function"
       ? options.setComposerValue
@@ -396,7 +401,9 @@ export function createCommandPaletteRuntimeController(options = {}) {
   }
 
   function render() {
-    visibleEntries = filterCommandPaletteEntries(buildEntries(), searchInputEl?.value || "");
+    visibleEntries = filterCommandPaletteEntries(buildEntries(), searchInputEl?.value || "", {
+      getUsageScore
+    });
     clampSelectedIndex();
     renderResults();
     if (emptyEl) {
@@ -422,6 +429,9 @@ export function createCommandPaletteRuntimeController(options = {}) {
   function executeEntry(entry) {
     if (!entry) {
       return;
+    }
+    if (entry.key) {
+      recordUsage(entry.key);
     }
     if (entry.group === "commands") {
       setComposerValue(entry.commandText);

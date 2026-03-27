@@ -105,6 +105,10 @@ export function createAppBootstrapCompositionController(options = {}) {
   const deckRuntimeController = options.deckRuntimeController || null;
   const getCustomCommands =
     typeof options.getCustomCommands === "function" ? options.getCustomCommands : () => [];
+  const getDiscoveryUsageScore =
+    typeof options.getDiscoveryUsageScore === "function" ? options.getDiscoveryUsageScore : () => 0;
+  const recordDiscoveryUsage =
+    typeof options.recordDiscoveryUsage === "function" ? options.recordDiscoveryUsage : () => {};
   const observeSessionData =
     typeof options.observeSessionData === "function" ? options.observeSessionData : () => {};
   const exportSessionReplayDownload =
@@ -135,7 +139,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       getActiveSessionId: () => store?.getState?.().activeSessionId || "",
       getSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
       getSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
-      getSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session)
+      getSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
+      getDiscoveryUsageScore
     });
 
     commandTargetRuntimeController = createCommandTargetRuntimeController({
@@ -268,8 +273,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       parseAutocompleteContext: (rawInput, customCommands) => commandEngine?.parseAutocompleteContext?.(rawInput, customCommands) || null,
       listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
       setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
-      submitCommand: () => appCommandUiFacadeController?.submitCommand?.()
-      ,
+      submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
+      recordDiscoveryUsage,
       onInputChange: () => commandComposerRuntimeController?.clearPendingSend?.({ renderAfterClear: true })
     });
 

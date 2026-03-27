@@ -176,6 +176,33 @@ test("command-composer autocomplete controller cycles autocomplete candidates", 
   assert.ok(renderCount >= 6);
 });
 
+test("command-composer autocomplete controller records accepted discovery usage", async () => {
+  const commandInput = new FakeInput();
+  const recordedKeys = [];
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    recordDiscoveryUsage: (key) => recordedKeys.push(key),
+    parseAutocompleteContext: () => ({
+      replacePrefix: "/",
+      matches: [{ key: "command:close", insertText: "close", label: "close", kind: "command" }]
+    })
+  });
+
+  commandInput.value = "/cl";
+  await controller.refreshSuggestions();
+  const enterEvent = createKeyEvent("Enter");
+  commandInput.dispatchEvent(enterEvent);
+
+  assert.equal(enterEvent.defaultPrevented, false);
+
+  controller.bindUiEvents();
+  commandInput.dispatchEvent(enterEvent);
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.deepEqual(recordedKeys, ["command:close"]);
+});
+
 test("command-composer autocomplete controller schedules inline hint refresh on input", async () => {
   const windowRef = createFakeWindow();
   const commandInput = new FakeInput();
