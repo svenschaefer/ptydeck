@@ -801,6 +801,9 @@ test("layout profile lifecycle persists and restores across restart", async () =
           activeDeckId: "ops",
           sidebarVisible: false,
           sessionFilterText: "ops critical",
+          controlPaneVisible: false,
+          controlPanePosition: "left",
+          controlPaneSize: 320,
           deckTerminalSettings: {
             default: { cols: 80, rows: 20 },
             ops: { cols: 132, rows: 40 }
@@ -815,6 +818,7 @@ test("layout profile lifecycle persists and restores across restart", async () =
             ops: {
               root: {
                 type: "row",
+                weights: [3, 2],
                 children: [
                   { type: "pane", paneId: "left" },
                   { type: "pane", paneId: "right" }
@@ -834,6 +838,10 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.equal(created.layout.activeDeckId, "ops");
     assert.equal(created.layout.sidebarVisible, false);
     assert.equal(created.layout.sessionFilterText, "ops critical");
+    assert.equal(created.layout.controlPaneVisible, false);
+    assert.equal(created.layout.controlPanePosition, "left");
+    assert.equal(created.layout.controlPaneSize, 320);
+    assert.deepEqual(created.layout.deckSplitLayouts.ops.root.weights, [0.6, 0.4]);
 
     const patchLayoutProfileRes = await fetch(`${firstBaseUrl}/layout-profiles/${created.id}`, {
       method: "PATCH",
@@ -844,6 +852,9 @@ test("layout profile lifecycle persists and restores across restart", async () =
           activeDeckId: "default",
           sidebarVisible: true,
           sessionFilterText: "",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckTerminalSettings: {
             default: { cols: 96, rows: 26 }
           },
@@ -863,6 +874,9 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.equal(updated.name, "Ops Focus Updated");
     assert.equal(updated.layout.activeDeckId, "default");
     assert.equal(updated.layout.sidebarVisible, true);
+    assert.equal(updated.layout.controlPaneVisible, true);
+    assert.equal(updated.layout.controlPanePosition, "bottom");
+    assert.equal(updated.layout.controlPaneSize, 240);
     assert.deepEqual(updated.layout.deckSplitLayouts.default.paneSessions.main, [defaultSessionId]);
 
     const listLayoutProfilesRes = await fetch(`${firstBaseUrl}/layout-profiles`);
@@ -875,6 +889,9 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.ok(Array.isArray(persistedRaw.layoutProfiles));
     assert.equal(persistedRaw.layoutProfiles.length, 1);
     assert.equal(persistedRaw.layoutProfiles[0].name, "Ops Focus Updated");
+    assert.equal(persistedRaw.layoutProfiles[0].layout.controlPaneVisible, true);
+    assert.equal(persistedRaw.layoutProfiles[0].layout.controlPanePosition, "bottom");
+    assert.equal(persistedRaw.layoutProfiles[0].layout.controlPaneSize, 240);
   } finally {
     await firstRuntime.stop();
   }
@@ -899,6 +916,9 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.equal(restoredProfiles.length, 1);
     assert.equal(restoredProfiles[0].name, "Ops Focus Updated");
     assert.equal(restoredProfiles[0].layout.activeDeckId, "default");
+    assert.equal(restoredProfiles[0].layout.controlPaneVisible, true);
+    assert.equal(restoredProfiles[0].layout.controlPanePosition, "bottom");
+    assert.equal(restoredProfiles[0].layout.controlPaneSize, 240);
     assert.deepEqual(restoredProfiles[0].layout.deckTerminalSettings, {
       default: { cols: 96, rows: 26 }
     });
@@ -1006,6 +1026,9 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
         workspace: {
           activeDeckId: "ops",
           layoutProfileId: "focus",
+          controlPaneVisible: false,
+          controlPanePosition: "right",
+          controlPaneSize: 300,
           deckGroups: {
             default: {
               activeGroupId: "primary",
@@ -1050,6 +1073,9 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
     workspacePresetId = createdPreset.id;
     assert.equal(createdPreset.workspace.activeDeckId, "ops");
     assert.equal(createdPreset.workspace.layoutProfileId, "focus");
+    assert.equal(createdPreset.workspace.controlPaneVisible, false);
+    assert.equal(createdPreset.workspace.controlPanePosition, "right");
+    assert.equal(createdPreset.workspace.controlPaneSize, 300);
 
     const patchWorkspacePresetRes = await fetch(`${firstBaseUrl}/workspace-presets/${workspacePresetId}`, {
       method: "PATCH",
@@ -1059,6 +1085,9 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
         workspace: {
           activeDeckId: "ops",
           layoutProfileId: "focus",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckGroups: {
             default: {
               activeGroupId: "primary",
@@ -1101,11 +1130,17 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
     assert.equal(patchWorkspacePresetRes.status, 200);
     const updatedPreset = await patchWorkspacePresetRes.json();
     assert.equal(updatedPreset.name, "Ops Workspace Updated");
+    assert.equal(updatedPreset.workspace.controlPaneVisible, true);
+    assert.equal(updatedPreset.workspace.controlPanePosition, "bottom");
+    assert.equal(updatedPreset.workspace.controlPaneSize, 240);
 
     const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
     assert.ok(Array.isArray(persistedRaw.workspacePresets));
     assert.equal(persistedRaw.workspacePresets.length, 1);
     assert.equal(persistedRaw.workspacePresets[0].name, "Ops Workspace Updated");
+    assert.equal(persistedRaw.workspacePresets[0].workspace.controlPaneVisible, true);
+    assert.equal(persistedRaw.workspacePresets[0].workspace.controlPanePosition, "bottom");
+    assert.equal(persistedRaw.workspacePresets[0].workspace.controlPaneSize, 240);
   } finally {
     await firstRuntime.stop();
   }
@@ -1131,6 +1166,9 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
     assert.equal(restoredPresets[0].id, workspacePresetId);
     assert.equal(restoredPresets[0].name, "Ops Workspace Updated");
     assert.equal(restoredPresets[0].workspace.layoutProfileId, "focus");
+    assert.equal(restoredPresets[0].workspace.controlPaneVisible, true);
+    assert.equal(restoredPresets[0].workspace.controlPanePosition, "bottom");
+    assert.equal(restoredPresets[0].workspace.controlPaneSize, 240);
     assert.deepEqual(restoredPresets[0].workspace.deckSplitLayouts.default.paneSessions.main, [defaultSessionId]);
     assert.deepEqual(restoredPresets[0].workspace.deckSplitLayouts.ops.paneSessions["runner-pane"], [opsSessionId]);
 

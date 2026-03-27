@@ -82,6 +82,28 @@ function cloneWorkspaceDeckGroupMap(deckGroups) {
   );
 }
 
+function normalizeControlPanePosition(value) {
+  const normalized = normalizeLower(value);
+  return ["top", "bottom", "left", "right"].includes(normalized) ? normalized : "bottom";
+}
+
+function normalizeControlPaneSize(value) {
+  const normalized = Number.parseInt(String(value ?? ""), 10);
+  if (Number.isInteger(normalized) && normalized >= 120 && normalized <= 960) {
+    return normalized;
+  }
+  return 240;
+}
+
+function normalizeControlPaneState(source) {
+  const value = source && typeof source === "object" && !Array.isArray(source) ? source : {};
+  return {
+    controlPaneVisible: value.controlPaneVisible !== false,
+    controlPanePosition: normalizeControlPanePosition(value.controlPanePosition),
+    controlPaneSize: normalizeControlPaneSize(value.controlPaneSize)
+  };
+}
+
 function cloneSplitLayoutNode(node) {
   if (!node || typeof node !== "object" || Array.isArray(node)) {
     return null;
@@ -110,9 +132,14 @@ function cloneSplitLayoutNode(node) {
   if (children.length < 2) {
     return children[0] || null;
   }
+  const weights =
+    Array.isArray(node.weights) && node.weights.length === children.length
+      ? node.weights.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry > 0)
+      : [];
   return {
     type,
-    children
+    children,
+    weights: weights.length === children.length ? weights : Array.from({ length: children.length }, () => 1 / children.length)
   };
 }
 
@@ -187,6 +214,7 @@ function cloneWorkspaceState(workspace) {
   return {
     activeDeckId: normalizeText(source.activeDeckId) || "default",
     layoutProfileId: normalizeText(source.layoutProfileId),
+    ...normalizeControlPaneState(source),
     deckGroups: cloneWorkspaceDeckGroupMap(source.deckGroups),
     deckSplitLayouts: cloneDeckSplitLayoutMap(source.deckSplitLayouts)
   };
@@ -309,6 +337,7 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const getActiveDeckId = typeof options.getActiveDeckId === "function" ? options.getActiveDeckId : () => "default";
   const getSessionFilterText = typeof options.getSessionFilterText === "function" ? options.getSessionFilterText : () => "";
+  const getControlPaneState = typeof options.getControlPaneState === "function" ? options.getControlPaneState : null;
   const resolveFilterSelectors =
     typeof options.resolveFilterSelectors === "function" ? options.resolveFilterSelectors : null;
   const resolveSessionDeckId =
@@ -322,10 +351,13 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   const applyLayoutProfileById =
     typeof options.applyLayoutProfileById === "function" ? options.applyLayoutProfileById : async () => "";
   const setActiveDeck = typeof options.setActiveDeck === "function" ? options.setActiveDeck : () => false;
+  const setControlPaneState = typeof options.setControlPaneState === "function" ? options.setControlPaneState : null;
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
+  const getDeckSplitLayouts = typeof options.getDeckSplitLayouts === "function" ? options.getDeckSplitLayouts : null;
+  const setDeckSplitLayouts = typeof options.setDeckSplitLayouts === "function" ? options.setDeckSplitLayouts : null;
 
   let presets = [];
   let selectedPresetId = "";
@@ -422,6 +454,7 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     return {
       activeDeckId,
       layoutProfileId,
+      ...normalizeControlPaneState(normalizedWorkspace),
       deckGroups,
       deckSplitLayouts
     };
@@ -490,6 +523,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
 
   function replaceWorkspaceState(nextWorkspace) {
     workspaceState = cloneWorkspaceState(nextWorkspace);
+    if (typeof setDeckSplitLayouts === "function") {
+      setDeckSplitLayouts(workspaceState.deckSplitLayouts);
+    }
     render();
     requestRender();
     return getWorkspaceState();
@@ -712,8 +748,11 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     return {
       activeDeckId: normalizeText(getActiveDeckId()) || workspaceState.activeDeckId || "default",
       layoutProfileId: normalizeText(getSelectedLayoutProfileId()) || workspaceState.layoutProfileId || "",
+      ...normalizeControlPaneState(typeof getControlPaneState === "function" ? getControlPaneState() : workspaceState),
       deckGroups: cloneWorkspaceDeckGroupMap(workspaceState.deckGroups),
-      deckSplitLayouts: cloneDeckSplitLayoutMap(workspaceState.deckSplitLayouts)
+      deckSplitLayouts: cloneDeckSplitLayoutMap(
+        typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : workspaceState.deckSplitLayouts
+      )
     };
   }
 
@@ -743,6 +782,12 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     selectedPresetId = preset.id;
     if (workspaceState.layoutProfileId) {
       await applyLayoutProfileById(workspaceState.layoutProfileId);
+    }
+    if (typeof setDeckSplitLayouts === "function") {
+      setDeckSplitLayouts(workspaceState.deckSplitLayouts);
+    }
+    if (typeof setControlPaneState === "function") {
+      setControlPaneState(normalizeControlPaneState(workspaceState));
     }
     if (workspaceState.activeDeckId) {
       setActiveDeck(workspaceState.activeDeckId);

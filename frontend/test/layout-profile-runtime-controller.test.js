@@ -96,8 +96,36 @@ function createDomLikeSelectElement() {
 
 test("resolveLayoutProfileToken matches exact and unique prefix selectors", () => {
   const profiles = [
-    { id: "focus", name: "Focus Layout", createdAt: 1, updatedAt: 1, layout: { activeDeckId: "default", sidebarVisible: true, sessionFilterText: "", deckTerminalSettings: {} } },
-    { id: "ops", name: "Ops Layout", createdAt: 2, updatedAt: 2, layout: { activeDeckId: "ops", sidebarVisible: false, sessionFilterText: "ops", deckTerminalSettings: {} } }
+    {
+      id: "focus",
+      name: "Focus Layout",
+      createdAt: 1,
+      updatedAt: 1,
+      layout: {
+        activeDeckId: "default",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    },
+    {
+      id: "ops",
+      name: "Ops Layout",
+      createdAt: 2,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "ops",
+        sidebarVisible: false,
+        sessionFilterText: "ops",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    }
   ];
 
   assert.equal(resolveLayoutProfileToken(profiles, "focus").profile?.id, "focus");
@@ -128,6 +156,9 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
               activeDeckId: "default",
               sidebarVisible: true,
               sessionFilterText: "",
+              controlPaneVisible: true,
+              controlPanePosition: "bottom",
+              controlPaneSize: 240,
               deckTerminalSettings: {
                 default: { cols: 80, rows: 20 }
               },
@@ -168,6 +199,9 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
             activeDeckId: "default",
             sidebarVisible: true,
             sessionFilterText: "",
+            controlPaneVisible: true,
+            controlPanePosition: "bottom",
+            controlPaneSize: 240,
             deckTerminalSettings: {}
           }
         };
@@ -198,17 +232,21 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
         activeDeckId: "default",
         sidebarVisible: true,
         sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
         deckTerminalSettings: {
           default: { cols: 80, rows: 20 }
         },
         deckSplitLayouts: {
           ops: {
-            root: {
-              type: "row",
-              children: [
-                { type: "pane", paneId: "left" },
-                { type: "pane", paneId: "right" }
-              ]
+              root: {
+                type: "row",
+                weights: [0.5, 0.5],
+                children: [
+                  { type: "pane", paneId: "left" },
+                  { type: "pane", paneId: "right" }
+                ]
             },
             paneSessions: {
               left: ["s-ops-1"],
@@ -227,6 +265,9 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
     activeDeckId: "ops",
     sidebarVisible: false,
     sessionFilterText: "ops critical",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 240,
     deckTerminalSettings: {
       default: { cols: 96, rows: 24 },
       ops: { cols: 132, rows: 40 }
@@ -235,6 +276,7 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
       ops: {
         root: {
           type: "row",
+          weights: [0.5, 0.5],
           children: [
             { type: "pane", paneId: "left" },
             { type: "pane", paneId: "right" }
@@ -279,6 +321,9 @@ test("layout profile runtime controller clears DOM-like select children before r
               activeDeckId: "default",
               sidebarVisible: true,
               sessionFilterText: "",
+              controlPaneVisible: true,
+              controlPanePosition: "bottom",
+              controlPaneSize: 240,
               deckTerminalSettings: {
                 default: { cols: 80, rows: 20 }
               }
@@ -303,6 +348,7 @@ test("layout profile runtime controller applies persisted layout state through s
   const runtimeEvents = [];
   const sidebarChanges = [];
   const filterChanges = [];
+  const controlPaneChanges = [];
   const activeDeckChanges = [];
   const renderCalls = [];
   const decks = [
@@ -324,9 +370,11 @@ test("layout profile runtime controller applies persisted layout state through s
     getActiveDeckId: () => "default",
     getSessionFilterText: () => "",
     getSidebarVisible: () => true,
+    getControlPaneState: () => ({ controlPaneVisible: true, controlPanePosition: "bottom", controlPaneSize: 240 }),
     getDeckTerminalGeometry: (deckId) => (deckId === "ops" ? { cols: 120, rows: 32 } : { cols: 96, rows: 24 }),
     setSidebarVisible: (value) => sidebarChanges.push(value),
     setSessionFilterText: (value) => filterChanges.push(value),
+    setControlPaneState: (value) => controlPaneChanges.push(value),
     setActiveDeck: (deckId) => {
       activeDeckChanges.push(deckId);
       return true;
@@ -345,6 +393,9 @@ test("layout profile runtime controller applies persisted layout state through s
         activeDeckId: "ops",
         sidebarVisible: false,
         sessionFilterText: "ops critical",
+        controlPaneVisible: false,
+        controlPanePosition: "left",
+        controlPaneSize: 320,
         deckTerminalSettings: {
           default: { cols: 96, rows: 24 },
           ops: { cols: 132, rows: 40 }
@@ -370,6 +421,9 @@ test("layout profile runtime controller applies persisted layout state through s
   assert.deepEqual(runtimeEvents[0].options, { preferredActiveDeckId: "ops" });
   assert.deepEqual(sidebarChanges, [false]);
   assert.deepEqual(filterChanges, ["ops critical"]);
+  assert.deepEqual(controlPaneChanges, [
+    { controlPaneVisible: false, controlPanePosition: "left", controlPaneSize: 320 }
+  ]);
   assert.deepEqual(activeDeckChanges, ["ops"]);
   assert.deepEqual(renderCalls, ["render"]);
 });

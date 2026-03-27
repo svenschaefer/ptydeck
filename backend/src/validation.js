@@ -100,7 +100,15 @@ function isSplitLayoutNode(value) {
     return typeof value.paneId === "string";
   }
   if (value.type === "row" || value.type === "column") {
-    return Array.isArray(value.children) && value.children.length >= 2 && value.children.every((entry) => isSplitLayoutNode(entry));
+    return (
+      Array.isArray(value.children) &&
+      value.children.length >= 2 &&
+      value.children.every((entry) => isSplitLayoutNode(entry)) &&
+      (value.weights === undefined ||
+        (Array.isArray(value.weights) &&
+          value.weights.length === value.children.length &&
+          value.weights.every((entry) => typeof entry === "number" && Number.isFinite(entry) && entry > 0)))
+    );
   }
   return false;
 }
@@ -126,6 +134,11 @@ function isLayoutProfileLayout(value) {
     typeof value.activeDeckId === "string" &&
     typeof value.sidebarVisible === "boolean" &&
     typeof value.sessionFilterText === "string" &&
+    typeof value.controlPaneVisible === "boolean" &&
+    ["top", "bottom", "left", "right"].includes(value.controlPanePosition) &&
+    Number.isInteger(value.controlPaneSize) &&
+    value.controlPaneSize >= 120 &&
+    value.controlPaneSize <= 960 &&
     isObject(value.deckTerminalSettings) &&
     Object.values(value.deckTerminalSettings).every((entry) => isLayoutProfileDeckTerminalSettings(entry)) &&
     (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
@@ -167,6 +180,11 @@ function isWorkspacePresetWorkspace(value) {
     isObject(value) &&
     typeof value.activeDeckId === "string" &&
     (value.layoutProfileId === undefined || typeof value.layoutProfileId === "string") &&
+    typeof value.controlPaneVisible === "boolean" &&
+    ["top", "bottom", "left", "right"].includes(value.controlPanePosition) &&
+    Number.isInteger(value.controlPaneSize) &&
+    value.controlPaneSize >= 120 &&
+    value.controlPaneSize <= 960 &&
     isObject(value.deckGroups) &&
     Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry)) &&
     (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))

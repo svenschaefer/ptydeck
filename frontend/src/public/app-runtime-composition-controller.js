@@ -7,6 +7,7 @@ import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-f
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
+import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createStore } from "./store.js";
@@ -14,6 +15,7 @@ import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
+import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
@@ -159,6 +161,14 @@ const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
 const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
 const startupWarmupSkipBtn = document.getElementById("startup-warmup-skip");
+const workspaceShellEl = document.getElementById("workspace-shell");
+const executionPaneEl = document.getElementById("execution-pane");
+const controlPaneEl = document.getElementById("control-pane");
+const controlPaneLauncherBtn = document.getElementById("control-pane-launcher");
+const controlPaneToggleBtn = document.getElementById("control-pane-toggle");
+const controlPanePositionSelectEl = document.getElementById("control-pane-position");
+const controlPaneStatusEl = document.getElementById("control-pane-status");
+const controlPaneResizeHandleEl = document.getElementById("control-pane-resize-handle");
 const terminalSearchInputEl = document.getElementById("terminal-search-input");
 const terminalSearchPrevBtn = document.getElementById("terminal-search-prev");
 const terminalSearchNextBtn = document.getElementById("terminal-search-next");
@@ -330,9 +340,11 @@ let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
 let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
+let controlPaneRuntimeController = null;
 let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
 let broadcastInputRuntimeController = null;
+let splitLayoutRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -416,6 +428,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getCommandComposerRuntimeController: () => commandComposerRuntimeController,
   getCommandTargetRuntimeController: () => commandTargetRuntimeController,
   getSessionGridController: () => sessionGridController,
+  getControlPaneRuntimeController: () => controlPaneRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getCommandExecutor: () => commandExecutor
 });
@@ -493,6 +506,20 @@ appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
   clearUiError: () => appRuntimeStateController?.clearError()
 });
 
+controlPaneRuntimeController = createControlPaneRuntimeController({
+  windowRef: window,
+  workspaceShellEl,
+  executionPaneEl,
+  controlPaneEl,
+  controlPaneLauncherBtn,
+  controlPaneToggleBtn,
+  controlPanePositionSelectEl,
+  controlPaneStatusEl,
+  controlPaneResizeHandleEl,
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
+  scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options)
+});
+
 layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   windowRef: window,
   documentRef: document,
@@ -507,6 +534,7 @@ layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
   getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText?.() || "",
   getSidebarVisible: () => terminalSettings?.sidebarVisible !== false,
+  getControlPaneState: () => controlPaneRuntimeController?.getState?.() || {},
   getDeckTerminalGeometry: (deckId) => appLayoutDeckFacadeController?.getDeckTerminalGeometry?.(deckId) || {
     cols: DEFAULT_TERMINAL_COLS,
     rows: DEFAULT_TERMINAL_ROWS
@@ -514,12 +542,15 @@ layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   getDeckById: (deckId) => appLayoutDeckFacadeController?.getDeckById?.(deckId),
   setSessionFilterText: (value) => appLayoutDeckFacadeController?.setSessionFilterText?.(value),
   setSidebarVisible: (visible) => appLayoutDeckFacadeController?.setSidebarVisible?.(visible),
+  setControlPaneState: (nextState) => controlPaneRuntimeController?.setState?.(nextState),
   setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
   applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, options) === true,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
-  requestRender: () => appCommandUiFacadeController?.render?.()
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  getDeckSplitLayouts: () => splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
+  setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
 });
 
 workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
@@ -542,6 +573,7 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   getSessions: () => store.getState().sessions || [],
   getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
   getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText?.() || "",
+  getControlPaneState: () => controlPaneRuntimeController?.getState?.() || {},
   resolveFilterSelectors: (selectorText, sessions, resolveOptions) =>
     commandTargetRuntimeController?.resolveFilterSelectors?.(selectorText, sessions, resolveOptions) || {
       sessions: Array.isArray(sessions) ? sessions.slice() : [],
@@ -553,10 +585,13 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   listLayoutProfiles: () => layoutProfileRuntimeController?.listProfiles?.() || [],
   applyLayoutProfileById: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
   setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
+  setControlPaneState: (nextState) => controlPaneRuntimeController?.setState?.(nextState),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
-  requestRender: () => appCommandUiFacadeController?.render?.()
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  getDeckSplitLayouts: () => splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
+  setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
 });
 
 broadcastInputRuntimeController = createBroadcastInputRuntimeController({
@@ -744,6 +779,20 @@ sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
   debugLog
 });
 
+splitLayoutRuntimeController = createSplitLayoutRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  gridEl,
+  defaultDeckId: DEFAULT_DECK_ID,
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
+  scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
+  setActiveSession: (sessionId) => store.setActiveSession(sessionId),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId?.(sessions) || []
+});
+
 layoutSettingsController = createLayoutSettingsController({
   documentRef: document,
   gridEl,
@@ -850,6 +899,7 @@ sessionGridController = createSessionGridController({
   sessionThemeDrafts,
   template,
   gridEl,
+  splitLayoutRuntimeController,
   getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck() || null,
   resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText() || "",

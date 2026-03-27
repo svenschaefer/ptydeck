@@ -78,6 +78,9 @@ test("workspace preset runtime controller manages preset lifecycle through backe
             workspace: {
               activeDeckId: "ops",
               layoutProfileId: "focus",
+              controlPaneVisible: true,
+              controlPanePosition: "bottom",
+              controlPaneSize: 240,
               deckGroups: {},
               deckSplitLayouts: {
                 ops: {
@@ -115,6 +118,9 @@ test("workspace preset runtime controller manages preset lifecycle through backe
             payload.workspace || {
               activeDeckId: "ops",
               layoutProfileId: "focus",
+              controlPaneVisible: true,
+              controlPanePosition: "bottom",
+              controlPaneSize: 240,
               deckGroups: {},
               deckSplitLayouts: {
                 ops: {
@@ -174,11 +180,15 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   controller.replaceWorkspaceState({
     activeDeckId: "ops",
     layoutProfileId: "focus",
+    controlPaneVisible: false,
+    controlPanePosition: "left",
+    controlPaneSize: 320,
     deckGroups: {},
     deckSplitLayouts: {
       ops: {
         root: {
           type: "row",
+          weights: [0.5, 0.5],
           children: [
             { type: "pane", paneId: "left" },
             { type: "pane", paneId: "right" }
@@ -198,10 +208,14 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   assert.ok(createCall);
   assert.equal(createCall[1].workspace.activeDeckId, "ops");
   assert.equal(createCall[1].workspace.layoutProfileId, "focus");
+  assert.equal(createCall[1].workspace.controlPaneVisible, false);
+  assert.equal(createCall[1].workspace.controlPanePosition, "left");
+  assert.equal(createCall[1].workspace.controlPaneSize, 320);
   assert.deepEqual(createCall[1].workspace.deckSplitLayouts, {
     ops: {
       root: {
         type: "row",
+        weights: [0.5, 0.5],
         children: [
           { type: "pane", paneId: "left" },
           { type: "pane", paneId: "right" }
@@ -251,6 +265,9 @@ test("workspace preset runtime controller normalizes stale references and resolv
   controller.replaceWorkspaceState({
     activeDeckId: "ghost",
     layoutProfileId: "missing",
+    controlPaneVisible: false,
+    controlPanePosition: "left",
+    controlPaneSize: 80,
     deckGroups: {
       ghost: {
         activeGroupId: "ghost",
@@ -274,6 +291,7 @@ test("workspace preset runtime controller normalizes stale references and resolv
       ops: {
         root: {
           type: "row",
+          weights: [0.5, 0.5],
           children: [
             { type: "pane", paneId: "left" },
             { type: "pane", paneId: "right" }
@@ -290,11 +308,15 @@ test("workspace preset runtime controller normalizes stale references and resolv
   const normalized = controller.getWorkspaceState();
   assert.equal(normalized.activeDeckId, "default");
   assert.equal(normalized.layoutProfileId, "");
+  assert.equal(normalized.controlPaneVisible, false);
+  assert.equal(normalized.controlPanePosition, "left");
+  assert.equal(normalized.controlPaneSize, 240);
   assert.equal(normalized.deckGroups.ghost, undefined);
   assert.deepEqual(normalized.deckGroups.ops.groups[0].sessionIds, ["s2"]);
   assert.equal(normalized.deckSplitLayouts.ghost, undefined);
   assert.deepEqual(normalized.deckSplitLayouts.ops.root, {
     type: "row",
+    weights: [0.5, 0.5],
     children: [
       { type: "pane", paneId: "left" },
       { type: "pane", paneId: "right" }

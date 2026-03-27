@@ -288,6 +288,7 @@ test("validateRequest accepts valid layout profile create and patch payloads", (
             default: {
               root: {
                 type: "row",
+                weights: [2, 1],
                 children: [
                   { type: "pane", paneId: "left" },
                   { type: "pane", paneId: "right" }
@@ -312,6 +313,9 @@ test("validateRequest accepts valid layout profile create and patch payloads", (
           activeDeckId: "default",
           sidebarVisible: false,
           sessionFilterText: "",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckTerminalSettings: {},
           deckSplitLayouts: {
             default: {
@@ -356,6 +360,9 @@ test("validateResponse accepts layout profile payloads", () => {
       activeDeckId: "default",
       sidebarVisible: true,
       sessionFilterText: "ops",
+      controlPaneVisible: true,
+      controlPanePosition: "bottom",
+      controlPaneSize: 240,
       deckTerminalSettings: {
         default: { cols: 110, rows: 28 }
       },
@@ -363,6 +370,7 @@ test("validateResponse accepts layout profile payloads", () => {
         default: {
           root: {
             type: "row",
+            weights: [0.7, 0.3],
             children: [
               { type: "pane", paneId: "left" },
               { type: "pane", paneId: "right" }
@@ -402,6 +410,9 @@ test("validateRequest accepts valid workspace preset create and patch payloads",
         workspace: {
           activeDeckId: "default",
           layoutProfileId: "ops",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckGroups: {
             default: {
               activeGroupId: "core",
@@ -418,6 +429,7 @@ test("validateRequest accepts valid workspace preset create and patch payloads",
             default: {
               root: {
                 type: "column",
+                weights: [3, 2],
                 children: [
                   { type: "pane", paneId: "upper" },
                   { type: "pane", paneId: "lower" }
@@ -440,6 +452,9 @@ test("validateRequest accepts valid workspace preset create and patch payloads",
         name: "Focus Workspace Updated",
         workspace: {
           activeDeckId: "default",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckGroups: {},
           deckSplitLayouts: {
             default: {
@@ -474,6 +489,46 @@ test("validateRequest rejects invalid workspace preset payloads", () => {
   });
 });
 
+test("validateResponse rejects split-layout container weights that do not match child count", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "layoutProfile",
+      body: {
+        id: "focus",
+        name: "Focus Layout",
+        createdAt: 1,
+        updatedAt: 1,
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: true,
+          sessionFilterText: "",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
+          deckTerminalSettings: {},
+          deckSplitLayouts: {
+            default: {
+              root: {
+                type: "row",
+                weights: [1],
+                children: [
+                  { type: "pane", paneId: "left" },
+                  { type: "pane", paneId: "right" }
+                ]
+              },
+              paneSessions: {
+                left: [],
+                right: []
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+});
+
 test("validateResponse accepts workspace preset payloads", () => {
   const body = {
     id: "focus",
@@ -483,6 +538,9 @@ test("validateResponse accepts workspace preset payloads", () => {
     workspace: {
       activeDeckId: "default",
       layoutProfileId: "ops",
+      controlPaneVisible: true,
+      controlPanePosition: "bottom",
+      controlPaneSize: 240,
       deckGroups: {
         default: {
           activeGroupId: "core",
@@ -499,6 +557,7 @@ test("validateResponse accepts workspace preset payloads", () => {
         default: {
           root: {
             type: "column",
+            weights: [0.6, 0.4],
             children: [
               { type: "pane", paneId: "upper" },
               { type: "pane", paneId: "lower" }

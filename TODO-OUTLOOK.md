@@ -4,9 +4,11 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 
 ## Product and UX
 
-- [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
+Promoted and completed in `v0.4.0-H29`:
 
-Promoted to active delivery (`v0.4.0-H28` in `TODO.md` / `ROADMAP.md`):
+- `UX-014`, `UX-015`, `UX-016`
+
+Promoted and completed in `v0.4.0-H28`:
 
 - `UX-011`, `UX-012`, `UX-013`
 

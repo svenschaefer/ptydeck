@@ -130,6 +130,9 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
           activeDeckId: "default",
           sidebarVisible: true,
           sessionFilterText: "ops",
+          controlPaneVisible: false,
+          controlPanePosition: "left",
+          controlPaneSize: 320,
           deckTerminalSettings: {
             default: { cols: 100, rows: 30 }
           },
@@ -137,6 +140,7 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
             default: {
               root: {
                 type: "row",
+                weights: [0.65, 0.35],
                 children: [
                   { type: "pane", paneId: "left" },
                   { type: "pane", paneId: "right" }
@@ -160,6 +164,9 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         workspace: {
           activeDeckId: "default",
           layoutProfileId: "ops",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
           deckGroups: {
             default: {
               activeGroupId: "core",

@@ -137,7 +137,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const session = args.session;
     const refs = args.refs || {};
     const initialVisible = args.initialVisible === true;
-    const gridEl = args.gridEl;
+    const containerEl = args.containerEl || args.gridEl;
     const terminals = args.terminals;
     const terminalObservers = args.terminalObservers;
     const resolveInitialTheme = args.resolveInitialTheme || (() => ({}));
@@ -159,7 +159,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     debugLog("terminal.created", { sessionId: session.id });
     onSessionMounted(session);
 
-    gridEl.appendChild(refs.node);
+    containerEl.appendChild(refs.node);
     terminal.open(refs.mount);
     terminal.onData((data) => {
       onTerminalData(session.id, data);

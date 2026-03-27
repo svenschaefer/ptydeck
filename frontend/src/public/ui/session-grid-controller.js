@@ -9,6 +9,7 @@ export function createSessionGridController(options = {}) {
   const sessionThemeDrafts = options.sessionThemeDrafts;
   const template = options.template || null;
   const gridEl = options.gridEl || null;
+  const splitLayoutRuntimeController = options.splitLayoutRuntimeController || null;
   const getActiveDeck = options.getActiveDeck || (() => null);
   const resolveSessionDeckId = options.resolveSessionDeckId || (() => defaultDeckId);
   const getSessionFilterText = options.getSessionFilterText || (() => "");
@@ -314,7 +315,9 @@ export function createSessionGridController(options = {}) {
           mount: refs.mount
         },
         initialVisible,
-        gridEl,
+        containerEl:
+          splitLayoutRuntimeController?.getCardParkingContainer?.() ||
+          gridEl,
         terminals,
         terminalObservers,
         resolveInitialTheme,
@@ -338,7 +341,17 @@ export function createSessionGridController(options = {}) {
       shouldRunResizePass = true;
     }
 
-    reorderExistingSessionCardsIfNeeded(orderedSessions);
+    if (splitLayoutRuntimeController?.renderDeckLayout) {
+      splitLayoutRuntimeController.renderDeckLayout({
+        deckId: activeDeckId,
+        orderedSessions,
+        deckSessions,
+        activeSessionId: state.activeSessionId,
+        terminals
+      });
+    } else {
+      reorderExistingSessionCardsIfNeeded(orderedSessions);
+    }
 
     syncActiveTerminalSearch({ preserveSelection: true });
 

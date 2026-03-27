@@ -56,6 +56,11 @@ const DECK_NAME_MAX_LENGTH = 64;
 const LAYOUT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const LAYOUT_PROFILE_NAME_MAX_LENGTH = 64;
 const LAYOUT_PROFILE_FILTER_MAX_LENGTH = 256;
+const CONTROL_PANE_POSITION_VALUES = new Set(["top", "bottom", "left", "right"]);
+const CONTROL_PANE_DEFAULT_POSITION = "bottom";
+const CONTROL_PANE_DEFAULT_SIZE = 240;
+const CONTROL_PANE_MIN_SIZE = 120;
+const CONTROL_PANE_MAX_SIZE = 960;
 const WORKSPACE_PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const WORKSPACE_PRESET_NAME_MAX_LENGTH = 64;
 const WORKSPACE_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -829,6 +834,61 @@ function buildDefaultDeckSplitLayout() {
   };
 }
 
+function normalizeSplitLayoutWeights(rawWeights, childCount, { strict = true, fieldPath = "layout.deckSplitLayouts.*.root.weights" } = {}) {
+  if (rawWeights === undefined) {
+    return Array.from({ length: childCount }, () => Number((1 / childCount).toFixed(6)));
+  }
+  if (!Array.isArray(rawWeights)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an array of positive numbers.`);
+    }
+    return Array.from({ length: childCount }, () => Number((1 / childCount).toFixed(6)));
+  }
+  if (rawWeights.length !== childCount) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPath}' must contain exactly ${childCount} weight entries for the split-layout children.`
+      );
+    }
+    return Array.from({ length: childCount }, () => Number((1 / childCount).toFixed(6)));
+  }
+
+  const parsed = [];
+  for (let index = 0; index < rawWeights.length; index += 1) {
+    const weight = Number(rawWeights[index]);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field '${fieldPath}[${index}]' must be a positive number.`);
+      }
+      return Array.from({ length: childCount }, () => Number((1 / childCount).toFixed(6)));
+    }
+    parsed.push(weight);
+  }
+
+  const total = parsed.reduce((sum, entry) => sum + entry, 0);
+  if (!(total > 0)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must sum to a positive value.`);
+    }
+    return Array.from({ length: childCount }, () => Number((1 / childCount).toFixed(6)));
+  }
+
+  const normalized = [];
+  let consumed = 0;
+  for (let index = 0; index < parsed.length; index += 1) {
+    if (index === parsed.length - 1) {
+      normalized.push(Number((1 - consumed).toFixed(6)));
+      continue;
+    }
+    const value = Number((parsed[index] / total).toFixed(6));
+    normalized.push(value);
+    consumed += value;
+  }
+  return normalized;
+}
+
 function normalizeSplitLayoutNode(node, { strict = true, fieldPath = "layout.deckSplitLayouts.*.root", seenPaneIds = new Set() } = {}) {
   if (!isPlainObject(node)) {
     if (strict) {
@@ -889,9 +949,15 @@ function normalizeSplitLayoutNode(node, { strict = true, fieldPath = "layout.dec
     return children[0] || null;
   }
 
+  const weights = normalizeSplitLayoutWeights(node.weights, children.length, {
+    strict,
+    fieldPath: `${fieldPath}.weights`
+  });
+
   return {
     type,
-    children
+    children,
+    weights
   };
 }
 
@@ -1116,6 +1182,61 @@ function normalizeLayoutProfileDeckTerminalSettingsEntry(value, { strict = true 
   return { cols, rows };
 }
 
+function normalizeControlPanePosition(value, fieldPath, { strict = true } = {}) {
+  if (value === undefined) {
+    return CONTROL_PANE_DEFAULT_POSITION;
+  }
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (CONTROL_PANE_POSITION_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPath}' must be one of: ${Array.from(CONTROL_PANE_POSITION_VALUES).join(", ")}.`
+    );
+  }
+  return CONTROL_PANE_DEFAULT_POSITION;
+}
+
+function normalizeControlPaneSize(value, fieldPath, { strict = true } = {}) {
+  if (value === undefined) {
+    return CONTROL_PANE_DEFAULT_SIZE;
+  }
+  const normalized = Number.parseInt(String(value), 10);
+  if (Number.isInteger(normalized) && normalized >= CONTROL_PANE_MIN_SIZE && normalized <= CONTROL_PANE_MAX_SIZE) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPath}' must be an integer between ${CONTROL_PANE_MIN_SIZE} and ${CONTROL_PANE_MAX_SIZE}.`
+    );
+  }
+  return CONTROL_PANE_DEFAULT_SIZE;
+}
+
+function normalizeControlPaneState(value, { strict = true, fieldPathPrefix = "layout" } = {}) {
+  if (value !== undefined && !isPlainObject(value)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}' must be an object.`);
+    }
+    return {
+      controlPaneVisible: true,
+      controlPanePosition: CONTROL_PANE_DEFAULT_POSITION,
+      controlPaneSize: CONTROL_PANE_DEFAULT_SIZE
+    };
+  }
+  const source = isPlainObject(value) ? value : {};
+  return {
+    controlPaneVisible: source.controlPaneVisible !== false,
+    controlPanePosition: normalizeControlPanePosition(source.controlPanePosition, `${fieldPathPrefix}.controlPanePosition`, { strict }),
+    controlPaneSize: normalizeControlPaneSize(source.controlPaneSize, `${fieldPathPrefix}.controlPaneSize`, { strict })
+  };
+}
+
 function normalizeLayoutProfileLayout(
   layout,
   {
@@ -1129,6 +1250,7 @@ function normalizeLayoutProfileLayout(
       activeDeckId: DEFAULT_DECK_ID,
       sidebarVisible: true,
       sessionFilterText: "",
+      ...normalizeControlPaneState(undefined, { strict: false, fieldPathPrefix: "layout" }),
       deckTerminalSettings: {},
       deckSplitLayouts: {}
     };
@@ -1141,6 +1263,7 @@ function normalizeLayoutProfileLayout(
       activeDeckId: DEFAULT_DECK_ID,
       sidebarVisible: true,
       sessionFilterText: "",
+      ...normalizeControlPaneState(undefined, { strict: false, fieldPathPrefix: "layout" }),
       deckTerminalSettings: {},
       deckSplitLayouts: {}
     };
@@ -1158,6 +1281,7 @@ function normalizeLayoutProfileLayout(
 
   const sidebarVisible = layout.sidebarVisible !== false;
   const sessionFilterText = normalizeLayoutProfileSessionFilterText(layout.sessionFilterText, { strict });
+  const controlPaneState = normalizeControlPaneState(layout, { strict, fieldPathPrefix: "layout" });
   const nextDeckTerminalSettings = {};
   if (layout.deckTerminalSettings !== undefined) {
     if (!isPlainObject(layout.deckTerminalSettings)) {
@@ -1196,6 +1320,7 @@ function normalizeLayoutProfileLayout(
     activeDeckId,
     sidebarVisible,
     sessionFilterText,
+    ...controlPaneState,
     deckTerminalSettings: nextDeckTerminalSettings,
     deckSplitLayouts
   };
@@ -1988,6 +2113,9 @@ export function createRuntime(config) {
         activeDeckId: profile.layout.activeDeckId,
         sidebarVisible: profile.layout.sidebarVisible,
         sessionFilterText: profile.layout.sessionFilterText,
+        controlPaneVisible: profile.layout.controlPaneVisible,
+        controlPanePosition: profile.layout.controlPanePosition,
+        controlPaneSize: profile.layout.controlPaneSize,
         deckTerminalSettings: JSON.parse(JSON.stringify(profile.layout.deckTerminalSettings)),
         deckSplitLayouts: JSON.parse(JSON.stringify(profile.layout.deckSplitLayouts))
       }
@@ -2238,6 +2366,7 @@ export function createRuntime(config) {
       return {
         activeDeckId: DEFAULT_DECK_ID,
         layoutProfileId: "",
+        ...normalizeControlPaneState(undefined, { strict: false, fieldPathPrefix: "workspace" }),
         deckGroups: {},
         deckSplitLayouts: {}
       };
@@ -2249,6 +2378,7 @@ export function createRuntime(config) {
       return {
         activeDeckId: DEFAULT_DECK_ID,
         layoutProfileId: "",
+        ...normalizeControlPaneState(undefined, { strict: false, fieldPathPrefix: "workspace" }),
         deckGroups: {},
         deckSplitLayouts: {}
       };
@@ -2271,6 +2401,7 @@ export function createRuntime(config) {
     }
 
     const layoutProfileId = normalizeWorkspacePresetLayoutProfileId(workspace.layoutProfileId, { strict });
+    const controlPaneState = normalizeControlPaneState(workspace, { strict, fieldPathPrefix: "workspace" });
     const deckGroups = {};
     if (workspace.deckGroups !== undefined) {
       if (!isPlainObject(workspace.deckGroups)) {
@@ -2311,6 +2442,7 @@ export function createRuntime(config) {
     return {
       activeDeckId,
       layoutProfileId,
+      ...controlPaneState,
       deckGroups,
       deckSplitLayouts
     };
@@ -2359,6 +2491,9 @@ export function createRuntime(config) {
       workspace: {
         activeDeckId: preset.workspace.activeDeckId,
         layoutProfileId: preset.workspace.layoutProfileId || undefined,
+        controlPaneVisible: preset.workspace.controlPaneVisible,
+        controlPanePosition: preset.workspace.controlPanePosition,
+        controlPaneSize: preset.workspace.controlPaneSize,
         deckGroups: JSON.parse(JSON.stringify(preset.workspace.deckGroups)),
         deckSplitLayouts: JSON.parse(JSON.stringify(preset.workspace.deckSplitLayouts))
       }

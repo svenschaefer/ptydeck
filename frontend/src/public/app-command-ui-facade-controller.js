@@ -24,6 +24,8 @@ export function createAppCommandUiFacadeController(options = {}) {
     typeof options.getWorkspacePresetRuntimeController === "function"
       ? options.getWorkspacePresetRuntimeController
       : () => null;
+  const getControlPaneRuntimeController =
+    typeof options.getControlPaneRuntimeController === "function" ? options.getControlPaneRuntimeController : () => null;
   const getCommandExecutor =
     typeof options.getCommandExecutor === "function" ? options.getCommandExecutor : () => null;
 
@@ -120,6 +122,7 @@ export function createAppCommandUiFacadeController(options = {}) {
       maybeReportStartupPerf,
       resolveFilterSelectors: getCommandTargetRuntimeController()?.resolveFilterSelectors
     });
+    getControlPaneRuntimeController()?.render?.();
     getWorkspacePresetRuntimeController()?.render?.();
   }
 

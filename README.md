@@ -86,6 +86,8 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Sidebar settings for fixed terminal geometry (`cols`/`rows`, e.g. `80x20`) with persisted browser preferences
 - Persisted named layout profiles for active deck, sidebar visibility, session filter text, and per-deck terminal geometry, available through the sidebar controls and backend-backed restart-safe storage
 - Persisted workspace presets with backend-backed active-deck, linked-layout, and per-deck session-group state, available through sidebar controls and `/workspace ...` commands
+- Split-based execution layouts per deck, with persisted `row` / `column` pane trees, drag-resize handles, session-to-pane assignment, and restart-safe apply/save behavior through layout profiles and workspace presets
+- Explicit control-plane and execution-plane separation, with a dedicated operator pane for composer/search/workspace controls, persisted pane visibility/position/size, responsive position fallback, and drag-resize behavior restored through layout profiles and workspace presets
 - Workspace-group broadcast mode for ordinary composer sends, controlled through `/broadcast status`, `/broadcast off`, and `/broadcast group [group]`, while explicit `@target ...` direct routing still bypasses broadcast mode
 - Per-session settings include configurable command submit terminator with deterministic modes: `auto` (default, `CR`), `crlf`, `lf`, `cr`
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names

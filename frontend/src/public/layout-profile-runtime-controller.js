@@ -51,6 +51,28 @@ function cloneDeckTerminalSettings(settings) {
   );
 }
 
+function normalizeControlPanePosition(value) {
+  const normalized = normalizeLower(value);
+  return ["top", "bottom", "left", "right"].includes(normalized) ? normalized : "bottom";
+}
+
+function normalizeControlPaneSize(value) {
+  const normalized = Number.parseInt(String(value ?? ""), 10);
+  if (Number.isInteger(normalized) && normalized >= 120 && normalized <= 960) {
+    return normalized;
+  }
+  return 240;
+}
+
+function normalizeControlPaneState(source) {
+  const value = source && typeof source === "object" && !Array.isArray(source) ? source : {};
+  return {
+    controlPaneVisible: value.controlPaneVisible !== false,
+    controlPanePosition: normalizeControlPanePosition(value.controlPanePosition),
+    controlPaneSize: normalizeControlPaneSize(value.controlPaneSize)
+  };
+}
+
 function cloneSplitLayoutNode(node) {
   if (!node || typeof node !== "object" || Array.isArray(node)) {
     return null;
@@ -79,9 +101,14 @@ function cloneSplitLayoutNode(node) {
   if (children.length < 2) {
     return children[0] || null;
   }
+  const weights =
+    Array.isArray(node.weights) && node.weights.length === children.length
+      ? node.weights.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry > 0)
+      : [];
   return {
     type,
-    children
+    children,
+    weights: weights.length === children.length ? weights : Array.from({ length: children.length }, () => 1 / children.length)
   };
 }
 
@@ -170,6 +197,7 @@ export function normalizeLayoutProfileRecord(profile) {
       activeDeckId: normalizeText(layout.activeDeckId) || "default",
       sidebarVisible: layout.sidebarVisible !== false,
       sessionFilterText: normalizeText(layout.sessionFilterText),
+      ...normalizeControlPaneState(layout),
       deckTerminalSettings: cloneDeckTerminalSettings(layout.deckTerminalSettings),
       deckSplitLayouts: cloneDeckSplitLayoutMap(layout.deckSplitLayouts)
     }
@@ -240,16 +268,20 @@ export function createLayoutProfileRuntimeController(options = {}) {
   const getActiveDeckId = typeof options.getActiveDeckId === "function" ? options.getActiveDeckId : () => "default";
   const getSessionFilterText = typeof options.getSessionFilterText === "function" ? options.getSessionFilterText : () => "";
   const getSidebarVisible = typeof options.getSidebarVisible === "function" ? options.getSidebarVisible : () => true;
+  const getControlPaneState = typeof options.getControlPaneState === "function" ? options.getControlPaneState : null;
   const getDeckTerminalGeometry = typeof options.getDeckTerminalGeometry === "function" ? options.getDeckTerminalGeometry : () => ({ cols: 80, rows: 20 });
   const getDeckById = typeof options.getDeckById === "function" ? options.getDeckById : () => null;
   const setSessionFilterText = typeof options.setSessionFilterText === "function" ? options.setSessionFilterText : () => {};
   const setSidebarVisible = typeof options.setSidebarVisible === "function" ? options.setSidebarVisible : () => {};
+  const setControlPaneState = typeof options.setControlPaneState === "function" ? options.setControlPaneState : null;
   const setActiveDeck = typeof options.setActiveDeck === "function" ? options.setActiveDeck : () => false;
   const applyRuntimeEvent = typeof options.applyRuntimeEvent === "function" ? options.applyRuntimeEvent : () => false;
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
+  const getDeckSplitLayouts = typeof options.getDeckSplitLayouts === "function" ? options.getDeckSplitLayouts : null;
+  const setDeckSplitLayouts = typeof options.setDeckSplitLayouts === "function" ? options.setDeckSplitLayouts : null;
 
   let profiles = [];
   let selectedProfileId = "";
@@ -381,8 +413,13 @@ export function createLayoutProfileRuntimeController(options = {}) {
       activeDeckId: normalizeText(getActiveDeckId()) || "default",
       sidebarVisible: getSidebarVisible() !== false,
       sessionFilterText: normalizeText(getSessionFilterText()),
+      ...normalizeControlPaneState(
+        typeof getControlPaneState === "function" ? getControlPaneState() : selectedProfile?.layout
+      ),
       deckTerminalSettings,
-      deckSplitLayouts: cloneDeckSplitLayoutMap(selectedProfile?.layout?.deckSplitLayouts)
+      deckSplitLayouts: cloneDeckSplitLayoutMap(
+        typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : selectedProfile?.layout?.deckSplitLayouts
+      )
     };
   }
 
@@ -432,6 +469,12 @@ export function createLayoutProfileRuntimeController(options = {}) {
     }
     setSidebarVisible(profile.layout.sidebarVisible);
     setSessionFilterText(profile.layout.sessionFilterText);
+    if (typeof setControlPaneState === "function") {
+      setControlPaneState(normalizeControlPaneState(profile.layout));
+    }
+    if (typeof setDeckSplitLayouts === "function") {
+      setDeckSplitLayouts(profile.layout.deckSplitLayouts);
+    }
     if (currentDecks.some((deck) => normalizeText(deck?.id) === targetActiveDeckId)) {
       setActiveDeck(targetActiveDeckId);
     }

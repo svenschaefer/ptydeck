@@ -12,9 +12,11 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
-- Active scoped tasks: `UX-012`, `UX-013`.
-- Latest completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H29` (Control-Plane and Execution-Plane Separation, `UX-014`, `UX-015`, `UX-016`).
+- Previous completed wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
+- Previous completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
 - Previous completed wave: `v0.4.0-H26` (Session Grouping and Workspace Presets, `UX-005`, `UX-006`, `UX-007`).
 - Previous completed wave: `v0.4.0-H25` (Session Theme Dual-Scheme and Composer/Help Simplification, `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`).
 - Previous completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
@@ -42,27 +44,45 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave
+## Latest Completed Wave
 
-### v0.4.0-H28 - Split Layout Foundation (Active)
+### v0.4.0-H29 - Control-Plane and Execution-Plane Separation (Completed)
 
-- Completed in-wave: `UX-011`
-- Remaining active tasks: `UX-012`, `UX-013`
+- `UX-014`, `UX-015`, `UX-016`
+
+Dependencies:
+
+- `UX-014` establishes the persisted workspace-chrome contract first so control-plane pane state is stored alongside the already completed layout-profile and workspace-preset layout model instead of becoming a local-only frontend flag.
+- `UX-015` follows `UX-014` and reuses that contract to separate operator controls from terminal execution surfaces without disturbing the completed split-layout execution pane model from `v0.4.0-H28`.
+- `UX-016` closes after `UX-014` and `UX-015`, so regression coverage spans normalization, persistence, toggle/resize behavior, apply/restore consistency, and responsive fallback end to end.
+
+Exit criteria:
+
+- Backend-exposed layout profiles and workspace presets can persist explicit control-pane workspace chrome state with deterministic normalization and restart-safe restore behavior.
+- Frontend renders a dedicated control-plane pane for operator controls and a separate execution plane for terminal sessions, with deterministic collapse/toggle/resize behavior.
+- Applying a layout profile or workspace preset restores both split-layout execution panes and the new control-pane state consistently.
+- Regression coverage exists for backend normalization plus frontend apply/toggle/resize/responsive behavior.
+
+## Previous Completed Wave
+
+### v0.4.0-H28 - Split Layout Foundation (Completed)
+
+- `UX-011`, `UX-012`, `UX-013`
 
 Dependencies:
 
 - `UX-011` established the persisted split-layout contract first by extending the completed layout-profile and workspace-preset baseline, so split-pane state is not trapped in a frontend-only runtime.
-- `UX-012` follows `UX-011` and reuses that contract for horizontal/vertical pane rendering, drag/resize behavior, and session-to-pane assignment, instead of inventing a second local split-layout model next to profiles/presets.
-- `UX-013` closes after `UX-011` and `UX-012`, so regression coverage spans normalization, persistence, resize behavior, deleted-session cleanup, and apply/restore consistency end to end.
+- `UX-012` followed `UX-011` and reuses that contract for horizontal/vertical pane rendering, drag/resize behavior, pane-weight normalization, session-to-pane assignment, and backend-backed apply/save behavior instead of inventing a second local split-layout model next to profiles/presets.
+- `UX-013` closed after `UX-011` and `UX-012`, so regression coverage now spans backend normalization, frontend pane rendering, resize behavior, quick-ID-aware pane ordering, deleted-session cleanup, and profile/preset apply/restore consistency end to end.
 
 Exit criteria:
 
-- Backend-exposed layout profiles and workspace presets can persist per-deck split-layout trees with deterministic normalization and deleted-session fallback rules.
-- Frontend can render horizontal/vertical split panes, resize them, and assign sessions through the persisted contract instead of a temporary client-only model.
-- Applying a layout profile or workspace preset restores split-pane structure and assigned sessions consistently.
+- Backend-exposed layout profiles and workspace presets can persist per-deck split-layout trees with deterministic normalization, pane-weight validation, and deleted-session fallback rules.
+- Frontend can render horizontal/vertical split panes, resize them, assign sessions to panes, and save/apply those layouts through the persisted contract instead of a temporary client-only model.
+- Applying a layout profile or workspace preset restores split-pane structure and assigned sessions consistently, and visible pane contents continue to follow current quick-ID ordering.
 - Regression coverage exists for backend normalization plus frontend apply/resize/session-cleanup behavior.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H27 - Workspace Group Broadcast Input (Completed)
 

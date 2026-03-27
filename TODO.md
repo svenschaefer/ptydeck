@@ -14,8 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `UX-012` Owner `FE`: Implement the split-based terminal layout runtime with horizontal/vertical pane rendering, drag/resize handles, session-to-pane assignment flows, and backend-backed apply/save behavior against the persisted split-layout contract.
-- `UX-013` Owner `QA`: Add regression coverage for split-layout normalization, resize behavior, deleted-session cleanup, layout-profile/workspace-preset apply behavior, and restart consistency.
+- none currently
 
 ## Active Ownership Role
 

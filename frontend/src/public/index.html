@@ -88,64 +88,102 @@
             <button id="workspace-group-clear" type="button">Clear Group</button>
           </div>
         </section>
-        <section class="terminal-search-panel">
-          <h2>Find</h2>
-          <div class="terminal-search-row">
-            <input id="terminal-search-input" type="text" placeholder="Find in active terminal" />
-            <button id="terminal-search-prev" type="button">Prev</button>
-            <button id="terminal-search-next" type="button">Next</button>
-            <button id="terminal-search-clear" type="button">Clear</button>
-            <p id="terminal-search-status" class="terminal-search-status"></p>
-          </div>
-        </section>
       </aside>
 
       <section class="workspace">
         <button
-          id="sidebar-launcher"
-          class="sidebar-launcher"
+          id="control-pane-launcher"
+          class="control-pane-launcher"
           type="button"
-          aria-controls="app-sidebar"
+          aria-controls="control-pane"
           aria-expanded="false"
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
+          aria-label="Show control pane"
+          title="Show control pane"
+          hidden
         >
-          <span aria-hidden="true">☰</span>
+          <span aria-hidden="true">⌘</span>
         </button>
-        <main id="terminal-grid" class="terminal-grid"></main>
-        <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
-
-        <section class="command-row">
-          <div class="command-input-column">
-            <div class="command-meta">
-              <p id="status-message" class="status-message"></p>
-              <p id="command-target" class="command-target"></p>
-              <p id="command-feedback" class="command-feedback"></p>
-            </div>
-            <div class="command-entry-row">
-              <div class="command-input-wrap">
-                <textarea
-                  id="command-input"
-                  rows="10"
-                  placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
-                ></textarea>
-                <div id="command-inline-hint" class="command-inline-hint"></div>
-                <p id="command-preview" class="command-preview"></p>
+        <div id="workspace-shell" class="workspace-shell">
+          <section id="control-pane" class="control-pane">
+            <div class="control-pane-head">
+              <div class="control-pane-heading">
+                <p class="control-pane-title">Control Plane</p>
+                <p id="control-pane-status" class="control-pane-status"></p>
               </div>
-              <button id="send-command" type="button">Send</button>
-            </div>
-            <section id="command-guard" class="command-guard" hidden>
-              <p id="command-guard-summary" class="command-guard-summary"></p>
-              <pre id="command-guard-reasons" class="command-guard-reasons"></pre>
-              <pre id="command-guard-preview" class="command-guard-preview"></pre>
-              <div class="command-guard-actions">
-                <button id="command-guard-send-once" type="button">Send once</button>
-                <button id="command-guard-cancel" type="button">Cancel</button>
+              <div class="control-pane-actions">
+                <label class="control-pane-position-wrap">
+                  <span>Position</span>
+                  <select id="control-pane-position" aria-label="Control pane position">
+                    <option value="bottom">Bottom</option>
+                    <option value="top">Top</option>
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                  </select>
+                </label>
+                <button id="control-pane-toggle" type="button">Hide</button>
               </div>
-            </section>
-            <pre id="command-suggestions" class="command-suggestions" hidden></pre>
-          </div>
-        </section>
+            </div>
+            <div class="control-pane-body">
+              <section class="command-row">
+                <div class="command-input-column">
+                  <div class="command-meta">
+                    <p id="status-message" class="status-message"></p>
+                    <p id="command-target" class="command-target"></p>
+                    <p id="command-feedback" class="command-feedback"></p>
+                  </div>
+                  <div class="command-entry-row">
+                    <div class="command-input-wrap">
+                      <textarea
+                        id="command-input"
+                        rows="10"
+                        placeholder="Run command(s) in active session (Ctrl/Cmd+Enter to send)"
+                      ></textarea>
+                      <div id="command-inline-hint" class="command-inline-hint"></div>
+                      <p id="command-preview" class="command-preview"></p>
+                    </div>
+                    <button id="send-command" type="button">Send</button>
+                  </div>
+                  <section id="command-guard" class="command-guard" hidden>
+                    <p id="command-guard-summary" class="command-guard-summary"></p>
+                    <pre id="command-guard-reasons" class="command-guard-reasons"></pre>
+                    <pre id="command-guard-preview" class="command-guard-preview"></pre>
+                    <div class="command-guard-actions">
+                      <button id="command-guard-send-once" type="button">Send once</button>
+                      <button id="command-guard-cancel" type="button">Cancel</button>
+                    </div>
+                  </section>
+                  <pre id="command-suggestions" class="command-suggestions" hidden></pre>
+                </div>
+              </section>
+              <section class="terminal-search-panel control-pane-search-panel">
+                <h2>Find</h2>
+                <div class="terminal-search-row">
+                  <input id="terminal-search-input" type="text" placeholder="Find in active terminal" />
+                  <button id="terminal-search-prev" type="button">Prev</button>
+                  <button id="terminal-search-next" type="button">Next</button>
+                  <button id="terminal-search-clear" type="button">Clear</button>
+                  <p id="terminal-search-status" class="terminal-search-status"></p>
+                </div>
+              </section>
+            </div>
+          </section>
+          <div id="control-pane-resize-handle" class="control-pane-resize-handle" aria-hidden="true"></div>
+          <section id="execution-pane" class="execution-pane">
+            <button
+              id="sidebar-launcher"
+              class="sidebar-launcher"
+              type="button"
+              aria-controls="app-sidebar"
+              aria-expanded="false"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+            <main id="terminal-grid" class="terminal-grid"></main>
+            <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
+          </section>
+        </div>
         <dialog id="replay-viewer-dialog" class="replay-viewer-dialog">
           <div class="replay-viewer-head">
             <div class="replay-viewer-heading">

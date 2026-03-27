@@ -482,6 +482,16 @@ function createDocumentFixture() {
   const sidebarToggle = new FakeElement({ id: "sidebar-toggle", tagName: "button" });
   const sidebarToggleIcon = new FakeElement({ id: "sidebar-toggle-icon", tagName: "span" });
   const sidebarLauncher = new FakeElement({ id: "sidebar-launcher", tagName: "button" });
+  const workspaceShell = new FakeElement({ id: "workspace-shell", clientWidth: 1100, clientHeight: 720 });
+  workspaceShell.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1100, bottom: 720, width: 1100, height: 720 });
+  const executionPane = new FakeElement({ id: "execution-pane" });
+  const controlPane = new FakeElement({ id: "control-pane" });
+  const controlPaneLauncher = new FakeElement({ id: "control-pane-launcher", tagName: "button" });
+  controlPaneLauncher.hidden = true;
+  const controlPaneToggle = new FakeElement({ id: "control-pane-toggle", tagName: "button" });
+  const controlPanePosition = new FakeElement({ id: "control-pane-position", tagName: "select" });
+  const controlPaneStatus = new FakeElement({ id: "control-pane-status", tagName: "p" });
+  const controlPaneResizeHandle = new FakeElement({ id: "control-pane-resize-handle", tagName: "div" });
   const createSession = new FakeElement({ id: "create-session", tagName: "button" });
   const deckTabs = new FakeElement({ id: "deck-tabs" });
   const deckCreate = new FakeElement({ id: "deck-create", tagName: "button" });
@@ -559,6 +569,14 @@ function createDocumentFixture() {
     sidebarToggle,
     sidebarToggleIcon,
     sidebarLauncher,
+    workspaceShell,
+    executionPane,
+    controlPane,
+    controlPaneLauncher,
+    controlPaneToggle,
+    controlPanePosition,
+    controlPaneStatus,
+    controlPaneResizeHandle,
     createSession,
     deckTabs,
     deckCreate,
@@ -614,6 +632,14 @@ function createDocumentFixture() {
       sidebarToggle,
       sidebarToggleIcon,
       sidebarLauncher,
+      workspaceShell,
+      executionPane,
+      controlPane,
+      controlPaneLauncher,
+      controlPaneToggle,
+      controlPanePosition,
+      controlPaneStatus,
+      controlPaneResizeHandle,
       createSession,
       deckTabs,
       deckCreate,
@@ -705,6 +731,17 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function waitFor(predicate, { timeoutMs = 200, intervalMs = 5 } = {}) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error("Timed out waiting for condition.");
+}
+
 function findDeckGroup(deckTabs, deckId) {
   return deckTabs.children.find((entry) => entry.getAttribute("data-deck-id") === deckId) || null;
 }
@@ -727,10 +764,30 @@ function findDeckSessionButton(deckTabs, deckId, sessionId) {
   return null;
 }
 
+function listTerminalCards(root) {
+  const cards = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.shift();
+    if (!current || !Array.isArray(current.children)) {
+      continue;
+    }
+    for (const child of current.children) {
+      if (child.classList?.contains("terminal-card")) {
+        cards.push(child);
+      }
+      stack.push(child);
+    }
+  }
+  return cards;
+}
+
+function listVisibleTerminalCards(root) {
+  return listTerminalCards(root).filter((entry) => entry.hidden === false);
+}
+
 function findTerminalCardBySessionName(terminalGrid, sessionName) {
-  return (
-    terminalGrid.children.find((entry) => entry.querySelector?.(".session-focus")?.textContent === sessionName) || null
-  );
+  return listTerminalCards(terminalGrid).find((entry) => entry.querySelector?.(".session-focus")?.textContent === sessionName) || null;
 }
 
 test("app handles critical error paths, DOM lifecycle, and connection state rendering", async (t) => {
@@ -1118,14 +1175,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(listSessionsCalls, 1);
 
   fixture.elements.createSession.click();
-  await tick();
+  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to create session.");
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to create session.");
 
-  const card = fixture.elements.terminalGrid.children[0];
+  const card = listTerminalCards(fixture.elements.terminalGrid)[0];
   assert.ok(card, "expected terminal card to exist");
   const closeBtn = card.querySelector(".session-close");
   closeBtn.click();
-  await tick();
+  await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to delete session.");
   assert.equal(fixture.elements.statusMessage.textContent, "Failed to delete session.");
 
   fixture.elements.commandInput.value = "pwd";
@@ -1621,7 +1678,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 2);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 2);
   assert.equal(fixture.elements.emptyState.style.display, "none");
   assert.equal(fixture.elements.deckTabs.children.length, 1);
   assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
@@ -1635,8 +1692,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2").querySelector(".session-quick-id").textContent,
     "2"
   );
-  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "1");
-  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "2");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[0].querySelector(".session-quick-id").textContent, "1");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[1].querySelector(".session-quick-id").textContent, "2");
 
   fixture.elements.commandInput.value = "/swap 1 2";
   fixture.elements.sendCommand.click();
@@ -1656,10 +1713,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       .children.map((entry) => entry.getAttribute("data-session-id")),
     ["s-2", "s-1"]
   );
-  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "1");
-  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "2");
-  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-focus").textContent, "two");
-  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-focus").textContent, "one");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[0].querySelector(".session-quick-id").textContent, "1");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[1].querySelector(".session-quick-id").textContent, "2");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[0].querySelector(".session-focus").textContent, "two");
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid)[1].querySelector(".session-focus").textContent, "one");
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1962,7 +2019,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   deckNewSessionButton.click();
   await tick();
-  const visibleAfterDeckSidebarSwitch = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  const visibleAfterDeckSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
   assert.equal(visibleAfterDeckSidebarSwitch.length, 1);
   assert.equal(visibleAfterDeckSidebarSwitch[0].querySelector(".session-focus").textContent, "two");
   assert.equal(findDeckGroup(fixture.elements.deckTabs, "deck-new").querySelector(".deck-tab").classList.contains("active"), true);
@@ -1972,7 +2029,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.ok(defaultSessionButton);
   defaultSessionButton.click();
   await tick();
-  const visibleAfterDefaultSidebarSwitch = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  const visibleAfterDefaultSidebarSwitch = listVisibleTerminalCards(fixture.elements.terminalGrid);
   assert.equal(visibleAfterDefaultSidebarSwitch.length, 1);
   assert.equal(visibleAfterDefaultSidebarSwitch[0].querySelector(".session-focus").textContent, "one");
   assert.equal(findDeckGroup(fixture.elements.deckTabs, "default").querySelector(".deck-tab").classList.contains("active"), true);
@@ -2015,7 +2072,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Active deck: [deck-new] Ops.");
-  const visibleDeckNewCards = fixture.elements.terminalGrid.children.filter((entry) => entry.hidden === false);
+  const visibleDeckNewCards = listVisibleTerminalCards(fixture.elements.terminalGrid);
   assert.equal(visibleDeckNewCards.length, 1);
   assert.equal(visibleDeckNewCards[0].classList.contains("active"), true);
   fixture.elements.commandInput.value = "/size 101 33";
@@ -2091,7 +2148,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     hiddenDeckTerminal.buffer.active.baseY,
     "expected hidden deck terminal to reach appended bottom content after recovery"
   );
-  const recoveredHiddenCard = fixture.elements.terminalGrid.children.find(
+  const recoveredHiddenCard = listVisibleTerminalCards(fixture.elements.terminalGrid).find(
     (entry) => entry.hidden === false && entry.querySelector(".session-focus")?.textContent === "two"
   );
   ws.emit("message", {
@@ -2270,7 +2327,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
   await sleep(250);
-  const unrestoredCard = fixture.elements.terminalGrid.children[2];
+  const unrestoredCard = listTerminalCards(fixture.elements.terminalGrid)[2];
   assert.ok(unrestoredCard.classList.contains("unrestored"));
   const unrestoredBadge = unrestoredCard.querySelector(".session-state-badge");
   const unrestoredHint = unrestoredCard.querySelector(".session-unrestored-hint");
@@ -2559,7 +2616,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 4);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 4);
 
   const routedBefore = inputPayloads.length;
   fixture.elements.commandInput.value = "@2 echo routed";
@@ -2653,7 +2710,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
 
   ws.emit("message", { data: JSON.stringify({ type: "session.closed", sessionId: "s-2" }) });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 3);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 3);
   ws.emit("message", {
     data: JSON.stringify({
       type: "session.created",
@@ -2671,7 +2728,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 4);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 4);
   const reopenedSecondTerminal = MockTerminal.instances[MockTerminal.instances.length - 1];
   assert.equal(reopenedSecondTerminal.options.theme.background, "#101010");
   assert.equal(reopenedSecondTerminal.options.theme.foreground, "#e0e0e0");
@@ -2682,7 +2739,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     data: JSON.stringify({ type: "session.exit", sessionId: "s-2", exitCode: 17, signal: "SIGTERM" })
   });
   await tick();
-  const exitedSecondCard = fixture.elements.terminalGrid.children.find(
+  const exitedSecondCard = listTerminalCards(fixture.elements.terminalGrid).find(
     (entry) => entry.querySelector(".session-focus")?.textContent === "two"
   );
   assert.ok(exitedSecondCard.classList.contains("exited"));
@@ -2722,7 +2779,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Removed exited session [1] two.");
   assert.equal(
-    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "two"),
+    listTerminalCards(fixture.elements.terminalGrid).some((entry) => entry.querySelector(".session-focus")?.textContent === "two"),
     false
   );
 
@@ -2731,7 +2788,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
   assert.equal(
-    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
+    listTerminalCards(fixture.elements.terminalGrid).some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
     true
   );
   ws.emit("message", {
@@ -2785,7 +2842,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
   assert.equal(
-    fixture.elements.terminalGrid.children.some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
+    listTerminalCards(fixture.elements.terminalGrid).some((entry) => entry.querySelector(".session-focus")?.textContent === "ops-node"),
     false
   );
   assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
@@ -2810,7 +2867,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 0);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 0);
   assert.equal(fixture.elements.emptyState.style.display, "block");
   assert.ok(findDeckGroup(fixture.elements.deckTabs, "default"));
   assert.equal(findDeckGroup(fixture.elements.deckTabs, "qa"), null);
@@ -3086,7 +3143,7 @@ test("app search tracks active terminal matches across buffer growth and deck sw
     })
   });
   await tick();
-  assert.equal(fixture.elements.terminalGrid.children.length, 1);
+  assert.equal(listTerminalCards(fixture.elements.terminalGrid).length, 1);
   assert.ok(findDeckGroup(fixture.elements.deckTabs, "ops"));
   assert.equal(findDeckGroup(fixture.elements.deckTabs, "default"), null);
   assert.equal(listDecksCalls, 0);

@@ -839,6 +839,9 @@ components:
         - activeDeckId
         - sidebarVisible
         - sessionFilterText
+        - controlPaneVisible
+        - controlPanePosition
+        - controlPaneSize
         - deckTerminalSettings
       properties:
         activeDeckId:
@@ -847,6 +850,19 @@ components:
           type: boolean
         sessionFilterText:
           type: string
+        controlPaneVisible:
+          type: boolean
+        controlPanePosition:
+          type: string
+          enum:
+            - top
+            - bottom
+            - left
+            - right
+        controlPaneSize:
+          type: integer
+          minimum: 120
+          maximum: 960
         deckTerminalSettings:
           type: object
           additionalProperties:
@@ -901,6 +917,12 @@ components:
           minItems: 2
           items:
             $ref: '#/components/schemas/SplitLayoutNode'
+        weights:
+          type: array
+          minItems: 2
+          items:
+            type: number
+            exclusiveMinimum: 0
     DeckSplitLayout:
       type: object
       required:
@@ -958,12 +980,28 @@ components:
       type: object
       required:
         - activeDeckId
+        - controlPaneVisible
+        - controlPanePosition
+        - controlPaneSize
         - deckGroups
       properties:
         activeDeckId:
           type: string
         layoutProfileId:
           type: string
+        controlPaneVisible:
+          type: boolean
+        controlPanePosition:
+          type: string
+          enum:
+            - top
+            - bottom
+            - left
+            - right
+        controlPaneSize:
+          type: integer
+          minimum: 120
+          maximum: 960
         deckGroups:
           type: object
           additionalProperties:

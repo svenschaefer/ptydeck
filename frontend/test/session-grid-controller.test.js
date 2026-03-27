@@ -274,6 +274,132 @@ test("session-grid controller creates new cards and schedules resize passes", ()
   ]);
 });
 
+test("session-grid controller mounts new cards into split-layout parking and delegates layout rendering", () => {
+  const calls = [];
+  const parkingEl = { id: "parking" };
+  const splitLayoutRuntimeController = {
+    getCardParkingContainer: () => parkingEl,
+    renderDeckLayout: (payload) => calls.push(["split-render", payload.deckId, payload.deckSessions.map((session) => session.id).join(",")])
+  };
+  const controller = createSessionGridController({
+    defaultDeckId: "default",
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    sessionThemeDrafts: new Map(),
+    template: { id: "tpl" },
+    gridEl: { id: "grid" },
+    splitLayoutRuntimeController,
+    getActiveDeck: () => ({ id: "ops" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionFilterText: () => "",
+    renderDeckTabs: () => calls.push("tabs"),
+    workspaceRenderController: {
+      resolveVisibleSessions: () => ({ visibleSessionIds: new Set(["s1"]), filterActive: false, switchedActiveSession: false }),
+      renderEmptyState: () => calls.push("empty"),
+      renderStatus: () => calls.push("status")
+    },
+    pruneQuickIds: () => calls.push("prune"),
+    syncActiveTerminalSearch: () => calls.push("search"),
+    sessionDisposalController: { cleanupRemovedSessions: () => false },
+    sessionCardFactoryController: {
+      createSessionCardView: () => ({
+        node: {},
+        focusBtn: {},
+        quickIdEl: {},
+        stateBadgeEl: {},
+        sessionMetaRowEl: {},
+        sessionNoteEl: {},
+        unrestoredHintEl: {},
+        settingsBtn: {},
+        renameBtn: {},
+        closeBtn: {},
+        settingsDialog: {},
+        settingsDismissBtn: {},
+        startCwdInput: {},
+        startCommandInput: {},
+        startEnvInput: {},
+        sessionSendTerminatorSelect: {},
+        inputSafetyPresetSelect: {},
+        sessionTagsInput: {},
+        startFeedback: {},
+        tagListEl: {},
+        themeCategory: {},
+        themeSearch: {},
+        themeSlotSelect: {},
+        themeSelect: {},
+        themeBg: {},
+        themeFg: {},
+        themeInputs: {},
+        settingsApplyBtn: {},
+        settingsCancelBtn: {},
+        settingsStatus: {},
+        mount: {}
+      })
+    },
+    sessionCardInteractionsController: {
+      bindSessionCardInteractions: () => {}
+    },
+    onSessionMounted: () => {},
+    sessionTerminalRuntimeController: {
+      mountSessionTerminalCard: ({ containerEl, afterEntryRegistered }) => {
+        calls.push(["mount-container", containerEl.id]);
+        afterEntryRegistered({}, { id: "s1" });
+      }
+    },
+    syncSessionStartupControls: () => {},
+    syncSessionInputSafetyControls: () => {},
+    syncSessionThemeControls: () => {},
+    setSettingsDirty: () => {},
+    scheduleGlobalResize: () => calls.push("resize-global"),
+    scheduleDeferredResizePasses: () => calls.push("resize-deferred"),
+    setActiveSession: () => {},
+    getSessionById: () => ({ id: "s1" }),
+    toggleSettingsDialog: () => {},
+    closeSettingsDialog: () => {},
+    confirmSessionDelete: () => true,
+    removeSession: () => {},
+    setCommandFeedback: () => {},
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: () => "session",
+    setError: () => {},
+    clearError: () => {},
+    applyRuntimeEvent: () => true,
+    applyThemeForSession: () => {},
+    getSessionThemeConfig: () => ({}),
+    setSessionSendTerminator: () => {},
+    setStartupSettingsFeedback: () => {},
+    requestRender: () => {},
+    api: {},
+    debugLog: () => {}
+  });
+
+  controller.renderWorkspace({
+    state: {
+      sessions: [{ id: "s1", deckId: "ops" }],
+      decks: [{ id: "ops" }],
+      activeSessionId: "s1",
+      connectionState: "connected"
+    },
+    uiState: {
+      loading: false,
+      error: "",
+      commandFeedback: "",
+      commandInlineHint: "",
+      commandInlineHintPrefixPx: 0,
+      commandPreview: "",
+      commandSuggestions: ""
+    },
+    startupPerf: { firstNonEmptyRenderAtMs: null, firstTerminalMountedAtMs: null },
+    nowMs: () => 12,
+    maybeReportStartupPerf: () => {}
+  });
+
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "mount-container" && entry[1] === "parking"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "split-render" && entry[1] === "ops"));
+});
+
 test("session-grid controller reorders existing cards by quick-id order", () => {
   const calls = [];
   const appended = [];
