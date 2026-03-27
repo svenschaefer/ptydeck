@@ -128,6 +128,23 @@
           <p id="replay-viewer-status" class="replay-viewer-status"></p>
           <pre id="replay-viewer-content" class="replay-viewer-content"></pre>
         </dialog>
+        <dialog id="command-palette-dialog" class="command-palette-dialog">
+          <div class="command-palette-head">
+            <div class="command-palette-heading">
+              <p class="command-palette-title">Command Palette</p>
+              <p id="command-palette-meta" class="command-palette-meta"></p>
+            </div>
+            <button id="command-palette-close" type="button" aria-label="Close command palette">x</button>
+          </div>
+          <input
+            id="command-palette-input"
+            class="command-palette-input"
+            type="text"
+            placeholder="Search commands, sessions, and decks"
+          />
+          <div id="command-palette-results" class="command-palette-results"></div>
+          <p id="command-palette-empty" class="command-palette-empty" hidden>No matching commands, sessions, or decks.</p>
+        </dialog>
       </section>
     </div>
 

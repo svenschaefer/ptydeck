@@ -515,6 +515,13 @@ function createDocumentFixture() {
   const replayViewerDownload = new FakeElement({ id: "replay-viewer-download", tagName: "button" });
   const replayViewerCopy = new FakeElement({ id: "replay-viewer-copy", tagName: "button" });
   const replayViewerClose = new FakeElement({ id: "replay-viewer-close", tagName: "button" });
+  const commandPaletteDialog = new FakeElement({ id: "command-palette-dialog", tagName: "dialog" });
+  const commandPaletteMeta = new FakeElement({ id: "command-palette-meta", tagName: "p" });
+  const commandPaletteInput = new FakeElement({ id: "command-palette-input", tagName: "input" });
+  const commandPaletteResults = new FakeElement({ id: "command-palette-results", tagName: "div" });
+  const commandPaletteEmpty = new FakeElement({ id: "command-palette-empty", tagName: "p" });
+  commandPaletteEmpty.hidden = true;
+  const commandPaletteClose = new FakeElement({ id: "command-palette-close", tagName: "button" });
   replayViewerDialog.appendChild(replayViewerTitle);
   replayViewerDialog.appendChild(replayViewerMeta);
   replayViewerDialog.appendChild(replayViewerStatus);
@@ -523,6 +530,11 @@ function createDocumentFixture() {
   replayViewerDialog.appendChild(replayViewerDownload);
   replayViewerDialog.appendChild(replayViewerCopy);
   replayViewerDialog.appendChild(replayViewerClose);
+  commandPaletteDialog.appendChild(commandPaletteMeta);
+  commandPaletteDialog.appendChild(commandPaletteInput);
+  commandPaletteDialog.appendChild(commandPaletteResults);
+  commandPaletteDialog.appendChild(commandPaletteEmpty);
+  commandPaletteDialog.appendChild(commandPaletteClose);
   const template = {
     id: "terminal-card-template",
     content: {
@@ -576,7 +588,13 @@ function createDocumentFixture() {
     replayViewerRefresh,
     replayViewerDownload,
     replayViewerCopy,
-    replayViewerClose
+    replayViewerClose,
+    commandPaletteDialog,
+    commandPaletteMeta,
+    commandPaletteInput,
+    commandPaletteResults,
+    commandPaletteEmpty,
+    commandPaletteClose
   ]) {
     byId.set(element.id, element);
   }
@@ -625,7 +643,13 @@ function createDocumentFixture() {
       replayViewerRefresh,
       replayViewerDownload,
       replayViewerCopy,
-      replayViewerClose
+      replayViewerClose,
+      commandPaletteDialog,
+      commandPaletteMeta,
+      commandPaletteInput,
+      commandPaletteResults,
+      commandPaletteEmpty,
+      commandPaletteClose
     },
     document: {
       getElementById(id) {
@@ -1287,6 +1311,36 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(suggestionEnterEvent.defaultPrevented, true);
   assert.equal(fixture.elements.commandInput.value, "/close");
   assert.equal(inputPayloads.length, inputCountBeforeSuggestionEnter);
+
+  const paletteShortcutEvent = {
+    type: "keydown",
+    key: "k",
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+  win.dispatchEvent(paletteShortcutEvent);
+  await tick();
+  assert.equal(paletteShortcutEvent.defaultPrevented, true);
+  assert.equal(fixture.elements.commandPaletteDialog.open, true);
+  fixture.elements.commandPaletteInput.value = "go";
+  fixture.elements.commandPaletteInput.dispatchEvent({ type: "input" });
+  await tick();
+  fixture.elements.commandPaletteInput.dispatchEvent({
+    type: "keydown",
+    key: "Enter",
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  });
+  await tick();
+  assert.equal(fixture.elements.commandPaletteDialog.open, false);
+  assert.equal(fixture.elements.commandInput.value, "/go");
 
   fixture.elements.commandInput.value = "/c";
   const tabForward = {

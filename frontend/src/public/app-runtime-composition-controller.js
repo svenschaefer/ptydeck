@@ -5,6 +5,7 @@ import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-co
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
+import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createStore } from "./store.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
@@ -127,6 +128,12 @@ const replayViewerRefreshBtn = document.getElementById("replay-viewer-refresh");
 const replayViewerDownloadBtn = document.getElementById("replay-viewer-download");
 const replayViewerCopyBtn = document.getElementById("replay-viewer-copy");
 const replayViewerCloseBtn = document.getElementById("replay-viewer-close");
+const commandPaletteDialogEl = document.getElementById("command-palette-dialog");
+const commandPaletteMetaEl = document.getElementById("command-palette-meta");
+const commandPaletteInputEl = document.getElementById("command-palette-input");
+const commandPaletteResultsEl = document.getElementById("command-palette-results");
+const commandPaletteEmptyEl = document.getElementById("command-palette-empty");
+const commandPaletteCloseBtn = document.getElementById("command-palette-close");
 const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
 const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
@@ -298,6 +305,7 @@ let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
 let replayViewerRuntimeController = null;
+let commandPaletteRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -842,6 +850,44 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   commandComposerRuntimeController,
   appLifecycleController
 } = appBootstrapCompositionController.composeControllers());
+
+commandPaletteRuntimeController = createCommandPaletteRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  dialogEl: commandPaletteDialogEl,
+  searchInputEl: commandPaletteInputEl,
+  resultsEl: commandPaletteResultsEl,
+  emptyEl: commandPaletteEmptyEl,
+  metaEl: commandPaletteMetaEl,
+  closeBtn: commandPaletteCloseBtn,
+  commandInput,
+  systemSlashCommands: SYSTEM_SLASH_COMMANDS,
+  getState: () => store.getState(),
+  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  activateSessionTarget: (session) => commandTargetRuntimeController?.activateSessionTarget?.(session) || { ok: false, message: "" },
+  activateDeckTarget: (deck) => commandTargetRuntimeController?.activateDeckTarget?.(deck) || { ok: false, message: "" },
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setComposerValue: (value) => {
+    if (!commandInput) {
+      return;
+    }
+    commandInput.value = String(value || "");
+    if (typeof commandInput.setSelectionRange === "function") {
+      const length = commandInput.value.length;
+      commandInput.setSelectionRange(length, length);
+    }
+    commandInput.focus?.();
+    if (typeof commandInput.dispatchEvent === "function") {
+      if (typeof window?.Event === "function") {
+        commandInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+      } else {
+        commandInput.dispatchEvent({ type: "input" });
+      }
+    }
+  }
+});
 
 function setInitializationError(message) {
   appCommandUiFacadeController?.setError(message);

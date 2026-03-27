@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
+- Latest completed wave: `v0.4.0-H22` (Command Palette and Keyboard Navigation, `UX-001`).
+- Previous completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
 - Previous completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
 - Previous completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
 - Previous completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
@@ -37,6 +38,22 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H22 - Command Palette and Keyboard Navigation (Completed)
+
+- `UX-001`
+
+Dependencies:
+
+- `UX-001` reused the existing declarative slash-command schema, command composer, session-target runtime, and deck activation flows so keyboard-first navigation could be added without introducing a second command system or backend contract.
+
+Exit criteria:
+
+- The frontend exposes a global command palette reachable via `Ctrl/Cmd+K`.
+- The palette searches deterministically across slash commands, saved custom commands, sessions, and decks.
+- Keyboard navigation (`ArrowUp`, `ArrowDown`, `Enter`, `Esc`) is supported end to end.
+- Command selections prefill the central composer, while session and deck selections activate their target directly.
+- Regression coverage exists for palette filtering, selection behavior, and app-level shortcut wiring.
 
 ### v0.4.0-H21 - Developer Productivity Templates and ADR Process (Completed)
 

@@ -925,6 +925,127 @@ button:hover {
   background: rgba(0, 0, 0, 0.55);
 }
 
+.command-palette-dialog {
+  width: min(760px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(23, 33, 49, 0.98), rgba(12, 18, 28, 0.98)),
+    #0f151f;
+  color: var(--text);
+  overflow: hidden;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+}
+
+.command-palette-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.command-palette-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid #223041;
+}
+
+.command-palette-heading {
+  min-width: 0;
+}
+
+.command-palette-title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9db8d2;
+}
+
+.command-palette-meta {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.command-palette-input {
+  width: calc(100% - 32px);
+  margin: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #2c4054;
+  background: rgba(9, 14, 22, 0.85);
+  color: #eef5ff;
+  font: inherit;
+}
+
+.command-palette-results {
+  padding: 0 16px 16px;
+  max-height: min(520px, calc(100vh - 220px));
+  overflow: auto;
+}
+
+.command-palette-group {
+  margin: 0;
+  padding: 14px 2px 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6f879d;
+}
+
+.command-palette-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(14, 20, 31, 0.76);
+  color: inherit;
+  text-align: left;
+}
+
+.command-palette-item + .command-palette-item {
+  margin-top: 8px;
+}
+
+.command-palette-item:hover,
+.command-palette-item.selected {
+  border-color: #4d8bff;
+  background: linear-gradient(180deg, rgba(34, 51, 80, 0.86), rgba(15, 25, 40, 0.9));
+}
+
+.command-palette-item-title {
+  color: #eef5ff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.command-palette-item-subtitle {
+  color: #9db8d2;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.command-palette-item-detail {
+  color: #6f879d;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.command-palette-empty {
+  margin: 0;
+  padding: 0 16px 16px;
+  color: #9db8d2;
+  font-size: 12px;
+}
+
 .replay-viewer-head {
   display: flex;
   align-items: flex-start;

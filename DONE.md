@@ -4,6 +4,15 @@ Completed and verified topics belong here.
 
 ## 2026-03-27
 
+- [x] `UX-001` is now completed: the frontend exposes a global command palette reachable via `Ctrl/Cmd+K`, with deterministic search across slash commands, saved custom commands, sessions, and decks plus keyboard-only selection via `ArrowUp`, `ArrowDown`, `Enter`, and `Esc`.
+- [x] Added `frontend/src/public/command-palette-runtime-controller.js`, which now owns command-palette entry construction, deterministic filtering, grouped rendering, global shortcut handling, and command/session/deck selection behavior.
+- [x] `frontend/src/public/app-runtime-composition-controller.js`, `frontend/src/public/index.html`, and `frontend/src/public/styles.css` now wire the new command-palette dialog into the existing runtime composition so command picks prefill the central composer while session and deck picks activate their target directly.
+- [x] Added or updated frontend regression coverage in `frontend/test/command-palette-runtime-controller.test.js` and `frontend/test/app.test.js`, covering palette ordering/filtering, command prefills, session/deck activation, and app-level `Ctrl/Cmd+K` integration.
+- [x] `README.md` now documents the command palette explicitly so the keyboard-first entry path is no longer implicit.
+- [x] Validation for the `v0.4.0-H22` closeout passed with targeted palette/app regressions (`node --test frontend/test/command-palette-runtime-controller.test.js frontend/test/app.test.js`), `npm run lint`, `npm run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `v0.4.0-H22` closeout step: backend `91.68%` lines and frontend `95.16%` lines on the final validated tree.
+- [x] `v0.4.0-H22` is now fully completed: `UX-001` is closed, and there is currently no active open delivery wave in `ROADMAP.md`.
+
 - [x] `DPR-001` is now completed: the repository now has an explicit ADR process in `docs/adr/README.md` with deterministic numbering, required section rules, a reusable template in `docs/adr/0000-template.md`, a creation helper in `scripts/new-adr.sh`, a structure checker in `scripts/check-adr-process.sh`, and an initial accepted ADR in `docs/adr/0001-local-validation-is-the-authoritative-quality-gate.md`.
 - [x] `DPR-002` is now completed: repository-local starter templates now exist in `templates/backend-endpoint/` and `templates/frontend-ui-module/`, and `scripts/scaffold-ui-module.mjs` can generate a frontend controller/test pair aligned with the current `create...Controller()` module pattern.
 - [x] Root validation now includes repository tooling coverage: `package.json` adds `./scripts/check-adr-process.sh` to `npm run lint` and `node --test test/*.test.js` to `npm run test`, while `test/adr-process.test.js` and `test/scaffolding.test.js` cover the ADR generator/checker and the frontend UI-module scaffold helper.
