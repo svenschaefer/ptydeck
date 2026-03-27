@@ -50,7 +50,7 @@ export function createSessionCardRenderController(options = {}) {
     renderSessionTagList(entry, session);
     renderSessionNote(entry, session);
 
-    if (!entry.settingsDirty) {
+    if (!entry.settingsDirty && entry.settingsDialog?.open === true) {
       syncSessionStartupControls(entry, session);
       syncSessionInputSafetyControls(entry, session);
       syncSessionThemeControls(entry, session.id);

@@ -82,7 +82,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   assert.deepEqual(calls.includes("sync:s1"), false);
   assert.deepEqual(calls.includes("tags"), true);
   assert.deepEqual(calls.includes("note"), true);
-  assert.deepEqual(calls.includes("theme"), true);
+  assert.deepEqual(calls.includes("theme"), false);
 });
 
 test("session-card-render controller performs viewport sync on show", () => {
@@ -104,4 +104,27 @@ test("session-card-render controller performs viewport sync on show", () => {
   });
 
   assert.deepEqual(calls, ["sync:s2"]);
+});
+
+test("session-card-render controller only syncs settings controls while dialog is open", () => {
+  const calls = [];
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {},
+    syncSessionStartupControls: () => calls.push("startup"),
+    syncSessionInputSafetyControls: () => calls.push("input-safety"),
+    syncSessionThemeControls: () => calls.push("theme"),
+    setSettingsDirty: () => calls.push("dirty:false")
+  });
+
+  const entry = createEntry();
+  entry.settingsDialog = { open: true };
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s3", name: "beta" },
+    activeSessionId: "other",
+    nextVisible: true
+  });
+
+  assert.deepEqual(calls, ["startup", "input-safety", "theme", "dirty:false"]);
 });

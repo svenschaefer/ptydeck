@@ -65,6 +65,15 @@ export function createSessionCardInteractionsController(options = {}) {
       setSettingsDirty(getEntry(), nextDirty);
     }
 
+    function syncSettingsDialogControls() {
+      const currentSession = getSession() || session;
+      const entry = getEntry();
+      syncSessionStartupControls(entry, currentSession);
+      syncSessionInputSafetyControls(entry, currentSession);
+      syncSessionThemeControls(entry, currentSession.id);
+      setSettingsDirty(entry, false);
+    }
+
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
     refs.replayViewBtn?.addEventListener("click", async () => {
       try {
@@ -90,7 +99,12 @@ export function createSessionCardInteractionsController(options = {}) {
         setError(getErrorMessage(error, "Failed to export session replay."));
       }
     });
-    refs.settingsBtn?.addEventListener("click", () => toggleSettingsDialog(refs.settingsDialog));
+    refs.settingsBtn?.addEventListener("click", () => {
+      if (!refs.settingsDialog?.open) {
+        syncSettingsDialogControls();
+      }
+      toggleSettingsDialog(refs.settingsDialog);
+    });
     refs.settingsDismissBtn?.addEventListener("click", () => closeSettingsDialog(refs.settingsDialog));
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {
       refs.settingsDialog.addEventListener("cancel", (event) => {

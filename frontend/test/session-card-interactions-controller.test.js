@@ -35,7 +35,13 @@ test("session-card-interactions controller wires focus and settings dialog contr
     session: { id: "s1" },
     refs,
     api: {},
+    getSession: () => ({ id: "s1" }),
+    getEntry: () => ({ id: "entry-1" }),
     onActivateSession: (sessionId) => calls.push(`focus:${sessionId}`),
+    syncSessionStartupControls: () => calls.push("sync-startup"),
+    syncSessionInputSafetyControls: () => calls.push("sync-input-safety"),
+    syncSessionThemeControls: () => calls.push("sync-theme"),
+    setSettingsDirty: (_entry, dirty) => calls.push(`dirty:${dirty}`),
     toggleSettingsDialog: () => calls.push("toggle"),
     closeSettingsDialog: () => calls.push("close")
   });
@@ -45,7 +51,17 @@ test("session-card-interactions controller wires focus and settings dialog contr
   await refs.settingsDismissBtn.emit("click");
   await refs.settingsDialog.emit("cancel", { preventDefault: () => calls.push("prevent") });
 
-  assert.deepEqual(calls, ["focus:s1", "toggle", "close", "prevent", "close"]);
+  assert.deepEqual(calls, [
+    "focus:s1",
+    "sync-startup",
+    "sync-input-safety",
+    "sync-theme",
+    "dirty:false",
+    "toggle",
+    "close",
+    "prevent",
+    "close"
+  ]);
 });
 
 test("session-card-interactions controller exports replay tails from the toolbar action", async () => {
