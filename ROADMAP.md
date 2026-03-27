@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
+- Latest completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
+- Previous completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
 - Previous completed wave: `v0.4.0-H22` (Command Palette and Keyboard Navigation, `UX-001`).
 - Previous completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
 - Previous completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
@@ -39,6 +40,24 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H24 - Frontend Quick-ID Swap Consistency (Completed)
+
+- `QLT-142`, `QLT-143`
+
+Dependencies:
+
+- `QLT-142` keeps the existing frontend-local quick-ID model but makes quick-ID order authoritative for rendered session order in the deck sidebar, workspace grid, and selector-driven navigation so `/swap` changes become visible immediately instead of staying cosmetic.
+- `QLT-143` follows `QLT-142` and persists the frontend-local quick-ID mapping in browser storage so manual swaps survive browser reloads without introducing backend persistence or changing the intentionally short-lived quick-ID contract.
+
+Exit criteria:
+
+- `/swap <selectorA> <selectorB>` immediately reorders visible session surfaces according to swapped quick IDs instead of only changing labels.
+- Quick-ID-ordered behavior is consistent across sidebar rendering, terminal-card order, and selector-driven navigation paths such as `/list`, `/next`, and `/prev`.
+- Frontend-local quick-ID swaps survive browser reloads within the same browser storage context while remaining intentionally non-backend-persisted.
+- Regression coverage exists for quick-ID swap ordering, browser-storage restore, and app-level render behavior.
+
+## Previous Completed Wave
 
 ### v0.4.0-H23 - Persistent Layout Profiles (Completed)
 

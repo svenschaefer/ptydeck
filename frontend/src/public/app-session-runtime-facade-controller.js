@@ -131,6 +131,10 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     return getSessionRuntimeController()?.formatSessionToken?.(sessionId) || "?";
   }
 
+  function sortSessionsByQuickId(sessions) {
+    return getSessionRuntimeController()?.sortSessionsByQuickId?.(sessions) || (Array.isArray(sessions) ? sessions.slice() : []);
+  }
+
   return {
     getSessionById,
     resolveSessionDeckId,
@@ -152,6 +156,7 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     applyRuntimeEvent,
     formatSessionDisplayName,
     swapSessionTokens,
-    formatSessionToken
+    formatSessionToken,
+    sortSessionsByQuickId
   };
 }

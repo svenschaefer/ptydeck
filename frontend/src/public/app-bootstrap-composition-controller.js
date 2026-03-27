@@ -164,6 +164,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
       formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
       formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+      sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId?.(sessions) || [],
       swapSessionTokens: (sessionIdA, sessionIdB) => appSessionRuntimeFacadeController?.swapSessionTokens?.(sessionIdA, sessionIdB) === true,
       getSessionRuntimeState: sessionUiFacadeController?.getSessionRuntimeState,
       isSessionExited: sessionUiFacadeController?.isSessionExited,

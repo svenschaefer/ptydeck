@@ -25,6 +25,8 @@ export function createCommandExecutor(options = {}) {
   const resolveSessionDeckId = options.resolveSessionDeckId;
   const formatSessionToken = options.formatSessionToken;
   const formatSessionDisplayName = options.formatSessionDisplayName;
+  const sortSessionsByQuickId =
+    typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
   const swapSessionTokens =
     typeof options.swapSessionTokens === "function" ? options.swapSessionTokens : () => false;
   const getSessionRuntimeState = options.getSessionRuntimeState;
@@ -120,7 +122,7 @@ export function createCommandExecutor(options = {}) {
     const command = commandRaw.toLowerCase();
     const args = interpreted.args;
     const state = store.getState();
-    const sessions = state.sessions;
+    const sessions = sortSessionsByQuickId(state.sessions);
     const activeSessionId = state.activeSessionId;
 
     if (command === "help" || command === "") {

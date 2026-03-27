@@ -17,6 +17,21 @@ function createTerminal() {
   };
 }
 
+function createStorage(initial = {}) {
+  const data = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
+  return {
+    getItem(key) {
+      return data.has(String(key)) ? data.get(String(key)) : null;
+    },
+    setItem(key, value) {
+      data.set(String(key), String(value));
+    },
+    removeItem(key) {
+      data.delete(String(key));
+    }
+  };
+}
+
 test("session-runtime controller assigns and prunes quick ids deterministically", () => {
   const controller = createSessionRuntimeController({
     sessionQuickIds: new Map(),
@@ -30,10 +45,12 @@ test("session-runtime controller assigns and prunes quick ids deterministically"
   assert.equal(controller.ensureQuickId("s3"), "1");
 });
 
-test("session-runtime controller swaps quick ids deterministically", () => {
+test("session-runtime controller swaps quick ids deterministically and restores them from browser storage", () => {
+  const storageRef = createStorage();
   const controller = createSessionRuntimeController({
     sessionQuickIds: new Map(),
-    quickIdPool: ["1", "2", "3"]
+    quickIdPool: ["1", "2", "3"],
+    storageRef
   });
 
   assert.equal(controller.ensureQuickId("s1"), "1");
@@ -41,7 +58,22 @@ test("session-runtime controller swaps quick ids deterministically", () => {
   assert.equal(controller.swapSessionTokens("s1", "s2"), true);
   assert.equal(controller.formatSessionToken("s1"), "2");
   assert.equal(controller.formatSessionToken("s2"), "1");
+  assert.deepEqual(
+    controller.sortSessionsByQuickId([
+      { id: "s1", name: "one" },
+      { id: "s2", name: "two" }
+    ]).map((session) => session.id),
+    ["s2", "s1"]
+  );
   assert.equal(controller.swapSessionTokens("s1", "s1"), false);
+
+  const reloadedController = createSessionRuntimeController({
+    sessionQuickIds: new Map(),
+    quickIdPool: ["1", "2", "3"],
+    storageRef
+  });
+  assert.equal(reloadedController.formatSessionToken("s1"), "2");
+  assert.equal(reloadedController.formatSessionToken("s2"), "1");
 });
 
 test("session-runtime controller appends chunks and retries replay for late terminal mounts", () => {

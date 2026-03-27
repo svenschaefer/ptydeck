@@ -23,6 +23,7 @@ function createExecutor() {
     resolveSessionDeckId: (session) => String(session?.deckId || "default"),
     formatSessionToken: (id) => String(id || ""),
     formatSessionDisplayName: (session) => String(session?.name || ""),
+    sortSessionsByQuickId: (sessions) => (Array.isArray(sessions) ? sessions.slice() : []),
     swapSessionTokens: () => false,
     getSessionRuntimeState: () => ({}),
     isSessionExited: () => false,
@@ -315,6 +316,7 @@ test("command executor swaps quick ids between two resolved sessions and request
     resolveSessionDeckId: () => "default",
     formatSessionToken: (id) => (id === "s1" ? "7" : id === "s2" ? "8" : id),
     formatSessionDisplayName: (session) => session.name,
+    sortSessionsByQuickId: (list) => list.slice().sort((left, right) => (left.id === "s2" ? -1 : right.id === "s2" ? 1 : 0)),
     swapSessionTokens: (left, right) => {
       calls.push(["swap", left, right]);
       return true;
@@ -362,6 +364,73 @@ test("command executor swaps quick ids between two resolved sessions and request
     ["swap", "s1", "s2"],
     ["render"]
   ]);
+});
+
+test("command executor uses quick-id order for list and next navigation", async () => {
+  const activeSessionState = { value: "s1" };
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: activeSessionState.value
+        };
+      },
+      setActiveSession(sessionId) {
+        activeSessionState.value = sessionId;
+      }
+    },
+    api: {},
+    systemSlashCommands: ["list", "next", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s1" ? "2" : id === "s2" ? "1" : id),
+    formatSessionDisplayName: (session) => session.name,
+    sortSessionsByQuickId: (list) => list.slice().sort((left, right) => (left.id === "s2" ? -1 : right.id === "s2" ? 1 : 0)),
+    swapSessionTokens: () => false,
+    getSessionRuntimeState: () => "inactive",
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  const listText = await executor.execute({ command: "list", args: [], raw: "/list" });
+  assert.match(listText, /^\s+\[1\] two/m);
+  assert.match(listText, /^\* \[2\] one/m);
+
+  const nextText = await executor.execute({ command: "next", args: [], raw: "/next" });
+  assert.equal(nextText, "Active session: [1] two.");
+  assert.equal(activeSessionState.value, "s2");
 });
 
 test("command executor downloads retained replay tails for the active session by default", async () => {

@@ -249,3 +249,73 @@ test("session-grid controller creates new cards and schedules resize passes", ()
     "resize-deferred"
   ]);
 });
+
+test("session-grid controller reorders existing cards by quick-id order", () => {
+  const calls = [];
+  const appended = [];
+  const entryOne = { element: { id: "node-s1" } };
+  const entryTwo = { element: { id: "node-s2" } };
+  const terminals = new Map([
+    ["s1", entryOne],
+    ["s2", entryTwo]
+  ]);
+  const controller = createSessionGridController({
+    defaultDeckId: "default",
+    terminals,
+    terminalObservers: new Map(),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    sessionThemeDrafts: new Map(),
+    gridEl: {
+      appendChild(node) {
+        appended.push(node.id);
+      }
+    },
+    getActiveDeck: () => ({ id: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionFilterText: () => "",
+    sortSessionsByQuickId: (sessions) => sessions.slice().reverse(),
+    renderDeckTabs: () => calls.push("tabs"),
+    workspaceRenderController: {
+      resolveVisibleSessions: () => ({ visibleSessionIds: new Set(["s1", "s2"]), filterActive: false, switchedActiveSession: false }),
+      renderEmptyState: () => calls.push("empty"),
+      renderStatus: () => calls.push("status")
+    },
+    pruneQuickIds: () => calls.push("prune"),
+    syncActiveTerminalSearch: () => calls.push("search"),
+    sessionDisposalController: {
+      cleanupRemovedSessions: () => false
+    },
+    sessionCardRenderController: {
+      updateExistingSessionCard: (payload) => calls.push(["update", payload.session.id, payload.nextVisible])
+    },
+    debugLog: () => calls.push("debug")
+  });
+
+  const result = controller.renderWorkspace({
+    state: {
+      sessions: [
+        { id: "s1", deckId: "d1" },
+        { id: "s2", deckId: "d1" }
+      ],
+      decks: [{ id: "d1" }],
+      activeSessionId: "s1",
+      connectionState: "connected"
+    },
+    uiState: {
+      loading: false,
+      error: "",
+      commandFeedback: "",
+      commandInlineHint: "",
+      commandInlineHintPrefixPx: 0,
+      commandPreview: "",
+      commandSuggestions: ""
+    },
+    startupPerf: { firstNonEmptyRenderAtMs: null, firstTerminalMountedAtMs: null },
+    nowMs: () => 42,
+    maybeReportStartupPerf: () => calls.push("perf")
+  });
+
+  assert.equal(result.aborted, false);
+  assert.deepEqual(appended, ["node-s2", "node-s1"]);
+});

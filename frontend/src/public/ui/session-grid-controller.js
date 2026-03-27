@@ -12,6 +12,8 @@ export function createSessionGridController(options = {}) {
   const getActiveDeck = options.getActiveDeck || (() => null);
   const resolveSessionDeckId = options.resolveSessionDeckId || (() => defaultDeckId);
   const getSessionFilterText = options.getSessionFilterText || (() => "");
+  const sortSessionsByQuickId =
+    typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
   const pruneQuickIds = options.pruneQuickIds || (() => {});
   const renderDeckTabs = options.renderDeckTabs || (() => {});
   const workspaceRenderController = options.workspaceRenderController || null;
@@ -61,11 +63,12 @@ export function createSessionGridController(options = {}) {
   function renderWorkspace({ state, uiState, startupPerf, nowMs, maybeReportStartupPerf, resolveFilterSelectors }) {
     const activeDeck = getActiveDeck();
     const activeDeckId = activeDeck ? activeDeck.id : "";
+    const orderedSessions = sortSessionsByQuickId(state.sessions);
     const deckSessions = activeDeckId
-      ? state.sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
-      : state.sessions.slice();
+      ? orderedSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
+      : orderedSessions.slice();
 
-    renderDeckTabs(state.sessions);
+    renderDeckTabs(orderedSessions);
     const hasDecks = state.decks.length > 0;
     if (deckRenameBtn) {
       deckRenameBtn.disabled = !hasDecks;
@@ -90,14 +93,14 @@ export function createSessionGridController(options = {}) {
       return { aborted: true };
     }
 
-    pruneQuickIds(state.sessions.map((session) => session.id));
-    if (state.sessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
+    pruneQuickIds(orderedSessions.map((session) => session.id));
+    if (orderedSessions.length > 0 && startupPerf.firstNonEmptyRenderAtMs === null) {
       startupPerf.firstNonEmptyRenderAtMs = nowMs();
       maybeReportStartupPerf();
     }
 
     debugLog("ui.render", {
-      sessions: state.sessions.length,
+      sessions: orderedSessions.length,
       deckSessions: deckSessions.length,
       visibleSessions: visibleSessionIds.size,
       activeSessionId: state.activeSessionId,
@@ -107,7 +110,7 @@ export function createSessionGridController(options = {}) {
     });
 
     workspaceRenderController?.renderEmptyState({
-      sessions: state.sessions,
+      sessions: orderedSessions,
       deckSessions,
       visibleSessionIds,
       filterActive
@@ -133,7 +136,7 @@ export function createSessionGridController(options = {}) {
     });
     syncActiveTerminalSearch({ preserveSelection: true });
 
-    const activeIds = new Set(state.sessions.map((session) => session.id));
+    const activeIds = new Set(orderedSessions.map((session) => session.id));
     let shouldRunResizePass =
       sessionDisposalController?.cleanupRemovedSessions({
         activeSessionIds: activeIds,
@@ -148,7 +151,7 @@ export function createSessionGridController(options = {}) {
         sessionThemeDrafts
       }) === true;
 
-    for (const session of state.sessions) {
+    for (const session of orderedSessions) {
       if (terminals.has(session.id)) {
         const entry = terminals.get(session.id);
         const nextVisible = visibleSessionIds.has(session.id);
@@ -158,6 +161,9 @@ export function createSessionGridController(options = {}) {
           activeSessionId: state.activeSessionId,
           nextVisible
         });
+        if (gridEl && entry?.element && typeof gridEl.appendChild === "function") {
+          gridEl.appendChild(entry.element);
+        }
         continue;
       }
 

@@ -4,6 +4,8 @@ export function createDeckSidebarController(options = {}) {
   const resolveSessionDeckId =
     typeof options.resolveSessionDeckId === "function" ? options.resolveSessionDeckId : (session) => String(session?.deckId || "default");
   const ensureQuickId = typeof options.ensureQuickId === "function" ? options.ensureQuickId : (sessionId) => String(sessionId || "");
+  const sortSessionsByQuickId =
+    typeof options.sortSessionsByQuickId === "function" ? options.sortSessionsByQuickId : (sessions) => (Array.isArray(sessions) ? sessions.slice() : []);
   const formatSessionDisplayName =
     typeof options.formatSessionDisplayName === "function" ? options.formatSessionDisplayName : (session) => String(session?.name || session?.id || "");
   const getSessionActivityIndicatorState =
@@ -29,7 +31,7 @@ export function createDeckSidebarController(options = {}) {
       return;
     }
     const decks = Array.isArray(state.decks) ? state.decks : [];
-    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    const sessions = sortSessionsByQuickId(Array.isArray(state.sessions) ? state.sessions : []);
     const activeDeckId = String(state.activeDeckId || "");
     const activeSessionId = String(state.activeSessionId || "");
 

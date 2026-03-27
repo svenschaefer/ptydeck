@@ -75,6 +75,13 @@ class FakeElement {
   }
 
   appendChild(child) {
+    if (child.parentNode) {
+      const siblings = child.parentNode.children;
+      const existingIndex = siblings.indexOf(child);
+      if (existingIndex >= 0) {
+        siblings.splice(existingIndex, 1);
+      }
+    }
     child.parentNode = this;
     this.children.push(child);
     return child;
@@ -718,6 +725,12 @@ function findDeckSessionButton(deckTabs, deckId, sessionId) {
     }
   }
   return null;
+}
+
+function findTerminalCardBySessionName(terminalGrid, sessionName) {
+  return (
+    terminalGrid.children.find((entry) => entry.querySelector?.(".session-focus")?.textContent === sessionName) || null
+  );
 }
 
 test("app handles critical error paths, DOM lifecycle, and connection state rendering", async (t) => {
@@ -1636,8 +1649,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     findDeckSessionButton(fixture.elements.deckTabs, "default", "s-2").querySelector(".session-quick-id").textContent,
     "1"
   );
-  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "2");
-  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "1");
+  assert.deepEqual(
+    findDeckGroup(fixture.elements.deckTabs, "default").children
+      .find((entry) => entry.classList?.contains("deck-session-list"))
+      .children.map((entry) => entry.getAttribute("data-session-id")),
+    ["s-2", "s-1"]
+  );
+  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-quick-id").textContent, "1");
+  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-quick-id").textContent, "2");
+  assert.equal(fixture.elements.terminalGrid.children[0].querySelector(".session-focus").textContent, "two");
+  assert.equal(fixture.elements.terminalGrid.children[1].querySelector(".session-focus").textContent, "one");
 
   ws.emit("message", {
     data: JSON.stringify({
@@ -1742,8 +1763,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   await tick();
 
-  const firstCard = fixture.elements.terminalGrid.children[0];
-  const secondCard = fixture.elements.terminalGrid.children[1];
+  const firstCard = findTerminalCardBySessionName(fixture.elements.terminalGrid, "one");
+  const secondCard = findTerminalCardBySessionName(fixture.elements.terminalGrid, "two");
   fixture.elements.commandInput.value = "/filter alpha";
   fixture.elements.sendCommand.click();
   await tick();
@@ -3000,17 +3021,18 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   fixture.elements.terminalSearchInput.dispatchEvent({ type: "input" });
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 1/2");
-  assert.equal(MockTerminal.instances[0].selected?.row, 0);
+  const selectedTerminal = MockTerminal.instances.find((terminal) => terminal.selected);
+  assert.equal(selectedTerminal?.selected?.row, 0);
 
   fixture.elements.terminalSearchNext.click();
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 2/2");
-  assert.equal(MockTerminal.instances[0].selected?.row, 1);
+  assert.equal(selectedTerminal?.selected?.row, 1);
 
   fixture.elements.terminalSearchNext.click();
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "Wrapped to next match (Match 1/2).");
-  assert.equal(MockTerminal.instances[0].selected?.row, 0);
+  assert.equal(selectedTerminal?.selected?.row, 0);
 
   fixture.elements.terminalSearchInput.value = "ops";
   fixture.elements.terminalSearchInput.dispatchEvent({ type: "input" });
@@ -3022,7 +3044,7 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   });
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "No matches in active terminal.");
-  assert.equal(MockTerminal.instances[1].selected, null);
+  assert.equal(MockTerminal.instances.filter((terminal) => terminal.selected).length, 0);
   let sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
   let indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
   assert.ok(sessionButton);
@@ -3043,7 +3065,8 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "Match 1/1");
-  assert.equal(MockTerminal.instances[1].selected?.row, 0);
+  const opsSelectedTerminal = MockTerminal.instances.find((terminal) => terminal.selected);
+  assert.equal(opsSelectedTerminal?.selected?.row, 0);
   sessionButton = findDeckSessionButton(fixture.elements.deckTabs, "ops", "s-2");
   indicator = sessionButton?.querySelector(".deck-session-activity-indicator");
   assert.equal(sessionButton.classList.contains("active"), true);
@@ -3052,7 +3075,7 @@ test("app search tracks active terminal matches across buffer growth and deck sw
   fixture.elements.terminalSearchClear.click();
   await tick();
   assert.equal(fixture.elements.terminalSearchStatus.textContent, "");
-  assert.equal(MockTerminal.instances[1].selected, null);
+  assert.equal(opsSelectedTerminal?.selected, null);
 
   ws.emit("close", {});
   await tick();

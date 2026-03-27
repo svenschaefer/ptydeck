@@ -142,3 +142,44 @@ test("deck-sidebar controller renders deck/session buttons and dispatches activa
   assert.deepEqual(activations, ["deck-b"]);
   assert.deepEqual(sessionActivations, ["s-2"]);
 });
+
+test("deck-sidebar controller renders sessions in quick-id order", () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => (sessionId === "s-1" ? "2" : "1"),
+    sortSessionsByQuickId: (sessions) =>
+      sessions.slice().sort((left, right) => {
+        const leftToken = left.id === "s-1" ? "2" : "1";
+        const rightToken = right.id === "s-1" ? "2" : "1";
+        return leftToken.localeCompare(rightToken, "en-US");
+      }),
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  controller.render({
+    decks: [{ id: "default", name: "Default" }],
+    sessions: [
+      { id: "s-1", name: "One", deckId: "default" },
+      { id: "s-2", name: "Two", deckId: "default" }
+    ],
+    activeDeckId: "default",
+    activeSessionId: "s-1"
+  });
+
+  const group = findFirst(container, (el) => el.getAttribute?.("data-deck-id") === "default");
+  const sessionList = findFirst(group, (el) => el.className === "deck-session-list");
+  assert.ok(sessionList);
+  assert.deepEqual(
+    sessionList.children.map((entry) => entry.getAttribute("data-session-id")),
+    ["s-2", "s-1"]
+  );
+});
