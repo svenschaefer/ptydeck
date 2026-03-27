@@ -1,4 +1,5 @@
 import { createCommandHelpText, createCommandTopicHelpText, createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
+import { formatConnectionProfileSummary } from "./connection-profile-runtime-controller.js";
 import {
   buildSessionInputSafetyProfileFromPreset,
   detectSessionInputSafetyPreset,
@@ -71,12 +72,22 @@ export function createCommandExecutor(options = {}) {
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
   const listLayoutProfiles = typeof options.listLayoutProfiles === "function" ? options.listLayoutProfiles : () => [];
+  const listConnectionProfiles = typeof options.listConnectionProfiles === "function" ? options.listConnectionProfiles : () => [];
   const resolveLayoutProfile = typeof options.resolveLayoutProfile === "function" ? options.resolveLayoutProfile : () => ({ profile: null, error: "Unknown layout profile." });
+  const resolveConnectionProfile =
+    typeof options.resolveConnectionProfile === "function"
+      ? options.resolveConnectionProfile
+      : () => ({ profile: null, error: "Unknown connection profile." });
   const createLayoutProfileFromCurrent =
     typeof options.createLayoutProfileFromCurrent === "function" ? options.createLayoutProfileFromCurrent : async () => "";
+  const createConnectionProfileFromSession =
+    typeof options.createConnectionProfileFromSession === "function" ? options.createConnectionProfileFromSession : async () => "";
   const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
+  const applyConnectionProfile = typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
   const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
+  const renameConnectionProfile = typeof options.renameConnectionProfile === "function" ? options.renameConnectionProfile : async () => "";
   const deleteLayoutProfile = typeof options.deleteLayoutProfile === "function" ? options.deleteLayoutProfile : async () => "";
+  const deleteConnectionProfile = typeof options.deleteConnectionProfile === "function" ? options.deleteConnectionProfile : async () => "";
   const listWorkspacePresets = typeof options.listWorkspacePresets === "function" ? options.listWorkspacePresets : () => [];
   const resolveWorkspacePreset =
     typeof options.resolveWorkspacePreset === "function"
@@ -168,6 +179,24 @@ export function createCommandExecutor(options = {}) {
       `inactiveThemeProfile=${JSON.stringify(inactiveThemeProfile)}`,
       `inputSafetyPreset=${inputSafetyPreset}`,
       `inputSafetyProfile=${JSON.stringify(inputSafetyProfile)}`
+    ].join("\n");
+  }
+
+  function formatConnectionProfileReport(profile) {
+    const launch = profile?.launch && typeof profile.launch === "object" ? profile.launch : {};
+    return [
+      `[${profile.id}] ${profile.name}`,
+      `kind=${JSON.stringify(launch.kind || "local")}`,
+      `deckId=${JSON.stringify(launch.deckId || defaultDeckId)}`,
+      `shell=${JSON.stringify(launch.shell || "")}`,
+      `startCwd=${JSON.stringify(launch.startCwd || "")}`,
+      `startCommand=${JSON.stringify(launch.startCommand || "")}`,
+      `env=${JSON.stringify(launch.env || {})}`,
+      `tags=${JSON.stringify(Array.isArray(launch.tags) ? launch.tags : [])}`,
+      `remoteConnection=${JSON.stringify(launch.remoteConnection || null)}`,
+      `remoteAuth=${JSON.stringify(launch.remoteAuth || null)}`,
+      `activeThemeProfile=${JSON.stringify(launch.activeThemeProfile || {})}`,
+      `inactiveThemeProfile=${JSON.stringify(launch.inactiveThemeProfile || {})}`
     ].join("\n");
   }
 
@@ -927,6 +956,123 @@ export function createCommandExecutor(options = {}) {
       }
 
       return formatUsage("layout");
+    }
+
+    if (command === "connection") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const rest = args.slice(1);
+      if (!subcommand || subcommand === "list") {
+        const profiles = listConnectionProfiles();
+        if (!Array.isArray(profiles) || profiles.length === 0) {
+          return "No connection profiles available.";
+        }
+        return profiles.map((profile) => formatConnectionProfileSummary(profile)).join("\n");
+      }
+
+      if (subcommand === "save") {
+        if (rest.length === 0) {
+          return formatUsage("connection", "save");
+        }
+        let targetSession = null;
+        let name = "";
+        if (rest.length === 1) {
+          const resolvedTarget = resolveSingleSessionForCommand(
+            "",
+            sessions,
+            activeSessionId,
+            "No active session to save as a connection profile.",
+            "Connection profile session selector"
+          );
+          if (resolvedTarget.error || !resolvedTarget.session) {
+            return resolvedTarget.error || "No active session to save as a connection profile.";
+          }
+          targetSession = resolvedTarget.session;
+          name = rest[0].trim();
+        } else {
+          const selectorToken = String(rest[0] || "").trim();
+          const resolvedTarget = resolveSingleSessionForCommand(
+            selectorToken,
+            sessions,
+            activeSessionId,
+            "No active session to save as a connection profile.",
+            "Connection profile session selector"
+          );
+          const selectorWasExplicit =
+            selectorToken.toLowerCase() === "active" ||
+            (!resolvedTarget.error && !!resolvedTarget.session);
+          if (selectorWasExplicit) {
+            targetSession = resolvedTarget.session;
+            name = rest.slice(1).join(" ").trim();
+          } else {
+            const activeTarget = resolveSingleSessionForCommand(
+              "",
+              sessions,
+              activeSessionId,
+              "No active session to save as a connection profile.",
+              "Connection profile session selector"
+            );
+            if (activeTarget.error || !activeTarget.session) {
+              return activeTarget.error || "No active session to save as a connection profile.";
+            }
+            targetSession = activeTarget.session;
+            name = rest.join(" ").trim();
+          }
+        }
+        if (!name) {
+          return formatUsage("connection", "save");
+        }
+        return createConnectionProfileFromSession(targetSession, name);
+      }
+
+      if (subcommand === "show") {
+        if (rest.length !== 1) {
+          return formatUsage("connection", "show");
+        }
+        const resolved = resolveConnectionProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        return formatConnectionProfileReport(resolved.profile);
+      }
+
+      if (subcommand === "apply") {
+        if (rest.length !== 1) {
+          return formatUsage("connection", "apply");
+        }
+        const resolved = resolveConnectionProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        return applyConnectionProfile(resolved.profile.id);
+      }
+
+      if (subcommand === "rename") {
+        if (rest.length < 2) {
+          return formatUsage("connection", "rename");
+        }
+        const resolved = resolveConnectionProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        const name = rest.slice(1).join(" ").trim();
+        if (!name) {
+          return formatUsage("connection", "rename");
+        }
+        return renameConnectionProfile(resolved.profile.id, name);
+      }
+
+      if (subcommand === "delete") {
+        if (rest.length !== 1) {
+          return formatUsage("connection", "delete");
+        }
+        const resolved = resolveConnectionProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        return deleteConnectionProfile(resolved.profile.id);
+      }
+
+      return formatUsage("connection");
     }
 
     if (command === "workspace") {

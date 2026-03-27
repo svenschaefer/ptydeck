@@ -97,6 +97,8 @@ const CONTROL_PANE_DEFAULT_POSITION = "bottom";
 const CONTROL_PANE_DEFAULT_SIZE = 240;
 const CONTROL_PANE_MIN_SIZE = 120;
 const CONTROL_PANE_MAX_SIZE = 960;
+const CONNECTION_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const CONNECTION_PROFILE_NAME_MAX_LENGTH = 64;
 const WORKSPACE_PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const WORKSPACE_PRESET_NAME_MAX_LENGTH = 64;
 const WORKSPACE_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -228,6 +230,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/layout-profiles" && method === "POST") {
     return { kind: "createLayoutProfile" };
   }
+  if (pathname === "/api/v1/connection-profiles" && method === "GET") {
+    return { kind: "listConnectionProfiles" };
+  }
+  if (pathname === "/api/v1/connection-profiles" && method === "POST") {
+    return { kind: "createConnectionProfile" };
+  }
   if (pathname === "/api/v1/workspace-presets" && method === "GET") {
     return { kind: "listWorkspacePresets" };
   }
@@ -289,6 +297,26 @@ function route(pathname, method) {
   }
   if (layoutProfileMatch && method === "DELETE") {
     return { kind: "deleteLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
+  }
+
+  const connectionProfileMatch = pathname.match(/^\/api\/v1\/connection-profiles\/([^/]+)$/);
+  if (connectionProfileMatch && method === "GET") {
+    return {
+      kind: "getConnectionProfile",
+      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
+    };
+  }
+  if (connectionProfileMatch && method === "PATCH") {
+    return {
+      kind: "updateConnectionProfile",
+      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
+    };
+  }
+  if (connectionProfileMatch && method === "DELETE") {
+    return {
+      kind: "deleteConnectionProfile",
+      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
+    };
   }
 
   const workspacePresetMatch = pathname.match(/^\/api\/v1\/workspace-presets\/([^/]+)$/);
@@ -1307,6 +1335,50 @@ function slugifyDeckId(name) {
   return root.slice(0, maxLength).replace(/-+$/g, "") || "deck";
 }
 
+function normalizeConnectionProfileName(name) {
+  if (typeof name !== "string") {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+  }
+  if (trimmed.length > CONNECTION_PROFILE_NAME_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'name' exceeds maximum length (${CONNECTION_PROFILE_NAME_MAX_LENGTH}).`
+    );
+  }
+  return trimmed;
+}
+
+function normalizeConnectionProfileIdInput(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !CONNECTION_PROFILE_ID_PATTERN.test(normalized)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'id' must match pattern ^[a-z0-9][a-z0-9-]{0,31}$."
+    );
+  }
+  return normalized;
+}
+
+function slugifyConnectionProfileId(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const root = base || "profile";
+  const maxLength = 32;
+  return root.slice(0, maxLength).replace(/-+$/g, "") || "profile";
+}
+
 function normalizeLayoutProfileName(name) {
   if (typeof name !== "string") {
     throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
@@ -1349,6 +1421,146 @@ function slugifyLayoutProfileId(name) {
   const root = base || "layout";
   const maxLength = 32;
   return root.slice(0, maxLength).replace(/-+$/g, "") || "layout";
+}
+
+function normalizeConnectionProfileDeckId(value, { strict = true, hasKnownDeck = () => true } = {}) {
+  let normalizedId = DEFAULT_DECK_ID;
+  try {
+    normalizedId = value === undefined ? DEFAULT_DECK_ID : normalizeDeckIdInput(value) || DEFAULT_DECK_ID;
+  } catch (error) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'launch.deckId' must be a valid deck id.");
+    }
+    normalizedId = DEFAULT_DECK_ID;
+  }
+  if (!hasKnownDeck(normalizedId)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Deck '${normalizedId}' was not found for connection profile launch.`);
+    }
+    return DEFAULT_DECK_ID;
+  }
+  return normalizedId;
+}
+
+function normalizeConnectionProfileLaunch(
+  input,
+  {
+    strict = true,
+    defaultShell = "",
+    defaultLocalStartCwd = homedir(),
+    hasKnownDeck = () => true
+  } = {}
+) {
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'launch' must be an object.");
+    }
+    input = {};
+  }
+  const kind = normalizeSessionKind(input.kind, { strict });
+  const startupConfig = normalizeSessionStartupConfig(
+    {
+      startCwd: input.startCwd !== undefined ? input.startCwd : input.cwd,
+      startCommand: input.startCommand,
+      env: input.env,
+      fallbackCwd: kind === SESSION_KIND_SSH ? "~" : defaultLocalStartCwd
+    },
+    { strict }
+  );
+  const remoteConnection = normalizeSessionRemoteConnection(input.remoteConnection, kind, { strict });
+  const remoteAuth = normalizeSessionRemoteAuth(input.remoteAuth, kind, { strict });
+  const themeSlots = normalizeSessionThemeSlots(input, { strict });
+  const tags = normalizeSessionTags(input.tags, { strict });
+  const deckId = normalizeConnectionProfileDeckId(input.deckId, { strict, hasKnownDeck });
+  let shell = "";
+  if (input.shell !== undefined && input.shell !== null && typeof input.shell !== "string") {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'launch.shell' must be a string.");
+    }
+    shell = kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : defaultShell;
+  } else {
+    shell = typeof input.shell === "string" && input.shell.trim()
+      ? input.shell.trim()
+      : kind === SESSION_KIND_SSH
+        ? DEFAULT_SSH_CLIENT
+        : defaultShell;
+  }
+
+  return {
+    kind,
+    deckId,
+    shell,
+    startCwd: startupConfig.startCwd,
+    startCommand: startupConfig.startCommand,
+    env: startupConfig.env,
+    tags,
+    themeProfile: themeSlots.themeProfile,
+    activeThemeProfile: themeSlots.activeThemeProfile,
+    inactiveThemeProfile: themeSlots.inactiveThemeProfile,
+    ...(remoteConnection ? { remoteConnection } : {}),
+    ...(remoteAuth ? { remoteAuth } : {})
+  };
+}
+
+function normalizeConnectionProfileEntity(
+  input,
+  {
+    strict = true,
+    defaultShell = "",
+    defaultLocalStartCwd = homedir(),
+    hasKnownDeck = () => true
+  } = {}
+) {
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    return null;
+  }
+  const name = strict
+    ? normalizeConnectionProfileName(input.name)
+    : typeof input.name === "string" && input.name.trim()
+      ? input.name.trim().slice(0, CONNECTION_PROFILE_NAME_MAX_LENGTH)
+      : "";
+  if (!name) {
+    return null;
+  }
+  let id = "";
+  try {
+    id = normalizeConnectionProfileIdInput(input.id);
+  } catch (error) {
+    if (strict) {
+      throw error;
+    }
+  }
+  const now = Date.now();
+  const createdAt = Number.isInteger(input.createdAt) ? input.createdAt : now;
+  const updatedAt = Number.isInteger(input.updatedAt) ? input.updatedAt : createdAt;
+  const launchSource = isPlainObject(input.launch) ? input.launch : input;
+  const launch = normalizeConnectionProfileLaunch(launchSource, {
+    strict,
+    defaultShell,
+    defaultLocalStartCwd,
+    hasKnownDeck
+  });
+  return {
+    id,
+    name,
+    createdAt,
+    updatedAt,
+    launch
+  };
+}
+
+function compareConnectionProfileEntries(a, b) {
+  const nameCompare = a.name.localeCompare(b.name, "en-US", { sensitivity: "base" });
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
 }
 
 function normalizeWorkspacePresetName(name) {
@@ -2058,6 +2270,7 @@ export function createRuntime(config) {
   const unrestoredSessions = new Map();
   let persistedReplayOutputs = new Map();
   const decks = new Map();
+  const connectionProfiles = new Map();
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
@@ -2491,6 +2704,12 @@ export function createRuntime(config) {
     if (kind === "createWorkspacePreset" || kind === "updateWorkspacePreset" || kind === "deleteWorkspacePreset") {
       return "sessions:write";
     }
+    if (kind === "listConnectionProfiles" || kind === "getConnectionProfile") {
+      return "sessions:read";
+    }
+    if (kind === "createConnectionProfile" || kind === "updateConnectionProfile" || kind === "deleteConnectionProfile") {
+      return "sessions:write";
+    }
     if (kind === "listSshTrustEntries") {
       return "sessions:read";
     }
@@ -2818,6 +3037,7 @@ export function createRuntime(config) {
       reassignDeckSessions(deckId, DEFAULT_DECK_ID);
     }
     decks.delete(deckId);
+    cleanupConnectionProfiles();
     cleanupLayoutProfiles();
     cleanupWorkspacePresets();
     return {
@@ -2825,6 +3045,108 @@ export function createRuntime(config) {
       fallbackDeckId: DEFAULT_DECK_ID,
       reassignedSessionIds: force ? affectedSessionIds : []
     };
+  }
+
+  function toApiConnectionProfile(profile) {
+    return {
+      id: profile.id,
+      name: profile.name,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      launch: JSON.parse(JSON.stringify(profile.launch))
+    };
+  }
+
+  function listConnectionProfiles() {
+    return Array.from(connectionProfiles.values()).sort(compareConnectionProfileEntries).map(toApiConnectionProfile);
+  }
+
+  function getConnectionProfileOrThrow(profileId) {
+    const profile = connectionProfiles.get(profileId);
+    if (!profile) {
+      throw new ApiError(404, "ConnectionProfileNotFound", `Connection profile '${profileId}' was not found.`);
+    }
+    return profile;
+  }
+
+  function createConnectionProfile(body) {
+    const candidate = normalizeConnectionProfileEntity(body, {
+      strict: true,
+      defaultShell: config.shell,
+      hasKnownDeck: (deckId) => decks.has(deckId)
+    });
+    let profileId = candidate.id;
+    if (!profileId) {
+      const slug = slugifyConnectionProfileId(candidate.name);
+      profileId = slug;
+      let suffix = 2;
+      while (connectionProfiles.has(profileId)) {
+        const suffixText = `-${suffix}`;
+        const rootMaxLength = 32 - suffixText.length;
+        const rooted = slug.slice(0, rootMaxLength).replace(/-+$/g, "") || "profile";
+        profileId = `${rooted}${suffixText}`;
+        suffix += 1;
+      }
+    }
+    if (connectionProfiles.has(profileId)) {
+      throw new ApiError(409, "ConnectionProfileAlreadyExists", `Connection profile '${profileId}' already exists.`);
+    }
+    const profile = {
+      ...candidate,
+      id: profileId
+    };
+    connectionProfiles.set(profile.id, profile);
+    return toApiConnectionProfile(profile);
+  }
+
+  function updateConnectionProfile(profileId, body) {
+    const existing = getConnectionProfileOrThrow(profileId);
+    const hasName = body?.name !== undefined;
+    const hasLaunch = body?.launch !== undefined;
+    if (!hasName && !hasLaunch) {
+      throw new ApiError(400, "ValidationError", "At least one updatable connection profile field is required.");
+    }
+    const next = {
+      ...existing,
+      name: hasName ? normalizeConnectionProfileName(body.name) : existing.name,
+      launch: hasLaunch
+        ? normalizeConnectionProfileLaunch(body.launch, {
+            strict: true,
+            defaultShell: config.shell,
+            hasKnownDeck: (deckId) => decks.has(deckId)
+          })
+        : existing.launch,
+      updatedAt: Date.now()
+    };
+    connectionProfiles.set(profileId, next);
+    return toApiConnectionProfile(next);
+  }
+
+  function deleteConnectionProfile(profileId) {
+    const profile = getConnectionProfileOrThrow(profileId);
+    connectionProfiles.delete(profileId);
+    return toApiConnectionProfile(profile);
+  }
+
+  function cleanupConnectionProfiles() {
+    let changed = false;
+    for (const [profileId, profile] of connectionProfiles.entries()) {
+      const nextLaunch = normalizeConnectionProfileLaunch(profile.launch, {
+        strict: false,
+        defaultShell: config.shell,
+        hasKnownDeck: (deckId) => decks.has(deckId)
+      });
+      if (JSON.stringify(nextLaunch) === JSON.stringify(profile.launch)) {
+        continue;
+      }
+      connectionProfiles.set(profileId, {
+        ...profile,
+        launch: nextLaunch,
+        updatedAt: Date.now()
+      });
+      changed = true;
+    }
+    return changed;
   }
 
   function toApiLayoutProfile(profile) {
@@ -3493,6 +3815,7 @@ export function createRuntime(config) {
       sessionOutputs: snapshot.outputs,
       customCommands: listCustomCommands(),
       decks: Array.from(decks.values()),
+      connectionProfiles: Array.from(connectionProfiles.values()).map(toApiConnectionProfile),
       layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile),
       workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset),
       sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry)
@@ -3643,6 +3966,7 @@ function tryCreateRestoredSession({
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
         deckCount: state.decks.length,
+        connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
         sshTrustEntryCount: state.sshTrustEntries.length
       });
@@ -3652,6 +3976,7 @@ function tryCreateRestoredSession({
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
         deckCount: state.decks.length,
+        connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
         sshTrustEntryCount: state.sshTrustEntries.length
       });
@@ -4038,6 +4363,43 @@ function tryCreateRestoredSession({
         return;
       }
 
+      if (match.kind === "listConnectionProfiles") {
+        const payload = listConnectionProfiles();
+        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfileList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createConnectionProfile") {
+        const payload = createConnectionProfile(body);
+        validateResponse({ statusCode: 201, body: payload, expect: "connectionProfile" });
+        await persistNow("connection-profile.create");
+        writeJson(req, res, 201, payload);
+        return;
+      }
+
+      if (match.kind === "getConnectionProfile") {
+        const payload = toApiConnectionProfile(getConnectionProfileOrThrow(match.params.profileId));
+        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "updateConnectionProfile") {
+        const payload = updateConnectionProfile(match.params.profileId, body);
+        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
+        await persistNow("connection-profile.update");
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "deleteConnectionProfile") {
+        deleteConnectionProfile(match.params.profileId);
+        await persistNow("connection-profile.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
       if (match.kind === "listWorkspacePresets") {
         const payload = listWorkspacePresets();
         validateResponse({ statusCode: 200, body: payload, expect: "workspacePresetList" });
@@ -4117,31 +4479,41 @@ function tryCreateRestoredSession({
             `Session creation rate limit exceeded. Retry in ${rateLimitResult.retryAfterSeconds} seconds.`
           );
         }
-        const kind = normalizeSessionKind(body?.kind, { strict: true });
+        const connectionProfileId =
+          typeof body?.connectionProfileId === "string" && body.connectionProfileId.trim()
+            ? normalizeConnectionProfileIdInput(body.connectionProfileId)
+            : "";
+        const connectionProfile = connectionProfileId ? getConnectionProfileOrThrow(connectionProfileId) : null;
+        const launchSource = connectionProfile?.launch || {};
+        const mergedBody = {
+          ...launchSource,
+          ...(body || {})
+        };
+        const kind = normalizeSessionKind(mergedBody?.kind, { strict: true });
         const startupConfig = normalizeSessionStartupConfig(
           {
-            startCwd: body?.startCwd !== undefined ? body.startCwd : body?.cwd,
-            startCommand: body?.startCommand,
-            env: body?.env,
-            fallbackCwd: kind === SESSION_KIND_SSH ? "~" : body?.cwd
+            startCwd: mergedBody?.startCwd !== undefined ? mergedBody.startCwd : mergedBody?.cwd,
+            startCommand: mergedBody?.startCommand,
+            env: mergedBody?.env,
+            fallbackCwd: kind === SESSION_KIND_SSH ? "~" : mergedBody?.cwd
           },
           { strict: true }
         );
-        const remoteConnection = normalizeSessionRemoteConnection(body?.remoteConnection, kind, { strict: true });
-        const remoteAuth = normalizeSessionRemoteAuth(body?.remoteAuth, kind, { strict: true });
+        const remoteConnection = normalizeSessionRemoteConnection(mergedBody?.remoteConnection, kind, { strict: true });
+        const remoteAuth = normalizeSessionRemoteAuth(mergedBody?.remoteAuth, kind, { strict: true });
         const remoteSecret = normalizeSessionRemoteSecret(body?.remoteSecret, remoteAuth, kind, { strict: true });
-        const themeSlots = normalizeSessionThemeSlots(body, { strict: true });
-        const note = normalizeSessionNote(body?.note, { strict: true });
-        const inputSafetyProfile = normalizeSessionInputSafetyProfile(body?.inputSafetyProfile, { strict: true });
-        const tags = normalizeSessionTags(body?.tags, { strict: true });
+        const themeSlots = normalizeSessionThemeSlots(mergedBody, { strict: true });
+        const note = normalizeSessionNote(mergedBody?.note, { strict: true });
+        const inputSafetyProfile = normalizeSessionInputSafetyProfile(mergedBody?.inputSafetyProfile, { strict: true });
+        const tags = normalizeSessionTags(mergedBody?.tags, { strict: true });
         const payload = manager.create({
           kind,
           remoteConnection,
           remoteAuth,
           remoteSecret,
           cwd: startupConfig.startCwd,
-          shell: body?.shell !== undefined ? body.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
-          name: body?.name,
+          shell: mergedBody?.shell !== undefined ? mergedBody.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
+          name: mergedBody?.name,
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
@@ -4152,7 +4524,13 @@ function tryCreateRestoredSession({
           activeThemeProfile: themeSlots.activeThemeProfile,
           inactiveThemeProfile: themeSlots.inactiveThemeProfile
         });
-        sessionDeckAssignments.set(payload.id, DEFAULT_DECK_ID);
+        sessionDeckAssignments.set(
+          payload.id,
+          normalizeConnectionProfileDeckId(mergedBody?.deckId, {
+            strict: false,
+            hasKnownDeck: (deckId) => decks.has(deckId)
+          })
+        );
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
@@ -4551,6 +4929,7 @@ function tryCreateRestoredSession({
     );
     startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
     decks.clear();
+    connectionProfiles.clear();
     layoutProfiles.clear();
     workspacePresets.clear();
     sshTrustEntries.clear();
@@ -4586,6 +4965,20 @@ function tryCreateRestoredSession({
       }
       layoutProfiles.set(normalizedProfile.id, normalizedProfile);
     }
+    for (const persistedConnectionProfile of Array.isArray(persistedState.connectionProfiles) ? persistedState.connectionProfiles : []) {
+      const normalizedProfile = normalizeConnectionProfileEntity(persistedConnectionProfile, {
+        strict: false,
+        defaultShell: config.shell,
+        hasKnownDeck: (deckId) => decks.has(deckId)
+      });
+      if (!normalizedProfile) {
+        continue;
+      }
+      if (!normalizedProfile.id) {
+        normalizedProfile.id = slugifyConnectionProfileId(normalizedProfile.name);
+      }
+      connectionProfiles.set(normalizedProfile.id, normalizedProfile);
+    }
     for (const persistedSshTrustEntry of Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries : []) {
       const normalizedEntry = normalizeSshTrustEntryEntity(persistedSshTrustEntry, { strict: false });
       if (!normalizedEntry) {
@@ -4613,6 +5006,7 @@ function tryCreateRestoredSession({
       persistedSessionCount: persistedState.sessions.length,
       persistedCustomCommandCount: persistedState.customCommands.length,
       persistedDeckCount: persistedState.decks.length,
+      persistedConnectionProfileCount: Array.isArray(persistedState.connectionProfiles) ? persistedState.connectionProfiles.length : 0,
       persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0,
       persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0,
       persistedSshTrustEntryCount: Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries.length : 0
@@ -4804,12 +5198,14 @@ function tryCreateRestoredSession({
       workspacePresets.set(normalizedPreset.id, normalizedPreset);
     }
     cleanupLayoutProfiles();
+    cleanupConnectionProfiles();
     cleanupWorkspacePresets();
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,
       unrestoredSessionCount: unrestoredSessions.size,
       restoredCustomCommandCount: customCommands.size,
       restoredDeckCount: decks.size,
+      restoredConnectionProfileCount: connectionProfiles.size,
       restoredWorkspacePresetCount: workspacePresets.size
     });
 

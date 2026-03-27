@@ -141,6 +141,63 @@ test("api client calls layout profile lifecycle endpoints", async () => {
   assert.equal(calls[3].options.method, "DELETE");
 });
 
+test("api client calls connection profile lifecycle endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    if (method === "DELETE") {
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: method === "POST" ? 201 : 200,
+      json: async () => ({
+        id: "ops-ssh",
+        name: "Ops SSH",
+        createdAt: 1,
+        updatedAt: 2,
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: ["ssh"],
+          activeThemeProfile: { background: "#111111" },
+          inactiveThemeProfile: { background: "#222222" },
+          remoteConnection: {
+            host: "ops.example",
+            port: 22,
+            username: "ops"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "/home/ops/.ssh/id_ed25519"
+          }
+        }
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listConnectionProfiles();
+  await api.createConnectionProfile({ name: "Ops SSH" });
+  await api.updateConnectionProfile("ops-ssh", { name: "Ops SSH Prod" });
+  await api.deleteConnectionProfile("ops-ssh");
+
+  assert.equal(calls.length, 4);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/connection-profiles");
+  assert.equal((calls[0].options.method || "GET"), "GET");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/connection-profiles");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/connection-profiles/ops-ssh");
+  assert.equal(calls[2].options.method, "PATCH");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/connection-profiles/ops-ssh");
+  assert.equal(calls[3].options.method, "DELETE");
+});
+
 test("api client calls workspace preset lifecycle endpoints", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

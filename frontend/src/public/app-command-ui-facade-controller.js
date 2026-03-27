@@ -24,6 +24,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     typeof options.getWorkspacePresetRuntimeController === "function"
       ? options.getWorkspacePresetRuntimeController
       : () => null;
+  const getConnectionProfileRuntimeController =
+    typeof options.getConnectionProfileRuntimeController === "function"
+      ? options.getConnectionProfileRuntimeController
+      : () => null;
   const getControlPaneRuntimeController =
     typeof options.getControlPaneRuntimeController === "function" ? options.getControlPaneRuntimeController : () => null;
   const getCommandExecutor =
@@ -122,6 +126,7 @@ export function createAppCommandUiFacadeController(options = {}) {
       maybeReportStartupPerf,
       resolveFilterSelectors: getCommandTargetRuntimeController()?.resolveFilterSelectors
     });
+    getConnectionProfileRuntimeController()?.render?.();
     getControlPaneRuntimeController()?.render?.();
     getWorkspacePresetRuntimeController()?.render?.();
   }

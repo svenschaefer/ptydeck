@@ -120,12 +120,103 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
     sessionOutputs: [{ sessionId: "a", data: "hello\r\n" }],
     customCommands: [{ name: "docu", content: "echo hi\n", createdAt: 3, updatedAt: 4 }],
     decks: [{ id: "default", name: "Default", createdAt: 5, updatedAt: 5, settings: {} }],
+    connectionProfiles: [
+      {
+        id: "ops-ssh",
+        name: "Ops SSH",
+        createdAt: 6,
+        updatedAt: 7,
+        launch: {
+          kind: "ssh",
+          deckId: "default",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "pwd",
+          env: {
+            LANG: "en_US.UTF-8"
+          },
+          tags: ["ops"],
+          themeProfile: {
+            background: "#0a0d12",
+            foreground: "#d8dee9",
+            cursor: "#8ec07c",
+            black: "#0a0d12",
+            red: "#fb4934",
+            green: "#8ec07c",
+            yellow: "#fabd2f",
+            blue: "#83a598",
+            magenta: "#b48ead",
+            cyan: "#8fbcbb",
+            white: "#d8dee9",
+            brightBlack: "#4b5563",
+            brightRed: "#ff6b5a",
+            brightGreen: "#a5d68a",
+            brightYellow: "#ffd36a",
+            brightBlue: "#98b6cc",
+            brightMagenta: "#c8a7d8",
+            brightCyan: "#a9d9d6",
+            brightWhite: "#f5f7fa"
+          },
+          activeThemeProfile: {
+            background: "#0a0d12",
+            foreground: "#d8dee9",
+            cursor: "#8ec07c",
+            black: "#0a0d12",
+            red: "#fb4934",
+            green: "#8ec07c",
+            yellow: "#fabd2f",
+            blue: "#83a598",
+            magenta: "#b48ead",
+            cyan: "#8fbcbb",
+            white: "#d8dee9",
+            brightBlack: "#4b5563",
+            brightRed: "#ff6b5a",
+            brightGreen: "#a5d68a",
+            brightYellow: "#ffd36a",
+            brightBlue: "#98b6cc",
+            brightMagenta: "#c8a7d8",
+            brightCyan: "#a9d9d6",
+            brightWhite: "#f5f7fa"
+          },
+          inactiveThemeProfile: {
+            background: "#0a0d12",
+            foreground: "#d8dee9",
+            cursor: "#8ec07c",
+            black: "#0a0d12",
+            red: "#fb4934",
+            green: "#8ec07c",
+            yellow: "#fabd2f",
+            blue: "#83a598",
+            magenta: "#b48ead",
+            cyan: "#8fbcbb",
+            white: "#d8dee9",
+            brightBlack: "#4b5563",
+            brightRed: "#ff6b5a",
+            brightGreen: "#a5d68a",
+            brightYellow: "#ffd36a",
+            brightBlue: "#98b6cc",
+            brightMagenta: "#c8a7d8",
+            brightCyan: "#a9d9d6",
+            brightWhite: "#f5f7fa"
+          },
+          remoteConnection: {
+            host: "ops.internal",
+            port: 2222,
+            username: "deploy"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "~/.ssh/ops"
+          }
+        }
+      }
+    ],
     layoutProfiles: [
       {
         id: "ops",
         name: "Operations",
-        createdAt: 6,
-        updatedAt: 7,
+        createdAt: 8,
+        updatedAt: 9,
         layout: {
           activeDeckId: "default",
           sidebarVisible: true,
@@ -159,8 +250,8 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
       {
         id: "focus",
         name: "Focus Workspace",
-        createdAt: 8,
-        updatedAt: 9,
+        createdAt: 10,
+        updatedAt: 11,
         workspace: {
           activeDeckId: "default",
           layoutProfileId: "ops",
@@ -198,8 +289,8 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         keyType: "ssh-ed25519",
         publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
         fingerprintSha256: "SHA256:fakefingerprintfortests",
-        createdAt: 10,
-        updatedAt: 11
+        createdAt: 12,
+        updatedAt: 13
       }
     ]
   };
@@ -225,6 +316,7 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     sessionOutputs: [],
     customCommands: [],
     decks: [],
+    connectionProfiles: [],
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: []

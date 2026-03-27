@@ -426,6 +426,116 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /connection-profiles:
+    get:
+      operationId: listConnectionProfiles
+      summary: List persisted connection profiles.
+      responses:
+        '200':
+          description: Connection profile list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConnectionProfile'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createConnectionProfile
+      summary: Create a persisted connection profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectionProfileRequest'
+      responses:
+        '201':
+          description: Connection profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionProfile'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Connection profile id already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /connection-profiles/{profileId}:
+    parameters:
+      - $ref: '#/components/parameters/profileId'
+    get:
+      operationId: getConnectionProfile
+      summary: Get connection profile by id.
+      responses:
+        '200':
+          description: Connection profile found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionProfile'
+        '404':
+          description: Connection profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    patch:
+      operationId: updateConnectionProfile
+      summary: Update persisted connection profile metadata/launch settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConnectionProfileRequest'
+      responses:
+        '200':
+          description: Connection profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionProfile'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Connection profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    delete:
+      operationId: deleteConnectionProfile
+      summary: Delete persisted connection profile by id.
+      responses:
+        '204':
+          description: Connection profile deleted
+        '404':
+          description: Connection profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /workspace-presets:
     get:
       operationId: listWorkspacePresets
@@ -1115,6 +1225,90 @@ components:
           type: string
         layout:
           $ref: '#/components/schemas/LayoutProfileLayout'
+    ConnectionProfile:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+        - launch
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+        launch:
+          $ref: '#/components/schemas/ConnectionProfileLaunch'
+    ConnectionProfileLaunch:
+      type: object
+      required:
+        - kind
+        - deckId
+        - shell
+        - startCwd
+        - startCommand
+        - env
+        - tags
+        - activeThemeProfile
+        - inactiveThemeProfile
+      properties:
+        kind:
+          type: string
+          enum:
+            - local
+            - ssh
+        deckId:
+          type: string
+        shell:
+          type: string
+        startCwd:
+          type: string
+        startCommand:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        themeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        activeThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        inactiveThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        remoteConnection:
+          $ref: '#/components/schemas/RemoteConnection'
+        remoteAuth:
+          $ref: '#/components/schemas/RemoteAuth'
+    CreateConnectionProfileRequest:
+      type: object
+      required:
+        - name
+        - launch
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        launch:
+          $ref: '#/components/schemas/ConnectionProfileLaunch'
+    UpdateConnectionProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        launch:
+          $ref: '#/components/schemas/ConnectionProfileLaunch'
     WorkspacePreset:
       type: object
       required:
@@ -1555,6 +1749,8 @@ components:
     CreateSessionRequest:
       type: object
       properties:
+        connectionProfileId:
+          type: string
         kind:
           type: string
           enum:

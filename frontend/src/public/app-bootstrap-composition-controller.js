@@ -93,6 +93,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const workflowKillBtn = options.workflowKillBtn || null;
   const layoutRuntimeController = options.layoutRuntimeController || null;
   const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
+  const connectionProfileRuntimeController = options.connectionProfileRuntimeController || null;
   const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
   const broadcastInputRuntimeController = options.broadcastInputRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
@@ -208,12 +209,20 @@ export function createAppBootstrapCompositionController(options = {}) {
       getTerminalSettings: terminalSettings,
       requestRender: () => appCommandUiFacadeController?.render(),
       listLayoutProfiles: () => layoutProfileRuntimeController?.listProfiles?.() || [],
+      listConnectionProfiles: () => connectionProfileRuntimeController?.listProfiles?.() || [],
       resolveLayoutProfile: (selectorText) =>
         layoutProfileRuntimeController?.resolveProfile?.(selectorText) || { profile: null, error: "Unknown layout profile." },
+      resolveConnectionProfile: (selectorText) =>
+        connectionProfileRuntimeController?.resolveProfile?.(selectorText) || { profile: null, error: "Unknown connection profile." },
       createLayoutProfileFromCurrent: (name) => layoutProfileRuntimeController?.createProfileFromCurrentLayout?.(name) || "",
+      createConnectionProfileFromSession: (sessionOrId, name, createOptions) =>
+        connectionProfileRuntimeController?.createProfileFromSession?.(sessionOrId, name, createOptions) || "",
       applyLayoutProfile: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
+      applyConnectionProfile: (profileId) => connectionProfileRuntimeController?.applyProfileById?.(profileId) || "",
       renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
+      renameConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       deleteLayoutProfile: (profileId) => layoutProfileRuntimeController?.deleteProfileById?.(profileId) || "",
+      deleteConnectionProfile: (profileId) => connectionProfileRuntimeController?.deleteProfileById?.(profileId) || "",
       listWorkspacePresets: () => workspacePresetRuntimeController?.listPresets?.() || [],
       resolveWorkspacePreset: (selectorText) =>
         workspacePresetRuntimeController?.resolvePreset?.(selectorText) || { preset: null, error: "Unknown workspace preset." },
@@ -427,6 +436,7 @@ export function createAppBootstrapCompositionController(options = {}) {
     appCommandUiFacadeController?.render?.();
     layoutRuntimeController?.bindUiEvents?.();
     layoutProfileRuntimeController?.bindUiEvents?.();
+    connectionProfileRuntimeController?.bindUiEvents?.();
     workspacePresetRuntimeController?.bindUiEvents?.();
     terminalSearchController?.bindUiEvents?.();
     terminalSearchController?.updateUi?.();
@@ -435,6 +445,7 @@ export function createAppBootstrapCompositionController(options = {}) {
     appLifecycleController.bindWindowEvents?.();
     const initializationResult = await appLifecycleController.initializeRuntime?.();
     await layoutProfileRuntimeController?.loadProfiles?.();
+    await connectionProfileRuntimeController?.loadProfiles?.();
     await workspacePresetRuntimeController?.loadPresets?.();
     return initializationResult;
   }

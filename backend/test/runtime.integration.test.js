@@ -1313,6 +1313,196 @@ test("layout profile lifecycle persists and restores across restart", async () =
   }
 });
 
+test("connection profile lifecycle persists, restores, cleans up deck references, and can launch sessions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-connection-profiles-"));
+  const dataPath = join(dir, "sessions.json");
+  const spawnCalls = [];
+  const fallbackFactory = createFallbackAwarePtyFactory();
+  const createPty = (options) => {
+    spawnCalls.push({
+      command: options.command || options.shell,
+      shell: options.shell,
+      cwd: options.cwd,
+      args: Array.isArray(options.args) ? [...options.args] : []
+    });
+    return fallbackFactory(options);
+  };
+
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let profileId = "";
+
+  try {
+    const createDeckRes = await fetch(`${baseUrlA}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Ops" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createProfileRes = await fetch(`${baseUrlA}/connection-profiles`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Ops SSH",
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          startCwd: "~/workspace",
+          startCommand: "pwd",
+          env: {
+            LANG: "en_US.UTF-8"
+          },
+          tags: ["ops", "ssh"],
+          remoteConnection: {
+            host: "ops.internal",
+            port: 2222,
+            username: "deploy"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "~/.ssh/ops"
+          }
+        }
+      })
+    });
+    assert.equal(createProfileRes.status, 201);
+    const createdProfile = await createProfileRes.json();
+    profileId = createdProfile.id;
+    assert.equal(createdProfile.name, "Ops SSH");
+    assert.equal(createdProfile.launch.kind, "ssh");
+    assert.equal(createdProfile.launch.deckId, "ops");
+    assert.equal(createdProfile.launch.shell, "ssh");
+    assert.equal(createdProfile.launch.startCwd, "~/workspace");
+    assert.equal(createdProfile.launch.startCommand, "pwd");
+    assert.deepEqual(createdProfile.launch.env, { LANG: "en_US.UTF-8" });
+    assert.deepEqual(createdProfile.launch.tags, ["ops", "ssh"]);
+    assert.deepEqual(createdProfile.launch.remoteConnection, {
+      host: "ops.internal",
+      port: 2222,
+      username: "deploy"
+    });
+    assert.deepEqual(createdProfile.launch.remoteAuth, {
+      method: "privateKey",
+      privateKeyPath: "~/.ssh/ops"
+    });
+
+    const createSessionRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        connectionProfileId: profileId,
+        name: "ops-shell"
+      })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+    assert.equal(createdSession.name, "ops-shell");
+    assert.equal(createdSession.deckId, "ops");
+    assert.equal(createdSession.kind, "ssh");
+    assert.equal(createdSession.shell, "ssh");
+    assert.equal(createdSession.cwd, "~/workspace");
+    assert.deepEqual(createdSession.tags, ["ops", "ssh"]);
+    assert.deepEqual(createdSession.remoteConnection, {
+      host: "ops.internal",
+      port: 2222,
+      username: "deploy"
+    });
+    assert.deepEqual(createdSession.remoteAuth, {
+      method: "privateKey",
+      privateKeyPath: "~/.ssh/ops"
+    });
+    assert.equal(spawnCalls.at(-1).command, "ssh");
+
+    const deleteSessionRes = await fetch(`${baseUrlA}/sessions/${createdSession.id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteSessionRes.status, 204);
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    assert.ok(Array.isArray(persistedRaw.connectionProfiles));
+    assert.equal(persistedRaw.connectionProfiles.length, 1);
+    assert.equal(persistedRaw.connectionProfiles[0].id, profileId);
+    assert.equal(persistedRaw.connectionProfiles[0].launch.deckId, "ops");
+    assert.equal(persistedRaw.connectionProfiles[0].launch.remoteSecret, undefined);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const listProfilesRes = await fetch(`${baseUrlB}/connection-profiles`);
+    assert.equal(listProfilesRes.status, 200);
+    const listedProfiles = await listProfilesRes.json();
+    assert.equal(listedProfiles.length, 1);
+    assert.equal(listedProfiles[0].id, profileId);
+    assert.equal(listedProfiles[0].launch.deckId, "ops");
+
+    const createSessionRes = await fetch(`${baseUrlB}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        connectionProfileId: profileId
+      })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const launchedSession = await createSessionRes.json();
+    assert.equal(launchedSession.deckId, "ops");
+    assert.equal(launchedSession.kind, "ssh");
+
+    const deleteSessionRes = await fetch(`${baseUrlB}/sessions/${launchedSession.id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteSessionRes.status, 204);
+
+    const deleteDeckRes = await fetch(`${baseUrlB}/decks/ops?force=true`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteDeckRes.status, 204);
+
+    const cleanedProfileRes = await fetch(`${baseUrlB}/connection-profiles/${profileId}`);
+    assert.equal(cleanedProfileRes.status, 200);
+    const cleanedProfile = await cleanedProfileRes.json();
+    assert.equal(cleanedProfile.launch.deckId, "default");
+
+    const deleteProfileRes = await fetch(`${baseUrlB}/connection-profiles/${profileId}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteProfileRes.status, 204);
+
+    const emptyListRes = await fetch(`${baseUrlB}/connection-profiles`);
+    assert.equal(emptyListRes.status, 200);
+    assert.deepEqual(await emptyListRes.json(), []);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("workspace preset lifecycle persists, restores, and cleans up deleted references", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-workspace-presets-"));
   const dataPath = join(dir, "sessions.json");

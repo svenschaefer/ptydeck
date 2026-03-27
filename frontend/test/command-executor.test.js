@@ -19,7 +19,7 @@ function createExecutor() {
         return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
       }
     },
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help", "run"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help", "run"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -73,7 +73,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace broadcast replay settings custom help run"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast replay settings custom help run"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -109,6 +109,12 @@ test("command executor help and usage strings derive from declarative schema met
 
   const noteUsage = await executor.execute({ command: "note", args: [], raw: "/note" });
   assert.equal(noteUsage, "Usage: /note <selector|active> [text...]");
+
+  const connectionUsage = await executor.execute({ command: "connection", args: ["wat"], raw: "/connection wat" });
+  assert.equal(
+    connectionUsage,
+    "Usage: /connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>"
+  );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
   assert.equal(layoutUsage, "Usage: /layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
@@ -329,6 +335,145 @@ test("command executor manages layout profiles through shared runtime hooks", as
     ["apply", "focus"],
     ["rename", "focus", "New Name"],
     ["delete", "focus"]
+  ]);
+});
+
+test("command executor manages connection profiles through shared runtime hooks", async () => {
+  const calls = [];
+  const sessions = [
+    {
+      id: "s1",
+      name: "Ops Shell",
+      deckId: "ops",
+      shell: "bash",
+      startCwd: "/srv/ops",
+      cwd: "/srv/ops",
+      startCommand: "tmux a || tmux",
+      env: { LANG: "en_US.UTF-8" },
+      tags: ["ops"],
+      activeThemeProfile: { background: "#111111" },
+      inactiveThemeProfile: { background: "#222222" }
+    }
+  ];
+  const profiles = [
+    {
+      id: "ops",
+      name: "Ops Shell",
+      launch: {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: ["ops"],
+        activeThemeProfile: { background: "#111111" },
+        inactiveThemeProfile: { background: "#222222" },
+        remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+        remoteAuth: { method: "privateKey", privateKeyPath: "/home/ops/.ssh/id_ed25519" }
+      }
+    }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "ops", name: "Ops" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["connection", "help"],
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    getSessionCountForDeck: () => sessions.length,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "ops",
+    formatSessionToken: (id) => (id === "s1" ? "1" : String(id || "")),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector, availableSessions) => ({
+      sessions: availableSessions.filter(
+        (session) => session.id === selector || session.name.toLowerCase() === String(selector || "").toLowerCase()
+      ),
+      error: ""
+    }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    listConnectionProfiles: () => profiles,
+    resolveConnectionProfile: (selector) =>
+      selector === "ops" ? { profile: profiles[0], error: "" } : { profile: null, error: `Unknown connection profile: ${selector}` },
+    createConnectionProfileFromSession: async (session, name) => {
+      calls.push(["save", session.id, name]);
+      return `Saved connection profile [ops] ${name} from [1] Ops Shell.`;
+    },
+    applyConnectionProfile: async (profileId) => {
+      calls.push(["apply", profileId]);
+      return `Started session [8] Ops Shell from connection profile [${profileId}] Ops Shell.`;
+    },
+    renameConnectionProfile: async (profileId, name) => {
+      calls.push(["rename", profileId, name]);
+      return `Renamed connection profile [${profileId}] to ${name}.`;
+    },
+    deleteConnectionProfile: async (profileId) => {
+      calls.push(["delete", profileId]);
+      return `Deleted connection profile [${profileId}] Ops Shell.`;
+    }
+  });
+
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["list"], raw: "/connection list" }),
+    "[ops] Ops Shell -> kind=ssh deck=ops shell=ssh target=ops@ops.example:22"
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["save", "Ops", "Saved"], raw: "/connection save Ops Saved" }),
+    "Saved connection profile [ops] Ops Saved from [1] Ops Shell."
+  );
+  assert.match(
+    await executor.execute({ command: "connection", args: ["show", "ops"], raw: "/connection show ops" }),
+    /\[ops\] Ops Shell/
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["apply", "ops"], raw: "/connection apply ops" }),
+    "Started session [8] Ops Shell from connection profile [ops] Ops Shell."
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["rename", "ops", "Prod", "Shell"], raw: "/connection rename ops Prod Shell" }),
+    "Renamed connection profile [ops] to Prod Shell."
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["delete", "ops"], raw: "/connection delete ops" }),
+    "Deleted connection profile [ops] Ops Shell."
+  );
+  assert.deepEqual(calls, [
+    ["save", "s1", "Ops Saved"],
+    ["apply", "ops"],
+    ["rename", "ops", "Prod Shell"],
+    ["delete", "ops"]
   ]);
 });
 

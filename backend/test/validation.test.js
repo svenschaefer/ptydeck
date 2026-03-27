@@ -594,6 +594,186 @@ test("validateResponse accepts layout profile payloads", () => {
   });
 });
 
+test("validateRequest accepts valid connection profile create and patch payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/connection-profiles",
+      params: {},
+      body: {
+        id: "ops-ssh",
+        name: "Ops SSH",
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "cd ~/app && exec $SHELL -l",
+          env: {
+            LANG: "en_US.UTF-8"
+          },
+          tags: ["ops", "ssh"],
+          remoteConnection: {
+            host: "ops.internal",
+            port: 2222,
+            username: "deploy"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "~/.ssh/ops"
+          }
+        }
+      }
+    });
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/connection-profiles/ops-ssh",
+      params: { profileId: "ops-ssh" },
+      body: {
+        name: "Ops SSH Updated",
+        launch: {
+          kind: "local",
+          deckId: "default",
+          shell: "bash",
+          startCwd: "/workspace",
+          startCommand: "",
+          env: {},
+          tags: ["local"]
+        }
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid connection profile payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/connection-profiles",
+      params: {},
+      body: {
+        name: "Ops SSH",
+        launch: {
+          kind: "ssh",
+          remoteSecret: "should-not-persist"
+        }
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/connection-profiles/ops-ssh",
+      params: { profileId: "ops-ssh" },
+      body: {}
+    });
+  });
+});
+
+test("validateResponse accepts connection profile payloads", () => {
+  const body = {
+    id: "ops-ssh",
+    name: "Ops SSH",
+    createdAt: 1,
+    updatedAt: 2,
+    launch: {
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      startCommand: "cd ~/app && exec $SHELL -l",
+      env: {
+        LANG: "en_US.UTF-8"
+      },
+      tags: ["ops", "ssh"],
+      themeProfile: {
+        background: "#0a0d12",
+        foreground: "#d8dee9",
+        cursor: "#8ec07c",
+        black: "#0a0d12",
+        red: "#fb4934",
+        green: "#8ec07c",
+        yellow: "#fabd2f",
+        blue: "#83a598",
+        magenta: "#b48ead",
+        cyan: "#8fbcbb",
+        white: "#d8dee9",
+        brightBlack: "#4b5563",
+        brightRed: "#ff6b5a",
+        brightGreen: "#a5d68a",
+        brightYellow: "#ffd36a",
+        brightBlue: "#98b6cc",
+        brightMagenta: "#c8a7d8",
+        brightCyan: "#a9d9d6",
+        brightWhite: "#f5f7fa"
+      },
+      activeThemeProfile: {
+        background: "#0a0d12",
+        foreground: "#d8dee9",
+        cursor: "#8ec07c",
+        black: "#0a0d12",
+        red: "#fb4934",
+        green: "#8ec07c",
+        yellow: "#fabd2f",
+        blue: "#83a598",
+        magenta: "#b48ead",
+        cyan: "#8fbcbb",
+        white: "#d8dee9",
+        brightBlack: "#4b5563",
+        brightRed: "#ff6b5a",
+        brightGreen: "#a5d68a",
+        brightYellow: "#ffd36a",
+        brightBlue: "#98b6cc",
+        brightMagenta: "#c8a7d8",
+        brightCyan: "#a9d9d6",
+        brightWhite: "#f5f7fa"
+      },
+      inactiveThemeProfile: {
+        background: "#0a0d12",
+        foreground: "#d8dee9",
+        cursor: "#8ec07c",
+        black: "#0a0d12",
+        red: "#fb4934",
+        green: "#8ec07c",
+        yellow: "#fabd2f",
+        blue: "#83a598",
+        magenta: "#b48ead",
+        cyan: "#8fbcbb",
+        white: "#d8dee9",
+        brightBlack: "#4b5563",
+        brightRed: "#ff6b5a",
+        brightGreen: "#a5d68a",
+        brightYellow: "#ffd36a",
+        brightBlue: "#98b6cc",
+        brightMagenta: "#c8a7d8",
+        brightCyan: "#a9d9d6",
+        brightWhite: "#f5f7fa"
+      },
+      remoteConnection: {
+        host: "ops.internal",
+        port: 2222,
+        username: "deploy"
+      },
+      remoteAuth: {
+        method: "privateKey",
+        privateKeyPath: "~/.ssh/ops"
+      }
+    }
+  };
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "connectionProfile",
+      body
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "connectionProfileList",
+      body: [body]
+    });
+  });
+});
+
 test("validateRequest accepts valid workspace preset create and patch payloads", () => {
   assert.doesNotThrow(() => {
     validateRequest({

@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
+- Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
+- Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
 - Previous completed wave: `v0.4.0-H37` (Workflow Safety Guardrails, `SWF-007`, `SWF-008`).
 - Previous completed wave: `v0.4.0-H36` (Workflow Control-Plane Runtime, `SWF-006`).
@@ -55,6 +56,24 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H40 - Saved Connection Profiles (Completed)
+
+- Completed scoped tasks: `REM-004A`, `REM-004B`, `REM-004C`
+
+Dependencies:
+
+- `REM-004A` established the persisted backend saved-connection-profile contract first so reusable launch presets for local shells and SSH targets now live in one backend-owned model instead of a frontend-only bookmark layer.
+- `REM-004B` followed that contract and reused it for sidebar and slash-command workflows, with profile application still respecting the existing non-persisted `remoteSecret` boundary for password-style SSH auth.
+- `REM-004C` closed after `REM-004A` and `REM-004B`, so regression coverage now spans profile validation, persistence/restore, deck-reference cleanup, slash-command help/usage surfaces, and frontend launch/apply flows end to end.
+
+Exit criteria:
+
+- Backend persists normalized saved connection profiles with non-secret launch metadata, deck-reference cleanup, and `connectionProfileId`-based session creation.
+- Frontend exposes discoverable sidebar and `/connection ...` workflows for list/save/show/apply/rename/delete behavior against the backend contract.
+- Password and keyboard-interactive SSH profiles never persist secrets; applying those profiles still prompts for a runtime-only secret when required.
+
+## Previous Completed Wave
 
 ### v0.4.0-H39 - Remote Reconnect Contract (Completed)
 

@@ -304,6 +304,84 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     usage: "/note <selector|active> [text...]",
     args: [{ provider: "session-selector" }]
   }),
+  connection: freezeCommandDefinition({
+    key: "slash:connection",
+    insertText: "connection",
+    label: "/connection",
+    kind: "command",
+    description: "manage saved connection profiles",
+    example: "/connection apply ops-shell",
+    summary: "/connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>",
+    usage: [
+      "/connection list",
+      "/connection save <name>",
+      "/connection save <selector|active> <name>",
+      "/connection show <profile>",
+      "/connection apply <profile>",
+      "/connection rename <profile> <name>",
+      "/connection delete <profile>"
+    ],
+    subcommands: {
+      list: {
+        insertText: "list",
+        label: "/connection list",
+        kind: "subcommand",
+        description: "list saved connection profiles",
+        example: "/connection list",
+        key: "slash:connection:list",
+        usage: "/connection list"
+      },
+      save: {
+        insertText: "save",
+        label: "/connection save",
+        kind: "subcommand",
+        description: "save a session launch preset as a connection profile",
+        example: "/connection save active ops shell",
+        key: "slash:connection:save",
+        usage: [
+          "/connection save <name>",
+          "/connection save <selector|active> <name>"
+        ],
+        args: [{ provider: "session-selector", optional: true }]
+      },
+      show: {
+        insertText: "show",
+        label: "/connection show",
+        kind: "subcommand",
+        description: "show connection profile details",
+        example: "/connection show ops-shell",
+        key: "slash:connection:show",
+        usage: "/connection show <profile>"
+      },
+      apply: {
+        insertText: "apply",
+        label: "/connection apply",
+        kind: "subcommand",
+        description: "start a session from a saved connection profile",
+        example: "/connection apply ops-shell",
+        key: "slash:connection:apply",
+        usage: "/connection apply <profile>"
+      },
+      rename: {
+        insertText: "rename",
+        label: "/connection rename",
+        kind: "subcommand",
+        description: "rename a saved connection profile",
+        example: "/connection rename ops-shell ops-shell-prod",
+        key: "slash:connection:rename",
+        usage: "/connection rename <profile> <name>"
+      },
+      delete: {
+        insertText: "delete",
+        label: "/connection delete",
+        kind: "subcommand",
+        description: "delete a saved connection profile",
+        example: "/connection delete ops-shell",
+        key: "slash:connection:delete",
+        usage: "/connection delete <profile>"
+      }
+    }
+  }),
   replay: freezeCommandDefinition({
     key: "slash:replay",
     insertText: "replay",
@@ -645,6 +723,12 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "layout.apply", command: "layout", subcommand: "apply" },
   { alias: "layout.rename", command: "layout", subcommand: "rename" },
   { alias: "layout.delete", command: "layout", subcommand: "delete" },
+  { alias: "connection.list", command: "connection", subcommand: "list" },
+  { alias: "connection.save", command: "connection", subcommand: "save" },
+  { alias: "connection.show", command: "connection", subcommand: "show" },
+  { alias: "connection.apply", command: "connection", subcommand: "apply" },
+  { alias: "connection.rename", command: "connection", subcommand: "rename" },
+  { alias: "connection.delete", command: "connection", subcommand: "delete" },
   { alias: "workspace.list", command: "workspace", subcommand: "list" },
   { alias: "workspace.save", command: "workspace", subcommand: "save" },
   { alias: "workspace.apply", command: "workspace", subcommand: "apply" },

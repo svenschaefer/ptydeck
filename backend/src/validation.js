@@ -275,6 +275,89 @@ function isWorkspacePreset(value) {
   );
 }
 
+function isConnectionProfileLaunch(value) {
+  return (
+    isObject(value) &&
+    SESSION_KIND_VALUES.has(value.kind) &&
+    typeof value.deckId === "string" &&
+    typeof value.shell === "string" &&
+    typeof value.startCwd === "string" &&
+    typeof value.startCommand === "string" &&
+    isObject(value.env) &&
+    Object.values(value.env).every((entry) => typeof entry === "string") &&
+    Array.isArray(value.tags) &&
+    value.tags.every((entry) => typeof entry === "string") &&
+    isThemeProfile(value.activeThemeProfile) &&
+    isThemeProfile(value.inactiveThemeProfile) &&
+    (value.themeProfile === undefined || isThemeProfile(value.themeProfile)) &&
+    (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
+    (value.remoteAuth === undefined || isRemoteAuth(value.remoteAuth))
+  );
+}
+
+function isConnectionProfile(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt) &&
+    isConnectionProfileLaunch(value.launch)
+  );
+}
+
+function validateConnectionProfileLaunchPayload(value, fieldPathPrefix = "launch") {
+  if (!isObject(value)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}' must be an object.`);
+  }
+  if (value.kind !== undefined && !SESSION_KIND_VALUES.has(value.kind)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.kind' must be 'local' or 'ssh'.`);
+  }
+  if (value.deckId !== undefined && typeof value.deckId !== "string") {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.deckId' must be a string.`);
+  }
+  if (value.shell !== undefined && typeof value.shell !== "string") {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.shell' must be a string.`);
+  }
+  if (value.cwd !== undefined && typeof value.cwd !== "string") {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.cwd' must be a string.`);
+  }
+  if (value.startCwd !== undefined && typeof value.startCwd !== "string") {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.startCwd' must be a string.`);
+  }
+  if (value.startCommand !== undefined && typeof value.startCommand !== "string") {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.startCommand' must be a string.`);
+  }
+  if (value.remoteConnection !== undefined && !isObject(value.remoteConnection)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteConnection' must be an object.`);
+  }
+  if (value.remoteAuth !== undefined && !isObject(value.remoteAuth)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteAuth' must be an object.`);
+  }
+  if (value.remoteSecret !== undefined) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteSecret' is not supported for connection profiles.`);
+  }
+  if (value.env !== undefined) {
+    if (!isObject(value.env) || !Object.values(value.env).every((entry) => typeof entry === "string")) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.env' must be an object with string values.`);
+    }
+  }
+  if (value.tags !== undefined) {
+    if (!Array.isArray(value.tags) || !value.tags.every((entry) => typeof entry === "string")) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.tags' must be an array of strings.`);
+    }
+  }
+  if (value.themeProfile !== undefined && !isObject(value.themeProfile)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.themeProfile' must be an object.`);
+  }
+  if (value.activeThemeProfile !== undefined && !isObject(value.activeThemeProfile)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.activeThemeProfile' must be an object.`);
+  }
+  if (value.inactiveThemeProfile !== undefined && !isObject(value.inactiveThemeProfile)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.inactiveThemeProfile' must be an object.`);
+  }
+}
+
 export function validateRequest({ method, pathname, params, query, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -288,6 +371,9 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body?.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
       throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
+    }
+    if (body?.connectionProfileId !== undefined && typeof body.connectionProfileId !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'connectionProfileId' must be a string.");
     }
     if (body?.name !== undefined && typeof body.name !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
@@ -413,6 +499,37 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (!isObject(body) || typeof body.data !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'data' must be a string.");
+    }
+  }
+
+  if (method === "POST" && pathname === "/api/v1/connection-profiles") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.name === undefined || typeof body.name !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+    if (body.id !== undefined && typeof body.id !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'id' must be a string.");
+    }
+    validateConnectionProfileLaunchPayload(body.launch, "launch");
+  }
+
+  if (method === "PATCH" && pathname.match(/^\/api\/v1\/connection-profiles\/[^/]+$/)) {
+    if (!params.profileId || typeof params.profileId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing profileId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.name === undefined && body.launch === undefined) {
+      throw new ApiError(400, "ValidationError", "At least one updatable connection profile field is required.");
+    }
+    if (body.name !== undefined && typeof body.name !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+    if (body.launch !== undefined) {
+      validateConnectionProfileLaunchPayload(body.launch, "launch");
     }
   }
 
@@ -882,6 +999,16 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "layoutProfileList") {
     if (!Array.isArray(body) || !body.every((item) => isLayoutProfile(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match LayoutProfile[] schema.");
+    }
+  }
+
+  if (expect === "connectionProfile" && !isConnectionProfile(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match ConnectionProfile schema.");
+  }
+
+  if (expect === "connectionProfileList") {
+    if (!Array.isArray(body) || !body.every((item) => isConnectionProfile(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match ConnectionProfile[] schema.");
     }
   }
 

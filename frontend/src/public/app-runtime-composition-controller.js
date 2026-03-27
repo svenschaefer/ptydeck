@@ -6,6 +6,7 @@ import { createAppRuntimeStateController } from "./app-runtime-state-controller.
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
+import { createConnectionProfileRuntimeController } from "./connection-profile-runtime-controller.js";
 import { createCommandDiscoveryUsageStore } from "./command-discovery-ranking.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
@@ -119,6 +120,12 @@ const layoutProfileApplyBtn = document.getElementById("layout-profile-apply");
 const layoutProfileRenameBtn = document.getElementById("layout-profile-rename");
 const layoutProfileDeleteBtn = document.getElementById("layout-profile-delete");
 const layoutProfileStatusEl = document.getElementById("layout-profile-status");
+const connectionProfileSelectEl = document.getElementById("connection-profile-select");
+const connectionProfileSaveBtn = document.getElementById("connection-profile-save");
+const connectionProfileApplyBtn = document.getElementById("connection-profile-apply");
+const connectionProfileRenameBtn = document.getElementById("connection-profile-rename");
+const connectionProfileDeleteBtn = document.getElementById("connection-profile-delete");
+const connectionProfileStatusEl = document.getElementById("connection-profile-status");
 const workspacePresetSelectEl = document.getElementById("workspace-preset-select");
 const workspacePresetSaveBtn = document.getElementById("workspace-preset-save");
 const workspacePresetApplyBtn = document.getElementById("workspace-preset-apply");
@@ -306,6 +313,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "rename",
   "restart",
   "note",
+  "connection",
   "layout",
   "workspace",
   "broadcast",
@@ -316,6 +324,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "run"
 ];
 let layoutRuntimeController = null;
+let connectionProfileRuntimeController = null;
 let terminalSettings = null;
 let sessionInputSettings = {};
 const sessionThemeDrafts = new Map();
@@ -451,6 +460,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getCommandComposerRuntimeController: () => commandComposerRuntimeController,
   getCommandTargetRuntimeController: () => commandTargetRuntimeController,
   getSessionGridController: () => sessionGridController,
+  getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
   getControlPaneRuntimeController: () => controlPaneRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getCommandExecutor: () => commandExecutor
@@ -574,6 +584,34 @@ layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   requestRender: () => appCommandUiFacadeController?.render?.(),
   getDeckSplitLayouts: () => splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
   setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
+});
+
+connectionProfileRuntimeController = createConnectionProfileRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  api,
+  selectEl: connectionProfileSelectEl,
+  saveBtn: connectionProfileSaveBtn,
+  applyBtn: connectionProfileApplyBtn,
+  renameBtn: connectionProfileRenameBtn,
+  deleteBtn: connectionProfileDeleteBtn,
+  statusEl: connectionProfileStatusEl,
+  getSessions: () => store.getState().sessions || [],
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  getActiveSessionId: () => store.getState().activeSessionId || "",
+  setActiveSession: (sessionId) => store.setActiveSession(sessionId),
+  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
+  applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  normalizeThemeProfile: (value) =>
+    sessionUiFacadeController?.normalizeThemeProfile?.(value) ||
+    (value && typeof value === "object" && !Array.isArray(value) ? value : {}),
+  defaultDeckId: DEFAULT_DECK_ID
 });
 
 workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
@@ -1023,6 +1061,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   layoutRuntimeController,
   terminalSearchController,
   layoutProfileRuntimeController,
+  connectionProfileRuntimeController,
   workspacePresetRuntimeController,
   broadcastInputRuntimeController,
   sessionTerminalResizeController,

@@ -222,6 +222,22 @@ export function createApiClient(baseUrl, options = {}) {
     async listLayoutProfiles() {
       return request("/layout-profiles");
     },
+    async listConnectionProfiles() {
+      return request("/connection-profiles");
+    },
+    async createConnectionProfile(payload) {
+      return request("/connection-profiles", withJson(payload || {}));
+    },
+    async updateConnectionProfile(profileId, payload) {
+      return request(`/connection-profiles/${encodeURIComponent(profileId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    },
+    async deleteConnectionProfile(profileId) {
+      await request(`/connection-profiles/${encodeURIComponent(profileId)}`, { method: "DELETE" }, { expectJson: false });
+    },
     async createLayoutProfile(payload) {
       return request("/layout-profiles", withJson(payload || {}));
     },

@@ -76,6 +76,7 @@ export class JsonPersistence {
           sessionOutputs: [],
           customCommands: [],
           decks: [],
+          connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
           sshTrustEntries: []
@@ -87,6 +88,7 @@ export class JsonPersistence {
           sessionOutputs: Array.isArray(parsed.sessionOutputs) ? parsed.sessionOutputs : [],
           customCommands: parsed.customCommands,
           decks: Array.isArray(parsed.decks) ? parsed.decks : [],
+          connectionProfiles: Array.isArray(parsed.connectionProfiles) ? parsed.connectionProfiles : [],
           layoutProfiles: Array.isArray(parsed.layoutProfiles) ? parsed.layoutProfiles : [],
           workspacePresets: Array.isArray(parsed.workspacePresets) ? parsed.workspacePresets : [],
           sshTrustEntries: Array.isArray(parsed.sshTrustEntries) ? parsed.sshTrustEntries : []
@@ -108,6 +110,7 @@ export class JsonPersistence {
             sessionOutputs: [],
             customCommands: [],
             decks: [],
+            connectionProfiles: [],
             layoutProfiles: [],
             workspacePresets: [],
             sshTrustEntries: []
@@ -123,6 +126,7 @@ export class JsonPersistence {
             sessionOutputs: Array.isArray(decryptedParsed.sessionOutputs) ? decryptedParsed.sessionOutputs : [],
             customCommands: decryptedParsed.customCommands,
             decks: Array.isArray(decryptedParsed.decks) ? decryptedParsed.decks : [],
+            connectionProfiles: Array.isArray(decryptedParsed.connectionProfiles) ? decryptedParsed.connectionProfiles : [],
             layoutProfiles: Array.isArray(decryptedParsed.layoutProfiles) ? decryptedParsed.layoutProfiles : [],
             workspacePresets: Array.isArray(decryptedParsed.workspacePresets) ? decryptedParsed.workspacePresets : [],
             sshTrustEntries: Array.isArray(decryptedParsed.sshTrustEntries) ? decryptedParsed.sshTrustEntries : []
@@ -133,6 +137,7 @@ export class JsonPersistence {
           sessionOutputs: [],
           customCommands: [],
           decks: [],
+          connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
           sshTrustEntries: []
@@ -143,6 +148,7 @@ export class JsonPersistence {
         sessionOutputs: [],
         customCommands: [],
         decks: [],
+        connectionProfiles: [],
         layoutProfiles: [],
         workspacePresets: [],
         sshTrustEntries: []
@@ -154,6 +160,7 @@ export class JsonPersistence {
           sessionOutputs: [],
           customCommands: [],
           decks: [],
+          connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
           sshTrustEntries: []
@@ -168,13 +175,23 @@ export class JsonPersistence {
       sessions,
       customCommands: [],
       decks: [],
+      connectionProfiles: [],
       layoutProfiles: [],
       workspacePresets: [],
       sshTrustEntries: []
     });
   }
 
-  async saveState({ sessions, sessionOutputs, customCommands, decks, layoutProfiles, workspacePresets, sshTrustEntries }) {
+  async saveState({
+    sessions,
+    sessionOutputs,
+    customCommands,
+    decks,
+    connectionProfiles,
+    layoutProfiles,
+    workspacePresets,
+    sshTrustEntries
+  }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const payloadJson = JSON.stringify(
@@ -183,6 +200,7 @@ export class JsonPersistence {
         sessionOutputs: Array.isArray(sessionOutputs) ? sessionOutputs : [],
         customCommands: Array.isArray(customCommands) ? customCommands : [],
         decks: Array.isArray(decks) ? decks : [],
+        connectionProfiles: Array.isArray(connectionProfiles) ? connectionProfiles : [],
         layoutProfiles: Array.isArray(layoutProfiles) ? layoutProfiles : [],
         workspacePresets: Array.isArray(workspacePresets) ? workspacePresets : [],
         sshTrustEntries: Array.isArray(sshTrustEntries) ? sshTrustEntries : []

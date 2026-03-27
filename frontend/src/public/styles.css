@@ -137,6 +137,7 @@ body {
 }
 
 .settings-panel,
+.connection-profile-panel,
 .layout-profile-panel,
 .workspace-preset-panel {
   margin-top: 8px;
@@ -158,6 +159,7 @@ body {
 }
 
 .settings-panel h2,
+.connection-profile-panel h2,
 .layout-profile-panel h2,
 .workspace-preset-panel h2 {
   margin: 0;
