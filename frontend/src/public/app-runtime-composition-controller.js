@@ -7,6 +7,7 @@ import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-f
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
+import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createStore } from "./store.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
@@ -103,6 +104,12 @@ const deckDeleteBtn = document.getElementById("deck-delete");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
 const settingsApplyBtn = document.getElementById("settings-apply");
+const layoutProfileSelectEl = document.getElementById("layout-profile-select");
+const layoutProfileSaveBtn = document.getElementById("layout-profile-save");
+const layoutProfileApplyBtn = document.getElementById("layout-profile-apply");
+const layoutProfileRenameBtn = document.getElementById("layout-profile-rename");
+const layoutProfileDeleteBtn = document.getElementById("layout-profile-delete");
+const layoutProfileStatusEl = document.getElementById("layout-profile-status");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
@@ -262,6 +269,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "rename",
   "restart",
   "note",
+  "layout",
   "replay",
   "settings",
   "custom",
@@ -306,6 +314,7 @@ let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
 let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
+let layoutProfileRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -463,6 +472,35 @@ appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
   terminalFontSize: TERMINAL_FONT_SIZE,
   terminalLineHeight: TERMINAL_LINE_HEIGHT,
   clearUiError: () => appRuntimeStateController?.clearError()
+});
+
+layoutProfileRuntimeController = createLayoutProfileRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  api,
+  selectEl: layoutProfileSelectEl,
+  saveBtn: layoutProfileSaveBtn,
+  applyBtn: layoutProfileApplyBtn,
+  renameBtn: layoutProfileRenameBtn,
+  deleteBtn: layoutProfileDeleteBtn,
+  statusEl: layoutProfileStatusEl,
+  getDecks: () => store.getState().decks || [],
+  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
+  getSessionFilterText: () => appLayoutDeckFacadeController?.getSessionFilterText?.() || "",
+  getSidebarVisible: () => terminalSettings?.sidebarVisible !== false,
+  getDeckTerminalGeometry: (deckId) => appLayoutDeckFacadeController?.getDeckTerminalGeometry?.(deckId) || {
+    cols: DEFAULT_TERMINAL_COLS,
+    rows: DEFAULT_TERMINAL_ROWS
+  },
+  getDeckById: (deckId) => appLayoutDeckFacadeController?.getDeckById?.(deckId),
+  setSessionFilterText: (value) => appLayoutDeckFacadeController?.setSessionFilterText?.(value),
+  setSidebarVisible: (visible) => appLayoutDeckFacadeController?.setSidebarVisible?.(visible),
+  setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId) === true,
+  applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, options) === true,
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  requestRender: () => appCommandUiFacadeController?.render?.()
 });
 
 if (typeof window.Terminal !== "function") {
@@ -820,6 +858,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   sendBtn,
   layoutRuntimeController,
   terminalSearchController,
+  layoutProfileRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,
   appLayoutDeckFacadeController,

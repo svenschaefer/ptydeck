@@ -80,6 +80,40 @@ function isDeck(value) {
   );
 }
 
+function isLayoutProfileDeckTerminalSettings(value) {
+  return (
+    isObject(value) &&
+    Number.isInteger(value.cols) &&
+    value.cols >= 20 &&
+    value.cols <= 400 &&
+    Number.isInteger(value.rows) &&
+    value.rows >= 5 &&
+    value.rows <= 120
+  );
+}
+
+function isLayoutProfileLayout(value) {
+  return (
+    isObject(value) &&
+    typeof value.activeDeckId === "string" &&
+    typeof value.sidebarVisible === "boolean" &&
+    typeof value.sessionFilterText === "string" &&
+    isObject(value.deckTerminalSettings) &&
+    Object.values(value.deckTerminalSettings).every((entry) => isLayoutProfileDeckTerminalSettings(entry))
+  );
+}
+
+function isLayoutProfile(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt) &&
+    isLayoutProfileLayout(value.layout)
+  );
+}
+
 export function validateRequest({ method, pathname, params, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
@@ -314,6 +348,51 @@ export function validateRequest({ method, pathname, params, body }) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
   }
+
+  if (method === "GET" && pathname.match(/^\/api\/v1\/layout-profiles\/[^/]+$/)) {
+    if (!params.profileId || typeof params.profileId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing profileId path parameter.");
+    }
+  }
+
+  if (method === "POST" && pathname === "/api/v1/layout-profiles") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.id !== undefined && typeof body.id !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'id' must be a string.");
+    }
+    if (body.layout !== undefined && !isObject(body.layout)) {
+      throw new ApiError(400, "ValidationError", "Field 'layout' must be an object.");
+    }
+  }
+
+  if (method === "PATCH" && pathname.match(/^\/api\/v1\/layout-profiles\/[^/]+$/)) {
+    if (!params.profileId || typeof params.profileId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing profileId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.name === undefined && body.layout === undefined) {
+      throw new ApiError(400, "ValidationError", "At least one updatable layout profile field is required.");
+    }
+    if (body.name !== undefined && (typeof body.name !== "string" || !body.name.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+    }
+    if (body.layout !== undefined && !isObject(body.layout)) {
+      throw new ApiError(400, "ValidationError", "Field 'layout' must be an object.");
+    }
+  }
+
+  if (method === "DELETE" && pathname.match(/^\/api\/v1\/layout-profiles\/[^/]+$/)) {
+    if (!params.profileId || typeof params.profileId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing profileId path parameter.");
+    }
+  }
 }
 
 function isSession(value) {
@@ -437,6 +516,16 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "deckList") {
     if (!Array.isArray(body) || !body.every((item) => isDeck(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match Deck[] schema.");
+    }
+  }
+
+  if (expect === "layoutProfile" && !isLayoutProfile(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match LayoutProfile schema.");
+  }
+
+  if (expect === "layoutProfileList") {
+    if (!Array.isArray(body) || !body.every((item) => isLayoutProfile(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match LayoutProfile[] schema.");
     }
   }
 }

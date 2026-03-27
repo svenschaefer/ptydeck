@@ -89,6 +89,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
   const layoutRuntimeController = options.layoutRuntimeController || null;
+  const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
   const sessionTerminalResizeController = options.sessionTerminalResizeController || null;
   const appCommandUiFacadeController = options.appCommandUiFacadeController || null;
@@ -185,6 +186,13 @@ export function createAppBootstrapCompositionController(options = {}) {
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,
       getTerminalSettings: terminalSettings,
       requestRender: () => appCommandUiFacadeController?.render(),
+      listLayoutProfiles: () => layoutProfileRuntimeController?.listProfiles?.() || [],
+      resolveLayoutProfile: (selectorText) =>
+        layoutProfileRuntimeController?.resolveProfile?.(selectorText) || { profile: null, error: "Unknown layout profile." },
+      createLayoutProfileFromCurrent: (name) => layoutProfileRuntimeController?.createProfileFromCurrentLayout?.(name) || "",
+      applyLayoutProfile: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
+      renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
+      deleteLayoutProfile: (profileId) => layoutProfileRuntimeController?.deleteProfileById?.(profileId) || "",
       openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy
@@ -374,12 +382,15 @@ export function createAppBootstrapCompositionController(options = {}) {
     appLayoutDeckFacadeController?.syncTerminalGeometryCss?.();
     appCommandUiFacadeController?.render?.();
     layoutRuntimeController?.bindUiEvents?.();
+    layoutProfileRuntimeController?.bindUiEvents?.();
     terminalSearchController?.bindUiEvents?.();
     terminalSearchController?.updateUi?.();
     commandComposerAutocompleteController.bindUiEvents?.();
     appLifecycleController.bindUiEvents?.();
     appLifecycleController.bindWindowEvents?.();
-    return appLifecycleController.initializeRuntime?.();
+    const initializationResult = await appLifecycleController.initializeRuntime?.();
+    await layoutProfileRuntimeController?.loadProfiles?.();
+    return initializationResult;
   }
 
   return {

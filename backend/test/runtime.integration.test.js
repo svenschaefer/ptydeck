@@ -759,6 +759,125 @@ test("session list/get are deck-aware with optional deckId query filter", async 
   }
 });
 
+test("layout profile lifecycle persists and restores across restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-layout-profiles-"));
+  const dataPath = join(dir, "sessions.json");
+  const firstRuntime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await firstRuntime.start();
+  const firstPort = firstRuntime.getAddress().port;
+  const firstBaseUrl = `http://127.0.0.1:${firstPort}/api/v1`;
+
+  try {
+    const createDeckRes = await fetch(`${firstBaseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Ops", settings: { terminal: { cols: 100, rows: 32 } } })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createLayoutProfileRes = await fetch(`${firstBaseUrl}/layout-profiles`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Ops Focus",
+        layout: {
+          activeDeckId: "ops",
+          sidebarVisible: false,
+          sessionFilterText: "ops critical",
+          deckTerminalSettings: {
+            default: { cols: 80, rows: 20 },
+            ops: { cols: 132, rows: 40 }
+          }
+        }
+      })
+    });
+    assert.equal(createLayoutProfileRes.status, 201);
+    const created = await createLayoutProfileRes.json();
+    assert.equal(created.layout.activeDeckId, "ops");
+    assert.equal(created.layout.sidebarVisible, false);
+    assert.equal(created.layout.sessionFilterText, "ops critical");
+
+    const patchLayoutProfileRes = await fetch(`${firstBaseUrl}/layout-profiles/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Ops Focus Updated",
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: true,
+          sessionFilterText: "",
+          deckTerminalSettings: {
+            default: { cols: 96, rows: 26 }
+          }
+        }
+      })
+    });
+    assert.equal(patchLayoutProfileRes.status, 200);
+    const updated = await patchLayoutProfileRes.json();
+    assert.equal(updated.name, "Ops Focus Updated");
+    assert.equal(updated.layout.activeDeckId, "default");
+    assert.equal(updated.layout.sidebarVisible, true);
+
+    const listLayoutProfilesRes = await fetch(`${firstBaseUrl}/layout-profiles`);
+    assert.equal(listLayoutProfilesRes.status, 200);
+    const listed = await listLayoutProfilesRes.json();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0].id, created.id);
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    assert.ok(Array.isArray(persistedRaw.layoutProfiles));
+    assert.equal(persistedRaw.layoutProfiles.length, 1);
+    assert.equal(persistedRaw.layoutProfiles[0].name, "Ops Focus Updated");
+  } finally {
+    await firstRuntime.stop();
+  }
+
+  const secondRuntime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await secondRuntime.start();
+  const secondPort = secondRuntime.getAddress().port;
+  const secondBaseUrl = `http://127.0.0.1:${secondPort}/api/v1`;
+
+  try {
+    const restoredListRes = await fetch(`${secondBaseUrl}/layout-profiles`);
+    assert.equal(restoredListRes.status, 200);
+    const restoredProfiles = await restoredListRes.json();
+    assert.equal(restoredProfiles.length, 1);
+    assert.equal(restoredProfiles[0].name, "Ops Focus Updated");
+    assert.equal(restoredProfiles[0].layout.activeDeckId, "default");
+    assert.deepEqual(restoredProfiles[0].layout.deckTerminalSettings, {
+      default: { cols: 96, rows: 26 }
+    });
+
+    const deleteLayoutProfileRes = await fetch(`${secondBaseUrl}/layout-profiles/${restoredProfiles[0].id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteLayoutProfileRes.status, 204);
+
+    const emptyListRes = await fetch(`${secondBaseUrl}/layout-profiles`);
+    assert.equal(emptyListRes.status, 200);
+    const emptyProfiles = await emptyListRes.json();
+    assert.deepEqual(emptyProfiles, []);
+  } finally {
+    await secondRuntime.stop();
+  }
+});
+
 test("REST negative routes return expected error responses", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 

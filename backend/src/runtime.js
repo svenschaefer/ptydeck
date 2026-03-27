@@ -26,6 +26,7 @@ const CUSTOM_COMMAND_RESERVED_NAMES = new Set([
   "rename",
   "restart",
   "note",
+  "layout",
   "help",
   "custom"
 ]);
@@ -51,6 +52,9 @@ const DEFAULT_AUTH_WS_TICKET_TTL_SECONDS = 30;
 const DEFAULT_STARTUP_WARMUP_QUIET_MS = 1000;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
+const LAYOUT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const LAYOUT_PROFILE_NAME_MAX_LENGTH = 64;
+const LAYOUT_PROFILE_FILTER_MAX_LENGTH = 256;
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
@@ -170,6 +174,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/decks" && method === "POST") {
     return { kind: "createDeck" };
   }
+  if (pathname === "/api/v1/layout-profiles" && method === "GET") {
+    return { kind: "listLayoutProfiles" };
+  }
+  if (pathname === "/api/v1/layout-profiles" && method === "POST") {
+    return { kind: "createLayoutProfile" };
+  }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
   if (customCommandMatch && method === "GET") {
@@ -208,6 +218,17 @@ function route(pathname, method) {
         sessionId: decodePathParam(moveSessionMatch[2], "sessionId")
       }
     };
+  }
+
+  const layoutProfileMatch = pathname.match(/^\/api\/v1\/layout-profiles\/([^/]+)$/);
+  if (layoutProfileMatch && method === "GET") {
+    return { kind: "getLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
+  }
+  if (layoutProfileMatch && method === "PATCH") {
+    return { kind: "updateLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
+  }
+  if (layoutProfileMatch && method === "DELETE") {
+    return { kind: "deleteLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
   }
 
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
@@ -250,6 +271,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/decks\/[^/]+$/.test(pathname)) {
     return "/api/v1/decks/{deckId}";
+  }
+  if (/^\/api\/v1\/layout-profiles\/[^/]+$/.test(pathname)) {
+    return "/api/v1/layout-profiles/{profileId}";
   }
   if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
     return "/api/v1/custom-commands/{commandName}";
@@ -591,6 +615,196 @@ function slugifyDeckId(name) {
   return root.slice(0, maxLength).replace(/-+$/g, "") || "deck";
 }
 
+function normalizeLayoutProfileName(name) {
+  if (typeof name !== "string") {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(400, "ValidationError", "Field 'name' must be a non-empty string.");
+  }
+  if (trimmed.length > LAYOUT_PROFILE_NAME_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'name' exceeds maximum length (${LAYOUT_PROFILE_NAME_MAX_LENGTH}).`
+    );
+  }
+  return trimmed;
+}
+
+function normalizeLayoutProfileIdInput(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !LAYOUT_PROFILE_ID_PATTERN.test(normalized)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'id' must match pattern ^[a-z0-9][a-z0-9-]{0,31}$."
+    );
+  }
+  return normalized;
+}
+
+function slugifyLayoutProfileId(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const root = base || "layout";
+  const maxLength = 32;
+  return root.slice(0, maxLength).replace(/-+$/g, "") || "layout";
+}
+
+function normalizeLayoutProfileSessionFilterText(value, { strict = true } = {}) {
+  if (value === undefined) {
+    return "";
+  }
+  if (typeof value !== "string") {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'layout.sessionFilterText' must be a string.");
+    }
+    return "";
+  }
+  const normalized = value.trim();
+  if (normalized.length > LAYOUT_PROFILE_FILTER_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'layout.sessionFilterText' exceeds maximum length (${LAYOUT_PROFILE_FILTER_MAX_LENGTH}).`
+      );
+    }
+    return normalized.slice(0, LAYOUT_PROFILE_FILTER_MAX_LENGTH);
+  }
+  return normalized;
+}
+
+function normalizeLayoutProfileDeckTerminalSettingsEntry(value, { strict = true } = {}) {
+  if (!isPlainObject(value)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Each 'layout.deckTerminalSettings' entry must be an object.");
+    }
+    return null;
+  }
+  const cols = Number.parseInt(String(value.cols ?? ""), 10);
+  const rows = Number.parseInt(String(value.rows ?? ""), 10);
+  if (!Number.isInteger(cols) || cols < 20 || cols > 400) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Each 'layout.deckTerminalSettings.*.cols' must be an integer between 20 and 400.");
+    }
+    return null;
+  }
+  if (!Number.isInteger(rows) || rows < 5 || rows > 120) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Each 'layout.deckTerminalSettings.*.rows' must be an integer between 5 and 120.");
+    }
+    return null;
+  }
+  return { cols, rows };
+}
+
+function normalizeLayoutProfileLayout(layout, { strict = true } = {}) {
+  if (layout === undefined) {
+    return {
+      activeDeckId: DEFAULT_DECK_ID,
+      sidebarVisible: true,
+      sessionFilterText: "",
+      deckTerminalSettings: {}
+    };
+  }
+  if (!isPlainObject(layout)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'layout' must be an object.");
+    }
+    return {
+      activeDeckId: DEFAULT_DECK_ID,
+      sidebarVisible: true,
+      sessionFilterText: "",
+      deckTerminalSettings: {}
+    };
+  }
+
+  let activeDeckId = DEFAULT_DECK_ID;
+  try {
+    activeDeckId =
+      layout.activeDeckId === undefined ? DEFAULT_DECK_ID : normalizeDeckIdInput(layout.activeDeckId) || DEFAULT_DECK_ID;
+  } catch (error) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'layout.activeDeckId' must be a valid deck id.");
+    }
+  }
+
+  const sidebarVisible = layout.sidebarVisible !== false;
+  const sessionFilterText = normalizeLayoutProfileSessionFilterText(layout.sessionFilterText, { strict });
+  const nextDeckTerminalSettings = {};
+  if (layout.deckTerminalSettings !== undefined) {
+    if (!isPlainObject(layout.deckTerminalSettings)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Field 'layout.deckTerminalSettings' must be an object.");
+      }
+    } else {
+      for (const [rawDeckId, rawSettings] of Object.entries(layout.deckTerminalSettings)) {
+        let deckId = "";
+        try {
+          deckId = normalizeDeckIdInput(rawDeckId);
+        } catch (error) {
+          if (strict) {
+            throw new ApiError(400, "ValidationError", "Field 'layout.deckTerminalSettings' contains an invalid deck id.");
+          }
+          continue;
+        }
+        const settings = normalizeLayoutProfileDeckTerminalSettingsEntry(rawSettings, { strict });
+        if (!settings) {
+          continue;
+        }
+        nextDeckTerminalSettings[deckId] = settings;
+      }
+    }
+  }
+
+  return {
+    activeDeckId,
+    sidebarVisible,
+    sessionFilterText,
+    deckTerminalSettings: nextDeckTerminalSettings
+  };
+}
+
+function normalizeLayoutProfileEntity(input, { strict = true } = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return null;
+  }
+  const id = typeof input.id === "string" ? input.id.trim() : "";
+  if (!id || !LAYOUT_PROFILE_ID_PATTERN.test(id)) {
+    return null;
+  }
+  const now = Date.now();
+  const createdAt = Number.isInteger(input.createdAt) ? input.createdAt : now;
+  const updatedAt = Number.isInteger(input.updatedAt) ? input.updatedAt : createdAt;
+  return {
+    id,
+    name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : id,
+    createdAt,
+    updatedAt,
+    layout: normalizeLayoutProfileLayout(input.layout, { strict })
+  };
+}
+
+function compareLayoutProfileEntries(a, b) {
+  const nameCompare = a.name.localeCompare(b.name, "en-US", { sensitivity: "base" });
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
+}
+
 function parseBooleanQueryParam(value, fieldName) {
   if (value === null || value === undefined || value === "") {
     return false;
@@ -638,6 +852,7 @@ export function createRuntime(config) {
   const unrestoredSessions = new Map();
   let persistedReplayOutputs = new Map();
   const decks = new Map();
+  const layoutProfiles = new Map();
   const sessionDeckAssignments = new Map();
   const metrics = {
     httpRequestsTotal: 0,
@@ -1320,6 +1535,87 @@ export function createRuntime(config) {
     };
   }
 
+  function toApiLayoutProfile(profile) {
+    return {
+      id: profile.id,
+      name: profile.name,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      layout: {
+        activeDeckId: profile.layout.activeDeckId,
+        sidebarVisible: profile.layout.sidebarVisible,
+        sessionFilterText: profile.layout.sessionFilterText,
+        deckTerminalSettings: JSON.parse(JSON.stringify(profile.layout.deckTerminalSettings))
+      }
+    };
+  }
+
+  function listLayoutProfiles() {
+    return Array.from(layoutProfiles.values()).sort(compareLayoutProfileEntries).map(toApiLayoutProfile);
+  }
+
+  function getLayoutProfileOrThrow(profileId) {
+    const profile = layoutProfiles.get(profileId);
+    if (!profile) {
+      throw new ApiError(404, "LayoutProfileNotFound", `Layout profile '${profileId}' was not found.`);
+    }
+    return profile;
+  }
+
+  function createLayoutProfile(body) {
+    const name = normalizeLayoutProfileName(body?.name);
+    const requestedId = normalizeLayoutProfileIdInput(body?.id);
+    let profileId = requestedId;
+    if (!profileId) {
+      const slug = slugifyLayoutProfileId(name);
+      profileId = slug;
+      let suffix = 2;
+      while (layoutProfiles.has(profileId)) {
+        const suffixText = `-${suffix}`;
+        const rootMaxLength = 32 - suffixText.length;
+        const rooted = slug.slice(0, rootMaxLength).replace(/-+$/g, "") || "layout";
+        profileId = `${rooted}${suffixText}`;
+        suffix += 1;
+      }
+    }
+    if (layoutProfiles.has(profileId)) {
+      throw new ApiError(409, "LayoutProfileAlreadyExists", `Layout profile '${profileId}' already exists.`);
+    }
+    const now = Date.now();
+    const profile = {
+      id: profileId,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      layout: normalizeLayoutProfileLayout(body?.layout, { strict: true })
+    };
+    layoutProfiles.set(profile.id, profile);
+    return toApiLayoutProfile(profile);
+  }
+
+  function updateLayoutProfile(profileId, body) {
+    const existing = getLayoutProfileOrThrow(profileId);
+    const hasName = body?.name !== undefined;
+    const hasLayout = body?.layout !== undefined;
+    if (!hasName && !hasLayout) {
+      throw new ApiError(400, "ValidationError", "At least one updatable layout profile field is required.");
+    }
+    const next = {
+      ...existing,
+      name: hasName ? normalizeLayoutProfileName(body.name) : existing.name,
+      layout: hasLayout ? normalizeLayoutProfileLayout(body.layout, { strict: true }) : existing.layout,
+      updatedAt: Date.now()
+    };
+    layoutProfiles.set(profileId, next);
+    return toApiLayoutProfile(next);
+  }
+
+  function deleteLayoutProfile(profileId) {
+    const profile = getLayoutProfileOrThrow(profileId);
+    layoutProfiles.delete(profileId);
+    return toApiLayoutProfile(profile);
+  }
+
   function ensureSessionExistsOrThrow(sessionId) {
     try {
       manager.get(sessionId);
@@ -1392,7 +1688,8 @@ export function createRuntime(config) {
       sessions: Array.from(sessionMap.values()),
       sessionOutputs: snapshot.outputs,
       customCommands: listCustomCommands(),
-      decks: Array.from(decks.values())
+      decks: Array.from(decks.values()),
+      layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile)
     };
   }
 
@@ -1859,6 +2156,43 @@ function tryCreateRestoredSession({
         return;
       }
 
+      if (match.kind === "listLayoutProfiles") {
+        const payload = listLayoutProfiles();
+        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfileList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createLayoutProfile") {
+        const payload = createLayoutProfile(body);
+        validateResponse({ statusCode: 201, body: payload, expect: "layoutProfile" });
+        await persistNow("layout-profile.create");
+        writeJson(req, res, 201, payload);
+        return;
+      }
+
+      if (match.kind === "getLayoutProfile") {
+        const payload = toApiLayoutProfile(getLayoutProfileOrThrow(match.params.profileId));
+        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "updateLayoutProfile") {
+        const payload = updateLayoutProfile(match.params.profileId, body);
+        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
+        await persistNow("layout-profile.update");
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "deleteLayoutProfile") {
+        deleteLayoutProfile(match.params.profileId);
+        await persistNow("layout-profile.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
       if (match.kind === "listSessions") {
         const requestedDeckId = parsedUrl.searchParams.get("deckId");
         const deckIdFilter = typeof requestedDeckId === "string" && requestedDeckId.trim() ? requestedDeckId.trim() : "";
@@ -2229,6 +2563,7 @@ function tryCreateRestoredSession({
     );
     startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
     decks.clear();
+    layoutProfiles.clear();
     sessionDeckAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
       const normalizedDeck = normalizeDeckEntity(persistedDeck);
@@ -2237,11 +2572,19 @@ function tryCreateRestoredSession({
       }
       decks.set(normalizedDeck.id, normalizedDeck);
     }
+    for (const persistedLayoutProfile of Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles : []) {
+      const normalizedProfile = normalizeLayoutProfileEntity(persistedLayoutProfile, { strict: false });
+      if (!normalizedProfile) {
+        continue;
+      }
+      layoutProfiles.set(normalizedProfile.id, normalizedProfile);
+    }
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {
       persistedSessionCount: persistedState.sessions.length,
       persistedCustomCommandCount: persistedState.customCommands.length,
-      persistedDeckCount: persistedState.decks.length
+      persistedDeckCount: persistedState.decks.length,
+      persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0
     });
     for (const session of persistedState.sessions) {
       try {

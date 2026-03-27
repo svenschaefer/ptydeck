@@ -295,6 +295,116 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /layout-profiles:
+    get:
+      operationId: listLayoutProfiles
+      summary: List persisted layout profiles.
+      responses:
+        '200':
+          description: Layout profile list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LayoutProfile'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createLayoutProfile
+      summary: Create a persisted layout profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLayoutProfileRequest'
+      responses:
+        '201':
+          description: Layout profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutProfile'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Layout profile id already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /layout-profiles/{profileId}:
+    parameters:
+      - $ref: '#/components/parameters/profileId'
+    get:
+      operationId: getLayoutProfile
+      summary: Get layout profile by id.
+      responses:
+        '200':
+          description: Layout profile found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutProfile'
+        '404':
+          description: Layout profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    patch:
+      operationId: updateLayoutProfile
+      summary: Update persisted layout profile metadata/layout.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLayoutProfileRequest'
+      responses:
+        '200':
+          description: Layout profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutProfile'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Layout profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    delete:
+      operationId: deleteLayoutProfile
+      summary: Delete persisted layout profile by id.
+      responses:
+        '204':
+          description: Layout profile deleted
+        '404':
+          description: Layout profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -537,6 +647,12 @@ components:
       required: true
       schema:
         type: string
+    profileId:
+      name: profileId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Deck:
       type: object
@@ -580,6 +696,77 @@ components:
           type: string
         settings:
           $ref: '#/components/schemas/DeckSettings'
+    LayoutProfile:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+        - layout
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+        layout:
+          $ref: '#/components/schemas/LayoutProfileLayout'
+    LayoutProfileLayout:
+      type: object
+      required:
+        - activeDeckId
+        - sidebarVisible
+        - sessionFilterText
+        - deckTerminalSettings
+      properties:
+        activeDeckId:
+          type: string
+        sidebarVisible:
+          type: boolean
+        sessionFilterText:
+          type: string
+        deckTerminalSettings:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LayoutProfileDeckTerminalSettings'
+    LayoutProfileDeckTerminalSettings:
+      type: object
+      required:
+        - cols
+        - rows
+      properties:
+        cols:
+          type: integer
+          minimum: 20
+          maximum: 400
+        rows:
+          type: integer
+          minimum: 5
+          maximum: 120
+    CreateLayoutProfileRequest:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        layout:
+          $ref: '#/components/schemas/LayoutProfileLayout'
+    UpdateLayoutProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        layout:
+          $ref: '#/components/schemas/LayoutProfileLayout'
     Session:
       type: object
       required:

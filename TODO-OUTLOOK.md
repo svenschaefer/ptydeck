@@ -5,9 +5,12 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 ## Product and UX
 
 - [ ] Add session grouping and workspace presets.
-- [ ] Add persistent layout profiles.
 - [ ] Add split-based layout model (horizontal/vertical) with drag/resize behavior.
 - [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
+
+Promoted and completed in `v0.4.0-H23`:
+
+- `UX-002`, `UX-003`, `UX-004`
 
 Promoted and completed in `v0.4.0-H22`:
 

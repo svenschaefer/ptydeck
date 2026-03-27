@@ -266,6 +266,90 @@ test("validateResponse accepts custom command payloads", () => {
   });
 });
 
+test("validateRequest accepts valid layout profile create and patch payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/layout-profiles",
+      params: {},
+      body: {
+        id: "focus",
+        name: "Focus Layout",
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: true,
+          sessionFilterText: "ops",
+          deckTerminalSettings: {
+            default: { cols: 110, rows: 28 }
+          }
+        }
+      }
+    });
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/layout-profiles/focus",
+      params: { profileId: "focus" },
+      body: {
+        name: "Focus Layout Updated",
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: false,
+          sessionFilterText: "",
+          deckTerminalSettings: {}
+        }
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid layout profile payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/layout-profiles",
+      params: {},
+      body: { name: "", layout: {} }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/layout-profiles/focus",
+      params: { profileId: "focus" },
+      body: {}
+    });
+  });
+});
+
+test("validateResponse accepts layout profile payloads", () => {
+  const body = {
+    id: "focus",
+    name: "Focus Layout",
+    createdAt: 1,
+    updatedAt: 2,
+    layout: {
+      activeDeckId: "default",
+      sidebarVisible: true,
+      sessionFilterText: "ops",
+      deckTerminalSettings: {
+        default: { cols: 110, rows: 28 }
+      }
+    }
+  };
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "layoutProfile",
+      body
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "layoutProfileList",
+      body: [body]
+    });
+  });
+});
+
 test("validateRequest accepts valid deck create/patch and move payloads", () => {
   assert.doesNotThrow(() => {
     validateRequest({

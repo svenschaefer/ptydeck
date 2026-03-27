@@ -15,7 +15,7 @@ function createExecutor() {
       }
     },
     api: {},
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "replay", "settings", "custom", "help"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "replay", "settings", "custom", "help"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -78,6 +78,9 @@ test("command executor help and usage strings derive from declarative schema met
   const noteUsage = await executor.execute({ command: "note", args: [], raw: "/note" });
   assert.equal(noteUsage, "Usage: /note <selector|active> [text...]");
 
+  const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
+  assert.equal(layoutUsage, "Usage: /layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
+
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(replayUsage, "Usage: /replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
 
@@ -89,6 +92,114 @@ test("command executor help and usage strings derive from declarative schema met
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
   assert.equal(customShowUsage, "Usage: /custom show <name>");
+});
+
+test("command executor manages layout profiles through shared runtime hooks", async () => {
+  const calls = [];
+  const profiles = [
+    {
+      id: "focus",
+      name: "Focus Layout",
+      layout: {
+        activeDeckId: "default",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        deckTerminalSettings: {}
+      }
+    }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: ""
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["layout", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 0,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => String(id || ""),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    listLayoutProfiles: () => profiles,
+    resolveLayoutProfile: (selector) =>
+      selector === "focus" ? { profile: profiles[0], error: "" } : { profile: null, error: `Unknown layout profile: ${selector}` },
+    createLayoutProfileFromCurrent: async (name) => {
+      calls.push(["save", name]);
+      return `Saved layout profile [focus] ${name}.`;
+    },
+    applyLayoutProfile: async (profileId) => {
+      calls.push(["apply", profileId]);
+      return `Applied layout profile [${profileId}] Focus Layout.`;
+    },
+    renameLayoutProfile: async (profileId, name) => {
+      calls.push(["rename", profileId, name]);
+      return `Renamed layout profile [${profileId}] to ${name}.`;
+    },
+    deleteLayoutProfile: async (profileId) => {
+      calls.push(["delete", profileId]);
+      return `Deleted layout profile [${profileId}] Focus Layout.`;
+    }
+  });
+
+  assert.equal(
+    await executor.execute({ command: "layout", args: ["list"], raw: "/layout list" }),
+    "[focus] Focus Layout -> deck=default filter=\"\""
+  );
+  assert.equal(
+    await executor.execute({ command: "layout", args: ["save", "Ops", "Layout"], raw: "/layout save Ops Layout" }),
+    "Saved layout profile [focus] Ops Layout."
+  );
+  assert.equal(
+    await executor.execute({ command: "layout", args: ["apply", "focus"], raw: "/layout apply focus" }),
+    "Applied layout profile [focus] Focus Layout."
+  );
+  assert.equal(
+    await executor.execute({ command: "layout", args: ["rename", "focus", "New", "Name"], raw: "/layout rename focus New Name" }),
+    "Renamed layout profile [focus] to New Name."
+  );
+  assert.equal(
+    await executor.execute({ command: "layout", args: ["delete", "focus"], raw: "/layout delete focus" }),
+    "Deleted layout profile [focus] Focus Layout."
+  );
+  assert.deepEqual(calls, [
+    ["save", "Ops Layout"],
+    ["apply", "focus"],
+    ["rename", "focus", "New Name"],
+    ["delete", "focus"]
+  ]);
 });
 
 test("command executor updates and clears persisted session notes", async () => {

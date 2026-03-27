@@ -61,6 +61,11 @@ function runtimeOperationKeys() {
     "PATCH /decks/{deckId}",
     "DELETE /decks/{deckId}",
     "POST /decks/{deckId}/sessions/{sessionId}:move",
+    "GET /layout-profiles",
+    "POST /layout-profiles",
+    "GET /layout-profiles/{profileId}",
+    "PATCH /layout-profiles/{profileId}",
+    "DELETE /layout-profiles/{profileId}",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -204,6 +209,47 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("DELETE /custom-commands/{commandName}").has(deleteCustomCommandRes.status));
+
+    const listLayoutProfilesRes = await contractFetch(`${baseUrl}/layout-profiles`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /layout-profiles").has(listLayoutProfilesRes.status));
+
+    const createLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: "Focus Layout",
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: true,
+          sessionFilterText: "",
+          deckTerminalSettings: {
+            default: { cols: 100, rows: 30 }
+          }
+        }
+      })
+    });
+    assert.ok(operations.get("POST /layout-profiles").has(createLayoutProfileRes.status));
+    const createdLayoutProfile = await createLayoutProfileRes.json();
+
+    const getLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /layout-profiles/{profileId}").has(getLayoutProfileRes.status));
+
+    const patchLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
+      method: "PATCH",
+      headers: authHeaders,
+      body: JSON.stringify({ name: "Focus Layout Updated" })
+    });
+    assert.ok(operations.get("PATCH /layout-profiles/{profileId}").has(patchLayoutProfileRes.status));
+
+    const deleteLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("DELETE /layout-profiles/{profileId}").has(deleteLayoutProfileRes.status));
 
     const getMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }

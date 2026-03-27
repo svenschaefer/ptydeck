@@ -202,6 +202,22 @@ export function createApiClient(baseUrl, options = {}) {
       const force = options && options.force === true ? "true" : "false";
       await request(`/decks/${encodeURIComponent(deckId)}?force=${force}`, { method: "DELETE" }, { expectJson: false });
     },
+    async listLayoutProfiles() {
+      return request("/layout-profiles");
+    },
+    async createLayoutProfile(payload) {
+      return request("/layout-profiles", withJson(payload || {}));
+    },
+    async updateLayoutProfile(profileId, payload) {
+      return request(`/layout-profiles/${encodeURIComponent(profileId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    },
+    async deleteLayoutProfile(profileId) {
+      await request(`/layout-profiles/${encodeURIComponent(profileId)}`, { method: "DELETE" }, { expectJson: false });
+    },
     async moveSessionToDeck(deckId, sessionId) {
       await request(
         `/decks/${encodeURIComponent(deckId)}/sessions/${encodeURIComponent(sessionId)}:move`,

@@ -367,6 +367,69 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  layout: freezeCommandDefinition({
+    key: "slash:layout",
+    insertText: "layout",
+    label: "/layout",
+    kind: "command",
+    description: "manage persisted layout profiles",
+    example: "/layout apply ops",
+    summary: "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>",
+    usage: [
+      "/layout list",
+      "/layout save <name>",
+      "/layout apply <profile>",
+      "/layout rename <profile> <name>",
+      "/layout delete <profile>"
+    ],
+    subcommands: {
+      list: {
+        insertText: "list",
+        label: "/layout list",
+        kind: "subcommand",
+        description: "list saved layout profiles",
+        example: "/layout list",
+        key: "slash:layout:list",
+        usage: "/layout list"
+      },
+      save: {
+        insertText: "save",
+        label: "/layout save",
+        kind: "subcommand",
+        description: "save the current workspace layout as a named profile",
+        example: "/layout save ops",
+        key: "slash:layout:save",
+        usage: "/layout save <name>"
+      },
+      apply: {
+        insertText: "apply",
+        label: "/layout apply",
+        kind: "subcommand",
+        description: "apply a saved layout profile",
+        example: "/layout apply ops",
+        key: "slash:layout:apply",
+        usage: "/layout apply <profile>"
+      },
+      rename: {
+        insertText: "rename",
+        label: "/layout rename",
+        kind: "subcommand",
+        description: "rename a saved layout profile",
+        example: "/layout rename ops ops-wide",
+        key: "slash:layout:rename",
+        usage: "/layout rename <profile> <name>"
+      },
+      delete: {
+        insertText: "delete",
+        label: "/layout delete",
+        kind: "subcommand",
+        description: "delete a saved layout profile",
+        example: "/layout delete ops",
+        key: "slash:layout:delete",
+        usage: "/layout delete <profile>"
+      }
+    }
+  }),
   custom: freezeCommandDefinition({
     key: "slash:custom",
     insertText: "custom",

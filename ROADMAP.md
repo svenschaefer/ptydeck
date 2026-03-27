@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H22` (Command Palette and Keyboard Navigation, `UX-001`).
+- Latest completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
+- Previous completed wave: `v0.4.0-H22` (Command Palette and Keyboard Navigation, `UX-001`).
 - Previous completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
 - Previous completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
 - Previous completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
@@ -38,6 +39,25 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H23 - Persistent Layout Profiles (Completed)
+
+- `UX-002`, `UX-003`, `UX-004`
+
+Dependencies:
+
+- `UX-002` establishes the backend layout-profile contract first so one persisted source owns named layout profiles instead of splitting state across local-only storage and ad hoc frontend commands.
+- `UX-003` follows `UX-002` and reuses that contract for discoverable UI plus slash-command create/apply/rename/delete flows without introducing a parallel client-only profile model.
+- `UX-004` closes after `UX-002` and `UX-003` so regression coverage spans persistence, restart restore, apply semantics, and invalid-payload handling end to end.
+
+Exit criteria:
+
+- Backend exposes named layout profiles with deterministic normalization for active deck, sidebar visibility, session filter text, and per-deck terminal geometry settings.
+- Frontend can create, apply, rename, delete, and list layout profiles through one shared workflow surface plus slash-command access.
+- Applying a layout profile updates active deck, sidebar visibility, session filter text, and relevant deck terminal geometry consistently from the persisted contract.
+- Regression coverage exists for backend contract behavior, frontend apply/save flows, and restart consistency.
+
+## Previous Completed Wave
 
 ### v0.4.0-H22 - Command Palette and Keyboard Navigation (Completed)
 

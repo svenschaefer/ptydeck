@@ -136,7 +136,8 @@ body {
   color: #a9d9d6;
 }
 
-.settings-panel {
+.settings-panel,
+.layout-profile-panel {
   margin-top: 8px;
   padding: 10px;
   border: 1px solid var(--border);
@@ -155,7 +156,8 @@ body {
   gap: 10px;
 }
 
-.settings-panel h2 {
+.settings-panel h2,
+.layout-profile-panel h2 {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.04em;
@@ -191,6 +193,7 @@ body {
 }
 
 .settings-grid input,
+.layout-profile-select,
 .settings-grid select {
   width: 100%;
   border: 1px solid var(--border);
@@ -199,6 +202,26 @@ body {
   color: var(--text);
   padding: 6px 8px;
   font-family: inherit;
+}
+
+.layout-profile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.layout-profile-status {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.layout-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .workspace {

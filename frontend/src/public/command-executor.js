@@ -56,6 +56,13 @@ export function createCommandExecutor(options = {}) {
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
+  const listLayoutProfiles = typeof options.listLayoutProfiles === "function" ? options.listLayoutProfiles : () => [];
+  const resolveLayoutProfile = typeof options.resolveLayoutProfile === "function" ? options.resolveLayoutProfile : () => ({ profile: null, error: "Unknown layout profile." });
+  const createLayoutProfileFromCurrent =
+    typeof options.createLayoutProfileFromCurrent === "function" ? options.createLayoutProfileFromCurrent : async () => "";
+  const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
+  const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
+  const deleteLayoutProfile = typeof options.deleteLayoutProfile === "function" ? options.deleteLayoutProfile : async () => "";
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -622,6 +629,67 @@ export function createCommandExecutor(options = {}) {
           ? await exportSessionReplayCopy(resolvedTarget.session)
           : await exportSessionReplayDownload(resolvedTarget.session);
       return outcome?.feedback || "";
+    }
+
+    if (command === "layout") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const rest = args.slice(1);
+      if (!subcommand || subcommand === "list") {
+        const profiles = listLayoutProfiles();
+        if (!Array.isArray(profiles) || profiles.length === 0) {
+          return "No layout profiles available.";
+        }
+        return profiles
+          .map((profile) => `[${profile.id}] ${profile.name} -> deck=${profile.layout?.activeDeckId || "default"} filter=${JSON.stringify(profile.layout?.sessionFilterText || "")}`)
+          .join("\n");
+      }
+
+      if (subcommand === "save") {
+        const name = rest.join(" ").trim();
+        if (!name) {
+          return formatUsage("layout", "save");
+        }
+        return createLayoutProfileFromCurrent(name);
+      }
+
+      if (subcommand === "apply") {
+        if (rest.length !== 1) {
+          return formatUsage("layout", "apply");
+        }
+        const resolved = resolveLayoutProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        return applyLayoutProfile(resolved.profile.id);
+      }
+
+      if (subcommand === "rename") {
+        if (rest.length < 2) {
+          return formatUsage("layout", "rename");
+        }
+        const resolved = resolveLayoutProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        const name = rest.slice(1).join(" ").trim();
+        if (!name) {
+          return formatUsage("layout", "rename");
+        }
+        return renameLayoutProfile(resolved.profile.id, name);
+      }
+
+      if (subcommand === "delete") {
+        if (rest.length !== 1) {
+          return formatUsage("layout", "delete");
+        }
+        const resolved = resolveLayoutProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        return deleteLayoutProfile(resolved.profile.id);
+      }
+
+      return formatUsage("layout");
     }
 
     if (command === "custom") {

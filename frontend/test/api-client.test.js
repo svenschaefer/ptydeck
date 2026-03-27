@@ -98,6 +98,49 @@ test("api client calls deck lifecycle and move endpoints", async () => {
   assert.equal(calls[5].options.method, "DELETE");
 });
 
+test("api client calls layout profile lifecycle endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    if (method === "DELETE") {
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: method === "POST" ? 201 : 200,
+      json: async () => ({
+        id: "focus",
+        name: "Focus Layout",
+        createdAt: 1,
+        updatedAt: 2,
+        layout: {
+          activeDeckId: "default",
+          sidebarVisible: true,
+          sessionFilterText: "",
+          deckTerminalSettings: {}
+        }
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listLayoutProfiles();
+  await api.createLayoutProfile({ name: "Focus Layout" });
+  await api.updateLayoutProfile("focus", { name: "Focus Updated" });
+  await api.deleteLayoutProfile("focus");
+
+  assert.equal(calls.length, 4);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/layout-profiles");
+  assert.equal((calls[0].options.method || "GET"), "GET");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/layout-profiles");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/layout-profiles/focus");
+  assert.equal(calls[2].options.method, "PATCH");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/layout-profiles/focus");
+  assert.equal(calls[3].options.method, "DELETE");
+});
+
 test("api client includes bearer auth header when token is set", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {
