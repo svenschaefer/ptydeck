@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H38`.
-- Active scoped tasks: `REM-001`, `REM-002`, `REM-003`, `REM-009`.
+- Active scoped tasks: `REM-002`, `REM-003`, `REM-009`.
 - Latest completed wave: `v0.4.0-H37` (Workflow Safety Guardrails, `SWF-007`, `SWF-008`).
 - Previous completed wave: `v0.4.0-H36` (Workflow Control-Plane Runtime, `SWF-006`).
 - Previous completed wave: `v0.4.0-H35` (PTY Control Endpoints, `SWF-005`).
@@ -56,11 +56,12 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ### v0.4.0-H38 - Remote SSH Session Foundation (Active)
 
-- Active scoped tasks: `REM-001`, `REM-002`, `REM-003`, `REM-009`
+- Completed in-wave: `REM-001`
+- Remaining scoped tasks: `REM-002`, `REM-003`, `REM-009`
 
 Dependencies:
 
-- `REM-001` lands first so remote-session identity, persistence, and launch semantics exist before any SSH credential or trust-path logic is layered on top.
+- `REM-001` landed first so remote-session identity, persistence, and launch semantics now exist before any SSH credential or trust-path logic is layered on top.
 - `REM-002` and `REM-003` both build directly on `REM-001`, so authentication and host-key trust reuse one backend-owned SSH session contract instead of diverging into separate launch paths.
 - `REM-009` closes after `REM-001`, `REM-002`, and `REM-003`, so regression coverage exercises the real remote-session runtime, trust-store, and authentication behavior end to end.
 

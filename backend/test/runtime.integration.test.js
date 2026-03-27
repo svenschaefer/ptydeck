@@ -2561,6 +2561,126 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
   }
 });
 
+test("ssh session contract persists normalized metadata and restores through the same session model", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const spawnCalls = [];
+  const fallbackFactory = createFallbackAwarePtyFactory();
+  const createPty = (options) => {
+    spawnCalls.push({
+      command: options.command || options.shell,
+      shell: options.shell,
+      cwd: options.cwd,
+      args: Array.isArray(options.args) ? [...options.args] : []
+    });
+    return fallbackFactory(options);
+  };
+
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let createdId = "";
+  try {
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 2222,
+          username: "ops"
+        },
+        startCwd: "~/workspace",
+        startCommand: "pwd"
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+    assert.equal(created.kind, "ssh");
+    assert.equal(created.shell, "ssh");
+    assert.equal(created.cwd, "~/workspace");
+    assert.deepEqual(created.remoteConnection, {
+      host: "example.internal",
+      port: 2222,
+      username: "ops"
+    });
+    assert.deepEqual(spawnCalls.at(-1), {
+      command: "ssh",
+      shell: "ssh",
+      cwd: homedir(),
+      args: [
+        "-tt",
+        "-p",
+        "2222",
+        "-l",
+        "ops",
+        "example.internal",
+        spawnCalls.at(-1).args[6]
+      ]
+    });
+    assert.match(spawnCalls.at(-1).args[6], /^sh -lc '/);
+    assert.match(spawnCalls.at(-1).args[6], /pwd/);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw.sessions) ? persistedRaw.sessions : [];
+  const persistedSession = persistedSessions.find((session) => session.id === createdId);
+  assert.ok(persistedSession);
+  assert.equal(persistedSession.kind, "ssh");
+  assert.deepEqual(persistedSession.remoteConnection, {
+    host: "example.internal",
+    port: 2222,
+    username: "ops"
+  });
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const getRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(getRes.status, 200);
+    const restored = await getRes.json();
+    assert.equal(restored.id, createdId);
+    assert.equal(restored.kind, "ssh");
+    assert.equal(restored.shell, "ssh");
+    assert.equal(restored.cwd, "~/workspace");
+    assert.deepEqual(restored.remoteConnection, {
+      host: "example.internal",
+      port: 2222,
+      username: "ops"
+    });
+    assert.equal(spawnCalls.at(-1).command, "ssh");
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("runtime restore falls back to configured shell when persisted shell is invalid", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

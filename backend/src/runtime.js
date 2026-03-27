@@ -56,6 +56,14 @@ const CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES = new Set([
 const SESSION_START_CWD_MAX_LENGTH = 1024;
 const SESSION_START_COMMAND_MAX_LENGTH = 4096;
 const SESSION_NOTE_MAX_LENGTH = 512;
+const SESSION_KIND_LOCAL = "local";
+const SESSION_KIND_SSH = "ssh";
+const SESSION_KIND_VALUES = new Set([SESSION_KIND_LOCAL, SESSION_KIND_SSH]);
+const DEFAULT_SSH_CLIENT = "ssh";
+const DEFAULT_SSH_PORT = 22;
+const REMOTE_HOST_MAX_LENGTH = 255;
+const REMOTE_USERNAME_MAX_LENGTH = 64;
+const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
 const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
@@ -702,6 +710,83 @@ function normalizeSessionStartupConfig(input = {}, { strict = true } = {}) {
     startCwd,
     startCommand,
     env
+  };
+}
+
+function normalizeSessionKind(input, { strict = true } = {}) {
+  if (input === undefined || input === null || input === "") {
+    return SESSION_KIND_LOCAL;
+  }
+  const normalized = String(input).trim().toLowerCase();
+  if (SESSION_KIND_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
+  }
+  return SESSION_KIND_LOCAL;
+}
+
+function normalizeSessionRemoteConnection(input, kind, { strict = true } = {}) {
+  if (kind !== SESSION_KIND_SSH) {
+    if ((input !== undefined && input !== null) && strict) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteConnection' is required for ssh sessions and must be an object."
+      );
+    }
+    return undefined;
+  }
+
+  const host = typeof input.host === "string" ? input.host.trim() : "";
+  if (!host || host.length > REMOTE_HOST_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(host)) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteConnection.host' must be a non-empty hostname or address without whitespace."
+      );
+    }
+    return undefined;
+  }
+
+  const port = input.port === undefined || input.port === null ? DEFAULT_SSH_PORT : Number(input.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection.port' must be an integer between 1 and 65535.");
+    }
+    return {
+      host,
+      port: DEFAULT_SSH_PORT
+    };
+  }
+
+  const username = typeof input.username === "string" ? input.username.trim() : "";
+  if (username && (username.length > REMOTE_USERNAME_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(username))) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteConnection.username' must be a non-empty token without whitespace."
+      );
+    }
+    return {
+      host,
+      port
+    };
+  }
+
+  return {
+    host,
+    port,
+    ...(username ? { username } : {})
   };
 }
 
@@ -3106,6 +3191,8 @@ export function createRuntime(config) {
 
 function tryCreateRestoredSession({
   session,
+  kind,
+  remoteConnection,
   shell,
   cwd,
   startCwd,
@@ -3121,6 +3208,8 @@ function tryCreateRestoredSession({
 }) {
     return manager.create({
       id: session.id,
+      kind,
+      remoteConnection,
       cwd,
       shell,
       name: session.name,
@@ -3594,22 +3683,26 @@ function tryCreateRestoredSession({
             `Session creation rate limit exceeded. Retry in ${rateLimitResult.retryAfterSeconds} seconds.`
           );
         }
+        const kind = normalizeSessionKind(body?.kind, { strict: true });
         const startupConfig = normalizeSessionStartupConfig(
           {
             startCwd: body?.startCwd !== undefined ? body.startCwd : body?.cwd,
             startCommand: body?.startCommand,
             env: body?.env,
-            fallbackCwd: body?.cwd
+            fallbackCwd: kind === SESSION_KIND_SSH ? "~" : body?.cwd
           },
           { strict: true }
         );
+        const remoteConnection = normalizeSessionRemoteConnection(body?.remoteConnection, kind, { strict: true });
         const themeSlots = normalizeSessionThemeSlots(body, { strict: true });
         const note = normalizeSessionNote(body?.note, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(body?.inputSafetyProfile, { strict: true });
         const tags = normalizeSessionTags(body?.tags, { strict: true });
         const payload = manager.create({
+          kind,
+          remoteConnection,
           cwd: startupConfig.startCwd,
-          shell: body?.shell,
+          shell: body?.shell !== undefined ? body.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
           name: body?.name,
           startCwd: startupConfig.startCwd,
           startCommand: startupConfig.startCommand,
@@ -3665,16 +3758,27 @@ function tryCreateRestoredSession({
         if (body?.name !== undefined) {
           patch.name = body.name;
         }
+        const current = manager.get(match.params.sessionId).meta;
+        const effectiveKind = normalizeSessionKind(body?.kind !== undefined ? body.kind : current.kind, { strict: true });
+        if (body?.kind !== undefined) {
+          patch.kind = effectiveKind;
+        }
+        if (body?.remoteConnection !== undefined || body?.kind !== undefined) {
+          patch.remoteConnection = normalizeSessionRemoteConnection(
+            body?.remoteConnection !== undefined ? body.remoteConnection : current.remoteConnection,
+            effectiveKind,
+            { strict: true }
+          );
+        }
         const hasStartupUpdates =
           body?.startCwd !== undefined || body?.startCommand !== undefined || body?.env !== undefined;
         if (hasStartupUpdates) {
-          const current = manager.get(match.params.sessionId).meta;
           const startupConfig = normalizeSessionStartupConfig(
             {
               startCwd: body?.startCwd !== undefined ? body.startCwd : current.startCwd || current.cwd,
               startCommand: body?.startCommand !== undefined ? body.startCommand : current.startCommand || "",
               env: body?.env !== undefined ? body.env : current.env || {},
-              fallbackCwd: current.startCwd || current.cwd
+              fallbackCwd: effectiveKind === SESSION_KIND_SSH ? "~" : current.startCwd || current.cwd
             },
             { strict: true }
           );
@@ -4037,15 +4141,17 @@ function tryCreateRestoredSession({
             ? session.deckId
             : DEFAULT_DECK_ID;
         sessionDeckAssignments.set(session.id, persistedDeckId);
+        const kind = normalizeSessionKind(session.kind, { strict: false });
         const startupConfig = normalizeSessionStartupConfig(
           {
             startCwd: session.startCwd !== undefined ? session.startCwd : session.cwd,
             startCommand: session.startCommand,
             env: session.env,
-            fallbackCwd: session.cwd
+            fallbackCwd: kind === SESSION_KIND_SSH ? "~" : session.cwd
           },
           { strict: false }
         );
+        const remoteConnection = normalizeSessionRemoteConnection(session.remoteConnection, kind, { strict: false });
         const themeSlots = normalizeSessionThemeSlots(
           {
             themeProfile: session.themeProfile,
@@ -4057,11 +4163,18 @@ function tryCreateRestoredSession({
         const note = normalizeSessionNote(session.note, { strict: false });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
-        const requestedShell = typeof session.shell === "string" && session.shell.trim() ? session.shell : config.shell;
+        const requestedShell =
+          typeof session.shell === "string" && session.shell.trim()
+            ? session.shell
+            : kind === SESSION_KIND_SSH
+              ? DEFAULT_SSH_CLIENT
+              : config.shell;
         const restoredCreatedAt = Number.isInteger(session.createdAt) ? session.createdAt : Date.now();
         const restoredUpdatedAt = Number.isInteger(session.updatedAt) ? session.updatedAt : restoredCreatedAt;
         const normalizedUnrestoredSession = {
           id: typeof session.id === "string" && session.id ? session.id : "",
+          kind,
+          ...(remoteConnection ? { remoteConnection } : {}),
           cwd:
             typeof session.cwd === "string" && session.cwd.trim()
               ? session.cwd
@@ -4082,8 +4195,8 @@ function tryCreateRestoredSession({
           updatedAt: restoredUpdatedAt
         };
         const requestedCwd = startupConfig.startCwd;
-        const fallbackCwd = homedir();
-        const fallbackShell = config.shell;
+        const fallbackCwd = kind === SESSION_KIND_SSH ? "~" : homedir();
+        const fallbackShell = kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : config.shell;
         const restoreAttempts = [
           { shell: requestedShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "saved-shell+saved-cwd" },
           { shell: fallbackShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "fallback-shell+saved-cwd" },
@@ -4096,6 +4209,8 @@ function tryCreateRestoredSession({
           try {
             tryCreateRestoredSession({
               session,
+              kind,
+              remoteConnection,
               shell: attempt.shell,
               cwd: attempt.cwd,
               startCwd: attempt.startCwd,

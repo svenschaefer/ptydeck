@@ -91,6 +91,7 @@ test("validateResponse checks session list schema", () => {
           id: "a",
           deckId: "default",
           state: "running",
+          kind: "local",
           cwd: "/tmp",
           shell: "bash",
           note: "needs review",
@@ -160,6 +161,39 @@ test("validateRequest accepts valid session patch payload", () => {
         env: { FOO: "BAR" },
         tags: ["ops", "prod"],
         themeProfile: THEME_PROFILE
+      }
+    });
+  });
+});
+
+test("validateRequest accepts ssh session create payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        startCwd: "~",
+        startCommand: "hostname"
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid ssh session kind", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        kind: "telnet"
       }
     });
   });

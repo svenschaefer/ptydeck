@@ -11,9 +11,16 @@ function now() {
 }
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
+const DEFAULT_SSH_CLIENT = "ssh";
+const DEFAULT_SSH_PORT = 22;
+const SESSION_KIND_LOCAL = "local";
+const SESSION_KIND_SSH = "ssh";
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_NOTE_MAX_LENGTH = 512;
+const REMOTE_HOST_MAX_LENGTH = 255;
+const REMOTE_USERNAME_MAX_LENGTH = 64;
+const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -118,6 +125,110 @@ function normalizeSessionNote(note) {
   return normalized;
 }
 
+function normalizeSessionKind(kind) {
+  return String(kind || "").trim().toLowerCase() === SESSION_KIND_SSH ? SESSION_KIND_SSH : SESSION_KIND_LOCAL;
+}
+
+function normalizeRemoteConnection(remoteConnection, kind) {
+  if (kind !== SESSION_KIND_SSH) {
+    if (remoteConnection !== undefined && remoteConnection !== null) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (!remoteConnection || typeof remoteConnection !== "object" || Array.isArray(remoteConnection)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteConnection' is required for ssh sessions and must be an object."
+    );
+  }
+  const host = typeof remoteConnection.host === "string" ? remoteConnection.host.trim() : "";
+  if (!host || host.length > REMOTE_HOST_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(host)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteConnection.host' must be a non-empty hostname or address without whitespace."
+    );
+  }
+  const port =
+    remoteConnection.port === undefined || remoteConnection.port === null ? DEFAULT_SSH_PORT : Number(remoteConnection.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ApiError(400, "ValidationError", "Field 'remoteConnection.port' must be an integer between 1 and 65535.");
+  }
+  const usernameRaw = typeof remoteConnection.username === "string" ? remoteConnection.username.trim() : "";
+  if (
+    usernameRaw &&
+    (usernameRaw.length > REMOTE_USERNAME_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(usernameRaw))
+  ) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteConnection.username' must be a non-empty token without whitespace."
+    );
+  }
+  return {
+    host,
+    port,
+    ...(usernameRaw ? { username: usernameRaw } : {})
+  };
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function buildSshRemoteCommand({ startCwd, startCommand }) {
+  const steps = [];
+  if (typeof startCwd === "string" && startCwd.trim() && startCwd.trim() !== "~") {
+    steps.push(`cd -- ${shellQuote(startCwd.trim())} >/dev/null 2>&1 || true`);
+  }
+  if (typeof startCommand === "string" && startCommand.trim()) {
+    steps.push(startCommand);
+  }
+  if (steps.length === 0) {
+    return "";
+  }
+  steps.push('exec "${SHELL:-/bin/sh}" -il');
+  return `sh -lc ${shellQuote(steps.join("; "))}`;
+}
+
+function buildSessionLaunchSpec({ kind, shell, spawnCwd, startCwd, startCommand, remoteConnection }) {
+  if (kind !== SESSION_KIND_SSH) {
+    return {
+      shellAdapterId: shell,
+      command: shell,
+      args: [],
+      spawnCwd,
+      metaCwd: spawnCwd,
+      postStartInput: typeof startCommand === "string" && startCommand.trim() ? `${startCommand}\n` : ""
+    };
+  }
+
+  const sshClient = typeof shell === "string" && shell.trim() ? shell.trim() : DEFAULT_SSH_CLIENT;
+  const args = ["-tt"];
+  if (remoteConnection.port !== DEFAULT_SSH_PORT) {
+    args.push("-p", String(remoteConnection.port));
+  }
+  if (typeof remoteConnection.username === "string" && remoteConnection.username.trim()) {
+    args.push("-l", remoteConnection.username.trim());
+  }
+  args.push(remoteConnection.host);
+  const remoteCommand = buildSshRemoteCommand({ startCwd, startCommand });
+  if (remoteCommand) {
+    args.push(remoteCommand);
+  }
+
+  return {
+    shellAdapterId: DEFAULT_SSH_CLIENT,
+    command: sshClient,
+    args,
+    spawnCwd: homedir(),
+    metaCwd: startCwd,
+    postStartInput: ""
+  };
+}
+
 export class SessionManager {
   constructor({
     defaultShell = "bash",
@@ -152,8 +263,8 @@ export class SessionManager {
     this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
     this.createPty =
       createPty ||
-      (({ shell, cwd, cols, rows, env }) =>
-        pty.spawn(shell, [], {
+      (({ command, shell, args = [], cwd, cols, rows, env }) =>
+        pty.spawn(command || shell, Array.isArray(args) ? args : [], {
           name: "xterm-color",
           cwd,
           cols,
@@ -295,8 +406,10 @@ export class SessionManager {
 
   create({
     id = randomUUID(),
+    kind = SESSION_KIND_LOCAL,
+    remoteConnection,
     cwd,
-    shell = this.defaultShell,
+    shell,
     name,
     startCwd,
     startCommand = "",
@@ -323,30 +436,61 @@ export class SessionManager {
     const createdTimestamp = Number.isInteger(createdAt) ? createdAt : this.nowFn();
     const updatedTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
     const initialActivityTimestamp = Number.isInteger(updatedAt) ? updatedAt : createdTimestamp;
+    const normalizedKind = normalizeSessionKind(kind);
     const normalizedStartCwd =
       typeof startCwd === "string" && startCwd.trim()
         ? startCwd
         : typeof cwd === "string" && cwd.trim()
           ? cwd
-          : homedir();
+          : normalizedKind === SESSION_KIND_SSH
+            ? "~"
+            : homedir();
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
     const normalizedNote = normalizeSessionNote(note);
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
+    const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
+    const normalizedShell =
+      typeof shell === "string" && shell.trim()
+        ? shell.trim()
+        : normalizedKind === SESSION_KIND_SSH
+          ? DEFAULT_SSH_CLIENT
+          : this.defaultShell;
     const normalizedThemeSlots = normalizeSessionThemeSlots({
       themeProfile,
       activeThemeProfile,
       inactiveThemeProfile
     });
-    const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
-    const shellAdapter = createShellAdapter(shell);
+    const localSpawnCwd =
+      normalizedKind === SESSION_KIND_SSH
+        ? homedir()
+        : typeof cwd === "string" && cwd.trim()
+          ? cwd
+          : normalizedStartCwd;
+    const launchSpec = buildSessionLaunchSpec({
+      kind: normalizedKind,
+      shell: normalizedShell,
+      spawnCwd: localSpawnCwd,
+      startCwd: normalizedStartCwd,
+      startCommand: normalizedStartCommand,
+      remoteConnection: normalizedRemoteConnection
+    });
+    const shellAdapter = createShellAdapter(launchSpec.shellAdapterId);
 
     const ptyEnv = shellAdapter.prepareSpawnEnv({
       ...process.env,
       ...normalizedEnv
     });
-    const ptyProcess = this.createPty({ shell, cwd: spawnCwd, cols: 80, rows: 24, env: ptyEnv });
+    const ptyProcess = this.createPty({
+      shell: launchSpec.command,
+      command: launchSpec.command,
+      args: launchSpec.args,
+      cwd: launchSpec.spawnCwd,
+      cols: 80,
+      rows: 24,
+      env: ptyEnv
+    });
 
     const initialReplayOutput = this.buildReplayRetentionResult(replayOutput);
     const session = {
@@ -360,8 +504,10 @@ export class SessionManager {
       lastActivityAt: initialActivityTimestamp,
       meta: {
         id,
-        cwd: spawnCwd,
-        shell,
+        kind: normalizedKind,
+        ...(normalizedRemoteConnection ? { remoteConnection: normalizedRemoteConnection } : {}),
+        cwd: launchSpec.metaCwd,
+        shell: launchSpec.command,
         ...(typeof name === "string" ? { name } : {}),
         startCwd: normalizedStartCwd,
         startCommand: normalizedStartCommand,
@@ -427,8 +573,8 @@ export class SessionManager {
     this.sessions.set(id, session);
     this.events.emit("session.created", { session: session.meta });
     this.transitionToRunning(session);
-    if (normalizedStartCommand.trim()) {
-      ptyProcess.write(`${normalizedStartCommand}\n`);
+    if (launchSpec.postStartInput) {
+      ptyProcess.write(launchSpec.postStartInput);
     }
     return session.meta;
   }
@@ -475,6 +621,7 @@ export class SessionManager {
 
   updateSession(sessionId, patch = {}) {
     const session = this.get(sessionId);
+    const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : session.meta.kind);
     if (patch.name !== undefined) {
       session.meta.name = patch.name;
     }
@@ -483,6 +630,22 @@ export class SessionManager {
     }
     if (patch.startCommand !== undefined) {
       session.meta.startCommand = patch.startCommand;
+    }
+    if (patch.kind !== undefined) {
+      session.meta.kind = nextKind;
+      session.meta.shell = nextKind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : this.defaultShell;
+      if (patch.startCwd === undefined) {
+        session.meta.startCwd = nextKind === SESSION_KIND_SSH ? "~" : homedir();
+      }
+      session.meta.cwd = nextKind === SESSION_KIND_SSH ? session.meta.startCwd || "~" : session.meta.startCwd || homedir();
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "remoteConnection")) {
+      const normalizedRemoteConnection = normalizeRemoteConnection(patch.remoteConnection, nextKind);
+      if (normalizedRemoteConnection) {
+        session.meta.remoteConnection = normalizedRemoteConnection;
+      } else {
+        delete session.meta.remoteConnection;
+      }
     }
     if (patch.env !== undefined) {
       session.meta.env = normalizeSessionEnv(patch.env);
@@ -536,6 +699,8 @@ export class SessionManager {
     this.delete(sessionId);
     return this.create({
       id: snapshot.id,
+      kind: snapshot.kind,
+      remoteConnection: snapshot.remoteConnection,
       cwd: snapshot.startCwd || snapshot.cwd,
       shell: snapshot.shell,
       name: snapshot.name,

@@ -14,7 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `REM-001` Owner `BE`: Add persisted remote session kind support (`local`, `ssh`) with normalized non-secret connection metadata, deterministic launch semantics, and reconnect-safe runtime persistence so the backend can manage SSH-backed sessions without introducing a parallel session model.
 - `REM-002` Owner `BE`: Add the SSH authentication matrix for remote sessions (`password`, private key, keyboard-interactive) with secure secret-handling boundaries, deterministic validation, and explicit forwarding/proxy guardrails on top of the remote-session contract.
 - `REM-003` Owner `BE`: Add the SSH host-key trust-store workflow (`known_hosts`-style trust persistence, first-connect trust contract, and changed-host-key rejection behavior) so SSH sessions fail safely and predictably.
 - `REM-009` Owner `QA`: Add integration and security coverage for remote-session authentication, host-key verification, launch/reconnect guardrails, and trust-failure paths across the new SSH-backed runtime contract.

@@ -16,6 +16,7 @@ const requiredMarkers = [
   "Session:",
   "CreateSessionRequest:",
   "UpdateSessionRequest:",
+  "RemoteConnection:",
   "SessionInputSafetyProfile:",
   "SessionThemeProfile:",
   "CustomCommand:",
@@ -34,6 +35,12 @@ for (const marker of requiredMarkers) {
 const types = `/* Auto-generated from backend/openapi/openapi.yaml. Do not edit manually. */
 
 export type DeckSettings = Record<string, unknown>;
+
+export type RemoteConnection = {
+  host: string;
+  port: number;
+  username?: string;
+};
 
 export type SessionInputSafetyProfile = {
   requireValidShellSyntax: boolean;
@@ -94,8 +101,10 @@ export type Session = {
   state: "starting" | "running" | "unrestored";
   activityState: "active" | "inactive";
   activityUpdatedAt: number;
+  kind: "local" | "ssh";
   cwd: string;
   shell: string;
+  remoteConnection?: RemoteConnection;
   tags: string[];
   inputSafetyProfile: SessionInputSafetyProfile;
   name?: string;
@@ -115,8 +124,10 @@ export type Session = {
 };
 
 export type CreateSessionRequest = {
+  kind?: "local" | "ssh";
   cwd?: string;
   shell?: string;
+  remoteConnection?: RemoteConnection;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
@@ -129,6 +140,8 @@ export type CreateSessionRequest = {
 };
 
 export type UpdateSessionRequest = {
+  kind?: "local" | "ssh";
+  remoteConnection?: RemoteConnection;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;

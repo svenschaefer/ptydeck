@@ -32,6 +32,19 @@ const THEME_PROFILE_KEYS = [
 ];
 const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
+const SESSION_KIND_VALUES = new Set(["local", "ssh"]);
+
+function isRemoteConnection(value) {
+  return (
+    isObject(value) &&
+    typeof value.host === "string" &&
+    value.host.length > 0 &&
+    Number.isInteger(value.port) &&
+    value.port >= 1 &&
+    value.port <= 65535 &&
+    (value.username === undefined || typeof value.username === "string")
+  );
+}
 
 function isThemeProfile(value) {
   if (!isObject(value)) {
@@ -214,8 +227,14 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body?.shell !== undefined && typeof body.shell !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'shell' must be a string.");
     }
+    if (body?.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
+      throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
+    }
     if (body?.name !== undefined && typeof body.name !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+    if (body?.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
     }
     if (body?.startCwd !== undefined && typeof body.startCwd !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
@@ -259,6 +278,8 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (
       body.name === undefined &&
+      body.kind === undefined &&
+      body.remoteConnection === undefined &&
       body.startCwd === undefined &&
       body.startCommand === undefined &&
       body.note === undefined &&
@@ -273,6 +294,12 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.name !== undefined && typeof body.name !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
+    }
+    if (body.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
+      throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
+    }
+    if (body.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
     }
     if (body.startCwd !== undefined && typeof body.startCwd !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
@@ -620,10 +647,12 @@ function isSession(value) {
     typeof value.id === "string" &&
     typeof value.deckId === "string" &&
     (value.state === "starting" || value.state === "running" || value.state === "unrestored") &&
+    SESSION_KIND_VALUES.has(value.kind) &&
     typeof value.cwd === "string" &&
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&
     (value.note === undefined || typeof value.note === "string") &&
+    (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
     typeof value.startCwd === "string" &&
     typeof value.startCommand === "string" &&
     isObject(value.env) &&

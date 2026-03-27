@@ -1142,6 +1142,20 @@ components:
           type: string
         workspace:
           $ref: '#/components/schemas/WorkspacePresetWorkspace'
+    RemoteConnection:
+      type: object
+      required:
+        - host
+        - port
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
     Session:
       type: object
       required:
@@ -1149,6 +1163,7 @@ components:
         - deckId
         - state
         - activityState
+        - kind
         - cwd
         - shell
         - inputSafetyProfile
@@ -1172,10 +1187,17 @@ components:
           enum:
             - active
             - inactive
+        kind:
+          type: string
+          enum:
+            - local
+            - ssh
         cwd:
           type: string
         shell:
           type: string
+        remoteConnection:
+          $ref: '#/components/schemas/RemoteConnection'
         name:
           type: string
         note:
@@ -1340,10 +1362,17 @@ components:
     CreateSessionRequest:
       type: object
       properties:
+        kind:
+          type: string
+          enum:
+            - local
+            - ssh
         cwd:
           type: string
         shell:
           type: string
+        remoteConnection:
+          $ref: '#/components/schemas/RemoteConnection'
         name:
           type: string
         note:
@@ -1371,6 +1400,13 @@ components:
     UpdateSessionRequest:
       type: object
       properties:
+        kind:
+          type: string
+          enum:
+            - local
+            - ssh
+        remoteConnection:
+          $ref: '#/components/schemas/RemoteConnection'
         name:
           type: string
         note:

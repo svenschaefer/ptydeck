@@ -358,6 +358,45 @@ test("SessionManager defaults cwd to user home when not provided", () => {
   assert.equal(created.cwd, homedir());
 });
 
+test("SessionManager builds deterministic ssh launch options and persists remote metadata", () => {
+  const fakePty = createFakePty();
+  let spawnOptions = null;
+  const manager = new SessionManager({
+    createPty: (options) => {
+      spawnOptions = options;
+      return fakePty;
+    }
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 2222,
+      username: "ops"
+    },
+    startCwd: "~/workspace",
+    startCommand: "pwd"
+  });
+
+  assert.equal(created.kind, "ssh");
+  assert.deepEqual(created.remoteConnection, {
+    host: "example.internal",
+    port: 2222,
+    username: "ops"
+  });
+  assert.equal(created.shell, "ssh");
+  assert.equal(created.cwd, "~/workspace");
+  assert.ok(spawnOptions);
+  assert.equal(spawnOptions.command, "ssh");
+  assert.equal(spawnOptions.shell, "ssh");
+  assert.equal(spawnOptions.cwd, homedir());
+  assert.deepEqual(spawnOptions.args.slice(0, 6), ["-tt", "-p", "2222", "-l", "ops", "example.internal"]);
+  assert.equal(fakePty.writes.length, 0);
+  assert.match(spawnOptions.args[6], /^sh -lc '/);
+  assert.match(spawnOptions.args[6], /pwd/);
+});
+
 test("SessionManager can rename sessions", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({
