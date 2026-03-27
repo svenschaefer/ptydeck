@@ -75,7 +75,7 @@ test("command-composer runtime controller handles control submit and preview sch
   await controller.submitCommand();
 
   assert.deepEqual(calls, [
-    ["preview", "payload"],
+    ["preview", ""],
     ["debug", "command.control.start", "go"],
     ["feedback", "ok"],
     ["history", "/go"],
@@ -86,6 +86,36 @@ test("command-composer runtime controller handles control submit and preview sch
     ["historyReset"],
     ["render"]
   ]);
+});
+
+test("command-composer runtime controller previews rendered template custom commands for the active session", async () => {
+  const calls = [];
+  let value = "/deploy env=prod";
+  const windowRef = createFakeWindow();
+  const controller = createCommandComposerRuntimeController({
+    windowRef,
+    getCommandValue: () => value,
+    interpretComposerInput: () => ({ kind: "control", command: "deploy", args: ["env=prod"], raw: value }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "ops", deckId: "default", cwd: "/srv/app" }],
+      decks: [{ id: "default", name: "Default" }],
+      activeSessionId: "s1"
+    }),
+    getCustomCommandState: () => ({
+      name: "deploy",
+      kind: "template",
+      content: "echo {{param:env}} from {{var:session.cwd}}",
+      templateVariables: ["session.cwd"]
+    }),
+    setCommandPreview: (message) => calls.push(["preview", message]),
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    getActiveDeck: () => ({ id: "default", name: "Default" })
+  });
+
+  controller.scheduleCommandPreview();
+  await windowRef.timers[0].fn();
+
+  assert.deepEqual(calls, [["preview", "echo prod from /srv/app"]]);
 });
 
 test("command-composer runtime controller sends command input via configured terminator", async () => {

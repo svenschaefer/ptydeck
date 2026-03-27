@@ -1117,10 +1117,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     if (path.startsWith("/api/v1/custom-commands/") && method === "PUT") {
       const commandName = decodeURIComponent(path.slice("/api/v1/custom-commands/".length));
       const body = JSON.parse(options.body || "{}");
-      customCommandUpserts.push({ commandName, content: body.content });
+      customCommandUpserts.push({
+        commandName,
+        content: body.content,
+        kind: body.kind || "plain",
+        templateVariables: Array.isArray(body.templateVariables) ? body.templateVariables : []
+      });
       const next = {
         name: commandName,
         content: body.content,
+        kind: body.kind || "plain",
+        templateVariables: Array.isArray(body.templateVariables) ? body.templateVariables : [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -1218,21 +1225,36 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(customCommandUpserts.length, 1);
-  assert.deepEqual(customCommandUpserts[0], { commandName: "docu", content: "echo verify" });
+  assert.deepEqual(customCommandUpserts[0], {
+    commandName: "docu",
+    content: "echo verify",
+    kind: "plain",
+    templateVariables: []
+  });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /docu (inline).");
 
   fixture.elements.commandInput.value = "/custom blockcmd\n---\nline 1\nline 2\n---";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(customCommandUpserts.length, 2);
-  assert.deepEqual(customCommandUpserts[1], { commandName: "blockcmd", content: "line 1\nline 2" });
+  assert.deepEqual(customCommandUpserts[1], {
+    commandName: "blockcmd",
+    content: "line 1\nline 2",
+    kind: "plain",
+    templateVariables: []
+  });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /blockcmd (block).");
 
   fixture.elements.commandInput.value = "/custom closeit echo close";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(customCommandUpserts.length, 3);
-  assert.deepEqual(customCommandUpserts[2], { commandName: "closeit", content: "echo close" });
+  assert.deepEqual(customCommandUpserts[2], {
+    commandName: "closeit",
+    content: "echo close",
+    kind: "plain",
+    templateVariables: []
+  });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /closeit (inline).");
 
   const longPreviewPayload = "x".repeat(5000);
@@ -1240,14 +1262,24 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(customCommandUpserts.length, 4);
-  assert.deepEqual(customCommandUpserts[3], { commandName: "longpreview", content: longPreviewPayload });
+  assert.deepEqual(customCommandUpserts[3], {
+    commandName: "longpreview",
+    content: longPreviewPayload,
+    kind: "plain",
+    templateVariables: []
+  });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /longpreview (inline).");
 
   fixture.elements.commandInput.value = "/custom escdelim\n---\nline 1\n\\---\nline 3\n---";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(customCommandUpserts.length, 5);
-  assert.deepEqual(customCommandUpserts[4], { commandName: "escdelim", content: "line 1\n---\nline 3" });
+  assert.deepEqual(customCommandUpserts[4], {
+    commandName: "escdelim",
+    content: "line 1\n---\nline 3",
+    kind: "plain",
+    templateVariables: []
+  });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /escdelim (block).");
 
   fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
@@ -1287,7 +1319,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(customCommandUpserts.length, 6);
   assert.deepEqual(customCommandUpserts[5], {
     commandName: "go",
-    content: "Take care of md's and quotes."
+    content: "Take care of md's and quotes.",
+    kind: "plain",
+    templateVariables: []
   });
   assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /go (block).");
 
@@ -1317,6 +1351,33 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(inputPayloads[3].data, "Take care of md\\'s and quotes.\r");
   assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/go on \[1\]\./);
 
+  fixture.elements.commandInput.value = "/custom template deploy echo {{param:env}} from {{var:session.cwd}}";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(customCommandUpserts.length, 7);
+  assert.deepEqual(customCommandUpserts[6], {
+    commandName: "deploy",
+    content: "echo {{param:env}} from {{var:session.cwd}}",
+    kind: "template",
+    templateVariables: ["session.cwd"]
+  });
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved template custom command /deploy (inline).");
+
+  fixture.elements.commandInput.value = "/custom preview deploy env=prod";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "/deploy -> [1] s-1\n---\necho prod from ~\n---");
+
+  fixture.elements.commandInput.value = "/deploy env=prod";
+  fixture.elements.commandInput.dispatchEvent({ type: "input" });
+  await sleep(160);
+  assert.equal(fixture.elements.commandPreview.textContent, "echo prod from ~");
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(inputPayloads.length, 5);
+  assert.equal(inputPayloads[4].data, "echo prod from ~\r");
+  assert.match(fixture.elements.commandFeedback.textContent, /^Executed \/deploy on \[1\]\./);
+
   fixture.elements.commandInput.value = "/custom remove docu";
   fixture.elements.sendCommand.click();
   await tick();
@@ -1329,7 +1390,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await sleep(160);
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(inputPayloads.length, 4);
+  assert.equal(inputPayloads.length, 5);
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown command: /docu");
 
   fixture.elements.commandInput.value = "/longpreview";

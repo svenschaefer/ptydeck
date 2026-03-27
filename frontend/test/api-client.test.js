@@ -424,6 +424,8 @@ test("api client calls upsert custom command endpoint", async () => {
       json: async () => ({
         name: "docu",
         content: "echo docs\n",
+        kind: "template",
+        templateVariables: ["session.cwd"],
         createdAt: 1,
         updatedAt: 2
       })
@@ -431,12 +433,20 @@ test("api client calls upsert custom command endpoint", async () => {
   };
 
   const api = createApiClient("http://localhost:18080/api/v1");
-  await api.upsertCustomCommand("docu", "echo docs\n");
+  await api.upsertCustomCommand("docu", {
+    content: "echo {{var:session.cwd}}\n",
+    kind: "template",
+    templateVariables: ["session.cwd"]
+  });
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/custom-commands/docu");
   assert.equal(calls[0].options.method, "PUT");
-  assert.deepEqual(JSON.parse(calls[0].options.body), { content: "echo docs\n" });
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    content: "echo {{var:session.cwd}}\n",
+    kind: "template",
+    templateVariables: ["session.cwd"]
+  });
 });
 
 test("api client calls custom command list/get/delete endpoints", async () => {
@@ -449,7 +459,7 @@ test("api client calls custom command list/get/delete endpoints", async () => {
     return {
       ok: true,
       status: 200,
-      json: async () => [{ name: "docu", content: "echo docs\n", createdAt: 1, updatedAt: 2 }]
+      json: async () => [{ name: "docu", content: "echo docs\n", kind: "plain", templateVariables: [], createdAt: 1, updatedAt: 2 }]
     };
   };
 

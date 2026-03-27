@@ -14,8 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `CMD-002` Owner `FE`: Implement template-capable custom-command definition, preview, and execution flows in the frontend so `/custom` can save explicit template commands, `/<customName>` can accept deterministic parameter assignments, and missing/unknown placeholders return concise guidance instead of silently sending malformed payloads.
-- `CMD-003` Owner `QA`: Add regression coverage for template-command validation, backward-compatible plain custom commands, parameter substitution, built-in variable expansion, preview rendering, and error handling for missing or unknown template inputs.
+- `CMD-004` Owner `FE`: Add deterministic fuzzy slash-suggestion ranking across slash commands, saved custom commands, sessions, and decks while preserving exact-prefix priority and stable fallback ordering when fuzzy scores tie.
+- `CMD-005` Owner `FE`: Add browser-local recency personalization for slash suggestions and command-palette results with explicit deterministic fallback behavior when no history exists or fuzzy matches tie.
+- `CMD-006` Owner `QA`: Add regression coverage for exact-prefix priority, fuzzy-match ordering, recency-based personalization, and stable no-history fallback behavior across composer autocomplete and command-palette flows.
 
 ## Active Ownership Role
 

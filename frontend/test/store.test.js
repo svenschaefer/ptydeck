@@ -61,19 +61,22 @@ test("store manages normalized custom commands and protects internal snapshots",
   store.setSessions([{ id: "a", deckId: "default" }]);
   store.replaceCustomCommands([
     { name: " Go ", content: "echo go", createdAt: 1, updatedAt: 2 },
-    { name: "ls", content: "ls -al", createdAt: 3, updatedAt: 4 }
+    { name: "deploy", content: "echo {{param:env}} {{var:session.cwd}}", kind: "template", templateVariables: ["session.cwd"], createdAt: 3, updatedAt: 4 }
   ]);
   store.upsertCustomCommand({ name: "go", content: "echo replaced", createdAt: 5, updatedAt: 6 });
 
   let state = store.getState();
   assert.deepEqual(
     state.customCommands.map((command) => command.name),
-    ["go", "ls"]
+    ["deploy", "go"]
   );
   assert.equal(store.getCustomCommand("GO")?.content, "echo replaced");
+  assert.equal(store.getCustomCommand("deploy")?.kind, "template");
+  assert.deepEqual(store.getCustomCommand("deploy")?.templateVariables, ["session.cwd"]);
 
   state.sessions.push({ id: "mutated" });
   state.customCommands[0].content = "broken";
+  state.customCommands[0].templateVariables.push("deck.name");
   state.decks.push({ id: "bad", name: "Bad" });
 
   state = store.getState();
@@ -82,6 +85,7 @@ test("store manages normalized custom commands and protects internal snapshots",
     ["a"]
   );
   assert.equal(store.getCustomCommand("go")?.content, "echo replaced");
+  assert.deepEqual(store.getCustomCommand("deploy")?.templateVariables, ["session.cwd"]);
   assert.equal(state.decks.length, 0);
 });
 

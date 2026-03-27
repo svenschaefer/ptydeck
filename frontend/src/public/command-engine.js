@@ -4,26 +4,12 @@ import {
   normalizeCompletionCandidates
 } from "./command-completion.js";
 import { createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
-
-function normalizeCustomCommandName(name) {
-  return String(name || "").trim().toLowerCase();
-}
-
-function normalizeCustomCommandRecord(command) {
-  if (!command || typeof command !== "object") {
-    return null;
-  }
-  const name = normalizeCustomCommandName(command.name);
-  if (!name) {
-    return null;
-  }
-  return {
-    name,
-    content: typeof command.content === "string" ? command.content : "",
-    createdAt: Number(command.createdAt || 0),
-    updatedAt: Number(command.updatedAt || 0)
-  };
-}
+import {
+  normalizeCustomCommandName,
+  normalizeCustomCommandRecord,
+  parseCustomCommandDefinition,
+  parseCustomCommandInvocation
+} from "./custom-command-model.js";
 
 export function createCustomCommandRegistry() {
   const state = new Map();
@@ -907,76 +893,11 @@ export function createCommandEngine(options = {}) {
   }
 
   function parseCustomDefinition(rawInput) {
-    const raw = String(rawInput || "").replaceAll("\r\n", "\n");
-    const trimmedStart = raw.trimStart();
-    const prefix = "/custom";
-    const customUsage = `Usage: ${getSlashCommandUsage("custom")}`;
-    if (!trimmedStart.startsWith(prefix)) {
-      return { ok: false, error: "Invalid /custom command input." };
-    }
+    return parseCustomCommandDefinition(rawInput, `Usage: ${getSlashCommandUsage("custom")}`);
+  }
 
-    const afterPrefix = trimmedStart.slice(prefix.length);
-    const newlineIndex = afterPrefix.indexOf("\n");
-
-    if (newlineIndex === -1) {
-      const trimmed = afterPrefix.trim();
-      if (!trimmed) {
-        return { ok: false, error: customUsage };
-      }
-      const firstWhitespace = trimmed.search(/\s/);
-      if (firstWhitespace < 0) {
-        return { ok: false, error: customUsage };
-      }
-      const name = trimmed.slice(0, firstWhitespace);
-      const content = trimmed.slice(firstWhitespace).trimStart();
-      if (!content) {
-        return { ok: false, error: "Inline custom-command content cannot be empty." };
-      }
-      return { ok: true, name, content, mode: "inline" };
-    }
-
-    const header = afterPrefix.slice(0, newlineIndex).trim();
-    if (!header) {
-      return { ok: false, error: "Missing custom-command name in block definition." };
-    }
-    if (/\s/.test(header)) {
-      return { ok: false, error: "Block definition header must be '/custom <name>' only." };
-    }
-
-    const trailing = afterPrefix.slice(newlineIndex + 1);
-    const lines = trailing.split("\n");
-    if (lines.length === 0 || lines[0].trim() !== "---") {
-      return { ok: false, error: "Block definition must start with '---' on its own line." };
-    }
-
-    let closingIndex = -1;
-    for (let index = 1; index < lines.length; index += 1) {
-      if (lines[index].trim() === "---") {
-        closingIndex = index;
-        break;
-      }
-    }
-    if (closingIndex < 0) {
-      return { ok: false, error: "Block definition must end with a closing '---' line." };
-    }
-
-    const contentLines = lines.slice(1, closingIndex);
-    const normalizedContentLines = contentLines.map((line) => (line.trim() === "\\---" ? "---" : line));
-    const blockContent = normalizedContentLines.join("\n");
-    if (!blockContent) {
-      return { ok: false, error: "Block custom-command content cannot be empty." };
-    }
-
-    const trailingLines = lines.slice(closingIndex + 1);
-    const afterClosing = trailingLines.join("\n").trim();
-    if (afterClosing) {
-      return {
-        ok: false,
-        error: "Block payload contains content after closing '---'. For a literal delimiter line inside payload, use '\\---'."
-      };
-    }
-
-    return { ok: true, name: header, content: blockContent, mode: "block" };
+  function parseCustomInvocation(rawInput, command) {
+    return parseCustomCommandInvocation(rawInput, command);
   }
 
   return {
@@ -991,6 +912,7 @@ export function createCommandEngine(options = {}) {
     parseSizeCommandArgs,
     parseDirectTargetRoutingInput,
     parseCustomDefinition,
+    parseCustomInvocation,
     parseAutocompleteContext
   };
 }

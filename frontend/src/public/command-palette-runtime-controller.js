@@ -1,4 +1,5 @@
 import { createSlashCommandSchema } from "./command-schema.js";
+import { formatCustomCommandDetail, normalizeCustomCommandRecord } from "./custom-command-model.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -43,21 +44,22 @@ function createCommandEntry(definition, index) {
 }
 
 function createCustomCommandEntry(command, index) {
-  const name = normalizeLower(command?.name);
-  if (!name) {
+  const custom = normalizeCustomCommandRecord(command);
+  if (!custom) {
     return null;
   }
-  const content = typeof command?.content === "string" ? command.content.trim() : "";
+  const name = custom.name;
+  const content = formatCustomCommandDetail(custom);
   return Object.freeze({
     key: `palette-custom:${name}`,
     group: "commands",
     kind: "custom-command",
     order: 10_000 + index,
     title: `/${name}`,
-    subtitle: "Saved custom command",
+    subtitle: custom.kind === "template" ? "Saved template command" : "Saved custom command",
     detail: content,
     commandText: `/${name}`,
-    searchText: joinSearchParts([`/${name}`, content, "custom command saved command"])
+    searchText: joinSearchParts([`/${name}`, content, custom.kind, "custom command saved command"])
   });
 }
 

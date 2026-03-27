@@ -62,8 +62,40 @@ test("command engine parses custom block definitions", () => {
     ok: true,
     name: "go",
     content: "echo hi",
-    mode: "block"
+    mode: "block",
+    kind: "plain",
+    templateVariables: [],
+    parameters: []
   });
+});
+
+test("command engine parses explicit template custom definitions and invocations", () => {
+  const engine = createEngineFixture();
+
+  const parsed = engine.parseCustomDefinition("/custom template deploy echo {{param:env}} {{var:session.cwd}}");
+  assert.deepEqual(parsed, {
+    ok: true,
+    name: "deploy",
+    content: "echo {{param:env}} {{var:session.cwd}}",
+    mode: "inline",
+    kind: "template",
+    templateVariables: ["session.cwd"],
+    parameters: ["env"]
+  });
+
+  assert.deepEqual(
+    engine.parseCustomInvocation("/deploy env=prod -- ops::beta", {
+      name: "deploy",
+      kind: "template",
+      content: "echo {{param:env}} {{var:session.cwd}}",
+      templateVariables: ["session.cwd"]
+    }),
+    {
+      ok: true,
+      parameterAssignments: { env: "prod" },
+      targetSelector: "ops::beta"
+    }
+  );
 });
 
 test("command engine derives schema-backed size and custom usage errors", () => {
@@ -76,7 +108,7 @@ test("command engine derives schema-backed size and custom usage errors", () => 
 
   assert.deepEqual(engine.parseCustomDefinition("/custom"), {
     ok: false,
-    error: "Usage: /custom <name> <text> | /custom <name> + block"
+    error: "Usage: /custom <name> <text> | /custom template <name> <text> | /custom <name> + block | /custom template <name> + block"
   });
 });
 

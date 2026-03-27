@@ -12,9 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
-- Completed in active wave: `CMD-001`.
-- Active scoped tasks: `CMD-002`, `CMD-003`.
+- Active release wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
+- Active scoped tasks: `CMD-004`, `CMD-005`, `CMD-006`.
+- Latest completed wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
 - Latest completed wave: `v0.4.0-H29` (Control-Plane and Execution-Plane Separation, `UX-014`, `UX-015`, `UX-016`).
 - Previous completed wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
 - Previous completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
@@ -47,16 +47,33 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H30 - Parameterized Custom Command Templates (Active)
+### v0.4.0-H31 - Fuzzy and Personalized Command Suggestions (Active)
 
-- Completed in wave: `CMD-001`
-- Remaining active scoped tasks: `CMD-002`, `CMD-003`
+- Active scoped tasks: `CMD-004`, `CMD-005`, `CMD-006`
+
+Dependencies:
+
+- `CMD-004` establishes deterministic fuzzy ranking first so the suggestion surfaces gain broader recall without sacrificing exact-prefix predictability or stable ordering guarantees.
+- `CMD-005` follows `CMD-004` and layers browser-local recency personalization on top of the deterministic fuzzy baseline instead of inventing a separate ranking path for the command palette and composer autocomplete.
+- `CMD-006` closes after `CMD-004` and `CMD-005`, so regression coverage spans exact-prefix priority, fuzzy fallback ordering, recency weighting, and stable no-history behavior end to end.
+
+Exit criteria:
+
+- Composer autocomplete and the command palette both support deterministic fuzzy matching across the existing command/session/deck/custom-command surfaces without regressing exact-prefix behavior.
+- Browser-local recency can personalize ranking when multiple fuzzy matches are otherwise comparable, while deterministic fallback order still applies when history is absent or tied.
+- Regression coverage exists for exact-prefix priority, fuzzy recall, personalized ranking, and no-history fallback behavior.
+
+## Latest Completed Wave
+
+### v0.4.0-H30 - Parameterized Custom Command Templates (Completed)
+
+- `CMD-001`, `CMD-002`, `CMD-003`
 
 Dependencies:
 
 - `CMD-001` established the persisted backend contract first so template-capable custom commands reuse the existing custom-command storage and API surface instead of introducing a second frontend-only command-template model.
-- `CMD-002` follows the completed `CMD-001` contract and reuses it for `/custom` save/show/execute flows, deterministic parameter parsing, preview substitution, and strict missing-placeholder feedback in the existing command plane.
-- `CMD-003` closes after `CMD-001` and `CMD-002`, so regression coverage spans REST validation, persistence/backward compatibility, frontend preview/execution behavior, and template error handling end to end.
+- `CMD-002` followed the completed `CMD-001` contract and reused it for `/custom` save/show/preview/execute flows, deterministic parameter parsing, preview substitution, and strict missing-placeholder feedback in the existing command plane.
+- `CMD-003` closed after `CMD-001` and `CMD-002`, so regression coverage now spans REST validation, persistence/backward compatibility, frontend preview/execution behavior, and template error handling end to end.
 
 Exit criteria:
 
@@ -65,7 +82,7 @@ Exit criteria:
 - Missing or unknown template inputs fail loudly with concise operator guidance instead of silently sending unresolved placeholders.
 - Regression coverage exists for contract validation, backward compatibility, preview behavior, and execution-time template substitution.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H29 - Control-Plane and Execution-Plane Separation (Completed)
 

@@ -545,7 +545,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     example: "/custom show deploy",
     usage: [
       "/custom <name> <text>",
-      "/custom <name> + block"
+      "/custom template <name> <text>",
+      "/custom <name> + block",
+      "/custom template <name> + block"
     ],
     subcommands: {
       show: {
@@ -556,6 +558,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/custom show deploy",
         key: "slash:custom:show",
         usage: "/custom show <name>",
+        args: [{ provider: "custom-command-name" }]
+      },
+      preview: {
+        insertText: "preview",
+        label: "/custom preview",
+        kind: "subcommand",
+        description: "preview custom command rendering",
+        example: "/custom preview deploy env=prod -- 7",
+        key: "slash:custom:preview",
+        usage: "/custom preview <name> [key=value ...] [-- <targetSelector>]",
         args: [{ provider: "custom-command-name" }]
       },
       remove: {

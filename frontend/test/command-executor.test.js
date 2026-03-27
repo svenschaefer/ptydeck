@@ -120,6 +120,9 @@ test("command executor help and usage strings derive from declarative schema met
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
   assert.equal(customShowUsage, "Usage: /custom show <name>");
+
+  const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
+  assert.equal(customPreviewUsage, "Usage: /custom preview <name> [key=value ...] [-- <targetSelector>]");
 });
 
 test("command executor manages layout profiles through shared runtime hooks", async () => {
@@ -967,8 +970,8 @@ test("command executor records correlated custom-command submissions per target 
     isSessionExited: () => false,
     isSessionActionBlocked: () => false,
     getBlockedSessionActionMessage: () => "",
-    listCustomCommandState: () => [{ name: "go", content: "echo hi" }],
-    getCustomCommandState: () => ({ name: "go", content: "echo hi" }),
+    listCustomCommandState: () => [{ name: "go", content: "echo hi", kind: "plain", templateVariables: [] }],
+    getCustomCommandState: () => ({ name: "go", content: "echo hi", kind: "plain", templateVariables: [] }),
     removeCustomCommandState: () => false,
     parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
     upsertCustomCommandState: () => null,
@@ -1000,5 +1003,91 @@ test("command executor records correlated custom-command submissions per target 
   assert.deepEqual(calls, [
     ["send", "s1", "echo hi\n"],
     ["record", "s1", "custom-command", "go", "/go", "echo hi\n"]
+  ]);
+});
+
+test("command executor previews and executes template custom commands with parameter assignments", async () => {
+  const calls = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [{ id: "s1", name: "one", deckId: "default", cwd: "/srv/one" }],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      sendInput() {}
+    },
+    systemSlashCommands: ["custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => id,
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [
+      {
+        name: "deploy",
+        content: "echo {{param:env}} from {{var:session.cwd}}",
+        kind: "template",
+        templateVariables: ["session.cwd"]
+      }
+    ],
+    getCustomCommandState: () => ({
+      name: "deploy",
+      content: "echo {{param:env}} from {{var:session.cwd}}",
+      kind: "template",
+      templateVariables: ["session.cwd"]
+    }),
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "crlf",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "CRLF",
+    sendInputWithConfiguredTerminator: async (_sendInput, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    recordCommandSubmission: (sessionId, submission) => {
+      calls.push(["record", sessionId, submission.commandName, submission.text]);
+    },
+    normalizeCustomCommandPayloadForShell: (value) => `${value}\n`,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 })
+  });
+
+  const preview = await executor.execute({
+    command: "custom",
+    args: ["preview", "deploy", "env=prod"],
+    raw: "/custom preview deploy env=prod"
+  });
+  assert.equal(preview, "/deploy -> [s1] one\n---\necho prod from /srv/one\n---");
+
+  const feedback = await executor.execute({
+    command: "deploy",
+    args: ["env=prod"],
+    raw: "/deploy env=prod"
+  });
+
+  assert.equal(feedback, "Executed /deploy on [s1].");
+  assert.deepEqual(calls, [
+    ["send", "s1", "echo prod from /srv/one\n"],
+    ["record", "s1", "deploy", "echo prod from /srv/one\n"]
   ]);
 });

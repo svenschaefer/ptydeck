@@ -1,4 +1,9 @@
 import { evaluateSendSafety as defaultEvaluateSendSafety } from "./command-send-safety-controller.js";
+import {
+  normalizeCustomCommandRecord,
+  parseCustomCommandInvocation,
+  renderCustomCommandForSession
+} from "./custom-command-model.js";
 
 export function createCommandComposerRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
@@ -374,6 +379,52 @@ export function createCommandComposerRuntimeController(options = {}) {
     return true;
   }
 
+  function resolveCustomPreview(custom, rawInput) {
+    const state = getState();
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    const decks = Array.isArray(state.decks) ? state.decks : [];
+    const normalized = normalizeCustomCommandRecord(custom);
+    if (!normalized) {
+      return "";
+    }
+    if (normalized.kind !== "template") {
+      return normalized.content || "";
+    }
+
+    const invocation = parseCustomCommandInvocation(rawInput, normalized);
+    if (!invocation.ok) {
+      return invocation.error;
+    }
+
+    let targetSessions = [];
+    if (invocation.targetSelector) {
+      const resolvedTargets = resolveTargetSelectors(invocation.targetSelector, sessions, {
+        source: "slash",
+        scopeMode: "active-deck",
+        activeDeckId: getActiveDeck()?.id || ""
+      });
+      if (resolvedTargets.error) {
+        return resolvedTargets.error;
+      }
+      targetSessions = Array.isArray(resolvedTargets.sessions) ? resolvedTargets.sessions : [];
+    } else {
+      const activeSession = sessions.find((session) => session.id === state.activeSessionId) || null;
+      targetSessions = activeSession ? [activeSession] : [];
+    }
+
+    if (targetSessions.length === 0) {
+      return "No active session for template preview.";
+    }
+    if (targetSessions.length > 1) {
+      return `Template preview varies across ${targetSessions.length} target sessions.`;
+    }
+
+    const session = targetSessions[0];
+    const deck = decks.find((entry) => entry?.id === session?.deckId) || null;
+    const rendered = renderCustomCommandForSession(normalized, session, deck, invocation.parameterAssignments);
+    return rendered.ok ? rendered.text : rendered.error;
+  }
+
   async function refreshCommandPreview() {
     const rawInput = getCommandValue();
     const interpreted = interpretComposerInput(rawInput);
@@ -393,14 +444,14 @@ export function createCommandComposerRuntimeController(options = {}) {
       setCommandPreview("");
       return;
     }
-    if (interpreted.args.length > 1) {
-      setCommandPreview("");
-      return;
-    }
 
     const custom = getCustomCommandState(commandRaw);
     if (custom) {
-      setCommandPreview(custom.content || "");
+      setCommandPreview(resolveCustomPreview(custom, rawInput));
+      return;
+    }
+    if (interpreted.args.length > 1) {
+      setCommandPreview("");
       return;
     }
     setCommandPreview("");

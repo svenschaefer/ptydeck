@@ -288,11 +288,15 @@ export function createApiClient(baseUrl, options = {}) {
     async createWsTicket(payload = {}) {
       return request("/auth/ws-ticket", withJson(payload));
     },
-    async upsertCustomCommand(commandName, content) {
+    async upsertCustomCommand(commandName, payload) {
+      const body =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? payload
+          : { content: String(payload || "") };
       return request(`/custom-commands/${encodeURIComponent(commandName)}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content })
+        body: JSON.stringify(body)
       });
     },
     async listCustomCommands() {

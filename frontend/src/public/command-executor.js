@@ -5,6 +5,12 @@ import {
   normalizeSessionInputSafetyProfile,
   SESSION_INPUT_SAFETY_PRESET_ORDER
 } from "./input-safety-profile.js";
+import {
+  analyzeCustomCommandTemplate,
+  normalizeCustomCommandRecord,
+  parseCustomCommandInvocation,
+  renderCustomCommandForSession
+} from "./custom-command-model.js";
 
 export function createCommandExecutor(options = {}) {
   const store = options.store;
@@ -132,12 +138,75 @@ export function createCommandExecutor(options = {}) {
     return { error: "", session: resolvedTargets.sessions[0] };
   }
 
+  function resolveCustomCommandTargets(selectorText, sessions, activeSessionId, missingActiveMessage) {
+    const normalizedSelector = String(selectorText || "").trim();
+    if (!normalizedSelector) {
+      if (!activeSessionId) {
+        return { error: missingActiveMessage, sessions: [] };
+      }
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return { error: missingActiveMessage, sessions: [] };
+      }
+      return { error: "", sessions: [activeSession] };
+    }
+
+    const resolvedTargets = resolveTargetSelectors(normalizedSelector, sessions, { source: "slash" });
+    if (resolvedTargets.error) {
+      return { error: resolvedTargets.error, sessions: [] };
+    }
+    if (!Array.isArray(resolvedTargets.sessions) || resolvedTargets.sessions.length === 0) {
+      return { error: missingActiveMessage, sessions: [] };
+    }
+    return { error: "", sessions: resolvedTargets.sessions };
+  }
+
+  function renderCustomCommandForTargets(custom, targetSessions, parameterAssignments, decks) {
+    const renderedEntries = [];
+    for (const session of targetSessions) {
+      const deckId = resolveSessionDeckId(session);
+      const deck = Array.isArray(decks) ? decks.find((entry) => entry.id === deckId) || null : null;
+      const rendered = renderCustomCommandForSession(custom, session, deck, parameterAssignments);
+      if (!rendered.ok) {
+        return { error: rendered.error, entries: [] };
+      }
+      renderedEntries.push({ session, text: rendered.text });
+    }
+    return { error: "", entries: renderedEntries };
+  }
+
+  function formatCustomCommandPreview(custom, entries) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return "";
+    }
+    if (entries.length === 1) {
+      const entry = entries[0];
+      return [
+        `/${custom.name} -> [${formatSessionToken(entry.session.id)}] ${formatSessionDisplayName(entry.session)}`,
+        "---",
+        entry.text,
+        "---"
+      ].join("\n");
+    }
+    return entries
+      .map((entry) =>
+        [
+          `[${formatSessionToken(entry.session.id)}] ${formatSessionDisplayName(entry.session)}`,
+          "---",
+          entry.text,
+          "---"
+        ].join("\n")
+      )
+      .join("\n\n");
+  }
+
   async function execute(interpreted) {
     const commandRaw = interpreted.command;
     const command = commandRaw.toLowerCase();
     const args = interpreted.args;
     const state = store.getState();
     const sessions = sortSessionsByQuickId(state.sessions);
+    const decks = Array.isArray(state.decks) ? state.decks : [];
     const activeSessionId = state.activeSessionId;
 
     if (command === "" || command === "help") {
@@ -799,7 +868,16 @@ export function createCommandExecutor(options = {}) {
         if (!Array.isArray(commands) || commands.length === 0) {
           return "No custom commands defined.";
         }
-        return commands.map((entry) => `/${entry.name}`).join("\n");
+        return commands
+          .map((entry) => {
+            const custom = normalizeCustomCommandRecord(entry);
+            if (!custom) {
+              return "";
+            }
+            return custom.kind === "template" ? `/${custom.name} (template)` : `/${custom.name}`;
+          })
+          .filter(Boolean)
+          .join("\n");
       }
 
       if (args[0] === "show") {
@@ -811,7 +889,52 @@ export function createCommandExecutor(options = {}) {
         if (!custom) {
           return `Custom command not found: /${name}`;
         }
-        return `/${custom.name}\n---\n${custom.content}\n---`;
+        const normalized = normalizeCustomCommandRecord(custom);
+        if (!normalized) {
+          return `Custom command not found: /${name}`;
+        }
+        if (normalized.kind !== "template") {
+          return `/${normalized.name}\n---\n${normalized.content}\n---`;
+        }
+        const template = analyzeCustomCommandTemplate(normalized.content);
+        const metadata = [`/${normalized.name}`, "kind: template"];
+        if (template.ok && template.parameters.length > 0) {
+          metadata.push(`parameters: ${template.parameters.join(", ")}`);
+        }
+        if (normalized.templateVariables.length > 0) {
+          metadata.push(`templateVariables: ${normalized.templateVariables.join(", ")}`);
+        }
+        return `${metadata.join("\n")}\n---\n${normalized.content}\n---`;
+      }
+
+      if (args[0] === "preview") {
+        const name = typeof args[1] === "string" ? args[1].trim() : "";
+        if (!name) {
+          return formatUsage("custom", "preview");
+        }
+        const custom = normalizeCustomCommandRecord(getCustomCommandState(name));
+        if (!custom) {
+          return `Custom command not found: /${name}`;
+        }
+        const invocationRaw = `/${custom.name}${args.length > 2 ? ` ${args.slice(2).join(" ")}` : ""}`;
+        const invocation = parseCustomCommandInvocation(invocationRaw, custom);
+        if (!invocation.ok) {
+          return invocation.error;
+        }
+        const targetResolution = resolveCustomCommandTargets(
+          invocation.targetSelector,
+          sessions,
+          activeSessionId,
+          "No active session for custom command preview."
+        );
+        if (targetResolution.error) {
+          return targetResolution.error;
+        }
+        const rendered = renderCustomCommandForTargets(custom, targetResolution.sessions, invocation.parameterAssignments, decks);
+        if (rendered.error) {
+          return rendered.error;
+        }
+        return formatCustomCommandPreview(custom, rendered.entries);
       }
 
       if (args[0] === "remove") {
@@ -835,9 +958,15 @@ export function createCommandExecutor(options = {}) {
       if (!parsed.ok) {
         return `Custom command definition error: ${parsed.error}`;
       }
-      const saved = await api.upsertCustomCommand(parsed.name, parsed.content);
+      const saved = await api.upsertCustomCommand(parsed.name, {
+        content: parsed.content,
+        kind: parsed.kind,
+        templateVariables: parsed.templateVariables
+      });
       upsertCustomCommandState(saved);
-      return `Saved custom command /${saved.name} (${parsed.mode}).`;
+      const savedRecord = normalizeCustomCommandRecord(saved) || normalizeCustomCommandRecord(parsed);
+      const savedLabel = savedRecord?.kind === "template" ? "Saved template custom command" : "Saved custom command";
+      return `${savedLabel} /${saved.name} (${parsed.mode}).`;
     }
 
     if (command === "settings") {
@@ -964,40 +1093,38 @@ export function createCommandExecutor(options = {}) {
       return `Applied settings to ${targets.length} session(s): ${appliedKeys.join(", ")}.`;
     }
 
-    const custom = getCustomCommandState(commandRaw);
+    const custom = normalizeCustomCommandRecord(getCustomCommandState(commandRaw));
     if (custom) {
-      let targetSessions = [];
-      if (args.length === 0) {
-        if (!activeSessionId) {
-          return "No active session for custom command execution.";
-        }
-        const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
-        if (!activeSession) {
-          return "No active session for custom command execution.";
-        }
-        targetSessions = [activeSession];
-      } else {
-        const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
-        if (resolvedTargets.error) {
-          return resolvedTargets.error;
-        }
-        targetSessions = resolvedTargets.sessions;
+      const invocation = parseCustomCommandInvocation(interpreted.raw || `/${custom.name}`, custom);
+      if (!invocation.ok) {
+        return invocation.error;
       }
-      if (targetSessions.length === 0) {
-        return "No active session for custom command execution.";
+      const targetResolution = resolveCustomCommandTargets(
+        invocation.targetSelector,
+        sessions,
+        activeSessionId,
+        "No active session for custom command execution."
+      );
+      if (targetResolution.error) {
+        return targetResolution.error;
       }
+      const targetSessions = targetResolution.sessions;
       const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
       if (blockedSessions.length > 0) {
         return getBlockedSessionActionMessage(blockedSessions, "Custom command execution");
       }
+      const rendered = renderCustomCommandForTargets(custom, targetSessions, invocation.parameterAssignments, decks);
+      if (rendered.error) {
+        return rendered.error;
+      }
       await Promise.all(
-        targetSessions.map((session) => {
-          const normalizedPayload = normalizeCustomCommandPayloadForShell(custom.content);
+        rendered.entries.map((entry) => {
+          const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
           return sendInputWithConfiguredTerminator(
             api.sendInput.bind(api),
-            session.id,
+            entry.session.id,
             normalizedPayload,
-            getSessionSendTerminator(session.id),
+            getSessionSendTerminator(entry.session.id),
             {
               normalizeMode: normalizeSendTerminatorMode,
               delayedSubmitMs
@@ -1005,9 +1132,9 @@ export function createCommandExecutor(options = {}) {
           );
         })
       );
-      const normalizedPayload = normalizeCustomCommandPayloadForShell(custom.content);
-      for (const session of targetSessions) {
-        recordCommandSubmission(session.id, {
+      for (const entry of rendered.entries) {
+        const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
+        recordCommandSubmission(entry.session.id, {
           source: "custom-command",
           commandName: custom.name,
           label: `/${custom.name}`,

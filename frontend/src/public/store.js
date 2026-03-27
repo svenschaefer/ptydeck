@@ -1,3 +1,5 @@
+import { normalizeCustomCommandName, normalizeCustomCommandRecord } from "./custom-command-model.js";
+
 const DEFAULT_CONNECTION_STATE = "connecting";
 const DEFAULT_DECK_ID = "default";
 const SESSION_NOTIFICATION_LIMIT = 20;
@@ -14,26 +16,6 @@ function normalizeText(value) {
 function getSessionDeckId(session, defaultDeckId = DEFAULT_DECK_ID) {
   const deckId = normalizeText(session?.deckId);
   return deckId || defaultDeckId;
-}
-
-function normalizeCustomCommandName(name) {
-  return normalizeText(name).toLowerCase();
-}
-
-function normalizeCustomCommandRecord(command) {
-  if (!command || typeof command !== "object") {
-    return null;
-  }
-  const name = normalizeCustomCommandName(command.name);
-  if (!name) {
-    return null;
-  }
-  return {
-    name,
-    content: typeof command.content === "string" ? command.content : "",
-    createdAt: Number(command.createdAt || 0),
-    updatedAt: Number(command.updatedAt || 0)
-  };
 }
 
 function sortDecks(decks) {
@@ -78,6 +60,16 @@ function normalizeSessionFilterText(value) {
 
 function cloneRecord(record) {
   return record && typeof record === "object" ? { ...record } : record;
+}
+
+function cloneCustomCommandRecord(command) {
+  if (!command || typeof command !== "object") {
+    return command;
+  }
+  return {
+    ...command,
+    templateVariables: Array.isArray(command.templateVariables) ? command.templateVariables.slice() : []
+  };
 }
 
 function cloneCommandCorrelationRecord(record) {
@@ -435,7 +427,7 @@ function createStateSnapshot(state) {
     ...state,
     sessions: state.sessions.map(cloneSessionRecord),
     decks: state.decks.map(cloneRecord),
-    customCommands: state.customCommands.map(cloneRecord)
+    customCommands: state.customCommands.map(cloneCustomCommandRecord)
   };
 }
 
@@ -1236,7 +1228,7 @@ export function createStore(options = {}) {
       return previous !== state;
     },
     listCustomCommands() {
-      return state.customCommands.slice();
+      return state.customCommands.map((command) => cloneCustomCommandRecord(command));
     },
     getCustomCommand(name) {
       const normalizedName = normalizeCustomCommandName(name);
