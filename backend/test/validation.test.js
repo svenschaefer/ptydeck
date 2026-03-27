@@ -634,6 +634,52 @@ test("validateRequest rejects invalid workspace preset payloads", () => {
   });
 });
 
+test("validateRequest accepts valid ssh trust entry create and delete payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/ssh-trust-entries",
+      params: {},
+      body: {
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      }
+    });
+    validateRequest({
+      method: "DELETE",
+      pathname: "/api/v1/ssh-trust-entries/trust-1234567890abcdef12345678",
+      params: { entryId: "trust-1234567890abcdef12345678" }
+    });
+  });
+});
+
+test("validateResponse accepts ssh trust entry payloads", () => {
+  const body = {
+    id: "trust-1234567890abcdef12345678",
+    host: "example.internal",
+    port: 2222,
+    keyType: "ssh-ed25519",
+    publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+    fingerprintSha256: "SHA256:fakefingerprintfortests",
+    createdAt: 1,
+    updatedAt: 2
+  };
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sshTrustEntry",
+      body
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "sshTrustEntryList",
+      body: [body]
+    });
+  });
+});
+
 test("validateResponse rejects split-layout container weights that do not match child count", () => {
   assert.throws(() => {
     validateResponse({

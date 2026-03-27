@@ -34,6 +34,7 @@ const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
 const SESSION_KIND_VALUES = new Set(["local", "ssh"]);
 const REMOTE_AUTH_METHOD_VALUES = new Set(["password", "privateKey", "keyboardInteractive"]);
+const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
 
 function isRemoteConnection(value) {
   return (
@@ -52,6 +53,27 @@ function isRemoteAuth(value) {
     isObject(value) &&
     REMOTE_AUTH_METHOD_VALUES.has(value.method) &&
     (value.privateKeyPath === undefined || typeof value.privateKeyPath === "string")
+  );
+}
+
+function isSshTrustEntry(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    SSH_TRUST_ENTRY_ID_PATTERN.test(value.id) &&
+    typeof value.host === "string" &&
+    value.host.length > 0 &&
+    Number.isInteger(value.port) &&
+    value.port >= 1 &&
+    value.port <= 65535 &&
+    typeof value.keyType === "string" &&
+    value.keyType.length > 0 &&
+    typeof value.publicKey === "string" &&
+    value.publicKey.length > 0 &&
+    typeof value.fingerprintSha256 === "string" &&
+    value.fingerprintSha256.startsWith("SHA256:") &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt)
   );
 }
 
@@ -662,6 +684,30 @@ export function validateRequest({ method, pathname, params, query, body }) {
       throw new ApiError(400, "ValidationError", "Missing presetId path parameter.");
     }
   }
+
+  if (method === "POST" && pathname === "/api/v1/ssh-trust-entries") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.host !== "string" || !body.host.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'host' must be a non-empty string.");
+    }
+    if (body.port !== undefined && !Number.isInteger(body.port)) {
+      throw new ApiError(400, "ValidationError", "Field 'port' must be an integer.");
+    }
+    if (typeof body.keyType !== "string" || !body.keyType.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'keyType' must be a non-empty string.");
+    }
+    if (typeof body.publicKey !== "string" || !body.publicKey.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'publicKey' must be a non-empty string.");
+    }
+  }
+
+  if (method === "DELETE" && pathname.match(/^\/api\/v1\/ssh-trust-entries\/[^/]+$/)) {
+    if (!params.entryId || typeof params.entryId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing entryId path parameter.");
+    }
+  }
 }
 
 function isSession(value) {
@@ -817,6 +863,16 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "workspacePresetList") {
     if (!Array.isArray(body) || !body.every((item) => isWorkspacePreset(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match WorkspacePreset[] schema.");
+    }
+  }
+
+  if (expect === "sshTrustEntry" && !isSshTrustEntry(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SshTrustEntry schema.");
+  }
+
+  if (expect === "sshTrustEntryList") {
+    if (!Array.isArray(body) || !body.every((item) => isSshTrustEntry(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match SshTrustEntry[] schema.");
     }
   }
 }

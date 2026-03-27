@@ -1,7 +1,8 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { appendFile } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
@@ -69,6 +70,11 @@ const REMOTE_USERNAME_MAX_LENGTH = 64;
 const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
 const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
+const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
+const SSH_HOST_KEY_TYPE_MAX_LENGTH = 128;
+const SSH_HOST_KEY_PUBLIC_KEY_MAX_LENGTH = 8192;
+const SSH_HOST_KEY_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9@._+-]{0,127}$/;
+const SSH_HOST_KEY_PUBLIC_KEY_PATTERN = /^[A-Za-z0-9+/]+={0,3}$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
 const SESSION_ENV_VALUE_MAX_LENGTH = 4096;
@@ -228,6 +234,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/workspace-presets" && method === "POST") {
     return { kind: "createWorkspacePreset" };
   }
+  if (pathname === "/api/v1/ssh-trust-entries" && method === "GET") {
+    return { kind: "listSshTrustEntries" };
+  }
+  if (pathname === "/api/v1/ssh-trust-entries" && method === "POST") {
+    return { kind: "createSshTrustEntry" };
+  }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
   if (customCommandMatch && method === "GET") {
@@ -288,6 +300,14 @@ function route(pathname, method) {
   }
   if (workspacePresetMatch && method === "DELETE") {
     return { kind: "deleteWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
+  }
+
+  const sshTrustEntryMatch = pathname.match(/^\/api\/v1\/ssh-trust-entries\/([^/]+)$/);
+  if (sshTrustEntryMatch && method === "DELETE") {
+    return {
+      kind: "deleteSshTrustEntry",
+      params: { entryId: decodePathParam(sshTrustEntryMatch[1], "entryId") }
+    };
   }
 
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
@@ -926,6 +946,147 @@ function normalizeSessionRemoteSecret(input, remoteAuth, kind, { strict = true }
     return undefined;
   }
   return input;
+}
+
+function normalizeSshTrustEntryHost(value, fieldPath, { strict = true } = {}) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized && normalized.length <= REMOTE_HOST_MAX_LENGTH && REMOTE_NON_WHITESPACE_PATTERN.test(normalized)) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPath}' must be a non-empty hostname or address without whitespace.`
+    );
+  }
+  return "";
+}
+
+function normalizeSshTrustEntryPort(value, fieldPath, { strict = true } = {}) {
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_SSH_PORT;
+  }
+  const normalized = Number(value);
+  if (Number.isInteger(normalized) && normalized >= 1 && normalized <= 65535) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an integer between 1 and 65535.`);
+  }
+  return DEFAULT_SSH_PORT;
+}
+
+function normalizeSshTrustEntryKeyType(value, fieldPath, { strict = true } = {}) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (
+    normalized &&
+    normalized.length <= SSH_HOST_KEY_TYPE_MAX_LENGTH &&
+    SSH_HOST_KEY_TYPE_PATTERN.test(normalized)
+  ) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPath}' must be a non-empty SSH host-key type token without whitespace.`
+    );
+  }
+  return "";
+}
+
+function normalizeSshTrustEntryPublicKey(value, fieldPath, { strict = true } = {}) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (
+    !normalized ||
+    normalized.length > SSH_HOST_KEY_PUBLIC_KEY_MAX_LENGTH ||
+    !SSH_HOST_KEY_PUBLIC_KEY_PATTERN.test(normalized)
+  ) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPath}' must be a base64-encoded SSH public key blob without whitespace.`
+      );
+    }
+    return "";
+  }
+
+  try {
+    const decoded = Buffer.from(normalized, "base64");
+    if (decoded.length === 0) {
+      throw new Error("empty");
+    }
+    const canonical = decoded.toString("base64").replace(/=+$/u, "");
+    if (canonical !== normalized.replace(/=+$/u, "")) {
+      throw new Error("mismatch");
+    }
+  } catch {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPath}' must be a valid base64-encoded SSH public key blob.`
+      );
+    }
+    return "";
+  }
+
+  return normalized.replace(/=+$/u, "");
+}
+
+function computeSshTrustFingerprintSha256(publicKey) {
+  const digest = crypto.createHash("sha256").update(Buffer.from(publicKey, "base64")).digest("base64").replace(/=+$/u, "");
+  return `SHA256:${digest}`;
+}
+
+function buildSshTrustEntryId({ host, port, keyType, publicKey }) {
+  const hash = crypto.createHash("sha256").update(`${host}\n${port}\n${keyType}\n${publicKey}`).digest("hex");
+  return `trust-${hash.slice(0, 24)}`;
+}
+
+function normalizeSshTrustEntryEntity(input, { strict = true } = {}) {
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    return null;
+  }
+
+  const host = normalizeSshTrustEntryHost(input.host, "host", { strict });
+  const keyType = normalizeSshTrustEntryKeyType(input.keyType, "keyType", { strict });
+  const publicKey = normalizeSshTrustEntryPublicKey(input.publicKey, "publicKey", { strict });
+  if (!host || !keyType || !publicKey) {
+    return null;
+  }
+  const port = normalizeSshTrustEntryPort(input.port, "port", { strict });
+  const createdAt = Number.isInteger(input.createdAt) ? input.createdAt : Date.now();
+  const updatedAt = Number.isInteger(input.updatedAt) ? input.updatedAt : createdAt;
+  return {
+    id: buildSshTrustEntryId({ host, port, keyType, publicKey }),
+    host,
+    port,
+    keyType,
+    publicKey,
+    fingerprintSha256: computeSshTrustFingerprintSha256(publicKey),
+    createdAt,
+    updatedAt
+  };
+}
+
+function renderSshKnownHostsHostToken(host, port) {
+  return port === DEFAULT_SSH_PORT ? host : `[${host}]:${port}`;
+}
+
+function renderSshKnownHosts(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return "";
+  }
+  const lines = entries.map((entry) =>
+    `${renderSshKnownHostsHostToken(entry.host, entry.port)} ${entry.keyType} ${entry.publicKey}`
+  );
+  return `${lines.join("\n")}\n`;
 }
 
 function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
@@ -1862,6 +2023,7 @@ export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
+  const sshKnownHostsPath = join(dirname(config.dataPath), "ssh_known_hosts");
   const sessionReplayPersistMaxChars =
     Number.isInteger(config.sessionReplayPersistMaxChars) && config.sessionReplayPersistMaxChars >= 0
       ? config.sessionReplayPersistMaxChars
@@ -1873,7 +2035,8 @@ export function createRuntime(config) {
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     sessionMaxLifetimeMs: config.sessionMaxLifetimeMs,
     sessionReplayMemoryMaxChars: config.sessionReplayMemoryMaxChars,
-    sessionActivityQuietMs: config.sessionActivityQuietMs
+    sessionActivityQuietMs: config.sessionActivityQuietMs,
+    sshKnownHostsPath
   });
   const persistence = new JsonPersistence(config.dataPath, {
     encryptionProvider: config.dataEncryptionProvider || null
@@ -1894,6 +2057,7 @@ export function createRuntime(config) {
   const decks = new Map();
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
+  const sshTrustEntries = new Map();
   const sessionDeckAssignments = new Map();
   const metrics = {
     httpRequestsTotal: 0,
@@ -2322,6 +2486,12 @@ export function createRuntime(config) {
       return "sessions:read";
     }
     if (kind === "createWorkspacePreset" || kind === "updateWorkspacePreset" || kind === "deleteWorkspacePreset") {
+      return "sessions:write";
+    }
+    if (kind === "listSshTrustEntries") {
+      return "sessions:read";
+    }
+    if (kind === "createSshTrustEntry" || kind === "deleteSshTrustEntry") {
       return "sessions:write";
     }
     if (kind === "listCustomCommands" || kind === "getCustomCommand") {
@@ -3155,6 +3325,96 @@ export function createRuntime(config) {
     return changed;
   }
 
+  function compareSshTrustEntries(a, b) {
+    const hostCompare = a.host.localeCompare(b.host, "en-US", { sensitivity: "base" });
+    if (hostCompare !== 0) {
+      return hostCompare;
+    }
+    if (a.port !== b.port) {
+      return a.port - b.port;
+    }
+    const keyTypeCompare = a.keyType.localeCompare(b.keyType, "en-US", { sensitivity: "base" });
+    if (keyTypeCompare !== 0) {
+      return keyTypeCompare;
+    }
+    if (a.createdAt !== b.createdAt) {
+      return a.createdAt - b.createdAt;
+    }
+    return a.id.localeCompare(b.id, "en-US", { sensitivity: "base" });
+  }
+
+  function toApiSshTrustEntry(entry) {
+    return {
+      id: entry.id,
+      host: entry.host,
+      port: entry.port,
+      keyType: entry.keyType,
+      publicKey: entry.publicKey,
+      fingerprintSha256: entry.fingerprintSha256,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt
+    };
+  }
+
+  function listSshTrustEntries() {
+    return Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry);
+  }
+
+  function findSshTrustConflict(entry) {
+    for (const candidate of sshTrustEntries.values()) {
+      if (candidate.host !== entry.host || candidate.port !== entry.port || candidate.keyType !== entry.keyType) {
+        continue;
+      }
+      if (candidate.publicKey === entry.publicKey) {
+        return { type: "exact", entry: candidate };
+      }
+      return { type: "conflict", entry: candidate };
+    }
+    return null;
+  }
+
+  function upsertSshTrustEntry(body) {
+    const normalized = normalizeSshTrustEntryEntity(body, { strict: true });
+    const conflict = findSshTrustConflict(normalized);
+    if (conflict?.type === "exact") {
+      return { created: false, entry: toApiSshTrustEntry(conflict.entry) };
+    }
+    if (conflict?.type === "conflict") {
+      throw new ApiError(
+        409,
+        "SshHostKeyTrustConflict",
+        `SSH trust entry '${conflict.entry.id}' already trusts ${normalized.host}:${normalized.port} ${normalized.keyType} with a different public key. Delete the existing entry before trusting the new host key.`
+      );
+    }
+    const now = Date.now();
+    const entry = {
+      ...normalized,
+      createdAt: now,
+      updatedAt: now
+    };
+    sshTrustEntries.set(entry.id, entry);
+    return { created: true, entry: toApiSshTrustEntry(entry) };
+  }
+
+  function deleteSshTrustEntry(entryId) {
+    const normalizedEntryId = typeof entryId === "string" ? entryId.trim() : "";
+    if (!SSH_TRUST_ENTRY_ID_PATTERN.test(normalizedEntryId)) {
+      throw new ApiError(404, "SshTrustEntryNotFound", `SSH trust entry '${entryId}' was not found.`);
+    }
+    const entry = sshTrustEntries.get(normalizedEntryId);
+    if (!entry) {
+      throw new ApiError(404, "SshTrustEntryNotFound", `SSH trust entry '${entryId}' was not found.`);
+    }
+    sshTrustEntries.delete(normalizedEntryId);
+    return toApiSshTrustEntry(entry);
+  }
+
+  async function syncSshKnownHostsFile() {
+    const payload = renderSshKnownHosts(Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries));
+    await mkdir(dirname(sshKnownHostsPath), { recursive: true });
+    await writeFile(sshKnownHostsPath, payload, { encoding: "utf8", mode: 0o600 });
+  }
+
   function ensureSessionExistsOrThrow(sessionId) {
     try {
       manager.get(sessionId);
@@ -3231,7 +3491,8 @@ export function createRuntime(config) {
       customCommands: listCustomCommands(),
       decks: Array.from(decks.values()),
       layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile),
-      workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset)
+      workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset),
+      sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry)
     };
   }
 
@@ -3379,7 +3640,8 @@ function tryCreateRestoredSession({
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
         deckCount: state.decks.length,
-        workspacePresetCount: state.workspacePresets.length
+        workspacePresetCount: state.workspacePresets.length,
+        sshTrustEntryCount: state.sshTrustEntries.length
       });
       await persistence.saveState(state);
       logDebug("persist.save.ok", {
@@ -3387,7 +3649,8 @@ function tryCreateRestoredSession({
         sessionCount: state.sessions.length,
         customCommandCount: state.customCommands.length,
         deckCount: state.decks.length,
-        workspacePresetCount: state.workspacePresets.length
+        workspacePresetCount: state.workspacePresets.length,
+        sshTrustEntryCount: state.sshTrustEntries.length
       });
     };
 
@@ -3805,6 +4068,30 @@ function tryCreateRestoredSession({
       if (match.kind === "deleteWorkspacePreset") {
         deleteWorkspacePreset(match.params.presetId);
         await persistNow("workspace-preset.delete");
+        writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "listSshTrustEntries") {
+        const payload = listSshTrustEntries();
+        validateResponse({ statusCode: 200, body: payload, expect: "sshTrustEntryList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createSshTrustEntry") {
+        const { created, entry } = upsertSshTrustEntry(body);
+        await syncSshKnownHostsFile();
+        await persistNow(created ? "ssh-trust-entry.create" : "ssh-trust-entry.reuse");
+        validateResponse({ statusCode: created ? 201 : 200, body: entry, expect: "sshTrustEntry" });
+        writeJson(req, res, created ? 201 : 200, entry);
+        return;
+      }
+
+      if (match.kind === "deleteSshTrustEntry") {
+        deleteSshTrustEntry(match.params.entryId);
+        await syncSshKnownHostsFile();
+        await persistNow("ssh-trust-entry.delete");
         writeJson(req, res, 204);
         return;
       }
@@ -4263,6 +4550,7 @@ function tryCreateRestoredSession({
     decks.clear();
     layoutProfiles.clear();
     workspacePresets.clear();
+    sshTrustEntries.clear();
     sessionDeckAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
       const normalizedDeck = normalizeDeckEntity(persistedDeck);
@@ -4295,13 +4583,36 @@ function tryCreateRestoredSession({
       }
       layoutProfiles.set(normalizedProfile.id, normalizedProfile);
     }
+    for (const persistedSshTrustEntry of Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries : []) {
+      const normalizedEntry = normalizeSshTrustEntryEntity(persistedSshTrustEntry, { strict: false });
+      if (!normalizedEntry) {
+        continue;
+      }
+      const conflict = findSshTrustConflict(normalizedEntry);
+      if (conflict?.type === "conflict") {
+        logDebug("runtime.restore.ssh_trust_entry_skip", {
+          entryId: normalizedEntry.id,
+          host: normalizedEntry.host,
+          port: normalizedEntry.port,
+          keyType: normalizedEntry.keyType,
+          reason: "conflicting-existing-entry"
+        });
+        continue;
+      }
+      if (conflict?.type === "exact") {
+        continue;
+      }
+      sshTrustEntries.set(normalizedEntry.id, normalizedEntry);
+    }
+    await syncSshKnownHostsFile();
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {
       persistedSessionCount: persistedState.sessions.length,
       persistedCustomCommandCount: persistedState.customCommands.length,
       persistedDeckCount: persistedState.decks.length,
       persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0,
-      persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0
+      persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0,
+      persistedSshTrustEntryCount: Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries.length : 0
     });
     for (const session of persistedState.sessions) {
       try {

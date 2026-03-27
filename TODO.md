@@ -14,8 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `REM-003` Owner `BE`: Add the SSH host-key trust-store workflow (`known_hosts`-style trust persistence, first-connect trust contract, and changed-host-key rejection behavior) so SSH sessions fail safely and predictably.
-- `REM-009` Owner `QA`: Add integration and security coverage for remote-session authentication, host-key verification, launch/reconnect guardrails, and trust-failure paths across the new SSH-backed runtime contract.
+- none currently
 
 ## Active Ownership Role
 

@@ -2621,7 +2621,7 @@ test("ssh session contract persists normalized metadata and restores through the
     assert.equal(spawnCalls.at(-1).command, "ssh");
     assert.equal(spawnCalls.at(-1).shell, "ssh");
     assert.equal(spawnCalls.at(-1).cwd, homedir());
-    assert.deepEqual(spawnCalls.at(-1).args.slice(0, 18), [
+    assert.deepEqual(spawnCalls.at(-1).args.slice(0, 24), [
       "-tt",
       "-o",
       "ClearAllForwardings=yes",
@@ -2629,6 +2629,12 @@ test("ssh session contract persists normalized metadata and restores through the
       "ForwardAgent=no",
       "-o",
       "ForwardX11=no",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "-o",
+      `UserKnownHostsFile=${join(dir, "ssh_known_hosts")}`,
+      "-o",
+      "GlobalKnownHostsFile=/dev/null",
       "-o",
       "PreferredAuthentications=publickey",
       "-o",
@@ -2641,8 +2647,8 @@ test("ssh session contract persists normalized metadata and restores through the
       "ops",
       "example.internal"
     ]);
-    assert.match(spawnCalls.at(-1).args[18], /^sh -lc '/);
-    assert.match(spawnCalls.at(-1).args[18], /pwd/);
+    assert.match(spawnCalls.at(-1).args[24], /^sh -lc '/);
+    assert.match(spawnCalls.at(-1).args[24], /pwd/);
   } finally {
     await runtimeA.stop();
   }
@@ -2867,6 +2873,202 @@ test("runtime restore normalizes invalid persisted ssh auth metadata to safe def
     assert.deepEqual(restored.remoteAuth, { method: "privateKey" });
     assert.equal(spawnCalls.length, 1);
     assert.ok(spawnCalls[0].args.includes("PreferredAuthentications=publickey"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("ssh trust entries persist, render managed known_hosts, and reject conflicting replacements", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-trust-"));
+  const dataPath = join(dir, "sessions.json");
+  const knownHostsPath = join(dir, "ssh_known_hosts");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let createdEntryId = "";
+  try {
+    const createRes = await fetch(`${baseUrlA}/ssh-trust-entries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdEntryId = created.id;
+    assert.equal(created.host, "example.internal");
+    assert.equal(created.port, 2222);
+    assert.equal(created.keyType, "ssh-ed25519");
+    assert.match(created.id, /^trust-[a-f0-9]{24}$/);
+    assert.match(created.fingerprintSha256, /^SHA256:/);
+
+    const knownHostsRaw = await readFile(knownHostsPath, "utf8");
+    assert.equal(
+      knownHostsRaw,
+      "[example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM\n"
+    );
+
+    const reuseRes = await fetch(`${baseUrlA}/ssh-trust-entries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      })
+    });
+    assert.equal(reuseRes.status, 200);
+    const reused = await reuseRes.json();
+    assert.equal(reused.id, createdEntryId);
+
+    const conflictRes = await fetch(`${baseUrlA}/ssh-trust-entries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      })
+    });
+    assert.equal(conflictRes.status, 409);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  assert.equal(Array.isArray(persistedRaw.sshTrustEntries), true);
+  assert.equal(persistedRaw.sshTrustEntries.length, 1);
+  assert.equal(persistedRaw.sshTrustEntries[0].id, createdEntryId);
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const listRes = await fetch(`${baseUrlB}/ssh-trust-entries`);
+    assert.equal(listRes.status, 200);
+    const entries = await listRes.json();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].id, createdEntryId);
+
+    const deleteRes = await fetch(`${baseUrlB}/ssh-trust-entries/${createdEntryId}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteRes.status, 204);
+
+    const emptyKnownHostsRaw = await readFile(knownHostsPath, "utf8");
+    assert.equal(emptyKnownHostsRaw, "");
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("runtime restore normalizes invalid persisted ssh trust entries before rendering managed known_hosts", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-trust-"));
+  const dataPath = join(dir, "sessions.json");
+  const knownHostsPath = join(dir, "ssh_known_hosts");
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [],
+        customCommands: [],
+        sessionOutputs: [],
+        decks: [],
+        layoutProfiles: [],
+        workspacePresets: [],
+        sshTrustEntries: [
+          {
+            id: "trust-invalid-port",
+            host: "example.internal",
+            port: 99999,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+          },
+          {
+            id: "trust-valid",
+            host: "example.internal",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+            createdAt: 10,
+            updatedAt: 11
+          },
+          {
+            id: "trust-conflict",
+            host: "example.internal",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            createdAt: 12,
+            updatedAt: 13
+          },
+          {
+            id: "trust-invalid-key",
+            host: "example.internal",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "not base64"
+          }
+        ]
+      },
+      null,
+      2
+    )
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+  try {
+    const listRes = await fetch(`${baseUrl}/ssh-trust-entries`);
+    assert.equal(listRes.status, 200);
+    const entries = await listRes.json();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].host, "example.internal");
+    assert.equal(entries[0].port, 22);
+    assert.equal(entries[0].keyType, "ssh-ed25519");
+
+    const knownHostsRaw = await readFile(knownHostsPath, "utf8");
+    assert.equal(
+      knownHostsRaw,
+      "example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM\n"
+    );
   } finally {
     await runtime.stop();
   }

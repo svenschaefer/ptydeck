@@ -189,6 +189,18 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
           }
         }
       }
+    ],
+    sshTrustEntries: [
+      {
+        id: "trust-1234567890abcdef12345678",
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+        fingerprintSha256: "SHA256:fakefingerprintfortests",
+        createdAt: 10,
+        updatedAt: 11
+      }
     ]
   };
 
@@ -214,6 +226,7 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     customCommands: [],
     decks: [],
     layoutProfiles: [],
-    workspacePresets: []
+    workspacePresets: [],
+    sshTrustEntries: []
   });
 });

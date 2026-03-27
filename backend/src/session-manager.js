@@ -30,6 +30,7 @@ const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
 const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
+const DEFAULT_SSH_KNOWN_HOSTS_PATH = join(SESSION_MANAGER_DIRNAME, "../data/ssh_known_hosts");
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -328,7 +329,8 @@ function buildSessionLaunchSpec({
   remoteConnection,
   remoteAuth,
   remoteSecret,
-  sshAskpassPath
+  sshAskpassPath,
+  sshKnownHostsPath
 }) {
   if (kind !== SESSION_KIND_SSH) {
     return {
@@ -343,7 +345,21 @@ function buildSessionLaunchSpec({
   }
 
   const sshClient = typeof shell === "string" && shell.trim() ? shell.trim() : DEFAULT_SSH_CLIENT;
-  const args = ["-tt", "-o", "ClearAllForwardings=yes", "-o", "ForwardAgent=no", "-o", "ForwardX11=no"];
+  const args = [
+    "-tt",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "ForwardAgent=no",
+    "-o",
+    "ForwardX11=no",
+    "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    `UserKnownHostsFile=${sshKnownHostsPath}`,
+    "-o",
+    "GlobalKnownHostsFile=/dev/null"
+  ];
   if (remoteAuth?.method === SSH_AUTH_METHOD_PASSWORD) {
     args.push(
       "-o",
@@ -420,6 +436,7 @@ export class SessionManager {
     sessionReplayMemoryMaxChars = DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS,
     sessionActivityQuietMs = DEFAULT_SESSION_ACTIVITY_QUIET_MS,
     sshAskpassPath = DEFAULT_SSH_ASKPASS_PATH,
+    sshKnownHostsPath = DEFAULT_SSH_KNOWN_HOSTS_PATH,
     nowFn = now,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout
@@ -438,6 +455,10 @@ export class SessionManager {
         : DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS;
     this.sshAskpassPath =
       typeof sshAskpassPath === "string" && sshAskpassPath.trim() ? sshAskpassPath.trim() : DEFAULT_SSH_ASKPASS_PATH;
+    this.sshKnownHostsPath =
+      typeof sshKnownHostsPath === "string" && sshKnownHostsPath.trim()
+        ? sshKnownHostsPath.trim()
+        : DEFAULT_SSH_KNOWN_HOSTS_PATH;
     this.sessionActivityQuietMs =
       Number.isInteger(sessionActivityQuietMs) && sessionActivityQuietMs > 0
         ? sessionActivityQuietMs
@@ -665,7 +686,8 @@ export class SessionManager {
       remoteConnection: normalizedRemoteConnection,
       remoteAuth: normalizedRemoteAuth,
       remoteSecret: normalizedRemoteSecret,
-      sshAskpassPath: this.sshAskpassPath
+      sshAskpassPath: this.sshAskpassPath,
+      sshKnownHostsPath: this.sshKnownHostsPath
     });
     const shellAdapter = createShellAdapter(launchSpec.shellAdapterId);
 

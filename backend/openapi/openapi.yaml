@@ -536,6 +536,78 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /ssh-trust-entries:
+    get:
+      operationId: listSshTrustEntries
+      summary: List persisted SSH host-key trust entries.
+      responses:
+        '200':
+          description: SSH trust entry list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SshTrustEntry'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createSshTrustEntry
+      summary: Create or reuse a persisted SSH host-key trust entry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSshTrustEntryRequest'
+      responses:
+        '200':
+          description: Existing trust entry reused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SshTrustEntry'
+        '201':
+          description: Trust entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SshTrustEntry'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Trust entry conflicts with an existing host/key-type mapping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /ssh-trust-entries/{entryId}:
+    parameters:
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: deleteSshTrustEntry
+      summary: Delete a persisted SSH host-key trust entry.
+      responses:
+        '204':
+          description: Trust entry deleted
+        '404':
+          description: Trust entry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -1309,6 +1381,55 @@ components:
           minimum: 0
         truncated:
           type: boolean
+    SshTrustEntry:
+      type: object
+      required:
+        - id
+        - host
+        - port
+        - keyType
+        - publicKey
+        - fingerprintSha256
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        keyType:
+          type: string
+        publicKey:
+          type: string
+        fingerprintSha256:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+    CreateSshTrustEntryRequest:
+      type: object
+      required:
+        - host
+        - keyType
+        - publicKey
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        keyType:
+          type: string
+        publicKey:
+          type: string
     CustomCommand:
       type: object
       required:

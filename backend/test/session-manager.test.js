@@ -367,7 +367,8 @@ test("SessionManager builds deterministic ssh launch options and persists remote
     createPty: (options) => {
       spawnOptions = options;
       return fakePty;
-    }
+    },
+    sshKnownHostsPath: "/tmp/ptydeck-test-known_hosts"
   });
 
   const created = manager.create({
@@ -393,7 +394,7 @@ test("SessionManager builds deterministic ssh launch options and persists remote
   assert.equal(spawnOptions.command, "ssh");
   assert.equal(spawnOptions.shell, "ssh");
   assert.equal(spawnOptions.cwd, homedir());
-  assert.deepEqual(spawnOptions.args.slice(0, 18), [
+  assert.deepEqual(spawnOptions.args.slice(0, 24), [
     "-tt",
     "-o",
     "ClearAllForwardings=yes",
@@ -401,6 +402,12 @@ test("SessionManager builds deterministic ssh launch options and persists remote
     "ForwardAgent=no",
     "-o",
     "ForwardX11=no",
+    "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    "UserKnownHostsFile=/tmp/ptydeck-test-known_hosts",
+    "-o",
+    "GlobalKnownHostsFile=/dev/null",
     "-o",
     "PreferredAuthentications=publickey",
     "-o",
@@ -414,8 +421,8 @@ test("SessionManager builds deterministic ssh launch options and persists remote
     "example.internal"
   ]);
   assert.equal(fakePty.writes.length, 0);
-  assert.match(spawnOptions.args[18], /^sh -lc '/);
-  assert.match(spawnOptions.args[18], /pwd/);
+  assert.match(spawnOptions.args[24], /^sh -lc '/);
+  assert.match(spawnOptions.args[24], /pwd/);
 });
 
 test("SessionManager wires askpass env for password ssh auth without persisting the secret", () => {
@@ -426,7 +433,8 @@ test("SessionManager wires askpass env for password ssh auth without persisting 
       spawnOptions = options;
       return fakePty;
     },
-    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh"
+    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh",
+    sshKnownHostsPath: "/tmp/ptydeck-test-known_hosts"
   });
 
   const created = manager.create({
@@ -445,7 +453,7 @@ test("SessionManager wires askpass env for password ssh auth without persisting 
   assert.deepEqual(created.remoteAuth, { method: "password" });
   assert.equal(created.remoteSecret, undefined);
   assert.ok(spawnOptions);
-  assert.deepEqual(spawnOptions.args.slice(0, 13), [
+  assert.deepEqual(spawnOptions.args.slice(0, 21), [
     "-tt",
     "-o",
     "ClearAllForwardings=yes",
@@ -454,11 +462,19 @@ test("SessionManager wires askpass env for password ssh auth without persisting 
     "-o",
     "ForwardX11=no",
     "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    "UserKnownHostsFile=/tmp/ptydeck-test-known_hosts",
+    "-o",
+    "GlobalKnownHostsFile=/dev/null",
+    "-o",
     "PreferredAuthentications=password",
     "-o",
     "PubkeyAuthentication=no",
     "-o",
-    "KbdInteractiveAuthentication=no"
+    "KbdInteractiveAuthentication=no",
+    "-o",
+    "NumberOfPasswordPrompts=1"
   ]);
   assert.equal(spawnOptions.env.SSH_ASKPASS, "/tmp/ptydeck-test-askpass.sh");
   assert.equal(spawnOptions.env.SSH_ASKPASS_REQUIRE, "force");
@@ -474,7 +490,8 @@ test("SessionManager supports keyboardInteractive and privateKey ssh launch vari
       spawned.push({ options, fakePty });
       return fakePty;
     },
-    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh"
+    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh",
+    sshKnownHostsPath: "/tmp/ptydeck-test-known_hosts"
   });
 
   const keyboardInteractive = manager.create({
@@ -492,7 +509,7 @@ test("SessionManager supports keyboardInteractive and privateKey ssh launch vari
   const keyboardLaunch = spawned[0].options;
   assert.equal(keyboardInteractive.kind, "ssh");
   assert.deepEqual(keyboardInteractive.remoteAuth, { method: "keyboardInteractive" });
-  assert.deepEqual(keyboardLaunch.args.slice(0, 15), [
+  assert.deepEqual(keyboardLaunch.args.slice(0, 21), [
     "-tt",
     "-o",
     "ClearAllForwardings=yes",
@@ -500,6 +517,12 @@ test("SessionManager supports keyboardInteractive and privateKey ssh launch vari
     "ForwardAgent=no",
     "-o",
     "ForwardX11=no",
+    "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    "UserKnownHostsFile=/tmp/ptydeck-test-known_hosts",
+    "-o",
+    "GlobalKnownHostsFile=/dev/null",
     "-o",
     "PreferredAuthentications=keyboard-interactive",
     "-o",

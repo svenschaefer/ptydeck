@@ -71,6 +71,9 @@ function runtimeOperationKeys() {
     "GET /workspace-presets/{presetId}",
     "PATCH /workspace-presets/{presetId}",
     "DELETE /workspace-presets/{presetId}",
+    "GET /ssh-trust-entries",
+    "POST /ssh-trust-entries",
+    "DELETE /ssh-trust-entries/{entryId}",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
@@ -297,6 +300,29 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("DELETE /workspace-presets/{presetId}").has(deleteWorkspacePresetRes.status));
+
+    const listSshTrustEntriesRes = await contractFetch(`${baseUrl}/ssh-trust-entries`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /ssh-trust-entries").has(listSshTrustEntriesRes.status));
+
+    const createSshTrustEntryRes = await contractFetch(`${baseUrl}/ssh-trust-entries`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        host: "example.internal",
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      })
+    });
+    assert.ok(operations.get("POST /ssh-trust-entries").has(createSshTrustEntryRes.status));
+    const createdSshTrustEntry = await createSshTrustEntryRes.json();
+
+    const deleteSshTrustEntryRes = await contractFetch(`${baseUrl}/ssh-trust-entries/${createdSshTrustEntry.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("DELETE /ssh-trust-entries/{entryId}").has(deleteSshTrustEntryRes.status));
 
     const deleteLayoutProfileRes = await contractFetch(`${baseUrl}/layout-profiles/${createdLayoutProfile.id}`, {
       method: "DELETE",
