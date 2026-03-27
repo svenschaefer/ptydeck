@@ -13,7 +13,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
-- Active scoped tasks: `CMD-001`, `CMD-002`, `CMD-003`.
+- Completed in active wave: `CMD-001`.
+- Active scoped tasks: `CMD-002`, `CMD-003`.
 - Latest completed wave: `v0.4.0-H29` (Control-Plane and Execution-Plane Separation, `UX-014`, `UX-015`, `UX-016`).
 - Previous completed wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
 - Previous completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
@@ -48,12 +49,13 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ### v0.4.0-H30 - Parameterized Custom Command Templates (Active)
 
-- Active scoped tasks: `CMD-001`, `CMD-002`, `CMD-003`
+- Completed in wave: `CMD-001`
+- Remaining active scoped tasks: `CMD-002`, `CMD-003`
 
 Dependencies:
 
-- `CMD-001` establishes the persisted backend contract first so template-capable custom commands reuse the existing custom-command storage and API surface instead of introducing a second frontend-only command-template model.
-- `CMD-002` follows `CMD-001` and reuses that contract for `/custom` save/show/execute flows, deterministic parameter parsing, preview substitution, and strict missing-placeholder feedback in the existing command plane.
+- `CMD-001` established the persisted backend contract first so template-capable custom commands reuse the existing custom-command storage and API surface instead of introducing a second frontend-only command-template model.
+- `CMD-002` follows the completed `CMD-001` contract and reuses it for `/custom` save/show/execute flows, deterministic parameter parsing, preview substitution, and strict missing-placeholder feedback in the existing command plane.
 - `CMD-003` closes after `CMD-001` and `CMD-002`, so regression coverage spans REST validation, persistence/backward compatibility, frontend preview/execution behavior, and template error handling end to end.
 
 Exit criteria:

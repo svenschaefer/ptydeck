@@ -36,6 +36,16 @@ const DEFAULT_CUSTOM_COMMAND_MAX_COUNT = 256;
 const DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH = 32;
 const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
 const CUSTOM_COMMAND_NAME_LOCALE = "en-US";
+const CUSTOM_COMMAND_KIND_VALUES = new Set(["plain", "template"]);
+const CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
+const CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES = new Set([
+  "session.id",
+  "session.name",
+  "session.cwd",
+  "session.note",
+  "deck.id",
+  "deck.name"
+]);
 const SESSION_START_CWD_MAX_LENGTH = 1024;
 const SESSION_START_COMMAND_MAX_LENGTH = 4096;
 const SESSION_NOTE_MAX_LENGTH = 512;
@@ -343,6 +353,165 @@ function normalizeCustomCommandName(value) {
   return String(value || "")
     .trim()
     .toLowerCase();
+}
+
+function normalizeCustomCommandKind(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return CUSTOM_COMMAND_KIND_VALUES.has(normalized) ? normalized : "plain";
+}
+
+function collectCustomCommandTemplateTokens(content, { strict = true, fieldPath = "content" } = {}) {
+  const text = typeof content === "string" ? content : "";
+  const tokens = [];
+  let invalid = false;
+  const remainder = text.replaceAll(/{{[\s\S]*?}}/g, (wrapper) => {
+    const match = /^{{\s*(param|var)\s*:\s*([A-Za-z0-9_.-]+)\s*}}$/.exec(wrapper);
+    if (!match) {
+      invalid = true;
+      return "";
+    }
+    const type = match[1];
+    const name = String(match[2] || "").trim().toLowerCase();
+    if (type === "param") {
+      if (!CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN.test(name)) {
+        invalid = true;
+        return "";
+      }
+    } else if (!CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES.has(name)) {
+      invalid = true;
+      return "";
+    }
+    tokens.push({ type, name });
+    return "";
+  });
+
+  if (invalid || remainder.includes("{{") || remainder.includes("}}")) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "CustomCommandTemplateInvalid",
+        `Field '${fieldPath}' contains an invalid template placeholder. Use '{{param:name}}' or '{{var:session.id}}'.`
+      );
+    }
+    return null;
+  }
+
+  return tokens;
+}
+
+function normalizeCustomCommandTemplateVariables(values, { strict = true, fieldPath = "templateVariables" } = {}) {
+  if (values === undefined) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an array of allowed template-variable names.`);
+    }
+    return [];
+  }
+  const normalized = [];
+  const seen = new Set();
+  for (let index = 0; index < values.length; index += 1) {
+    const value = String(values[index] || "").trim().toLowerCase();
+    if (!CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES.has(value)) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "ValidationError",
+          `Field '${fieldPath}[${index}]' must be one of: ${Array.from(CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES).join(", ")}.`
+        );
+      }
+      continue;
+    }
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized.sort((left, right) => left.localeCompare(right, CUSTOM_COMMAND_NAME_LOCALE));
+}
+
+function buildCustomCommandEntry(name, source, options = {}) {
+  const strict = options.strict !== false;
+  const fieldPathPrefix = options.fieldPathPrefix || "body";
+  const normalizedName = normalizeCustomCommandName(name ?? source?.name);
+  if (!normalizedName) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Custom command name must be a non-empty string.");
+    }
+    return null;
+  }
+  if (!source || typeof source !== "object" || Array.isArray(source) || typeof source.content !== "string") {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.content' must be a string.`);
+    }
+    return null;
+  }
+
+  const content = source.content;
+  const kind = normalizeCustomCommandKind(source.kind);
+  const templateVariables = normalizeCustomCommandTemplateVariables(source.templateVariables, {
+    strict,
+    fieldPath: `${fieldPathPrefix}.templateVariables`
+  });
+
+  if (kind === "plain") {
+    if (templateVariables.length > 0) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "CustomCommandTemplateVariablesNotAllowed",
+          "Plain custom commands cannot define templateVariables. Set kind='template' first."
+        );
+      }
+      return null;
+    }
+  } else {
+    const tokens = collectCustomCommandTemplateTokens(content, { strict, fieldPath: `${fieldPathPrefix}.content` });
+    if (!tokens) {
+      return null;
+    }
+    if (tokens.length === 0) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "CustomCommandTemplateEmpty",
+          "Template custom commands must contain at least one '{{param:name}}' or '{{var:...}}' placeholder."
+        );
+      }
+      return null;
+    }
+    const unresolvedTemplateVariables = Array.from(
+      new Set(tokens.filter((token) => token.type === "var").map((token) => token.name))
+    ).filter((nameValue) => !templateVariables.includes(nameValue));
+    if (unresolvedTemplateVariables.length > 0) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "CustomCommandTemplateVariableNotAllowed",
+          `Template custom command uses unallowed built-in variable(s): ${unresolvedTemplateVariables.join(", ")}.`
+        );
+      }
+      return null;
+    }
+  }
+
+  const now = Date.now();
+  return {
+    name: normalizedName,
+    content,
+    kind,
+    templateVariables,
+    createdAt:
+      Number.isInteger(source.createdAt) && source.createdAt > 0
+        ? source.createdAt
+        : options.currentEntry?.createdAt || now,
+    updatedAt:
+      Number.isInteger(source.updatedAt) && source.updatedAt > 0
+        ? source.updatedAt
+        : now
+  };
 }
 
 function compareCustomCommandEntries(a, b) {
@@ -1906,7 +2075,7 @@ export function createRuntime(config) {
     return { ...entry };
   }
 
-  function upsertCustomCommand(name, content) {
+  function upsertCustomCommand(name, payload) {
     const normalizedName = normalizeCustomCommandName(name);
     if (normalizedName.length > customCommandMaxNameLength) {
       throw new ApiError(
@@ -1925,7 +2094,13 @@ export function createRuntime(config) {
     if (CUSTOM_COMMAND_RESERVED_NAMES.has(normalizedName)) {
       throw new ApiError(409, "CustomCommandNameReserved", "Custom command name collides with a system command.");
     }
-    if (content.length > customCommandMaxContentLength) {
+    const current = customCommands.get(normalizedName);
+    const next = buildCustomCommandEntry(normalizedName, payload, {
+      strict: true,
+      fieldPathPrefix: "body",
+      currentEntry: current
+    });
+    if (next.content.length > customCommandMaxContentLength) {
       throw new ApiError(
         400,
         "CustomCommandContentTooLarge",
@@ -1939,15 +2114,6 @@ export function createRuntime(config) {
         `Custom command limit reached (${customCommandMaxCount}).`
       );
     }
-
-    const current = customCommands.get(normalizedName);
-    const now = Date.now();
-    const next = {
-      name: normalizedName,
-      content,
-      createdAt: current ? current.createdAt : now,
-      updatedAt: now
-    };
     customCommands.set(normalizedName, next);
     return { ...next };
   }
@@ -3079,7 +3245,7 @@ function tryCreateRestoredSession({
 
       if (match.kind === "upsertCustomCommand") {
         const existed = hasCustomCommand(match.params.commandName);
-        const payload = upsertCustomCommand(match.params.commandName, body.content);
+        const payload = upsertCustomCommand(match.params.commandName, body);
         validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
         broadcast({
           type: existed ? "custom-command.updated" : "custom-command.created",
@@ -3775,17 +3941,13 @@ function tryCreateRestoredSession({
     }
     const restoreCandidates = [];
     for (const customCommand of persistedState.customCommands) {
-      if (!customCommand || typeof customCommand.name !== "string" || typeof customCommand.content !== "string") {
+      const candidate = buildCustomCommandEntry(customCommand?.name, customCommand, {
+        strict: false,
+        fieldPathPrefix: "customCommands[]"
+      });
+      if (!candidate) {
         continue;
       }
-      const normalizedName = normalizeCustomCommandName(customCommand.name);
-      const now = Date.now();
-      const candidate = {
-        name: normalizedName,
-        content: customCommand.content,
-        createdAt: Number.isInteger(customCommand.createdAt) && customCommand.createdAt > 0 ? customCommand.createdAt : now,
-        updatedAt: Number.isInteger(customCommand.updatedAt) && customCommand.updatedAt > 0 ? customCommand.updatedAt : now
-      };
       if (
         candidate.name.length > customCommandMaxNameLength ||
         !CUSTOM_COMMAND_NAME_PATTERN.test(candidate.name) ||

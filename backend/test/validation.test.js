@@ -227,6 +227,16 @@ test("validateRequest accepts valid custom command upsert payload", () => {
       params: { commandName: "docu" },
       body: { content: "echo hi\n" }
     });
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/deploy",
+      params: { commandName: "deploy" },
+      body: {
+        content: "echo {{param:env}} {{var:session.cwd}}\n",
+        kind: "template",
+        templateVariables: ["session.cwd"]
+      }
+    });
   });
 });
 
@@ -239,6 +249,22 @@ test("validateRequest rejects invalid custom command upsert payload", () => {
       body: { content: 123 }
     });
   });
+  assert.throws(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: { content: "echo hi\n", kind: "macro" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: { content: "echo hi\n", templateVariables: "session.cwd" }
+    });
+  });
 });
 
 test("validateResponse accepts custom command payloads", () => {
@@ -249,6 +275,8 @@ test("validateResponse accepts custom command payloads", () => {
       body: {
         name: "docu",
         content: "echo hi\n",
+        kind: "plain",
+        templateVariables: [],
         createdAt: 1,
         updatedAt: 2
       }
@@ -260,6 +288,8 @@ test("validateResponse accepts custom command payloads", () => {
         {
           name: "docu",
           content: "echo hi\n",
+          kind: "template",
+          templateVariables: ["session.cwd"],
           createdAt: 1,
           updatedAt: 2
         }

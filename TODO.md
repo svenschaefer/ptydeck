@@ -14,7 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `CMD-001` Owner `BE`: Extend the persisted custom-command contract so a saved command can be either plain text or an explicit template command, with deterministic placeholder validation, strict built-in template-variable allowlisting, restart persistence, and backward compatibility for existing plain-content commands.
 - `CMD-002` Owner `FE`: Implement template-capable custom-command definition, preview, and execution flows in the frontend so `/custom` can save explicit template commands, `/<customName>` can accept deterministic parameter assignments, and missing/unknown placeholders return concise guidance instead of silently sending malformed payloads.
 - `CMD-003` Owner `QA`: Add regression coverage for template-command validation, backward-compatible plain custom commands, parameter substitution, built-in variable expansion, preview rendering, and error handling for missing or unknown template inputs.
 

@@ -1189,6 +1189,8 @@ components:
       required:
         - name
         - content
+        - kind
+        - templateVariables
         - createdAt
         - updatedAt
       properties:
@@ -1196,6 +1198,15 @@ components:
           type: string
         content:
           type: string
+        kind:
+          type: string
+          enum:
+            - plain
+            - template
+        templateVariables:
+          type: array
+          items:
+            type: string
         createdAt:
           type: integer
         updatedAt:
@@ -1207,6 +1218,15 @@ components:
       properties:
         content:
           type: string
+        kind:
+          type: string
+          enum:
+            - plain
+            - template
+        templateVariables:
+          type: array
+          items:
+            type: string
     CreateSessionRequest:
       type: object
       properties:

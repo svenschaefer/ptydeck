@@ -386,6 +386,14 @@ export function validateRequest({ method, pathname, params, body }) {
     if (typeof body.content !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'content' must be a string.");
     }
+    if (body.kind !== undefined && body.kind !== "plain" && body.kind !== "template") {
+      throw new ApiError(400, "ValidationError", "Field 'kind' must be 'plain' or 'template'.");
+    }
+    if (body.templateVariables !== undefined) {
+      if (!Array.isArray(body.templateVariables) || !body.templateVariables.every((entry) => typeof entry === "string")) {
+        throw new ApiError(400, "ValidationError", "Field 'templateVariables' must be a string array.");
+      }
+    }
   }
 
   if (method === "DELETE" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
@@ -591,6 +599,9 @@ function isCustomCommand(value) {
     isObject(value) &&
     typeof value.name === "string" &&
     typeof value.content === "string" &&
+    (value.kind === "plain" || value.kind === "template") &&
+    Array.isArray(value.templateVariables) &&
+    value.templateVariables.every((entry) => typeof entry === "string") &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );

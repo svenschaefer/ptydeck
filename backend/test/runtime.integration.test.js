@@ -448,6 +448,8 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     const putPayload = await putRes.json();
     assert.equal(putPayload.name, "docu");
     assert.equal(putPayload.content, "echo DOCU_A\n");
+    assert.equal(putPayload.kind, "plain");
+    assert.deepEqual(putPayload.templateVariables, []);
     assert.equal(Number.isInteger(putPayload.createdAt), true);
     assert.equal(Number.isInteger(putPayload.updatedAt), true);
 
@@ -456,6 +458,8 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     const listed = await listRes.json();
     assert.equal(listed.length, 1);
     assert.equal(listed[0].name, "docu");
+    assert.equal(listed[0].kind, "plain");
+    assert.deepEqual(listed[0].templateVariables, []);
 
     const overwriteRes = await fetch(`${baseUrlA}/custom-commands/docu`, {
       method: "PUT",
@@ -466,6 +470,8 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     const overwritePayload = await overwriteRes.json();
     assert.equal(overwritePayload.name, "docu");
     assert.equal(overwritePayload.content, "echo DOCU_B\n");
+    assert.equal(overwritePayload.kind, "plain");
+    assert.deepEqual(overwritePayload.templateVariables, []);
     assert.equal(overwritePayload.createdAt, putPayload.createdAt);
     assert.ok(overwritePayload.updatedAt >= putPayload.updatedAt);
   } finally {
@@ -489,9 +495,91 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     const payload = await getRes.json();
     assert.equal(payload.name, "docu");
     assert.equal(payload.content, "echo DOCU_B\n");
+    assert.equal(payload.kind, "plain");
+    assert.deepEqual(payload.templateVariables, []);
 
     const deleteRes = await fetch(`${baseUrlB}/custom-commands/docu`, { method: "DELETE" });
     assert.equal(deleteRes.status, 204);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("custom command endpoints persist template commands with validated built-in variables", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-custom-template-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+  await runtimeA.start();
+  const baseUrlA = `http://127.0.0.1:${runtimeA.getAddress().port}/api/v1`;
+
+  try {
+    const plainLiteralRes = await fetch(`${baseUrlA}/custom-commands/literal`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo {{var:session.cwd}}\n"
+      })
+    });
+    assert.equal(plainLiteralRes.status, 200);
+    const plainLiteralPayload = await plainLiteralRes.json();
+    assert.equal(plainLiteralPayload.kind, "plain");
+    assert.deepEqual(plainLiteralPayload.templateVariables, []);
+
+    const putRes = await fetch(`${baseUrlA}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo {{param:env}} from {{var:session.cwd}}\n",
+        kind: "template",
+        templateVariables: ["session.cwd"]
+      })
+    });
+    assert.equal(putRes.status, 200);
+    const payload = await putRes.json();
+    assert.equal(payload.name, "deploy");
+    assert.equal(payload.kind, "template");
+    assert.deepEqual(payload.templateVariables, ["session.cwd"]);
+
+    const invalidRes = await fetch(`${baseUrlA}/custom-commands/bad`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo {{var:deck.name}}\n",
+        kind: "template",
+        templateVariables: []
+      })
+    });
+    assert.equal(invalidRes.status, 400);
+    const invalidPayload = await invalidRes.json();
+    assert.equal(invalidPayload.error, "CustomCommandTemplateVariableNotAllowed");
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20
+  });
+  await runtimeB.start();
+  const baseUrlB = `http://127.0.0.1:${runtimeB.getAddress().port}/api/v1`;
+  try {
+    const getRes = await fetch(`${baseUrlB}/custom-commands/deploy`);
+    assert.equal(getRes.status, 200);
+    const payload = await getRes.json();
+    assert.equal(payload.kind, "template");
+    assert.deepEqual(payload.templateVariables, ["session.cwd"]);
   } finally {
     await runtimeB.stop();
   }
@@ -509,6 +597,8 @@ test("custom command names normalize deterministically and list order is stable"
     assert.equal(firstPutRes.status, 200);
     const firstPutBody = await firstPutRes.json();
     assert.equal(firstPutBody.name, "docu");
+    assert.equal(firstPutBody.kind, "plain");
+    assert.deepEqual(firstPutBody.templateVariables, []);
 
     const secondPutRes = await fetch(`${baseUrl}/custom-commands/docu`, {
       method: "PUT",
@@ -540,6 +630,8 @@ test("custom command names normalize deterministically and list order is stable"
     const getUpperBody = await getUpperRes.json();
     assert.equal(getUpperBody.name, "docu");
     assert.equal(getUpperBody.content, "echo B\n");
+    assert.equal(getUpperBody.kind, "plain");
+    assert.deepEqual(getUpperBody.templateVariables, []);
 
     const listRes = await fetch(`${baseUrl}/custom-commands`);
     assert.equal(listRes.status, 200);
