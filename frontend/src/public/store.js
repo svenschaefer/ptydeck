@@ -1,4 +1,11 @@
-import { normalizeCustomCommandName, normalizeCustomCommandRecord } from "./custom-command-model.js";
+import {
+  buildCustomCommandLookupKey,
+  compareCustomCommandRecords,
+  normalizeCustomCommandName,
+  normalizeCustomCommandRecord,
+  resolveCustomCommandForSession,
+  resolveExactCustomCommand
+} from "./custom-command-model.js";
 
 const DEFAULT_CONNECTION_STATE = "connecting";
 const DEFAULT_DECK_ID = "default";
@@ -1061,13 +1068,13 @@ export function reduceRuntimeState(state, action, options = {}) {
       const seen = new Set();
       for (const command of Array.isArray(action.commands) ? action.commands : []) {
         const normalized = normalizeCustomCommandRecord(command);
-        if (!normalized || seen.has(normalized.name)) {
+        if (!normalized || seen.has(normalized.lookupKey)) {
           continue;
         }
-        seen.add(normalized.name);
+        seen.add(normalized.lookupKey);
         nextCommands.push(normalized);
       }
-      nextCommands.sort((left, right) => left.name.localeCompare(right.name, "en-US", { sensitivity: "base" }));
+      nextCommands.sort(compareCustomCommandRecords);
       return {
         ...runtimeState,
         customCommands: nextCommands
@@ -1078,20 +1085,28 @@ export function reduceRuntimeState(state, action, options = {}) {
       if (!normalized) {
         return runtimeState;
       }
-      const nextCommands = runtimeState.customCommands.filter((entry) => entry.name !== normalized.name);
+      const nextCommands = runtimeState.customCommands.filter((entry) => entry.lookupKey !== normalized.lookupKey);
       nextCommands.push(normalized);
-      nextCommands.sort((left, right) => left.name.localeCompare(right.name, "en-US", { sensitivity: "base" }));
+      nextCommands.sort(compareCustomCommandRecords);
       return {
         ...runtimeState,
         customCommands: nextCommands
       };
     }
     case "command.remove": {
-      const name = normalizeCustomCommandName(action.name);
-      if (!name) {
+      const command = normalizeCustomCommandRecord(action.command);
+      const lookupKey =
+        command?.lookupKey ||
+        (action.scope
+          ? buildCustomCommandLookupKey(action.name, action.scope, action.sessionId)
+          : "");
+      const name = lookupKey ? "" : normalizeCustomCommandName(action.name);
+      if (!lookupKey && !name) {
         return runtimeState;
       }
-      const nextCommands = runtimeState.customCommands.filter((entry) => entry.name !== name);
+      const nextCommands = runtimeState.customCommands.filter((entry) =>
+        lookupKey ? entry.lookupKey !== lookupKey : entry.name !== name
+      );
       if (nextCommands.length === runtimeState.customCommands.length) {
         return runtimeState;
       }
@@ -1230,12 +1245,23 @@ export function createStore(options = {}) {
     listCustomCommands() {
       return state.customCommands.map((command) => cloneCustomCommandRecord(command));
     },
-    getCustomCommand(name) {
+    getCustomCommand(name, options = {}) {
       const normalizedName = normalizeCustomCommandName(name);
       if (!normalizedName) {
         return null;
       }
-      return state.customCommands.find((command) => command.name === normalizedName) || null;
+      if (options.scope) {
+        return cloneCustomCommandRecord(
+          resolveExactCustomCommand(state.customCommands, normalizedName, options.scope, options.sessionId)
+        );
+      }
+      if (options.sessionId) {
+        return cloneCustomCommandRecord(resolveCustomCommandForSession(state.customCommands, normalizedName, options.sessionId));
+      }
+      const matches = state.customCommands
+        .filter((command) => command.name === normalizedName)
+        .sort(compareCustomCommandRecords);
+      return cloneCustomCommandRecord(matches[0] || null);
     },
     replaceCustomCommands(commands) {
       dispatch({ type: "commands.replace", commands });
@@ -1244,17 +1270,33 @@ export function createStore(options = {}) {
       const before = state.customCommands;
       dispatch({ type: "command.upsert", command });
       const normalizedName = normalizeCustomCommandName(command?.name);
-      if (!normalizedName) {
+      const normalized = normalizeCustomCommandRecord(command);
+      if (!normalizedName || !normalized) {
         return null;
       }
       if (before === state.customCommands) {
-        return this.getCustomCommand(normalizedName);
+        return this.getCustomCommand(normalizedName, {
+          scope: normalized.scope,
+          sessionId: normalized.sessionId
+        });
       }
-      return this.getCustomCommand(normalizedName);
+      return this.getCustomCommand(normalizedName, {
+        scope: normalized.scope,
+        sessionId: normalized.sessionId
+      });
     },
-    removeCustomCommand(name) {
+    removeCustomCommand(nameOrCommand, options = {}) {
       const beforeLength = state.customCommands.length;
-      dispatch({ type: "command.remove", name });
+      if (nameOrCommand && typeof nameOrCommand === "object" && !Array.isArray(nameOrCommand)) {
+        dispatch({ type: "command.remove", command: nameOrCommand });
+      } else {
+        dispatch({
+          type: "command.remove",
+          name: nameOrCommand,
+          scope: options.scope,
+          sessionId: options.sessionId
+        });
+      }
       return state.customCommands.length !== beforeLength;
     },
     setSessionFilterText(value) {

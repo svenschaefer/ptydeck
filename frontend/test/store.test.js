@@ -89,6 +89,30 @@ test("store manages normalized custom commands and protects internal snapshots",
   assert.equal(state.decks.length, 0);
 });
 
+test("store keeps duplicate custom-command names across scopes and resolves effective precedence by session", () => {
+  const store = createStore();
+
+  store.replaceCustomCommands([
+    { name: "deploy", content: "echo global", scope: "global", createdAt: 1, updatedAt: 1 },
+    { name: "deploy", content: "echo project", scope: "project", createdAt: 2, updatedAt: 2 },
+    { name: "deploy", content: "echo session", scope: "session", sessionId: "s1", createdAt: 3, updatedAt: 3 }
+  ]);
+
+  const state = store.getState();
+  assert.deepEqual(
+    state.customCommands.map((command) => [command.scope, command.sessionId || "", command.content]),
+    [
+      ["session", "s1", "echo session"],
+      ["project", "", "echo project"],
+      ["global", "", "echo global"]
+    ]
+  );
+  assert.equal(store.getCustomCommand("deploy")?.content, "echo session");
+  assert.equal(store.getCustomCommand("deploy", { sessionId: "s1" })?.content, "echo session");
+  assert.equal(store.getCustomCommand("deploy", { sessionId: "s2" })?.content, "echo project");
+  assert.equal(store.getCustomCommand("deploy", { scope: "global" })?.content, "echo global");
+});
+
 test("store tracks live and unread session activity and clears unread on activation", () => {
   const store = createStore();
 

@@ -1,5 +1,10 @@
 import { createSlashCommandSchema } from "./command-schema.js";
 import { rankDiscoveryItems } from "./command-discovery-ranking.js";
+import {
+  compareCustomCommandRecords,
+  formatCustomCommandScopeLabel,
+  normalizeCustomCommandRecord
+} from "./custom-command-model.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -192,7 +197,10 @@ function stableDeckSignature(decks) {
 
 function stableCommandSignature(commands) {
   return (Array.isArray(commands) ? commands : [])
-    .map((command) => `${normalizeLower(command?.name)}|${normalizeText(command?.updatedAt)}`)
+    .map(
+      (command) =>
+        `${normalizeLower(command?.name)}|${normalizeLower(command?.scope)}|${normalizeText(command?.sessionId)}|${normalizeText(command?.updatedAt)}`
+    )
     .sort()
     .join(";");
 }
@@ -359,23 +367,88 @@ export function createSuggestionProviderRegistry(options = {}) {
     return candidates;
   }
 
-  function buildCustomCommandCandidates(prefix = "") {
+  function buildCustomCommandCandidates(prefix = "", context = {}) {
     const commands = listCustomCommands();
     const candidates = [];
     const seen = new Set();
+    const sessions = getScopedSessions(context);
+    const getSessionById = (sessionId) => sessions.find((session) => normalizeText(session?.id) === normalizeText(sessionId)) || null;
+    const grouped = new Map();
     for (const command of commands) {
-      const name = normalizeText(command?.name);
+      const normalized = normalizeCustomCommandRecord(command);
+      const name = normalizeText(normalized?.name);
       if (!name) {
         continue;
       }
+      const list = grouped.get(name) || [];
+      list.push(normalized);
+      grouped.set(name, list);
+    }
+    for (const [name, entries] of grouped.entries()) {
+      const scopeLabels = entries
+        .slice()
+        .sort(compareCustomCommandRecords)
+        .map((entry) =>
+          formatCustomCommandScopeLabel(entry, {
+            getSessionById,
+            formatSessionToken: getSessionToken,
+            formatSessionDisplayName: getSessionDisplayName
+          })
+        );
       pushCandidate(candidates, seen, {
         insertText: name,
         label: `/${name}`,
         kind: "custom-command",
-        description: "saved custom command",
+        description: scopeLabels.length > 1 ? `saved custom command · ${scopeLabels.join(" · ")}` : "saved custom command",
         example: `/${name} 1`,
         previewText: name,
         key: `custom-command:${normalizeLower(name)}`
+      });
+    }
+    return candidates;
+  }
+
+  function buildCustomCommandReferenceCandidates(prefix = "", context = {}) {
+    const commands = listCustomCommands()
+      .map((command) => normalizeCustomCommandRecord(command))
+      .filter(Boolean)
+      .sort(compareCustomCommandRecords);
+    const candidates = [];
+    const seen = new Set();
+    const sessions = getScopedSessions(context);
+    const getSessionById = (sessionId) => sessions.find((session) => normalizeText(session?.id) === normalizeText(sessionId)) || null;
+    const nameCounts = new Map();
+    for (const command of commands) {
+      nameCounts.set(command.name, (nameCounts.get(command.name) || 0) + 1);
+    }
+    for (const command of commands) {
+      const scopeLabel = formatCustomCommandScopeLabel(command, {
+        getSessionById,
+        formatSessionToken: getSessionToken,
+        formatSessionDisplayName: getSessionDisplayName
+      });
+      if ((nameCounts.get(command.name) || 0) === 1) {
+        pushCandidate(candidates, seen, {
+          insertText: command.name,
+          label: `/${command.name}`,
+          kind: "custom-command",
+          description: scopeLabel ? `saved custom command · ${scopeLabel}` : "saved custom command",
+          example: `/${command.name}`,
+          previewText: command.name,
+          key: `custom-command-ref:${command.lookupKey}`
+        });
+        continue;
+      }
+      const insertText =
+        command.scope === "session" ? `@session:${getSessionToken(command.sessionId) || command.sessionId} ${command.name}` : `@${command.scope} ${command.name}`;
+      pushCandidate(candidates, seen, {
+        insertText,
+        label: `/${command.name}`,
+        kind: "custom-command",
+        description: scopeLabel ? `saved custom command · ${scopeLabel}` : "saved custom command",
+        example: insertText,
+        previewText: insertText,
+        key: `custom-command-ref:${command.lookupKey}`
       });
     }
     return candidates;
@@ -569,7 +642,10 @@ export function createSuggestionProviderRegistry(options = {}) {
             candidates = buildDeckCandidates(prefix, { ...context, includeExplicitPrefix: true });
             break;
           case "custom-command-name":
-            candidates = buildCustomCommandCandidates(prefix);
+            candidates = buildCustomCommandCandidates(prefix, context);
+            break;
+          case "custom-command-reference":
+            candidates = buildCustomCommandReferenceCandidates(prefix, context);
             break;
           case "tag-selector":
             candidates = buildTagCandidates(prefix, context);

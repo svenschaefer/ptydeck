@@ -137,7 +137,7 @@ export function createRuntimeEventController(options = {}) {
         return false;
       case "custom-command.deleted":
         if (event.command) {
-          removeCustomCommandState(event.command.name);
+          removeCustomCommandState(event.command);
           scheduleCommandPreview();
           scheduleCommandSuggestions();
           clearError();

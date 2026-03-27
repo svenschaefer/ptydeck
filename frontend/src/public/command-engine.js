@@ -150,17 +150,28 @@ export function createCommandEngine(options = {}) {
 
   function buildRootSlashCompletionCandidates(customCommands = listCustomCommands()) {
     const candidates = [...slashCommandSpecs];
+    const seen = new Set();
     for (const entry of Array.isArray(customCommands) ? customCommands : []) {
-      const name = String(entry?.name || "").trim().toLowerCase();
+      const normalized = normalizeCustomCommandRecord(entry);
+      const name = String(normalized?.name || "").trim().toLowerCase();
       if (!name) {
         continue;
       }
+      if (seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      const scopes = (Array.isArray(customCommands) ? customCommands : [])
+        .map((item) => normalizeCustomCommandRecord(item))
+        .filter((item) => item && item.name === name)
+        .map((item) => item.scope)
+        .filter((value, index, values) => values.indexOf(value) === index);
       candidates.push({
         key: `slash-custom:${name}`,
         insertText: name,
         label: `/${name}`,
         kind: "custom-command",
-        description: "saved custom command",
+        description: scopes.length > 1 ? `saved custom command (${scopes.join("/")})` : "saved custom command",
         example: `/${name} 1`
       });
     }

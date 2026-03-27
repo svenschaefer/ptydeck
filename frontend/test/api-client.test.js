@@ -197,6 +197,24 @@ test("api client includes bearer auth header when token is set", async () => {
   assert.equal(calls[0].options.headers.authorization, "Bearer dev-token");
 });
 
+test("api client appends custom-command scope queries deterministically", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return { ok: true, status: options.method === "DELETE" ? 204 : 200, json: async () => [] };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listCustomCommands({ scope: "session", sessionId: "s1" });
+  await api.getCustomCommand("deploy", { scope: "project" });
+  await api.deleteCustomCommand("deploy", { scope: "session", sessionId: "s2" });
+
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/custom-commands?scope=session&sessionId=s1");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/custom-commands/deploy?scope=project");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/custom-commands/deploy?scope=session&sessionId=s2");
+  assert.equal(calls[2].options.method, "DELETE");
+});
+
 test("api client retries once after 401 when unauthorized recovery succeeds", async () => {
   const calls = [];
   let attempt = 0;

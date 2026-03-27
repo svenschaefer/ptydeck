@@ -119,10 +119,13 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(settingsUsage, "Usage: /settings show [selector] | /settings apply <selector|active> <json>");
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
-  assert.equal(customShowUsage, "Usage: /custom show <name>");
+  assert.equal(customShowUsage, "Usage: /custom show [@global|@project|@session:<selector>] <name>");
 
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
-  assert.equal(customPreviewUsage, "Usage: /custom preview <name> [key=value ...] [-- <targetSelector>]");
+  assert.equal(
+    customPreviewUsage,
+    "Usage: /custom preview [@global|@project|@session:<selector>] <name> [key=value ...] [-- <targetSelector>]"
+  );
 });
 
 test("command executor manages layout profiles through shared runtime hooks", async () => {
@@ -1077,7 +1080,7 @@ test("command executor previews and executes template custom commands with param
     args: ["preview", "deploy", "env=prod"],
     raw: "/custom preview deploy env=prod"
   });
-  assert.equal(preview, "/deploy -> [s1] one\n---\necho prod from /srv/one\n---");
+  assert.equal(preview, "/deploy · project -> [s1] one\n---\necho prod from /srv/one\n---");
 
   const feedback = await executor.execute({
     command: "deploy",
@@ -1090,4 +1093,143 @@ test("command executor previews and executes template custom commands with param
     ["send", "s1", "echo prod from /srv/one\n"],
     ["record", "s1", "deploy", "echo prod from /srv/one\n"]
   ]);
+});
+
+test("command executor resolves scoped custom commands by session precedence", async () => {
+  const calls = [];
+  const commands = [
+    { name: "deploy", content: "echo global", scope: "global", kind: "plain" },
+    { name: "deploy", content: "echo project", scope: "project", kind: "plain" },
+    { name: "deploy", content: "echo session one", scope: "session", sessionId: "s1", kind: "plain" },
+    { name: "deploy", content: "echo session two", scope: "session", sessionId: "s2", kind: "plain" }
+  ];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: { sendInput() {} },
+    systemSlashCommands: ["custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s1" ? "1" : "2"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => commands,
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "2") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "crlf",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "CRLF",
+    sendInputWithConfiguredTerminator: async (_sendInput, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    recordCommandSubmission: (sessionId, submission) => {
+      calls.push(["record", sessionId, submission.commandName, submission.label, submission.text]);
+    },
+    normalizeCustomCommandPayloadForShell: (value) => `${value}\n`,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 })
+  });
+
+  const feedbackActive = await executor.execute({ command: "deploy", args: [], raw: "/deploy" });
+  const feedbackOther = await executor.execute({ command: "deploy", args: ["2"], raw: "/deploy 2" });
+
+  assert.equal(feedbackActive, "Executed /deploy on [1].");
+  assert.equal(feedbackOther, "Executed /deploy on [2].");
+  assert.deepEqual(calls, [
+    ["send", "s1", "echo session one\n"],
+    ["record", "s1", "deploy", "/deploy", "echo session one\n"],
+    ["send", "s2", "echo session two\n"],
+    ["record", "s2", "deploy", "/deploy", "echo session two\n"]
+  ]);
+});
+
+test("command executor requires explicit scope when removing an ambiguous scoped custom command", async () => {
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [{ id: "s1", name: "one", deckId: "default" }],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [
+      { name: "deploy", content: "echo global", scope: "global", kind: "plain" },
+      { name: "deploy", content: "echo project", scope: "project", kind: "plain" }
+    ],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 })
+  });
+
+  const feedback = await executor.execute({
+    command: "custom",
+    args: ["remove", "deploy"],
+    raw: "/custom remove deploy"
+  });
+
+  assert.equal(feedback, "Multiple scoped custom commands share /deploy. Use @global, @project, or @session:<selector>.");
 });

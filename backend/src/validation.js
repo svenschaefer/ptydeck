@@ -31,6 +31,7 @@ const THEME_PROFILE_KEYS = [
   "brightWhite"
 ];
 const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
 
 function isThemeProfile(value) {
   if (!isObject(value)) {
@@ -202,7 +203,7 @@ function isWorkspacePreset(value) {
   );
 }
 
-export function validateRequest({ method, pathname, params, body }) {
+export function validateRequest({ method, pathname, params, query, body }) {
   if (method === "POST" && pathname === "/api/v1/sessions") {
     if (body !== undefined && !isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
@@ -364,9 +365,36 @@ export function validateRequest({ method, pathname, params, body }) {
     }
   }
 
+  if (method === "GET" && pathname === "/api/v1/custom-commands") {
+    if (query?.scope !== undefined && !CUSTOM_COMMAND_SCOPE_VALUES.has(query.scope)) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'scope' must be 'global', 'project', or 'session'.");
+    }
+    if (query?.sessionId !== undefined && typeof query.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' must be a string.");
+    }
+    if (query?.scope === "session" && (!query?.sessionId || !query.sessionId.trim())) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is required when 'scope=session'.");
+    }
+    if (query?.scope !== "session" && query?.sessionId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is only allowed when 'scope=session'.");
+    }
+  }
+
   if (method === "GET" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
     if (!params.commandName || typeof params.commandName !== "string") {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
+    }
+    if (query?.scope !== undefined && !CUSTOM_COMMAND_SCOPE_VALUES.has(query.scope)) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'scope' must be 'global', 'project', or 'session'.");
+    }
+    if (query?.sessionId !== undefined && typeof query.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' must be a string.");
+    }
+    if (query?.scope === "session" && (!query?.sessionId || !query.sessionId.trim())) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is required when 'scope=session'.");
+    }
+    if (query?.scope !== "session" && query?.sessionId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is only allowed when 'scope=session'.");
     }
   }
 
@@ -389,6 +417,18 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body.kind !== undefined && body.kind !== "plain" && body.kind !== "template") {
       throw new ApiError(400, "ValidationError", "Field 'kind' must be 'plain' or 'template'.");
     }
+    if (body.scope !== undefined && !CUSTOM_COMMAND_SCOPE_VALUES.has(body.scope)) {
+      throw new ApiError(400, "ValidationError", "Field 'scope' must be 'global', 'project', or 'session'.");
+    }
+    if (body.sessionId !== undefined && typeof body.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'sessionId' must be a string.");
+    }
+    if (body.scope === "session" && (!body.sessionId || !body.sessionId.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'sessionId' is required when 'scope' is 'session'.");
+    }
+    if (body.scope !== undefined && body.scope !== "session" && body.sessionId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Field 'sessionId' is only allowed when 'scope' is 'session'.");
+    }
     if (body.templateVariables !== undefined) {
       if (!Array.isArray(body.templateVariables) || !body.templateVariables.every((entry) => typeof entry === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'templateVariables' must be a string array.");
@@ -399,6 +439,18 @@ export function validateRequest({ method, pathname, params, body }) {
   if (method === "DELETE" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
     if (!params.commandName || typeof params.commandName !== "string") {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
+    }
+    if (query?.scope !== undefined && !CUSTOM_COMMAND_SCOPE_VALUES.has(query.scope)) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'scope' must be 'global', 'project', or 'session'.");
+    }
+    if (query?.sessionId !== undefined && typeof query.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' must be a string.");
+    }
+    if (query?.scope === "session" && (!query?.sessionId || !query.sessionId.trim())) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is required when 'scope=session'.");
+    }
+    if (query?.scope !== "session" && query?.sessionId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'sessionId' is only allowed when 'scope=session'.");
     }
   }
 
@@ -600,6 +652,10 @@ function isCustomCommand(value) {
     typeof value.name === "string" &&
     typeof value.content === "string" &&
     (value.kind === "plain" || value.kind === "template") &&
+    CUSTOM_COMMAND_SCOPE_VALUES.has(value.scope) &&
+    (value.sessionId === null || value.sessionId === undefined || typeof value.sessionId === "string") &&
+    Number.isInteger(value.precedence) &&
+    value.precedence >= 0 &&
     Array.isArray(value.templateVariables) &&
     value.templateVariables.every((entry) => typeof entry === "string") &&
     Number.isInteger(value.createdAt) &&

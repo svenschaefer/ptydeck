@@ -542,12 +542,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/custom",
     kind: "command",
     description: "manage custom commands",
-    example: "/custom show deploy",
+    example: "/custom show @project deploy",
     usage: [
-      "/custom <name> <text>",
-      "/custom template <name> <text>",
-      "/custom <name> + block",
-      "/custom template <name> + block"
+      "/custom [plain|template] [@global|@project|@session:<selector>] <name> <text>",
+      "/custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
     ],
     subcommands: {
       show: {
@@ -555,30 +553,30 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/custom show",
         kind: "subcommand",
         description: "show custom command",
-        example: "/custom show deploy",
+        example: "/custom show @project deploy",
         key: "slash:custom:show",
-        usage: "/custom show <name>",
-        args: [{ provider: "custom-command-name" }]
+        usage: "/custom show [@global|@project|@session:<selector>] <name>",
+        args: [{ provider: "custom-command-reference" }]
       },
       preview: {
         insertText: "preview",
         label: "/custom preview",
         kind: "subcommand",
         description: "preview custom command rendering",
-        example: "/custom preview deploy env=prod -- 7",
+        example: "/custom preview @session:7 deploy env=prod -- 7",
         key: "slash:custom:preview",
-        usage: "/custom preview <name> [key=value ...] [-- <targetSelector>]",
-        args: [{ provider: "custom-command-name" }]
+        usage: "/custom preview [@global|@project|@session:<selector>] <name> [key=value ...] [-- <targetSelector>]",
+        args: [{ provider: "custom-command-reference" }]
       },
       remove: {
         insertText: "remove",
         label: "/custom remove",
         kind: "subcommand",
         description: "delete custom command",
-        example: "/custom remove deploy",
+        example: "/custom remove @project deploy",
         key: "slash:custom:remove",
-        usage: "/custom remove <name>",
-        args: [{ provider: "custom-command-name" }]
+        usage: "/custom remove [@global|@project|@session:<selector>] <name>",
+        args: [{ provider: "custom-command-reference" }]
       }
     }
   }),

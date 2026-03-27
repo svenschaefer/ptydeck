@@ -37,6 +37,13 @@ const DEFAULT_CUSTOM_COMMAND_MAX_NAME_LENGTH = 32;
 const DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH = 8192;
 const CUSTOM_COMMAND_NAME_LOCALE = "en-US";
 const CUSTOM_COMMAND_KIND_VALUES = new Set(["plain", "template"]);
+const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
+const DEFAULT_CUSTOM_COMMAND_SCOPE = "project";
+const CUSTOM_COMMAND_SCOPE_PRECEDENCE = Object.freeze({
+  global: 100,
+  project: 200,
+  session: 300
+});
 const CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 const CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES = new Set([
   "session.id",
@@ -360,6 +367,26 @@ function normalizeCustomCommandKind(value) {
   return CUSTOM_COMMAND_KIND_VALUES.has(normalized) ? normalized : "plain";
 }
 
+function normalizeCustomCommandScope(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return CUSTOM_COMMAND_SCOPE_VALUES.has(normalized) ? normalized : DEFAULT_CUSTOM_COMMAND_SCOPE;
+}
+
+function getCustomCommandPrecedence(scope) {
+  return CUSTOM_COMMAND_SCOPE_PRECEDENCE[scope] || CUSTOM_COMMAND_SCOPE_PRECEDENCE[DEFAULT_CUSTOM_COMMAND_SCOPE];
+}
+
+function normalizeCustomCommandSessionId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function buildCustomCommandKey(name, scope, sessionId) {
+  const normalizedName = normalizeCustomCommandName(name);
+  const normalizedScope = normalizeCustomCommandScope(scope);
+  const normalizedSessionId = normalizedScope === "session" ? normalizeCustomCommandSessionId(sessionId) : "";
+  return `${normalizedScope}:${normalizedSessionId}:${normalizedName}`;
+}
+
 function collectCustomCommandTemplateTokens(content, { strict = true, fieldPath = "content" } = {}) {
   const text = typeof content === "string" ? content : "";
   const tokens = [];
@@ -451,6 +478,28 @@ function buildCustomCommandEntry(name, source, options = {}) {
 
   const content = source.content;
   const kind = normalizeCustomCommandKind(source.kind);
+  const scope = normalizeCustomCommandScope(source.scope);
+  const normalizedSessionId = normalizeCustomCommandSessionId(source.sessionId);
+  if (scope === "session" && !normalizedSessionId) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPathPrefix}.sessionId' must be a non-empty string when '${fieldPathPrefix}.scope' is 'session'.`
+      );
+    }
+    return null;
+  }
+  if (scope !== "session" && normalizedSessionId) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPathPrefix}.sessionId' is only allowed when '${fieldPathPrefix}.scope' is 'session'.`
+      );
+    }
+    return null;
+  }
   const templateVariables = normalizeCustomCommandTemplateVariables(source.templateVariables, {
     strict,
     fieldPath: `${fieldPathPrefix}.templateVariables`
@@ -502,6 +551,9 @@ function buildCustomCommandEntry(name, source, options = {}) {
     name: normalizedName,
     content,
     kind,
+    scope,
+    sessionId: scope === "session" ? normalizedSessionId : null,
+    precedence: getCustomCommandPrecedence(scope),
     templateVariables,
     createdAt:
       Number.isInteger(source.createdAt) && source.createdAt > 0
@@ -518,6 +570,19 @@ function compareCustomCommandEntries(a, b) {
   const nameCompare = a.name.localeCompare(b.name, CUSTOM_COMMAND_NAME_LOCALE, { sensitivity: "base" });
   if (nameCompare !== 0) {
     return nameCompare;
+  }
+  if (a.precedence !== b.precedence) {
+    return b.precedence - a.precedence;
+  }
+  const scopeCompare = String(a.scope || "").localeCompare(String(b.scope || ""), CUSTOM_COMMAND_NAME_LOCALE, { sensitivity: "base" });
+  if (scopeCompare !== 0) {
+    return scopeCompare;
+  }
+  const sessionIdCompare = String(a.sessionId || "").localeCompare(String(b.sessionId || ""), CUSTOM_COMMAND_NAME_LOCALE, {
+    sensitivity: "base"
+  });
+  if (sessionIdCompare !== 0) {
+    return sessionIdCompare;
   }
   if (a.createdAt !== b.createdAt) {
     return a.createdAt - b.createdAt;
@@ -2062,17 +2127,45 @@ export function createRuntime(config) {
     }
   }
 
-  function listCustomCommands() {
-    return Array.from(customCommands.values()).sort(compareCustomCommandEntries);
+  function listCustomCommands({ scope = null, sessionId = null } = {}) {
+    const entries = Array.from(customCommands.values());
+    const filtered = scope
+      ? entries.filter((entry) =>
+          entry.scope === scope && (scope !== "session" || entry.sessionId === normalizeCustomCommandSessionId(sessionId))
+        )
+      : entries;
+    return filtered.sort(compareCustomCommandEntries);
   }
 
-  function getCustomCommandOrThrow(name) {
+  function listCustomCommandsByName(name) {
     const normalizedName = normalizeCustomCommandName(name);
-    const entry = customCommands.get(normalizedName);
-    if (!entry) {
+    return listCustomCommands().filter((entry) => entry.name === normalizedName);
+  }
+
+  function getCustomCommandOrThrow(name, { scope = null, sessionId = null } = {}) {
+    const normalizedName = normalizeCustomCommandName(name);
+    if (!normalizedName) {
       throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
     }
-    return { ...entry };
+    if (scope) {
+      const entry = customCommands.get(buildCustomCommandKey(normalizedName, scope, sessionId));
+      if (!entry) {
+        throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
+      }
+      return { ...entry };
+    }
+    const candidates = listCustomCommandsByName(normalizedName);
+    if (candidates.length === 0) {
+      throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
+    }
+    if (candidates.length > 1) {
+      throw new ApiError(
+        409,
+        "CustomCommandAmbiguous",
+        "Multiple scoped custom commands share this name. Specify scope (and sessionId for session scope)."
+      );
+    }
+    return { ...candidates[0] };
   }
 
   function upsertCustomCommand(name, payload) {
@@ -2094,12 +2187,29 @@ export function createRuntime(config) {
     if (CUSTOM_COMMAND_RESERVED_NAMES.has(normalizedName)) {
       throw new ApiError(409, "CustomCommandNameReserved", "Custom command name collides with a system command.");
     }
-    const current = customCommands.get(normalizedName);
-    const next = buildCustomCommandEntry(normalizedName, payload, {
+    const nextInput = {
+      ...payload,
+      name: normalizedName
+    };
+    const nextScope = normalizeCustomCommandScope(nextInput.scope);
+    const nextSessionId = nextScope === "session" ? normalizeCustomCommandSessionId(nextInput.sessionId) : "";
+    if (nextScope === "session") {
+      ensureSessionExistsOrThrow(nextSessionId);
+    }
+    const current = customCommands.get(buildCustomCommandKey(normalizedName, nextScope, nextSessionId));
+    const next = buildCustomCommandEntry(normalizedName, nextInput, {
       strict: true,
       fieldPathPrefix: "body",
       currentEntry: current
     });
+    const existingSameName = listCustomCommandsByName(normalizedName);
+    if (existingSameName.some((entry) => entry.kind !== next.kind)) {
+      throw new ApiError(
+        409,
+        "CustomCommandKindConflict",
+        "Scoped custom commands sharing the same name must use the same kind."
+      );
+    }
     if (next.content.length > customCommandMaxContentLength) {
       throw new ApiError(
         400,
@@ -2107,29 +2217,49 @@ export function createRuntime(config) {
         `Custom command content exceeds maximum length (${customCommandMaxContentLength}).`
       );
     }
-    if (!customCommands.has(normalizedName) && customCommands.size >= customCommandMaxCount) {
+    const nextKey = buildCustomCommandKey(normalizedName, next.scope, next.sessionId);
+    if (!customCommands.has(nextKey) && customCommands.size >= customCommandMaxCount) {
       throw new ApiError(
         409,
         "CustomCommandLimitExceeded",
         `Custom command limit reached (${customCommandMaxCount}).`
       );
     }
-    customCommands.set(normalizedName, next);
+    customCommands.set(nextKey, next);
     return { ...next };
   }
 
-  function deleteCustomCommand(name) {
-    const normalizedName = normalizeCustomCommandName(name);
-    const existing = customCommands.get(normalizedName);
-    if (!existing) {
+  function deleteCustomCommand(name, { scope = null, sessionId = null } = {}) {
+    const existing = getCustomCommandOrThrow(name, { scope, sessionId });
+    const key = buildCustomCommandKey(existing.name, existing.scope, existing.sessionId);
+    if (!customCommands.has(key)) {
       throw new ApiError(404, "CustomCommandNotFound", "Custom command not found.");
     }
-    customCommands.delete(normalizedName);
+    customCommands.delete(key);
     return { ...existing };
   }
 
-  function hasCustomCommand(name) {
-    return customCommands.has(normalizeCustomCommandName(name));
+  function hasCustomCommand(name, { scope = null, sessionId = null } = {}) {
+    if (!scope) {
+      return listCustomCommandsByName(name).length > 0;
+    }
+    return customCommands.has(buildCustomCommandKey(name, scope, sessionId));
+  }
+
+  function removeCustomCommandsForSession(sessionId) {
+    const normalizedSessionId = normalizeCustomCommandSessionId(sessionId);
+    if (!normalizedSessionId) {
+      return [];
+    }
+    const deleted = [];
+    for (const [key, entry] of customCommands.entries()) {
+      if (entry.scope === "session" && entry.sessionId === normalizedSessionId) {
+        deleted.push({ ...entry });
+        customCommands.delete(key);
+      }
+    }
+    deleted.sort(compareCustomCommandEntries);
+    return deleted;
   }
 
   function toApiDeck(deck) {
@@ -3164,6 +3294,7 @@ function tryCreateRestoredSession({
         method: req.method || "GET",
         pathname: parsedUrl.pathname,
         params,
+        query: Object.fromEntries(parsedUrl.searchParams.entries()),
         body
       });
       ensureTlsIngress(requestContext);
@@ -3230,21 +3361,36 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "listCustomCommands") {
-        const payload = listCustomCommands();
+        const scope = parsedUrl.searchParams.get("scope");
+        const sessionId = parsedUrl.searchParams.get("sessionId");
+        const payload = listCustomCommands({
+          scope: scope ? normalizeCustomCommandScope(scope) : null,
+          sessionId
+        });
         validateResponse({ statusCode: 200, body: payload, expect: "customCommandList" });
         writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "getCustomCommand") {
-        const payload = getCustomCommandOrThrow(match.params.commandName);
+        const scope = parsedUrl.searchParams.get("scope");
+        const sessionId = parsedUrl.searchParams.get("sessionId");
+        const payload = getCustomCommandOrThrow(match.params.commandName, {
+          scope: scope ? normalizeCustomCommandScope(scope) : null,
+          sessionId
+        });
         validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
         writeJson(req, res, 200, payload);
         return;
       }
 
       if (match.kind === "upsertCustomCommand") {
-        const existed = hasCustomCommand(match.params.commandName);
+        const targetScope = normalizeCustomCommandScope(body?.scope);
+        const targetSessionId = targetScope === "session" ? normalizeCustomCommandSessionId(body?.sessionId) : "";
+        const existed = hasCustomCommand(match.params.commandName, {
+          scope: targetScope,
+          sessionId: targetSessionId
+        });
         const payload = upsertCustomCommand(match.params.commandName, body);
         validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
         broadcast({
@@ -3257,7 +3403,12 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "deleteCustomCommand") {
-        const deletedCommand = deleteCustomCommand(match.params.commandName);
+        const scope = parsedUrl.searchParams.get("scope");
+        const sessionId = parsedUrl.searchParams.get("sessionId");
+        const deletedCommand = deleteCustomCommand(match.params.commandName, {
+          scope: scope ? normalizeCustomCommandScope(scope) : null,
+          sessionId
+        });
         broadcast({
           type: "custom-command.deleted",
           command: deletedCommand
@@ -3464,6 +3615,12 @@ function tryCreateRestoredSession({
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
+        for (const deletedCommand of removeCustomCommandsForSession(match.params.sessionId)) {
+          broadcast({
+            type: "custom-command.deleted",
+            command: deletedCommand
+          });
+        }
         cleanupLayoutProfiles();
         cleanupWorkspacePresets();
         await persistNow("session.delete");
@@ -3960,14 +4117,22 @@ function tryCreateRestoredSession({
     }
     restoreCandidates.sort(compareCustomCommandEntries);
     for (const candidate of restoreCandidates) {
-      if (customCommands.has(candidate.name)) {
-        customCommands.set(candidate.name, candidate);
+      if (candidate.scope === "session") {
+        try {
+          ensureSessionExistsOrThrow(candidate.sessionId);
+        } catch {
+          continue;
+        }
+      }
+      const key = buildCustomCommandKey(candidate.name, candidate.scope, candidate.sessionId);
+      if (customCommands.has(key)) {
+        customCommands.set(key, candidate);
         continue;
       }
       if (customCommands.size >= customCommandMaxCount) {
         continue;
       }
-      customCommands.set(candidate.name, candidate);
+      customCommands.set(key, candidate);
     }
     for (const persistedWorkspacePreset of Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets : []) {
       const normalizedPreset = normalizeWorkspacePresetEntity(persistedWorkspacePreset, { strict: false });

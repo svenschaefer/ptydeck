@@ -1,6 +1,11 @@
 import { createSlashCommandSchema } from "./command-schema.js";
 import { rankDiscoveryItems } from "./command-discovery-ranking.js";
-import { formatCustomCommandDetail, normalizeCustomCommandRecord } from "./custom-command-model.js";
+import {
+  compareCustomCommandRecords,
+  formatCustomCommandDetail,
+  formatCustomCommandScopeLabel,
+  normalizeCustomCommandRecord
+} from "./custom-command-model.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -40,23 +45,45 @@ function createCommandEntry(definition, index) {
   });
 }
 
-function createCustomCommandEntry(command, index) {
-  const custom = normalizeCustomCommandRecord(command);
-  if (!custom) {
+function createCustomCommandEntry(commandGroup, index, options = {}) {
+  const entries = (Array.isArray(commandGroup) ? commandGroup : [])
+    .map((command) => normalizeCustomCommandRecord(command))
+    .filter(Boolean)
+    .sort(compareCustomCommandRecords);
+  const custom = entries[0] || null;
+  if (!custom || !custom.name) {
     return null;
   }
   const name = custom.name;
   const content = formatCustomCommandDetail(custom);
+  const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
+  const formatSessionToken =
+    typeof options.formatSessionToken === "function" ? options.formatSessionToken : (sessionId) => String(sessionId || "").slice(0, 8);
+  const formatSessionDisplayName =
+    typeof options.formatSessionDisplayName === "function"
+      ? options.formatSessionDisplayName
+      : (session) => String(session?.name || session?.id || "");
+  const scopeSummary = entries
+    .map((entry) =>
+      formatCustomCommandScopeLabel(entry, {
+        getSessionById,
+        formatSessionToken,
+        formatSessionDisplayName
+      })
+    )
+    .filter(Boolean)
+    .join(" · ");
   return Object.freeze({
     key: `palette-custom:${name}`,
     group: "commands",
     kind: "custom-command",
     order: 10_000 + index,
     title: `/${name}`,
-    subtitle: custom.kind === "template" ? "Saved template command" : "Saved custom command",
+    subtitle:
+      `${custom.kind === "template" ? "Saved template command" : "Saved custom command"}${scopeSummary ? ` · ${scopeSummary}` : ""}`,
     detail: content,
     commandText: `/${name}`,
-    searchText: joinSearchParts([`/${name}`, content, custom.kind, "custom command saved command"])
+    searchText: joinSearchParts([`/${name}`, content, custom.kind, scopeSummary, "custom command saved command"])
   });
 }
 
@@ -159,9 +186,25 @@ export function buildCommandPaletteEntries(options = {}) {
 
   const commandEntries = createSlashCommandSchema(systemSlashCommands).map((entry, index) => createCommandEntry(entry, index));
   const customEntries = customCommands
-    .slice()
-    .sort((left, right) => normalizeLower(left?.name).localeCompare(normalizeLower(right?.name), "en-US", { sensitivity: "base" }))
-    .map((entry, index) => createCustomCommandEntry(entry, index))
+    .reduce((map, entry) => {
+      const custom = normalizeCustomCommandRecord(entry);
+      if (!custom) {
+        return map;
+      }
+      const list = map.get(custom.name) || [];
+      list.push(custom);
+      map.set(custom.name, list);
+      return map;
+    }, new Map());
+  const customEntriesArray = Array.from(customEntries.entries())
+    .sort((left, right) => left[0].localeCompare(right[0], "en-US", { sensitivity: "base" }))
+    .map(([, entries], index) =>
+      createCustomCommandEntry(entries, index, {
+        getSessionById: (sessionId) => sessions.find((session) => normalizeText(session?.id) === normalizeText(sessionId)) || null,
+        formatSessionToken,
+        formatSessionDisplayName
+      })
+    )
     .filter(Boolean);
   const sessionEntries = sessions
     .map((session) =>
@@ -179,7 +222,7 @@ export function buildCommandPaletteEntries(options = {}) {
     .filter(Boolean)
     .sort((left, right) => compareSortTuples(left.sortTuple || [], right.sortTuple || []));
 
-  return Object.freeze([...commandEntries, ...customEntries, ...sessionEntries, ...deckEntries]);
+  return Object.freeze([...commandEntries, ...customEntriesArray, ...sessionEntries, ...deckEntries]);
 }
 
 export function filterCommandPaletteEntries(entries = [], query = "", options = {}) {

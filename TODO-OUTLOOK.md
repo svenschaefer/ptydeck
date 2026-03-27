@@ -73,10 +73,11 @@ Promoted and completed in `v0.4.0-H21`:
 - [ ] Add plugin interface for project-specific automations.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
-- [ ] Add command-language namespaces and scriptability (for example `/session.new`, `/system.restart`).
+- Promoted to active delivery (`v0.4.0-H33` in `TODO.md` / `ROADMAP.md`):
+  - `CMD-010`, `CMD-011`, `CMD-012`
 - Promoted and completed in `v0.4.0-H30`:
   - `CMD-001`, `CMD-002`, `CMD-003`
-- Promoted to active delivery (`v0.4.0-H32` in `TODO.md` / `ROADMAP.md`):
+- Promoted and completed in `v0.4.0-H32`:
   - `CMD-007`, `CMD-008`, `CMD-009`
 - Promoted and completed in `v0.4.0-H31`:
   - `CMD-004`, `CMD-005`, `CMD-006`

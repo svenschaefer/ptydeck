@@ -18,6 +18,23 @@ function withJson(body) {
   };
 }
 
+function appendCustomCommandScopeQuery(path, options = {}) {
+  const scope = typeof options.scope === "string" ? options.scope.trim() : "";
+  const sessionId = typeof options.sessionId === "string" ? options.sessionId.trim() : "";
+  if (!scope && !sessionId) {
+    return path;
+  }
+  const search = new URLSearchParams();
+  if (scope) {
+    search.set("scope", scope);
+  }
+  if (sessionId) {
+    search.set("sessionId", sessionId);
+  }
+  const query = search.toString();
+  return query ? `${path}?${query}` : path;
+}
+
 async function parseJsonSafe(response) {
   try {
     return await response.json();
@@ -299,14 +316,18 @@ export function createApiClient(baseUrl, options = {}) {
         body: JSON.stringify(body)
       });
     },
-    async listCustomCommands() {
-      return request("/custom-commands");
+    async listCustomCommands(options = {}) {
+      return request(appendCustomCommandScopeQuery("/custom-commands", options));
     },
-    async getCustomCommand(commandName) {
-      return request(`/custom-commands/${encodeURIComponent(commandName)}`);
+    async getCustomCommand(commandName, options = {}) {
+      return request(appendCustomCommandScopeQuery(`/custom-commands/${encodeURIComponent(commandName)}`, options));
     },
-    async deleteCustomCommand(commandName) {
-      await request(`/custom-commands/${encodeURIComponent(commandName)}`, { method: "DELETE" }, { expectJson: false });
+    async deleteCustomCommand(commandName, options = {}) {
+      await request(
+        appendCustomCommandScopeQuery(`/custom-commands/${encodeURIComponent(commandName)}`, options),
+        { method: "DELETE" },
+        { expectJson: false }
+      );
     }
   };
 }

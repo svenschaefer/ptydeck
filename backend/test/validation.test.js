@@ -237,6 +237,25 @@ test("validateRequest accepts valid custom command upsert payload", () => {
         templateVariables: ["session.cwd"]
       }
     });
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/deploy",
+      params: { commandName: "deploy" },
+      body: {
+        content: "echo session\n",
+        scope: "session",
+        sessionId: "session-1"
+      }
+    });
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands/deploy",
+      params: { commandName: "deploy" },
+      query: {
+        scope: "session",
+        sessionId: "session-1"
+      }
+    });
   });
 });
 
@@ -265,6 +284,22 @@ test("validateRequest rejects invalid custom command upsert payload", () => {
       body: { content: "echo hi\n", templateVariables: "session.cwd" }
     });
   });
+  assert.throws(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: { content: "echo hi\n", scope: "session" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      query: { sessionId: "session-1" }
+    });
+  });
 });
 
 test("validateResponse accepts custom command payloads", () => {
@@ -276,6 +311,9 @@ test("validateResponse accepts custom command payloads", () => {
         name: "docu",
         content: "echo hi\n",
         kind: "plain",
+        scope: "project",
+        sessionId: null,
+        precedence: 200,
         templateVariables: [],
         createdAt: 1,
         updatedAt: 2
@@ -289,6 +327,9 @@ test("validateResponse accepts custom command payloads", () => {
           name: "docu",
           content: "echo hi\n",
           kind: "template",
+          scope: "session",
+          sessionId: "session-1",
+          precedence: 300,
           templateVariables: ["session.cwd"],
           createdAt: 1,
           updatedAt: 2

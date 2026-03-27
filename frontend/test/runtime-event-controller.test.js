@@ -126,7 +126,7 @@ test("runtime-event controller applies representative runtime updates and deck f
     ["preview"],
     ["suggestions"],
     ["clearError"],
-    ["commandDeleted", "go"],
+    ["commandDeleted", { name: "go" }],
     ["preview"],
     ["suggestions"],
     ["clearError"]

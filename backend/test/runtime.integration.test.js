@@ -449,6 +449,9 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     assert.equal(putPayload.name, "docu");
     assert.equal(putPayload.content, "echo DOCU_A\n");
     assert.equal(putPayload.kind, "plain");
+    assert.equal(putPayload.scope, "project");
+    assert.equal(putPayload.sessionId, null);
+    assert.equal(putPayload.precedence, 200);
     assert.deepEqual(putPayload.templateVariables, []);
     assert.equal(Number.isInteger(putPayload.createdAt), true);
     assert.equal(Number.isInteger(putPayload.updatedAt), true);
@@ -459,6 +462,9 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     assert.equal(listed.length, 1);
     assert.equal(listed[0].name, "docu");
     assert.equal(listed[0].kind, "plain");
+    assert.equal(listed[0].scope, "project");
+    assert.equal(listed[0].sessionId, null);
+    assert.equal(listed[0].precedence, 200);
     assert.deepEqual(listed[0].templateVariables, []);
 
     const overwriteRes = await fetch(`${baseUrlA}/custom-commands/docu`, {
@@ -471,6 +477,9 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     assert.equal(overwritePayload.name, "docu");
     assert.equal(overwritePayload.content, "echo DOCU_B\n");
     assert.equal(overwritePayload.kind, "plain");
+    assert.equal(overwritePayload.scope, "project");
+    assert.equal(overwritePayload.sessionId, null);
+    assert.equal(overwritePayload.precedence, 200);
     assert.deepEqual(overwritePayload.templateVariables, []);
     assert.equal(overwritePayload.createdAt, putPayload.createdAt);
     assert.ok(overwritePayload.updatedAt >= putPayload.updatedAt);
@@ -496,6 +505,9 @@ test("custom command endpoints work end-to-end and persist across restart", asyn
     assert.equal(payload.name, "docu");
     assert.equal(payload.content, "echo DOCU_B\n");
     assert.equal(payload.kind, "plain");
+    assert.equal(payload.scope, "project");
+    assert.equal(payload.sessionId, null);
+    assert.equal(payload.precedence, 200);
     assert.deepEqual(payload.templateVariables, []);
 
     const deleteRes = await fetch(`${baseUrlB}/custom-commands/docu`, { method: "DELETE" });
@@ -530,6 +542,8 @@ test("custom command endpoints persist template commands with validated built-in
     assert.equal(plainLiteralRes.status, 200);
     const plainLiteralPayload = await plainLiteralRes.json();
     assert.equal(plainLiteralPayload.kind, "plain");
+    assert.equal(plainLiteralPayload.scope, "project");
+    assert.equal(plainLiteralPayload.precedence, 200);
     assert.deepEqual(plainLiteralPayload.templateVariables, []);
 
     const putRes = await fetch(`${baseUrlA}/custom-commands/deploy`, {
@@ -545,6 +559,9 @@ test("custom command endpoints persist template commands with validated built-in
     const payload = await putRes.json();
     assert.equal(payload.name, "deploy");
     assert.equal(payload.kind, "template");
+    assert.equal(payload.scope, "project");
+    assert.equal(payload.sessionId, null);
+    assert.equal(payload.precedence, 200);
     assert.deepEqual(payload.templateVariables, ["session.cwd"]);
 
     const invalidRes = await fetch(`${baseUrlA}/custom-commands/bad`, {
@@ -579,6 +596,9 @@ test("custom command endpoints persist template commands with validated built-in
     assert.equal(getRes.status, 200);
     const payload = await getRes.json();
     assert.equal(payload.kind, "template");
+    assert.equal(payload.scope, "project");
+    assert.equal(payload.sessionId, null);
+    assert.equal(payload.precedence, 200);
     assert.deepEqual(payload.templateVariables, ["session.cwd"]);
   } finally {
     await runtimeB.stop();
@@ -598,6 +618,9 @@ test("custom command names normalize deterministically and list order is stable"
     const firstPutBody = await firstPutRes.json();
     assert.equal(firstPutBody.name, "docu");
     assert.equal(firstPutBody.kind, "plain");
+    assert.equal(firstPutBody.scope, "project");
+    assert.equal(firstPutBody.sessionId, null);
+    assert.equal(firstPutBody.precedence, 200);
     assert.deepEqual(firstPutBody.templateVariables, []);
 
     const secondPutRes = await fetch(`${baseUrl}/custom-commands/docu`, {
@@ -631,6 +654,9 @@ test("custom command names normalize deterministically and list order is stable"
     assert.equal(getUpperBody.name, "docu");
     assert.equal(getUpperBody.content, "echo B\n");
     assert.equal(getUpperBody.kind, "plain");
+    assert.equal(getUpperBody.scope, "project");
+    assert.equal(getUpperBody.sessionId, null);
+    assert.equal(getUpperBody.precedence, 200);
     assert.deepEqual(getUpperBody.templateVariables, []);
 
     const listRes = await fetch(`${baseUrl}/custom-commands`);
@@ -645,6 +671,140 @@ test("custom command names normalize deterministically and list order is stable"
       method: "DELETE"
     });
     assert.equal(deleteMixedCaseRes.status, 204);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("custom command scopes expose deterministic precedence, exact selectors, and session cleanup", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "scope-target" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    const globalRes = await fetch(`${baseUrl}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo GLOBAL\n", scope: "global" })
+    });
+    assert.equal(globalRes.status, 200);
+    const globalBody = await globalRes.json();
+    assert.equal(globalBody.scope, "global");
+    assert.equal(globalBody.sessionId, null);
+    assert.equal(globalBody.precedence, 100);
+
+    const projectRes = await fetch(`${baseUrl}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo PROJECT\n" })
+    });
+    assert.equal(projectRes.status, 200);
+    const projectBody = await projectRes.json();
+    assert.equal(projectBody.scope, "project");
+    assert.equal(projectBody.sessionId, null);
+    assert.equal(projectBody.precedence, 200);
+
+    const sessionRes = await fetch(`${baseUrl}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo SESSION\n",
+        scope: "session",
+        sessionId: createdSession.id
+      })
+    });
+    assert.equal(sessionRes.status, 200);
+    const sessionBody = await sessionRes.json();
+    assert.equal(sessionBody.scope, "session");
+    assert.equal(sessionBody.sessionId, createdSession.id);
+    assert.equal(sessionBody.precedence, 300);
+
+    const conflictingKindRes = await fetch(`${baseUrl}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo {{param:env}}\n",
+        kind: "template",
+        templateVariables: [],
+        scope: "session",
+        sessionId: createdSession.id
+      })
+    });
+    assert.equal(conflictingKindRes.status, 409);
+    const conflictingKindBody = await conflictingKindRes.json();
+    assert.equal(conflictingKindBody.error, "CustomCommandKindConflict");
+
+    const listRes = await fetch(`${baseUrl}/custom-commands`);
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.equal(listed.length, 3);
+    assert.deepEqual(
+      listed.map((entry) => [entry.name, entry.scope, entry.sessionId, entry.precedence]),
+      [
+        ["deploy", "session", createdSession.id, 300],
+        ["deploy", "project", null, 200],
+        ["deploy", "global", null, 100]
+      ]
+    );
+
+    const filteredSessionListRes = await fetch(
+      `${baseUrl}/custom-commands?scope=session&sessionId=${encodeURIComponent(createdSession.id)}`
+    );
+    assert.equal(filteredSessionListRes.status, 200);
+    const filteredSessionList = await filteredSessionListRes.json();
+    assert.equal(filteredSessionList.length, 1);
+    assert.equal(filteredSessionList[0].scope, "session");
+    assert.equal(filteredSessionList[0].sessionId, createdSession.id);
+
+    const ambiguousGetRes = await fetch(`${baseUrl}/custom-commands/deploy`);
+    assert.equal(ambiguousGetRes.status, 409);
+    const ambiguousGetBody = await ambiguousGetRes.json();
+    assert.equal(ambiguousGetBody.error, "CustomCommandAmbiguous");
+
+    const exactSessionGetRes = await fetch(
+      `${baseUrl}/custom-commands/deploy?scope=session&sessionId=${encodeURIComponent(createdSession.id)}`
+    );
+    assert.equal(exactSessionGetRes.status, 200);
+    const exactSessionGetBody = await exactSessionGetRes.json();
+    assert.equal(exactSessionGetBody.content, "echo SESSION\n");
+    assert.equal(exactSessionGetBody.scope, "session");
+
+    const missingSessionScopedRes = await fetch(`${baseUrl}/custom-commands/deploy`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo BAD\n",
+        scope: "session",
+        sessionId: "missing-session"
+      })
+    });
+    assert.equal(missingSessionScopedRes.status, 404);
+    const missingSessionScopedBody = await missingSessionScopedRes.json();
+    assert.equal(missingSessionScopedBody.error, "SessionNotFound");
+
+    const deleteGlobalRes = await fetch(`${baseUrl}/custom-commands/deploy?scope=global`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteGlobalRes.status, 204);
+
+    const deleteSessionRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteSessionRes.status, 204);
+
+    const postDeleteListRes = await fetch(`${baseUrl}/custom-commands`);
+    assert.equal(postDeleteListRes.status, 200);
+    const postDeleteList = await postDeleteListRes.json();
+    assert.deepEqual(
+      postDeleteList.map((entry) => [entry.name, entry.scope]),
+      [["deploy", "project"]]
+    );
   } finally {
     await runtime.stop();
   }
@@ -709,6 +869,51 @@ test("custom command guardrails reject reserved names, invalid names, oversized 
     assert.equal(overflowRes.status, 409);
     const overflowBody = await overflowRes.json();
     assert.equal(overflowBody.error, "CustomCommandLimitExceeded");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("legacy persisted custom commands migrate to project scope on restore", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-custom-legacy-"));
+  const dataPath = join(dir, "sessions.json");
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [],
+        sessionOutputs: [],
+        customCommands: [
+          {
+            name: "docu",
+            content: "echo LEGACY\n",
+            kind: "plain",
+            templateVariables: [],
+            createdAt: 1,
+            updatedAt: 2
+          }
+        ],
+        decks: [],
+        layoutProfiles: [],
+        workspacePresets: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const { runtime, baseUrl } = await createStartedRuntime({ dataPath });
+
+  try {
+    const listRes = await fetch(`${baseUrl}/custom-commands`);
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0].name, "docu");
+    assert.equal(listed[0].scope, "project");
+    assert.equal(listed[0].sessionId, null);
+    assert.equal(listed[0].precedence, 200);
   } finally {
     await runtime.stop();
   }

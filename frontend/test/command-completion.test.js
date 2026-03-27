@@ -77,3 +77,30 @@ test("suggestion provider registry yields bounded contextual candidates and isol
   assert.ok(registry.provide("session-selector", "").length <= 48);
   assert.deepEqual(registry.provide("failing", ""), []);
 });
+
+test("suggestion provider registry exposes scoped custom-command references deterministically", () => {
+  const sessions = [
+    { id: "s1", name: "alpha", deckId: "default" },
+    { id: "s2", name: "beta", deckId: "ops" }
+  ];
+  const registry = createSuggestionProviderRegistry({
+    getSessions: () => sessions,
+    listCustomCommands: () => [
+      { name: "deploy", content: "echo global", scope: "global" },
+      { name: "deploy", content: "echo project", scope: "project" },
+      { name: "deploy", content: "echo beta", scope: "session", sessionId: "s2" },
+      { name: "sync", content: "echo sync", scope: "project" }
+    ],
+    getSessionToken: (id) => (id === "s1" ? "1" : "2"),
+    getSessionDisplayName: (session) => session.name
+  });
+
+  const refs = registry.provide("custom-command-reference", "d");
+  assert.deepEqual(
+    refs.map((candidate) => candidate.insertText),
+    ["@global deploy", "@project deploy", "@session:2 deploy"]
+  );
+
+  const unique = registry.provide("custom-command-reference", "sy");
+  assert.equal(unique[0]?.insertText, "sync");
+});

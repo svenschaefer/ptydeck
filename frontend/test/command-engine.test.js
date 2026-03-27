@@ -69,6 +69,8 @@ test("command engine parses custom block definitions", () => {
     content: "echo hi",
     mode: "block",
     kind: "plain",
+    scope: "project",
+    sessionSelector: "",
     templateVariables: [],
     parameters: []
   });
@@ -84,6 +86,8 @@ test("command engine parses explicit template custom definitions and invocations
     content: "echo {{param:env}} {{var:session.cwd}}",
     mode: "inline",
     kind: "template",
+    scope: "project",
+    sessionSelector: "",
     templateVariables: ["session.cwd"],
     parameters: ["env"]
   });
@@ -113,7 +117,8 @@ test("command engine derives schema-backed size and custom usage errors", () => 
 
   assert.deepEqual(engine.parseCustomDefinition("/custom"), {
     ok: false,
-    error: "Usage: /custom <name> <text> | /custom template <name> <text> | /custom <name> + block | /custom template <name> + block"
+    error:
+      "Usage: /custom [plain|template] [@global|@project|@session:<selector>] <name> <text> | /custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
   });
 });
 

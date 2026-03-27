@@ -175,6 +175,25 @@ test("command palette filtering keeps group order, supports fuzzy matches, and p
   );
 });
 
+test("buildCommandPaletteEntries aggregates scoped custom commands into one entry with scope summary", () => {
+  const entries = buildCommandPaletteEntries({
+    systemSlashCommands: [],
+    customCommands: [
+      { name: "deploy", content: "echo global", scope: "global" },
+      { name: "deploy", content: "echo project", scope: "project" },
+      { name: "deploy", content: "echo beta", scope: "session", sessionId: "s-2" }
+    ],
+    sessions: [{ id: "s-2", name: "beta", deckId: "ops" }],
+    decks: [],
+    formatSessionToken: () => "2",
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  const customEntry = entries.find((entry) => entry.title === "/deploy");
+  assert.ok(customEntry);
+  assert.match(customEntry.subtitle, /Saved custom command · session \[2\] beta · project · global/);
+});
+
 test("command palette opens from the global shortcut and fills the composer for command picks", () => {
   const win = createWindowStub();
   const dialogEl = createElement("dialog");

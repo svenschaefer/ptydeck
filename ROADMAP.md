@@ -12,8 +12,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
-- Active scoped tasks: `CMD-007`, `CMD-008`, `CMD-009`.
+- Active release wave: `v0.4.0-H33` (Command Namespaces and Scriptability, `CMD-010`, `CMD-011`, `CMD-012`).
+- Active scoped tasks: `CMD-010`, `CMD-011`, `CMD-012`.
+- Latest completed wave: `v0.4.0-H32` (Scoped Custom-Command Sets, `CMD-007`, `CMD-008`, `CMD-009`).
 - Latest completed wave: `v0.4.0-H31` (Fuzzy and Personalized Command Suggestions, `CMD-004`, `CMD-005`, `CMD-006`).
 - Latest completed wave: `v0.4.0-H30` (Parameterized Custom Command Templates, `CMD-001`, `CMD-002`, `CMD-003`).
 - Latest completed wave: `v0.4.0-H29` (Control-Plane and Execution-Plane Separation, `UX-014`, `UX-015`, `UX-016`).
@@ -48,15 +49,34 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H32 - Scoped Custom-Command Sets (Active)
+### v0.4.0-H33 - Command Namespaces and Scriptability (Active)
 
-- Active scoped tasks: `CMD-007`, `CMD-008`, `CMD-009`
+- Active scoped tasks: `CMD-010`, `CMD-011`, `CMD-012`
 
 Dependencies:
 
-- `CMD-007` establishes the persisted scoped-command contract first so command scope and precedence are stored in the backend custom-command model instead of becoming a second frontend-only overlay.
-- `CMD-008` follows `CMD-007` and reuses that contract for slash-command, preview, autocomplete, and command-palette behavior, while keeping backward-compatible unscoped commands deterministic under the new precedence rules.
-- `CMD-009` closes after `CMD-007` and `CMD-008`, so regression coverage spans migration, scope visibility, precedence ordering, session binding, and execution behavior end to end.
+- `CMD-010` establishes deterministic namespaced aliases first so the command plane has one canonical registry of short names plus explicit domain-prefixed forms before any multi-command scripting is layered on top.
+- `CMD-011` follows `CMD-010` and reuses that alias registry for sequential slash-command script execution, avoiding a second parser or executor path for scripted command-plane automation.
+- `CMD-012` closes after `CMD-010` and `CMD-011`, so regression coverage spans alias resolution, help/autocomplete/palette surfacing, backward compatibility, and stop-on-failure multi-command execution behavior end to end.
+
+Exit criteria:
+
+- The slash-command plane supports explicit domain-prefixed aliases for the existing command families without breaking current short-form command usage.
+- Help, autocomplete, and the command palette expose the new namespaced command forms deterministically while keeping short forms available.
+- The frontend can execute a deterministic sequential command-plane script from one composer submission, short-circuiting on failure and reporting concise aggregated results without mixing slash-command scripting with PTY input semantics.
+- Regression coverage exists for alias resolution, backward compatibility, and command-script execution behavior.
+
+## Latest Completed Wave
+
+### v0.4.0-H32 - Scoped Custom-Command Sets (Completed)
+
+- `CMD-007`, `CMD-008`, `CMD-009`
+
+Dependencies:
+
+- `CMD-007` established the persisted scoped-command contract first so command scope and precedence are stored in the backend custom-command model instead of becoming a second frontend-only overlay.
+- `CMD-008` followed `CMD-007` and reused that contract for slash-command, preview, autocomplete, and command-palette behavior, while keeping backward-compatible unscoped commands deterministic under the new precedence rules.
+- `CMD-009` closed after `CMD-007` and `CMD-008`, so regression coverage now spans migration, scope visibility, precedence ordering, session binding, and execution behavior end to end.
 
 Exit criteria:
 
@@ -64,7 +84,7 @@ Exit criteria:
 - Frontend command surfaces can create, show, list, preview, autocomplete, and execute scoped custom commands while exposing scope clearly and resolving precedence deterministically.
 - Regression coverage exists for migration/backward compatibility, scope visibility, precedence resolution, and execution-time behavior across REST and frontend command flows.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H31 - Fuzzy and Personalized Command Suggestions (Completed)
 

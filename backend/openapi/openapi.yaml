@@ -72,6 +72,9 @@ paths:
     get:
       operationId: listCustomCommands
       summary: List persisted custom commands.
+      parameters:
+        - $ref: '#/components/parameters/customCommandScope'
+        - $ref: '#/components/parameters/customCommandSessionId'
       responses:
         '200':
           description: Custom command list
@@ -89,6 +92,9 @@ paths:
     get:
       operationId: getCustomCommand
       summary: Get custom command by name.
+      parameters:
+        - $ref: '#/components/parameters/customCommandScope'
+        - $ref: '#/components/parameters/customCommandSessionId'
       responses:
         '200':
           description: Custom command found
@@ -98,6 +104,12 @@ paths:
                 $ref: '#/components/schemas/CustomCommand'
         '404':
           description: Custom command not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Custom command name resolves to multiple scoped commands
           content:
             application/json:
               schema:
@@ -137,11 +149,20 @@ paths:
     delete:
       operationId: deleteCustomCommand
       summary: Delete custom command by name.
+      parameters:
+        - $ref: '#/components/parameters/customCommandScope'
+        - $ref: '#/components/parameters/customCommandSessionId'
       responses:
         '204':
           description: Custom command deleted
         '404':
           description: Custom command not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Custom command name resolves to multiple scoped commands
           content:
             application/json:
               schema:
@@ -751,6 +772,22 @@ components:
       required: true
       schema:
         type: string
+    customCommandScope:
+      name: scope
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+          - global
+          - project
+          - session
+    customCommandSessionId:
+      name: sessionId
+      in: query
+      required: false
+      schema:
+        type: string
     deckId:
       name: deckId
       in: path
@@ -1190,6 +1227,8 @@ components:
         - name
         - content
         - kind
+        - scope
+        - precedence
         - templateVariables
         - createdAt
         - updatedAt
@@ -1203,6 +1242,18 @@ components:
           enum:
             - plain
             - template
+        scope:
+          type: string
+          enum:
+            - global
+            - project
+            - session
+        sessionId:
+          type: string
+          nullable: true
+        precedence:
+          type: integer
+          minimum: 0
         templateVariables:
           type: array
           items:
@@ -1223,6 +1274,14 @@ components:
           enum:
             - plain
             - template
+        scope:
+          type: string
+          enum:
+            - global
+            - project
+            - session
+        sessionId:
+          type: string
         templateVariables:
           type: array
           items:

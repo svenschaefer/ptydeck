@@ -1121,13 +1121,17 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         commandName,
         content: body.content,
         kind: body.kind || "plain",
-        templateVariables: Array.isArray(body.templateVariables) ? body.templateVariables : []
+        templateVariables: Array.isArray(body.templateVariables) ? body.templateVariables : [],
+        scope: body.scope || "project",
+        sessionId: body.sessionId || null
       });
       const next = {
         name: commandName,
         content: body.content,
         kind: body.kind || "plain",
         templateVariables: Array.isArray(body.templateVariables) ? body.templateVariables : [],
+        scope: body.scope || "project",
+        sessionId: body.sessionId || null,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -1229,9 +1233,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "docu",
     content: "echo verify",
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /docu (inline).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /docu (inline · project).");
 
   fixture.elements.commandInput.value = "/custom blockcmd\n---\nline 1\nline 2\n---";
   fixture.elements.sendCommand.click();
@@ -1241,9 +1247,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "blockcmd",
     content: "line 1\nline 2",
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /blockcmd (block).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /blockcmd (block · project).");
 
   fixture.elements.commandInput.value = "/custom closeit echo close";
   fixture.elements.sendCommand.click();
@@ -1253,9 +1261,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "closeit",
     content: "echo close",
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /closeit (inline).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /closeit (inline · project).");
 
   const longPreviewPayload = "x".repeat(5000);
   fixture.elements.commandInput.value = `/custom longpreview ${longPreviewPayload}`;
@@ -1266,9 +1276,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "longpreview",
     content: longPreviewPayload,
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /longpreview (inline).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /longpreview (inline · project).");
 
   fixture.elements.commandInput.value = "/custom escdelim\n---\nline 1\n\\---\nline 3\n---";
   fixture.elements.sendCommand.click();
@@ -1278,9 +1290,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "escdelim",
     content: "line 1\n---\nline 3",
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /escdelim (block).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /escdelim (block · project).");
 
   fixture.elements.commandInput.value = "/custom broken\n---\nline 1";
   fixture.elements.sendCommand.click();
@@ -1310,7 +1324,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/custom show docu";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.commandFeedback.textContent, /^\/docu\n---\necho verify\n---$/);
+  assert.match(
+    fixture.elements.commandFeedback.textContent,
+    /^\/docu\nkind: plain\nscope: project\nprecedence: 200\n---\necho verify\n---$/
+  );
   assert.equal(getCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/custom go\n---\nTake care of md's and quotes.\n---";
@@ -1321,9 +1338,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "go",
     content: "Take care of md's and quotes.",
     kind: "plain",
-    templateVariables: []
+    templateVariables: [],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /go (block).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved custom command /go (block · project).");
 
   fixture.elements.commandInput.value = "/docu";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1359,14 +1378,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     commandName: "deploy",
     content: "echo {{param:env}} from {{var:session.cwd}}",
     kind: "template",
-    templateVariables: ["session.cwd"]
+    templateVariables: ["session.cwd"],
+    scope: "project",
+    sessionId: null
   });
-  assert.equal(fixture.elements.commandFeedback.textContent, "Saved template custom command /deploy (inline).");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Saved template custom command /deploy (inline · project).");
 
   fixture.elements.commandInput.value = "/custom preview deploy env=prod";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "/deploy -> [1] s-1\n---\necho prod from ~\n---");
+  assert.equal(fixture.elements.commandFeedback.textContent, "/deploy · project -> [1] s-1\n---\necho prod from ~\n---");
 
   fixture.elements.commandInput.value = "/deploy env=prod";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1383,7 +1404,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(customCommandDeletes.length, 1);
   assert.equal(customCommandDeletes[0], "docu");
-  assert.equal(fixture.elements.commandFeedback.textContent, "Removed custom command /docu.");
+  assert.equal(fixture.elements.commandFeedback.textContent, "Removed custom command /docu (project).");
 
   fixture.elements.commandInput.value = "/docu";
   fixture.elements.commandInput.dispatchEvent({ type: "input" });
@@ -1795,7 +1816,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/custom show remote";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "/remote\n---\necho remote\n---");
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "/remote\nkind: plain\nscope: project\nprecedence: 200\n---\necho remote\n---"
+  );
   assert.equal(getCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/remote";
@@ -1856,7 +1880,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/custom list";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.equal(fixture.elements.commandFeedback.textContent, "/snaponly");
+  assert.equal(fixture.elements.commandFeedback.textContent, "/snaponly (plain · project)");
   assert.equal(listCustomCommandCalls, 0);
 
   fixture.elements.commandInput.value = "/blockcmd";

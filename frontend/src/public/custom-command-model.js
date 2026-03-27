@@ -1,4 +1,11 @@
 const CUSTOM_COMMAND_KIND_VALUES = new Set(["plain", "template"]);
+const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
+const DEFAULT_CUSTOM_COMMAND_SCOPE = "project";
+const CUSTOM_COMMAND_SCOPE_PRECEDENCE = Object.freeze({
+  global: 100,
+  project: 200,
+  session: 300
+});
 const CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 const CUSTOM_COMMAND_TEMPLATE_VARIABLE_VALUES = new Set([
   "deck.id",
@@ -24,6 +31,26 @@ export function normalizeCustomCommandName(name) {
 export function normalizeCustomCommandKind(value) {
   const normalized = normalizeLower(value);
   return CUSTOM_COMMAND_KIND_VALUES.has(normalized) ? normalized : "plain";
+}
+
+export function normalizeCustomCommandScope(value) {
+  const normalized = normalizeLower(value);
+  return CUSTOM_COMMAND_SCOPE_VALUES.has(normalized) ? normalized : DEFAULT_CUSTOM_COMMAND_SCOPE;
+}
+
+export function normalizeCustomCommandSessionId(value) {
+  return normalizeText(value);
+}
+
+export function getCustomCommandPrecedence(scope) {
+  return CUSTOM_COMMAND_SCOPE_PRECEDENCE[normalizeCustomCommandScope(scope)] || CUSTOM_COMMAND_SCOPE_PRECEDENCE[DEFAULT_CUSTOM_COMMAND_SCOPE];
+}
+
+export function buildCustomCommandLookupKey(name, scope, sessionId = "") {
+  const normalizedName = normalizeCustomCommandName(name);
+  const normalizedScope = normalizeCustomCommandScope(scope);
+  const normalizedSessionId = normalizedScope === "session" ? normalizeCustomCommandSessionId(sessionId) : "";
+  return `${normalizedScope}:${normalizedSessionId}:${normalizedName}`;
 }
 
 export function normalizeCustomCommandTemplateVariables(values) {
@@ -52,10 +79,104 @@ export function normalizeCustomCommandRecord(command) {
     name,
     content: typeof command.content === "string" ? command.content : "",
     kind: normalizeCustomCommandKind(command.kind),
+    scope: normalizeCustomCommandScope(command.scope),
+    sessionId:
+      normalizeCustomCommandScope(command.scope) === "session" ? normalizeCustomCommandSessionId(command.sessionId) : null,
+    precedence: Number.isInteger(command.precedence)
+      ? Number(command.precedence)
+      : getCustomCommandPrecedence(command.scope),
     templateVariables: normalizeCustomCommandTemplateVariables(command.templateVariables),
     createdAt: Number(command.createdAt || 0),
-    updatedAt: Number(command.updatedAt || 0)
+    updatedAt: Number(command.updatedAt || 0),
+    lookupKey: buildCustomCommandLookupKey(name, command.scope, command.sessionId)
   };
+}
+
+export function compareCustomCommandRecords(leftValue, rightValue) {
+  const left = normalizeCustomCommandRecord(leftValue);
+  const right = normalizeCustomCommandRecord(rightValue);
+  if (!left && !right) {
+    return 0;
+  }
+  if (!left) {
+    return 1;
+  }
+  if (!right) {
+    return -1;
+  }
+  const nameCompare = left.name.localeCompare(right.name, "en-US", { sensitivity: "base" });
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+  if (left.precedence !== right.precedence) {
+    return right.precedence - left.precedence;
+  }
+  const scopeCompare = left.scope.localeCompare(right.scope, "en-US", { sensitivity: "base" });
+  if (scopeCompare !== 0) {
+    return scopeCompare;
+  }
+  const sessionCompare = String(left.sessionId || "").localeCompare(String(right.sessionId || ""), "en-US", { sensitivity: "base" });
+  if (sessionCompare !== 0) {
+    return sessionCompare;
+  }
+  if (left.createdAt !== right.createdAt) {
+    return left.createdAt - right.createdAt;
+  }
+  if (left.updatedAt !== right.updatedAt) {
+    return left.updatedAt - right.updatedAt;
+  }
+  return left.content.localeCompare(right.content, "en-US", { sensitivity: "base" });
+}
+
+export function parseCustomCommandScopeToken(token) {
+  const normalized = normalizeText(token);
+  if (!normalized.startsWith("@")) {
+    return null;
+  }
+  const payload = normalizeLower(normalized.slice(1));
+  if (payload === "global" || payload === "project") {
+    return { ok: true, scope: payload, sessionSelector: "" };
+  }
+  if (payload.startsWith("session:")) {
+    const sessionSelector = normalizeText(normalized.slice("@session:".length));
+    if (!sessionSelector) {
+      return { ok: false, error: "Scope token '@session:<selector>' requires a non-empty selector." };
+    }
+    return { ok: true, scope: "session", sessionSelector };
+  }
+  return { ok: false, error: "Invalid scope token. Use @global, @project, or @session:<selector>." };
+}
+
+function parseScopedCustomCommandHeaderTokens(tokens, usageText) {
+  const parts = Array.isArray(tokens) ? tokens.filter(Boolean) : [];
+  if (parts.length === 0) {
+    return { ok: false, error: usageText };
+  }
+
+  let offset = 0;
+  let kind = "plain";
+  if (parts[offset] === "plain" || parts[offset] === "template") {
+    kind = parts[offset];
+    offset += 1;
+  }
+
+  let scope = DEFAULT_CUSTOM_COMMAND_SCOPE;
+  let sessionSelector = "";
+  if (parts[offset]?.startsWith("@")) {
+    const parsedScope = parseCustomCommandScopeToken(parts[offset]);
+    if (!parsedScope?.ok) {
+      return parsedScope || { ok: false, error: usageText };
+    }
+    scope = parsedScope.scope;
+    sessionSelector = parsedScope.sessionSelector || "";
+    offset += 1;
+  }
+
+  const name = parts[offset] || "";
+  if (!name || parts.length !== offset + 1) {
+    return { ok: false, error: usageText };
+  }
+  return { ok: true, kind, scope, sessionSelector, name };
 }
 
 export function analyzeCustomCommandTemplate(content) {
@@ -122,23 +243,10 @@ function parseCustomCommandHeader(header, usageText) {
     return { ok: false, error: usageText };
   }
   const parts = raw.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) {
-    return { ok: false, error: usageText };
-  }
-  let kind = "plain";
-  let name = parts[0];
-  if (parts[0] === "plain" || parts[0] === "template") {
-    kind = parts[0];
-    name = parts[1] || "";
-    if (!name || parts.length !== 2) {
-      return { ok: false, error: usageText };
-    }
-    return { ok: true, kind, name };
-  }
-  if (parts.length !== 1) {
-    return { ok: false, error: "Block definition header must be '/custom <name>' or '/custom template <name>' only." };
-  }
-  return { ok: true, kind, name };
+  return parseScopedCustomCommandHeaderTokens(
+    parts,
+    "Block definition header must be '/custom [template] [@global|@project|@session:<selector>] <name>' only."
+  );
 }
 
 function parseInlineCustomCommand(afterPrefix, usageText) {
@@ -146,33 +254,45 @@ function parseInlineCustomCommand(afterPrefix, usageText) {
   if (!trimmed) {
     return { ok: false, error: usageText };
   }
-  const firstWhitespace = trimmed.search(/\s/);
-  if (firstWhitespace < 0) {
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) {
     return { ok: false, error: usageText };
   }
-  const firstToken = trimmed.slice(0, firstWhitespace);
+  let offset = 0;
   let kind = "plain";
-  let name = firstToken;
-  let content = trimmed.slice(firstWhitespace).trimStart();
-
-  if (firstToken === "plain" || firstToken === "template") {
-    kind = firstToken;
-    const rest = trimmed.slice(firstWhitespace).trimStart();
-    const secondWhitespace = rest.search(/\s/);
-    if (secondWhitespace < 0) {
-      return { ok: false, error: usageText };
-    }
-    name = rest.slice(0, secondWhitespace);
-    content = rest.slice(secondWhitespace).trimStart();
+  if (parts[offset] === "plain" || parts[offset] === "template") {
+    kind = parts[offset];
+    offset += 1;
   }
+
+  let scope = DEFAULT_CUSTOM_COMMAND_SCOPE;
+  let sessionSelector = "";
+  if (parts[offset]?.startsWith("@")) {
+    const parsedScope = parseCustomCommandScopeToken(parts[offset]);
+    if (!parsedScope?.ok) {
+      return parsedScope || { ok: false, error: usageText };
+    }
+    scope = parsedScope.scope;
+    sessionSelector = parsedScope.sessionSelector || "";
+    offset += 1;
+  }
+
+  const name = parts[offset] || "";
+  if (!name) {
+    return { ok: false, error: usageText };
+  }
+  const content = parts.slice(offset + 1).join(" ").trimStart();
 
   if (!content) {
     return { ok: false, error: "Inline custom-command content cannot be empty." };
   }
-  return { ok: true, name, kind, content, mode: "inline" };
+  return { ok: true, name, kind, scope, sessionSelector, content, mode: "inline" };
 }
 
-export function parseCustomCommandDefinition(rawInput, usageText = "Usage: /custom [plain|template] <name> <text> | /custom [plain|template] <name> + block") {
+export function parseCustomCommandDefinition(
+  rawInput,
+  usageText = "Usage: /custom [plain|template] [@global|@project|@session:<selector>] <name> <text> | /custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
+) {
   const raw = String(rawInput || "").replaceAll("\r\n", "\n");
   const trimmedStart = raw.trimStart();
   const prefix = "/custom";
@@ -219,7 +339,15 @@ export function parseCustomCommandDefinition(rawInput, usageText = "Usage: /cust
               error: "Block payload contains content after closing '---'. For a literal delimiter line inside payload, use '\\---'."
             };
           }
-          return { ok: true, name: header.name, kind: header.kind, content, mode: "block" };
+          return {
+            ok: true,
+            name: header.name,
+            kind: header.kind,
+            scope: header.scope,
+            sessionSelector: header.sessionSelector,
+            content,
+            mode: "block"
+          };
         })();
 
   if (!parsed.ok) {
@@ -343,6 +471,102 @@ export function parseCustomCommandInvocation(rawInput, command) {
     parameterAssignments: assignments,
     targetSelector
   };
+}
+
+export function parseCustomCommandReferenceArgs(args = [], options = {}) {
+  const parts = Array.isArray(args) ? args.map((entry) => normalizeText(entry)).filter(Boolean) : [];
+  const requireName = options.requireName !== false;
+  if (parts.length === 0) {
+    return requireName ? { ok: false, error: "Custom command name is required." } : { ok: true, name: "", scope: null, sessionSelector: "" };
+  }
+  let offset = 0;
+  let scope = null;
+  let sessionSelector = "";
+  if (parts[offset].startsWith("@")) {
+    const parsedScope = parseCustomCommandScopeToken(parts[offset]);
+    if (!parsedScope?.ok) {
+      return parsedScope || { ok: false, error: "Invalid scope token." };
+    }
+    scope = parsedScope.scope;
+    sessionSelector = parsedScope.sessionSelector || "";
+    offset += 1;
+  }
+  const name = parts[offset] || "";
+  if (!name && requireName) {
+    return { ok: false, error: "Custom command name is required." };
+  }
+  return {
+    ok: true,
+    name,
+    scope,
+    sessionSelector,
+    rest: parts.slice(offset + 1)
+  };
+}
+
+export function isCustomCommandVisibleForSession(command, sessionId) {
+  const custom = normalizeCustomCommandRecord(command);
+  if (!custom) {
+    return false;
+  }
+  if (custom.scope === "session") {
+    return normalizeCustomCommandSessionId(sessionId) === custom.sessionId;
+  }
+  return true;
+}
+
+export function resolveCustomCommandForSession(commands, name, sessionId) {
+  const normalizedName = normalizeCustomCommandName(name);
+  const visible = (Array.isArray(commands) ? commands : [])
+    .map((entry) => normalizeCustomCommandRecord(entry))
+    .filter((entry) => entry && entry.name === normalizedName && isCustomCommandVisibleForSession(entry, sessionId))
+    .sort(compareCustomCommandRecords);
+  return visible[0] || null;
+}
+
+export function resolveExactCustomCommand(commands, name, scope, sessionId = "") {
+  const normalizedName = normalizeCustomCommandName(name);
+  const normalizedScope = normalizeCustomCommandScope(scope);
+  const normalizedSessionId = normalizedScope === "session" ? normalizeCustomCommandSessionId(sessionId) : "";
+  const lookupKey = buildCustomCommandLookupKey(normalizedName, normalizedScope, normalizedSessionId);
+  return (
+    (Array.isArray(commands) ? commands : [])
+      .map((entry) => normalizeCustomCommandRecord(entry))
+      .find((entry) => entry && entry.lookupKey === lookupKey) || null
+  );
+}
+
+export function listScopedCustomCommandsByName(commands, name) {
+  const normalizedName = normalizeCustomCommandName(name);
+  return (Array.isArray(commands) ? commands : [])
+    .map((entry) => normalizeCustomCommandRecord(entry))
+    .filter((entry) => entry && entry.name === normalizedName)
+    .sort(compareCustomCommandRecords);
+}
+
+export function formatCustomCommandScopeLabel(command, options = {}) {
+  const custom = normalizeCustomCommandRecord(command);
+  if (!custom) {
+    return "";
+  }
+  if (custom.scope === "global") {
+    return "global";
+  }
+  if (custom.scope === "project") {
+    return "project";
+  }
+  const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
+  const formatSessionToken =
+    typeof options.formatSessionToken === "function" ? options.formatSessionToken : (sessionId) => String(sessionId || "").slice(0, 8);
+  const formatSessionDisplayName =
+    typeof options.formatSessionDisplayName === "function"
+      ? options.formatSessionDisplayName
+      : (session) => String(session?.name || session?.id || "");
+  const session = getSessionById(custom.sessionId);
+  if (session) {
+    return `session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
+  }
+  return `session ${custom.sessionId}`;
 }
 
 function resolveBuiltInTemplateVariable(name, session = {}, deck = null) {

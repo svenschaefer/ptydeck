@@ -73,6 +73,9 @@ function assertApiSessionShape(session) {
 function assertCustomCommandShape(command) {
   assert.equal(typeof command?.name, "string");
   assert.equal(typeof command?.content, "string");
+  assert.ok(command?.scope === "global" || command?.scope === "project" || command?.scope === "session");
+  assert.ok(command?.sessionId === null || command?.sessionId === undefined || typeof command?.sessionId === "string");
+  assert.equal(typeof command?.precedence, "number");
   assert.equal(typeof command?.createdAt, "number");
   assert.equal(typeof command?.updatedAt, "number");
 }

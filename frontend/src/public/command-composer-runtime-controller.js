@@ -387,9 +387,6 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (!normalized) {
       return "";
     }
-    if (normalized.kind !== "template") {
-      return normalized.content || "";
-    }
 
     const invocation = parseCustomCommandInvocation(rawInput, normalized);
     if (!invocation.ok) {
@@ -413,15 +410,16 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
 
     if (targetSessions.length === 0) {
-      return "No active session for template preview.";
+      return "No active session for custom command preview.";
     }
     if (targetSessions.length > 1) {
-      return `Template preview varies across ${targetSessions.length} target sessions.`;
+      return `Custom command preview varies across ${targetSessions.length} target sessions.`;
     }
 
     const session = targetSessions[0];
+    const effectiveCustom = normalizeCustomCommandRecord(getCustomCommandState(normalized.name, { sessionId: session.id })) || normalized;
     const deck = decks.find((entry) => entry?.id === session?.deckId) || null;
-    const rendered = renderCustomCommandForSession(normalized, session, deck, invocation.parameterAssignments);
+    const rendered = renderCustomCommandForSession(effectiveCustom, session, deck, invocation.parameterAssignments);
     return rendered.ok ? rendered.text : rendered.error;
   }
 
