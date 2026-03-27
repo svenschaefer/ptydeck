@@ -52,6 +52,7 @@ export function createSessionGridController(options = {}) {
   const setSessionSendTerminator = options.setSessionSendTerminator || (() => {});
   const setStartupSettingsFeedback = options.setStartupSettingsFeedback || (() => {});
   const requestRender = options.requestRender || (() => {});
+  const exportSessionReplayDownload = options.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
   const api = options.api;
   const themeProfileKeys = options.themeProfileKeys || [];
   const debugLog = options.debugLog || (() => {});
@@ -173,6 +174,7 @@ export function createSessionGridController(options = {}) {
         session,
         refs: {
           focusBtn: refs.focusBtn,
+          replayExportBtn: refs.replayExportBtn,
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
           closeBtn: refs.closeBtn,
@@ -216,7 +218,8 @@ export function createSessionGridController(options = {}) {
         setSettingsDirty,
         setSessionSendTerminator,
         setStartupSettingsFeedback,
-        requestRender
+        requestRender,
+        exportSessionReplayDownload
       });
 
       sessionTerminalRuntimeController?.mountSessionTerminalCard({

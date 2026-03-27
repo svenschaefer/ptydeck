@@ -38,6 +38,7 @@ function createNodeStub() {
     ".terminal-toolbar-meta",
     ".session-note-text",
     ".session-unrestored-hint",
+    ".session-replay-export",
     ".session-settings",
     ".session-rename",
     ".session-close",
@@ -115,6 +116,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.unrestoredHintEl.textContent, "hint");
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
+  assert.ok(result.replayExportBtn);
   assert.equal(result.node.classList.contains("active"), true);
   assert.equal(result.node.classList.contains("attention"), false);
   assert.ok(result.themeInputs.brightRed);

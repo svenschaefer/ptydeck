@@ -355,6 +355,7 @@ function createTerminalCardTemplateNode() {
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
   stateBadge.hidden = true;
+  const replayExport = new FakeElement({ className: "session-replay-export", tagName: "button" });
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
   tagList.classList.add("empty");
@@ -413,6 +414,7 @@ function createTerminalCardTemplateNode() {
   titleGroup.appendChild(quickId);
   titleGroup.appendChild(focus);
   titleGroup.appendChild(stateBadge);
+  toolbarActions.appendChild(replayExport);
   toolbarActions.appendChild(settings);
   toolbarMain.appendChild(titleGroup);
   toolbarMain.appendChild(toolbarActions);
@@ -695,6 +697,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   ];
   let listSessionsCalls = 0;
   const browserNotifications = [];
+  const createdObjectUrls = [];
+  const revokedObjectUrls = [];
   class MockNotification {
     static permission = "granted";
 
@@ -725,6 +729,21 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     },
     Terminal: MockTerminal,
     Notification: MockNotification,
+    URL: {
+      createObjectURL(blob) {
+        createdObjectUrls.push(blob);
+        return `blob:replay-${createdObjectUrls.length}`;
+      },
+      revokeObjectURL(url) {
+        revokedObjectUrls.push(url);
+      }
+    },
+    Blob: class MockBlob {
+      constructor(parts, options = {}) {
+        this.parts = parts;
+        this.options = options;
+      }
+    },
     FitAddon: {
       FitAddon: MockFitAddon
     },
@@ -901,6 +920,21 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         tags: Array.isArray(payload.tags) ? payload.tags : baseSession.tags,
         themeProfile: payload.themeProfile || baseSession.themeProfile,
         updatedAt: Date.now()
+      });
+    }
+    const replayExportMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);
+    if (replayExportMatch && method === "GET") {
+      const sessionId = decodeURIComponent(replayExportMatch[1]);
+      return makeJsonResponse(200, {
+        sessionId,
+        scope: "retained_replay_tail",
+        format: "text",
+        contentType: "text/plain; charset=utf-8",
+        fileName: `${sessionId}-replay.txt`,
+        data: sessionId === "s-2" ? "line one\nline two\n" : "",
+        retainedChars: sessionId === "s-2" ? 18 : 0,
+        retentionLimitChars: 32,
+        truncated: sessionId === "s-2"
       });
     }
     if (path === "/api/v1/sessions/s-1" && method === "DELETE") {
@@ -2306,6 +2340,23 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(secondNote.textContent, "");
   assert.equal(secondNote.hidden, true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Cleared note for [1] two.");
+  fixture.elements.commandInput.value = "/replay export 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Downloaded replay tail for [1] two (18/32 chars retained, truncated)."
+  );
+  assert.equal(createdObjectUrls.length > 0, true);
+  assert.deepEqual(createdObjectUrls[createdObjectUrls.length - 1].parts, ["line one\nline two\n"]);
+  assert.equal(revokedObjectUrls[revokedObjectUrls.length - 1], `blob:replay-${createdObjectUrls.length}`);
+  const secondReplayExport = secondCard.querySelector(".session-replay-export");
+  secondReplayExport.click();
+  await tick();
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Downloaded replay tail for [1] two (18/32 chars retained, truncated)."
+  );
   fixture.elements.commandInput.value = '/settings apply 1 {"unknown":1}';
   fixture.elements.sendCommand.click();
   await tick();

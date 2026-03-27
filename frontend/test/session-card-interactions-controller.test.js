@@ -48,6 +48,37 @@ test("session-card-interactions controller wires focus and settings dialog contr
   assert.deepEqual(calls, ["focus:s1", "toggle", "close", "prevent", "close"]);
 });
 
+test("session-card-interactions controller exports replay tails from the toolbar action", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({});
+  const refs = {
+    focusBtn: createEventTarget(),
+    replayExportBtn: createEventTarget()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    exportSessionReplayDownload: async (session) => {
+      calls.push(`export:${session.id}`);
+      return { feedback: "Downloaded replay tail for [7] alpha (32 chars retained)." };
+    },
+    clearError: () => calls.push("clear-error"),
+    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
+    setError: (message) => calls.push(`error:${message}`)
+  });
+
+  await refs.replayExportBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    "export:s1",
+    "clear-error",
+    "feedback:Downloaded replay tail for [7] alpha (32 chars retained)."
+  ]);
+});
+
 test("session-card-interactions controller handles theme select changes through injected callbacks", async () => {
   const calls = [];
   const sessionThemeDrafts = new Map();

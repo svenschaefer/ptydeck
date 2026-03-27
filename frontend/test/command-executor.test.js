@@ -15,7 +15,7 @@ function createExecutor() {
       }
     },
     api: {},
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "settings", "custom", "help"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "replay", "settings", "custom", "help"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -77,6 +77,9 @@ test("command executor help and usage strings derive from declarative schema met
 
   const noteUsage = await executor.execute({ command: "note", args: [], raw: "/note" });
   assert.equal(noteUsage, "Usage: /note <selector|active> [text...]");
+
+  const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
+  assert.equal(replayUsage, "Usage: /replay export [selector|active] | /replay copy [selector|active]");
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
   assert.equal(renameUsage, "Usage: /rename <name> | /rename <selector> <name>");
@@ -248,6 +251,138 @@ test("command executor swaps quick ids between two resolved sessions and request
     ["swap", "s1", "s2"],
     ["render"]
   ]);
+});
+
+test("command executor downloads retained replay tails for the active session by default", async () => {
+  const calls = [];
+  const session = { id: "s1", name: "one", deckId: "default" };
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [session],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    exportSessionReplayDownload: async (currentSession) => {
+      calls.push(["download", currentSession.id]);
+      return {
+        feedback: "Downloaded replay tail for [7] one (12 chars retained)."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({ command: "replay", args: ["export"], raw: "/replay export" });
+
+  assert.equal(feedback, "Downloaded replay tail for [7] one (12 chars retained).");
+  assert.deepEqual(calls, [["download", "s1"]]);
+});
+
+test("command executor copies retained replay tails for an explicitly selected session", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    exportSessionReplayCopy: async (currentSession) => {
+      calls.push(["copy", currentSession.id]);
+      return {
+        feedback: "Copied replay tail for [8] two (0 chars retained)."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({ command: "replay", args: ["copy", "8"], raw: "/replay copy 8" });
+
+  assert.equal(feedback, "Copied replay tail for [8] two (0 chars retained).");
+  assert.deepEqual(calls, [["copy", "s2"]]);
 });
 
 test("command executor applies input safety presets through settings payloads", async () => {

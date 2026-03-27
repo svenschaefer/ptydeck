@@ -25,6 +25,7 @@ import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
+import { createReplayExportRuntimeController } from "./replay-export-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -69,6 +70,15 @@ const api = createApiClient(config.apiBaseUrl, {
 });
 const clipboardRuntimeController = createClipboardRuntimeController({
   navigatorRef: window?.navigator || globalThis.navigator || null
+});
+const replayExportRuntimeController = createReplayExportRuntimeController({
+  api,
+  documentRef: document,
+  URLRef: window?.URL || globalThis.URL || null,
+  BlobCtor: window?.Blob || globalThis.Blob,
+  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
 });
 const streamDebugTraceController = debugLogs
   ? createStreamDebugTraceController({
@@ -235,6 +245,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "rename",
   "restart",
   "note",
+  "replay",
   "settings",
   "custom",
   "help"
@@ -557,7 +568,8 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   detectThemePreset: sessionUiFacadeController.detectThemePreset,
   isSessionSettingsDirty: sessionUiFacadeController.isSessionSettingsDirty,
   isSessionExited: sessionUiFacadeController.isSessionExited,
-  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage
+  getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage(error, fallback) || fallback
 });
 
 sessionCardRenderController = createSessionCardRenderController({
@@ -732,6 +744,7 @@ sessionGridController = createSessionGridController({
   setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
   setStartupSettingsFeedback: sessionUiFacadeController.setStartupSettingsFeedback,
   requestRender: () => appCommandUiFacadeController?.render(),
+  exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   api,
   themeProfileKeys: THEME_PROFILE_KEYS,
   debugLog
@@ -781,6 +794,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   deckRuntimeController,
   readClipboardText: () => clipboardRuntimeController.readText(),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
+  exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
   disposeStreamDebugTrace: () => streamDebugTraceController.dispose(),
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,

@@ -104,6 +104,10 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.getCustomCommands === "function" ? options.getCustomCommands : () => [];
   const observeSessionData =
     typeof options.observeSessionData === "function" ? options.observeSessionData : () => {};
+  const exportSessionReplayDownload =
+    typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
+  const exportSessionReplayCopy =
+    typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
 
   let commandEngine = null;
   let commandTargetRuntimeController = null;
@@ -178,7 +182,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       normalizeSessionTags: sessionUiFacadeController?.normalizeSessionTags,
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,
       getTerminalSettings: terminalSettings,
-      requestRender: () => appCommandUiFacadeController?.render()
+      requestRender: () => appCommandUiFacadeController?.render(),
+      exportSessionReplayDownload,
+      exportSessionReplayCopy
     });
 
     authBootstrapRuntimeController = createAuthBootstrapRuntimeController({

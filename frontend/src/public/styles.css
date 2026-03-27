@@ -814,6 +814,20 @@ button:hover {
   color: #a9d9d6;
 }
 
+.session-replay-export {
+  flex: 0 0 auto;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #9fd3ff;
+}
+
 .session-settings-icon {
   line-height: 1;
 }

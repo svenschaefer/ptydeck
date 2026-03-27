@@ -13,6 +13,7 @@ export function createSessionCardInteractionsController(options = {}) {
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
+  const getErrorMessage = options.getErrorMessage || ((error, fallback) => (error instanceof Error && error.message ? error.message : fallback));
 
   function bindSessionCardInteractions(args = {}) {
     const session = args.session;
@@ -41,6 +42,7 @@ export function createSessionCardInteractionsController(options = {}) {
     const setSessionSendTerminator = args.setSessionSendTerminator || (() => {});
     const setStartupSettingsFeedback = args.setStartupSettingsFeedback || (() => {});
     const requestRender = args.requestRender || (() => {});
+    const exportSessionReplayDownload = args.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
 
     if (!session || !refs.focusBtn) {
       return;
@@ -63,6 +65,18 @@ export function createSessionCardInteractionsController(options = {}) {
     }
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
+    refs.replayExportBtn?.addEventListener("click", async () => {
+      try {
+        const currentSession = getSession() || session;
+        const outcome = await exportSessionReplayDownload(currentSession);
+        clearError();
+        if (outcome?.feedback) {
+          setCommandFeedback(outcome.feedback);
+        }
+      } catch (error) {
+        setError(getErrorMessage(error, "Failed to export session replay."));
+      }
+    });
     refs.settingsBtn?.addEventListener("click", () => toggleSettingsDialog(refs.settingsDialog));
     refs.settingsDismissBtn?.addEventListener("click", () => closeSettingsDialog(refs.settingsDialog));
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {

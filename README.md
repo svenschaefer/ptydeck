@@ -306,6 +306,14 @@ The payload includes:
 
 This export does not imply full shell-state recovery. It is an explicit operator-facing view of the bounded replay tail only.
 
+Frontend operator workflow:
+
+- Session toolbar now exposes a discoverable `DL` action on each terminal card to download the retained replay tail immediately.
+- Slash commands now support both download and copy flows:
+  - `/replay export [selector|active]`
+  - `/replay copy [selector|active]`
+- Frontend feedback surfaces retained-size and truncation state explicitly, for example `18/32 chars retained, truncated`.
+
 ## Working Directory Tracking
 
 PTY does not expose the current working directory directly.

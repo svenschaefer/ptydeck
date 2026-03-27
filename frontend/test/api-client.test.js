@@ -240,6 +240,36 @@ test("api client calls update session endpoint", async () => {
   assert.equal(calls[0].options.method, "PATCH");
 });
 
+test("api client calls session replay export endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        sessionId: "abc",
+        scope: "retained_replay_tail",
+        format: "text",
+        contentType: "text/plain; charset=utf-8",
+        fileName: "abc.txt",
+        data: "pwd\n",
+        retainedChars: 4,
+        retentionLimitChars: 400,
+        truncated: false
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const payload = await api.getSessionReplayExport("abc");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/replay-export");
+  assert.equal(calls[0].options.method || "GET", "GET");
+  assert.equal(payload.fileName, "abc.txt");
+});
+
 test("api client calls restart session endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

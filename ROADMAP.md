@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H19`.
-- Active scoped tasks: `REP-002`, `REP-003`.
-- Latest completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
+- Previous completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
 - Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
 - Previous completed wave before that: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
 - Previous completed wave before that: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
@@ -33,17 +34,17 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave Plan
+## Latest Completed Wave
 
-### v0.4.0-H19 - Session Replay Export Baseline
+### v0.4.0-H19 - Session Replay Export Baseline (Completed)
 
-- `REP-002`, `REP-003`
+- `REP-001`, `REP-002`, `REP-003`
 
 Dependencies:
 
-- `REP-001` is completed and establishes the backend export contract so frontend delivery and QA coverage can rely on one deterministic replay-export source.
-- `REP-002` follows completed `REP-001` so the frontend workflow reuses the finalized export format, truncation metadata, and empty-session semantics.
-- `REP-003` follows completed `REP-001` and closes after `REP-002` so regression coverage spans both the backend export contract and the frontend operator workflow.
+- `REP-001` established the backend export contract first so frontend delivery and QA coverage could rely on one deterministic replay-export source.
+- `REP-002` then reused the finalized export format, truncation metadata, and empty-session semantics in the frontend operator workflow.
+- `REP-003` closed after `REP-002` so regression coverage now spans both the backend export contract and the frontend operator workflow.
 
 Exit criteria:
 
@@ -51,7 +52,7 @@ Exit criteria:
 - Frontend provides an explicit replay-export workflow that surfaces truncation state clearly.
 - Regression coverage exists for replay export across reconnect, restart-restored replay, truncation, and empty-session paths.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H18 - Shell Runtime Compatibility Foundation (Completed)
 

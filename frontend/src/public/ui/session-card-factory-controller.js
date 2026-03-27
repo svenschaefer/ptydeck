@@ -16,6 +16,7 @@ export function createSessionCardFactoryController(options = {}) {
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
+    const replayExportBtn = node.querySelector(".session-replay-export");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -87,6 +88,7 @@ export function createSessionCardFactoryController(options = {}) {
       sessionMetaRowEl,
       sessionNoteEl,
       unrestoredHintEl,
+      replayExportBtn,
       settingsBtn,
       renameBtn,
       closeBtn,

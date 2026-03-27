@@ -287,6 +287,41 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     usage: "/note <selector|active> [text...]",
     args: [{ provider: "session-selector" }]
   }),
+  replay: freezeCommandDefinition({
+    key: "slash:replay",
+    insertText: "replay",
+    label: "/replay",
+    kind: "command",
+    description: "export the retained replay tail for a session",
+    example: "/replay export 7",
+    summary: "/replay export [selector|active] | /replay copy [selector|active]",
+    usage: [
+      "/replay export [selector|active]",
+      "/replay copy [selector|active]"
+    ],
+    subcommands: {
+      export: {
+        insertText: "export",
+        label: "/replay export",
+        kind: "subcommand",
+        description: "download the retained replay tail",
+        example: "/replay export 7",
+        key: "slash:replay:export",
+        usage: "/replay export [selector|active]",
+        args: [{ provider: "session-selector", optional: true }]
+      },
+      copy: {
+        insertText: "copy",
+        label: "/replay copy",
+        kind: "subcommand",
+        description: "copy the retained replay tail to the clipboard",
+        example: "/replay copy active",
+        key: "slash:replay:copy",
+        usage: "/replay copy [selector|active]",
+        args: [{ provider: "session-selector", optional: true }]
+      }
+    }
+  }),
   settings: freezeCommandDefinition({
     key: "slash:settings",
     insertText: "settings",

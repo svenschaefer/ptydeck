@@ -222,6 +222,9 @@ export function createApiClient(baseUrl, options = {}) {
     async getSession(sessionId) {
       return request(`/sessions/${sessionId}`);
     },
+    async getSessionReplayExport(sessionId) {
+      return request(`/sessions/${sessionId}/replay-export`);
+    },
     /** @returns {Promise<Session>} */
     async updateSession(sessionId, payload) {
       return request(`/sessions/${sessionId}`, {

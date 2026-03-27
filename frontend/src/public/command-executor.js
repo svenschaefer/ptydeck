@@ -50,6 +50,10 @@ export function createCommandExecutor(options = {}) {
   const getTerminalSettings =
     typeof options.getTerminalSettings === "function" ? options.getTerminalSettings : () => ({ cols: 80, rows: 20 });
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
+  const exportSessionReplayDownload =
+    typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
+  const exportSessionReplayCopy =
+    typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -77,6 +81,29 @@ export function createCommandExecutor(options = {}) {
       `inputSafetyPreset=${inputSafetyPreset}`,
       `inputSafetyProfile=${JSON.stringify(inputSafetyProfile)}`
     ].join("\n");
+  }
+
+  function resolveSingleSessionForCommand(selectorText, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
+    const normalizedSelector = String(selectorText || "").trim();
+    if (!normalizedSelector || normalizedSelector.toLowerCase() === "active") {
+      if (!activeSessionId) {
+        return { error: missingActiveMessage, session: null };
+      }
+      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
+      if (!activeSession) {
+        return { error: missingActiveMessage, session: null };
+      }
+      return { error: "", session: activeSession };
+    }
+
+    const resolvedTargets = resolveTargetSelectors(normalizedSelector, sessions, { source: "slash" });
+    if (resolvedTargets.error) {
+      return { error: resolvedTargets.error, session: null };
+    }
+    if (resolvedTargets.sessions.length !== 1) {
+      return { error: `${selectorLabel} must resolve to exactly one session.`, session: null };
+    }
+    return { error: "", session: resolvedTargets.sessions[0] };
   }
 
   async function execute(interpreted) {
@@ -548,33 +575,47 @@ export function createCommandExecutor(options = {}) {
         return formatUsage("note");
       }
 
-      let targetSession = null;
-      if (String(args[0] || "").toLowerCase() === "active") {
-        if (!activeSessionId) {
-          return "No active session for /note.";
-        }
-        targetSession = sessions.find((session) => session.id === activeSessionId) || null;
-        if (!targetSession) {
-          return "No active session for /note.";
-        }
-      } else {
-        const resolvedTargets = resolveTargetSelectors(args[0], sessions, { source: "slash" });
-        if (resolvedTargets.error) {
-          return resolvedTargets.error;
-        }
-        if (resolvedTargets.sessions.length !== 1) {
-          return "Note selector must resolve to exactly one session.";
-        }
-        targetSession = resolvedTargets.sessions[0];
+      const resolvedTarget = resolveSingleSessionForCommand(
+        args[0],
+        sessions,
+        activeSessionId,
+        "No active session for /note.",
+        "Note selector"
+      );
+      if (resolvedTarget.error) {
+        return resolvedTarget.error;
       }
 
       const note = args.slice(1).join(" ").trim();
-      const updated = await api.updateSession(targetSession.id, { note });
+      const updated = await api.updateSession(resolvedTarget.session.id, { note });
       applyRuntimeEvent({ type: "session.updated", session: updated });
       if (updated?.note) {
         return `Updated note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
       }
       return `Cleared note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+    }
+
+    if (command === "replay") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      if (subcommand !== "export" && subcommand !== "copy") {
+        return formatUsage("replay");
+      }
+      const selectorText = args[1] || "active";
+      const resolvedTarget = resolveSingleSessionForCommand(
+        selectorText,
+        sessions,
+        activeSessionId,
+        "No active session for /replay.",
+        "Replay selector"
+      );
+      if (resolvedTarget.error) {
+        return resolvedTarget.error;
+      }
+      const outcome =
+        subcommand === "copy"
+          ? await exportSessionReplayCopy(resolvedTarget.session)
+          : await exportSessionReplayDownload(resolvedTarget.session);
+      return outcome?.feedback || "";
     }
 
     if (command === "custom") {
