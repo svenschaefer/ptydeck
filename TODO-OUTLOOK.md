@@ -126,7 +126,6 @@ Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current s
 
 - Inspiration source: [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
 - [ ] `REM-004` Owner `FE`: Add saved connection profiles and reusable launch presets for local shells and SSH targets (`host`, `port`, `username`, `shell`, `cwd`, `env`, `tags`, `deck`, `theme`).
-- [ ] `REM-005` Owner `BE`: Add remote-session disconnect/reconnect contract for SSH-backed sessions, including explicit degraded/offline state, retry policy, and deterministic user-visible recovery semantics.
 - [ ] `REM-006` Owner `BE`: Add controlled session file-transfer support with explicit upload/download permission model, progress reporting, and large-transfer guardrails.
 - [ ] `REM-007` Owner `FE`: Add session/deck sharing UX with explicit read-only spectator mode and visible control/write-permission state.
 - [ ] `REM-008` Owner `FE`: Add terminal theme import/export compatibility for external theme catalogs/formats (for example iTerm2, Windows Terminal, or Xresources-style payloads) with deterministic mapping and validation.

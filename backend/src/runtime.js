@@ -2036,6 +2036,9 @@ export function createRuntime(config) {
     sessionMaxLifetimeMs: config.sessionMaxLifetimeMs,
     sessionReplayMemoryMaxChars: config.sessionReplayMemoryMaxChars,
     sessionActivityQuietMs: config.sessionActivityQuietMs,
+    remoteReconnectMaxAttempts: config.remoteReconnectMaxAttempts,
+    remoteReconnectDelayMs: config.remoteReconnectDelayMs,
+    remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath
   });
   const persistence = new JsonPersistence(config.dataPath, {

@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
+- Latest completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
+- Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
 - Previous completed wave: `v0.4.0-H37` (Workflow Safety Guardrails, `SWF-007`, `SWF-008`).
 - Previous completed wave: `v0.4.0-H36` (Workflow Control-Plane Runtime, `SWF-006`).
 - Previous completed wave: `v0.4.0-H35` (PTY Control Endpoints, `SWF-005`).
@@ -54,6 +55,22 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H39 - Remote Reconnect Contract (Completed)
+
+- Completed scoped task: `REM-005`
+
+Dependencies:
+
+- `REM-005` followed the completed H38 remote-session foundation so reconnect semantics build on the existing unified `local|ssh` session contract, auth handling, and trust-store rules instead of inventing a second remote-runtime model.
+
+Exit criteria:
+
+- SSH-backed sessions expose an explicit degraded/offline lifecycle instead of looking identical to healthy local PTY sessions after disconnect or launch loss.
+- Backend reconnect behavior is deterministic and bounded, with operator-visible retry metadata and no silent infinite retry loop.
+- Restore/restart semantics preserve the new remote reconnect state without weakening the H38 secret/trust safety boundaries.
+
+## Previous Completed Wave
 
 ### v0.4.0-H38 - Remote SSH Session Foundation (Completed)
 

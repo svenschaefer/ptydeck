@@ -103,6 +103,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function waitFor(predicate, timeoutMs = 4000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await predicate()) {
+      return;
+    }
+    await sleep(10);
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms`);
+}
+
 test("REST lifecycle endpoints work end-to-end", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
@@ -2873,6 +2884,187 @@ test("runtime restore normalizes invalid persisted ssh auth metadata to safe def
     assert.deepEqual(restored.remoteAuth, { method: "privateKey" });
     assert.equal(spawnCalls.length, 1);
     assert.ok(spawnCalls[0].args.includes("PreferredAuthentications=publickey"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("ssh sessions expose degraded then connected remote runtime metadata after bounded reconnect", async () => {
+  const ptys = [];
+  const createPty = () => {
+    let exitHandler = null;
+    let dataHandler = null;
+    const ptyInstance = {
+      onExit(handler) {
+        exitHandler = handler;
+      },
+      onData(handler) {
+        dataHandler = handler;
+      },
+      write() {},
+      resize() {},
+      kill() {
+        if (exitHandler) {
+          exitHandler({ exitCode: 255, signal: "" });
+        }
+      },
+      emitData(data) {
+        if (dataHandler) {
+          dataHandler(data);
+        }
+      },
+      emitExit(payload = { exitCode: 255, signal: "" }) {
+        if (exitHandler) {
+          exitHandler(payload);
+        }
+      }
+    };
+    ptys.push(ptyInstance);
+    return ptyInstance;
+  };
+
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty,
+    remoteReconnectDelayMs: 5,
+    remoteReconnectStableMs: 5
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "privateKey"
+        }
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.remoteRuntime.connectivityState, "connected");
+    assert.equal(created.remoteRuntime.reconnectPolicy.maxAttempts, 3);
+
+    ptys[0].emitExit();
+
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      const body = await res.json();
+      return body.remoteRuntime?.connectivityState === "degraded";
+    });
+
+    await waitFor(() => ptys.length >= 2);
+    ptys[1].emitData("reconnected\n");
+
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      const body = await res.json();
+      return body.remoteRuntime?.connectivityState === "connected" && body.remoteRuntime?.reconnectAttempts === 0;
+    });
+
+    const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(getRes.status, 200);
+    const reconnected = await getRes.json();
+    assert.equal(reconnected.state, "running");
+    assert.equal(reconnected.remoteRuntime.connectivityState, "connected");
+    assert.equal(reconnected.remoteRuntime.reconnectAttempts, 0);
+    assert.equal(typeof reconnected.remoteRuntime.lastReconnectAt, "number");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("ssh sessions become offline after bounded reconnect retries and reject direct input", async () => {
+  const ptys = [];
+  const createPty = () => {
+    let exitHandler = null;
+    const ptyInstance = {
+      onExit(handler) {
+        exitHandler = handler;
+      },
+      onData() {},
+      write() {},
+      resize() {},
+      kill() {
+        if (exitHandler) {
+          exitHandler({ exitCode: 255, signal: "" });
+        }
+      },
+      emitExit(payload = { exitCode: 255, signal: "" }) {
+        if (exitHandler) {
+          exitHandler(payload);
+        }
+      }
+    };
+    ptys.push(ptyInstance);
+    return ptyInstance;
+  };
+
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty,
+    remoteReconnectMaxAttempts: 2,
+    remoteReconnectDelayMs: 5,
+    remoteReconnectStableMs: 5
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22
+        },
+        remoteAuth: {
+          method: "privateKey"
+        }
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    ptys[0].emitExit();
+    await waitFor(() => ptys.length >= 2);
+    ptys[1].emitExit();
+    await waitFor(() => ptys.length >= 3);
+    ptys[2].emitExit();
+
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      const body = await res.json();
+      return body.remoteRuntime?.connectivityState === "offline";
+    });
+
+    const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(getRes.status, 200);
+    const offline = await getRes.json();
+    assert.equal(offline.remoteRuntime.connectivityState, "offline");
+    assert.equal(offline.remoteRuntime.reconnectAttempts, 2);
+    assert.equal(typeof offline.remoteRuntime.disconnectedAt, "number");
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "pwd\n" })
+    });
+    assert.equal(inputRes.status, 409);
+    const errorBody = await inputRes.json();
+    assert.equal(errorBody.error, "RemoteSessionOffline");
+
+    const restartRes = await fetch(`${baseUrl}/sessions/${created.id}/restart`, {
+      method: "POST"
+    });
+    assert.equal(restartRes.status, 200);
+    const restarted = await restartRes.json();
+    assert.equal(restarted.state, "running");
+    assert.equal(restarted.remoteRuntime.connectivityState, "connected");
   } finally {
     await runtime.stop();
   }

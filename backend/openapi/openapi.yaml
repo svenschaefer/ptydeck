@@ -1241,6 +1241,61 @@ components:
             - keyboardInteractive
         privateKeyPath:
           type: string
+    RemoteReconnectPolicy:
+      type: object
+      required:
+        - maxAttempts
+        - delayMs
+      properties:
+        maxAttempts:
+          type: integer
+          minimum: 0
+        delayMs:
+          type: integer
+          minimum: 1
+    RemoteRuntime:
+      type: object
+      required:
+        - connectivityState
+        - reconnectPolicy
+        - reconnectAttempts
+        - disconnectedAt
+        - nextReconnectAt
+        - lastReconnectAt
+        - lastDisconnectReason
+        - lastExitCode
+        - lastExitSignal
+      properties:
+        connectivityState:
+          type: string
+          enum:
+            - connected
+            - degraded
+            - offline
+        reconnectPolicy:
+          $ref: '#/components/schemas/RemoteReconnectPolicy'
+        reconnectAttempts:
+          type: integer
+          minimum: 0
+        disconnectedAt:
+          type: integer
+          format: int64
+          nullable: true
+        nextReconnectAt:
+          type: integer
+          format: int64
+          nullable: true
+        lastReconnectAt:
+          type: integer
+          format: int64
+          nullable: true
+        lastDisconnectReason:
+          type: string
+        lastExitCode:
+          type: integer
+          nullable: true
+        lastExitSignal:
+          type: string
     Session:
       type: object
       required:
@@ -1285,6 +1340,8 @@ components:
           $ref: '#/components/schemas/RemoteConnection'
         remoteAuth:
           $ref: '#/components/schemas/RemoteAuth'
+        remoteRuntime:
+          $ref: '#/components/schemas/RemoteRuntime'
         name:
           type: string
         note:

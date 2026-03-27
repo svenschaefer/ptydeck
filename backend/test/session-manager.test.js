@@ -49,6 +49,18 @@ function createFakePty() {
   };
 }
 
+function createQueuedFakePtyFactory() {
+  const ptys = [];
+  return {
+    ptys,
+    createPty() {
+      const pty = createFakePty();
+      ptys.push(pty);
+      return pty;
+    }
+  };
+}
+
 test("SessionManager create/list/get/delete lifecycle", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({
@@ -126,6 +138,80 @@ test("SessionManager emits stable exit metadata", () => {
   assert.equal(exits[0].signal, "");
   assert.equal(exits[0].exitedAt, 1710000001234);
   assert.equal(exits[0].updatedAt, 1710000001234);
+});
+
+test("SessionManager reconnects unexpected ssh exits and restores connected remote runtime state", async () => {
+  const queued = createQueuedFakePtyFactory();
+  const manager = new SessionManager({
+    createPty: () => queued.createPty(),
+    remoteReconnectDelayMs: 5,
+    remoteReconnectStableMs: 5
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22,
+      username: "ops"
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+
+  assert.equal(created.remoteRuntime.connectivityState, "connected");
+  assert.equal(queued.ptys.length, 1);
+
+  queued.ptys[0].kill();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+  assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "degraded");
+  assert.equal(manager.get(created.id).meta.remoteRuntime.reconnectPolicy.maxAttempts, 3);
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(queued.ptys.length, 2);
+  assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "connected");
+  assert.equal(manager.get(created.id).meta.remoteRuntime.reconnectAttempts, 0);
+  assert.equal(typeof manager.get(created.id).meta.remoteRuntime.lastReconnectAt, "number");
+});
+
+test("SessionManager marks ssh sessions offline after bounded reconnect failures", async () => {
+  const queued = createQueuedFakePtyFactory();
+  const manager = new SessionManager({
+    createPty: () => queued.createPty(),
+    remoteReconnectMaxAttempts: 2,
+    remoteReconnectDelayMs: 5,
+    remoteReconnectStableMs: 5
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+
+  queued.ptys[0].kill();
+  await new Promise((resolve) => setTimeout(resolve, 8));
+  assert.equal(queued.ptys.length, 2);
+  queued.ptys[1].kill();
+  await new Promise((resolve) => setTimeout(resolve, 8));
+  assert.equal(queued.ptys.length, 3);
+  queued.ptys[2].kill();
+  await new Promise((resolve) => setTimeout(resolve, 8));
+
+  const offline = manager.get(created.id).meta;
+  assert.equal(offline.remoteRuntime.connectivityState, "offline");
+  assert.equal(offline.remoteRuntime.reconnectAttempts, 2);
+  assert.equal(typeof offline.remoteRuntime.disconnectedAt, "number");
+  assert.throws(
+    () => manager.sendInput(created.id, "pwd\n"),
+    /Remote SSH session '.*' is offline/
+  );
 });
 
 test("SessionManager emits activity completion after quiet period and persists inactive metadata in-session", async () => {

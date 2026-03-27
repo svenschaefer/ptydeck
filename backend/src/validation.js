@@ -56,6 +56,34 @@ function isRemoteAuth(value) {
   );
 }
 
+function isRemoteReconnectPolicy(value) {
+  return (
+    isObject(value) &&
+    Number.isInteger(value.maxAttempts) &&
+    value.maxAttempts >= 0 &&
+    Number.isInteger(value.delayMs) &&
+    value.delayMs > 0
+  );
+}
+
+function isRemoteRuntime(value) {
+  return (
+    isObject(value) &&
+    (value.connectivityState === "connected" ||
+      value.connectivityState === "degraded" ||
+      value.connectivityState === "offline") &&
+    isRemoteReconnectPolicy(value.reconnectPolicy) &&
+    Number.isInteger(value.reconnectAttempts) &&
+    value.reconnectAttempts >= 0 &&
+    (value.disconnectedAt === null || Number.isInteger(value.disconnectedAt)) &&
+    (value.nextReconnectAt === null || Number.isInteger(value.nextReconnectAt)) &&
+    (value.lastReconnectAt === null || Number.isInteger(value.lastReconnectAt)) &&
+    typeof value.lastDisconnectReason === "string" &&
+    (value.lastExitCode === null || Number.isInteger(value.lastExitCode)) &&
+    typeof value.lastExitSignal === "string"
+  );
+}
+
 function isSshTrustEntry(value) {
   return (
     isObject(value) &&
@@ -723,6 +751,7 @@ function isSession(value) {
     (value.note === undefined || typeof value.note === "string") &&
     (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
     (value.remoteAuth === undefined || isRemoteAuth(value.remoteAuth)) &&
+    (value.remoteRuntime === undefined || isRemoteRuntime(value.remoteRuntime)) &&
     typeof value.startCwd === "string" &&
     typeof value.startCommand === "string" &&
     isObject(value.env) &&

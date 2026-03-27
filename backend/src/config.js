@@ -154,6 +154,18 @@ export function loadConfig(env = process.env) {
     env.SESSION_ACTIVITY_QUIET_MS || 1400,
     "SESSION_ACTIVITY_QUIET_MS"
   );
+  const remoteReconnectMaxAttempts = parseNonNegativeInt(
+    env.REMOTE_RECONNECT_MAX_ATTEMPTS || 3,
+    "REMOTE_RECONNECT_MAX_ATTEMPTS"
+  );
+  const remoteReconnectDelayMs = parsePositiveInt(
+    env.REMOTE_RECONNECT_DELAY_MS || 1500,
+    "REMOTE_RECONNECT_DELAY_MS"
+  );
+  const remoteReconnectStableMs = parsePositiveInt(
+    env.REMOTE_RECONNECT_STABLE_MS || 500,
+    "REMOTE_RECONNECT_STABLE_MS"
+  );
   const sessionGuardrailSweepMs = parsePositiveInt(env.SESSION_GUARDRAIL_SWEEP_MS || 1000, "SESSION_GUARDRAIL_SWEEP_MS");
   const authDevTokenTtlSeconds = parsePositiveInt(
     env.AUTH_DEV_TOKEN_TTL_SECONDS || 900,
@@ -180,6 +192,9 @@ export function loadConfig(env = process.env) {
     sessionReplayMemoryMaxChars,
     sessionReplayPersistMaxChars,
     sessionActivityQuietMs,
+    remoteReconnectMaxAttempts,
+    remoteReconnectDelayMs,
+    remoteReconnectStableMs,
     sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,

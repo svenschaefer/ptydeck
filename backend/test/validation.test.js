@@ -111,6 +111,57 @@ test("validateResponse checks session list schema", () => {
   });
 });
 
+test("validateResponse accepts ssh session remote runtime metadata", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "session",
+      body: {
+        id: "ssh-1",
+        deckId: "default",
+        state: "running",
+        activityState: "inactive",
+        kind: "ssh",
+        cwd: "~/workspace",
+        shell: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "privateKey"
+        },
+        remoteRuntime: {
+          connectivityState: "degraded",
+          reconnectPolicy: {
+            maxAttempts: 3,
+            delayMs: 1500
+          },
+          reconnectAttempts: 1,
+          disconnectedAt: 10,
+          nextReconnectAt: 1510,
+          lastReconnectAt: null,
+          lastDisconnectReason: "ssh-transport-exit",
+          lastExitCode: 255,
+          lastExitSignal: ""
+        },
+        inputSafetyProfile: INPUT_SAFETY_PROFILE,
+        startCwd: "~/workspace",
+        startCommand: "",
+        env: {},
+        tags: [],
+        themeProfile: THEME_PROFILE,
+        activeThemeProfile: THEME_PROFILE,
+        inactiveThemeProfile: THEME_PROFILE,
+        createdAt: 1,
+        updatedAt: 10,
+        activityUpdatedAt: 10
+      }
+    });
+  });
+});
+
 test("validateRequest rejects invalid session create body", () => {
   assert.throws(() => {
     validateRequest({
