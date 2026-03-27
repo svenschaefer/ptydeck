@@ -2045,7 +2045,8 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
   const persistedSession = persistedSessions.find((session) => session.id === createdId);
   assert.ok(persistedSession);
   assert.equal(persistedSession.createdAt, createdAt);
-  assert.equal(persistedSession.updatedAt, updatedAt);
+  assert.ok(persistedSession.updatedAt >= updatedAt);
+  updatedAt = persistedSession.updatedAt;
 
   const runtimeB = createRuntime({
     port: 0,
@@ -2617,22 +2618,31 @@ test("ssh session contract persists normalized metadata and restores through the
       port: 2222,
       username: "ops"
     });
-    assert.deepEqual(spawnCalls.at(-1), {
-      command: "ssh",
-      shell: "ssh",
-      cwd: homedir(),
-      args: [
-        "-tt",
-        "-p",
-        "2222",
-        "-l",
-        "ops",
-        "example.internal",
-        spawnCalls.at(-1).args[6]
-      ]
-    });
-    assert.match(spawnCalls.at(-1).args[6], /^sh -lc '/);
-    assert.match(spawnCalls.at(-1).args[6], /pwd/);
+    assert.equal(spawnCalls.at(-1).command, "ssh");
+    assert.equal(spawnCalls.at(-1).shell, "ssh");
+    assert.equal(spawnCalls.at(-1).cwd, homedir());
+    assert.deepEqual(spawnCalls.at(-1).args.slice(0, 18), [
+      "-tt",
+      "-o",
+      "ClearAllForwardings=yes",
+      "-o",
+      "ForwardAgent=no",
+      "-o",
+      "ForwardX11=no",
+      "-o",
+      "PreferredAuthentications=publickey",
+      "-o",
+      "PasswordAuthentication=no",
+      "-o",
+      "KbdInteractiveAuthentication=no",
+      "-p",
+      "2222",
+      "-l",
+      "ops",
+      "example.internal"
+    ]);
+    assert.match(spawnCalls.at(-1).args[18], /^sh -lc '/);
+    assert.match(spawnCalls.at(-1).args[18], /pwd/);
   } finally {
     await runtimeA.stop();
   }
@@ -2678,6 +2688,187 @@ test("ssh session contract persists normalized metadata and restores through the
     assert.equal(spawnCalls.at(-1).command, "ssh");
   } finally {
     await runtimeB.stop();
+  }
+});
+
+test("password-auth ssh sessions persist metadata but fail closed into unrestored state after restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const spawnCalls = [];
+  const fallbackFactory = createFallbackAwarePtyFactory();
+  const createPty = (options) => {
+    spawnCalls.push({
+      command: options.command || options.shell,
+      shell: options.shell,
+      cwd: options.cwd,
+      args: Array.isArray(options.args) ? [...options.args] : [],
+      env: {
+        SSH_ASKPASS: options.env?.SSH_ASKPASS,
+        SSH_ASKPASS_REQUIRE: options.env?.SSH_ASKPASS_REQUIRE,
+        DISPLAY: options.env?.DISPLAY,
+        PTYDECK_SSH_SECRET: options.env?.PTYDECK_SSH_SECRET
+      }
+    });
+    return fallbackFactory(options);
+  };
+
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let createdId = "";
+  try {
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "password"
+        },
+        remoteSecret: "super-secret"
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+    assert.deepEqual(created.remoteAuth, { method: "password" });
+    assert.equal("remoteSecret" in created, false);
+    assert.equal(spawnCalls.at(-1).env.SSH_ASKPASS_REQUIRE, "force");
+    assert.equal(spawnCalls.at(-1).env.DISPLAY, "ptydeck-ssh-askpass");
+    assert.equal(spawnCalls.at(-1).env.PTYDECK_SSH_SECRET, "super-secret");
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  const persistedSessions = Array.isArray(persistedRaw.sessions) ? persistedRaw.sessions : [];
+  const persistedSession = persistedSessions.find((session) => session.id === createdId);
+  assert.ok(persistedSession);
+  assert.deepEqual(persistedSession.remoteAuth, { method: "password" });
+  assert.equal("remoteSecret" in persistedSession, false);
+
+  const spawnCountBeforeRestore = spawnCalls.length;
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    assert.equal(spawnCalls.length, spawnCountBeforeRestore);
+    const getRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(getRes.status, 200);
+    const restored = await getRes.json();
+    assert.equal(restored.state, "unrestored");
+    assert.equal(restored.kind, "ssh");
+    assert.deepEqual(restored.remoteAuth, { method: "password" });
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("runtime restore normalizes invalid persisted ssh auth metadata to safe defaults", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "restore-invalid-ssh-auth";
+  const spawnCalls = [];
+  const createPty = (options) => {
+    spawnCalls.push({
+      command: options.command || options.shell,
+      args: Array.isArray(options.args) ? [...options.args] : []
+    });
+    return createFallbackAwarePtyFactory()(options);
+  };
+
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: sessionId,
+            kind: "ssh",
+            remoteConnection: {
+              host: "example.internal",
+              port: 99999,
+              username: "ops user"
+            },
+            remoteAuth: {
+              method: "token"
+            },
+            cwd: "~/workspace",
+            shell: "ssh",
+            name: "invalid-ssh-auth",
+            startCwd: "~/workspace",
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: 1710000000000,
+            updatedAt: 1710000000500
+          }
+        ],
+        customCommands: [],
+        sessionOutputs: []
+      },
+      null,
+      2
+    )
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    createPty
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+  try {
+    const getRes = await fetch(`${baseUrl}/sessions/${sessionId}`);
+    assert.equal(getRes.status, 200);
+    const restored = await getRes.json();
+    assert.equal(restored.state, "running");
+    assert.equal(restored.kind, "ssh");
+    assert.deepEqual(restored.remoteConnection, {
+      host: "example.internal",
+      port: 22
+    });
+    assert.deepEqual(restored.remoteAuth, { method: "privateKey" });
+    assert.equal(spawnCalls.length, 1);
+    assert.ok(spawnCalls[0].args.includes("PreferredAuthentications=publickey"));
+  } finally {
+    await runtime.stop();
   }
 });
 

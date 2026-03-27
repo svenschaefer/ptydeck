@@ -22,6 +22,7 @@ function createFakePty() {
   return {
     writes: [],
     resizeCalls: [],
+    killSignals: [],
     killed: false,
     onExit(handler) {
       lastExitHandler = handler;
@@ -38,7 +39,8 @@ function createFakePty() {
     resize(cols, rows) {
       this.resizeCalls.push({ cols, rows });
     },
-    kill() {
+    kill(signal) {
+      this.killSignals.push(signal || "SIGHUP");
       this.killed = true;
       if (lastExitHandler) {
         lastExitHandler({ exitCode: 0, signal: 0 });
@@ -391,10 +393,334 @@ test("SessionManager builds deterministic ssh launch options and persists remote
   assert.equal(spawnOptions.command, "ssh");
   assert.equal(spawnOptions.shell, "ssh");
   assert.equal(spawnOptions.cwd, homedir());
-  assert.deepEqual(spawnOptions.args.slice(0, 6), ["-tt", "-p", "2222", "-l", "ops", "example.internal"]);
+  assert.deepEqual(spawnOptions.args.slice(0, 18), [
+    "-tt",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "ForwardAgent=no",
+    "-o",
+    "ForwardX11=no",
+    "-o",
+    "PreferredAuthentications=publickey",
+    "-o",
+    "PasswordAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no",
+    "-p",
+    "2222",
+    "-l",
+    "ops",
+    "example.internal"
+  ]);
   assert.equal(fakePty.writes.length, 0);
-  assert.match(spawnOptions.args[6], /^sh -lc '/);
-  assert.match(spawnOptions.args[6], /pwd/);
+  assert.match(spawnOptions.args[18], /^sh -lc '/);
+  assert.match(spawnOptions.args[18], /pwd/);
+});
+
+test("SessionManager wires askpass env for password ssh auth without persisting the secret", () => {
+  const fakePty = createFakePty();
+  let spawnOptions = null;
+  const manager = new SessionManager({
+    createPty: (options) => {
+      spawnOptions = options;
+      return fakePty;
+    },
+    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh"
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "password"
+    },
+    remoteSecret: "super-secret"
+  });
+
+  assert.equal(created.kind, "ssh");
+  assert.deepEqual(created.remoteAuth, { method: "password" });
+  assert.equal(created.remoteSecret, undefined);
+  assert.ok(spawnOptions);
+  assert.deepEqual(spawnOptions.args.slice(0, 13), [
+    "-tt",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "ForwardAgent=no",
+    "-o",
+    "ForwardX11=no",
+    "-o",
+    "PreferredAuthentications=password",
+    "-o",
+    "PubkeyAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no"
+  ]);
+  assert.equal(spawnOptions.env.SSH_ASKPASS, "/tmp/ptydeck-test-askpass.sh");
+  assert.equal(spawnOptions.env.SSH_ASKPASS_REQUIRE, "force");
+  assert.equal(spawnOptions.env.DISPLAY, "ptydeck-ssh-askpass");
+  assert.equal(spawnOptions.env.PTYDECK_SSH_SECRET, "super-secret");
+});
+
+test("SessionManager supports keyboardInteractive and privateKey ssh launch variants", () => {
+  const spawned = [];
+  const manager = new SessionManager({
+    createPty: (options) => {
+      const fakePty = createFakePty();
+      spawned.push({ options, fakePty });
+      return fakePty;
+    },
+    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh"
+  });
+
+  const keyboardInteractive = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22,
+      username: "ops"
+    },
+    remoteAuth: {
+      method: "keyboardInteractive"
+    },
+    remoteSecret: "otp-code"
+  });
+  const keyboardLaunch = spawned[0].options;
+  assert.equal(keyboardInteractive.kind, "ssh");
+  assert.deepEqual(keyboardInteractive.remoteAuth, { method: "keyboardInteractive" });
+  assert.deepEqual(keyboardLaunch.args.slice(0, 15), [
+    "-tt",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "ForwardAgent=no",
+    "-o",
+    "ForwardX11=no",
+    "-o",
+    "PreferredAuthentications=keyboard-interactive",
+    "-o",
+    "PubkeyAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=yes",
+    "-o",
+    "NumberOfPasswordPrompts=1"
+  ]);
+  assert.equal(keyboardLaunch.env.SSH_ASKPASS, "/tmp/ptydeck-test-askpass.sh");
+  assert.equal(keyboardLaunch.env.PTYDECK_SSH_SECRET, "otp-code");
+
+  const privateKey = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 2222
+    },
+    remoteAuth: {
+      method: "privateKey",
+      privateKeyPath: "/keys/id_ed25519"
+    }
+  });
+  const privateKeyLaunch = spawned[1].options;
+  assert.deepEqual(privateKey.remoteAuth, {
+    method: "privateKey",
+    privateKeyPath: "/keys/id_ed25519"
+  });
+  assert.equal(privateKeyLaunch.args.includes("-i"), true);
+  assert.equal(privateKeyLaunch.args[privateKeyLaunch.args.indexOf("-i") + 1], "/keys/id_ed25519");
+});
+
+test("SessionManager updateSession enforces ssh auth secret transitions and signal helpers", () => {
+  const fakePty = createFakePty();
+  fakePty.kill = function kill(signal) {
+    this.killSignals.push(signal || "SIGHUP");
+    this.killed = true;
+  };
+  let currentTime = 1000;
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => {
+      currentTime += 1;
+      return currentTime;
+    }
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+
+  assert.throws(() => {
+    manager.updateSession(created.id, {
+      remoteAuth: { method: "password" }
+    });
+  }, /Field 'remoteSecret' is required when changing to password or keyboardInteractive ssh auth\./);
+
+  const passwordUpdated = manager.updateSession(created.id, {
+    remoteAuth: { method: "password" },
+    remoteSecret: "super-secret"
+  });
+  assert.deepEqual(passwordUpdated.remoteAuth, { method: "password" });
+  assert.equal(manager.get(created.id).remoteSecret, "super-secret");
+
+  const privateKeyUpdated = manager.updateSession(created.id, {
+    remoteAuth: { method: "privateKey", privateKeyPath: "/keys/id_ed25519" }
+  });
+  assert.deepEqual(privateKeyUpdated.remoteAuth, {
+    method: "privateKey",
+    privateKeyPath: "/keys/id_ed25519"
+  });
+  assert.equal(manager.get(created.id).remoteSecret, undefined);
+
+  manager.interrupt(created.id);
+  manager.terminate(created.id);
+  manager.kill(created.id);
+  assert.deepEqual(fakePty.killSignals, ["SIGINT", "SIGTERM", "SIGKILL"]);
+});
+
+test("SessionManager rejects unsupported proxy and forwarding overrides for ssh sessions", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22,
+        proxyJump: "bastion.internal"
+      }
+    });
+  });
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "privateKey",
+        forwardAgent: true
+      }
+    });
+  });
+});
+
+test("SessionManager rejects invalid ssh auth payloads and secret combinations", () => {
+  const manager = new SessionManager({
+    createPty: () => createFakePty()
+  });
+
+  assert.throws(() => {
+    manager.create({
+      remoteAuth: { method: "password" }
+    });
+  }, /Field 'remoteAuth' is only supported for ssh sessions\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: "password"
+    });
+  }, /Field 'remoteAuth' must be an object for ssh sessions\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "token"
+      }
+    });
+  }, /Field 'remoteAuth\.method' must be 'password', 'privateKey', or 'keyboardInteractive'\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "password",
+        privateKeyPath: "/keys/id_ed25519"
+      },
+      remoteSecret: "super-secret"
+    });
+  }, /Field 'remoteAuth\.privateKeyPath' is only supported for privateKey ssh auth\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "privateKey",
+        privateKeyPath: "x".repeat(1025)
+      }
+    });
+  }, /Field 'remoteAuth\.privateKeyPath' must not exceed 1024 characters\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "password"
+      }
+    });
+  }, /Field 'remoteSecret' is required for password and keyboardInteractive ssh auth\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "privateKey"
+      },
+      remoteSecret: "super-secret"
+    });
+  }, /Field 'remoteSecret' is only supported for password and keyboardInteractive ssh auth\./);
+
+  assert.throws(() => {
+    manager.create({
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "keyboardInteractive"
+      },
+      remoteSecret: ""
+    });
+  }, /Field 'remoteSecret' must be a non-empty string up to 4096 characters\./);
 });
 
 test("SessionManager can rename sessions", () => {

@@ -179,6 +179,10 @@ test("validateRequest accepts ssh session create payload", () => {
           port: 22,
           username: "ops"
         },
+        remoteAuth: {
+          method: "password"
+        },
+        remoteSecret: "super-secret",
         startCwd: "~",
         startCommand: "hostname"
       }
@@ -194,6 +198,19 @@ test("validateRequest rejects invalid ssh session kind", () => {
       params: {},
       body: {
         kind: "telnet"
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid remoteSecret type", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        remoteSecret: 123
       }
     });
   });

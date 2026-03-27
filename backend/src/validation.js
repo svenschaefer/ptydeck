@@ -33,6 +33,7 @@ const THEME_PROFILE_KEYS = [
 const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
 const SESSION_KIND_VALUES = new Set(["local", "ssh"]);
+const REMOTE_AUTH_METHOD_VALUES = new Set(["password", "privateKey", "keyboardInteractive"]);
 
 function isRemoteConnection(value) {
   return (
@@ -43,6 +44,14 @@ function isRemoteConnection(value) {
     value.port >= 1 &&
     value.port <= 65535 &&
     (value.username === undefined || typeof value.username === "string")
+  );
+}
+
+function isRemoteAuth(value) {
+  return (
+    isObject(value) &&
+    REMOTE_AUTH_METHOD_VALUES.has(value.method) &&
+    (value.privateKeyPath === undefined || typeof value.privateKeyPath === "string")
   );
 }
 
@@ -236,6 +245,12 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body?.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
       throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
     }
+    if (body?.remoteAuth !== undefined && !isObject(body.remoteAuth)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object.");
+    }
+    if (body?.remoteSecret !== undefined && typeof body.remoteSecret !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' must be a string.");
+    }
     if (body?.startCwd !== undefined && typeof body.startCwd !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
     }
@@ -280,6 +295,8 @@ export function validateRequest({ method, pathname, params, query, body }) {
       body.name === undefined &&
       body.kind === undefined &&
       body.remoteConnection === undefined &&
+      body.remoteAuth === undefined &&
+      body.remoteSecret === undefined &&
       body.startCwd === undefined &&
       body.startCommand === undefined &&
       body.note === undefined &&
@@ -300,6 +317,12 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
       throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
+    }
+    if (body.remoteAuth !== undefined && !isObject(body.remoteAuth)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object.");
+    }
+    if (body.remoteSecret !== undefined && typeof body.remoteSecret !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' must be a string.");
     }
     if (body.startCwd !== undefined && typeof body.startCwd !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
@@ -653,6 +676,7 @@ function isSession(value) {
     (value.name === undefined || typeof value.name === "string") &&
     (value.note === undefined || typeof value.note === "string") &&
     (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
+    (value.remoteAuth === undefined || isRemoteAuth(value.remoteAuth)) &&
     typeof value.startCwd === "string" &&
     typeof value.startCommand === "string" &&
     isObject(value.env) &&

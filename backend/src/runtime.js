@@ -61,8 +61,13 @@ const SESSION_KIND_SSH = "ssh";
 const SESSION_KIND_VALUES = new Set([SESSION_KIND_LOCAL, SESSION_KIND_SSH]);
 const DEFAULT_SSH_CLIENT = "ssh";
 const DEFAULT_SSH_PORT = 22;
+const SSH_AUTH_METHOD_PASSWORD = "password";
+const SSH_AUTH_METHOD_PRIVATE_KEY = "privateKey";
+const SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE = "keyboardInteractive";
 const REMOTE_HOST_MAX_LENGTH = 255;
 const REMOTE_USERNAME_MAX_LENGTH = 64;
+const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
+const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
 const SESSION_ENV_MAX_ENTRIES = 64;
 const SESSION_ENV_KEY_MAX_LENGTH = 128;
@@ -744,6 +749,18 @@ function normalizeSessionRemoteConnection(input, kind, { strict = true } = {}) {
     }
     return undefined;
   }
+  for (const unsupportedField of ["proxyJump", "proxyCommand", "forwardAgent", "forwardX11", "sshOptions"]) {
+    if (Object.prototype.hasOwnProperty.call(input, unsupportedField)) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "ValidationError",
+          `Field 'remoteConnection.${unsupportedField}' is not supported in the H38 remote baseline.`
+        );
+      }
+      return undefined;
+    }
+  }
 
   const host = typeof input.host === "string" ? input.host.trim() : "";
   if (!host || host.length > REMOTE_HOST_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(host)) {
@@ -788,6 +805,127 @@ function normalizeSessionRemoteConnection(input, kind, { strict = true } = {}) {
     port,
     ...(username ? { username } : {})
   };
+}
+
+function normalizeSessionRemoteAuth(input, kind, { strict = true } = {}) {
+  if (kind !== SESSION_KIND_SSH) {
+    if (input !== undefined && input !== null && strict) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (input === undefined || input === null) {
+    return { method: SSH_AUTH_METHOD_PRIVATE_KEY };
+  }
+  if (!isPlainObject(input)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object for ssh sessions.");
+    }
+    return { method: SSH_AUTH_METHOD_PRIVATE_KEY };
+  }
+  for (const unsupportedField of ["proxyJump", "proxyCommand", "forwardAgent", "forwardX11", "sshOptions"]) {
+    if (Object.prototype.hasOwnProperty.call(input, unsupportedField)) {
+      if (strict) {
+        throw new ApiError(
+          400,
+          "ValidationError",
+          `Field 'remoteAuth.${unsupportedField}' is not supported in the H38 authentication baseline.`
+        );
+      }
+      return { method: SSH_AUTH_METHOD_PRIVATE_KEY };
+    }
+  }
+  const method =
+    typeof input.method === "string" && input.method.trim() ? input.method.trim() : SSH_AUTH_METHOD_PRIVATE_KEY;
+  if (
+    method !== SSH_AUTH_METHOD_PASSWORD &&
+    method !== SSH_AUTH_METHOD_PRIVATE_KEY &&
+    method !== SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE
+  ) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteAuth.method' must be 'password', 'privateKey', or 'keyboardInteractive'."
+      );
+    }
+    return { method: SSH_AUTH_METHOD_PRIVATE_KEY };
+  }
+  const privateKeyPath = typeof input.privateKeyPath === "string" ? input.privateKeyPath.trim() : "";
+  if (method !== SSH_AUTH_METHOD_PRIVATE_KEY && privateKeyPath) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteAuth.privateKeyPath' is only supported for privateKey ssh auth."
+      );
+    }
+    return { method };
+  }
+  if (privateKeyPath && privateKeyPath.length > REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'remoteAuth.privateKeyPath' must not exceed ${REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH} characters.`
+      );
+    }
+    return { method };
+  }
+  return {
+    method,
+    ...(privateKeyPath ? { privateKeyPath } : {})
+  };
+}
+
+function remoteAuthRequiresSecret(remoteAuth) {
+  if (!remoteAuth) {
+    return false;
+  }
+  return (
+    remoteAuth.method === SSH_AUTH_METHOD_PASSWORD ||
+    remoteAuth.method === SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE
+  );
+}
+
+function normalizeSessionRemoteSecret(input, remoteAuth, kind, { strict = true } = {}) {
+  if (kind !== SESSION_KIND_SSH) {
+    if (input !== undefined && input !== null && strict) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (input === undefined || input === null) {
+    if (strict && remoteAuthRequiresSecret(remoteAuth)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteSecret' is required for password and keyboardInteractive ssh auth."
+      );
+    }
+    return undefined;
+  }
+  if (!remoteAuthRequiresSecret(remoteAuth)) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteSecret' is only supported for password and keyboardInteractive ssh auth."
+      );
+    }
+    return undefined;
+  }
+  if (typeof input !== "string" || input.length < 1 || input.length > REMOTE_SECRET_MAX_LENGTH) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'remoteSecret' must be a non-empty string up to ${REMOTE_SECRET_MAX_LENGTH} characters.`
+      );
+    }
+    return undefined;
+  }
+  return input;
 }
 
 function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
@@ -3193,11 +3331,14 @@ function tryCreateRestoredSession({
   session,
   kind,
   remoteConnection,
+  remoteAuth,
   shell,
   cwd,
   startCwd,
   startCommand,
   replayOutput,
+  replayOutputTruncated,
+  remoteSecret,
   env,
   note,
   inputSafetyProfile,
@@ -3210,12 +3351,15 @@ function tryCreateRestoredSession({
       id: session.id,
       kind,
       remoteConnection,
+      remoteAuth,
+      remoteSecret,
       cwd,
       shell,
       name: session.name,
       startCwd,
       startCommand,
       replayOutput,
+      replayOutputTruncated,
       env,
       note,
       inputSafetyProfile,
@@ -3694,6 +3838,8 @@ function tryCreateRestoredSession({
           { strict: true }
         );
         const remoteConnection = normalizeSessionRemoteConnection(body?.remoteConnection, kind, { strict: true });
+        const remoteAuth = normalizeSessionRemoteAuth(body?.remoteAuth, kind, { strict: true });
+        const remoteSecret = normalizeSessionRemoteSecret(body?.remoteSecret, remoteAuth, kind, { strict: true });
         const themeSlots = normalizeSessionThemeSlots(body, { strict: true });
         const note = normalizeSessionNote(body?.note, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(body?.inputSafetyProfile, { strict: true });
@@ -3701,6 +3847,8 @@ function tryCreateRestoredSession({
         const payload = manager.create({
           kind,
           remoteConnection,
+          remoteAuth,
+          remoteSecret,
           cwd: startupConfig.startCwd,
           shell: body?.shell !== undefined ? body.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
           name: body?.name,
@@ -3765,10 +3913,31 @@ function tryCreateRestoredSession({
         }
         if (body?.remoteConnection !== undefined || body?.kind !== undefined) {
           patch.remoteConnection = normalizeSessionRemoteConnection(
-            body?.remoteConnection !== undefined ? body.remoteConnection : current.remoteConnection,
+            body?.remoteConnection !== undefined
+              ? body.remoteConnection
+              : body?.kind !== undefined && effectiveKind !== current.kind
+                ? undefined
+                : current.remoteConnection,
             effectiveKind,
             { strict: true }
           );
+        }
+        const effectiveRemoteAuth = normalizeSessionRemoteAuth(
+          body?.remoteAuth !== undefined
+            ? body.remoteAuth
+            : body?.kind !== undefined && effectiveKind !== current.kind
+              ? undefined
+              : current.remoteAuth,
+          effectiveKind,
+          { strict: true }
+        );
+        if (body?.remoteAuth !== undefined || body?.kind !== undefined) {
+          patch.remoteAuth = effectiveRemoteAuth;
+        }
+        if (body?.remoteSecret !== undefined) {
+          patch.remoteSecret = normalizeSessionRemoteSecret(body.remoteSecret, effectiveRemoteAuth, effectiveKind, {
+            strict: true
+          });
         }
         const hasStartupUpdates =
           body?.startCwd !== undefined || body?.startCommand !== undefined || body?.env !== undefined;
@@ -4152,6 +4321,7 @@ function tryCreateRestoredSession({
           { strict: false }
         );
         const remoteConnection = normalizeSessionRemoteConnection(session.remoteConnection, kind, { strict: false });
+        const remoteAuth = normalizeSessionRemoteAuth(session.remoteAuth, kind, { strict: false });
         const themeSlots = normalizeSessionThemeSlots(
           {
             themeProfile: session.themeProfile,
@@ -4175,6 +4345,7 @@ function tryCreateRestoredSession({
           id: typeof session.id === "string" && session.id ? session.id : "",
           kind,
           ...(remoteConnection ? { remoteConnection } : {}),
+          ...(remoteAuth ? { remoteAuth } : {}),
           cwd:
             typeof session.cwd === "string" && session.cwd.trim()
               ? session.cwd
@@ -4197,6 +4368,16 @@ function tryCreateRestoredSession({
         const requestedCwd = startupConfig.startCwd;
         const fallbackCwd = kind === SESSION_KIND_SSH ? "~" : homedir();
         const fallbackShell = kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : config.shell;
+        if (remoteAuthRequiresSecret(remoteAuth)) {
+          unrestoredSessions.set(normalizedUnrestoredSession.id, normalizedUnrestoredSession);
+          logDebug("restore.session.skip", {
+            sessionId: normalizedUnrestoredSession.id,
+            reason: "missing-remote-secret",
+            kind,
+            authMethod: remoteAuth?.method || null
+          });
+          continue;
+        }
         const restoreAttempts = [
           { shell: requestedShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "saved-shell+saved-cwd" },
           { shell: fallbackShell, cwd: requestedCwd, startCwd: requestedCwd, reason: "fallback-shell+saved-cwd" },
@@ -4211,11 +4392,13 @@ function tryCreateRestoredSession({
               session,
               kind,
               remoteConnection,
+              remoteAuth,
               shell: attempt.shell,
               cwd: attempt.cwd,
               startCwd: attempt.startCwd,
               startCommand: startupConfig.startCommand,
               replayOutput: persistedReplayOutputs.get(session.id)?.data || "",
+              remoteSecret: undefined,
               replayOutputTruncated: persistedReplayOutputs.get(session.id)?.truncated === true,
               env: startupConfig.env,
               note,

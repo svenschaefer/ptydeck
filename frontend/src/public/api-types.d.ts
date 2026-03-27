@@ -8,6 +8,11 @@ export type RemoteConnection = {
   username?: string;
 };
 
+export type RemoteAuth = {
+  method: "password" | "privateKey" | "keyboardInteractive";
+  privateKeyPath?: string;
+};
+
 export type SessionInputSafetyProfile = {
   requireValidShellSyntax: boolean;
   confirmOnIncompleteShellConstruct: boolean;
@@ -71,6 +76,7 @@ export type Session = {
   cwd: string;
   shell: string;
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
   tags: string[];
   inputSafetyProfile: SessionInputSafetyProfile;
   name?: string;
@@ -94,6 +100,8 @@ export type CreateSessionRequest = {
   cwd?: string;
   shell?: string;
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
+  remoteSecret?: string;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
@@ -108,6 +116,8 @@ export type CreateSessionRequest = {
 export type UpdateSessionRequest = {
   kind?: "local" | "ssh";
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
+  remoteSecret?: string;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;

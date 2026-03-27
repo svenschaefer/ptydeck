@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import pty from "node-pty";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { createShellAdapter } from "./shell-adapter.js";
@@ -15,12 +17,19 @@ const DEFAULT_SSH_CLIENT = "ssh";
 const DEFAULT_SSH_PORT = 22;
 const SESSION_KIND_LOCAL = "local";
 const SESSION_KIND_SSH = "ssh";
+const SSH_AUTH_METHOD_PASSWORD = "password";
+const SSH_AUTH_METHOD_PRIVATE_KEY = "privateKey";
+const SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE = "keyboardInteractive";
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_NOTE_MAX_LENGTH = 512;
 const REMOTE_HOST_MAX_LENGTH = 255;
 const REMOTE_USERNAME_MAX_LENGTH = 64;
+const REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH = 1024;
+const REMOTE_SECRET_MAX_LENGTH = 4096;
 const REMOTE_NON_WHITESPACE_PATTERN = /^\S+$/;
+const SESSION_MANAGER_DIRNAME = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_SSH_ASKPASS_PATH = join(SESSION_MANAGER_DIRNAME, "../libexec/ssh-askpass.sh");
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -129,6 +138,10 @@ function normalizeSessionKind(kind) {
   return String(kind || "").trim().toLowerCase() === SESSION_KIND_SSH ? SESSION_KIND_SSH : SESSION_KIND_LOCAL;
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function normalizeRemoteConnection(remoteConnection, kind) {
   if (kind !== SESSION_KIND_SSH) {
     if (remoteConnection !== undefined && remoteConnection !== null) {
@@ -142,6 +155,15 @@ function normalizeRemoteConnection(remoteConnection, kind) {
       "ValidationError",
       "Field 'remoteConnection' is required for ssh sessions and must be an object."
     );
+  }
+  for (const unsupportedField of ["proxyJump", "proxyCommand", "forwardAgent", "forwardX11", "sshOptions"]) {
+    if (Object.prototype.hasOwnProperty.call(remoteConnection, unsupportedField)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'remoteConnection.${unsupportedField}' is not supported in the H38 remote baseline.`
+      );
+    }
   }
   const host = typeof remoteConnection.host === "string" ? remoteConnection.host.trim() : "";
   if (!host || host.length > REMOTE_HOST_MAX_LENGTH || !REMOTE_NON_WHITESPACE_PATTERN.test(host)) {
@@ -174,6 +196,110 @@ function normalizeRemoteConnection(remoteConnection, kind) {
   };
 }
 
+function normalizeRemoteAuth(remoteAuth, kind) {
+  if (kind !== SESSION_KIND_SSH) {
+    if (remoteAuth !== undefined && remoteAuth !== null) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (remoteAuth === undefined || remoteAuth === null) {
+    return { method: SSH_AUTH_METHOD_PRIVATE_KEY };
+  }
+  if (!isPlainObject(remoteAuth)) {
+    throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object for ssh sessions.");
+  }
+  for (const unsupportedField of ["proxyJump", "proxyCommand", "forwardAgent", "forwardX11", "sshOptions"]) {
+    if (Object.prototype.hasOwnProperty.call(remoteAuth, unsupportedField)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'remoteAuth.${unsupportedField}' is not supported in the H38 authentication baseline.`
+      );
+    }
+  }
+  const methodRaw =
+    typeof remoteAuth.method === "string" && remoteAuth.method.trim()
+      ? remoteAuth.method.trim()
+      : SSH_AUTH_METHOD_PRIVATE_KEY;
+  const method = methodRaw;
+  if (
+    method !== SSH_AUTH_METHOD_PASSWORD &&
+    method !== SSH_AUTH_METHOD_PRIVATE_KEY &&
+    method !== SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE
+  ) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteAuth.method' must be 'password', 'privateKey', or 'keyboardInteractive'."
+    );
+  }
+  const privateKeyPath =
+    typeof remoteAuth.privateKeyPath === "string" ? remoteAuth.privateKeyPath.trim() : "";
+  if (method !== SSH_AUTH_METHOD_PRIVATE_KEY && privateKeyPath) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteAuth.privateKeyPath' is only supported for privateKey ssh auth."
+    );
+  }
+  if (privateKeyPath && privateKeyPath.length > REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'remoteAuth.privateKeyPath' must not exceed ${REMOTE_PRIVATE_KEY_PATH_MAX_LENGTH} characters.`
+    );
+  }
+  return {
+    method,
+    ...(privateKeyPath ? { privateKeyPath } : {})
+  };
+}
+
+function remoteAuthRequiresSecret(remoteAuth) {
+  if (!remoteAuth) {
+    return false;
+  }
+  return (
+    remoteAuth.method === SSH_AUTH_METHOD_PASSWORD ||
+    remoteAuth.method === SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE
+  );
+}
+
+function normalizeRemoteSecret(remoteSecret, remoteAuth, kind) {
+  if (kind !== SESSION_KIND_SSH) {
+    if (remoteSecret !== undefined && remoteSecret !== null) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' is only supported for ssh sessions.");
+    }
+    return undefined;
+  }
+  if (remoteSecret === undefined || remoteSecret === null) {
+    if (remoteAuthRequiresSecret(remoteAuth)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteSecret' is required for password and keyboardInteractive ssh auth."
+      );
+    }
+    return undefined;
+  }
+  if (!remoteAuthRequiresSecret(remoteAuth)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'remoteSecret' is only supported for password and keyboardInteractive ssh auth."
+    );
+  }
+  if (typeof remoteSecret !== "string" || remoteSecret.length < 1 || remoteSecret.length > REMOTE_SECRET_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'remoteSecret' must be a non-empty string up to ${REMOTE_SECRET_MAX_LENGTH} characters.`
+    );
+  }
+  return remoteSecret;
+}
+
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
@@ -193,7 +319,17 @@ function buildSshRemoteCommand({ startCwd, startCommand }) {
   return `sh -lc ${shellQuote(steps.join("; "))}`;
 }
 
-function buildSessionLaunchSpec({ kind, shell, spawnCwd, startCwd, startCommand, remoteConnection }) {
+function buildSessionLaunchSpec({
+  kind,
+  shell,
+  spawnCwd,
+  startCwd,
+  startCommand,
+  remoteConnection,
+  remoteAuth,
+  remoteSecret,
+  sshAskpassPath
+}) {
   if (kind !== SESSION_KIND_SSH) {
     return {
       shellAdapterId: shell,
@@ -201,12 +337,48 @@ function buildSessionLaunchSpec({ kind, shell, spawnCwd, startCwd, startCommand,
       args: [],
       spawnCwd,
       metaCwd: spawnCwd,
+      ptyEnvAdditions: {},
       postStartInput: typeof startCommand === "string" && startCommand.trim() ? `${startCommand}\n` : ""
     };
   }
 
   const sshClient = typeof shell === "string" && shell.trim() ? shell.trim() : DEFAULT_SSH_CLIENT;
-  const args = ["-tt"];
+  const args = ["-tt", "-o", "ClearAllForwardings=yes", "-o", "ForwardAgent=no", "-o", "ForwardX11=no"];
+  if (remoteAuth?.method === SSH_AUTH_METHOD_PASSWORD) {
+    args.push(
+      "-o",
+      "PreferredAuthentications=password",
+      "-o",
+      "PubkeyAuthentication=no",
+      "-o",
+      "KbdInteractiveAuthentication=no",
+      "-o",
+      "NumberOfPasswordPrompts=1"
+    );
+  } else if (remoteAuth?.method === SSH_AUTH_METHOD_KEYBOARD_INTERACTIVE) {
+    args.push(
+      "-o",
+      "PreferredAuthentications=keyboard-interactive",
+      "-o",
+      "PubkeyAuthentication=no",
+      "-o",
+      "KbdInteractiveAuthentication=yes",
+      "-o",
+      "NumberOfPasswordPrompts=1"
+    );
+  } else {
+    args.push(
+      "-o",
+      "PreferredAuthentications=publickey",
+      "-o",
+      "PasswordAuthentication=no",
+      "-o",
+      "KbdInteractiveAuthentication=no"
+    );
+    if (typeof remoteAuth?.privateKeyPath === "string" && remoteAuth.privateKeyPath) {
+      args.push("-i", remoteAuth.privateKeyPath);
+    }
+  }
   if (remoteConnection.port !== DEFAULT_SSH_PORT) {
     args.push("-p", String(remoteConnection.port));
   }
@@ -219,12 +391,21 @@ function buildSessionLaunchSpec({ kind, shell, spawnCwd, startCwd, startCommand,
     args.push(remoteCommand);
   }
 
+  const ptyEnvAdditions = {};
+  if (remoteAuthRequiresSecret(remoteAuth)) {
+    ptyEnvAdditions.DISPLAY = "ptydeck-ssh-askpass";
+    ptyEnvAdditions.SSH_ASKPASS_REQUIRE = "force";
+    ptyEnvAdditions.SSH_ASKPASS = sshAskpassPath;
+    ptyEnvAdditions.PTYDECK_SSH_SECRET = remoteSecret;
+  }
+
   return {
     shellAdapterId: DEFAULT_SSH_CLIENT,
     command: sshClient,
     args,
     spawnCwd: homedir(),
     metaCwd: startCwd,
+    ptyEnvAdditions,
     postStartInput: ""
   };
 }
@@ -238,6 +419,7 @@ export class SessionManager {
     sessionMaxLifetimeMs = 0,
     sessionReplayMemoryMaxChars = DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS,
     sessionActivityQuietMs = DEFAULT_SESSION_ACTIVITY_QUIET_MS,
+    sshAskpassPath = DEFAULT_SSH_ASKPASS_PATH,
     nowFn = now,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout
@@ -254,6 +436,8 @@ export class SessionManager {
       Number.isInteger(sessionReplayMemoryMaxChars) && sessionReplayMemoryMaxChars >= 0
         ? sessionReplayMemoryMaxChars
         : DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS;
+    this.sshAskpassPath =
+      typeof sshAskpassPath === "string" && sshAskpassPath.trim() ? sshAskpassPath.trim() : DEFAULT_SSH_ASKPASS_PATH;
     this.sessionActivityQuietMs =
       Number.isInteger(sessionActivityQuietMs) && sessionActivityQuietMs > 0
         ? sessionActivityQuietMs
@@ -408,6 +592,8 @@ export class SessionManager {
     id = randomUUID(),
     kind = SESSION_KIND_LOCAL,
     remoteConnection,
+    remoteAuth,
+    remoteSecret,
     cwd,
     shell,
     name,
@@ -451,6 +637,8 @@ export class SessionManager {
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
     const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
+    const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
+    const normalizedRemoteSecret = normalizeRemoteSecret(remoteSecret, normalizedRemoteAuth, normalizedKind);
     const normalizedShell =
       typeof shell === "string" && shell.trim()
         ? shell.trim()
@@ -474,13 +662,17 @@ export class SessionManager {
       spawnCwd: localSpawnCwd,
       startCwd: normalizedStartCwd,
       startCommand: normalizedStartCommand,
-      remoteConnection: normalizedRemoteConnection
+      remoteConnection: normalizedRemoteConnection,
+      remoteAuth: normalizedRemoteAuth,
+      remoteSecret: normalizedRemoteSecret,
+      sshAskpassPath: this.sshAskpassPath
     });
     const shellAdapter = createShellAdapter(launchSpec.shellAdapterId);
 
     const ptyEnv = shellAdapter.prepareSpawnEnv({
       ...process.env,
-      ...normalizedEnv
+      ...normalizedEnv,
+      ...launchSpec.ptyEnvAdditions
     });
     const ptyProcess = this.createPty({
       shell: launchSpec.command,
@@ -502,10 +694,12 @@ export class SessionManager {
       outputTruncated: replayOutputTruncated === true || initialReplayOutput.truncated,
       activityTimer: null,
       lastActivityAt: initialActivityTimestamp,
+      remoteSecret: normalizedRemoteSecret,
       meta: {
         id,
         kind: normalizedKind,
         ...(normalizedRemoteConnection ? { remoteConnection: normalizedRemoteConnection } : {}),
+        ...(normalizedRemoteAuth ? { remoteAuth: normalizedRemoteAuth } : {}),
         cwd: launchSpec.metaCwd,
         shell: launchSpec.command,
         ...(typeof name === "string" ? { name } : {}),
@@ -622,6 +816,13 @@ export class SessionManager {
   updateSession(sessionId, patch = {}) {
     const session = this.get(sessionId);
     const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : session.meta.kind);
+    const nextRemoteAuth =
+      patch.remoteAuth !== undefined || patch.kind !== undefined
+        ? normalizeRemoteAuth(
+            patch.remoteAuth !== undefined ? patch.remoteAuth : session.meta.remoteAuth,
+            nextKind
+          )
+        : session.meta.remoteAuth;
     if (patch.name !== undefined) {
       session.meta.name = patch.name;
     }
@@ -646,6 +847,24 @@ export class SessionManager {
       } else {
         delete session.meta.remoteConnection;
       }
+    }
+    if (patch.remoteAuth !== undefined || patch.kind !== undefined) {
+      if (nextRemoteAuth) {
+        session.meta.remoteAuth = nextRemoteAuth;
+      } else {
+        delete session.meta.remoteAuth;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "remoteSecret")) {
+      session.remoteSecret = normalizeRemoteSecret(patch.remoteSecret, nextRemoteAuth, nextKind);
+    } else if (remoteAuthRequiresSecret(nextRemoteAuth) && !session.remoteSecret) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'remoteSecret' is required when changing to password or keyboardInteractive ssh auth."
+      );
+    } else if (!remoteAuthRequiresSecret(nextRemoteAuth)) {
+      session.remoteSecret = undefined;
     }
     if (patch.env !== undefined) {
       session.meta.env = normalizeSessionEnv(patch.env);
@@ -701,6 +920,8 @@ export class SessionManager {
       id: snapshot.id,
       kind: snapshot.kind,
       remoteConnection: snapshot.remoteConnection,
+      remoteAuth: snapshot.remoteAuth,
+      remoteSecret: session.remoteSecret,
       cwd: snapshot.startCwd || snapshot.cwd,
       shell: snapshot.shell,
       name: snapshot.name,

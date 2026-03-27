@@ -17,6 +17,7 @@ const requiredMarkers = [
   "CreateSessionRequest:",
   "UpdateSessionRequest:",
   "RemoteConnection:",
+  "RemoteAuth:",
   "SessionInputSafetyProfile:",
   "SessionThemeProfile:",
   "CustomCommand:",
@@ -40,6 +41,11 @@ export type RemoteConnection = {
   host: string;
   port: number;
   username?: string;
+};
+
+export type RemoteAuth = {
+  method: "password" | "privateKey" | "keyboardInteractive";
+  privateKeyPath?: string;
 };
 
 export type SessionInputSafetyProfile = {
@@ -105,6 +111,7 @@ export type Session = {
   cwd: string;
   shell: string;
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
   tags: string[];
   inputSafetyProfile: SessionInputSafetyProfile;
   name?: string;
@@ -128,6 +135,8 @@ export type CreateSessionRequest = {
   cwd?: string;
   shell?: string;
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
+  remoteSecret?: string;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
@@ -142,6 +151,8 @@ export type CreateSessionRequest = {
 export type UpdateSessionRequest = {
   kind?: "local" | "ssh";
   remoteConnection?: RemoteConnection;
+  remoteAuth?: RemoteAuth;
+  remoteSecret?: string;
   name?: string;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;

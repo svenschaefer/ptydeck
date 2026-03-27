@@ -96,7 +96,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Delete` actions are available inside each session settings dialog (removed from direct toolbar); delete requires explicit user confirmation
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with unified dialog-level `Apply Changes`/`Cancel`, dirty-state indicator, and explicit save feedback
-- Backend session contract now supports both `local` and `ssh` session kinds through one persisted model, with normalized non-secret `remoteConnection` metadata (`host`, `port`, optional `username`) and restart-safe restore semantics; SSH credential and host-trust handling remain part of the active H38 follow-up scope rather than implicit local-only frontend state
+- Backend session contract now supports both `local` and `ssh` session kinds through one persisted model, with normalized non-secret `remoteConnection` metadata (`host`, `port`, optional `username`), normalized non-secret `remoteAuth` metadata (`password`, `privateKey`, `keyboardInteractive`, plus optional `privateKeyPath`), restart-safe restore semantics, and write-only `remoteSecret` handling that never persists in session storage/API responses
 - Per-session terminal theme editor in session settings with complete iTerm2 dark/light theme catalog integration (from `mbadolato/iTerm2-Color-Schemes`), category/search filtering, and full custom palette editing (`background`, `foreground`, `cursor`, ANSI 16 colors) persisted through two independently selectable backend theme slots: `activeThemeProfile` and `inactiveThemeProfile`
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Backend per-session dual-theme contract via REST (`activeThemeProfile`, `inactiveThemeProfile`, plus legacy `themeProfile` compatibility) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
@@ -219,9 +219,16 @@ Remote-session example:
     "host": "example.internal",
     "port": 2222,
     "username": "ops"
+  },
+  "remoteAuth": {
+    "method": "privateKey",
+    "privateKeyPath": "/home/ops/.ssh/id_ed25519"
   }
 }
 ```
+
+Create/patch requests for password and keyboard-interactive SSH auth can include a write-only `remoteSecret` field.
+That secret is injected into the live SSH launch path through `SSH_ASKPASS` wiring and is never returned by the API or persisted to disk.
 
 ### Multiplexing
 

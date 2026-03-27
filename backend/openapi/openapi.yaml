@@ -1156,6 +1156,19 @@ components:
           maximum: 65535
         username:
           type: string
+    RemoteAuth:
+      type: object
+      required:
+        - method
+      properties:
+        method:
+          type: string
+          enum:
+            - password
+            - privateKey
+            - keyboardInteractive
+        privateKeyPath:
+          type: string
     Session:
       type: object
       required:
@@ -1198,6 +1211,8 @@ components:
           type: string
         remoteConnection:
           $ref: '#/components/schemas/RemoteConnection'
+        remoteAuth:
+          $ref: '#/components/schemas/RemoteAuth'
         name:
           type: string
         note:
@@ -1373,6 +1388,11 @@ components:
           type: string
         remoteConnection:
           $ref: '#/components/schemas/RemoteConnection'
+        remoteAuth:
+          $ref: '#/components/schemas/RemoteAuth'
+        remoteSecret:
+          type: string
+          writeOnly: true
         name:
           type: string
         note:
@@ -1407,6 +1427,11 @@ components:
             - ssh
         remoteConnection:
           $ref: '#/components/schemas/RemoteConnection'
+        remoteAuth:
+          $ref: '#/components/schemas/RemoteAuth'
+        remoteSecret:
+          type: string
+          writeOnly: true
         name:
           type: string
         note:
