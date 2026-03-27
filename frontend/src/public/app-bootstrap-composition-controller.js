@@ -108,6 +108,8 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
   const exportSessionReplayCopy =
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
+  const openSessionReplayViewer =
+    typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
 
   let commandEngine = null;
   let commandTargetRuntimeController = null;
@@ -183,6 +185,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,
       getTerminalSettings: terminalSettings,
       requestRender: () => appCommandUiFacadeController?.render(),
+      openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy
     });

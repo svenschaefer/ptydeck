@@ -292,14 +292,25 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     insertText: "replay",
     label: "/replay",
     kind: "command",
-    description: "export the retained replay tail for a session",
-    example: "/replay export 7",
-    summary: "/replay export [selector|active] | /replay copy [selector|active]",
+    description: "view, export, or copy the retained replay tail for a session",
+    example: "/replay view 7",
+    summary: "/replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]",
     usage: [
+      "/replay view [selector|active]",
       "/replay export [selector|active]",
       "/replay copy [selector|active]"
     ],
     subcommands: {
+      view: {
+        insertText: "view",
+        label: "/replay view",
+        kind: "subcommand",
+        description: "open the retained replay tail in the reading viewer",
+        example: "/replay view 7",
+        key: "slash:replay:view",
+        usage: "/replay view [selector|active]",
+        args: [{ provider: "session-selector", optional: true }]
+      },
       export: {
         insertText: "export",
         label: "/replay export",

@@ -79,6 +79,37 @@ test("session-card-interactions controller exports replay tails from the toolbar
   ]);
 });
 
+test("session-card-interactions controller opens the replay viewer from the toolbar action", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({});
+  const refs = {
+    focusBtn: createEventTarget(),
+    replayViewBtn: createEventTarget()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    openSessionReplayViewer: async (session) => {
+      calls.push(`view:${session.id}`);
+      return { feedback: "Opened replay viewer for [7] alpha." };
+    },
+    clearError: () => calls.push("clear-error"),
+    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
+    setError: (message) => calls.push(`error:${message}`)
+  });
+
+  await refs.replayViewBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    "view:s1",
+    "clear-error",
+    "feedback:Opened replay viewer for [7] alpha."
+  ]);
+});
+
 test("session-card-interactions controller handles theme select changes through injected callbacks", async () => {
   const calls = [];
   const sessionThemeDrafts = new Map();

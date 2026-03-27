@@ -79,7 +79,7 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(noteUsage, "Usage: /note <selector|active> [text...]");
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
-  assert.equal(replayUsage, "Usage: /replay export [selector|active] | /replay copy [selector|active]");
+  assert.equal(replayUsage, "Usage: /replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
   assert.equal(renameUsage, "Usage: /rename <name> | /rename <selector> <name>");
@@ -313,6 +313,76 @@ test("command executor downloads retained replay tails for the active session by
 
   assert.equal(feedback, "Downloaded replay tail for [7] one (12 chars retained).");
   assert.deepEqual(calls, [["download", "s1"]]);
+});
+
+test("command executor opens the replay viewer for an explicitly selected session", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    openSessionReplayViewer: async (currentSession) => {
+      calls.push(["view", currentSession.id]);
+      return {
+        feedback: "Opened replay viewer for [8] two."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({ command: "replay", args: ["view", "8"], raw: "/replay view 8" });
+
+  assert.equal(feedback, "Opened replay viewer for [8] two.");
+  assert.deepEqual(calls, [["view", "s2"]]);
 });
 
 test("command executor copies retained replay tails for an explicitly selected session", async () => {

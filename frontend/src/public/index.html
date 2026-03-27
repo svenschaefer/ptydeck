@@ -112,6 +112,22 @@
             <pre id="command-suggestions" class="command-suggestions" hidden></pre>
           </div>
         </section>
+        <dialog id="replay-viewer-dialog" class="replay-viewer-dialog">
+          <div class="replay-viewer-head">
+            <div class="replay-viewer-heading">
+              <p id="replay-viewer-title" class="replay-viewer-title">Replay Tail</p>
+              <p id="replay-viewer-meta" class="replay-viewer-meta"></p>
+            </div>
+            <div class="replay-viewer-actions">
+              <button id="replay-viewer-refresh" type="button">Refresh</button>
+              <button id="replay-viewer-download" type="button">Download</button>
+              <button id="replay-viewer-copy" type="button">Copy</button>
+              <button id="replay-viewer-close" type="button" aria-label="Close replay viewer">x</button>
+            </div>
+          </div>
+          <p id="replay-viewer-status" class="replay-viewer-status"></p>
+          <pre id="replay-viewer-content" class="replay-viewer-content"></pre>
+        </dialog>
       </section>
     </div>
 
@@ -125,6 +141,9 @@
               <span class="session-state-badge" hidden></span>
             </div>
             <div class="session-toolbar-actions">
+              <button class="session-replay-view" type="button" aria-label="Open replay tail viewer" title="Open replay tail viewer">
+                View
+              </button>
               <button class="session-replay-export" type="button" aria-label="Export replay tail" title="Export replay tail">
                 DL
               </button>

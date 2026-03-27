@@ -26,6 +26,7 @@ import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createReplayExportRuntimeController } from "./replay-export-runtime-controller.js";
+import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
@@ -117,6 +118,15 @@ const commandGuardReasonsEl = document.getElementById("command-guard-reasons");
 const commandGuardPreviewEl = document.getElementById("command-guard-preview");
 const commandGuardSendOnceBtn = document.getElementById("command-guard-send-once");
 const commandGuardCancelBtn = document.getElementById("command-guard-cancel");
+const replayViewerDialogEl = document.getElementById("replay-viewer-dialog");
+const replayViewerTitleEl = document.getElementById("replay-viewer-title");
+const replayViewerMetaEl = document.getElementById("replay-viewer-meta");
+const replayViewerStatusEl = document.getElementById("replay-viewer-status");
+const replayViewerContentEl = document.getElementById("replay-viewer-content");
+const replayViewerRefreshBtn = document.getElementById("replay-viewer-refresh");
+const replayViewerDownloadBtn = document.getElementById("replay-viewer-download");
+const replayViewerCopyBtn = document.getElementById("replay-viewer-copy");
+const replayViewerCloseBtn = document.getElementById("replay-viewer-close");
 const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
 const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
@@ -287,6 +297,7 @@ let terminalSearchController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
+let replayViewerRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -654,6 +665,24 @@ workspaceRenderController = createWorkspaceRenderController({
   startupWarmupDetailEl,
   startupWarmupSkipBtn
 });
+replayViewerRuntimeController = createReplayViewerRuntimeController({
+  dialogEl: replayViewerDialogEl,
+  titleEl: replayViewerTitleEl,
+  metaEl: replayViewerMetaEl,
+  statusEl: replayViewerStatusEl,
+  contentEl: replayViewerContentEl,
+  refreshBtn: replayViewerRefreshBtn,
+  downloadBtn: replayViewerDownloadBtn,
+  copyBtn: replayViewerCopyBtn,
+  closeBtn: replayViewerCloseBtn,
+  loadSessionReplay: (session) => replayExportRuntimeController.loadSessionReplay(session),
+  exportSessionReplay: (session, options) => replayExportRuntimeController.exportSessionReplay(session, options),
+  buildReplayRetentionSummary: replayExportRuntimeController.buildReplayRetentionSummary,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
+  getErrorMessage: (error, fallback) => appRuntimeStateController?.getErrorMessage?.(error, fallback) || fallback
+});
 
 terminalSearchController = createTerminalSearchController({
   terminalSearchState,
@@ -744,6 +773,7 @@ sessionGridController = createSessionGridController({
   setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
   setStartupSettingsFeedback: sessionUiFacadeController.setStartupSettingsFeedback,
   requestRender: () => appCommandUiFacadeController?.render(),
+  openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   api,
   themeProfileKeys: THEME_PROFILE_KEYS,
@@ -794,6 +824,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   deckRuntimeController,
   readClipboardText: () => clipboardRuntimeController.readText(),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
   disposeStreamDebugTrace: () => streamDebugTraceController.dispose(),

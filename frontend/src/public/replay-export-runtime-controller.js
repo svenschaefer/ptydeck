@@ -87,21 +87,25 @@ export function createReplayExportRuntimeController(options = {}) {
     return api.getSessionReplayExport(sessionId);
   }
 
-  async function exportSessionReplay(session, { mode = "download" } = {}) {
+  async function loadSessionReplay(session) {
     if (!session?.id) {
       throw new Error("Replay export requires a session.");
     }
-    const payload = await fetchReplayExport(session.id);
+    return fetchReplayExport(session.id);
+  }
+
+  async function exportSessionReplay(session, { mode = "download", payload = null } = {}) {
+    const nextPayload = payload || (await loadSessionReplay(session));
     if (mode === "copy") {
-      await copyReplayText(payload);
+      await copyReplayText(nextPayload);
     } else {
-      triggerReplayDownload(payload);
+      triggerReplayDownload(nextPayload);
     }
     return {
-      payload,
+      payload: nextPayload,
       feedback: buildReplayFeedback({
         session,
-        payload,
+        payload: nextPayload,
         mode,
         formatSessionToken,
         formatSessionDisplayName
@@ -110,6 +114,8 @@ export function createReplayExportRuntimeController(options = {}) {
   }
 
   return {
-    exportSessionReplay
+    buildReplayRetentionSummary,
+    exportSessionReplay,
+    loadSessionReplay
   };
 }

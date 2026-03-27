@@ -54,6 +54,8 @@ export function createCommandExecutor(options = {}) {
     typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
   const exportSessionReplayCopy =
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
+  const openSessionReplayViewer =
+    typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -597,7 +599,7 @@ export function createCommandExecutor(options = {}) {
 
     if (command === "replay") {
       const subcommand = String(args[0] || "").trim().toLowerCase();
-      if (subcommand !== "export" && subcommand !== "copy") {
+      if (subcommand !== "view" && subcommand !== "export" && subcommand !== "copy") {
         return formatUsage("replay");
       }
       const selectorText = args[1] || "active";
@@ -610,6 +612,10 @@ export function createCommandExecutor(options = {}) {
       );
       if (resolvedTarget.error) {
         return resolvedTarget.error;
+      }
+      if (subcommand === "view") {
+        const outcome = await openSessionReplayViewer(resolvedTarget.session);
+        return outcome?.feedback || "";
       }
       const outcome =
         subcommand === "copy"

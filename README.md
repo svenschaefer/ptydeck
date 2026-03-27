@@ -81,7 +81,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Backend session startup settings via REST (`startCwd`, `startCommand`, `env`) with deterministic apply on create/restart
 - Backend per-session theme profile contract via REST (`themeProfile`) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
 - Central command input targeting the active session
-- Command-plane controls via slash commands: `/new [shell]`, `/size <cols> <rows>` or `/size c<cols>` or `/size r<rows>`, `/filter [id/tag[,id/tag...]]`, `/close [selector[,selector...]]`, `/switch <id>`, `/swap <selectorA> <selectorB>`, `/next`, `/prev`, `/list`, `/rename <name>` (active) or `/rename <selector> <name>`, `/restart [selector[,selector...]]`, `/note <selector|active> [text...]`, `/settings show [selector]`, `/settings apply <selector|active> <json>`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
+- Command-plane controls via slash commands: `/new [shell]`, `/size <cols> <rows>` or `/size c<cols>` or `/size r<rows>`, `/filter [id/tag[,id/tag...]]`, `/close [selector[,selector...]]`, `/switch <id>`, `/swap <selectorA> <selectorB>`, `/next`, `/prev`, `/list`, `/rename <name>` (active) or `/rename <selector> <name>`, `/restart [selector[,selector...]]`, `/note <selector|active> [text...]`, `/replay view [selector|active]`, `/replay export [selector|active]`, `/replay copy [selector|active]`, `/settings show [selector]`, `/settings apply <selector|active> <json>`, `/custom <name> <text>`, `/custom <name>` block mode, `/custom list`, `/custom show <name>`, `/custom remove <name>`, `/help`, and custom execution via `/<customName> [target]`
 - Sessions support one optional persisted note; `/note <selector|active>` clears the note, and a non-empty note is rendered in compact form inside the session header
 - Sessions also support one persisted per-terminal input-safety preset/profile; shell-oriented sessions can opt into syntax-gated or stricter guarded-send behavior with inline confirmation before risky sends
 - `/custom` block mode supports escaped delimiter payload lines (`\---`) for literal `---` content and returns explicit guidance for unescaped delimiter edge cases
@@ -308,8 +308,11 @@ This export does not imply full shell-state recovery. It is an explicit operator
 
 Frontend operator workflow:
 
-- Session toolbar now exposes a discoverable `DL` action on each terminal card to download the retained replay tail immediately.
-- Slash commands now support both download and copy flows:
+- Session toolbar now exposes a discoverable `View` action on each terminal card to open the retained replay tail in a reading-focused viewer.
+- Session toolbar also exposes a `DL` action on each terminal card to download the retained replay tail immediately.
+- The replay viewer exposes `Refresh`, `Download`, and `Copy` actions without implying a second replay source beyond the retained-tail export contract.
+- Slash commands now support view, download, and copy flows:
+  - `/replay view [selector|active]`
   - `/replay export [selector|active]`
   - `/replay copy [selector|active]`
 - Frontend feedback surfaces retained-size and truncation state explicitly, for example `18/32 chars retained, truncated`.

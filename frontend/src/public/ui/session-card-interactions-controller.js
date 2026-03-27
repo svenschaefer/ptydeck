@@ -42,6 +42,7 @@ export function createSessionCardInteractionsController(options = {}) {
     const setSessionSendTerminator = args.setSessionSendTerminator || (() => {});
     const setStartupSettingsFeedback = args.setStartupSettingsFeedback || (() => {});
     const requestRender = args.requestRender || (() => {});
+    const openSessionReplayViewer = args.openSessionReplayViewer || (() => Promise.resolve({ feedback: "" }));
     const exportSessionReplayDownload = args.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
 
     if (!session || !refs.focusBtn) {
@@ -65,6 +66,18 @@ export function createSessionCardInteractionsController(options = {}) {
     }
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
+    refs.replayViewBtn?.addEventListener("click", async () => {
+      try {
+        const currentSession = getSession() || session;
+        const outcome = await openSessionReplayViewer(currentSession);
+        clearError();
+        if (outcome?.feedback) {
+          setCommandFeedback(outcome.feedback);
+        }
+      } catch (error) {
+        setError(getErrorMessage(error, "Failed to open replay viewer."));
+      }
+    });
     refs.replayExportBtn?.addEventListener("click", async () => {
       try {
         const currentSession = getSession() || session;

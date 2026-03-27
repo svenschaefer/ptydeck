@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
+- Latest completed wave: `v0.4.0-H20` (Replay Reading Mode, `REP-004`, `REP-005`).
+- Previous completed wave: `v0.4.0-H19` (Session Replay Export Baseline, `REP-001`, `REP-002`, `REP-003`).
 - Previous completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
 - Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
 - Previous completed wave before that: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
@@ -36,6 +37,23 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Latest Completed Wave
 
+### v0.4.0-H20 - Replay Reading Mode (Completed)
+
+- `REP-004`, `REP-005`
+
+Dependencies:
+
+- `REP-004` reused the completed replay-export contract from `REP-001` through `REP-003` so the viewer reads only the deterministic retained replay tail and does not invent a second replay source.
+- `REP-005` closed after `REP-004` so regression coverage now spans slash-command access, session-toolbar access, viewer refresh/download/copy controls, truncation messaging, and empty-tail behavior.
+
+Exit criteria:
+
+- Frontend exposes an explicit replay reading mode for the retained replay tail with refresh/download/copy controls.
+- Slash commands and discoverable session actions both reach the same retained-tail viewer workflow.
+- Regression coverage exists for the replay viewer across truncation, empty-tail, and command/session-action entry paths.
+
+## Previous Completed Wave
+
 ### v0.4.0-H19 - Session Replay Export Baseline (Completed)
 
 - `REP-001`, `REP-002`, `REP-003`
@@ -51,8 +69,6 @@ Exit criteria:
 - Backend exposes a deterministic replay export contract for the retained replay tail rather than implying full process-state export.
 - Frontend provides an explicit replay-export workflow that surfaces truncation state clearly.
 - Regression coverage exists for replay export across reconnect, restart-restored replay, truncation, and empty-session paths.
-
-## Previous Completed Wave
 
 ### v0.4.0-H18 - Shell Runtime Compatibility Foundation (Completed)
 

@@ -7,7 +7,6 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 - [ ] Add session grouping and workspace presets.
 - [ ] Add persistent layout profiles.
 - [ ] Add a command palette and keyboard-first navigation.
-- [ ] Add output-focused reading mode for long-running logs.
 - [ ] Add split-based layout model (horizontal/vertical) with drag/resize behavior.
 - [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
 
@@ -70,7 +69,11 @@ Promoted and completed in `v0.4.0-H18`:
 
 - `DRV-001`, `DRV-002`, `DRV-005`
 
-Promoted to active delivery (`v0.4.0-H19` in `TODO.md` / `ROADMAP.md`):
+Promoted and completed in `v0.4.0-H20`:
+
+- `REP-004`, `REP-005`
+
+Promoted and completed in `v0.4.0-H19`:
 
 - `REP-001`, `REP-002`, `REP-003`
 

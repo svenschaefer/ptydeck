@@ -355,6 +355,7 @@ function createTerminalCardTemplateNode() {
   const focus = new FakeElement({ className: "session-focus", tagName: "button" });
   const stateBadge = new FakeElement({ className: "session-state-badge", tagName: "span" });
   stateBadge.hidden = true;
+  const replayView = new FakeElement({ className: "session-replay-view", tagName: "button" });
   const replayExport = new FakeElement({ className: "session-replay-export", tagName: "button" });
   const settings = new FakeElement({ className: "session-settings", tagName: "button" });
   const tagList = new FakeElement({ className: "session-tag-list", tagName: "p" });
@@ -414,6 +415,7 @@ function createTerminalCardTemplateNode() {
   titleGroup.appendChild(quickId);
   titleGroup.appendChild(focus);
   titleGroup.appendChild(stateBadge);
+  toolbarActions.appendChild(replayView);
   toolbarActions.appendChild(replayExport);
   toolbarActions.appendChild(settings);
   toolbarMain.appendChild(titleGroup);
@@ -504,6 +506,23 @@ function createDocumentFixture() {
   const commandGuardPreview = new FakeElement({ id: "command-guard-preview", tagName: "pre" });
   const commandGuardSendOnce = new FakeElement({ id: "command-guard-send-once", tagName: "button" });
   const commandGuardCancel = new FakeElement({ id: "command-guard-cancel", tagName: "button" });
+  const replayViewerDialog = new FakeElement({ id: "replay-viewer-dialog", tagName: "dialog" });
+  const replayViewerTitle = new FakeElement({ id: "replay-viewer-title", tagName: "p" });
+  const replayViewerMeta = new FakeElement({ id: "replay-viewer-meta", tagName: "p" });
+  const replayViewerStatus = new FakeElement({ id: "replay-viewer-status", tagName: "p" });
+  const replayViewerContent = new FakeElement({ id: "replay-viewer-content", tagName: "pre" });
+  const replayViewerRefresh = new FakeElement({ id: "replay-viewer-refresh", tagName: "button" });
+  const replayViewerDownload = new FakeElement({ id: "replay-viewer-download", tagName: "button" });
+  const replayViewerCopy = new FakeElement({ id: "replay-viewer-copy", tagName: "button" });
+  const replayViewerClose = new FakeElement({ id: "replay-viewer-close", tagName: "button" });
+  replayViewerDialog.appendChild(replayViewerTitle);
+  replayViewerDialog.appendChild(replayViewerMeta);
+  replayViewerDialog.appendChild(replayViewerStatus);
+  replayViewerDialog.appendChild(replayViewerContent);
+  replayViewerDialog.appendChild(replayViewerRefresh);
+  replayViewerDialog.appendChild(replayViewerDownload);
+  replayViewerDialog.appendChild(replayViewerCopy);
+  replayViewerDialog.appendChild(replayViewerClose);
   const template = {
     id: "terminal-card-template",
     content: {
@@ -548,7 +567,16 @@ function createDocumentFixture() {
     commandGuardReasons,
     commandGuardPreview,
     commandGuardSendOnce,
-    commandGuardCancel
+    commandGuardCancel,
+    replayViewerDialog,
+    replayViewerTitle,
+    replayViewerMeta,
+    replayViewerStatus,
+    replayViewerContent,
+    replayViewerRefresh,
+    replayViewerDownload,
+    replayViewerCopy,
+    replayViewerClose
   ]) {
     byId.set(element.id, element);
   }
@@ -588,7 +616,16 @@ function createDocumentFixture() {
       commandGuardReasons,
       commandGuardPreview,
       commandGuardSendOnce,
-      commandGuardCancel
+      commandGuardCancel,
+      replayViewerDialog,
+      replayViewerTitle,
+      replayViewerMeta,
+      replayViewerStatus,
+      replayViewerContent,
+      replayViewerRefresh,
+      replayViewerDownload,
+      replayViewerCopy,
+      replayViewerClose
     },
     document: {
       getElementById(id) {
@@ -600,6 +637,7 @@ function createDocumentFixture() {
         }
         return null;
       },
+      body: new FakeElement({ tagName: "body" }),
       createElement(tagName) {
         if (String(tagName).toLowerCase() === "canvas") {
           return {
@@ -742,6 +780,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       constructor(parts, options = {}) {
         this.parts = parts;
         this.options = options;
+      }
+    },
+    navigator: {
+      clipboard: {
+        async writeText() {
+          return undefined;
+        },
+        async readText() {
+          return "";
+        }
       }
     },
     FitAddon: {
@@ -2350,13 +2398,34 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(createdObjectUrls.length > 0, true);
   assert.deepEqual(createdObjectUrls[createdObjectUrls.length - 1].parts, ["line one\nline two\n"]);
   assert.equal(revokedObjectUrls[revokedObjectUrls.length - 1], `blob:replay-${createdObjectUrls.length}`);
+  fixture.elements.commandInput.value = "/replay view 1";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Opened replay viewer for [1] two.");
+  assert.equal(fixture.elements.replayViewerDialog.open, true);
+  assert.equal(fixture.elements.replayViewerTitle.textContent, "Replay Tail · [1] two");
+  assert.equal(
+    fixture.elements.replayViewerMeta.textContent,
+    "Retained replay tail · 18/32 chars retained, truncated."
+  );
+  assert.equal(fixture.elements.replayViewerContent.textContent, "line one\nline two\n");
+  fixture.elements.replayViewerCopy.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Copied replay tail for [1] two (18/32 chars retained, truncated).");
   const secondReplayExport = secondCard.querySelector(".session-replay-export");
+  const secondReplayView = secondCard.querySelector(".session-replay-view");
+  secondReplayView.click();
+  await tick();
+  assert.equal(fixture.elements.commandFeedback.textContent, "Opened replay viewer for [1] two.");
   secondReplayExport.click();
   await tick();
   assert.equal(
     fixture.elements.commandFeedback.textContent,
     "Downloaded replay tail for [1] two (18/32 chars retained, truncated)."
   );
+  fixture.elements.replayViewerClose.click();
+  await tick();
+  assert.equal(fixture.elements.replayViewerDialog.open, false);
   fixture.elements.commandInput.value = '/settings apply 1 {"unknown":1}';
   fixture.elements.sendCommand.click();
   await tick();

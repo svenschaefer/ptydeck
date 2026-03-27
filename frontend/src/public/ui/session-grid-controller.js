@@ -52,6 +52,7 @@ export function createSessionGridController(options = {}) {
   const setSessionSendTerminator = options.setSessionSendTerminator || (() => {});
   const setStartupSettingsFeedback = options.setStartupSettingsFeedback || (() => {});
   const requestRender = options.requestRender || (() => {});
+  const openSessionReplayViewer = options.openSessionReplayViewer || (() => Promise.resolve({ feedback: "" }));
   const exportSessionReplayDownload = options.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
   const api = options.api;
   const themeProfileKeys = options.themeProfileKeys || [];
@@ -174,6 +175,7 @@ export function createSessionGridController(options = {}) {
         session,
         refs: {
           focusBtn: refs.focusBtn,
+          replayViewBtn: refs.replayViewBtn,
           replayExportBtn: refs.replayExportBtn,
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
@@ -219,6 +221,7 @@ export function createSessionGridController(options = {}) {
         setSessionSendTerminator,
         setStartupSettingsFeedback,
         requestRender,
+        openSessionReplayViewer,
         exportSessionReplayDownload
       });
 
