@@ -109,7 +109,7 @@ test("workspace-render controller renders empty-state and status fields", () => 
     connectionState: "connecting",
     loading: false,
     error: "",
-    commandTargetText: "Target: [7] Ops · Shell Balanced",
+    commandTargetText: "Target: [7] Ops",
     commandFeedback: "ok",
     commandInlineHint: " /help",
     commandInlineHintPrefixPx: 24,
@@ -123,7 +123,7 @@ test("workspace-render controller renders empty-state and status fields", () => 
 
   assert.equal(stateEl.textContent, "connecting");
   assert.equal(statusMessageEl.textContent, "Connection state: connecting");
-  assert.equal(commandTargetEl.textContent, "Target: [7] Ops · Shell Balanced");
+  assert.equal(commandTargetEl.textContent, "Target: [7] Ops");
   assert.equal(commandFeedbackEl.textContent, "ok");
   assert.equal(commandInlineHintEl.textContent, " /help");
   assert.equal(commandInlineHintEl.style.getPropertyValue("--hint-prefix-px"), "24px");

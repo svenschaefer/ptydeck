@@ -31,6 +31,7 @@ export function createSessionGridController(options = {}) {
   const onSessionMounted = options.onSessionMounted || (() => {});
   const resolveInitialTheme = options.resolveInitialTheme || (() => ({}));
   const handleSessionTerminalInput = options.handleSessionTerminalInput || (() => {});
+  const handleSessionTerminalPaste = options.handleSessionTerminalPaste || handleSessionTerminalInput;
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
@@ -54,8 +55,6 @@ export function createSessionGridController(options = {}) {
   const setSessionSendTerminator = options.setSessionSendTerminator || (() => {});
   const setStartupSettingsFeedback = options.setStartupSettingsFeedback || (() => {});
   const requestRender = options.requestRender || (() => {});
-  const openSessionReplayViewer = options.openSessionReplayViewer || (() => Promise.resolve({ feedback: "" }));
-  const exportSessionReplayDownload = options.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
   const api = options.api;
   const themeProfileKeys = options.themeProfileKeys || [];
   const debugLog = options.debugLog || (() => {});
@@ -231,8 +230,6 @@ export function createSessionGridController(options = {}) {
         session,
         refs: {
           focusBtn: refs.focusBtn,
-          replayViewBtn: refs.replayViewBtn,
-          replayExportBtn: refs.replayExportBtn,
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
           closeBtn: refs.closeBtn,
@@ -247,6 +244,7 @@ export function createSessionGridController(options = {}) {
           startFeedback: refs.startFeedback,
           themeCategory: refs.themeCategory,
           themeSearch: refs.themeSearch,
+          themeSlotSelect: refs.themeSlotSelect,
           themeSelect: refs.themeSelect,
           themeBg: refs.themeBg,
           themeFg: refs.themeFg,
@@ -276,9 +274,7 @@ export function createSessionGridController(options = {}) {
         setSettingsDirty,
         setSessionSendTerminator,
         setStartupSettingsFeedback,
-        requestRender,
-        openSessionReplayViewer,
-        exportSessionReplayDownload
+        requestRender
       });
 
       sessionTerminalRuntimeController?.mountSessionTerminalCard({
@@ -304,6 +300,7 @@ export function createSessionGridController(options = {}) {
           settingsStatus: refs.settingsStatus,
           themeCategory: refs.themeCategory,
           themeSearch: refs.themeSearch,
+          themeSlotSelect: refs.themeSlotSelect,
           themeSelect: refs.themeSelect,
           themeBg: refs.themeBg,
           themeFg: refs.themeFg,
@@ -317,6 +314,7 @@ export function createSessionGridController(options = {}) {
         resolveInitialTheme,
         onSessionMounted,
         onTerminalData: handleSessionTerminalInput,
+        onTerminalPaste: handleSessionTerminalPaste,
         afterEntryRegistered: (entry, currentSession) => {
           syncSessionStartupControls(entry, currentSession);
           syncSessionInputSafetyControls(entry, currentSession);

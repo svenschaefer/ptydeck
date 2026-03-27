@@ -124,10 +124,10 @@ export function createSessionUiFacadeController(options = {}) {
     return getSessionViewModel()?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "";
   }
 
-  function getSessionThemeConfig(sessionId) {
+  function getSessionThemeConfig(sessionId, slot = undefined) {
     const settingsStateController = getSessionSettingsStateController();
     if (typeof settingsStateController?.getSessionThemeConfig === "function") {
-      return settingsStateController.getSessionThemeConfig(sessionId);
+      return settingsStateController.getSessionThemeConfig(sessionId, slot);
     }
     return {
       preset: "custom",
@@ -135,6 +135,26 @@ export function createSessionUiFacadeController(options = {}) {
       category: "all",
       search: ""
     };
+  }
+
+  function normalizeThemeSlot(value) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.normalizeThemeSlot === "function") {
+      return settingsStateController.normalizeThemeSlot(value);
+    }
+    return String(value || "").trim().toLowerCase() === "inactive" ? "inactive" : "active";
+  }
+
+  function getSessionThemeSelectedSlot(sessionId) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.getSessionThemeSelectedSlot === "function") {
+      return settingsStateController.getSessionThemeSelectedSlot(sessionId);
+    }
+    return "active";
+  }
+
+  function setSessionThemeSelectedSlot(sessionId, slot) {
+    getSessionSettingsStateController()?.setSessionThemeSelectedSlot?.(sessionId, slot);
   }
 
   function buildThemeFromConfig(config) {
@@ -155,6 +175,26 @@ export function createSessionUiFacadeController(options = {}) {
       return settingsStateController.readThemeProfileFromControls(entry);
     }
     return normalizeThemeProfile(null);
+  }
+
+  function updateSessionThemeDraftFromControls(entry, sessionId, overrides = {}) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.updateSessionThemeDraftFromControls === "function") {
+      return settingsStateController.updateSessionThemeDraftFromControls(entry, sessionId, overrides);
+    }
+    return null;
+  }
+
+  function readSessionThemeProfilesForSave(entry, sessionId, session) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.readSessionThemeProfilesForSave === "function") {
+      return settingsStateController.readSessionThemeProfilesForSave(entry, sessionId, session);
+    }
+    const profile = readThemeProfileFromControls(entry);
+    return {
+      activeThemeProfile: profile,
+      inactiveThemeProfile: profile
+    };
   }
 
   function syncSessionThemeControls(entry, sessionId) {
@@ -231,6 +271,7 @@ export function createSessionUiFacadeController(options = {}) {
 
   return {
     isValidHexColor,
+    normalizeThemeSlot,
     normalizeThemeProfile,
     normalizeThemeFilterCategory,
     getThemePresetById,
@@ -247,9 +288,13 @@ export function createSessionUiFacadeController(options = {}) {
     getExitedSessionMessage,
     getBlockedSessionActionMessage,
     getSessionThemeConfig,
+    getSessionThemeSelectedSlot,
+    setSessionThemeSelectedSlot,
     buildThemeFromConfig,
     applyThemeForSession,
     readThemeProfileFromControls,
+    updateSessionThemeDraftFromControls,
+    readSessionThemeProfilesForSave,
     syncSessionThemeControls,
     formatSessionEnv,
     normalizeSessionTags,

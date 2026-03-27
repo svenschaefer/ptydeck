@@ -16,8 +16,6 @@ export function createSessionCardFactoryController(options = {}) {
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
-    const replayViewBtn = node.querySelector(".session-replay-view");
-    const replayExportBtn = node.querySelector(".session-replay-export");
     const settingsBtn = node.querySelector(".session-settings");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -33,6 +31,7 @@ export function createSessionCardFactoryController(options = {}) {
     const tagListEl = node.querySelector(".session-tag-list");
     const themeCategory = node.querySelector(".session-theme-category");
     const themeSearch = node.querySelector(".session-theme-search");
+    const themeSlotSelect = node.querySelector(".session-theme-slot");
     const themeSelect = node.querySelector(".session-theme-select");
     const themeBg = node.querySelector(".session-theme-bg");
     const themeFg = node.querySelector(".session-theme-fg");
@@ -89,8 +88,6 @@ export function createSessionCardFactoryController(options = {}) {
       sessionMetaRowEl,
       sessionNoteEl,
       unrestoredHintEl,
-      replayViewBtn,
-      replayExportBtn,
       settingsBtn,
       renameBtn,
       closeBtn,
@@ -106,6 +103,7 @@ export function createSessionCardFactoryController(options = {}) {
       tagListEl,
       themeCategory,
       themeSearch,
+      themeSlotSelect,
       themeSelect,
       themeBg,
       themeFg,

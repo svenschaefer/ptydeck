@@ -259,3 +259,76 @@ test("command-composer runtime controller guards risky sends until confirmed or 
     ["feedback", "Command send cancelled."]
   ]);
 });
+
+test("command-composer runtime controller applies send safety to terminal pastes", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => "composer value",
+    setCommandValue: (next) => calls.push(["value", next]),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "ops" }],
+      activeSessionId: "s1"
+    }),
+    setActiveSession: (sessionId) => calls.push(["active", sessionId]),
+    evaluateSendSafety: () => ({
+      requiresConfirmation: true,
+      summary: "Confirmation required before sending to [7] ops.",
+      reasons: [{ label: "Paste is guarded.", targets: ["[7] ops"] }]
+    }),
+    setCommandGuardState: (nextState) => calls.push(["guard", nextState.summary, nextState.preview]),
+    clearCommandGuardState: ({ render } = {}) => calls.push(["clear-guard", render === true]),
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    render: () => calls.push(["render"])
+  });
+
+  const immediate = await controller.submitTerminalPaste("s1", "rm -rf ./tmp");
+  assert.equal(immediate, false);
+  assert.deepEqual(calls, [
+    ["clear-guard", false],
+    ["guard", "Confirmation required before sending to [7] ops.", "rm -rf ./tmp"],
+    ["render"]
+  ]);
+
+  calls.length = 0;
+  const confirmed = await controller.confirmPendingSend();
+  assert.equal(confirmed, true);
+});
+
+test("command-composer runtime controller sends terminal pastes without clearing composer text", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => "composer value",
+    setCommandValue: (next) => calls.push(["value", next]),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "ops" }],
+      activeSessionId: "s1"
+    }),
+    setActiveSession: (sessionId) => calls.push(["active", sessionId]),
+    evaluateSendSafety: () => ({
+      requiresConfirmation: false,
+      reasons: []
+    }),
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source, submission.text]),
+    setCommandPreview: (message) => calls.push(["preview", message]),
+    clearCommandSuggestions: () => calls.push(["clear-suggestions"]),
+    clearError: () => calls.push(["clear-error"]),
+    render: () => calls.push(["render"])
+  });
+
+  const sent = await controller.submitTerminalPaste("s1", "echo hi");
+  assert.equal(sent, true);
+  assert.deepEqual(calls, [
+    ["active", "s1"],
+    ["send", "s1", "echo hi"],
+    ["record", "s1", "paste", "echo hi"],
+    ["preview", ""],
+    ["clear-suggestions"],
+    ["clear-error"],
+    ["render"]
+  ]);
+});

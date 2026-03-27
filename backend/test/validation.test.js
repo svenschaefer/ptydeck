@@ -77,6 +77,8 @@ test("validateResponse checks session list schema", () => {
           env: {},
           tags: [],
           themeProfile: THEME_PROFILE,
+          activeThemeProfile: THEME_PROFILE,
+          inactiveThemeProfile: THEME_PROFILE,
           createdAt: 1,
           updatedAt: 1
         }

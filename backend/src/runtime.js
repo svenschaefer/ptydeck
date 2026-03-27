@@ -450,6 +450,24 @@ function normalizeSessionThemeProfile(input = {}, { strict = true } = {}) {
   return normalized;
 }
 
+function normalizeSessionThemeSlots(input = {}, { strict = true } = {}) {
+  const source = isPlainObject(input) ? input : {};
+  const fallbackThemeProfile = normalizeSessionThemeProfile(source.themeProfile, { strict });
+  const activeThemeProfile =
+    source.activeThemeProfile !== undefined
+      ? normalizeSessionThemeProfile(source.activeThemeProfile, { strict })
+      : fallbackThemeProfile;
+  const inactiveThemeProfile =
+    source.inactiveThemeProfile !== undefined
+      ? normalizeSessionThemeProfile(source.inactiveThemeProfile, { strict })
+      : fallbackThemeProfile;
+  return {
+    themeProfile: activeThemeProfile,
+    activeThemeProfile,
+    inactiveThemeProfile
+  };
+}
+
 function normalizeSessionNote(input, { strict = true } = {}) {
   if (input === undefined || input === null) {
     return undefined;
@@ -1796,7 +1814,9 @@ function tryCreateRestoredSession({
   note,
   inputSafetyProfile,
   tags,
-  themeProfile
+  themeProfile,
+  activeThemeProfile,
+  inactiveThemeProfile
 }) {
     return manager.create({
       id: session.id,
@@ -1811,6 +1831,8 @@ function tryCreateRestoredSession({
       inputSafetyProfile,
       tags,
       themeProfile,
+      activeThemeProfile,
+      inactiveThemeProfile,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt
     });
@@ -2220,7 +2242,7 @@ function tryCreateRestoredSession({
           },
           { strict: true }
         );
-        const themeProfile = normalizeSessionThemeProfile(body?.themeProfile, { strict: true });
+        const themeSlots = normalizeSessionThemeSlots(body, { strict: true });
         const note = normalizeSessionNote(body?.note, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(body?.inputSafetyProfile, { strict: true });
         const tags = normalizeSessionTags(body?.tags, { strict: true });
@@ -2234,7 +2256,9 @@ function tryCreateRestoredSession({
           note,
           inputSafetyProfile,
           tags,
-          themeProfile
+          themeProfile: themeSlots.themeProfile,
+          activeThemeProfile: themeSlots.activeThemeProfile,
+          inactiveThemeProfile: themeSlots.inactiveThemeProfile
         });
         sessionDeckAssignments.set(payload.id, DEFAULT_DECK_ID);
         const apiPayload = toApiSession(payload);
@@ -2289,8 +2313,22 @@ function tryCreateRestoredSession({
           patch.startCommand = startupConfig.startCommand;
           patch.env = startupConfig.env;
         }
-        if (body?.themeProfile !== undefined) {
-          patch.themeProfile = normalizeSessionThemeProfile(body.themeProfile, { strict: true });
+        if (
+          body?.themeProfile !== undefined ||
+          body?.activeThemeProfile !== undefined ||
+          body?.inactiveThemeProfile !== undefined
+        ) {
+          const themeSlots = normalizeSessionThemeSlots(
+            {
+              themeProfile: body?.themeProfile,
+              activeThemeProfile: body?.activeThemeProfile,
+              inactiveThemeProfile: body?.inactiveThemeProfile
+            },
+            { strict: true }
+          );
+          patch.themeProfile = themeSlots.themeProfile;
+          patch.activeThemeProfile = themeSlots.activeThemeProfile;
+          patch.inactiveThemeProfile = themeSlots.inactiveThemeProfile;
         }
         if (body?.note !== undefined) {
           patch.note = normalizeSessionNote(body.note, { strict: true });
@@ -2602,7 +2640,14 @@ function tryCreateRestoredSession({
           },
           { strict: false }
         );
-        const themeProfile = normalizeSessionThemeProfile(session.themeProfile, { strict: false });
+        const themeSlots = normalizeSessionThemeSlots(
+          {
+            themeProfile: session.themeProfile,
+            activeThemeProfile: session.activeThemeProfile,
+            inactiveThemeProfile: session.inactiveThemeProfile
+          },
+          { strict: false }
+        );
         const note = normalizeSessionNote(session.note, { strict: false });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
@@ -2623,7 +2668,9 @@ function tryCreateRestoredSession({
           ...(note ? { note } : {}),
           inputSafetyProfile,
           tags,
-          themeProfile,
+          themeProfile: themeSlots.themeProfile,
+          activeThemeProfile: themeSlots.activeThemeProfile,
+          inactiveThemeProfile: themeSlots.inactiveThemeProfile,
           deckId: persistedDeckId,
           createdAt: restoredCreatedAt,
           updatedAt: restoredUpdatedAt
@@ -2653,7 +2700,9 @@ function tryCreateRestoredSession({
               note,
               inputSafetyProfile,
               tags,
-              themeProfile
+              themeProfile: themeSlots.themeProfile,
+              activeThemeProfile: themeSlots.activeThemeProfile,
+              inactiveThemeProfile: themeSlots.inactiveThemeProfile
             });
             restored = true;
             if (attempt.reason !== "saved-shell+saved-cwd") {

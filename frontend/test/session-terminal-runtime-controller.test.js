@@ -300,7 +300,8 @@ test("session-terminal-runtime controller pastes clipboard text into the termina
     gridEl: { appendChild() {} },
     terminals: new Map(),
     terminalObservers: new Map(),
-    onTerminalData: (sessionId, data) => pasted.push([sessionId, data]),
+    onTerminalData: () => pasted.push(["data"]),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
     applyResizeForSession() {}
   });
 
@@ -310,5 +311,77 @@ test("session-terminal-runtime controller pastes clipboard text into the termina
 
   assert.equal(middleDown.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "pwd\n"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller routes clipboard paste events through guarded paste handling", () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const pasteEvent = {
+    type: "paste",
+    clipboardData: {
+      getData(format) {
+        return format === "text" ? "echo hi" : "";
+      }
+    },
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  };
+  refs.mount.dispatchEvent(pasteEvent);
+
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [["s1", "echo hi"]]);
   assert.equal(entry.terminal.focusCalls, 1);
 });

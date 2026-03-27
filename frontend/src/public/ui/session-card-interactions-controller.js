@@ -3,9 +3,15 @@ export function createSessionCardInteractionsController(options = {}) {
   const themeModeSet = options.themeModeSet || new Set();
   const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys.slice() : [];
   const getThemePresetById = options.getThemePresetById || (() => null);
+  const normalizeThemeSlot = options.normalizeThemeSlot || ((value) => value);
   const normalizeThemeProfile = options.normalizeThemeProfile || ((value) => value);
   const normalizeThemeFilterCategory = options.normalizeThemeFilterCategory || ((value) => value);
   const readThemeProfileFromControls = options.readThemeProfileFromControls || (() => ({}));
+  const updateSessionThemeDraftFromControls = options.updateSessionThemeDraftFromControls || (() => null);
+  const readSessionThemeProfilesForSave = options.readSessionThemeProfilesForSave || (() => ({
+    activeThemeProfile: {},
+    inactiveThemeProfile: {}
+  }));
   const readSessionStartupFromControls = options.readSessionStartupFromControls || (() => ({}));
   const readSessionInputSafetyFromControls = options.readSessionInputSafetyFromControls || ((_, session) => session?.inputSafetyProfile || {});
   const isValidHexColor = options.isValidHexColor || (() => true);
@@ -42,8 +48,6 @@ export function createSessionCardInteractionsController(options = {}) {
     const setSessionSendTerminator = args.setSessionSendTerminator || (() => {});
     const setStartupSettingsFeedback = args.setStartupSettingsFeedback || (() => {});
     const requestRender = args.requestRender || (() => {});
-    const openSessionReplayViewer = args.openSessionReplayViewer || (() => Promise.resolve({ feedback: "" }));
-    const exportSessionReplayDownload = args.exportSessionReplayDownload || (() => Promise.resolve({ feedback: "" }));
 
     if (!session || !refs.focusBtn) {
       return;
@@ -75,30 +79,6 @@ export function createSessionCardInteractionsController(options = {}) {
     }
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
-    refs.replayViewBtn?.addEventListener("click", async () => {
-      try {
-        const currentSession = getSession() || session;
-        const outcome = await openSessionReplayViewer(currentSession);
-        clearError();
-        if (outcome?.feedback) {
-          setCommandFeedback(outcome.feedback);
-        }
-      } catch (error) {
-        setError(getErrorMessage(error, "Failed to open replay viewer."));
-      }
-    });
-    refs.replayExportBtn?.addEventListener("click", async () => {
-      try {
-        const currentSession = getSession() || session;
-        const outcome = await exportSessionReplayDownload(currentSession);
-        clearError();
-        if (outcome?.feedback) {
-          setCommandFeedback(outcome.feedback);
-        }
-      } catch (error) {
-        setError(getErrorMessage(error, "Failed to export session replay."));
-      }
-    });
     refs.settingsBtn?.addEventListener("click", () => {
       if (!refs.settingsDialog?.open) {
         syncSettingsDialogControls();
@@ -168,6 +148,17 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.sessionTagsInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionSendTerminatorSelect?.addEventListener("change", markDirtyFromControls);
     refs.inputSafetyPresetSelect?.addEventListener("change", markDirtyFromControls);
+    refs.themeSlotSelect?.addEventListener("change", () => {
+      updateSessionThemeDraftFromControls(refs, session.id, {
+        selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value)
+      });
+      syncSessionThemeControls(refs, session.id);
+      applyThemeForSession(session.id, {
+        themeSlot: normalizeThemeSlot(refs.themeSlotSelect?.value)
+      });
+      markDirtyFromControls();
+      clearError();
+    });
 
     refs.themeSelect?.addEventListener("change", () => {
       const nextPreset = themeModeSet.has(refs.themeSelect.value) ? refs.themeSelect.value : "custom";
@@ -178,25 +169,28 @@ export function createSessionCardInteractionsController(options = {}) {
       });
       const preset = getThemePresetById(nextPreset);
       const nextProfile = nextPreset === "custom" || !preset ? currentProfile : normalizeThemeProfile(preset.profile);
-      sessionThemeDrafts.set(session.id, {
+      updateSessionThemeDraftFromControls(refs, session.id, {
+        selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
         preset: nextPreset,
         profile: nextProfile,
         category: normalizeThemeFilterCategory(String(refs.themeCategory?.value || "all").toLowerCase()),
         search: String(refs.themeSearch?.value || "")
       });
       syncSessionThemeControls(refs, session.id);
-      applyThemeForSession(session.id);
+      applyThemeForSession(session.id, {
+        themeSlot: normalizeThemeSlot(refs.themeSlotSelect?.value)
+      });
       markDirtyFromControls();
       clearError();
       requestRender();
     });
 
     refs.themeCategory?.addEventListener("change", () => {
-      const current = getSessionThemeConfig(session.id);
-      const category = normalizeThemeFilterCategory(String(refs.themeCategory.value || "all").toLowerCase());
-      sessionThemeDrafts.set(session.id, {
-        ...current,
-        category,
+      updateSessionThemeDraftFromControls(refs, session.id, {
+        selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        category: normalizeThemeFilterCategory(String(refs.themeCategory.value || "all").toLowerCase()),
         search: String(refs.themeSearch?.value || "")
       });
       syncSessionThemeControls(refs, session.id);
@@ -204,9 +198,9 @@ export function createSessionCardInteractionsController(options = {}) {
     });
 
     refs.themeSearch?.addEventListener("input", () => {
-      const current = getSessionThemeConfig(session.id);
-      sessionThemeDrafts.set(session.id, {
-        ...current,
+      updateSessionThemeDraftFromControls(refs, session.id, {
+        selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
         category: normalizeThemeFilterCategory(String(refs.themeCategory?.value || "all").toLowerCase()),
         search: String(refs.themeSearch.value || "")
       });
@@ -220,9 +214,9 @@ export function createSessionCardInteractionsController(options = {}) {
         continue;
       }
       input.addEventListener("input", () => {
-        const draft = getSessionThemeConfig(session.id);
-        sessionThemeDrafts.set(session.id, {
-          ...draft,
+        updateSessionThemeDraftFromControls(refs, session.id, {
+          selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+          slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
           preset: "custom",
           profile: readThemeProfileFromControls({
             themeInputs: refs.themeInputs,
@@ -230,7 +224,9 @@ export function createSessionCardInteractionsController(options = {}) {
             themeFg: refs.themeFg
           })
         });
-        applyThemeForSession(session.id);
+        applyThemeForSession(session.id, {
+          themeSlot: normalizeThemeSlot(refs.themeSlotSelect?.value)
+        });
         markDirtyFromControls();
       });
     }
@@ -268,27 +264,29 @@ export function createSessionCardInteractionsController(options = {}) {
         setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, startupDraft.tagResult.error, true);
         return;
       }
-      const profile = readThemeProfileFromControls({
-        themeInputs: refs.themeInputs,
-        themeBg: refs.themeBg,
-        themeFg: refs.themeFg
-      });
-      const invalidKey = themeProfileKeys.find((key) => !isValidHexColor(profile[key]));
+      const { activeThemeProfile, inactiveThemeProfile } = readSessionThemeProfilesForSave(refs, session.id, currentSession);
+      const invalidKey = themeProfileKeys.find(
+        (key) => !isValidHexColor(activeThemeProfile[key]) || !isValidHexColor(inactiveThemeProfile[key])
+      );
       if (invalidKey) {
         setError("Custom theme colors must be valid hex values like #1d2021.");
         return;
       }
-      const detectedPreset = detectThemePreset(profile);
       const requestedPreset = themeModeSet.has(refs.themeSelect?.value) ? refs.themeSelect.value : "custom";
+      const selectedSlot = normalizeThemeSlot(refs.themeSlotSelect?.value);
+      const selectedProfile = selectedSlot === "inactive" ? inactiveThemeProfile : activeThemeProfile;
+      const detectedPreset = detectThemePreset(selectedProfile);
       const nextPreset =
         requestedPreset === "custom" ? "custom" : detectedPreset === requestedPreset ? requestedPreset : "custom";
-      sessionThemeDrafts.set(session.id, {
+      updateSessionThemeDraftFromControls(refs, session.id, {
+        selectedSlot,
+        slot: selectedSlot,
         preset: nextPreset,
-        profile,
+        profile: selectedProfile,
         category: normalizeThemeFilterCategory(String(refs.themeCategory?.value || "all").toLowerCase()),
         search: String(refs.themeSearch?.value || "")
       });
-      applyThemeForSession(session.id);
+      applyThemeForSession(session.id, { themeSlot: selectedSlot });
       syncSessionThemeControls(refs, session.id);
       clearError();
       try {
@@ -297,7 +295,8 @@ export function createSessionCardInteractionsController(options = {}) {
           startCommand: startupDraft.startCommand,
           env: startupDraft.envResult.env,
           tags: startupDraft.tagResult.tags,
-          themeProfile: profile,
+          activeThemeProfile,
+          inactiveThemeProfile,
           inputSafetyProfile
         });
         applyRuntimeEvent({ type: "session.updated", session: updated });

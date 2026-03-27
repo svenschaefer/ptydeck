@@ -53,7 +53,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     return getTerminalSelection(terminal).length > 0;
   }
 
-  function bindTerminalClipboardInteractions({ session, mount, terminal, onTerminalData }) {
+  function bindTerminalClipboardInteractions({ session, mount, terminal, onTerminalData, onTerminalPaste }) {
     if (!mount || typeof mount.addEventListener !== "function") {
       return () => {};
     }
@@ -92,10 +92,22 @@ export function createSessionTerminalRuntimeController(options = {}) {
             return;
           }
           terminal.focus?.();
-          onTerminalData(session.id, text);
+          onTerminalPaste(session.id, text);
           debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length });
         })
         .catch(() => {});
+    };
+
+    const handlePaste = (event) => {
+      const text = event?.clipboardData?.getData?.("text") || "";
+      if (!text) {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      terminal.focus?.();
+      onTerminalPaste(session.id, text);
+      debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length, source: "clipboard" });
     };
 
     const handleAuxClick = (event) => {
@@ -109,12 +121,14 @@ export function createSessionTerminalRuntimeController(options = {}) {
     mount.addEventListener("keydown", handleKeydown, true);
     mount.addEventListener("mousedown", handleMiddleMouseDown);
     mount.addEventListener("auxclick", handleAuxClick);
+    mount.addEventListener("paste", handlePaste, true);
 
     return () => {
       if (typeof mount.removeEventListener === "function") {
         mount.removeEventListener("keydown", handleKeydown, true);
         mount.removeEventListener("mousedown", handleMiddleMouseDown);
         mount.removeEventListener("auxclick", handleAuxClick);
+        mount.removeEventListener("paste", handlePaste, true);
       }
     };
   }
@@ -129,6 +143,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const resolveInitialTheme = args.resolveInitialTheme || (() => ({}));
     const onSessionMounted = args.onSessionMounted || (() => {});
     const onTerminalData = args.onTerminalData || (() => {});
+    const onTerminalPaste = args.onTerminalPaste || onTerminalData;
     const afterEntryRegistered = args.afterEntryRegistered || (() => {});
     const onFirstTerminalMounted = args.onFirstTerminalMounted || (() => {});
     const applyResizeForSession = args.applyResizeForSession || (() => {});
@@ -153,7 +168,8 @@ export function createSessionTerminalRuntimeController(options = {}) {
       session,
       mount: refs.mount,
       terminal,
-      onTerminalData
+      onTerminalData,
+      onTerminalPaste
     });
 
     const entry = {

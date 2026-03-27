@@ -14,6 +14,7 @@ export function createSessionCardRenderController(options = {}) {
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
+  const applyThemeForSession = options.applyThemeForSession || (() => {});
   const getActiveElement =
     typeof options.getActiveElement === "function" ? options.getActiveElement : () => documentRef?.activeElement || null;
   const refocusTerminal =
@@ -46,6 +47,7 @@ export function createSessionCardRenderController(options = {}) {
     entry.element.classList.toggle("active", activeSessionId === session.id);
     entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
     entry.element.classList.toggle("exited", isSessionExited(session));
+    applyThemeForSession(session.id, { active: activeSessionId === session.id });
     if (wasVisible && !nextVisible) {
       entry.followOnShow = isTerminalAtBottom(entry.terminal);
     }

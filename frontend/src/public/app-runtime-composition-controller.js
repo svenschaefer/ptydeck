@@ -600,6 +600,7 @@ sessionSettingsStateController = createSessionSettingsStateController({
   terminalThemeModeSet: TERMINAL_THEME_MODE_SET,
   sessionThemeDrafts,
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
+  getActiveSessionId: () => store.getState().activeSessionId,
   getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator(sessionId) || "auto",
   normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode(value) || "auto",
   formatSessionEnv: sessionUiFacadeController.formatSessionEnv,
@@ -616,9 +617,12 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   themeModeSet: TERMINAL_THEME_MODE_SET,
   themeProfileKeys: THEME_PROFILE_KEYS,
   getThemePresetById: sessionUiFacadeController.getThemePresetById,
+  normalizeThemeSlot: sessionUiFacadeController.normalizeThemeSlot,
   normalizeThemeProfile: sessionUiFacadeController.normalizeThemeProfile,
   normalizeThemeFilterCategory: sessionUiFacadeController.normalizeThemeFilterCategory,
   readThemeProfileFromControls: sessionUiFacadeController.readThemeProfileFromControls,
+  updateSessionThemeDraftFromControls: sessionUiFacadeController.updateSessionThemeDraftFromControls,
+  readSessionThemeProfilesForSave: sessionUiFacadeController.readSessionThemeProfilesForSave,
   readSessionStartupFromControls: sessionUiFacadeController.readSessionStartupFromControls,
   readSessionInputSafetyFromControls: sessionUiFacadeController.readSessionInputSafetyFromControls,
   isValidHexColor: sessionUiFacadeController.isValidHexColor,
@@ -643,7 +647,8 @@ sessionCardRenderController = createSessionCardRenderController({
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
-  setSettingsDirty: sessionUiFacadeController.setSettingsDirty
+  setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
+  applyThemeForSession: sessionUiFacadeController.applyThemeForSession
 });
 
 sessionTerminalResizeController = createSessionTerminalResizeController({
@@ -796,8 +801,14 @@ sessionGridController = createSessionGridController({
   sessionTerminalRuntimeController,
   onSessionMounted: (session) => appSessionRuntimeFacadeController?.ensureSessionRuntime(session),
   resolveInitialTheme: (sessionId) =>
-    sessionUiFacadeController.buildThemeFromConfig(sessionUiFacadeController.getSessionThemeConfig(sessionId)),
+    sessionUiFacadeController.buildThemeFromConfig(
+      sessionUiFacadeController.getSessionThemeConfig(
+        sessionId,
+        store.getState().activeSessionId === sessionId ? "active" : "inactive"
+      )
+    ),
   handleSessionTerminalInput: (sessionId, data) => appSessionRuntimeFacadeController?.handleSessionTerminalInput(sessionId, data),
+  handleSessionTerminalPaste: (sessionId, text) => commandComposerRuntimeController?.submitTerminalPaste?.(sessionId, text),
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
@@ -821,8 +832,6 @@ sessionGridController = createSessionGridController({
   setSessionSendTerminator: (sessionId, mode) => appLayoutDeckFacadeController?.setSessionSendTerminator(sessionId, mode),
   setStartupSettingsFeedback: sessionUiFacadeController.setStartupSettingsFeedback,
   requestRender: () => appCommandUiFacadeController?.render(),
-  openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
-  exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   api,
   themeProfileKeys: THEME_PROFILE_KEYS,
   debugLog

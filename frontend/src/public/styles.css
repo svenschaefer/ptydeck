@@ -418,9 +418,17 @@ body {
 }
 
 .command-meta {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 0;
   min-width: 0;
+  overflow: hidden;
+}
+
+.command-meta > * {
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .command-target {
@@ -429,7 +437,9 @@ body {
   color: #8bb6ff;
   font-size: 12px;
   line-height: 1.35;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .terminal-search-row {
@@ -551,7 +561,9 @@ body {
   color: #ff8f8f;
   font-size: 12px;
   line-height: 1.35;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .command-feedback {
@@ -560,13 +572,23 @@ body {
   color: #8ec07c;
   font-size: 12px;
   line-height: 1.35;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-message:empty,
 .command-target:empty,
 .command-feedback:empty {
   display: none;
+}
+
+.status-message:not(:empty) + .command-target:not(:empty)::before,
+.status-message:not(:empty) + .command-feedback:not(:empty)::before,
+.command-target:not(:empty) + .command-feedback:not(:empty)::before {
+  content: "·";
+  margin: 0 6px;
+  color: #70839a;
 }
 
 .command-guard {

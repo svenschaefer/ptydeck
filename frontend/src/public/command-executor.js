@@ -1,4 +1,4 @@
-import { createCommandHelpText, getSlashCommandUsage } from "./command-schema.js";
+import { createCommandHelpText, createCommandTopicHelpText, getSlashCommandUsage } from "./command-schema.js";
 import {
   buildSessionInputSafetyProfileFromPreset,
   detectSessionInputSafetyPreset,
@@ -77,7 +77,8 @@ export function createCommandExecutor(options = {}) {
     const startCommand = typeof session.startCommand === "string" ? session.startCommand : "";
     const env = session?.env && typeof session.env === "object" ? session.env : {};
     const tags = normalizeSessionTags(session.tags);
-    const themeProfile = normalizeThemeProfile(session.themeProfile);
+    const activeThemeProfile = normalizeThemeProfile(session.activeThemeProfile || session.themeProfile);
+    const inactiveThemeProfile = normalizeThemeProfile(session.inactiveThemeProfile || session.themeProfile);
     const sendTerminator = getSessionSendTerminator(session.id);
     const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile);
     const inputSafetyPreset = detectSessionInputSafetyPreset(inputSafetyProfile);
@@ -88,7 +89,8 @@ export function createCommandExecutor(options = {}) {
       `env=${JSON.stringify(env)}`,
       `tags=${JSON.stringify(tags)}`,
       `sendTerminator=${sendTerminator}`,
-      `themeProfile=${JSON.stringify(themeProfile)}`,
+      `activeThemeProfile=${JSON.stringify(activeThemeProfile)}`,
+      `inactiveThemeProfile=${JSON.stringify(inactiveThemeProfile)}`,
       `inputSafetyPreset=${inputSafetyPreset}`,
       `inputSafetyProfile=${JSON.stringify(inputSafetyProfile)}`
     ].join("\n");
@@ -125,7 +127,14 @@ export function createCommandExecutor(options = {}) {
     const sessions = sortSessionsByQuickId(state.sessions);
     const activeSessionId = state.activeSessionId;
 
-    if (command === "help" || command === "") {
+    if (command === "" || command === "help") {
+      if (args.length === 0) {
+        return createCommandHelpText(systemSlashCommands);
+      }
+      const topicHelp = createCommandTopicHelpText(args[0], args[1] || "", systemSlashCommands);
+      if (topicHelp) {
+        return topicHelp;
+      }
       return createCommandHelpText(systemSlashCommands);
     }
 
@@ -782,6 +791,8 @@ export function createCommandExecutor(options = {}) {
         "env",
         "tags",
         "themeProfile",
+        "activeThemeProfile",
+        "inactiveThemeProfile",
         "sendTerminator",
         "inputSafetyProfile",
         "inputSafetyPreset"
@@ -806,6 +817,12 @@ export function createCommandExecutor(options = {}) {
       }
       if (Object.prototype.hasOwnProperty.call(payload, "themeProfile")) {
         patch.themeProfile = payload.themeProfile;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "activeThemeProfile")) {
+        patch.activeThemeProfile = payload.activeThemeProfile;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "inactiveThemeProfile")) {
+        patch.inactiveThemeProfile = payload.inactiveThemeProfile;
       }
       if (
         Object.prototype.hasOwnProperty.call(payload, "inputSafetyProfile") &&

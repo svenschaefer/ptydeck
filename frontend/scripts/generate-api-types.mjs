@@ -103,6 +103,8 @@ export type Session = {
   startCommand?: string;
   env?: Record<string, string>;
   themeProfile?: SessionThemeProfile;
+  activeThemeProfile?: SessionThemeProfile;
+  inactiveThemeProfile?: SessionThemeProfile;
   createdAt: number;
   updatedAt: number;
   startedAt?: number | null;
@@ -122,6 +124,8 @@ export type CreateSessionRequest = {
   env?: Record<string, string>;
   tags?: string[];
   themeProfile?: SessionThemeProfile;
+  activeThemeProfile?: SessionThemeProfile;
+  inactiveThemeProfile?: SessionThemeProfile;
 };
 
 export type UpdateSessionRequest = {
@@ -132,6 +136,8 @@ export type UpdateSessionRequest = {
   env?: Record<string, string>;
   tags?: string[];
   themeProfile?: SessionThemeProfile;
+  activeThemeProfile?: SessionThemeProfile;
+  inactiveThemeProfile?: SessionThemeProfile;
 };
 
 export type CustomCommand = {

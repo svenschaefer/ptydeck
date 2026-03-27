@@ -153,6 +153,12 @@ export function validateRequest({ method, pathname, params, body }) {
     if (body?.themeProfile !== undefined && !isObject(body.themeProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
     }
+    if (body?.activeThemeProfile !== undefined && !isObject(body.activeThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must be an object.");
+    }
+    if (body?.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
+    }
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/sessions\/[^/]+$/)) {
@@ -170,7 +176,9 @@ export function validateRequest({ method, pathname, params, body }) {
       body.inputSafetyProfile === undefined &&
       body.env === undefined &&
       body.tags === undefined &&
-      body.themeProfile === undefined
+      body.themeProfile === undefined &&
+      body.activeThemeProfile === undefined &&
+      body.inactiveThemeProfile === undefined
     ) {
       throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
     }
@@ -201,6 +209,12 @@ export function validateRequest({ method, pathname, params, body }) {
     }
     if (body.themeProfile !== undefined && !isObject(body.themeProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
+    }
+    if (body.activeThemeProfile !== undefined && !isObject(body.activeThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must be an object.");
+    }
+    if (body.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
     }
   }
 
@@ -412,7 +426,9 @@ function isSession(value) {
     isInputSafetyProfile(value.inputSafetyProfile) &&
     Array.isArray(value.tags) &&
     value.tags.every((entry) => typeof entry === "string") &&
-    isThemeProfile(value.themeProfile) &&
+    isThemeProfile(value.activeThemeProfile) &&
+    isThemeProfile(value.inactiveThemeProfile) &&
+    (value.themeProfile === undefined || isThemeProfile(value.themeProfile)) &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );

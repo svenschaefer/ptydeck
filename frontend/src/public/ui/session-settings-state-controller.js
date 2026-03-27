@@ -5,6 +5,11 @@ import {
   normalizeSessionInputSafetyProfile
 } from "../input-safety-profile.js";
 
+const THEME_SLOT_OPTIONS = Object.freeze([
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" }
+]);
+
 export function createSessionSettingsStateController(options = {}) {
   const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys.slice() : [];
   const defaultTerminalTheme = options.defaultTerminalTheme && typeof options.defaultTerminalTheme === "object"
@@ -17,6 +22,7 @@ export function createSessionSettingsStateController(options = {}) {
   const sessionThemeDrafts = options.sessionThemeDrafts || new Map();
   const getSessionById = options.getSessionById || (() => null);
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "auto");
+  const getActiveSessionId = options.getActiveSessionId || (() => "");
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode || ((value) => value);
   const formatSessionEnv = options.formatSessionEnv || (() => "");
   const formatSessionTags = options.formatSessionTags || (() => "");
@@ -31,6 +37,10 @@ export function createSessionSettingsStateController(options = {}) {
 
   function isValidHexColor(value) {
     return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
+  }
+
+  function normalizeThemeSlot(value) {
+    return String(value || "").trim().toLowerCase() === "inactive" ? "inactive" : "active";
   }
 
   function normalizeThemeProfile(themeProfile) {
@@ -88,31 +98,6 @@ export function createSessionSettingsStateController(options = {}) {
     selectEl.value = selectedValue;
   }
 
-  function syncThemePresetOptions(entry, config) {
-    if (!entry?.themeSelect) {
-      return;
-    }
-    const category = normalizeThemeFilterCategory(config?.category);
-    const search = String(config?.search || "");
-    const filtered = getFilteredThemePresets(category, search);
-    const selectedPresetId = terminalThemeModeSet.has(config?.preset) ? config.preset : "custom";
-    const options = filtered.map((preset) => ({
-      value: preset.id,
-      label: `[${preset.category}] ${preset.name}`
-    }));
-    if (!options.some((option) => option.value === selectedPresetId) && selectedPresetId !== "custom") {
-      const selectedPreset = getThemePresetById(selectedPresetId);
-      if (selectedPreset) {
-        options.unshift({
-          value: selectedPreset.id,
-          label: `[${selectedPreset.category}] ${selectedPreset.name}`
-        });
-      }
-    }
-    options.push({ value: "custom", label: "Custom Palette" });
-    setSelectOptions(entry.themeSelect, options, selectedPresetId);
-  }
-
   function detectThemePreset(themeProfile) {
     const normalized = normalizeThemeProfile(themeProfile);
     for (const preset of terminalThemePresets) {
@@ -131,39 +116,85 @@ export function createSessionSettingsStateController(options = {}) {
     return "custom";
   }
 
-  function getSessionThemeConfig(sessionId) {
+  function getSessionThemeProfile(session, slot) {
+    const normalizedSlot = normalizeThemeSlot(slot);
+    const directKey = normalizedSlot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+    const fallbackProfile = session?.themeProfile;
+    return normalizeThemeProfile(session?.[directKey] || fallbackProfile);
+  }
+
+  function createThemeSlotConfig(profile) {
+    const normalizedProfile = normalizeThemeProfile(profile);
+    return {
+      preset: detectThemePreset(normalizedProfile),
+      profile: normalizedProfile,
+      category: "all",
+      search: ""
+    };
+  }
+
+  function normalizeThemeSlotConfig(config, fallbackProfile) {
+    const normalizedProfile = normalizeThemeProfile(config?.profile || fallbackProfile);
+    const preset = terminalThemeModeSet.has(config?.preset) ? config.preset : detectThemePreset(normalizedProfile);
+    return {
+      preset,
+      profile: normalizedProfile,
+      category: normalizeThemeFilterCategory(String(config?.category || "all").toLowerCase()),
+      search: String(config?.search || "")
+    };
+  }
+
+  function getSessionThemeDraft(sessionId) {
     const draft = sessionThemeDrafts.get(sessionId);
-    if (draft) {
-      return {
-        preset: terminalThemeModeSet.has(draft.preset) ? draft.preset : "custom",
-        profile: normalizeThemeProfile(draft.profile),
-        category: normalizeThemeFilterCategory(draft.category),
-        search: String(draft.search || "")
-      };
-    }
     const session = getSessionById(sessionId);
-    const profile = normalizeThemeProfile(session?.themeProfile);
-    const preset = detectThemePreset(profile);
-    return { preset, profile, category: "all", search: "" };
+    const activeProfile = getSessionThemeProfile(session, "active");
+    const inactiveProfile = getSessionThemeProfile(session, "inactive");
+
+    if (draft && typeof draft === "object") {
+      const selectedSlot = normalizeThemeSlot(draft.selectedSlot || draft.slot || "active");
+      if (draft.active || draft.inactive) {
+        return {
+          selectedSlot,
+          active: normalizeThemeSlotConfig(draft.active, activeProfile),
+          inactive: normalizeThemeSlotConfig(draft.inactive, inactiveProfile)
+        };
+      }
+      if (draft.profile) {
+        return {
+          selectedSlot,
+          active: normalizeThemeSlotConfig(draft, activeProfile),
+          inactive: createThemeSlotConfig(inactiveProfile)
+        };
+      }
+    }
+
+    return {
+      selectedSlot: "active",
+      active: createThemeSlotConfig(activeProfile),
+      inactive: createThemeSlotConfig(inactiveProfile)
+    };
+  }
+
+  function getSessionThemeSelectedSlot(sessionId) {
+    return getSessionThemeDraft(sessionId).selectedSlot;
+  }
+
+  function setSessionThemeSelectedSlot(sessionId, slot) {
+    const draft = getSessionThemeDraft(sessionId);
+    sessionThemeDrafts.set(sessionId, {
+      ...draft,
+      selectedSlot: normalizeThemeSlot(slot)
+    });
+  }
+
+  function getSessionThemeConfig(sessionId, slot = undefined) {
+    const draft = getSessionThemeDraft(sessionId);
+    const resolvedSlot = normalizeThemeSlot(slot || draft.selectedSlot);
+    return draft[resolvedSlot];
   }
 
   function buildThemeFromConfig(config) {
     return normalizeThemeProfile(config?.profile);
-  }
-
-  function applyThemeForSession(sessionId) {
-    const entry = terminals.get(sessionId);
-    if (!entry) {
-      return;
-    }
-    const theme = buildThemeFromConfig(getSessionThemeConfig(sessionId));
-    if (typeof entry.terminal?.setOption === "function") {
-      entry.terminal.setOption("theme", theme);
-      return;
-    }
-    if (entry.terminal?.options && typeof entry.terminal.options === "object") {
-      entry.terminal.options.theme = theme;
-    }
   }
 
   function getThemeInput(entry, key) {
@@ -201,11 +232,86 @@ export function createSessionSettingsStateController(options = {}) {
     }
   }
 
+  function writeThemeDraft(sessionId, nextDraft) {
+    sessionThemeDrafts.set(sessionId, {
+      selectedSlot: normalizeThemeSlot(nextDraft.selectedSlot),
+      active: normalizeThemeSlotConfig(nextDraft.active, nextDraft.active?.profile),
+      inactive: normalizeThemeSlotConfig(nextDraft.inactive, nextDraft.inactive?.profile)
+    });
+    return sessionThemeDrafts.get(sessionId);
+  }
+
+  function updateSessionThemeDraftFromControls(entry, sessionId, overrides = {}) {
+    const draft = getSessionThemeDraft(sessionId);
+    const selectedSlot = normalizeThemeSlot(overrides.selectedSlot || entry?.themeSlotSelect?.value || draft.selectedSlot);
+    const currentSlot = normalizeThemeSlot(overrides.slot || selectedSlot);
+    const currentConfig = draft[currentSlot];
+    const nextPreset = terminalThemeModeSet.has(overrides.preset)
+      ? overrides.preset
+      : terminalThemeModeSet.has(entry?.themeSelect?.value)
+        ? entry.themeSelect.value
+        : currentConfig.preset;
+    const nextProfile = normalizeThemeProfile(overrides.profile || readThemeProfileFromControls(entry));
+    const nextConfig = {
+      preset: nextPreset,
+      profile: nextProfile,
+      category: normalizeThemeFilterCategory(
+        String(overrides.category || entry?.themeCategory?.value || currentConfig.category || "all").toLowerCase()
+      ),
+      search: String(overrides.search !== undefined ? overrides.search : entry?.themeSearch?.value || currentConfig.search || "")
+    };
+    return writeThemeDraft(sessionId, {
+      ...draft,
+      selectedSlot,
+      [currentSlot]: nextConfig
+    });
+  }
+
+  function readSessionThemeProfilesForSave(entry, sessionId, session) {
+    const draft = updateSessionThemeDraftFromControls(entry, sessionId, {
+      selectedSlot: entry?.themeSlotSelect?.value || getSessionThemeSelectedSlot(sessionId)
+    });
+    return {
+      activeThemeProfile: normalizeThemeProfile(draft.active?.profile || getSessionThemeProfile(session, "active")),
+      inactiveThemeProfile: normalizeThemeProfile(draft.inactive?.profile || getSessionThemeProfile(session, "inactive"))
+    };
+  }
+
+  function syncThemePresetOptions(entry, config) {
+    if (!entry?.themeSelect) {
+      return;
+    }
+    const category = normalizeThemeFilterCategory(config?.category);
+    const search = String(config?.search || "");
+    const filtered = getFilteredThemePresets(category, search);
+    const selectedPresetId = terminalThemeModeSet.has(config?.preset) ? config.preset : "custom";
+    const options = filtered.map((preset) => ({
+      value: preset.id,
+      label: `[${preset.category}] ${preset.name}`
+    }));
+    if (!options.some((option) => option.value === selectedPresetId) && selectedPresetId !== "custom") {
+      const selectedPreset = getThemePresetById(selectedPresetId);
+      if (selectedPreset) {
+        options.unshift({
+          value: selectedPreset.id,
+          label: `[${selectedPreset.category}] ${selectedPreset.name}`
+        });
+      }
+    }
+    options.push({ value: "custom", label: "Custom Palette" });
+    setSelectOptions(entry.themeSelect, options, selectedPresetId);
+  }
+
   function syncSessionThemeControls(entry, sessionId) {
     if (!entry || !entry.themeSelect) {
       return;
     }
-    const config = getSessionThemeConfig(sessionId);
+    const draft = getSessionThemeDraft(sessionId);
+    const selectedSlot = normalizeThemeSlot(entry.themeSlotSelect?.value || draft.selectedSlot);
+    if (entry.themeSlotSelect) {
+      setSelectOptions(entry.themeSlotSelect, THEME_SLOT_OPTIONS, selectedSlot);
+    }
+    const config = draft[selectedSlot];
     if (entry.themeCategory) {
       entry.themeCategory.value = normalizeThemeFilterCategory(config.category);
     }
@@ -221,6 +327,27 @@ export function createSessionSettingsStateController(options = {}) {
         input.disabled = !customSelected;
       }
     }
+  }
+
+  function applyThemeForSession(sessionId, options = {}) {
+    const entry = terminals.get(sessionId);
+    if (!entry) {
+      return;
+    }
+    const requestedSlot = options.themeSlot ? normalizeThemeSlot(options.themeSlot) : null;
+    const activeSessionId = getActiveSessionId();
+    const resolvedSlot = requestedSlot || (options.active === false ? "inactive" : options.active === true ? "active" : activeSessionId === sessionId ? "active" : "inactive");
+    const theme = buildThemeFromConfig(getSessionThemeConfig(sessionId, resolvedSlot));
+    const themeSignature = `${resolvedSlot}:${JSON.stringify(theme)}`;
+    if (entry.appliedThemeSignature === themeSignature) {
+      return;
+    }
+    if (typeof entry.terminal?.setOption === "function") {
+      entry.terminal.setOption("theme", theme);
+    } else if (entry.terminal?.options && typeof entry.terminal.options === "object") {
+      entry.terminal.options.theme = theme;
+    }
+    entry.appliedThemeSignature = themeSignature;
   }
 
   function setStartupSettingsFeedback(entry, message, isError = false) {
@@ -323,7 +450,7 @@ export function createSessionSettingsStateController(options = {}) {
     }
     const currentStartup = normalizeSessionStartupFromSession(session);
     const draftStartup = readSessionStartupFromControls(entry);
-    const draftTheme = readThemeProfileFromControls(entry);
+    const draftThemes = readSessionThemeProfilesForSave(entry, session.id, session);
     if (!draftStartup.startCwd || !draftStartup.envResult.ok || !draftStartup.tagResult.ok) {
       return true;
     }
@@ -339,7 +466,10 @@ export function createSessionSettingsStateController(options = {}) {
     if (!areStringArraysEqual(currentStartup.tags, draftStartup.tagResult.tags)) {
       return true;
     }
-    if (!areThemeProfilesEqual(session.themeProfile, draftTheme)) {
+    if (!areThemeProfilesEqual(getSessionThemeProfile(session, "active"), draftThemes.activeThemeProfile)) {
+      return true;
+    }
+    if (!areThemeProfilesEqual(getSessionThemeProfile(session, "inactive"), draftThemes.inactiveThemeProfile)) {
       return true;
     }
     if (getSessionSendTerminator(session.id) !== draftStartup.sendTerminator) {
@@ -356,14 +486,19 @@ export function createSessionSettingsStateController(options = {}) {
 
   return {
     isValidHexColor,
+    normalizeThemeSlot,
     normalizeThemeProfile,
     normalizeThemeFilterCategory,
     getThemePresetById,
     detectThemePreset,
     getSessionThemeConfig,
+    getSessionThemeSelectedSlot,
+    setSessionThemeSelectedSlot,
     buildThemeFromConfig,
     applyThemeForSession,
     readThemeProfileFromControls,
+    updateSessionThemeDraftFromControls,
+    readSessionThemeProfilesForSave,
     syncSessionThemeControls,
     setStartupSettingsFeedback,
     syncSessionStartupControls,

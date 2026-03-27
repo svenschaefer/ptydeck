@@ -99,6 +99,14 @@ function cloneSessionRecord(session) {
     ...session,
     env: session.env && typeof session.env === "object" ? { ...session.env } : session.env,
     themeProfile: session.themeProfile && typeof session.themeProfile === "object" ? { ...session.themeProfile } : session.themeProfile,
+    activeThemeProfile:
+      session.activeThemeProfile && typeof session.activeThemeProfile === "object"
+        ? { ...session.activeThemeProfile }
+        : session.activeThemeProfile,
+    inactiveThemeProfile:
+      session.inactiveThemeProfile && typeof session.inactiveThemeProfile === "object"
+        ? { ...session.inactiveThemeProfile }
+        : session.inactiveThemeProfile,
     tags: Array.isArray(session.tags) ? session.tags.slice() : session.tags,
     meta: session.meta && typeof session.meta === "object" ? { ...session.meta } : session.meta,
     pluginBadges: Array.isArray(session.pluginBadges) ? session.pluginBadges.map((badge) => ({ ...badge })) : [],

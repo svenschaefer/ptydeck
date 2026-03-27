@@ -92,10 +92,19 @@ test("session-settings state controller syncs theme controls and applies draft t
     [
       "s1",
       {
-        preset: "gruvbox-dark",
-        profile: presetProfile,
-        category: "dark",
-        search: "gruv"
+        selectedSlot: "inactive",
+        active: {
+          preset: "custom",
+          profile: defaultTheme,
+          category: "all",
+          search: ""
+        },
+        inactive: {
+          preset: "gruvbox-dark",
+          profile: presetProfile,
+          category: "dark",
+          search: "gruv"
+        }
       }
     ]
   ]);
@@ -107,12 +116,17 @@ test("session-settings state controller syncs theme controls and applies draft t
     terminalThemePresets: [{ id: "gruvbox-dark", category: "dark", name: "Gruvbox Dark", profile: presetProfile }],
     terminalThemeModeSet: new Set(["custom", "gruvbox-dark"]),
     sessionThemeDrafts,
-    getSessionById: () => ({ id: "s1", themeProfile: defaultTheme }),
+    getSessionById: () => ({
+      id: "s1",
+      activeThemeProfile: defaultTheme,
+      inactiveThemeProfile: presetProfile
+    }),
     terminals,
     documentRef: createFakeDocument()
   });
 
   const entry = {
+    themeSlotSelect: new FakeSelect(),
     themeCategory: createInput(),
     themeSearch: createInput(),
     themeSelect: new FakeSelect(),
@@ -125,6 +139,7 @@ test("session-settings state controller syncs theme controls and applies draft t
 
   controller.syncSessionThemeControls(entry, "s1");
 
+  assert.equal(entry.themeSlotSelect.value, "inactive");
   assert.equal(entry.themeCategory.value, "dark");
   assert.equal(entry.themeSearch.value, "gruv");
   assert.equal(entry.themeSelect.value, "gruvbox-dark");
@@ -133,8 +148,9 @@ test("session-settings state controller syncs theme controls and applies draft t
   assert.equal(entry.themeInputs.cursor.value, presetProfile.cursor);
   assert.equal(entry.themeInputs.background.disabled, true);
   assert.equal(entry.themeSelect.children.length, 2);
+  assert.equal(entry.themeSlotSelect.children.length, 2);
 
-  controller.applyThemeForSession("s1");
+  controller.applyThemeForSession("s1", { themeSlot: "inactive" });
   assert.deepEqual(calls, [["theme", presetProfile]]);
 });
 
@@ -147,7 +163,11 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     inputSafetyProfile: {
       requireValidShellSyntax: false
     },
-    themeProfile: {
+    activeThemeProfile: {
+      background: "#111111",
+      foreground: "#eeeeee"
+    },
+    inactiveThemeProfile: {
       background: "#111111",
       foreground: "#eeeeee"
     }
@@ -168,6 +188,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
       env: { FOO: "bar" },
       tags: ["ops"]
     }),
+    getSessionById: () => session,
     getSessionSendTerminator: () => "crlf",
     normalizeSendTerminatorMode: (value) => value
   });
@@ -177,6 +198,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     classList: new FakeClassList()
   };
   const entry = {
+    themeSlotSelect: createInput("active"),
     startCwdInput: createInput("/workspace"),
     startCommandInput: createInput("npm run dev"),
     startEnvInput: createInput("FOO=bar"),
@@ -191,6 +213,12 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   };
 
   assert.equal(controller.isSessionSettingsDirty(entry, session), false);
+
+  entry.themeSlotSelect.value = "inactive";
+  entry.themeInputs.background.value = "#222222";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+  entry.themeInputs.background.value = "#111111";
+  entry.themeSlotSelect.value = "active";
 
   entry.sessionSendTerminatorSelect.value = "lf";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);

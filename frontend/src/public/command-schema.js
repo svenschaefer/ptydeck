@@ -470,8 +470,12 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/help",
     kind: "command",
     description: "show command help",
-    example: "/help",
-    usage: "/help"
+    example: "/help deck",
+    usage: [
+      "/help",
+      "/help <topic>",
+      "/help <topic> <subcommand>"
+    ]
   })
 });
 
@@ -536,25 +540,55 @@ export function getSlashCommandUsage(commandName, subcommandName = "") {
   return command.usage?.join(" | ") || "";
 }
 
+export function createCommandTopicHelpText(commandName, subcommandName = "", systemSlashCommands = []) {
+  const registry = createSlashCommandRegistry(systemSlashCommands);
+  const command = registry.get(commandName);
+  if (!command) {
+    return "";
+  }
+
+  if (subcommandName) {
+    const subcommand = command.subcommands?.[normalizeLower(subcommandName)] || null;
+    if (!subcommand) {
+      return "";
+    }
+    return [subcommand.label, `Usage: ${subcommand.usage.join(" | ")}`, subcommand.description]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const sections = [command.label];
+  if (command.summary) {
+    sections.push(command.summary);
+  }
+  if (command.usage?.length) {
+    sections.push(`Usage: ${command.usage.join(" | ")}`);
+  }
+  if (command.description) {
+    sections.push(command.description);
+  }
+  if (command.subcommands && Object.keys(command.subcommands).length > 0) {
+    sections.push(
+      `Subcommands: ${Object.values(command.subcommands)
+        .map((entry) => entry.insertText)
+        .join(" ")}`
+    );
+  }
+  return sections.filter(Boolean).join("\n");
+}
+
 export function createCommandHelpText(systemSlashCommands = [], options = {}) {
   const includeQuickSwitch = options.includeQuickSwitch !== false;
-  const quickSwitchUsages = Array.isArray(options.quickSwitchUsages)
-    ? options.quickSwitchUsages.map((entry) => normalizeText(entry)).filter(Boolean)
-    : [">selector", ">deckSelector::sessionSelector"];
+  const commandNames = createSlashCommandSchema(systemSlashCommands)
+    .map((command) => normalizeText(command?.insertText))
+    .filter(Boolean);
   const parts = [];
-  for (const command of createSlashCommandSchema(systemSlashCommands)) {
-    const summary = normalizeText(command?.summary);
-    if (summary) {
-      parts.push(summary);
-      continue;
-    }
-    const usages = Array.isArray(command?.usage) ? command.usage : [];
-    if (usages.length > 0) {
-      parts.push(usages.join(", "));
-    }
-  }
   if (includeQuickSwitch) {
-    parts.push(...quickSwitchUsages);
+    parts.push(">");
   }
-  return `Commands: ${parts.join(", ")}`;
+  if (commandNames.length > 0) {
+    parts.push("/");
+    parts.push(...commandNames);
+  }
+  return `Commands: ${parts.join(" ")}`.trim();
 }

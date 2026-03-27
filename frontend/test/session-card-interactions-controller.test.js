@@ -64,81 +64,38 @@ test("session-card-interactions controller wires focus and settings dialog contr
   ]);
 });
 
-test("session-card-interactions controller exports replay tails from the toolbar action", async () => {
-  const calls = [];
-  const controller = createSessionCardInteractionsController({});
-  const refs = {
-    focusBtn: createEventTarget(),
-    replayExportBtn: createEventTarget()
-  };
-
-  controller.bindSessionCardInteractions({
-    session: { id: "s1", name: "alpha" },
-    refs,
-    api: {},
-    getSession: () => ({ id: "s1", name: "alpha" }),
-    exportSessionReplayDownload: async (session) => {
-      calls.push(`export:${session.id}`);
-      return { feedback: "Downloaded replay tail for [7] alpha (32 chars retained)." };
-    },
-    clearError: () => calls.push("clear-error"),
-    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
-    setError: (message) => calls.push(`error:${message}`)
-  });
-
-  await refs.replayExportBtn.emit("click");
-
-  assert.deepEqual(calls, [
-    "export:s1",
-    "clear-error",
-    "feedback:Downloaded replay tail for [7] alpha (32 chars retained)."
-  ]);
-});
-
-test("session-card-interactions controller opens the replay viewer from the toolbar action", async () => {
-  const calls = [];
-  const controller = createSessionCardInteractionsController({});
-  const refs = {
-    focusBtn: createEventTarget(),
-    replayViewBtn: createEventTarget()
-  };
-
-  controller.bindSessionCardInteractions({
-    session: { id: "s1", name: "alpha" },
-    refs,
-    api: {},
-    getSession: () => ({ id: "s1", name: "alpha" }),
-    openSessionReplayViewer: async (session) => {
-      calls.push(`view:${session.id}`);
-      return { feedback: "Opened replay viewer for [7] alpha." };
-    },
-    clearError: () => calls.push("clear-error"),
-    setCommandFeedback: (message) => calls.push(`feedback:${message}`),
-    setError: (message) => calls.push(`error:${message}`)
-  });
-
-  await refs.replayViewBtn.emit("click");
-
-  assert.deepEqual(calls, [
-    "view:s1",
-    "clear-error",
-    "feedback:Opened replay viewer for [7] alpha."
-  ]);
-});
-
 test("session-card-interactions controller handles theme select changes through injected callbacks", async () => {
   const calls = [];
   const sessionThemeDrafts = new Map();
   const controller = createSessionCardInteractionsController({
     themeModeSet: new Set(["dark"]),
+    normalizeThemeSlot: (value) => value || "active",
     readThemeProfileFromControls: () => ({ background: "#000000" }),
     getThemePresetById: () => ({ profile: { background: "#111111" } }),
     normalizeThemeProfile: (profile) => profile,
     normalizeThemeFilterCategory: (value) => value,
+    updateSessionThemeDraftFromControls: (_refs, sessionId, overrides) => {
+      sessionThemeDrafts.set(sessionId, {
+        selectedSlot: overrides.selectedSlot,
+        active: {
+          preset: overrides.preset,
+          profile: overrides.profile,
+          category: overrides.category,
+          search: overrides.search
+        },
+        inactive: {
+          preset: "custom",
+          profile: { background: "#222222" },
+          category: "all",
+          search: ""
+        }
+      });
+    },
     isSessionSettingsDirty: () => true
   });
   const refs = {
     focusBtn: createEventTarget(),
+    themeSlotSelect: createEventTarget("active"),
     themeSelect: createEventTarget("dark"),
     themeCategory: createEventTarget("all"),
     themeSearch: createEventTarget(""),
@@ -169,10 +126,19 @@ test("session-card-interactions controller handles theme select changes through 
   await refs.themeSelect.emit("change");
 
   assert.deepEqual(sessionThemeDrafts.get("s1"), {
-    preset: "dark",
-    profile: { background: "#111111" },
-    category: "all",
-    search: ""
+    selectedSlot: "active",
+    active: {
+      preset: "dark",
+      profile: { background: "#111111" },
+      category: "all",
+      search: ""
+    },
+    inactive: {
+      preset: "custom",
+      profile: { background: "#222222" },
+      category: "all",
+      search: ""
+    }
   });
   assert.deepEqual(calls, ["sync-theme", "apply-theme:s1", "dirty:true", "clear-error", "render"]);
 });
@@ -181,6 +147,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   const calls = [];
   const controller = createSessionCardInteractionsController({
     themeProfileKeys: ["background"],
+    normalizeThemeSlot: (value) => value || "active",
     readSessionStartupFromControls: () => ({
       startCwd: "",
       envResult: { ok: true, env: {} },
@@ -191,13 +158,20 @@ test("session-card-interactions controller blocks settings apply when startCwd i
     readSessionInputSafetyFromControls: () => ({
       requireValidShellSyntax: true
     }),
-    readThemeProfileFromControls: () => ({ background: "#000000" }),
+    readSessionThemeProfilesForSave: () => ({
+      activeThemeProfile: { background: "#000000" },
+      inactiveThemeProfile: { background: "#111111" }
+    }),
     isValidHexColor: () => true,
     detectThemePreset: () => "custom"
   });
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    themeSlotSelect: createEventTarget("active"),
+    themeSelect: createEventTarget("custom"),
+    themeCategory: createEventTarget("all"),
+    themeSearch: createEventTarget(""),
     inputSafetyPresetSelect: createEventTarget("shell_balanced"),
     startFeedback: {}
   };

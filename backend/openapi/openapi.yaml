@@ -821,6 +821,10 @@ components:
             type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
+        activeThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        inactiveThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
         createdAt:
           type: integer
           format: int64
@@ -943,6 +947,10 @@ components:
             type: string
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
+        activeThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        inactiveThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
     UpdateSessionRequest:
       type: object
       properties:
@@ -965,6 +973,10 @@ components:
           items:
             type: string
         themeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        activeThemeProfile:
+          $ref: '#/components/schemas/SessionThemeProfile'
+        inactiveThemeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
     SessionInputSafetyProfile:
       type: object

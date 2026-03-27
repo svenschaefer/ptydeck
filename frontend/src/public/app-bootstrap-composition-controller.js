@@ -272,6 +272,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       resolveQuickSwitchTarget: commandTargetRuntimeController.resolveQuickSwitchTarget,
       activateSessionTarget: commandTargetRuntimeController.activateSessionTarget,
       activateDeckTarget: commandTargetRuntimeController.activateDeckTarget,
+      setActiveSession: (sessionId) => store?.setActiveSession?.(sessionId),
       setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
       setCommandPreview: (message) => appCommandUiFacadeController?.setCommandPreview?.(message),
       setCommandGuardState: (nextState) => appCommandUiFacadeController?.setCommandGuardState?.(nextState),

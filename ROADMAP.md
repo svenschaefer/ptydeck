@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H25`.
-- Active scoped tasks: `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`.
-- Latest completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H25` (Session Theme Dual-Scheme and Composer/Help Simplification, `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`).
+- Previous completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
 - Previous completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
 - Previous completed wave: `v0.4.0-H22` (Command Palette and Keyboard Navigation, `UX-001`).
 - Previous completed wave: `v0.4.0-H21` (Developer Productivity Templates and ADR Process, `DPR-001`, `DPR-002`).
@@ -39,20 +40,20 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave
+## Latest Completed Wave
 
-### v0.4.0-H25 - Session Theme Dual-Scheme and Composer/Help Simplification (Active)
+### v0.4.0-H25 - Session Theme Dual-Scheme and Composer/Help Simplification (Completed)
 
 - `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`
 
 Dependencies:
 
-- `QLT-144` establishes the persisted backend contract for two independently selectable per-session theme slots, `activeThemeProfile` and `inactiveThemeProfile`, so the frontend does not invent a local-only dual-theme model.
-- `QLT-145` follows `QLT-144` and applies the two user-selected theme schemes in session settings plus runtime theme switching when active-session state changes.
-- `QLT-146` is independent of the theme work but remains in the same UX simplification wave because it removes replay actions from the terminal header in favor of the existing slash-command path.
-- `QLT-147` builds on the already persisted input-safety profile and extends guarded-send behavior to paste-triggered input flows without introducing a second safety profile model.
-- `QLT-148` should close after `QLT-146` and `QLT-147` so the one-line composer metadata strip reflects the final replay-action removal and guarded-input feedback shape.
-- `QLT-149` can close after the command-plane simplification work in the same wave so `/help` and `/help <topic>` reflect the final active slash-command surface consistently.
+- `QLT-144` established the persisted backend contract for two independently selectable per-session theme slots, `activeThemeProfile` and `inactiveThemeProfile`, so the frontend did not invent a local-only dual-theme model.
+- `QLT-145` followed `QLT-144` and applies the two user-selected theme schemes in session settings plus runtime theme switching when active-session state changes.
+- `QLT-146` closed in the same UX simplification wave by removing replay actions from the terminal header in favor of the existing slash-command path.
+- `QLT-147` extended the already persisted input-safety profile to paste-triggered input flows without introducing a second safety profile model.
+- `QLT-148` closed after the replay-action removal and guarded-input work so the one-line composer metadata strip reflects the final feedback shape without a visible preset label.
+- `QLT-149` closed after the command-plane simplification work so `/help` and `/help <topic>` now reflect the final active slash-command surface consistently.
 
 Exit criteria:
 
@@ -62,7 +63,7 @@ Exit criteria:
 - The composer metadata strip is reduced to one line with ` · ` separators and no preset label above the input box.
 - Slash help supports both a main overview and command/topic-specific sub-help output.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H24 - Frontend Quick-ID Swap Consistency (Completed)
 

@@ -992,9 +992,13 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         env: {},
         tags: sessionId === "s-2" ? ["beta", "ops"] : sessionId === "ops" ? ["ops"] : [],
         themeProfile: undefined,
+        activeThemeProfile: undefined,
+        inactiveThemeProfile: undefined,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
+      const nextActiveThemeProfile = payload.activeThemeProfile || payload.themeProfile || baseSession.activeThemeProfile;
+      const nextInactiveThemeProfile = payload.inactiveThemeProfile || payload.themeProfile || baseSession.inactiveThemeProfile;
       return makeJsonResponse(200, {
         ...baseSession,
         name: payload.name || baseSession.name,
@@ -1003,7 +1007,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         startCommand: payload.startCommand || baseSession.startCommand,
         env: payload.env || baseSession.env,
         tags: Array.isArray(payload.tags) ? payload.tags : baseSession.tags,
-        themeProfile: payload.themeProfile || baseSession.themeProfile,
+        themeProfile: nextActiveThemeProfile || baseSession.themeProfile,
+        activeThemeProfile: nextActiveThemeProfile,
+        inactiveThemeProfile: nextInactiveThemeProfile,
         updatedAt: Date.now()
       });
     }
@@ -1146,15 +1152,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/help";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.commandFeedback.textContent, /^Commands:/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/size <cols> <rows>/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/filter \[id\/tag/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/restart \[selector/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/rename <selector> <name>/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/deck list\|new\|rename\|switch\|delete/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/move <sessionSelector> <deckSelector>/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/settings apply <selector\|active> <json>/);
-  assert.match(fixture.elements.commandFeedback.textContent, /\/custom <name> <text>/);
+  assert.equal(
+    fixture.elements.commandFeedback.textContent,
+    "Commands: > / new deck move size filter close switch swap next prev list rename restart note layout replay settings custom help"
+  );
 
   fixture.elements.commandInput.value = "/custom docu echo verify";
   fixture.elements.sendCommand.click();
@@ -2364,50 +2365,29 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(updateSessionCalls.length > 0, true);
   const latestSettingsCall = updateSessionCalls[updateSessionCalls.length - 1];
-  assert.deepEqual(latestSettingsCall, {
-    sessionId: "s-2",
-    payload: {
-      startCwd: "/var/tmp",
-      startCommand: "echo start",
-      env: {
-        APP_MODE: "dev",
-        FEATURE_X: "1"
-      },
-      tags: ["ops", "prod"],
-      inputSafetyProfile: {
-        requireValidShellSyntax: false,
-        confirmOnIncompleteShellConstruct: false,
-        confirmOnNaturalLanguageInput: false,
-        confirmOnDangerousShellCommand: false,
-        confirmOnMultilineInput: false,
-        confirmOnRecentTargetSwitch: false,
-        targetSwitchGraceMs: 4000,
-        pasteLengthConfirmThreshold: 400,
-        pasteLineConfirmThreshold: 5
-      },
-      themeProfile: {
-        background: "#101010",
-        foreground: "#e0e0e0",
-        cursor: "#8ec07c",
-        black: "#0a0d12",
-        red: "#fb4934",
-        green: "#8ec07c",
-        yellow: "#fabd2f",
-        blue: "#83a598",
-        magenta: "#b48ead",
-        cyan: "#8fbcbb",
-        white: "#d8dee9",
-        brightBlack: "#4b5563",
-        brightRed: "#ff6b5a",
-        brightGreen: "#a5d68a",
-        brightYellow: "#ffd36a",
-        brightBlue: "#98b6cc",
-        brightMagenta: "#c8a7d8",
-        brightCyan: "#a9d9d6",
-        brightWhite: "#f5f7fa"
-      }
-    }
+  assert.equal(latestSettingsCall.sessionId, "s-2");
+  assert.equal(latestSettingsCall.payload.startCwd, "/var/tmp");
+  assert.equal(latestSettingsCall.payload.startCommand, "echo start");
+  assert.deepEqual(latestSettingsCall.payload.env, {
+    APP_MODE: "dev",
+    FEATURE_X: "1"
   });
+  assert.deepEqual(latestSettingsCall.payload.tags, ["ops", "prod"]);
+  assert.deepEqual(latestSettingsCall.payload.inputSafetyProfile, {
+    requireValidShellSyntax: false,
+    confirmOnIncompleteShellConstruct: false,
+    confirmOnNaturalLanguageInput: false,
+    confirmOnDangerousShellCommand: false,
+    confirmOnMultilineInput: false,
+    confirmOnRecentTargetSwitch: false,
+    targetSwitchGraceMs: 4000,
+    pasteLengthConfirmThreshold: 400,
+    pasteLineConfirmThreshold: 5
+  });
+  assert.equal(latestSettingsCall.payload.activeThemeProfile.background, "#101010");
+  assert.equal(latestSettingsCall.payload.activeThemeProfile.foreground, "#e0e0e0");
+  assert.equal(latestSettingsCall.payload.inactiveThemeProfile.background, persistedBgBeforeDraft);
+  assert.equal(latestSettingsCall.payload.inactiveThemeProfile.foreground, persistedFgBeforeDraft);
   assert.equal(MockTerminal.instances[1].options.theme.background, "#101010");
   assert.equal(MockTerminal.instances[1].options.theme.foreground, "#e0e0e0");
   assert.equal(secondStartFeedback.textContent, "Settings saved.");
@@ -2418,7 +2398,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     env: { APP_MODE: "slash" },
     tags: ["ops", "slash"],
     themeProfile: {
-      ...latestSettingsCall.payload.themeProfile,
+      ...latestSettingsCall.payload.activeThemeProfile,
       background: "#202020",
       foreground: "#f0f0f0"
     },
@@ -2436,7 +2416,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       env: { APP_MODE: "slash" },
       tags: ["ops", "slash"],
       themeProfile: {
-        ...latestSettingsCall.payload.themeProfile,
+        ...latestSettingsCall.payload.activeThemeProfile,
         background: "#202020",
         foreground: "#f0f0f0"
       }
@@ -2487,12 +2467,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.replayViewerCopy.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Copied replay tail for [1] two (18/32 chars retained, truncated).");
-  const secondReplayExport = secondCard.querySelector(".session-replay-export");
-  const secondReplayView = secondCard.querySelector(".session-replay-view");
-  secondReplayView.click();
+  fixture.elements.commandInput.value = "/replay view 1";
+  fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Opened replay viewer for [1] two.");
-  secondReplayExport.click();
+  fixture.elements.commandInput.value = "/replay export 1";
+  fixture.elements.sendCommand.click();
   await tick();
   assert.equal(
     fixture.elements.commandFeedback.textContent,
@@ -2684,7 +2664,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         cwd: "~",
         name: "two",
         tags: ["ops", "prod"],
-        themeProfile: latestSettingsCall.payload.themeProfile,
+        themeProfile: latestSettingsCall.payload.activeThemeProfile,
         createdAt: Date.now(),
         updatedAt: Date.now()
       }
@@ -2782,7 +2762,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
           cwd: "~",
           name: "one",
           tags: ["alpha"],
-          themeProfile: latestSettingsCall.payload.themeProfile,
+          themeProfile: latestSettingsCall.payload.activeThemeProfile,
           createdAt: Date.now(),
           updatedAt: Date.now()
         },
@@ -2794,7 +2774,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
           cwd: "~",
           name: "unrestored",
           tags: ["broken"],
-          themeProfile: latestSettingsCall.payload.themeProfile,
+          themeProfile: latestSettingsCall.payload.activeThemeProfile,
           createdAt: Date.now(),
           updatedAt: Date.now()
         }

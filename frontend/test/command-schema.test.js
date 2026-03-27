@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   createCommandHelpText,
+  createCommandTopicHelpText,
   createSlashCommandRegistry,
   createSlashCommandSchema,
   getSlashCommandUsage
@@ -46,14 +47,20 @@ test("command schema exposes declarative command metadata and distinct help/usag
 test("command schema formats command help text from declarative command summaries", () => {
   const helpText = createCommandHelpText(["new", "deck", "swap", "note", "layout", "replay", "custom", "help"]);
   assert.match(helpText, /^Commands: /);
-  assert.match(helpText, /\/new \[shell\]/);
-  assert.match(helpText, /\/deck list\|new\|rename\|switch\|delete/);
-  assert.match(helpText, /\/swap <selectorA> <selectorB>/);
-  assert.match(helpText, /\/note <selector\|active> \[text\.\.\.\]/);
-  assert.match(helpText, /\/layout list \| \/layout save <name> \| \/layout apply <profile> \| \/layout rename <profile> <name> \| \/layout delete <profile>/);
-  assert.match(helpText, /\/replay view \[selector\|active\] \| \/replay export \[selector\|active\] \| \/replay copy \[selector\|active\]/);
-  assert.match(helpText, /\/custom <name> <text>, \/custom <name> \+ block/);
-  assert.match(helpText, />selector/);
+  assert.equal(
+    helpText,
+    "Commands: > / new deck swap note layout replay custom help"
+  );
+});
+
+test("command schema formats topic help text for commands and subcommands", () => {
+  const topicHelp = createCommandTopicHelpText("deck", "", ["deck", "help"]);
+  assert.match(topicHelp, /^\/deck$/m);
+  assert.match(topicHelp, /Usage: \/deck list \| \/deck new <name>/);
+  assert.match(topicHelp, /Subcommands: list new rename switch delete/);
+
+  const subcommandHelp = createCommandTopicHelpText("deck", "switch", ["deck", "help"]);
+  assert.equal(subcommandHelp, ["/deck switch", "Usage: /deck switch <deckSelector>", "switch active deck"].join("\n"));
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {

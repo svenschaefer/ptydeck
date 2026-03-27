@@ -214,7 +214,7 @@ test("command-target runtime controller tracks active target summaries and recen
     formatSessionDisplayName: (session) => session.name
   });
 
-  assert.equal(controller.formatActiveTargetSummary(), "Target: [7] Ops · Shell Syntax Gated");
+  assert.equal(controller.formatActiveTargetSummary(), "Target: [7] Ops");
   assert.equal(controller.getLastActiveSessionSwitchAt(), 0);
 
   nowValue = 4321;
@@ -222,5 +222,5 @@ test("command-target runtime controller tracks active target summaries and recen
   listeners[0](state);
 
   assert.equal(controller.getLastActiveSessionSwitchAt(), 4321);
-  assert.equal(controller.formatActiveTargetSummary(), "Target: [8] Agent · Agent");
+  assert.equal(controller.formatActiveTargetSummary(), "Target: [8] Agent");
 });

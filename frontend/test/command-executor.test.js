@@ -58,8 +58,17 @@ test("command executor help and usage strings derive from declarative schema met
   const executor = createExecutor();
 
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
-  assert.match(helpText, /\/deck list\|new\|rename\|switch\|delete/);
-  assert.match(helpText, /\/custom <name> <text>, \/custom <name> \+ block/);
+  assert.equal(
+    helpText,
+    "Commands: > / new deck move size filter close switch swap next prev list rename restart note layout replay settings custom help"
+  );
+
+  const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
+  assert.match(topicHelp, /^\/deck$/m);
+  assert.match(topicHelp, /Subcommands: list new rename switch delete/);
+
+  const subcommandHelp = await executor.execute({ command: "help", args: ["deck", "switch"], raw: "/help deck switch" });
+  assert.equal(subcommandHelp, ["/deck switch", "Usage: /deck switch <deckSelector>", "switch active deck"].join("\n"));
 
   const deckUsage = await executor.execute({ command: "deck", args: ["wat"], raw: "/deck wat" });
   assert.equal(

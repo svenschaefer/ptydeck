@@ -66,6 +66,23 @@ function normalizeSessionThemeProfile(themeProfile) {
   return normalized;
 }
 
+function normalizeSessionThemeSlots({ themeProfile, activeThemeProfile, inactiveThemeProfile } = {}) {
+  const fallbackTheme = normalizeSessionThemeProfile(themeProfile);
+  const normalizedActiveThemeProfile =
+    activeThemeProfile !== undefined
+      ? normalizeSessionThemeProfile(activeThemeProfile)
+      : fallbackTheme;
+  const normalizedInactiveThemeProfile =
+    inactiveThemeProfile !== undefined
+      ? normalizeSessionThemeProfile(inactiveThemeProfile)
+      : fallbackTheme;
+  return {
+    themeProfile: normalizedActiveThemeProfile,
+    activeThemeProfile: normalizedActiveThemeProfile,
+    inactiveThemeProfile: normalizedInactiveThemeProfile
+  };
+}
+
 function normalizeSessionTags(tags) {
   if (!Array.isArray(tags)) {
     return [];
@@ -290,6 +307,8 @@ export class SessionManager {
     inputSafetyProfile,
     tags = [],
     themeProfile = {},
+    activeThemeProfile,
+    inactiveThemeProfile,
     createdAt,
     updatedAt
   } = {}) {
@@ -315,7 +334,11 @@ export class SessionManager {
     const normalizedNote = normalizeSessionNote(note);
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
-    const normalizedThemeProfile = normalizeSessionThemeProfile(themeProfile);
+    const normalizedThemeSlots = normalizeSessionThemeSlots({
+      themeProfile,
+      activeThemeProfile,
+      inactiveThemeProfile
+    });
     const spawnCwd = typeof cwd === "string" && cwd.trim() ? cwd : normalizedStartCwd;
     const shellAdapter = createShellAdapter(shell);
 
@@ -346,7 +369,9 @@ export class SessionManager {
         ...(normalizedNote ? { note: normalizedNote } : {}),
         inputSafetyProfile: normalizedInputSafetyProfile,
         tags: normalizedTags,
-        themeProfile: normalizedThemeProfile,
+        themeProfile: normalizedThemeSlots.themeProfile,
+        activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
+        inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
         state: SESSION_STATE_STARTING,
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
@@ -456,8 +481,26 @@ export class SessionManager {
     if (patch.tags !== undefined) {
       session.meta.tags = normalizeSessionTags(patch.tags);
     }
-    if (patch.themeProfile !== undefined) {
-      session.meta.themeProfile = normalizeSessionThemeProfile(patch.themeProfile);
+    if (
+      patch.themeProfile !== undefined ||
+      patch.activeThemeProfile !== undefined ||
+      patch.inactiveThemeProfile !== undefined
+    ) {
+      const nextActiveThemeInput =
+        patch.activeThemeProfile !== undefined
+          ? patch.activeThemeProfile
+          : patch.themeProfile !== undefined
+            ? patch.themeProfile
+            : session.meta.activeThemeProfile;
+      const normalizedThemeSlots = normalizeSessionThemeSlots({
+        themeProfile: nextActiveThemeInput,
+        activeThemeProfile: nextActiveThemeInput,
+        inactiveThemeProfile:
+          patch.inactiveThemeProfile !== undefined ? patch.inactiveThemeProfile : session.meta.inactiveThemeProfile
+      });
+      session.meta.themeProfile = normalizedThemeSlots.themeProfile;
+      session.meta.activeThemeProfile = normalizedThemeSlots.activeThemeProfile;
+      session.meta.inactiveThemeProfile = normalizedThemeSlots.inactiveThemeProfile;
     }
     session.meta.updatedAt = now();
     return session.meta;
@@ -483,6 +526,8 @@ export class SessionManager {
       inputSafetyProfile: snapshot.inputSafetyProfile,
       tags: snapshot.tags || [],
       themeProfile: snapshot.themeProfile || {},
+      activeThemeProfile: snapshot.activeThemeProfile,
+      inactiveThemeProfile: snapshot.inactiveThemeProfile,
       createdAt: snapshot.createdAt,
       updatedAt: this.nowFn()
     });

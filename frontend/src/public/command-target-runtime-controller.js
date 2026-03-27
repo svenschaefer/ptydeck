@@ -1,5 +1,3 @@
-import { detectSessionInputSafetyPreset, getSessionInputSafetyPresetLabel } from "./input-safety-profile.js";
-
 export function createCommandTargetRuntimeController(options = {}) {
   const commandEngine = options.commandEngine || {};
   const store = options.store || null;
@@ -158,9 +156,7 @@ export function createCommandTargetRuntimeController(options = {}) {
     if (!activeSession) {
       return "Target: no active session.";
     }
-    const preset = detectSessionInputSafetyPreset(activeSession.inputSafetyProfile);
-    const presetLabel = getSessionInputSafetyPresetLabel(preset);
-    return `Target: [${formatSessionToken(activeSession.id)}] ${formatSessionDisplayName(activeSession)} · ${presetLabel}`;
+    return `Target: [${formatSessionToken(activeSession.id)}] ${formatSessionDisplayName(activeSession)}`;
   }
 
   return {

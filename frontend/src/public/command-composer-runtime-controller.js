@@ -18,6 +18,7 @@ export function createCommandComposerRuntimeController(options = {}) {
   const resolveQuickSwitchTarget = options.resolveQuickSwitchTarget || (() => ({ error: "Unknown target." }));
   const activateSessionTarget = options.activateSessionTarget || (() => ({ message: "" }));
   const activateDeckTarget = options.activateDeckTarget || (() => ({ message: "" }));
+  const setActiveSession = options.setActiveSession || (() => {});
   const setCommandFeedback = options.setCommandFeedback || (() => {});
   const setCommandPreview = options.setCommandPreview || (() => {});
   const setCommandGuardState = options.setCommandGuardState || (() => {});
@@ -121,7 +122,29 @@ export function createCommandComposerRuntimeController(options = {}) {
       targetSessions,
       targetPayload,
       routeFeedback,
-      directRouteMatched: directRouting.matched === true
+      directRouteMatched: directRouting.matched === true,
+      source: "composer",
+      activateTargetBeforeSend: false
+    };
+  }
+
+  function resolveSingleSessionPlan(sessionId, text, options = {}) {
+    const state = getState();
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    const session = sessions.find((entry) => entry.id === sessionId) || null;
+    if (!session) {
+      return { error: "Unknown session target." };
+    }
+    if (isSessionActionBlocked(session)) {
+      return { error: getBlockedSessionActionMessage([session], "Command send") };
+    }
+    return {
+      targetSessions: [session],
+      targetPayload: String(text || ""),
+      routeFeedback: options.routeFeedback || "",
+      directRouteMatched: false,
+      source: options.source || "composer",
+      activateTargetBeforeSend: options.activateTargetBeforeSend === true
     };
   }
 
@@ -131,11 +154,15 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
 
     for (const session of plan.targetSessions) {
+      if (plan.activateTargetBeforeSend === true) {
+        setActiveSession(session.id);
+      }
       const terminatorMode = getSessionSendTerminator(session.id);
       debugLog("command.send.start", {
         activeSessionId: session.id,
         mode: terminatorMode,
-        directRoute: plan.directRouteMatched === true
+        directRoute: plan.directRouteMatched === true,
+        source: plan.source || "composer"
       });
       await sendInputWithConfiguredTerminator(apiSendInput, session.id, plan.targetPayload, terminatorMode, {
         normalizeMode: normalizeSendTerminatorMode,
@@ -146,14 +173,16 @@ export function createCommandComposerRuntimeController(options = {}) {
     const submittedAt = Date.now();
     for (const session of plan.targetSessions) {
       recordCommandSubmission(session.id, {
-        source: "input",
+        source: plan.source === "paste" ? "paste" : "input",
         text: plan.targetPayload,
         submittedAt
       });
     }
 
     clearPendingSend({ renderAfterClear: false });
-    setCommandValue("");
+    if (plan.source !== "paste") {
+      setCommandValue("");
+    }
     setCommandPreview("");
     clearCommandSuggestions();
     clearError();
@@ -163,7 +192,8 @@ export function createCommandComposerRuntimeController(options = {}) {
     resetSlashHistoryNavigationState();
     debugLog("command.send.ok", {
       activeSessionId: plan.targetSessions[0]?.id || "",
-      directRoute: plan.directRouteMatched === true
+      directRoute: plan.directRouteMatched === true,
+      source: plan.source || "composer"
     });
     render();
   }
@@ -270,6 +300,58 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
   }
 
+  async function submitTerminalPaste(sessionId, text) {
+    const payload = String(text || "");
+    if (!payload) {
+      return false;
+    }
+
+    clearPendingSend({ renderAfterClear: false });
+    const plan = resolveSingleSessionPlan(sessionId, payload, {
+      source: "paste",
+      activateTargetBeforeSend: true
+    });
+    if (!plan || plan.error) {
+      if (plan?.error) {
+        setCommandFeedback(plan.error);
+      }
+      return false;
+    }
+
+    const guardResult = evaluateSendSafety({
+      sessions: plan.targetSessions,
+      text: plan.targetPayload,
+      directRoute: false,
+      recentTargetSwitchAt: getLastActiveSessionSwitchAt(),
+      formatSessionToken,
+      formatSessionDisplayName
+    });
+
+    if (guardResult.requiresConfirmation) {
+      pendingSend = {
+        command: "",
+        plan,
+        guardResult
+      };
+      setCommandGuardState({
+        active: true,
+        summary: guardResult.summary,
+        reasons: formatCommandGuardReasons(guardResult.reasons),
+        preview: plan.targetPayload
+      });
+      render();
+      return false;
+    }
+
+    try {
+      await executeSendPlan(plan);
+      return true;
+    } catch {
+      setError("Failed to paste into terminal.");
+      return false;
+    }
+  }
+
   function cancelPendingSend() {
     if (!pendingSend) {
       return false;
@@ -326,6 +408,7 @@ export function createCommandComposerRuntimeController(options = {}) {
 
   return {
     submitCommand,
+    submitTerminalPaste,
     confirmPendingSend,
     cancelPendingSend,
     clearPendingSend,
