@@ -1243,6 +1243,116 @@ test("runtime restore keeps persisted createdAt and updatedAt timestamps", async
   }
 });
 
+test("runtime persists bounded replay output when configured and restores it into snapshot replay", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6
+  });
+
+  let createdId = "";
+  try {
+    await runtimeA.start();
+    const { port } = runtimeA.getAddress();
+    const baseUrlA = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const inputRes = await fetch(`${baseUrlA}/sessions/${createdId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "1234567890" })
+    });
+    assert.equal(inputRes.status, 204);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  assert.ok(Array.isArray(persistedRaw.sessionOutputs));
+  assert.deepEqual(persistedRaw.sessionOutputs, [{ sessionId: createdId, data: "567890" }]);
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 6
+  });
+
+  try {
+    await runtimeB.start();
+    const snapshot = runtimeB.manager.getSnapshot();
+    assert.deepEqual(snapshot.outputs, [{ sessionId: createdId, data: "567890" }]);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
+test("runtime leaves persisted replay output disabled when persist depth is zero", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    sessionReplayMemoryMaxChars: 12,
+    sessionReplayPersistMaxChars: 0
+  });
+
+  let createdId = "";
+  try {
+    await runtime.start();
+    const { port } = runtime.getAddress();
+    const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${createdId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "abcdef" })
+    });
+    assert.equal(inputRes.status, 204);
+  } finally {
+    await runtime.stop();
+  }
+
+  const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+  assert.ok(Array.isArray(persistedRaw.sessionOutputs));
+  assert.deepEqual(persistedRaw.sessionOutputs, []);
+});
+
 test("session create persists immediately before response completes", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

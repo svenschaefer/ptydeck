@@ -139,6 +139,17 @@ export function loadConfig(env = process.env) {
   const sessionMaxConcurrent = parseNonNegativeInt(env.SESSION_MAX_CONCURRENT || 0, "SESSION_MAX_CONCURRENT");
   const sessionIdleTimeoutMs = parseNonNegativeInt(env.SESSION_IDLE_TIMEOUT_MS || 0, "SESSION_IDLE_TIMEOUT_MS");
   const sessionMaxLifetimeMs = parseNonNegativeInt(env.SESSION_MAX_LIFETIME_MS || 0, "SESSION_MAX_LIFETIME_MS");
+  const sessionReplayMemoryMaxChars = parseNonNegativeInt(
+    env.SESSION_REPLAY_MEMORY_MAX_CHARS || 16 * 1024,
+    "SESSION_REPLAY_MEMORY_MAX_CHARS"
+  );
+  const sessionReplayPersistMaxChars = parseNonNegativeInt(
+    env.SESSION_REPLAY_PERSIST_MAX_CHARS || 0,
+    "SESSION_REPLAY_PERSIST_MAX_CHARS"
+  );
+  if (sessionReplayPersistMaxChars > sessionReplayMemoryMaxChars) {
+    throw new Error("SESSION_REPLAY_PERSIST_MAX_CHARS must be less than or equal to SESSION_REPLAY_MEMORY_MAX_CHARS.");
+  }
   const sessionActivityQuietMs = parsePositiveInt(
     env.SESSION_ACTIVITY_QUIET_MS || 1400,
     "SESSION_ACTIVITY_QUIET_MS"
@@ -166,6 +177,8 @@ export function loadConfig(env = process.env) {
     sessionMaxConcurrent,
     sessionIdleTimeoutMs,
     sessionMaxLifetimeMs,
+    sessionReplayMemoryMaxChars,
+    sessionReplayPersistMaxChars,
     sessionActivityQuietMs,
     sessionGuardrailSweepMs,
     debugLogs,

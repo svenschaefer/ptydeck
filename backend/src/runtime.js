@@ -597,12 +597,17 @@ export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
+  const sessionReplayPersistMaxChars =
+    Number.isInteger(config.sessionReplayPersistMaxChars) && config.sessionReplayPersistMaxChars >= 0
+      ? config.sessionReplayPersistMaxChars
+      : 0;
   const manager = new SessionManager({
     defaultShell: config.shell,
     createPty: typeof config.createPty === "function" ? config.createPty : undefined,
     sessionMaxConcurrent: config.sessionMaxConcurrent,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     sessionMaxLifetimeMs: config.sessionMaxLifetimeMs,
+    sessionReplayMemoryMaxChars: config.sessionReplayMemoryMaxChars,
     sessionActivityQuietMs: config.sessionActivityQuietMs
   });
   const persistence = new JsonPersistence(config.dataPath, {
@@ -1353,8 +1358,11 @@ export function createRuntime(config) {
   }
 
   function snapshotRuntimeState() {
+    const snapshot = manager.getSnapshot({
+      outputMaxChars: sessionReplayPersistMaxChars
+    });
     const sessionMap = new Map();
-    for (const session of manager.list()) {
+    for (const session of snapshot.sessions) {
       sessionMap.set(session.id, withDeckId(session));
     }
     for (const [sessionId, session] of unrestoredSessions.entries()) {
@@ -1365,6 +1373,7 @@ export function createRuntime(config) {
     ensureDefaultDeck();
     return {
       sessions: Array.from(sessionMap.values()),
+      sessionOutputs: snapshot.outputs,
       customCommands: listCustomCommands(),
       decks: Array.from(decks.values())
     };
@@ -1423,6 +1432,7 @@ function tryCreateRestoredSession({
   cwd,
   startCwd,
   startCommand,
+  replayOutput,
   env,
   note,
   inputSafetyProfile,
@@ -1436,6 +1446,7 @@ function tryCreateRestoredSession({
       name: session.name,
       startCwd,
       startCommand,
+      replayOutput,
       env,
       note,
       inputSafetyProfile,
@@ -2126,6 +2137,13 @@ function tryCreateRestoredSession({
     });
 
     const persistedState = await persistence.loadState();
+    const persistedReplayOutputs = new Map(
+      Array.isArray(persistedState.sessionOutputs)
+        ? persistedState.sessionOutputs
+            .filter((entry) => entry && typeof entry.sessionId === "string" && typeof entry.data === "string")
+            .map((entry) => [entry.sessionId, entry.data])
+        : []
+    );
     startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
     decks.clear();
     sessionDeckAssignments.clear();
@@ -2203,6 +2221,7 @@ function tryCreateRestoredSession({
               cwd: attempt.cwd,
               startCwd: attempt.startCwd,
               startCommand: startupConfig.startCommand,
+              replayOutput: persistedReplayOutputs.get(session.id) || "",
               env: startupConfig.env,
               note,
               inputSafetyProfile,

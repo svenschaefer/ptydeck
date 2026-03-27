@@ -67,7 +67,7 @@ Deferred from `TODO.md` scope (explicit backlog items):
 - [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
 - [ ] Add broadcast input modes for explicit session groups.
 
-Promoted to active delivery (`v0.4.0-H18` in `TODO.md` / `ROADMAP.md`):
+Promoted and completed in `v0.4.0-H18`:
 
 - `DRV-001`, `DRV-002`, `DRV-005`
 

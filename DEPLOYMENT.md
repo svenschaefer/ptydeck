@@ -403,6 +403,25 @@ Operational guidance:
 - Keep `SESSION_MAX_CONCURRENT` aligned with host capacity and PTY process limits.
 - Tune idle/lifetime thresholds to expected operator workflows to avoid premature termination.
 
+## 9.5A Replay and Scrollback Retention Baseline (DRV-002)
+
+Backend replay recovery is explicitly tail-based and configurable:
+
+- In-memory reconnect replay tail:
+  - Config: `SESSION_REPLAY_MEMORY_MAX_CHARS`
+  - Default: `16384`
+  - `0` disables replay output in reconnect snapshots.
+- Persisted restart replay tail:
+  - Config: `SESSION_REPLAY_PERSIST_MAX_CHARS`
+  - Default: `0` (disabled)
+  - When enabled, backend persists the configured tail and seeds it back into snapshot replay after restart.
+
+Operational/product constraints:
+
+- `SESSION_REPLAY_PERSIST_MAX_CHARS` must be less than or equal to `SESSION_REPLAY_MEMORY_MAX_CHARS`.
+- Recovery is partial by design; this preserves recent operator context only.
+- Full terminal state, job control state, editor state, and full shell history are still out of scope.
+
 ## 9.6 Persistence Encryption-at-Rest Baseline (ENT-012)
 
 Persistence encryption is optional and uses AES-256-GCM envelope format:

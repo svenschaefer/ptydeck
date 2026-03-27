@@ -249,6 +249,41 @@ test("SessionManager snapshot includes buffered terminal output", () => {
   assert.equal(snapshot.outputs[0].data, "hello\r\n");
 });
 
+test("SessionManager snapshot respects configurable replay memory limit", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionReplayMemoryMaxChars: 5
+  });
+  const created = manager.create({ cwd: "/tmp" });
+
+  fakePty.write("hello world\r\n");
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.outputs.length, 1);
+  assert.equal(snapshot.outputs[0].sessionId, created.id);
+  assert.equal(snapshot.outputs[0].data, "rld\r\n");
+});
+
+test("SessionManager can seed replay output for restored sessions", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionReplayMemoryMaxChars: 8
+  });
+
+  const created = manager.create({
+    id: "restore-1",
+    cwd: "/tmp",
+    replayOutput: "line-1\r\nline-2\r\n"
+  });
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.outputs.length, 1);
+  assert.equal(snapshot.outputs[0].sessionId, created.id);
+  assert.equal(snapshot.outputs[0].data, "line-2\r\n");
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()

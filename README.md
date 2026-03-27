@@ -269,6 +269,24 @@ pty.spawn(shell, [], {
 });
 ```
 
+### Replay and Scrollback Retention
+
+Replay recovery is intentionally tail-based, not full-history.
+
+- Live reconnect snapshots use an in-memory replay tail.
+  - Config: `SESSION_REPLAY_MEMORY_MAX_CHARS`
+  - Default: `16384`
+  - `0` disables replay output in reconnect snapshots.
+- Restart recovery can optionally persist a smaller replay tail to disk.
+  - Config: `SESSION_REPLAY_PERSIST_MAX_CHARS`
+  - Default: `0` (disabled)
+  - When enabled, the persisted replay tail is restored into the session snapshot after backend restart.
+
+Product constraint:
+
+- Persisted replay depth must be less than or equal to the in-memory replay depth.
+- Recovery remains partial by design; `ptydeck` does not attempt full shell history or TUI state reconstruction.
+
 ## Working Directory Tracking
 
 PTY does not expose the current working directory directly.

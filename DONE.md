@@ -2,6 +2,19 @@
 
 Completed and verified topics belong here.
 
+## 2026-03-27
+
+- [x] `DRV-002` is now completed: backend replay/scrollback retention is explicit and configurable, with separate limits for in-memory reconnect replay and optional persisted restart replay tails, plus documented product constraints for partial-history recovery instead of full session restoration.
+- [x] `backend/src/config.js` now defines `SESSION_REPLAY_MEMORY_MAX_CHARS` and `SESSION_REPLAY_PERSIST_MAX_CHARS`, validates that persisted replay depth cannot exceed the in-memory replay depth, and feeds those limits into runtime composition.
+- [x] `backend/src/session-manager.js`, `backend/src/runtime.js`, and `backend/src/persistence.js` now trim replay buffers deterministically, persist optional `sessionOutputs` replay tails separately from session metadata, and restore those tails on backend restart only when persisted replay is configured.
+- [x] Added focused regression coverage for replay retention and persistence behavior in `backend/test/config.test.js`, `backend/test/persistence.test.js`, `backend/test/session-manager.test.js`, and `backend/test/runtime.integration.test.js`, including both persisted-tail restore and zero-persist-depth behavior.
+- [x] `README.md` and `DEPLOYMENT.md` now document the replay-retention contract explicitly, including memory tail vs persisted tail semantics and the requirement that persisted replay depth stays less than or equal to in-memory replay depth.
+- [x] `DRV-005` is now completed: explicit compatibility regression coverage now exists for the supported shell/runtime matrix, proving CWD-tracking and replay behavior across `bash`, `zsh`, and `fish` without relying on bash-only assumptions.
+- [x] Added `backend/test/shell-runtime-compatibility.test.js`, which now exercises shell-adapter-driven CWD tracking, reconnect replay, and persisted snapshot behavior as an explicit regression matrix instead of leaving shell/runtime compatibility implicit.
+- [x] Validation for the `DRV-002` / `DRV-005` closeout passed with targeted backend regressions (`node --test backend/test/config.test.js backend/test/persistence.test.js backend/test/session-manager.test.js backend/test/runtime.integration.test.js backend/test/shell-runtime-compatibility.test.js`), `npm run lint`, `npm run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
+- [x] Coverage after the `v0.4.0-H18` closeout step: backend `92.31%` lines, frontend `95.32%` lines overall.
+- [x] `v0.4.0-H18` is now fully completed: `DRV-001`, `DRV-002`, and `DRV-005` are closed, and there is currently no active open delivery wave in `ROADMAP.md`.
+
 ## 2026-03-26
 
 - [x] `DRV-001` is now completed: backend shell-specific CWD tracking no longer lives as a bash-only inline special case inside `SessionManager`; it now flows through a dedicated shell-adapter abstraction with an explicit capability matrix and deterministic fallback behavior for unsupported shells.
@@ -11,8 +24,6 @@ Completed and verified topics belong here.
 - [x] `backend/package.json` syntax-check gates now include `src/shell-adapter.js`, and `README.md` now documents the current shell capability matrix for working-directory tracking instead of implying a generic shell-wide `PROMPT_COMMAND` solution.
 - [x] Validation for the `DRV-001` cycle passed with targeted backend regressions (`node --test backend/test/shell-adapter.test.js backend/test/session-manager.test.js`), `npm run lint`, `npm --prefix backend run test`, `npm --prefix frontend run test`, and `npm run test:coverage:check`, with no leftover background validation processes after completion.
 - [x] Coverage after the `DRV-001` cycle: backend `91.10%` lines, frontend `95.32%` lines overall.
-- [x] `v0.4.0-H18` is now active with `DRV-002` and `DRV-005` still open; `DRV-001` is completed and removed from `TODO.md`.
-
 - [x] `QLT-140` is now completed: the active frontend runtime path no longer wires stream-interpretation plugins, derived header-status scanning, artifact overlays, attention-driven session surfaces, or browser notification popups; raw websocket session data now stays on the terminal append path plus debug tracing and idle-based activity clearing only.
 - [x] Deleted obsolete frontend stream/runtime modules and their tests: `frontend/src/public/activity-completion-notifier.js`, `frontend/src/public/stream-action-dispatcher.js`, `frontend/src/public/stream-artifact-plugins.js`, `frontend/src/public/stream-builtins.js`, `frontend/src/public/stream-plugin-engine.js`, and the matching `frontend/test/*` suites, with `frontend/package.json` syntax-check gates updated accordingly.
 - [x] `frontend/src/public/index.html`, `frontend/src/public/styles.css`, `frontend/src/public/ui/session-card-meta-controller.js`, `frontend/src/public/ui/session-card-factory-controller.js`, `frontend/src/public/ui/session-card-render-controller.js`, `frontend/src/public/ui/session-card-interactions-controller.js`, `frontend/src/public/ui/session-disposal-controller.js`, `frontend/src/public/ui/session-grid-controller.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/ui/session-ui-facade-controller.js` now keep session-card metadata limited to persisted notes and tags, with no stream-derived status/plugin/artifact rendering left in the active header path.

@@ -12,13 +12,13 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H18`.
-- Active scoped tasks: `DRV-002`, `DRV-005`.
-- Latest completed scoped task in the active wave: `DRV-001` (Shell CWD Adapter Baseline).
-- Latest completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
-- Previous completed wave: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
-- Previous completed wave: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
-- Previous completed wave: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H18` (Shell Runtime Compatibility Foundation, `DRV-001`, `DRV-002`, `DRV-005`).
+- Previous completed wave: `v0.4.0-H17` (Frontend Stream Runtime Cleanup, `QLT-140`, `QLT-141`).
+- Previous completed wave before that: `v0.4.0-H16` (Target Clarity and Send Safety, `QLT-137`, `QLT-138`, `QLT-139`).
+- Previous completed wave before that: `v0.4.0-H15` (Persistent Session Notes, `QLT-135`, `QLT-136`).
+- Previous completed wave before that: `v0.4.0-H14` (Frontend Quick-ID Swap Command, `QLT-134`).
 - Previous completed wave before that: `v0.4.0-H13` (Attention Header Text Silence, `QLT-133`).
 - Previous completed wave before that: `v0.4.0-H12` (Frontend Notification Silence by Default, `QLT-132`).
 - Previous completed wave before that: `v0.4.0-H11` (Header Status Churn Suppression, `QLT-131`).
@@ -33,9 +33,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave Plan
+## Latest Completed Wave
 
-### v0.4.0-H18 - Shell Runtime Compatibility Foundation
+### v0.4.0-H18 - Shell Runtime Compatibility Foundation (Completed)
 
 - `DRV-001`, `DRV-002`, `DRV-005`
 

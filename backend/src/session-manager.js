@@ -10,7 +10,7 @@ function now() {
   return Date.now();
 }
 
-const MAX_OUTPUT_BUFFER_CHARS = 16 * 1024;
+const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const THEME_COLOR_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const SESSION_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SESSION_NOTE_MAX_LENGTH = 512;
@@ -108,6 +108,7 @@ export class SessionManager {
     sessionMaxConcurrent = 0,
     sessionIdleTimeoutMs = 0,
     sessionMaxLifetimeMs = 0,
+    sessionReplayMemoryMaxChars = DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS,
     sessionActivityQuietMs = DEFAULT_SESSION_ACTIVITY_QUIET_MS,
     nowFn = now,
     setTimeoutFn = setTimeout,
@@ -121,6 +122,10 @@ export class SessionManager {
     this.sessionIdleTimeoutMs = Number.isInteger(sessionIdleTimeoutMs) && sessionIdleTimeoutMs > 0 ? sessionIdleTimeoutMs : 0;
     this.sessionMaxLifetimeMs =
       Number.isInteger(sessionMaxLifetimeMs) && sessionMaxLifetimeMs > 0 ? sessionMaxLifetimeMs : 0;
+    this.sessionReplayMemoryMaxChars =
+      Number.isInteger(sessionReplayMemoryMaxChars) && sessionReplayMemoryMaxChars >= 0
+        ? sessionReplayMemoryMaxChars
+        : DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS;
     this.sessionActivityQuietMs =
       Number.isInteger(sessionActivityQuietMs) && sessionActivityQuietMs > 0
         ? sessionActivityQuietMs
@@ -196,13 +201,25 @@ export class SessionManager {
     return Array.from(this.sessions.values()).map((session) => session.meta);
   }
 
-  getSnapshot() {
+  trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
+    if (typeof value !== "string" || value.length === 0 || !Number.isInteger(maxChars) || maxChars <= 0) {
+      return "";
+    }
+    return value.length > maxChars ? value.slice(-maxChars) : value;
+  }
+
+  getSnapshot({ outputMaxChars } = {}) {
+    const effectiveOutputMaxChars =
+      Number.isInteger(outputMaxChars) && outputMaxChars >= 0
+        ? Math.min(outputMaxChars, this.sessionReplayMemoryMaxChars)
+        : this.sessionReplayMemoryMaxChars;
     const sessions = [];
     const outputs = [];
     for (const session of this.sessions.values()) {
       sessions.push(session.meta);
-      if (session.outputBuffer) {
-        outputs.push({ sessionId: session.id, data: session.outputBuffer });
+      const replayOutput = this.trimReplayOutput(session.outputBuffer, effectiveOutputMaxChars);
+      if (replayOutput) {
+        outputs.push({ sessionId: session.id, data: replayOutput });
       }
     }
     return { sessions, outputs };
@@ -241,6 +258,7 @@ export class SessionManager {
     startCwd,
     startCommand = "",
     env = {},
+    replayOutput = "",
     note,
     inputSafetyProfile,
     tags = [],
@@ -285,7 +303,7 @@ export class SessionManager {
       ptyProcess,
       shellAdapter,
       cwdTrackingBuffer: "",
-      outputBuffer: "",
+      outputBuffer: this.trimReplayOutput(replayOutput),
       activityTimer: null,
       lastActivityAt: initialActivityTimestamp,
       meta: {
@@ -320,10 +338,7 @@ export class SessionManager {
         } else {
           session.meta.updatedAt = timestamp;
         }
-        session.outputBuffer = `${session.outputBuffer}${cleaned}`;
-        if (session.outputBuffer.length > MAX_OUTPUT_BUFFER_CHARS) {
-          session.outputBuffer = session.outputBuffer.slice(-MAX_OUTPUT_BUFFER_CHARS);
-        }
+        session.outputBuffer = this.trimReplayOutput(`${session.outputBuffer}${cleaned}`);
         this.scheduleSessionActivityCompletion(session);
         this.events.emit("session.data", { sessionId: id, data: cleaned });
       }
