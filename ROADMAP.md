@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H28` (Split Layout Foundation, `UX-011`, `UX-012`, `UX-013`).
+- Active scoped tasks: `UX-011`, `UX-012`, `UX-013`.
 - Latest completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
 - Previous completed wave: `v0.4.0-H26` (Session Grouping and Workspace Presets, `UX-005`, `UX-006`, `UX-007`).
 - Previous completed wave: `v0.4.0-H25` (Session Theme Dual-Scheme and Composer/Help Simplification, `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`).
@@ -41,6 +41,25 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave
+
+### v0.4.0-H28 - Split Layout Foundation (Active)
+
+- `UX-011`, `UX-012`, `UX-013`
+
+Dependencies:
+
+- `UX-011` establishes the persisted split-layout contract first by extending the completed layout-profile and workspace-preset baseline, so split-pane state is not trapped in a frontend-only runtime.
+- `UX-012` follows `UX-011` and reuses that contract for horizontal/vertical pane rendering, drag/resize behavior, and session-to-pane assignment, instead of inventing a second local split-layout model next to profiles/presets.
+- `UX-013` closes after `UX-011` and `UX-012`, so regression coverage spans normalization, persistence, resize behavior, deleted-session cleanup, and apply/restore consistency end to end.
+
+Exit criteria:
+
+- Backend-exposed layout profiles and workspace presets can persist per-deck split-layout trees with deterministic normalization and deleted-session fallback rules.
+- Frontend can render horizontal/vertical split panes, resize them, and assign sessions through the persisted contract instead of a temporary client-only model.
+- Applying a layout profile or workspace preset restores split-pane structure and assigned sessions consistently.
+- Regression coverage exists for backend normalization plus frontend apply/resize/session-cleanup behavior.
 
 ## Latest Completed Wave
 

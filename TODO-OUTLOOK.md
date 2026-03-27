@@ -4,8 +4,11 @@ Items in this file are intentionally not part of near-term delivery in `TODO.md`
 
 ## Product and UX
 
-- [ ] Add split-based layout model (horizontal/vertical) with drag/resize behavior.
 - [ ] Add explicit control-plane and execution-plane panes for advanced operator workflows.
+
+Promoted to active delivery (`v0.4.0-H28` in `TODO.md` / `ROADMAP.md`):
+
+- `UX-011`, `UX-012`, `UX-013`
 
 Promoted and completed in `v0.4.0-H26`:
 
