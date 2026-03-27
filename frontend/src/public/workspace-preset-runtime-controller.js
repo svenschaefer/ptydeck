@@ -82,12 +82,113 @@ function cloneWorkspaceDeckGroupMap(deckGroups) {
   );
 }
 
+function cloneSplitLayoutNode(node) {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return null;
+  }
+  const type = normalizeLower(node.type);
+  if (type === "pane") {
+    const paneId = normalizeText(node.paneId).toLowerCase();
+    if (!paneId) {
+      return null;
+    }
+    return {
+      type: "pane",
+      paneId
+    };
+  }
+  if (type !== "row" && type !== "column") {
+    return null;
+  }
+  const children = [];
+  for (const rawChild of Array.isArray(node.children) ? node.children : []) {
+    const child = cloneSplitLayoutNode(rawChild);
+    if (child) {
+      children.push(child);
+    }
+  }
+  if (children.length < 2) {
+    return children[0] || null;
+  }
+  return {
+    type,
+    children
+  };
+}
+
+function collectSplitLayoutPaneIds(node, target = []) {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return target;
+  }
+  if (node.type === "pane" && normalizeText(node.paneId)) {
+    target.push(normalizeText(node.paneId).toLowerCase());
+    return target;
+  }
+  for (const child of Array.isArray(node.children) ? node.children : []) {
+    collectSplitLayoutPaneIds(child, target);
+  }
+  return target;
+}
+
+function cloneDeckSplitLayoutEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const root = cloneSplitLayoutNode(entry.root);
+  if (!root) {
+    return null;
+  }
+  const paneIds = new Set(collectSplitLayoutPaneIds(root));
+  const paneSessions = Object.fromEntries(Array.from(paneIds, (paneId) => [paneId, []]));
+  if (entry.paneSessions && typeof entry.paneSessions === "object" && !Array.isArray(entry.paneSessions)) {
+    for (const [rawPaneId, rawSessionIds] of Object.entries(entry.paneSessions)) {
+      const paneId = normalizeText(rawPaneId).toLowerCase();
+      if (!paneId || !paneIds.has(paneId)) {
+        continue;
+      }
+      const seenSessionIds = new Set();
+      paneSessions[paneId] = [];
+      for (const rawSessionId of Array.isArray(rawSessionIds) ? rawSessionIds : []) {
+        const sessionId = normalizeText(rawSessionId);
+        if (!sessionId || seenSessionIds.has(sessionId)) {
+          continue;
+        }
+        seenSessionIds.add(sessionId);
+        paneSessions[paneId].push(sessionId);
+      }
+    }
+  }
+  return {
+    root,
+    paneSessions
+  };
+}
+
+function cloneDeckSplitLayoutMap(deckSplitLayouts) {
+  if (!deckSplitLayouts || typeof deckSplitLayouts !== "object" || Array.isArray(deckSplitLayouts)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(deckSplitLayouts)
+      .map(([deckId, entry]) => {
+        const normalizedDeckId = normalizeText(deckId);
+        const clonedEntry = cloneDeckSplitLayoutEntry(entry);
+        if (!normalizedDeckId || !clonedEntry) {
+          return null;
+        }
+        return [normalizedDeckId, clonedEntry];
+      })
+      .filter(Boolean)
+  );
+}
+
 function cloneWorkspaceState(workspace) {
   const source = workspace && typeof workspace === "object" && !Array.isArray(workspace) ? workspace : {};
   return {
     activeDeckId: normalizeText(source.activeDeckId) || "default",
     layoutProfileId: normalizeText(source.layoutProfileId),
-    deckGroups: cloneWorkspaceDeckGroupMap(source.deckGroups)
+    deckGroups: cloneWorkspaceDeckGroupMap(source.deckGroups),
+    deckSplitLayouts: cloneDeckSplitLayoutMap(source.deckSplitLayouts)
   };
 }
 
@@ -295,10 +396,34 @@ export function createWorkspacePresetRuntimeController(options = {}) {
         groups
       };
     }
+    const deckSplitLayouts = {};
+    for (const [deckId, entry] of Object.entries(normalizedWorkspace.deckSplitLayouts)) {
+      const normalizedDeckId = normalizeText(deckId);
+      if (!normalizedDeckId || !knownDeckIds.has(normalizedDeckId)) {
+        continue;
+      }
+      const clonedEntry = cloneDeckSplitLayoutEntry(entry);
+      if (!clonedEntry) {
+        continue;
+      }
+      const knownSessionIds = getKnownSessionIdsForDeck(normalizedDeckId);
+      const assignedSessionIds = new Set();
+      for (const paneId of Object.keys(clonedEntry.paneSessions)) {
+        clonedEntry.paneSessions[paneId] = clonedEntry.paneSessions[paneId].filter((sessionId) => {
+          if (!knownSessionIds.has(sessionId) || assignedSessionIds.has(sessionId)) {
+            return false;
+          }
+          assignedSessionIds.add(sessionId);
+          return true;
+        });
+      }
+      deckSplitLayouts[normalizedDeckId] = clonedEntry;
+    }
     return {
       activeDeckId,
       layoutProfileId,
-      deckGroups
+      deckGroups,
+      deckSplitLayouts
     };
   }
 
@@ -587,7 +712,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     return {
       activeDeckId: normalizeText(getActiveDeckId()) || workspaceState.activeDeckId || "default",
       layoutProfileId: normalizeText(getSelectedLayoutProfileId()) || workspaceState.layoutProfileId || "",
-      deckGroups: cloneWorkspaceDeckGroupMap(workspaceState.deckGroups)
+      deckGroups: cloneWorkspaceDeckGroupMap(workspaceState.deckGroups),
+      deckSplitLayouts: cloneDeckSplitLayoutMap(workspaceState.deckSplitLayouts)
     };
   }
 

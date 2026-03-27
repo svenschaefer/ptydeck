@@ -132,6 +132,21 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
           sessionFilterText: "ops",
           deckTerminalSettings: {
             default: { cols: 100, rows: 30 }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: {
+                type: "row",
+                children: [
+                  { type: "pane", paneId: "left" },
+                  { type: "pane", paneId: "right" }
+                ]
+              },
+              paneSessions: {
+                left: ["a"],
+                right: []
+              }
+            }
           }
         }
       }
@@ -155,6 +170,14 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
                   sessionIds: ["a"]
                 }
               ]
+            }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: ["a"]
+              }
             }
           }
         }

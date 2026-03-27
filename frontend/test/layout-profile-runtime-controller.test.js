@@ -130,6 +130,17 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
               sessionFilterText: "",
               deckTerminalSettings: {
                 default: { cols: 80, rows: 20 }
+              },
+              deckSplitLayouts: {
+                default: {
+                  root: {
+                    type: "pane",
+                    paneId: "main"
+                  },
+                  paneSessions: {
+                    main: ["s-default"]
+                  }
+                }
               }
             }
           }
@@ -177,6 +188,38 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
   assert.equal(selectEl.children.length, 1);
   assert.equal(statusEl.textContent, "1 profile(s)");
 
+  controller.replaceProfiles([
+    {
+      id: "focus",
+      name: "Focus Layout",
+      createdAt: 1,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "default",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        deckTerminalSettings: {
+          default: { cols: 80, rows: 20 }
+        },
+        deckSplitLayouts: {
+          ops: {
+            root: {
+              type: "row",
+              children: [
+                { type: "pane", paneId: "left" },
+                { type: "pane", paneId: "right" }
+              ]
+            },
+            paneSessions: {
+              left: ["s-ops-1"],
+              right: ["s-ops-2"]
+            }
+          }
+        }
+      }
+    }
+  ]);
+
   const createFeedback = await controller.createProfileFromCurrentLayout("Ops Focus");
   assert.equal(createFeedback, "Saved layout profile [layout-1] Ops Focus.");
   assert.equal(controller.listProfiles().length, 2);
@@ -187,6 +230,21 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
     deckTerminalSettings: {
       default: { cols: 96, rows: 24 },
       ops: { cols: 132, rows: 40 }
+    },
+    deckSplitLayouts: {
+      ops: {
+        root: {
+          type: "row",
+          children: [
+            { type: "pane", paneId: "left" },
+            { type: "pane", paneId: "right" }
+          ]
+        },
+        paneSessions: {
+          left: ["s-ops-1"],
+          right: ["s-ops-2"]
+        }
+      }
     }
   });
 

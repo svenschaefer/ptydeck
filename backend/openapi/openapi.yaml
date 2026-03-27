@@ -851,6 +851,10 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/LayoutProfileDeckTerminalSettings'
+        deckSplitLayouts:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeckSplitLayout'
     LayoutProfileDeckTerminalSettings:
       type: object
       required:
@@ -865,6 +869,52 @@ components:
           type: integer
           minimum: 5
           maximum: 120
+    SplitLayoutNode:
+      oneOf:
+        - $ref: '#/components/schemas/SplitLayoutPaneNode'
+        - $ref: '#/components/schemas/SplitLayoutContainerNode'
+    SplitLayoutPaneNode:
+      type: object
+      required:
+        - type
+        - paneId
+      properties:
+        type:
+          type: string
+          enum:
+            - pane
+        paneId:
+          type: string
+    SplitLayoutContainerNode:
+      type: object
+      required:
+        - type
+        - children
+      properties:
+        type:
+          type: string
+          enum:
+            - row
+            - column
+        children:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/SplitLayoutNode'
+    DeckSplitLayout:
+      type: object
+      required:
+        - root
+        - paneSessions
+      properties:
+        root:
+          $ref: '#/components/schemas/SplitLayoutNode'
+        paneSessions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
     CreateLayoutProfileRequest:
       type: object
       required:
@@ -918,6 +968,10 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/WorkspacePresetDeckGroups'
+        deckSplitLayouts:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DeckSplitLayout'
     WorkspacePresetDeckGroups:
       type: object
       required:

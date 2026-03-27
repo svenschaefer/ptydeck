@@ -60,6 +60,8 @@ const WORKSPACE_PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const WORKSPACE_PRESET_NAME_MAX_LENGTH = 64;
 const WORKSPACE_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const WORKSPACE_GROUP_NAME_MAX_LENGTH = 64;
+const SPLIT_LAYOUT_PANE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const DEFAULT_SPLIT_LAYOUT_PANE_ID = "main";
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
@@ -794,6 +796,278 @@ function slugifyWorkspaceGroupId(name) {
   return root.slice(0, maxLength).replace(/-+$/g, "") || "group";
 }
 
+function normalizeSplitLayoutPaneIdInput(value, fieldPath, { strict = true } = {}) {
+  if (value === undefined || value === null) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be a string.`);
+    }
+    return "";
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || !SPLIT_LAYOUT_PANE_ID_PATTERN.test(normalized)) {
+    if (strict) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field '${fieldPath}' must match pattern ^[a-z0-9][a-z0-9_-]{0,31}$.`
+      );
+    }
+    return "";
+  }
+  return normalized;
+}
+
+function buildDefaultDeckSplitLayout() {
+  return {
+    root: {
+      type: "pane",
+      paneId: DEFAULT_SPLIT_LAYOUT_PANE_ID
+    },
+    paneSessions: {
+      [DEFAULT_SPLIT_LAYOUT_PANE_ID]: []
+    }
+  };
+}
+
+function normalizeSplitLayoutNode(node, { strict = true, fieldPath = "layout.deckSplitLayouts.*.root", seenPaneIds = new Set() } = {}) {
+  if (!isPlainObject(node)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an object.`);
+    }
+    return null;
+  }
+
+  const type = String(node.type || "").trim().toLowerCase();
+  if (type === "pane") {
+    const paneId = normalizeSplitLayoutPaneIdInput(node.paneId, `${fieldPath}.paneId`, { strict });
+    if (!paneId) {
+      return null;
+    }
+    if (seenPaneIds.has(paneId)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field '${fieldPath}.paneId' must be unique within a split layout tree.`);
+      }
+      return null;
+    }
+    seenPaneIds.add(paneId);
+    return {
+      type: "pane",
+      paneId
+    };
+  }
+
+  if (type !== "row" && type !== "column") {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}.type' must be one of row, column, or pane.`);
+    }
+    return null;
+  }
+
+  if (!Array.isArray(node.children)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}.children' must be an array.`);
+    }
+    return null;
+  }
+
+  const children = [];
+  for (let index = 0; index < node.children.length; index += 1) {
+    const normalizedChild = normalizeSplitLayoutNode(node.children[index], {
+      strict,
+      fieldPath: `${fieldPath}.children[${index}]`,
+      seenPaneIds
+    });
+    if (normalizedChild) {
+      children.push(normalizedChild);
+    }
+  }
+
+  if (children.length < 2) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}.children' must contain at least two valid child nodes.`);
+    }
+    return children[0] || null;
+  }
+
+  return {
+    type,
+    children
+  };
+}
+
+function normalizeSplitLayoutPaneSessions(
+  paneSessions,
+  deckId,
+  paneIds,
+  {
+    strict = true,
+    fieldPath = "layout.deckSplitLayouts.*.paneSessions",
+    hasKnownSession = null,
+    resolveSessionDeckId = null
+  } = {}
+) {
+  const next = Object.fromEntries(Array.from(paneIds, (paneId) => [paneId, []]));
+  if (paneSessions === undefined) {
+    return next;
+  }
+  if (!isPlainObject(paneSessions)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an object.`);
+    }
+    return next;
+  }
+
+  const seenSessionIds = new Set();
+  for (const [rawPaneId, rawSessionIds] of Object.entries(paneSessions)) {
+    const paneId = normalizeSplitLayoutPaneIdInput(rawPaneId, fieldPath, { strict: false });
+    if (!paneId || !paneIds.has(paneId)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field '${fieldPath}' contains an unknown pane id '${rawPaneId}'.`);
+      }
+      continue;
+    }
+    if (!Array.isArray(rawSessionIds)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field '${fieldPath}.${paneId}' must be an array of session ids.`);
+      }
+      continue;
+    }
+
+    const normalizedSessionIds = [];
+    const seenInPane = new Set();
+    for (const rawSessionId of rawSessionIds) {
+      if (typeof rawSessionId !== "string") {
+        if (strict) {
+          throw new ApiError(400, "ValidationError", `Field '${fieldPath}.${paneId}' must contain only strings.`);
+        }
+        continue;
+      }
+      const sessionId = rawSessionId.trim();
+      if (!sessionId || seenInPane.has(sessionId)) {
+        continue;
+      }
+      if (seenSessionIds.has(sessionId)) {
+        if (strict) {
+          throw new ApiError(
+            400,
+            "ValidationError",
+            `Session '${sessionId}' cannot be assigned to multiple panes in deck '${deckId}'.`
+          );
+        }
+        continue;
+      }
+      if (typeof hasKnownSession === "function" && typeof resolveSessionDeckId === "function") {
+        const exists = hasKnownSession(sessionId);
+        const matchesDeck = exists && resolveSessionDeckId(sessionId) === deckId;
+        if (!exists || !matchesDeck) {
+          if (strict) {
+            throw new ApiError(
+              400,
+              "ValidationError",
+              `Session '${sessionId}' is not available in deck '${deckId}' for split-layout pane assignment.`
+            );
+          }
+          continue;
+        }
+      }
+      seenInPane.add(sessionId);
+      seenSessionIds.add(sessionId);
+      normalizedSessionIds.push(sessionId);
+    }
+    next[paneId] = normalizedSessionIds;
+  }
+
+  return next;
+}
+
+function normalizeDeckSplitLayoutEntry(
+  entry,
+  deckId,
+  {
+    strict = true,
+    fieldPath = "layout.deckSplitLayouts.*",
+    hasKnownSession = null,
+    resolveSessionDeckId = null
+  } = {}
+) {
+  if (!isPlainObject(entry)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an object.`);
+    }
+    return buildDefaultDeckSplitLayout();
+  }
+
+  const seenPaneIds = new Set();
+  const normalizedRoot = normalizeSplitLayoutNode(entry.root, {
+    strict,
+    fieldPath: `${fieldPath}.root`,
+    seenPaneIds
+  });
+
+  const fallback = buildDefaultDeckSplitLayout();
+  const root = normalizedRoot || fallback.root;
+  const paneIds = normalizedRoot ? seenPaneIds : new Set([DEFAULT_SPLIT_LAYOUT_PANE_ID]);
+  const paneSessions = normalizeSplitLayoutPaneSessions(entry.paneSessions, deckId, paneIds, {
+    strict,
+    fieldPath: `${fieldPath}.paneSessions`,
+    hasKnownSession,
+    resolveSessionDeckId
+  });
+
+  return {
+    root,
+    paneSessions
+  };
+}
+
+function normalizeDeckSplitLayoutMap(
+  value,
+  {
+    strict = true,
+    fieldPath = "layout.deckSplitLayouts",
+    allowUnknownDeckIds = true,
+    hasKnownDeck = null,
+    hasKnownSession = null,
+    resolveSessionDeckId = null
+  } = {}
+) {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isPlainObject(value)) {
+    if (strict) {
+      throw new ApiError(400, "ValidationError", `Field '${fieldPath}' must be an object.`);
+    }
+    return {};
+  }
+
+  const next = {};
+  for (const [rawDeckId, rawEntry] of Object.entries(value)) {
+    let deckId = "";
+    try {
+      deckId = normalizeDeckIdInput(rawDeckId);
+    } catch (error) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Field '${fieldPath}' contains an invalid deck id.`);
+      }
+      continue;
+    }
+    if (!allowUnknownDeckIds && typeof hasKnownDeck === "function" && !hasKnownDeck(deckId)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", `Deck '${deckId}' was not found for split-layout state.`);
+      }
+      continue;
+    }
+    next[deckId] = normalizeDeckSplitLayoutEntry(rawEntry, deckId, {
+      strict,
+      fieldPath: `${fieldPath}.${deckId}`,
+      hasKnownSession,
+      resolveSessionDeckId
+    });
+  }
+  return next;
+}
+
 function normalizeLayoutProfileSessionFilterText(value, { strict = true } = {}) {
   if (value === undefined) {
     return "";
@@ -842,13 +1116,21 @@ function normalizeLayoutProfileDeckTerminalSettingsEntry(value, { strict = true 
   return { cols, rows };
 }
 
-function normalizeLayoutProfileLayout(layout, { strict = true } = {}) {
+function normalizeLayoutProfileLayout(
+  layout,
+  {
+    strict = true,
+    hasKnownSession = null,
+    resolveSessionDeckId = null
+  } = {}
+) {
   if (layout === undefined) {
     return {
       activeDeckId: DEFAULT_DECK_ID,
       sidebarVisible: true,
       sessionFilterText: "",
-      deckTerminalSettings: {}
+      deckTerminalSettings: {},
+      deckSplitLayouts: {}
     };
   }
   if (!isPlainObject(layout)) {
@@ -859,7 +1141,8 @@ function normalizeLayoutProfileLayout(layout, { strict = true } = {}) {
       activeDeckId: DEFAULT_DECK_ID,
       sidebarVisible: true,
       sessionFilterText: "",
-      deckTerminalSettings: {}
+      deckTerminalSettings: {},
+      deckSplitLayouts: {}
     };
   }
 
@@ -901,15 +1184,31 @@ function normalizeLayoutProfileLayout(layout, { strict = true } = {}) {
     }
   }
 
+  const deckSplitLayouts = normalizeDeckSplitLayoutMap(layout.deckSplitLayouts, {
+    strict,
+    fieldPath: "layout.deckSplitLayouts",
+    allowUnknownDeckIds: true,
+    hasKnownSession,
+    resolveSessionDeckId
+  });
+
   return {
     activeDeckId,
     sidebarVisible,
     sessionFilterText,
-    deckTerminalSettings: nextDeckTerminalSettings
+    deckTerminalSettings: nextDeckTerminalSettings,
+    deckSplitLayouts
   };
 }
 
-function normalizeLayoutProfileEntity(input, { strict = true } = {}) {
+function normalizeLayoutProfileEntity(
+  input,
+  {
+    strict = true,
+    hasKnownSession = null,
+    resolveSessionDeckId = null
+  } = {}
+) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return null;
   }
@@ -925,7 +1224,7 @@ function normalizeLayoutProfileEntity(input, { strict = true } = {}) {
     name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : id,
     createdAt,
     updatedAt,
-    layout: normalizeLayoutProfileLayout(input.layout, { strict })
+    layout: normalizeLayoutProfileLayout(input.layout, { strict, hasKnownSession, resolveSessionDeckId })
   };
 }
 
@@ -1670,6 +1969,7 @@ export function createRuntime(config) {
       reassignDeckSessions(deckId, DEFAULT_DECK_ID);
     }
     decks.delete(deckId);
+    cleanupLayoutProfiles();
     cleanupWorkspacePresets();
     return {
       deckId,
@@ -1688,7 +1988,8 @@ export function createRuntime(config) {
         activeDeckId: profile.layout.activeDeckId,
         sidebarVisible: profile.layout.sidebarVisible,
         sessionFilterText: profile.layout.sessionFilterText,
-        deckTerminalSettings: JSON.parse(JSON.stringify(profile.layout.deckTerminalSettings))
+        deckTerminalSettings: JSON.parse(JSON.stringify(profile.layout.deckTerminalSettings)),
+        deckSplitLayouts: JSON.parse(JSON.stringify(profile.layout.deckSplitLayouts))
       }
     };
   }
@@ -1730,7 +2031,11 @@ export function createRuntime(config) {
       name,
       createdAt: now,
       updatedAt: now,
-      layout: normalizeLayoutProfileLayout(body?.layout, { strict: true })
+      layout: normalizeLayoutProfileLayout(body?.layout, {
+        strict: true,
+        hasKnownSession,
+        resolveSessionDeckId
+      })
     };
     layoutProfiles.set(profile.id, profile);
     return toApiLayoutProfile(profile);
@@ -1746,7 +2051,13 @@ export function createRuntime(config) {
     const next = {
       ...existing,
       name: hasName ? normalizeLayoutProfileName(body.name) : existing.name,
-      layout: hasLayout ? normalizeLayoutProfileLayout(body.layout, { strict: true }) : existing.layout,
+      layout: hasLayout
+        ? normalizeLayoutProfileLayout(body.layout, {
+            strict: true,
+            hasKnownSession,
+            resolveSessionDeckId
+          })
+        : existing.layout,
       updatedAt: Date.now()
     };
     layoutProfiles.set(profileId, next);
@@ -1927,7 +2238,8 @@ export function createRuntime(config) {
       return {
         activeDeckId: DEFAULT_DECK_ID,
         layoutProfileId: "",
-        deckGroups: {}
+        deckGroups: {},
+        deckSplitLayouts: {}
       };
     }
     if (!isPlainObject(workspace)) {
@@ -1937,7 +2249,8 @@ export function createRuntime(config) {
       return {
         activeDeckId: DEFAULT_DECK_ID,
         layoutProfileId: "",
-        deckGroups: {}
+        deckGroups: {},
+        deckSplitLayouts: {}
       };
     }
 
@@ -1986,10 +2299,20 @@ export function createRuntime(config) {
       }
     }
 
+    const deckSplitLayouts = normalizeDeckSplitLayoutMap(workspace.deckSplitLayouts, {
+      strict,
+      fieldPath: "workspace.deckSplitLayouts",
+      allowUnknownDeckIds: false,
+      hasKnownDeck: (deckId) => decks.has(deckId),
+      hasKnownSession,
+      resolveSessionDeckId
+    });
+
     return {
       activeDeckId,
       layoutProfileId,
-      deckGroups
+      deckGroups,
+      deckSplitLayouts
     };
   }
 
@@ -2036,7 +2359,8 @@ export function createRuntime(config) {
       workspace: {
         activeDeckId: preset.workspace.activeDeckId,
         layoutProfileId: preset.workspace.layoutProfileId || undefined,
-        deckGroups: JSON.parse(JSON.stringify(preset.workspace.deckGroups))
+        deckGroups: JSON.parse(JSON.stringify(preset.workspace.deckGroups)),
+        deckSplitLayouts: JSON.parse(JSON.stringify(preset.workspace.deckSplitLayouts))
       }
     };
   }
@@ -2124,6 +2448,27 @@ export function createRuntime(config) {
     return changed;
   }
 
+  function cleanupLayoutProfiles() {
+    let changed = false;
+    for (const [profileId, profile] of layoutProfiles.entries()) {
+      const nextLayout = normalizeLayoutProfileLayout(profile.layout, {
+        strict: false,
+        hasKnownSession,
+        resolveSessionDeckId
+      });
+      if (JSON.stringify(nextLayout) === JSON.stringify(profile.layout)) {
+        continue;
+      }
+      layoutProfiles.set(profileId, {
+        ...profile,
+        layout: nextLayout,
+        updatedAt: Date.now()
+      });
+      changed = true;
+    }
+    return changed;
+  }
+
   function ensureSessionExistsOrThrow(sessionId) {
     try {
       manager.get(sessionId);
@@ -2147,6 +2492,7 @@ export function createRuntime(config) {
       return false;
     }
     sessionDeckAssignments.set(sessionId, deckId);
+    cleanupLayoutProfiles();
     cleanupWorkspacePresets();
     return true;
   }
@@ -2817,6 +3163,7 @@ function tryCreateRestoredSession({
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
+        cleanupLayoutProfiles();
         cleanupWorkspacePresets();
         await persistNow("session.delete");
         writeJson(req, res, 204);
@@ -3143,8 +3490,25 @@ function tryCreateRestoredSession({
       }
       decks.set(normalizedDeck.id, normalizedDeck);
     }
+    const persistedSessionDeckAssignments = new Map();
+    for (const session of Array.isArray(persistedState.sessions) ? persistedState.sessions : []) {
+      if (!session || typeof session.id !== "string" || !session.id) {
+        continue;
+      }
+      const persistedDeckId =
+        typeof session.deckId === "string" && session.deckId && decks.has(session.deckId)
+          ? session.deckId
+          : DEFAULT_DECK_ID;
+      persistedSessionDeckAssignments.set(session.id, persistedDeckId);
+    }
     for (const persistedLayoutProfile of Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles : []) {
-      const normalizedProfile = normalizeLayoutProfileEntity(persistedLayoutProfile, { strict: false });
+      const normalizedProfile = normalizeLayoutProfileEntity(persistedLayoutProfile, {
+        strict: false,
+        hasKnownSession: (sessionId) => persistedSessionDeckAssignments.has(sessionId) || hasKnownSession(sessionId),
+        resolveSessionDeckId: (sessionId) =>
+          persistedSessionDeckAssignments.get(sessionId) ||
+          resolveSessionDeckId(sessionId)
+      });
       if (!normalizedProfile) {
         continue;
       }
@@ -3315,6 +3679,7 @@ function tryCreateRestoredSession({
       }
       workspacePresets.set(normalizedPreset.id, normalizedPreset);
     }
+    cleanupLayoutProfiles();
     cleanupWorkspacePresets();
     logDebug("runtime.restore.done", {
       restoredSessionCount: manager.list().length,

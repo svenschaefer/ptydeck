@@ -51,6 +51,106 @@ function cloneDeckTerminalSettings(settings) {
   );
 }
 
+function cloneSplitLayoutNode(node) {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return null;
+  }
+  const type = normalizeLower(node.type);
+  if (type === "pane") {
+    const paneId = normalizeText(node.paneId).toLowerCase();
+    if (!paneId) {
+      return null;
+    }
+    return {
+      type: "pane",
+      paneId
+    };
+  }
+  if (type !== "row" && type !== "column") {
+    return null;
+  }
+  const children = [];
+  for (const rawChild of Array.isArray(node.children) ? node.children : []) {
+    const child = cloneSplitLayoutNode(rawChild);
+    if (child) {
+      children.push(child);
+    }
+  }
+  if (children.length < 2) {
+    return children[0] || null;
+  }
+  return {
+    type,
+    children
+  };
+}
+
+function collectSplitLayoutPaneIds(node, target = []) {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return target;
+  }
+  if (node.type === "pane" && normalizeText(node.paneId)) {
+    target.push(normalizeText(node.paneId).toLowerCase());
+    return target;
+  }
+  for (const child of Array.isArray(node.children) ? node.children : []) {
+    collectSplitLayoutPaneIds(child, target);
+  }
+  return target;
+}
+
+function cloneDeckSplitLayoutEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const root = cloneSplitLayoutNode(entry.root);
+  if (!root) {
+    return null;
+  }
+  const paneIds = new Set(collectSplitLayoutPaneIds(root));
+  const paneSessions = Object.fromEntries(Array.from(paneIds, (paneId) => [paneId, []]));
+  if (entry.paneSessions && typeof entry.paneSessions === "object" && !Array.isArray(entry.paneSessions)) {
+    for (const [rawPaneId, rawSessionIds] of Object.entries(entry.paneSessions)) {
+      const paneId = normalizeText(rawPaneId).toLowerCase();
+      if (!paneId || !paneIds.has(paneId)) {
+        continue;
+      }
+      const seenSessionIds = new Set();
+      paneSessions[paneId] = [];
+      for (const rawSessionId of Array.isArray(rawSessionIds) ? rawSessionIds : []) {
+        const sessionId = normalizeText(rawSessionId);
+        if (!sessionId || seenSessionIds.has(sessionId)) {
+          continue;
+        }
+        seenSessionIds.add(sessionId);
+        paneSessions[paneId].push(sessionId);
+      }
+    }
+  }
+  return {
+    root,
+    paneSessions
+  };
+}
+
+function cloneDeckSplitLayoutMap(deckSplitLayouts) {
+  if (!deckSplitLayouts || typeof deckSplitLayouts !== "object" || Array.isArray(deckSplitLayouts)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(deckSplitLayouts)
+      .map(([deckId, entry]) => {
+        const normalizedDeckId = normalizeText(deckId);
+        const clonedEntry = cloneDeckSplitLayoutEntry(entry);
+        if (!normalizedDeckId || !clonedEntry) {
+          return null;
+        }
+        return [normalizedDeckId, clonedEntry];
+      })
+      .filter(Boolean)
+  );
+}
+
 export function normalizeLayoutProfileRecord(profile) {
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return null;
@@ -70,7 +170,8 @@ export function normalizeLayoutProfileRecord(profile) {
       activeDeckId: normalizeText(layout.activeDeckId) || "default",
       sidebarVisible: layout.sidebarVisible !== false,
       sessionFilterText: normalizeText(layout.sessionFilterText),
-      deckTerminalSettings: cloneDeckTerminalSettings(layout.deckTerminalSettings)
+      deckTerminalSettings: cloneDeckTerminalSettings(layout.deckTerminalSettings),
+      deckSplitLayouts: cloneDeckSplitLayoutMap(layout.deckSplitLayouts)
     }
   };
 }
@@ -261,6 +362,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
   }
 
   function captureCurrentLayout() {
+    const selectedProfile = getSelectedProfile();
     const deckTerminalSettings = {};
     for (const deck of getDecks()) {
       const deckId = normalizeText(deck?.id);
@@ -279,7 +381,8 @@ export function createLayoutProfileRuntimeController(options = {}) {
       activeDeckId: normalizeText(getActiveDeckId()) || "default",
       sidebarVisible: getSidebarVisible() !== false,
       sessionFilterText: normalizeText(getSessionFilterText()),
-      deckTerminalSettings
+      deckTerminalSettings,
+      deckSplitLayouts: cloneDeckSplitLayoutMap(selectedProfile?.layout?.deckSplitLayouts)
     };
   }
 

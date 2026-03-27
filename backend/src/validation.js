@@ -92,6 +92,34 @@ function isLayoutProfileDeckTerminalSettings(value) {
   );
 }
 
+function isSplitLayoutNode(value) {
+  if (!isObject(value) || typeof value.type !== "string") {
+    return false;
+  }
+  if (value.type === "pane") {
+    return typeof value.paneId === "string";
+  }
+  if (value.type === "row" || value.type === "column") {
+    return Array.isArray(value.children) && value.children.length >= 2 && value.children.every((entry) => isSplitLayoutNode(entry));
+  }
+  return false;
+}
+
+function isDeckSplitLayout(value) {
+  return (
+    isObject(value) &&
+    isSplitLayoutNode(value.root) &&
+    isObject(value.paneSessions) &&
+    Object.entries(value.paneSessions).every(
+      ([paneId, sessionIds]) => typeof paneId === "string" && Array.isArray(sessionIds) && sessionIds.every((entry) => typeof entry === "string")
+    )
+  );
+}
+
+function isDeckSplitLayoutMap(value) {
+  return isObject(value) && Object.values(value).every((entry) => isDeckSplitLayout(entry));
+}
+
 function isLayoutProfileLayout(value) {
   return (
     isObject(value) &&
@@ -99,7 +127,8 @@ function isLayoutProfileLayout(value) {
     typeof value.sidebarVisible === "boolean" &&
     typeof value.sessionFilterText === "string" &&
     isObject(value.deckTerminalSettings) &&
-    Object.values(value.deckTerminalSettings).every((entry) => isLayoutProfileDeckTerminalSettings(entry))
+    Object.values(value.deckTerminalSettings).every((entry) => isLayoutProfileDeckTerminalSettings(entry)) &&
+    (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
   );
 }
 
@@ -139,7 +168,8 @@ function isWorkspacePresetWorkspace(value) {
     typeof value.activeDeckId === "string" &&
     (value.layoutProfileId === undefined || typeof value.layoutProfileId === "string") &&
     isObject(value.deckGroups) &&
-    Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry))
+    Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry)) &&
+    (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
   );
 }
 

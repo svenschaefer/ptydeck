@@ -283,6 +283,21 @@ test("validateRequest accepts valid layout profile create and patch payloads", (
           sessionFilterText: "ops",
           deckTerminalSettings: {
             default: { cols: 110, rows: 28 }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: {
+                type: "row",
+                children: [
+                  { type: "pane", paneId: "left" },
+                  { type: "pane", paneId: "right" }
+                ]
+              },
+              paneSessions: {
+                left: ["s-1"],
+                right: ["s-2"]
+              }
+            }
           }
         }
       }
@@ -297,7 +312,15 @@ test("validateRequest accepts valid layout profile create and patch payloads", (
           activeDeckId: "default",
           sidebarVisible: false,
           sessionFilterText: "",
-          deckTerminalSettings: {}
+          deckTerminalSettings: {},
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: []
+              }
+            }
+          }
         }
       }
     });
@@ -315,9 +338,9 @@ test("validateRequest rejects invalid layout profile payloads", () => {
   });
   assert.throws(() => {
     validateRequest({
-      method: "PATCH",
-      pathname: "/api/v1/layout-profiles/focus",
-      params: { profileId: "focus" },
+      method: "POST",
+      pathname: "/api/v1/layout-profiles",
+      params: {},
       body: {}
     });
   });
@@ -335,6 +358,21 @@ test("validateResponse accepts layout profile payloads", () => {
       sessionFilterText: "ops",
       deckTerminalSettings: {
         default: { cols: 110, rows: 28 }
+      },
+      deckSplitLayouts: {
+        default: {
+          root: {
+            type: "row",
+            children: [
+              { type: "pane", paneId: "left" },
+              { type: "pane", paneId: "right" }
+            ]
+          },
+          paneSessions: {
+            left: ["s-1"],
+            right: ["s-2"]
+          }
+        }
       }
     }
   };
@@ -375,6 +413,21 @@ test("validateRequest accepts valid workspace preset create and patch payloads",
                 }
               ]
             }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: {
+                type: "column",
+                children: [
+                  { type: "pane", paneId: "upper" },
+                  { type: "pane", paneId: "lower" }
+                ]
+              },
+              paneSessions: {
+                upper: ["s-1"],
+                lower: ["s-2"]
+              }
+            }
           }
         }
       }
@@ -387,7 +440,15 @@ test("validateRequest accepts valid workspace preset create and patch payloads",
         name: "Focus Workspace Updated",
         workspace: {
           activeDeckId: "default",
-          deckGroups: {}
+          deckGroups: {},
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: []
+              }
+            }
+          }
         }
       }
     });
@@ -405,9 +466,9 @@ test("validateRequest rejects invalid workspace preset payloads", () => {
   });
   assert.throws(() => {
     validateRequest({
-      method: "PATCH",
-      pathname: "/api/v1/workspace-presets/focus",
-      params: { presetId: "focus" },
+      method: "POST",
+      pathname: "/api/v1/workspace-presets",
+      params: {},
       body: {}
     });
   });
@@ -432,6 +493,21 @@ test("validateResponse accepts workspace preset payloads", () => {
               sessionIds: ["s-1", "s-2"]
             }
           ]
+        }
+      },
+      deckSplitLayouts: {
+        default: {
+          root: {
+            type: "column",
+            children: [
+              { type: "pane", paneId: "upper" },
+              { type: "pane", paneId: "lower" }
+            ]
+          },
+          paneSessions: {
+            upper: ["s-1"],
+            lower: ["s-2"]
+          }
         }
       }
     }

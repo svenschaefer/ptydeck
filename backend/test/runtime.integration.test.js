@@ -774,8 +774,17 @@ test("layout profile lifecycle persists and restores across restart", async () =
   await firstRuntime.start();
   const firstPort = firstRuntime.getAddress().port;
   const firstBaseUrl = `http://127.0.0.1:${firstPort}/api/v1`;
+  let defaultSessionId = "";
 
   try {
+    const createSessionRes = await fetch(`${firstBaseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", name: "default-shell" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    defaultSessionId = (await createSessionRes.json()).id;
+
     const createDeckRes = await fetch(`${firstBaseUrl}/decks`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -795,6 +804,27 @@ test("layout profile lifecycle persists and restores across restart", async () =
           deckTerminalSettings: {
             default: { cols: 80, rows: 20 },
             ops: { cols: 132, rows: 40 }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: [defaultSessionId]
+              }
+            },
+            ops: {
+              root: {
+                type: "row",
+                children: [
+                  { type: "pane", paneId: "left" },
+                  { type: "pane", paneId: "right" }
+                ]
+              },
+              paneSessions: {
+                left: [],
+                right: []
+              }
+            }
           }
         }
       })
@@ -816,6 +846,14 @@ test("layout profile lifecycle persists and restores across restart", async () =
           sessionFilterText: "",
           deckTerminalSettings: {
             default: { cols: 96, rows: 26 }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: [defaultSessionId]
+              }
+            }
           }
         }
       })
@@ -825,6 +863,7 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.equal(updated.name, "Ops Focus Updated");
     assert.equal(updated.layout.activeDeckId, "default");
     assert.equal(updated.layout.sidebarVisible, true);
+    assert.deepEqual(updated.layout.deckSplitLayouts.default.paneSessions.main, [defaultSessionId]);
 
     const listLayoutProfilesRes = await fetch(`${firstBaseUrl}/layout-profiles`);
     assert.equal(listLayoutProfilesRes.status, 200);
@@ -863,6 +902,17 @@ test("layout profile lifecycle persists and restores across restart", async () =
     assert.deepEqual(restoredProfiles[0].layout.deckTerminalSettings, {
       default: { cols: 96, rows: 26 }
     });
+    assert.deepEqual(restoredProfiles[0].layout.deckSplitLayouts.default.paneSessions.main, [defaultSessionId]);
+
+    const deleteSessionRes = await fetch(`${secondBaseUrl}/sessions/${defaultSessionId}`, {
+      method: "DELETE"
+    });
+    assert.equal(deleteSessionRes.status, 204);
+
+    const cleanedLayoutProfileRes = await fetch(`${secondBaseUrl}/layout-profiles/${restoredProfiles[0].id}`);
+    assert.equal(cleanedLayoutProfileRes.status, 200);
+    const cleanedLayoutProfile = await cleanedLayoutProfileRes.json();
+    assert.deepEqual(cleanedLayoutProfile.layout.deckSplitLayouts.default.paneSessions.main, []);
 
     const deleteLayoutProfileRes = await fetch(`${secondBaseUrl}/layout-profiles/${restoredProfiles[0].id}`, {
       method: "DELETE"
@@ -977,6 +1027,20 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
                 }
               ]
             }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: [defaultSessionId]
+              }
+            },
+            ops: {
+              root: { type: "pane", paneId: "runner-pane" },
+              paneSessions: {
+                "runner-pane": [opsSessionId]
+              }
+            }
           }
         }
       })
@@ -1016,6 +1080,20 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
                 }
               ]
             }
+          },
+          deckSplitLayouts: {
+            default: {
+              root: { type: "pane", paneId: "main" },
+              paneSessions: {
+                main: [defaultSessionId]
+              }
+            },
+            ops: {
+              root: { type: "pane", paneId: "runner-pane" },
+              paneSessions: {
+                "runner-pane": [opsSessionId]
+              }
+            }
           }
         }
       })
@@ -1053,6 +1131,8 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
     assert.equal(restoredPresets[0].id, workspacePresetId);
     assert.equal(restoredPresets[0].name, "Ops Workspace Updated");
     assert.equal(restoredPresets[0].workspace.layoutProfileId, "focus");
+    assert.deepEqual(restoredPresets[0].workspace.deckSplitLayouts.default.paneSessions.main, [defaultSessionId]);
+    assert.deepEqual(restoredPresets[0].workspace.deckSplitLayouts.ops.paneSessions["runner-pane"], [opsSessionId]);
 
     const deleteDefaultSessionRes = await fetch(`${secondBaseUrl}/sessions/${defaultSessionId}`, {
       method: "DELETE"
@@ -1076,6 +1156,8 @@ test("workspace preset lifecycle persists, restores, and cleans up deleted refer
     assert.equal(cleanedPreset.workspace.layoutProfileId, undefined);
     assert.equal(cleanedPreset.workspace.deckGroups.ops, undefined);
     assert.deepEqual(cleanedPreset.workspace.deckGroups.default.groups[0].sessionIds, []);
+    assert.equal(cleanedPreset.workspace.deckSplitLayouts.ops, undefined);
+    assert.deepEqual(cleanedPreset.workspace.deckSplitLayouts.default.paneSessions.main, []);
 
     const deleteWorkspacePresetRes = await fetch(`${secondBaseUrl}/workspace-presets/${workspacePresetId}`, {
       method: "DELETE"

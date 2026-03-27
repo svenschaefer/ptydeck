@@ -78,7 +78,18 @@ test("workspace preset runtime controller manages preset lifecycle through backe
             workspace: {
               activeDeckId: "ops",
               layoutProfileId: "focus",
-              deckGroups: {}
+              deckGroups: {},
+              deckSplitLayouts: {
+                ops: {
+                  root: {
+                    type: "pane",
+                    paneId: "main"
+                  },
+                  paneSessions: {
+                    main: ["s1"]
+                  }
+                }
+              }
             }
           }
         ];
@@ -100,11 +111,23 @@ test("workspace preset runtime controller manages preset lifecycle through backe
           name: payload.name || "Ops Workspace",
           createdAt: 1,
           updatedAt: 3,
-          workspace: payload.workspace || {
-            activeDeckId: "ops",
-            layoutProfileId: "focus",
-            deckGroups: {}
-          }
+          workspace:
+            payload.workspace || {
+              activeDeckId: "ops",
+              layoutProfileId: "focus",
+              deckGroups: {},
+              deckSplitLayouts: {
+                ops: {
+                  root: {
+                    type: "pane",
+                    paneId: "main"
+                  },
+                  paneSessions: {
+                    main: ["s1"]
+                  }
+                }
+              }
+            }
         };
       },
       async deleteWorkspacePreset(presetId) {
@@ -148,11 +171,48 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   assert.equal(controller.listPresets().length, 1);
   assert.equal(presetSelectEl.children.length, 1);
 
+  controller.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "focus",
+    deckGroups: {},
+    deckSplitLayouts: {
+      ops: {
+        root: {
+          type: "row",
+          children: [
+            { type: "pane", paneId: "left" },
+            { type: "pane", paneId: "right" }
+          ]
+        },
+        paneSessions: {
+          left: ["s1"],
+          right: ["s2"]
+        }
+      }
+    }
+  });
+
   const saveFeedback = await controller.createPresetFromCurrentWorkspace("Ops Snapshot");
   assert.equal(saveFeedback, "Saved workspace preset [ops-2] Ops Snapshot.");
-  assert.equal(calls[1][0], "create");
-  assert.equal(calls[1][1].workspace.activeDeckId, "ops");
-  assert.equal(calls[1][1].workspace.layoutProfileId, "focus");
+  const createCall = calls.find((entry) => entry[0] === "create");
+  assert.ok(createCall);
+  assert.equal(createCall[1].workspace.activeDeckId, "ops");
+  assert.equal(createCall[1].workspace.layoutProfileId, "focus");
+  assert.deepEqual(createCall[1].workspace.deckSplitLayouts, {
+    ops: {
+      root: {
+        type: "row",
+        children: [
+          { type: "pane", paneId: "left" },
+          { type: "pane", paneId: "right" }
+        ]
+      },
+      paneSessions: {
+        left: ["s1"],
+        right: ["s2"]
+      }
+    }
+  });
 
   const applyFeedback = await controller.applyPresetById("ops");
   assert.equal(applyFeedback, "Applied workspace preset [ops] Ops Workspace.");
@@ -200,6 +260,30 @@ test("workspace preset runtime controller normalizes stale references and resolv
         activeGroupId: "ops-team",
         groups: [{ id: "ops-team", name: "Ops Team", sessionIds: ["s2", "missing"] }]
       }
+    },
+    deckSplitLayouts: {
+      ghost: {
+        root: {
+          type: "pane",
+          paneId: "main"
+        },
+        paneSessions: {
+          main: ["missing"]
+        }
+      },
+      ops: {
+        root: {
+          type: "row",
+          children: [
+            { type: "pane", paneId: "left" },
+            { type: "pane", paneId: "right" }
+          ]
+        },
+        paneSessions: {
+          left: ["s2", "missing", "s3"],
+          right: ["s3"]
+        }
+      }
     }
   });
 
@@ -208,6 +292,18 @@ test("workspace preset runtime controller normalizes stale references and resolv
   assert.equal(normalized.layoutProfileId, "");
   assert.equal(normalized.deckGroups.ghost, undefined);
   assert.deepEqual(normalized.deckGroups.ops.groups[0].sessionIds, ["s2"]);
+  assert.equal(normalized.deckSplitLayouts.ghost, undefined);
+  assert.deepEqual(normalized.deckSplitLayouts.ops.root, {
+    type: "row",
+    children: [
+      { type: "pane", paneId: "left" },
+      { type: "pane", paneId: "right" }
+    ]
+  });
+  assert.deepEqual(normalized.deckSplitLayouts.ops.paneSessions, {
+    left: ["s2", "s3"],
+    right: []
+  });
 
   const resolved = controller.resolveDeckSessions("ops", [
     { id: "s2", deckId: "ops" },
