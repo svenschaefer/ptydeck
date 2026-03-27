@@ -4,6 +4,7 @@ import { createAppCommandUiFacadeController } from "./app-command-ui-facade-cont
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
+import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
 import { createClipboardRuntimeController } from "./clipboard-runtime-controller.js";
 import { createCommandPaletteRuntimeController } from "./command-palette-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
@@ -284,6 +285,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "note",
   "layout",
   "workspace",
+  "broadcast",
   "replay",
   "settings",
   "custom",
@@ -330,6 +332,7 @@ let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
 let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
+let broadcastInputRuntimeController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -554,6 +557,16 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
   requestRender: () => appCommandUiFacadeController?.render?.()
+});
+
+broadcastInputRuntimeController = createBroadcastInputRuntimeController({
+  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
+  getSessions: () => store.getState().sessions || [],
+  resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID,
+  sortSessionsByQuickId: (sessions) => appSessionRuntimeFacadeController?.sortSessionsByQuickId?.(sessions) || [],
+  listGroupsForDeck: (deckId) => workspacePresetRuntimeController?.listGroupsForDeck?.(deckId) || [],
+  getActiveGroupIdForDeck: (deckId) => workspacePresetRuntimeController?.getActiveGroupIdForDeck?.(deckId) || "",
+  applyGroupLocally: (groupId, deckId) => workspacePresetRuntimeController?.applyGroupLocally?.(groupId, deckId) || null
 });
 
 if (typeof window.Terminal !== "function") {
@@ -930,6 +943,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   terminalSearchController,
   layoutProfileRuntimeController,
   workspacePresetRuntimeController,
+  broadcastInputRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,
   appLayoutDeckFacadeController,

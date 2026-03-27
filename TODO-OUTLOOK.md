@@ -73,11 +73,14 @@ Promoted and completed in `v0.4.0-H21`:
 - [ ] Add template variables for command expansion (for example `$session`, `$cwd`) with strict opt-in behavior.
 - [ ] Add scoped custom-command sets (global, project, session scopes) with deterministic precedence.
 - [ ] Add fuzzy/personalized slash-command suggestions with deterministic fallback order.
-- [ ] Add broadcast input modes for explicit session groups.
 
 Promoted and completed in `v0.4.0-H18`:
 
 - `DRV-001`, `DRV-002`, `DRV-005`
+
+Promoted and completed in `v0.4.0-H27`:
+
+- `UX-008`, `UX-009`, `UX-010`
 
 Promoted and completed in `v0.4.0-H20`:
 

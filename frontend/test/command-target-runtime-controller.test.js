@@ -224,3 +224,22 @@ test("command-target runtime controller tracks active target summaries and recen
   assert.equal(controller.getLastActiveSessionSwitchAt(), 4321);
   assert.equal(controller.formatActiveTargetSummary(), "Target: [8] Agent");
 });
+
+test("command-target runtime controller prefers broadcast target summary when provided", () => {
+  const state = {
+    sessions: [{ id: "s1", name: "Ops" }],
+    activeSessionId: "s1",
+    activeDeckId: "deck-a"
+  };
+  const controller = createCommandTargetRuntimeController({
+    store: {
+      getState: () => state,
+      subscribe() {}
+    },
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getBroadcastTargetSummary: () => "Target: group [build] Build · 2 sessions"
+  });
+
+  assert.equal(controller.formatActiveTargetSummary(), "Target: group [build] Build · 2 sessions");
+});

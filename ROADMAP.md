@@ -14,7 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Latest completed wave: `v0.4.0-H26` (Session Grouping and Workspace Presets, `UX-005`, `UX-006`, `UX-007`).
+- Latest completed wave: `v0.4.0-H27` (Workspace Group Broadcast Input, `UX-008`, `UX-009`, `UX-010`).
+- Previous completed wave: `v0.4.0-H26` (Session Grouping and Workspace Presets, `UX-005`, `UX-006`, `UX-007`).
 - Previous completed wave: `v0.4.0-H25` (Session Theme Dual-Scheme and Composer/Help Simplification, `QLT-144`, `QLT-145`, `QLT-146`, `QLT-147`, `QLT-148`, `QLT-149`).
 - Previous completed wave: `v0.4.0-H24` (Frontend Quick-ID Swap Consistency, `QLT-142`, `QLT-143`).
 - Previous completed wave: `v0.4.0-H23` (Persistent Layout Profiles, `UX-002`, `UX-003`, `UX-004`).
@@ -42,6 +43,25 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
 ## Latest Completed Wave
+
+### v0.4.0-H27 - Workspace Group Broadcast Input (Completed)
+
+- `UX-008`, `UX-009`, `UX-010`
+
+Dependencies:
+
+- `UX-008` reuses the completed `v0.4.0-H26` workspace-preset and session-group contract as the only authoritative source for group membership, so broadcast targeting does not introduce a second local-only grouping model.
+- `UX-009` follows `UX-008` by exposing group broadcast control through `/broadcast status`, `/broadcast off`, and `/broadcast group [group]`, plus one-line composer target-summary integration, while keeping explicit `@target ...` direct routing authoritative for single-target overrides.
+- `UX-010` closes after `UX-008` and `UX-009`, so regression coverage now spans broadcast-target resolution, composer send fan-out, direct-route bypass, and help-surface integration end to end.
+
+Exit criteria:
+
+- The frontend can route ordinary composer sends to the active or explicitly selected workspace group on the active deck without changing the persisted backend contract.
+- Slash-command control exists for broadcast-mode status, activation, and disable flows.
+- The one-line composer target summary reflects group broadcast mode clearly, while direct `@target ...` routing still bypasses broadcast mode deterministically.
+- Regression coverage exists for broadcast-target resolution, command execution, composer send fan-out, and help/overview integration.
+
+## Previous Completed Wave
 
 ### v0.4.0-H26 - Session Grouping and Workspace Presets (Completed)
 

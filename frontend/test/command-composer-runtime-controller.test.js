@@ -194,6 +194,105 @@ test("command-composer runtime controller records one submission per direct-rout
   ]);
 });
 
+test("command-composer runtime controller sends to active broadcast targets and bypasses them for direct routes", async () => {
+  const calls = [];
+  let value = "npm test";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "input", data: value }),
+    getState: () => ({
+      sessions: [
+        { id: "s1", name: "one" },
+        { id: "s2", name: "two" },
+        { id: "s3", name: "three" }
+      ],
+      activeSessionId: "s1"
+    }),
+    resolveBroadcastTargets: () => ({
+      active: true,
+      sessions: [
+        { id: "s2", name: "two" },
+        { id: "s3", name: "three" }
+      ],
+      error: "",
+      routeFeedback: "Sent to workspace group [build] Build (2 sessions)."
+    }),
+    isSessionActionBlocked: () => false,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.text]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    clearError: () => {},
+    resetSlashHistoryNavigationState: () => {},
+    render: () => {}
+  });
+
+  await controller.submitCommand();
+  assert.deepEqual(calls, [
+    ["send", "s2", "npm test"],
+    ["send", "s3", "npm test"],
+    ["record", "s2", "npm test"],
+    ["record", "s3", "npm test"],
+    ["value", ""],
+    ["feedback", "Sent to workspace group [build] Build (2 sessions)."]
+  ]);
+
+  calls.length = 0;
+  value = "@ops pwd";
+  const directRouteController = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "input", data: value }),
+    getState: () => ({
+      sessions: [
+        { id: "s1", name: "one" },
+        { id: "s2", name: "two" }
+      ],
+      activeSessionId: "s1"
+    }),
+    parseDirectTargetRoutingInput: () => ({ matched: true, payload: "pwd", targetToken: "ops" }),
+    resolveTargetSelectors: () => ({ sessions: [{ id: "s1", name: "one" }], error: "" }),
+    resolveBroadcastTargets: () => {
+      throw new Error("broadcast should not run for direct routes");
+    },
+    getActiveDeck: () => ({ id: "default" }),
+    isSessionActionBlocked: () => false,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordCommandSubmission: () => null,
+    formatSessionToken: (sessionId) => sessionId,
+    formatSessionDisplayName: (session) => session.name,
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    clearError: () => {},
+    resetSlashHistoryNavigationState: () => {},
+    render: () => {}
+  });
+
+  await directRouteController.submitCommand();
+  assert.deepEqual(calls, [
+    ["send", "s1", "pwd"],
+    ["value", ""],
+    ["feedback", "Sent to [s1] one."]
+  ]);
+});
+
 test("command-composer runtime controller guards risky sends until confirmed or cancelled", async () => {
   const calls = [];
   let value = "please fix the tests";

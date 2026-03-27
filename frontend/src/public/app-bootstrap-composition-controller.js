@@ -91,6 +91,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const layoutRuntimeController = options.layoutRuntimeController || null;
   const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
   const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
+  const broadcastInputRuntimeController = options.broadcastInputRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
   const sessionTerminalResizeController = options.sessionTerminalResizeController || null;
   const appCommandUiFacadeController = options.appCommandUiFacadeController || null;
@@ -143,7 +144,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       setActiveDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck?.(deckId),
       resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session),
       formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
-      formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
+      formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+      getBroadcastTargetSummary: () => broadcastInputRuntimeController?.formatTargetSummary?.() || ""
     });
 
     commandExecutor = createCommandExecutor({
@@ -202,6 +204,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       applyWorkspacePreset: (presetId) => workspacePresetRuntimeController?.applyPresetById?.(presetId) || "",
       renameWorkspacePreset: (presetId, name) => workspacePresetRuntimeController?.renamePresetById?.(presetId, name) || "",
       deleteWorkspacePreset: (presetId) => workspacePresetRuntimeController?.deletePresetById?.(presetId) || "",
+      getBroadcastStatus: () => broadcastInputRuntimeController?.getStatus?.() || "Broadcast: off.",
+      enableGroupBroadcast: (selectorText) => broadcastInputRuntimeController?.enableGroupBroadcast?.(selectorText) || "",
+      disableBroadcast: () => broadcastInputRuntimeController?.disableBroadcast?.() || "Broadcast mode disabled.",
       openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy
@@ -294,6 +299,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       resetSlashHistoryNavigationState: () => commandComposerAutocompleteController?.resetSlashHistoryNavigationState?.(),
       parseDirectTargetRoutingInput: commandTargetRuntimeController.parseDirectTargetRoutingInput,
       resolveTargetSelectors: commandTargetRuntimeController.resolveTargetSelectors,
+      resolveBroadcastTargets: () => broadcastInputRuntimeController?.getBroadcastTargets?.() || { active: false, sessions: [], error: "", routeFeedback: "" },
       getActiveDeck: () => appLayoutDeckFacadeController?.getActiveDeck?.() || null,
       formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
       formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",

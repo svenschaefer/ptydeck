@@ -159,7 +159,7 @@ export function resolveWorkspacePresetToken(presets, token) {
   };
 }
 
-function resolveWorkspaceGroupToken(groups, token) {
+export function resolveWorkspaceGroupToken(groups, token) {
   const normalizedToken = normalizeLower(token);
   if (!normalizedToken) {
     return { group: null, error: "Workspace group target is required." };

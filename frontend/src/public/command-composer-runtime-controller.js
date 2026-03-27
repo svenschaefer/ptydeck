@@ -33,6 +33,10 @@ export function createCommandComposerRuntimeController(options = {}) {
   const parseDirectTargetRoutingInput = options.parseDirectTargetRoutingInput || (() => ({ matched: false, payload: "", targetToken: "" }));
   const resolveTargetSelectors = options.resolveTargetSelectors || (() => ({ sessions: [], error: "" }));
   const getActiveDeck = options.getActiveDeck || (() => null);
+  const resolveBroadcastTargets =
+    typeof options.resolveBroadcastTargets === "function"
+      ? options.resolveBroadcastTargets
+      : () => ({ active: false, sessions: [], error: "", routeFeedback: "" });
   const formatSessionToken = options.formatSessionToken || ((sessionId) => String(sessionId || ""));
   const formatSessionDisplayName = options.formatSessionDisplayName || ((session) => String(session?.name || ""));
   const evaluateSendSafety =
@@ -102,11 +106,20 @@ export function createCommandComposerRuntimeController(options = {}) {
         routeFeedback = `Sent to ${targetSessions.length} sessions.`;
       }
     } else {
-      const activeSession = sessions.find((session) => session.id === state.activeSessionId) || null;
-      if (!activeSession) {
-        return null;
+      const broadcastTargets = resolveBroadcastTargets();
+      if (broadcastTargets?.active === true) {
+        if (broadcastTargets.error) {
+          return { error: broadcastTargets.error };
+        }
+        targetSessions = Array.isArray(broadcastTargets.sessions) ? broadcastTargets.sessions : [];
+        routeFeedback = broadcastTargets.routeFeedback || (targetSessions.length > 1 ? `Sent to ${targetSessions.length} sessions.` : "");
+      } else {
+        const activeSession = sessions.find((session) => session.id === state.activeSessionId) || null;
+        if (!activeSession) {
+          return null;
+        }
+        targetSessions = [activeSession];
       }
-      targetSessions = [activeSession];
     }
 
     if (targetSessions.length === 0) {

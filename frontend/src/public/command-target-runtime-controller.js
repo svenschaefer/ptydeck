@@ -11,6 +11,8 @@ export function createCommandTargetRuntimeController(options = {}) {
     typeof options.formatSessionDisplayName === "function"
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "");
+  const getBroadcastTargetSummary =
+    typeof options.getBroadcastTargetSummary === "function" ? options.getBroadcastTargetSummary : () => "";
   let lastActiveSessionId = String(store?.getState?.().activeSessionId || "");
   let lastActiveSessionSwitchAt = 0;
 
@@ -152,6 +154,10 @@ export function createCommandTargetRuntimeController(options = {}) {
   }
 
   function formatActiveTargetSummary() {
+    const broadcastSummary = normalizeText(getBroadcastTargetSummary());
+    if (broadcastSummary) {
+      return broadcastSummary;
+    }
     const activeSession = getActiveSessionTarget();
     if (!activeSession) {
       return "Target: no active session.";
@@ -177,4 +183,8 @@ export function createCommandTargetRuntimeController(options = {}) {
     getActiveSessionTarget,
     formatActiveTargetSummary
   };
+}
+
+function normalizeText(value) {
+  return String(value || "").trim();
 }

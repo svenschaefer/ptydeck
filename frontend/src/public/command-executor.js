@@ -75,6 +75,9 @@ export function createCommandExecutor(options = {}) {
   const applyWorkspacePreset = typeof options.applyWorkspacePreset === "function" ? options.applyWorkspacePreset : async () => "";
   const renameWorkspacePreset = typeof options.renameWorkspacePreset === "function" ? options.renameWorkspacePreset : async () => "";
   const deleteWorkspacePreset = typeof options.deleteWorkspacePreset === "function" ? options.deleteWorkspacePreset : async () => "";
+  const getBroadcastStatus = typeof options.getBroadcastStatus === "function" ? options.getBroadcastStatus : () => "Broadcast: off.";
+  const enableGroupBroadcast = typeof options.enableGroupBroadcast === "function" ? options.enableGroupBroadcast : async () => "";
+  const disableBroadcast = typeof options.disableBroadcast === "function" ? options.disableBroadcast : async () => "";
 
   function formatUsage(commandName, subcommandName = "") {
     return `Usage: ${getSlashCommandUsage(commandName, subcommandName)}`;
@@ -772,6 +775,22 @@ export function createCommandExecutor(options = {}) {
       }
 
       return formatUsage("workspace");
+    }
+
+    if (command === "broadcast") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const selector = args.slice(1).join(" ").trim();
+
+      if (!subcommand || subcommand === "status") {
+        return getBroadcastStatus();
+      }
+      if (subcommand === "off") {
+        return disableBroadcast();
+      }
+      if (subcommand === "group") {
+        return enableGroupBroadcast(selector);
+      }
+      return formatUsage("broadcast");
     }
 
     if (command === "custom") {

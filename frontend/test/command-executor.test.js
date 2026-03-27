@@ -15,7 +15,7 @@ function createExecutor() {
       }
     },
     api: {},
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "replay", "settings", "custom", "help"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -56,7 +56,10 @@ function createExecutor() {
     createWorkspacePresetFromCurrent: async () => "",
     applyWorkspacePreset: async () => "",
     renameWorkspacePreset: async () => "",
-    deleteWorkspacePreset: async () => ""
+    deleteWorkspacePreset: async () => "",
+    getBroadcastStatus: () => "Broadcast: off.",
+    enableGroupBroadcast: async () => "",
+    disableBroadcast: async () => "Broadcast mode disabled."
   });
 }
 
@@ -66,7 +69,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace replay settings custom help"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note layout workspace broadcast replay settings custom help"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -102,6 +105,9 @@ test("command executor help and usage strings derive from declarative schema met
     workspaceUsage,
     "Usage: /workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>"
   );
+
+  const broadcastUsage = await executor.execute({ command: "broadcast", args: ["wat"], raw: "/broadcast wat" });
+  assert.equal(broadcastUsage, "Usage: /broadcast status | /broadcast off | /broadcast group [group]");
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(replayUsage, "Usage: /replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
@@ -333,6 +339,76 @@ test("command executor manages workspace presets through shared runtime hooks", 
     ["apply", "ops"],
     ["rename", "ops", "New Name"],
     ["delete", "ops"]
+  ]);
+});
+
+test("command executor manages broadcast mode through shared runtime hooks", async () => {
+  const calls = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: ""
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["broadcast", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 0,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => String(id || ""),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    getBroadcastStatus: () => "Broadcast: off.",
+    enableGroupBroadcast: async (selector) => {
+      calls.push(["group", selector]);
+      return "Broadcasting to workspace group [build] Build on deck [ops].";
+    },
+    disableBroadcast: async () => {
+      calls.push(["off"]);
+      return "Broadcast mode disabled.";
+    }
+  });
+
+  assert.equal(await executor.execute({ command: "broadcast", args: [], raw: "/broadcast" }), "Broadcast: off.");
+  assert.equal(
+    await executor.execute({ command: "broadcast", args: ["group", "build"], raw: "/broadcast group build" }),
+    "Broadcasting to workspace group [build] Build on deck [ops]."
+  );
+  assert.equal(await executor.execute({ command: "broadcast", args: ["off"], raw: "/broadcast off" }), "Broadcast mode disabled.");
+  assert.deepEqual(calls, [
+    ["group", "build"],
+    ["off"]
   ]);
 });
 

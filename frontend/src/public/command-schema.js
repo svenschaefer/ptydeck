@@ -493,6 +493,49 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  broadcast: freezeCommandDefinition({
+    key: "slash:broadcast",
+    insertText: "broadcast",
+    label: "/broadcast",
+    kind: "command",
+    description: "manage composer broadcast mode for workspace groups",
+    example: "/broadcast group",
+    summary: "/broadcast status | /broadcast off | /broadcast group [group]",
+    usage: [
+      "/broadcast status",
+      "/broadcast off",
+      "/broadcast group [group]"
+    ],
+    subcommands: {
+      status: {
+        insertText: "status",
+        label: "/broadcast status",
+        kind: "subcommand",
+        description: "show current broadcast mode",
+        example: "/broadcast status",
+        key: "slash:broadcast:status",
+        usage: "/broadcast status"
+      },
+      off: {
+        insertText: "off",
+        label: "/broadcast off",
+        kind: "subcommand",
+        description: "disable broadcast mode",
+        example: "/broadcast off",
+        key: "slash:broadcast:off",
+        usage: "/broadcast off"
+      },
+      group: {
+        insertText: "group",
+        label: "/broadcast group",
+        kind: "subcommand",
+        description: "broadcast composer sends to the active or selected workspace group",
+        example: "/broadcast group build",
+        key: "slash:broadcast:group",
+        usage: "/broadcast group [group]"
+      }
+    }
+  }),
   custom: freezeCommandDefinition({
     key: "slash:custom",
     insertText: "custom",
