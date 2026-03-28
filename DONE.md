@@ -2,6 +2,16 @@
 
 Completed and verified topics belong here.
 
+## 2026-03-28
+
+- [x] `QLT-150` is now completed: the backend now owns persisted quick-ID ordering in `backend/src/runtime.js`, `backend/src/session-manager.js`, `backend/src/validation.js`, and `backend/openapi/openapi.yaml`, adding stable `quickIdToken` session fields plus `POST /api/v1/sessions/{sessionId}/swap-quick-id` so manual `/swap` operations are stored in backend state instead of living only in browser storage.
+- [x] Quick-ID restore behavior is now deterministic and restart-safe: session creation assigns backend-owned quick-ID tokens from the canonical pool, delete/restart paths preserve or release them consistently, persisted restore normalizes duplicate stored tokens back to unique values, and API plus WebSocket session payloads now expose `quickIdToken` alongside `deckId` as part of the authoritative session contract.
+- [x] `QLT-151` is now completed: the frontend now reuses the backend-owned quick-ID model in `frontend/src/public/api-client.js`, `frontend/src/public/command-executor.js`, and `frontend/src/public/session-runtime-controller.js`, so `/swap` applies the backend response as the source of truth and swapped ordering survives reloads, reconnects, backend restart restore, and cross-browser/operator views instead of depending on browser-local persistence.
+- [x] `QLT-152` is now completed: regression coverage now spans request/response validation, OpenAPI/runtime conformance, restart restore, duplicate-token normalization, frontend runtime sync, backend-backed `/swap` execution, and app-level ordering behavior across `backend/test/validation.test.js`, `backend/test/contract-conformance.test.js`, `backend/test/runtime.integration.test.js`, `backend/test/ws.integration.test.js`, `frontend/test/api-client.test.js`, `frontend/test/session-runtime-controller.test.js`, `frontend/test/command-executor.test.js`, and `frontend/test/app.test.js`.
+- [x] Validation for the `v0.4.0-H42` closeout passed with focused backend/frontend regressions and the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation processes after completion.
+- [x] Coverage after the `v0.4.0-H42` closeout step: backend `90.73%` lines and frontend `93.34%` lines on the final validated tree.
+- [x] `v0.4.0-H42` is now fully completed: `QLT-150`, `QLT-151`, and `QLT-152` are closed.
+
 ## 2026-03-27
 
 - [x] `REM-004A` is now completed: the backend now persists saved connection profiles and reusable launch presets in `backend/src/runtime.js`, `backend/src/persistence.js`, `backend/src/validation.js`, and `backend/openapi/openapi.yaml`, adding `GET/POST/PATCH/DELETE /api/v1/connection-profiles` plus `connectionProfileId`-based session creation without introducing a second remote-session model.

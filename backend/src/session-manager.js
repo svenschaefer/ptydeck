@@ -141,6 +141,14 @@ function normalizeSessionNote(note) {
   return normalized;
 }
 
+function normalizeQuickIdToken(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
 function normalizeSessionKind(kind) {
   return String(kind || "").trim().toLowerCase() === SESSION_KIND_SSH ? SESSION_KIND_SSH : SESSION_KIND_LOCAL;
 }
@@ -951,6 +959,7 @@ export class SessionManager {
 
   create({
     id = randomUUID(),
+    quickIdToken,
     kind = SESSION_KIND_LOCAL,
     remoteConnection,
     remoteAuth,
@@ -997,6 +1006,7 @@ export class SessionManager {
     const normalizedNote = normalizeSessionNote(note);
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
+    const normalizedQuickIdToken = normalizeQuickIdToken(quickIdToken);
     const normalizedRemoteConnection = normalizeRemoteConnection(remoteConnection, normalizedKind);
     const normalizedRemoteAuth = normalizeRemoteAuth(remoteAuth, normalizedKind);
     const normalizedRemoteSecret = normalizeRemoteSecret(remoteSecret, normalizedRemoteAuth, normalizedKind);
@@ -1052,6 +1062,7 @@ export class SessionManager {
         cwd: launchBundle.launchSpec.metaCwd,
         shell: launchBundle.launchSpec.command,
         ...(typeof name === "string" ? { name } : {}),
+        ...(normalizedQuickIdToken ? { quickIdToken: normalizedQuickIdToken } : {}),
         startCwd: normalizedStartCwd,
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
@@ -1153,6 +1164,14 @@ export class SessionManager {
         : session.meta.remoteAuth;
     if (patch.name !== undefined) {
       session.meta.name = patch.name;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "quickIdToken")) {
+      const normalizedQuickIdToken = normalizeQuickIdToken(patch.quickIdToken);
+      if (normalizedQuickIdToken) {
+        session.meta.quickIdToken = normalizedQuickIdToken;
+      } else {
+        delete session.meta.quickIdToken;
+      }
     }
     if (patch.startCwd !== undefined) {
       session.meta.startCwd = patch.startCwd;
@@ -1260,6 +1279,7 @@ export class SessionManager {
       remoteConnection: snapshot.remoteConnection,
       remoteAuth: snapshot.remoteAuth,
       remoteSecret: session.remoteSecret,
+      quickIdToken: snapshot.quickIdToken,
       cwd: snapshot.startCwd || snapshot.cwd,
       shell: snapshot.shell,
       name: snapshot.name,

@@ -109,6 +109,8 @@ const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
 const SESSION_REPLAY_EXPORT_CONTENT_TYPE = "text/plain; charset=utf-8";
+const SESSION_QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const SESSION_QUICK_ID_FALLBACK = "?";
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -354,6 +356,11 @@ function route(pathname, method) {
     return { kind: "input", params: { sessionId: inputMatch[1] } };
   }
 
+  const swapQuickIdMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/swap-quick-id$/);
+  if (swapQuickIdMatch && method === "POST") {
+    return { kind: "swapSessionQuickId", params: { sessionId: swapQuickIdMatch[1] } };
+  }
+
   const replayExportMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);
   if (replayExportMatch && method === "GET") {
     return { kind: "getSessionReplayExport", params: { sessionId: replayExportMatch[1] } };
@@ -405,6 +412,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/input$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/input";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/swap-quick-id$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/swap-quick-id";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/replay-export$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/replay-export";
@@ -2275,6 +2285,8 @@ export function createRuntime(config) {
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
   const sessionDeckAssignments = new Map();
+  const sessionQuickIdAssignments = new Map();
+  const sessionQuickIdRank = new Map(SESSION_QUICK_ID_POOL.map((token, index) => [token, index]));
   const metrics = {
     httpRequestsTotal: 0,
     httpErrorsTotal: 0,
@@ -3787,10 +3799,133 @@ export function createRuntime(config) {
     return DEFAULT_DECK_ID;
   }
 
+  function normalizeQuickIdToken(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    const normalized = value.trim().toUpperCase();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized === SESSION_QUICK_ID_FALLBACK) {
+      return SESSION_QUICK_ID_FALLBACK;
+    }
+    return sessionQuickIdRank.has(normalized) ? normalized : "";
+  }
+
+  function getSessionRecordRef(sessionId) {
+    try {
+      return manager.get(sessionId);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const unrestored = unrestoredSessions.get(sessionId);
+    if (unrestored) {
+      return { meta: unrestored };
+    }
+    return null;
+  }
+
+  function findNextQuickIdToken(excludedSessionIds = []) {
+    const excluded = new Set((Array.isArray(excludedSessionIds) ? excludedSessionIds : []).map((entry) => String(entry || "").trim()));
+    const used = new Set();
+    for (const [sessionId, token] of sessionQuickIdAssignments.entries()) {
+      if (!excluded.has(sessionId)) {
+        used.add(token);
+      }
+    }
+    for (const candidate of SESSION_QUICK_ID_POOL) {
+      if (!used.has(candidate)) {
+        return candidate;
+      }
+    }
+    return SESSION_QUICK_ID_FALLBACK;
+  }
+
+  function assignSessionQuickIdToken(sessionId, preferredToken = "") {
+    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+    if (!normalizedSessionId) {
+      return SESSION_QUICK_ID_FALLBACK;
+    }
+    const existing = normalizeQuickIdToken(sessionQuickIdAssignments.get(normalizedSessionId));
+    if (existing) {
+      return existing;
+    }
+    const preferred = normalizeQuickIdToken(preferredToken);
+    let nextToken = preferred;
+    if (
+      !nextToken ||
+      (nextToken !== SESSION_QUICK_ID_FALLBACK &&
+        Array.from(sessionQuickIdAssignments.entries()).some(
+          ([otherSessionId, otherToken]) => otherSessionId !== normalizedSessionId && otherToken === nextToken
+        ))
+    ) {
+      nextToken = findNextQuickIdToken([normalizedSessionId]);
+    }
+    sessionQuickIdAssignments.set(normalizedSessionId, nextToken);
+    const record = getSessionRecordRef(normalizedSessionId);
+    if (record?.meta) {
+      record.meta.quickIdToken = nextToken;
+    }
+    return nextToken;
+  }
+
+  function getSessionQuickIdToken(sessionId) {
+    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+    if (!normalizedSessionId) {
+      return SESSION_QUICK_ID_FALLBACK;
+    }
+    return assignSessionQuickIdToken(normalizedSessionId);
+  }
+
+  function setSessionQuickIdToken(sessionId, token) {
+    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+    if (!normalizedSessionId) {
+      throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+    }
+    const nextToken = normalizeQuickIdToken(token) || findNextQuickIdToken([normalizedSessionId]);
+    sessionQuickIdAssignments.set(normalizedSessionId, nextToken);
+    const record = getSessionRecordRef(normalizedSessionId);
+    if (record?.meta) {
+      record.meta.quickIdToken = nextToken;
+      record.meta.updatedAt = Date.now();
+    }
+    return nextToken;
+  }
+
+  function deleteSessionQuickIdToken(sessionId) {
+    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+    if (!normalizedSessionId) {
+      return false;
+    }
+    return sessionQuickIdAssignments.delete(normalizedSessionId);
+  }
+
+  function swapSessionQuickIds(sessionIdA, sessionIdB) {
+    const leftSessionId = typeof sessionIdA === "string" ? sessionIdA.trim() : "";
+    const rightSessionId = typeof sessionIdB === "string" ? sessionIdB.trim() : "";
+    if (!leftSessionId || !rightSessionId || leftSessionId === rightSessionId) {
+      throw new ApiError(400, "ValidationError", "Swap requires two different session ids.");
+    }
+    ensureSessionExistsOrThrow(leftSessionId);
+    ensureSessionExistsOrThrow(rightSessionId);
+    const leftToken = getSessionQuickIdToken(leftSessionId);
+    const rightToken = getSessionQuickIdToken(rightSessionId);
+    setSessionQuickIdToken(leftSessionId, rightToken);
+    setSessionQuickIdToken(rightSessionId, leftToken);
+    return {
+      leftSession: getApiSessionOrThrow(leftSessionId),
+      rightSession: getApiSessionOrThrow(rightSessionId)
+    };
+  }
+
   function withDeckId(session) {
     return {
       ...session,
-      deckId: resolveSessionDeckId(session.id)
+      deckId: resolveSessionDeckId(session.id),
+      quickIdToken: getSessionQuickIdToken(session.id)
     };
   }
 
@@ -3825,8 +3960,7 @@ export function createRuntime(config) {
   function toApiSession(session, explicitState) {
     const sessionState = typeof explicitState === "string" && explicitState.trim() ? explicitState.trim() : String(session?.state || "").trim();
     return {
-      ...session,
-      deckId: resolveSessionDeckId(session.id),
+      ...withDeckId(session),
       state: sessionState || "running"
     };
   }
@@ -4506,24 +4640,34 @@ function tryCreateRestoredSession({
         const note = normalizeSessionNote(mergedBody?.note, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(mergedBody?.inputSafetyProfile, { strict: true });
         const tags = normalizeSessionTags(mergedBody?.tags, { strict: true });
-        const payload = manager.create({
-          kind,
-          remoteConnection,
-          remoteAuth,
-          remoteSecret,
-          cwd: startupConfig.startCwd,
-          shell: mergedBody?.shell !== undefined ? mergedBody.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
-          name: mergedBody?.name,
-          startCwd: startupConfig.startCwd,
-          startCommand: startupConfig.startCommand,
-          env: startupConfig.env,
-          note,
-          inputSafetyProfile,
-          tags,
-          themeProfile: themeSlots.themeProfile,
-          activeThemeProfile: themeSlots.activeThemeProfile,
-          inactiveThemeProfile: themeSlots.inactiveThemeProfile
-        });
+        const sessionId = crypto.randomUUID();
+        const quickIdToken = assignSessionQuickIdToken(sessionId);
+        let payload = null;
+        try {
+          payload = manager.create({
+            id: sessionId,
+            quickIdToken,
+            kind,
+            remoteConnection,
+            remoteAuth,
+            remoteSecret,
+            cwd: startupConfig.startCwd,
+            shell: mergedBody?.shell !== undefined ? mergedBody.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
+            name: mergedBody?.name,
+            startCwd: startupConfig.startCwd,
+            startCommand: startupConfig.startCommand,
+            env: startupConfig.env,
+            note,
+            inputSafetyProfile,
+            tags,
+            themeProfile: themeSlots.themeProfile,
+            activeThemeProfile: themeSlots.activeThemeProfile,
+            inactiveThemeProfile: themeSlots.inactiveThemeProfile
+          });
+        } catch (error) {
+          deleteSessionQuickIdToken(sessionId);
+          throw error;
+        }
         sessionDeckAssignments.set(
           payload.id,
           normalizeConnectionProfileDeckId(mergedBody?.deckId, {
@@ -4555,6 +4699,7 @@ function tryCreateRestoredSession({
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
+        deleteSessionQuickIdToken(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
         for (const deletedCommand of removeCustomCommandsForSession(match.params.sessionId)) {
           broadcast({
@@ -4566,6 +4711,22 @@ function tryCreateRestoredSession({
         cleanupWorkspacePresets();
         await persistNow("session.delete");
         writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "swapSessionQuickId") {
+        const result = swapSessionQuickIds(match.params.sessionId, body.otherSessionId);
+        validateResponse({ statusCode: 200, body: result, expect: "sessionQuickIdSwap" });
+        await persistNow("session.quick_id.swap");
+        broadcast({
+          type: "session.updated",
+          session: result.leftSession
+        });
+        broadcast({
+          type: "session.updated",
+          session: result.rightSession
+        });
+        writeJson(req, res, 200, result);
         return;
       }
 
@@ -4678,6 +4839,7 @@ function tryCreateRestoredSession({
 
       if (match.kind === "restart") {
         const payload = manager.restart(match.params.sessionId);
+        assignSessionQuickIdToken(payload.id, payload.quickIdToken);
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.restart");
@@ -4934,6 +5096,7 @@ function tryCreateRestoredSession({
     workspacePresets.clear();
     sshTrustEntries.clear();
     sessionDeckAssignments.clear();
+    sessionQuickIdAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
       const normalizedDeck = normalizeDeckEntity(persistedDeck);
       if (!normalizedDeck) {
@@ -5041,6 +5204,7 @@ function tryCreateRestoredSession({
         const note = normalizeSessionNote(session.note, { strict: false });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
+        const quickIdToken = assignSessionQuickIdToken(session.id, session.quickIdToken);
         const requestedShell =
           typeof session.shell === "string" && session.shell.trim()
             ? session.shell
@@ -5064,6 +5228,7 @@ function tryCreateRestoredSession({
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
           ...(note ? { note } : {}),
+          quickIdToken,
           inputSafetyProfile,
           tags,
           themeProfile: themeSlots.themeProfile,
@@ -5109,6 +5274,7 @@ function tryCreateRestoredSession({
               remoteSecret: undefined,
               replayOutputTruncated: persistedReplayOutputs.get(session.id)?.truncated === true,
               env: startupConfig.env,
+              quickIdToken,
               note,
               inputSafetyProfile,
               tags,

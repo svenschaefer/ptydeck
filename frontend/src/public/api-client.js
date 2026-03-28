@@ -199,6 +199,13 @@ export function createApiClient(baseUrl, options = {}) {
     async listSessions() {
       return request("/sessions");
     },
+    async swapSessionQuickIds(sessionId, otherSessionId) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/swap-quick-id`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ otherSessionId })
+      });
+    },
     async getReadyStatus() {
       return requestAbsolute(readyUrl);
     },

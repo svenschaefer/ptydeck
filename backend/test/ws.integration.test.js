@@ -55,6 +55,7 @@ function assertDeckShape(deck) {
 function assertApiSessionShape(session) {
   assert.equal(typeof session?.id, "string");
   assert.equal(typeof session?.deckId, "string");
+  assert.equal(typeof session?.quickIdToken, "string");
   assert.equal(typeof session?.state, "string");
   assert.ok(session.state === "starting" || session.state === "running" || session.state === "unrestored");
   assert.equal(typeof session?.cwd, "string");

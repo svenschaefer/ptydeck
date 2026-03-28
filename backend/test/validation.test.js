@@ -90,6 +90,7 @@ test("validateResponse checks session list schema", () => {
         {
           id: "a",
           deckId: "default",
+          quickIdToken: "1",
           state: "running",
           kind: "local",
           cwd: "/tmp",
@@ -119,6 +120,7 @@ test("validateResponse accepts ssh session remote runtime metadata", () => {
       body: {
         id: "ssh-1",
         deckId: "default",
+        quickIdToken: "7",
         state: "running",
         activityState: "inactive",
         kind: "ssh",
@@ -180,6 +182,66 @@ test("validateRequest rejects missing input payload field", () => {
       pathname: "/api/v1/sessions/abc/input",
       params: { sessionId: "abc" },
       body: {}
+    });
+  });
+});
+
+test("validateRequest accepts quick-id swap payload", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/swap-quick-id",
+      params: { sessionId: "a" },
+      body: { otherSessionId: "b" }
+    });
+  });
+});
+
+test("validateResponse accepts quick-id swap payload", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionQuickIdSwap",
+      body: {
+        leftSession: {
+          id: "a",
+          deckId: "default",
+          quickIdToken: "2",
+          state: "running",
+          kind: "local",
+          cwd: "/tmp",
+          shell: "bash",
+          inputSafetyProfile: INPUT_SAFETY_PROFILE,
+          startCwd: "/tmp",
+          startCommand: "",
+          env: {},
+          tags: [],
+          themeProfile: THEME_PROFILE,
+          activeThemeProfile: THEME_PROFILE,
+          inactiveThemeProfile: THEME_PROFILE,
+          createdAt: 1,
+          updatedAt: 2
+        },
+        rightSession: {
+          id: "b",
+          deckId: "default",
+          quickIdToken: "1",
+          state: "running",
+          kind: "local",
+          cwd: "/tmp",
+          shell: "bash",
+          inputSafetyProfile: INPUT_SAFETY_PROFILE,
+          startCwd: "/tmp",
+          startCommand: "",
+          env: {},
+          tags: [],
+          themeProfile: THEME_PROFILE,
+          activeThemeProfile: THEME_PROFILE,
+          inactiveThemeProfile: THEME_PROFILE,
+          createdAt: 1,
+          updatedAt: 2
+        }
+      }
     });
   });
 });

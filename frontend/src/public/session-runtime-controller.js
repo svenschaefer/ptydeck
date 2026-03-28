@@ -28,8 +28,6 @@ export function createSessionRuntimeController(options = {}) {
   const getSessionViewModel =
     typeof options.getSessionViewModel === "function" ? options.getSessionViewModel : () => null;
   const windowRef = options.windowRef || (typeof window !== "undefined" ? window : null);
-  const storageRef = options.storageRef || windowRef?.sessionStorage || windowRef?.localStorage || null;
-  const quickIdStorageKey = String(options.quickIdStorageKey || "ptydeck.session-quick-ids.v1");
   const setTimeoutRef =
     typeof windowRef?.setTimeout === "function"
       ? windowRef.setTimeout.bind(windowRef)
@@ -37,72 +35,24 @@ export function createSessionRuntimeController(options = {}) {
         ? globalThis.setTimeout.bind(globalThis)
         : null;
 
-  function persistQuickIds() {
-    try {
-      if (!storageRef || typeof storageRef.setItem !== "function") {
-        return false;
-      }
-      const payload = {};
-      const entries = Array.from(sessionQuickIds.entries()).sort((left, right) => {
-        const leftRank = quickIdRank.get(left[1]);
-        const rightRank = quickIdRank.get(right[1]);
-        if (Number.isInteger(leftRank) && Number.isInteger(rightRank) && leftRank !== rightRank) {
-          return leftRank - rightRank;
-        }
-        if (left[1] !== right[1]) {
-          return String(left[1]).localeCompare(String(right[1]), "en-US");
-        }
-        return String(left[0]).localeCompare(String(right[0]), "en-US");
-      });
-      for (const [sessionId, token] of entries) {
-        payload[sessionId] = token;
-      }
-      storageRef.setItem(quickIdStorageKey, JSON.stringify(payload));
-      return true;
-    } catch {
-      return false;
-    }
+  function normalizeQuickIdToken(value) {
+    const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+    return normalized || "";
   }
 
-  function loadStoredQuickIds() {
-    try {
-      if (!storageRef || typeof storageRef.getItem !== "function") {
-        return;
+  function syncQuickIdsFromSessions(sessions = []) {
+    for (const session of Array.isArray(sessions) ? sessions : []) {
+      const sessionId = String(session?.id || "").trim();
+      const quickIdToken = normalizeQuickIdToken(session?.quickIdToken);
+      if (!sessionId || !quickIdToken) {
+        continue;
       }
-      const raw = storageRef.getItem(quickIdStorageKey);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return;
-      }
-      const usedTokens = new Set(sessionQuickIds.values());
-      const orderedEntries = Object.entries(parsed).sort((left, right) => {
-        const leftRank = quickIdRank.get(String(left[1] || "").trim());
-        const rightRank = quickIdRank.get(String(right[1] || "").trim());
-        if (Number.isInteger(leftRank) && Number.isInteger(rightRank) && leftRank !== rightRank) {
-          return leftRank - rightRank;
-        }
-        return String(left[0]).localeCompare(String(right[0]), "en-US");
-      });
-      for (const [sessionIdRaw, tokenRaw] of orderedEntries) {
-        const sessionId = String(sessionIdRaw || "").trim();
-        const token = String(tokenRaw || "").trim();
-        if (!sessionId || !quickIdRank.has(token) || usedTokens.has(token)) {
-          continue;
-        }
-        sessionQuickIds.set(sessionId, token);
-        usedTokens.add(token);
-      }
-    } catch {
-      // ignore storage failures
+      sessionQuickIds.set(sessionId, quickIdToken);
     }
   }
-
-  loadStoredQuickIds();
 
   function findNextQuickId() {
+    syncQuickIdsFromSessions(store?.getState?.().sessions || []);
     const used = new Set(sessionQuickIds.values());
     for (const candidate of quickIdPool) {
       if (!used.has(candidate)) {
@@ -113,24 +63,27 @@ export function createSessionRuntimeController(options = {}) {
   }
 
   function ensureQuickId(sessionId) {
-    if (!sessionQuickIds.has(sessionId)) {
-      sessionQuickIds.set(sessionId, findNextQuickId());
-      persistQuickIds();
+    const normalizedSessionId = String(sessionId || "").trim();
+    if (!normalizedSessionId) {
+      return "?";
     }
-    return sessionQuickIds.get(sessionId);
+    const sessionToken = normalizeQuickIdToken(getSessionById(normalizedSessionId)?.quickIdToken);
+    if (sessionToken) {
+      sessionQuickIds.set(normalizedSessionId, sessionToken);
+      return sessionToken;
+    }
+    if (!sessionQuickIds.has(normalizedSessionId)) {
+      sessionQuickIds.set(normalizedSessionId, findNextQuickId());
+    }
+    return sessionQuickIds.get(normalizedSessionId);
   }
 
   function pruneQuickIds(activeSessionIds) {
     const activeSet = new Set(activeSessionIds);
-    let changed = false;
     for (const sessionId of sessionQuickIds.keys()) {
       if (!activeSet.has(sessionId)) {
         sessionQuickIds.delete(sessionId);
-        changed = true;
       }
-    }
-    if (changed) {
-      persistQuickIds();
     }
   }
 
@@ -252,7 +205,6 @@ export function createSessionRuntimeController(options = {}) {
     const rightToken = formatSessionToken(rightId);
     sessionQuickIds.set(leftId, rightToken);
     sessionQuickIds.set(rightId, leftToken);
-    persistQuickIds();
     return true;
   }
 
@@ -261,6 +213,7 @@ export function createSessionRuntimeController(options = {}) {
   }
 
   function sortSessionsByQuickId(sessions) {
+    syncQuickIdsFromSessions(sessions);
     return Array.isArray(sessions)
       ? sessions.slice().sort((left, right) => {
           const leftToken = formatSessionToken(left?.id);

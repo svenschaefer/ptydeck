@@ -16,6 +16,31 @@ test("api client calls list sessions endpoint", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions");
 });
 
+test("api client calls persisted quick-id swap endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        leftSession: { id: "s1", quickIdToken: "2" },
+        rightSession: { id: "s2", quickIdToken: "1" }
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const result = await api.swapSessionQuickIds("s1", "s2");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/s1/swap-quick-id");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.body, JSON.stringify({ otherSessionId: "s2" }));
+  assert.equal(result.leftSession.quickIdToken, "2");
+  assert.equal(result.rightSession.quickIdToken, "1");
+});
+
 test("api client calls ready endpoint outside api v1 base path", async () => {
   const calls = [];
   global.fetch = async (url) => {

@@ -735,8 +735,17 @@ export function createCommandExecutor(options = {}) {
       }
       const leftTokenBefore = formatSessionToken(leftSession.id);
       const rightTokenBefore = formatSessionToken(rightSession.id);
-      if (!swapSessionTokens(leftSession.id, rightSession.id)) {
-        return "Failed to swap session quick IDs.";
+      if (!api || typeof api.swapSessionQuickIds !== "function") {
+        if (!swapSessionTokens(leftSession.id, rightSession.id)) {
+          return "Failed to swap session quick IDs.";
+        }
+      } else {
+        const result = await api.swapSessionQuickIds(leftSession.id, rightSession.id);
+        if (!result?.leftSession || !result?.rightSession) {
+          return "Failed to swap session quick IDs.";
+        }
+        applyRuntimeEvent({ type: "session.updated", session: result.leftSession });
+        applyRuntimeEvent({ type: "session.updated", session: result.rightSession });
       }
       requestRender();
       return `Swapped quick IDs: [${leftTokenBefore}] ${formatSessionDisplayName(leftSession)} <-> [${rightTokenBefore}] ${formatSessionDisplayName(rightSession)}.`;

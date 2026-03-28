@@ -86,6 +86,7 @@ function runtimeOperationKeys() {
     "PATCH /sessions/{sessionId}",
     "DELETE /sessions/{sessionId}",
     "POST /sessions/{sessionId}/input",
+    "POST /sessions/{sessionId}/swap-quick-id",
     "POST /sessions/{sessionId}/resize",
     "POST /sessions/{sessionId}/restart",
     "POST /sessions/{sessionId}/interrupt",
@@ -178,6 +179,13 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /sessions/{sessionId}/replay-export").has(replayExportRes.status));
+
+    const swapQuickIdRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/swap-quick-id`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ otherSessionId: createdSession.id })
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/swap-quick-id").has(swapQuickIdRes.status));
 
     const listCustomCommandsRes = await contractFetch(`${baseUrl}/custom-commands`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }

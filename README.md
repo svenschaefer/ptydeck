@@ -92,7 +92,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Workspace-group broadcast mode for ordinary composer sends, controlled through `/broadcast status`, `/broadcast off`, and `/broadcast group [group]`, while explicit `@target ...` direct routing still bypasses broadcast mode
 - Per-session settings include configurable command submit terminator with deterministic modes: `auto` (default, `CR`), `crlf`, `lf`, `cr`
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
-- `/swap <selectorA> <selectorB>` swaps frontend-local quick IDs, immediately reorders session surfaces by quick-ID order, and survives browser reloads in the same browser storage context without becoming a backend-persisted setting
+- `/swap <selectorA> <selectorB>` swaps backend-persisted quick IDs, immediately reorders session surfaces by quick-ID order, and survives reloads, reconnects, backend restart/restore, and cross-browser/operator views through the shared backend session contract
 - Per-terminal settings entry on each terminal card (gear icon) with session-scoped settings dialog
 - Terminal `Rename` and `Delete` actions are available inside each session settings dialog (removed from direct toolbar); delete requires explicit user confirmation
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with unified dialog-level `Apply Changes`/`Cancel`, dirty-state indicator, and explicit save feedback

@@ -12,17 +12,16 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering).
-- Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`.
-- Queued next wave: `v0.4.0-H43` (Command Surface Consistency).
-- Queued scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`.
-- Queued next wave after that: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes).
-- Queued scoped tasks after that: `QLT-158`, `QLT-159`, `QLT-160`.
+- Active release wave: `v0.4.0-H43` (Command Surface Consistency).
+- Active scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`.
+- Queued next wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes).
+- Queued scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`.
 - Queued next wave after that: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
 - Queued scoped tasks after that: `QLT-161`, `QLT-162`.
 - Queued next wave after that: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
 - Queued scoped tasks after that: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
-- Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
+- Latest completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
+- Previous completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
 - Previous completed wave: `v0.4.0-H37` (Workflow Safety Guardrails, `SWF-007`, `SWF-008`).
@@ -65,27 +64,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H42 - Persisted Quick-ID Swap Ordering (Active)
+### v0.4.0-H43 - Command Surface Consistency (Active)
 
-- Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`
-
-Dependencies:
-
-- `QLT-150` lands first so persisted quick-ID ordering and normalization live in one backend-owned contract before the frontend stops relying on browser-local swap persistence.
-- `QLT-151` follows `QLT-150` and reuses that persisted contract for `/swap`, deck/session ordering, and restored UI state instead of inventing a second frontend-only persistence path.
-- `QLT-152` closes after `QLT-150` and `QLT-151`, so regression coverage locks restart/reload/reconnect ordering behavior against the actual persisted model.
-
-Exit criteria:
-
-- Manual `/swap` operations persist outside one browser storage context and survive backend restart/restore.
-- Frontend deck/session ordering surfaces consume the same persisted quick-ID contract consistently across reloads and reconnects.
-- Regression coverage exists for swap persistence, restore/reload behavior, and ordering normalization/conflict handling.
-
-## Queued Next Wave
-
-### v0.4.0-H43 - Command Surface Consistency (Queued)
-
-- Queued scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`
+- Active scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`
 
 Dependencies:
 
@@ -102,6 +83,8 @@ Exit criteria:
 - `>` remains a clear session-first switching shortcut, with any deck-oriented variants made explicit rather than implicit.
 - Help, autocomplete, and command-palette surfaces document the same model and stop advertising deprecated selector-after-slash forms.
 - Regression coverage exists for grammar, parser conflicts, help alignment, and shorthand/direct-target behavior.
+
+## Queued Next Wave
 
 ### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Queued)
 
@@ -156,6 +139,24 @@ Exit criteria:
 - Regression coverage exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
 
 ## Latest Completed Wave
+
+### v0.4.0-H42 - Persisted Quick-ID Swap Ordering (Completed)
+
+- Completed scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`
+
+Dependencies:
+
+- `QLT-150` landed first so persisted quick-ID ordering and normalization now live in one backend-owned contract before the frontend stopped relying on browser-local swap persistence.
+- `QLT-151` followed `QLT-150` and now reuses that persisted contract for `/swap`, deck/session ordering, and restored UI state instead of inventing a second frontend-only persistence path.
+- `QLT-152` closed after `QLT-150` and `QLT-151`, so regression coverage now locks restart/reload/reconnect ordering behavior against the actual persisted model.
+
+Exit criteria:
+
+- Manual `/swap` operations now persist outside one browser storage context and survive backend restart/restore.
+- Frontend deck/session ordering surfaces now consume the same persisted quick-ID contract consistently across reloads and reconnects.
+- Regression coverage now exists for swap persistence, restore/reload behavior, and ordering normalization/conflict handling.
+
+## Previous Completed Wave
 
 ### v0.4.0-H40 - Saved Connection Profiles (Completed)
 

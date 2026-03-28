@@ -502,6 +502,15 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/swap-quick-id$/)) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body) || typeof body.otherSessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'otherSessionId' must be a string.");
+    }
+  }
+
   if (method === "POST" && pathname === "/api/v1/connection-profiles") {
     if (!isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
@@ -860,6 +869,7 @@ function isSession(value) {
     isObject(value) &&
     typeof value.id === "string" &&
     typeof value.deckId === "string" &&
+    typeof value.quickIdToken === "string" &&
     (value.state === "starting" || value.state === "running" || value.state === "unrestored") &&
     SESSION_KIND_VALUES.has(value.kind) &&
     typeof value.cwd === "string" &&
@@ -882,6 +892,10 @@ function isSession(value) {
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
   );
+}
+
+function isSessionQuickIdSwap(value) {
+  return isObject(value) && isSession(value.leftSession) && isSession(value.rightSession);
 }
 
 function isAuthToken(value) {
@@ -970,6 +984,10 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "sessionReplayExport" && !isSessionReplayExport(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match SessionReplayExport schema.");
+  }
+
+  if (expect === "sessionQuickIdSwap" && !isSessionQuickIdSwap(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SessionQuickIdSwap schema.");
   }
 
   if (expect === "customCommand" && !isCustomCommand(body)) {

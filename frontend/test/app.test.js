@@ -817,6 +817,10 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     ["s-1", "default"],
     ["s-2", "default"]
   ]);
+  const sessionQuickIdById = new Map([
+    ["s-1", "1"],
+    ["s-2", "2"]
+  ]);
   const customCommands = new Map();
   let deckState = [
     {
@@ -1009,7 +1013,19 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(
-            makeJsonResponse(200, [{ id: "s-1", state: "active", shell: "bash", cwd: "~", tags: [], createdAt: Date.now(), updatedAt: Date.now() }])
+            makeJsonResponse(200, [
+              {
+                id: "s-1",
+                deckId: sessionDeckById.get("s-1") || "default",
+                quickIdToken: sessionQuickIdById.get("s-1") || "1",
+                state: "active",
+                shell: "bash",
+                cwd: "~",
+                tags: [],
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+              }
+            ])
           );
         }, 60);
       });
@@ -1023,6 +1039,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       return makeJsonResponse(200, {
         id: sessionId,
         deckId: sessionDeckById.get(sessionId) || "default",
+        quickIdToken: sessionQuickIdById.get(sessionId) || "1",
         state: "active",
         shell: "bash",
         cwd: "~",
@@ -1039,6 +1056,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       const baseSession = {
         id: sessionId,
         deckId: sessionDeckById.get(sessionId) || "default",
+        quickIdToken: sessionQuickIdById.get(sessionId) || "1",
         state: "active",
         shell: "bash",
         cwd: "~",
@@ -1068,6 +1086,42 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         activeThemeProfile: nextActiveThemeProfile,
         inactiveThemeProfile: nextInactiveThemeProfile,
         updatedAt: Date.now()
+      });
+    }
+    const swapMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/swap-quick-id$/);
+    if (swapMatch && method === "POST") {
+      const leftSessionId = decodeURIComponent(swapMatch[1]);
+      const payload = JSON.parse(options.body || "{}");
+      const rightSessionId = String(payload.otherSessionId || "");
+      const leftToken = sessionQuickIdById.get(leftSessionId) || "1";
+      const rightToken = sessionQuickIdById.get(rightSessionId) || "2";
+      sessionQuickIdById.set(leftSessionId, rightToken);
+      sessionQuickIdById.set(rightSessionId, leftToken);
+      return makeJsonResponse(200, {
+        leftSession: {
+          id: leftSessionId,
+          deckId: sessionDeckById.get(leftSessionId) || "default",
+          quickIdToken: sessionQuickIdById.get(leftSessionId) || rightToken,
+          state: "active",
+          shell: "bash",
+          cwd: "~",
+          name: leftSessionId === "s-2" ? "two" : "one",
+          tags: leftSessionId === "s-2" ? ["beta", "ops"] : [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        rightSession: {
+          id: rightSessionId,
+          deckId: sessionDeckById.get(rightSessionId) || "default",
+          quickIdToken: sessionQuickIdById.get(rightSessionId) || leftToken,
+          state: "active",
+          shell: "bash",
+          cwd: "~",
+          name: rightSessionId === "s-2" ? "two" : "one",
+          tags: rightSessionId === "s-2" ? ["beta", "ops"] : [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
       });
     }
     const replayExportMatch = path.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);

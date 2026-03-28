@@ -747,7 +747,7 @@ test("command executor updates and clears persisted session notes", async () => 
   ]);
 });
 
-test("command executor swaps quick ids between two resolved sessions and requests a rerender", async () => {
+test("command executor swaps quick ids through the backend contract and requests a rerender", async () => {
   const calls = [];
   const sessions = [
     { id: "s1", name: "one", deckId: "default" },
@@ -763,20 +763,25 @@ test("command executor swaps quick ids between two resolved sessions and request
         };
       }
     },
-    api: {},
+    api: {
+      async swapSessionQuickIds(leftId, rightId) {
+        calls.push(["api-swap", leftId, rightId]);
+        return {
+          leftSession: { ...sessions[0], quickIdToken: "8" },
+          rightSession: { ...sessions[1], quickIdToken: "7" }
+        };
+      }
+    },
     systemSlashCommands: ["swap", "help"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 2,
-    applyRuntimeEvent: () => {},
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.id, event.session.quickIdToken]),
     setActiveDeck: () => true,
     resolveSessionDeckId: () => "default",
     formatSessionToken: (id) => (id === "s1" ? "7" : id === "s2" ? "8" : id),
     formatSessionDisplayName: (session) => session.name,
     sortSessionsByQuickId: (list) => list.slice().sort((left, right) => (left.id === "s2" ? -1 : right.id === "s2" ? 1 : 0)),
-    swapSessionTokens: (left, right) => {
-      calls.push(["swap", left, right]);
-      return true;
-    },
+    swapSessionTokens: () => false,
     getSessionRuntimeState: () => ({}),
     isSessionExited: () => false,
     isSessionActionBlocked: () => false,
@@ -817,7 +822,9 @@ test("command executor swaps quick ids between two resolved sessions and request
 
   assert.equal(feedback, "Swapped quick IDs: [7] one <-> [8] two.");
   assert.deepEqual(calls, [
-    ["swap", "s1", "s2"],
+    ["api-swap", "s1", "s2"],
+    ["event", "session.updated", "s1", "8"],
+    ["event", "session.updated", "s2", "7"],
     ["render"]
   ]);
 });

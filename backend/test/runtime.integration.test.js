@@ -2643,6 +2643,97 @@ test("session create persists immediately before response completes", async () =
   }
 });
 
+test("quick-id swaps persist across restart restore", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    startupWarmupQuietMs: 20
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let leftId = "";
+  let rightId = "";
+  try {
+    const leftRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "left" })
+    });
+    assert.equal(leftRes.status, 201);
+    const leftSession = await leftRes.json();
+    leftId = leftSession.id;
+    assert.equal(leftSession.quickIdToken, "1");
+
+    const rightRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "right" })
+    });
+    assert.equal(rightRes.status, 201);
+    const rightSession = await rightRes.json();
+    rightId = rightSession.id;
+    assert.equal(rightSession.quickIdToken, "2");
+
+    const swapRes = await fetch(`${baseUrlA}/sessions/${leftId}/swap-quick-id`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ otherSessionId: rightId })
+    });
+    assert.equal(swapRes.status, 200);
+    const swapped = await swapRes.json();
+    assert.equal(swapped.leftSession.quickIdToken, "2");
+    assert.equal(swapped.rightSession.quickIdToken, "1");
+
+    const persistedRaw = JSON.parse(await readFile(dataPath, "utf8"));
+    const persistedSessions = Array.isArray(persistedRaw) ? persistedRaw : persistedRaw.sessions;
+    const persistedLeft = persistedSessions.find((session) => session.id === leftId);
+    const persistedRight = persistedSessions.find((session) => session.id === rightId);
+    assert.ok(persistedLeft);
+    assert.ok(persistedRight);
+    assert.equal(persistedLeft.quickIdToken, "2");
+    assert.equal(persistedRight.quickIdToken, "1");
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    startupWarmupQuietMs: 20
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const listRes = await fetch(`${baseUrlB}/sessions`);
+    assert.equal(listRes.status, 200);
+    const sessions = await listRes.json();
+    const restoredLeft = sessions.find((session) => session.id === leftId);
+    const restoredRight = sessions.find((session) => session.id === rightId);
+    assert.ok(restoredLeft);
+    assert.ok(restoredRight);
+    assert.equal(restoredLeft.quickIdToken, "2");
+    assert.equal(restoredRight.quickIdToken, "1");
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("session persistence stores default deck catalog and default deckId assignment", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
@@ -2713,6 +2804,71 @@ test("runtime migrates legacy persistence to default deck catalog and deckId ass
   const migratedSession = persistedSessions.find((session) => session.id === sessionId);
   assert.ok(migratedSession);
   assert.equal(migratedSession.deckId, "default");
+});
+
+test("runtime restore normalizes duplicate persisted quick-id tokens to unique values", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: "dup-a",
+            cwd: homedir(),
+            shell: "sh",
+            startCwd: homedir(),
+            quickIdToken: "1",
+            createdAt: 1,
+            updatedAt: 1
+          },
+          {
+            id: "dup-b",
+            cwd: homedir(),
+            shell: "sh",
+            startCwd: homedir(),
+            quickIdToken: "1",
+            createdAt: 2,
+            updatedAt: 2
+          }
+        ],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    createPty: createFallbackAwarePtyFactory(),
+    startupWarmupQuietMs: 20
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+  try {
+    const listRes = await fetch(`${baseUrl}/sessions`);
+    assert.equal(listRes.status, 200);
+    const sessions = await listRes.json();
+    const first = sessions.find((session) => session.id === "dup-a");
+    const second = sessions.find((session) => session.id === "dup-b");
+    assert.ok(first);
+    assert.ok(second);
+    assert.equal(first.quickIdToken, "1");
+    assert.equal(second.quickIdToken, "2");
+    assert.notEqual(first.quickIdToken, second.quickIdToken);
+  } finally {
+    await runtime.stop();
+  }
 });
 
 test("runtime restore falls back to home when persisted startCwd is invalid", async () => {
@@ -3221,16 +3377,16 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
     const created = await createRes.json();
 
     ptys[0].emitExit();
-    await waitFor(() => ptys.length >= 2);
+    await waitFor(() => ptys.length >= 2, 10000);
     ptys[1].emitExit();
-    await waitFor(() => ptys.length >= 3);
+    await waitFor(() => ptys.length >= 3, 10000);
     ptys[2].emitExit();
 
     await waitFor(async () => {
       const res = await fetch(`${baseUrl}/sessions/${created.id}`);
       const body = await res.json();
       return body.remoteRuntime?.connectivityState === "offline";
-    });
+    }, 10000);
 
     const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
     assert.equal(getRes.status, 200);

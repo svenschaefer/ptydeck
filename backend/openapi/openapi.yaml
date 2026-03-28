@@ -888,6 +888,43 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/swap-quick-id:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: swapSessionQuickId
+      summary: Swap persisted quick-id tokens between two sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otherSessionId]
+              properties:
+                otherSessionId:
+                  type: string
+      responses:
+        '200':
+          description: Quick-id tokens swapped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionQuickIdSwap'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/resize:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -1495,6 +1532,7 @@ components:
       required:
         - id
         - deckId
+        - quickIdToken
         - state
         - activityState
         - kind
@@ -1509,6 +1547,8 @@ components:
         id:
           type: string
         deckId:
+          type: string
+        quickIdToken:
           type: string
         state:
           type: string
@@ -1587,6 +1627,16 @@ components:
           type: integer
           format: int64
           nullable: true
+    SessionQuickIdSwap:
+      type: object
+      required:
+        - leftSession
+        - rightSession
+      properties:
+        leftSession:
+          $ref: '#/components/schemas/Session'
+        rightSession:
+          $ref: '#/components/schemas/Session'
     SessionReplayExport:
       type: object
       required:
