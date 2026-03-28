@@ -13,11 +13,13 @@ export function createSessionCardInteractionsController(options = {}) {
     inactiveThemeProfile: {}
   }));
   const readSessionStartupFromControls = options.readSessionStartupFromControls || (() => ({}));
+  const readSessionNoteFromControls = options.readSessionNoteFromControls || (() => "");
   const readSessionInputSafetyFromControls = options.readSessionInputSafetyFromControls || ((_, session) => session?.inputSafetyProfile || {});
   const isValidHexColor = options.isValidHexColor || (() => true);
   const detectThemePreset = options.detectThemePreset || (() => "custom");
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
+  const setActiveSettingsTab = options.setActiveSettingsTab || (() => "startup");
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const getErrorMessage = options.getErrorMessage || ((error, fallback) => (error instanceof Error && error.message ? error.message : fallback));
 
@@ -40,6 +42,7 @@ export function createSessionCardInteractionsController(options = {}) {
     const applyRuntimeEvent = args.applyRuntimeEvent || (() => {});
     const syncSessionThemeControls = args.syncSessionThemeControls || (() => {});
     const syncSessionStartupControls = args.syncSessionStartupControls || (() => {});
+    const syncSessionNoteControls = args.syncSessionNoteControls || (() => {});
     const syncSessionInputSafetyControls = args.syncSessionInputSafetyControls || (() => {});
     const applyThemeForSession = args.applyThemeForSession || (() => {});
     const getSessionThemeConfig = args.getSessionThemeConfig || (() => ({}));
@@ -59,6 +62,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startCwdInput: refs.startCwdInput,
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
+          sessionNoteInput: refs.sessionNoteInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
           inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
@@ -73,9 +77,18 @@ export function createSessionCardInteractionsController(options = {}) {
       const currentSession = getSession() || session;
       const entry = getEntry();
       syncSessionStartupControls(entry, currentSession);
+      syncSessionNoteControls(entry, currentSession);
       syncSessionInputSafetyControls(entry, currentSession);
       syncSessionThemeControls(entry, currentSession.id);
+      setActiveSettingsTab(entry, entry?.activeSettingsTab || "startup");
       setSettingsDirty(entry, false);
+    }
+
+    function buildSettingsFeedbackEntry() {
+      return {
+        settingsFeedback: refs.settingsFeedback,
+        startFeedback: refs.startFeedback
+      };
     }
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
@@ -94,6 +107,9 @@ export function createSessionCardInteractionsController(options = {}) {
         closeSettingsDialog(refs.settingsDialog);
       });
     }
+    refs.settingsTabStartupBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "startup"));
+    refs.settingsTabNoteBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "note"));
+    refs.settingsTabThemeBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "theme"));
 
     refs.renameBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;
@@ -145,6 +161,7 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.startCwdInput?.addEventListener("input", markDirtyFromControls);
     refs.startCommandInput?.addEventListener("input", markDirtyFromControls);
     refs.startEnvInput?.addEventListener("input", markDirtyFromControls);
+    refs.sessionNoteInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionTagsInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionSendTerminatorSelect?.addEventListener("change", markDirtyFromControls);
     refs.inputSafetyPresetSelect?.addEventListener("change", markDirtyFromControls);
@@ -236,15 +253,19 @@ export function createSessionCardInteractionsController(options = {}) {
       if (isSessionExited(currentSession)) {
         const blockedMessage = getBlockedSessionActionMessage([currentSession], "Settings apply");
         setError(blockedMessage);
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, blockedMessage, true);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), blockedMessage, true);
         return;
       }
       const startupDraft = readSessionStartupFromControls({
         startCwdInput: refs.startCwdInput,
         startCommandInput: refs.startCommandInput,
         startEnvInput: refs.startEnvInput,
+        sessionNoteInput: refs.sessionNoteInput,
         sessionTagsInput: refs.sessionTagsInput,
         sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect
+      });
+      const note = readSessionNoteFromControls({
+        sessionNoteInput: refs.sessionNoteInput
       });
       const inputSafetyProfile = readSessionInputSafetyFromControls(
         {
@@ -253,15 +274,15 @@ export function createSessionCardInteractionsController(options = {}) {
         currentSession
       );
       if (!startupDraft.startCwd) {
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, "Working Directory cannot be empty.", true);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "Working Directory cannot be empty.", true);
         return;
       }
       if (!startupDraft.envResult.ok) {
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, startupDraft.envResult.error, true);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), startupDraft.envResult.error, true);
         return;
       }
       if (!startupDraft.tagResult.ok) {
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, startupDraft.tagResult.error, true);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), startupDraft.tagResult.error, true);
         return;
       }
       const { activeThemeProfile, inactiveThemeProfile } = readSessionThemeProfilesForSave(refs, session.id, currentSession);
@@ -294,6 +315,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startCwd: startupDraft.startCwd,
           startCommand: startupDraft.startCommand,
           env: startupDraft.envResult.env,
+          note,
           tags: startupDraft.tagResult.tags,
           activeThemeProfile,
           inactiveThemeProfile,
@@ -302,11 +324,11 @@ export function createSessionCardInteractionsController(options = {}) {
         applyRuntimeEvent({ type: "session.updated", session: updated });
         sessionThemeDrafts.delete(session.id);
         setSessionSendTerminator(session.id, startupDraft.sendTerminator);
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, "Settings saved.");
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "Settings saved.");
         setSettingsDirty(getEntry(), false);
       } catch {
-        setError("Failed to save theme settings.");
-        setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, "Failed to save settings.", true);
+        setError("Failed to save settings.");
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "Failed to save settings.", true);
       }
     });
 
@@ -319,17 +341,19 @@ export function createSessionCardInteractionsController(options = {}) {
             startCwdInput: refs.startCwdInput,
             startCommandInput: refs.startCommandInput,
             startEnvInput: refs.startEnvInput,
+            sessionNoteInput: refs.sessionNoteInput,
             sessionTagsInput: refs.sessionTagsInput,
             sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
             inputSafetyPresetSelect: refs.inputSafetyPresetSelect
           },
           freshSession
         );
+        syncSessionNoteControls(refs, freshSession);
         syncSessionInputSafetyControls(refs, freshSession);
         syncSessionThemeControls(refs, session.id);
       }
       applyThemeForSession(session.id);
-      setStartupSettingsFeedback({ startFeedback: refs.startFeedback }, "");
+      setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "");
       setSettingsDirty(getEntry(), false);
     });
   }

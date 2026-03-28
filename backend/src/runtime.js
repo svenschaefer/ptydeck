@@ -1190,7 +1190,12 @@ function normalizeSessionNote(input, { strict = true } = {}) {
     }
     return undefined;
   }
-  const normalized = input.replace(/\s+/g, " ").trim();
+  const normalized = input
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
   if (!normalized) {
     return undefined;
   }

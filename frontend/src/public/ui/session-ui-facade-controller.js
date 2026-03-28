@@ -229,6 +229,10 @@ export function createSessionUiFacadeController(options = {}) {
     getSessionSettingsStateController()?.syncSessionStartupControls?.(entry, session);
   }
 
+  function syncSessionNoteControls(entry, session) {
+    getSessionSettingsStateController()?.syncSessionNoteControls?.(entry, session);
+  }
+
   function normalizeSessionStartupFromSession(session) {
     return getSessionViewModel()?.normalizeSessionStartupFromSession?.(session) || createDefaultSessionStartupState();
   }
@@ -241,6 +245,14 @@ export function createSessionUiFacadeController(options = {}) {
     return createDefaultStartupReadResult();
   }
 
+  function readSessionNoteFromControls(entry) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.readSessionNoteFromControls === "function") {
+      return settingsStateController.readSessionNoteFromControls(entry);
+    }
+    return "";
+  }
+
   function syncSessionInputSafetyControls(entry, session) {
     getSessionSettingsStateController()?.syncSessionInputSafetyControls?.(entry, session);
   }
@@ -251,6 +263,18 @@ export function createSessionUiFacadeController(options = {}) {
       return settingsStateController.readSessionInputSafetyFromControls(entry, session);
     }
     return session?.inputSafetyProfile || {};
+  }
+
+  function normalizeSessionNoteText(value) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.normalizeSessionNoteText === "function") {
+      return settingsStateController.normalizeSessionNoteText(value);
+    }
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function setActiveSettingsTab(entry, tab) {
+    return getSessionSettingsStateController()?.setActiveSettingsTab?.(entry, tab) || "startup";
   }
 
   function setSettingsDirty(entry, dirty) {
@@ -303,10 +327,14 @@ export function createSessionUiFacadeController(options = {}) {
     parseSessionEnv,
     setStartupSettingsFeedback,
     syncSessionStartupControls,
+    syncSessionNoteControls,
     syncSessionInputSafetyControls,
     normalizeSessionStartupFromSession,
     readSessionStartupFromControls,
+    readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
+    normalizeSessionNoteText,
+    setActiveSettingsTab,
     setSettingsDirty,
     isSessionSettingsDirty,
     renderSessionTagList,

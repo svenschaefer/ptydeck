@@ -36,6 +36,7 @@ export function createSessionGridController(options = {}) {
   const handleSessionTerminalInput = options.handleSessionTerminalInput || (() => {});
   const handleSessionTerminalPaste = options.handleSessionTerminalPaste || handleSessionTerminalInput;
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
+  const syncSessionNoteControls = options.syncSessionNoteControls || (() => {});
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
@@ -242,13 +243,18 @@ export function createSessionGridController(options = {}) {
           closeBtn: refs.closeBtn,
           settingsDialog: refs.settingsDialog,
           settingsDismissBtn: refs.settingsDismissBtn,
+          settingsTabStartupBtn: refs.settingsTabStartupBtn,
+          settingsTabNoteBtn: refs.settingsTabNoteBtn,
+          settingsTabThemeBtn: refs.settingsTabThemeBtn,
           startCwdInput: refs.startCwdInput,
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
+          sessionNoteInput: refs.sessionNoteInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
           inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
           startFeedback: refs.startFeedback,
+          settingsFeedback: refs.settingsFeedback,
           themeCategory: refs.themeCategory,
           themeSearch: refs.themeSearch,
           themeSlotSelect: refs.themeSlotSelect,
@@ -275,6 +281,7 @@ export function createSessionGridController(options = {}) {
         applyRuntimeEvent,
         syncSessionThemeControls,
         syncSessionStartupControls,
+        syncSessionNoteControls,
         applyThemeForSession,
         getSessionThemeConfig,
         sessionThemeDrafts,
@@ -295,13 +302,21 @@ export function createSessionGridController(options = {}) {
           sessionNoteEl: refs.sessionNoteEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           settingsDialog: refs.settingsDialog,
+          settingsTabStartupBtn: refs.settingsTabStartupBtn,
+          settingsTabNoteBtn: refs.settingsTabNoteBtn,
+          settingsTabThemeBtn: refs.settingsTabThemeBtn,
+          settingsPanelStartup: refs.settingsPanelStartup,
+          settingsPanelNote: refs.settingsPanelNote,
+          settingsPanelTheme: refs.settingsPanelTheme,
           startCwdInput: refs.startCwdInput,
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
+          sessionNoteInput: refs.sessionNoteInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
           inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
           sessionTagsInput: refs.sessionTagsInput,
           startFeedback: refs.startFeedback,
+          settingsFeedback: refs.settingsFeedback,
           tagListEl: refs.tagListEl,
           settingsApplyBtn: refs.settingsApplyBtn,
           settingsStatus: refs.settingsStatus,

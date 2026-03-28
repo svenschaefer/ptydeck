@@ -248,7 +248,7 @@ test("session startup settings persist through patch and apply on restart", asyn
       body: JSON.stringify({
         shell: "sh",
         name: "ops-shell",
-        note: "needs review",
+        note: "needs review\r\ncapture logs",
         inputSafetyProfile: {
           requireValidShellSyntax: true,
           confirmOnIncompleteShellConstruct: true,
@@ -290,7 +290,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
     assert.equal(created.state, "running");
-    assert.equal(created.note, "needs review");
+    assert.equal(created.note, "needs review\ncapture logs");
     assert.equal(created.inputSafetyProfile.requireValidShellSyntax, true);
     assert.equal(created.inputSafetyProfile.confirmOnNaturalLanguageInput, false);
     assert.equal(created.startCwd, "/tmp");
@@ -304,7 +304,7 @@ test("session startup settings persist through patch and apply on restart", asyn
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        note: "capture restart logs",
+        note: "capture restart logs\nbefore restart",
         inputSafetyProfile: {
           requireValidShellSyntax: false,
           confirmOnIncompleteShellConstruct: true,
@@ -346,7 +346,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
     assert.equal(patched.state, "running");
-    assert.equal(patched.note, "capture restart logs");
+    assert.equal(patched.note, "capture restart logs\nbefore restart");
     assert.equal(patched.inputSafetyProfile.requireValidShellSyntax, false);
     assert.equal(patched.inputSafetyProfile.confirmOnMultilineInput, true);
     assert.equal(patched.inputSafetyProfile.targetSwitchGraceMs, 5000);
@@ -364,7 +364,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
-    assert.equal(restarted.note, "capture restart logs");
+    assert.equal(restarted.note, "capture restart logs\nbefore restart");
     assert.equal(restarted.inputSafetyProfile.requireValidShellSyntax, false);
     assert.equal(restarted.inputSafetyProfile.confirmOnRecentTargetSwitch, true);
     assert.equal(restarted.cwd, "/var/tmp");
@@ -379,18 +379,18 @@ test("session startup settings persist through patch and apply on restart", asyn
   }
 });
 
-test("session notes normalize and clear through patch", async () => {
+test("session notes preserve multiline text and clear through patch", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
   try {
     const createRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "sh", note: "  keep   logs handy " })
+      body: JSON.stringify({ shell: "sh", note: "  keep   logs handy \r\n second line  " })
     });
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
-    assert.equal(created.note, "keep logs handy");
+    assert.equal(created.note, "keep   logs handy\nsecond line");
 
     const clearRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "PATCH",

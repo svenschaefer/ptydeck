@@ -58,7 +58,7 @@ test("session-card-meta controller updates dirty/saved state", () => {
   assert.equal(entry.settingsStatus.classList.contains("saved"), true);
 });
 
-test("session-card-meta controller renders notes and tags", () => {
+test("session-card-meta controller renders note preview line, tooltip, and tags", () => {
   const controller = createSessionCardMetaController({
     normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
   });
@@ -70,14 +70,15 @@ test("session-card-meta controller renders notes and tags", () => {
   };
   const session = {
     id: "s-1",
-    note: "check metrics",
+    note: "check metrics\ncapture logs",
     tags: ["alpha", "beta"]
   };
 
   controller.renderSessionNote(entry, session);
   controller.renderSessionTagList(entry, session);
 
-  assert.equal(entry.sessionNoteEl.textContent, "check metrics");
+  assert.equal(entry.sessionNoteEl.textContent, "check metrics...");
+  assert.equal(entry.sessionNoteEl.title, "check metrics\ncapture logs");
   assert.equal(entry.sessionNoteEl.hidden, false);
   assert.equal(entry.tagListEl.textContent, "#alpha #beta");
   assert.equal(entry.sessionMetaRowEl.hidden, false);

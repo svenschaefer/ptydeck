@@ -278,9 +278,14 @@
               <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
             </div>
           </div>
-          <p class="session-settings-hint">Configure startup behavior, terminal theme, and session actions.</p>
+          <p class="session-settings-hint">Configure startup behavior, session notes, terminal theme, and session actions.</p>
+          <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">
+            <button class="session-settings-tab session-settings-tab-startup" type="button">Startup</button>
+            <button class="session-settings-tab session-settings-tab-note" type="button">Note</button>
+            <button class="session-settings-tab session-settings-tab-theme" type="button">Theme</button>
+          </div>
           <div class="session-settings-layout">
-            <section class="session-settings-section session-startup-controls">
+            <section class="session-settings-section session-settings-panel-startup session-startup-controls">
               <p class="session-settings-section-title">Startup</p>
               <label class="session-startup-label">Working Directory</label>
               <input class="session-start-cwd" type="text" value="" />
@@ -311,9 +316,16 @@
               <p class="session-settings-inline-hint">
                 Safety presets control parser-backed shell validation and confirmation rules per session.
               </p>
-              <p class="session-start-feedback"></p>
             </section>
-            <section class="session-settings-section session-theme-controls">
+            <section class="session-settings-section session-settings-panel-note session-note-controls" hidden>
+              <p class="session-settings-section-title">Note</p>
+              <label class="session-startup-label">Session Note</label>
+              <textarea class="session-note-input" rows="8" placeholder="Optional persisted session note"></textarea>
+              <p class="session-settings-inline-hint">
+                Notes are persisted per session. Empty note clears the existing note. The header shows only the first line.
+              </p>
+            </section>
+            <section class="session-settings-section session-settings-panel-theme session-theme-controls" hidden>
               <p class="session-settings-section-title">Theme</p>
               <div class="session-theme-filter-grid">
                 <label class="session-theme-label" for="">Theme Slot</label>
@@ -378,7 +390,10 @@
             </section>
           </div>
           <div class="session-settings-footer">
-            <p class="session-settings-status"></p>
+            <div class="session-settings-footer-meta">
+              <p class="session-start-feedback session-settings-feedback"></p>
+              <p class="session-settings-status"></p>
+            </div>
             <div class="session-settings-footer-actions">
               <button class="session-settings-cancel" type="button">Cancel</button>
               <button class="session-settings-apply" type="button">Apply Changes</button>

@@ -62,8 +62,10 @@ export function createSessionCardMetaController(options = {}) {
       return;
     }
     const note = typeof session?.note === "string" ? session.note.trim() : "";
+    const firstLine = note.split("\n", 1)[0] || "";
+    const displayNote = note.includes("\n") ? `${firstLine}...` : firstLine;
     entry.sessionNoteEl.hidden = !note;
-    entry.sessionNoteEl.textContent = note;
+    entry.sessionNoteEl.textContent = displayNote;
     entry.sessionNoteEl.title = note;
     syncMetaRowVisibility(entry);
   }

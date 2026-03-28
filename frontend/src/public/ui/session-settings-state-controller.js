@@ -9,6 +9,7 @@ const THEME_SLOT_OPTIONS = Object.freeze([
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" }
 ]);
+const SETTINGS_TAB_VALUES = Object.freeze(["startup", "note", "theme"]);
 
 export function createSessionSettingsStateController(options = {}) {
   const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys.slice() : [];
@@ -55,6 +56,10 @@ export function createSessionSettingsStateController(options = {}) {
 
   function normalizeThemeFilterCategory(value) {
     return themeFilterCategorySet.has(value) ? value : "all";
+  }
+
+  function normalizeSettingsTab(value) {
+    return SETTINGS_TAB_VALUES.includes(value) ? value : "startup";
   }
 
   function getThemePresetById(presetId) {
@@ -351,11 +356,12 @@ export function createSessionSettingsStateController(options = {}) {
   }
 
   function setStartupSettingsFeedback(entry, message, isError = false) {
-    if (!entry?.startFeedback) {
+    const feedbackEl = entry?.settingsFeedback || entry?.startFeedback;
+    if (!feedbackEl) {
       return;
     }
-    entry.startFeedback.textContent = message || "";
-    entry.startFeedback.classList.toggle("error", Boolean(isError));
+    feedbackEl.textContent = message || "";
+    feedbackEl.classList?.toggle?.("error", Boolean(isError));
   }
 
   function syncSessionStartupControls(entry, session) {
@@ -372,6 +378,72 @@ export function createSessionSettingsStateController(options = {}) {
     if (entry.sessionSendTerminatorSelect) {
       entry.sessionSendTerminatorSelect.value = getSessionSendTerminator(session.id);
     }
+  }
+
+  function normalizeSessionNoteText(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .join("\n")
+      .trim();
+  }
+
+  function syncSessionNoteControls(entry, session) {
+    if (!entry?.sessionNoteInput) {
+      return;
+    }
+    entry.sessionNoteInput.value = normalizeSessionNoteText(session?.note || "");
+  }
+
+  function readSessionNoteFromControls(entry) {
+    return normalizeSessionNoteText(String(entry?.sessionNoteInput?.value || ""));
+  }
+
+  function getSettingsTabButton(entry, tab) {
+    switch (normalizeSettingsTab(tab)) {
+      case "note":
+        return entry?.settingsTabNoteBtn || null;
+      case "theme":
+        return entry?.settingsTabThemeBtn || null;
+      default:
+        return entry?.settingsTabStartupBtn || null;
+    }
+  }
+
+  function getSettingsTabPanel(entry, tab) {
+    switch (normalizeSettingsTab(tab)) {
+      case "note":
+        return entry?.settingsPanelNote || null;
+      case "theme":
+        return entry?.settingsPanelTheme || null;
+      default:
+        return entry?.settingsPanelStartup || null;
+    }
+  }
+
+  function setActiveSettingsTab(entry, tab) {
+    if (!entry) {
+      return "startup";
+    }
+    const nextTab = normalizeSettingsTab(tab || entry.activeSettingsTab || "startup");
+    entry.activeSettingsTab = nextTab;
+    for (const candidate of SETTINGS_TAB_VALUES) {
+      const button = getSettingsTabButton(entry, candidate);
+      const panel = getSettingsTabPanel(entry, candidate);
+      const active = candidate === nextTab;
+      if (button) {
+        button.classList?.toggle?.("active", active);
+        button.setAttribute?.("aria-selected", active ? "true" : "false");
+      }
+      if (panel) {
+        panel.hidden = !active;
+      }
+    }
+    return nextTab;
   }
 
   function syncSessionInputSafetyControls(entry, session) {
@@ -466,6 +538,9 @@ export function createSessionSettingsStateController(options = {}) {
     if (!areStringArraysEqual(currentStartup.tags, draftStartup.tagResult.tags)) {
       return true;
     }
+    if (normalizeSessionNoteText(session?.note || "") !== readSessionNoteFromControls(entry)) {
+      return true;
+    }
     if (!areThemeProfilesEqual(getSessionThemeProfile(session, "active"), draftThemes.activeThemeProfile)) {
       return true;
     }
@@ -502,9 +577,13 @@ export function createSessionSettingsStateController(options = {}) {
     syncSessionThemeControls,
     setStartupSettingsFeedback,
     syncSessionStartupControls,
+    syncSessionNoteControls,
     syncSessionInputSafetyControls,
     readSessionStartupFromControls,
+    readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
+    normalizeSessionNoteText,
+    setActiveSettingsTab,
     isSessionSettingsDirty
   };
 }

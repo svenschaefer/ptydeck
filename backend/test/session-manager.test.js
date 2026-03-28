@@ -843,7 +843,7 @@ test("SessionManager can rename sessions", () => {
   assert.equal(updated.name, "ops-shell");
 });
 
-test("SessionManager stores, normalizes, clears, and restarts session notes", () => {
+test("SessionManager stores, normalizes multiline notes, clears them, and restarts with preserved line breaks", () => {
   const firstPty = createFakePty();
   const secondPty = createFakePty();
   let spawnCount = 0;
@@ -856,14 +856,14 @@ test("SessionManager stores, normalizes, clears, and restarts session notes", ()
 
   const created = manager.create({
     cwd: "/tmp",
-    note: "  Needs   follow-up   "
+    note: "  Needs   follow-up  \r\n  Capture logs  "
   });
-  assert.equal(created.note, "Needs follow-up");
+  assert.equal(created.note, "Needs   follow-up\nCapture logs");
 
   const updated = manager.updateSession(created.id, {
-    note: "  capture logs before restart  "
+    note: "  capture logs before restart  \n\n  restart marker  "
   });
-  assert.equal(updated.note, "capture logs before restart");
+  assert.equal(updated.note, "capture logs before restart\n\nrestart marker");
 
   const cleared = manager.updateSession(created.id, {
     note: ""
@@ -871,10 +871,10 @@ test("SessionManager stores, normalizes, clears, and restarts session notes", ()
   assert.equal(cleared.note, undefined);
 
   manager.updateSession(created.id, {
-    note: "restart marker"
+    note: "restart marker\nline two"
   });
   const restarted = manager.restart(created.id);
-  assert.equal(restarted.note, "restart marker");
+  assert.equal(restarted.note, "restart marker\nline two");
 });
 
 test("SessionManager stores, updates, and restarts session input safety profiles", () => {

@@ -43,11 +43,20 @@ function createNodeStub() {
     ".session-close",
     ".session-settings-dialog",
     ".session-settings-dismiss",
+    ".session-settings-tab-startup",
+    ".session-settings-tab-note",
+    ".session-settings-tab-theme",
+    ".session-settings-panel-startup",
+    ".session-settings-panel-note",
+    ".session-settings-panel-theme",
     ".session-start-cwd",
     ".session-start-command",
     ".session-start-env",
+    ".session-note-input",
     ".session-send-terminator",
     ".session-tags-input",
+    ".session-start-feedback",
+    ".session-settings-feedback",
     ".session-start-feedback",
     ".session-tag-list",
     ".session-theme-category",
@@ -116,6 +125,11 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.unrestoredHintEl.textContent, "hint");
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
+  assert.ok(result.settingsTabStartupBtn);
+  assert.ok(result.settingsTabNoteBtn);
+  assert.ok(result.settingsTabThemeBtn);
+  assert.ok(result.settingsPanelNote);
+  assert.ok(result.sessionNoteInput);
   assert.ok(result.themeSlotSelect);
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);

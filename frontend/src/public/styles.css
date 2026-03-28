@@ -1597,12 +1597,34 @@ button:hover {
   color: #9db8d2;
 }
 
+.session-settings-tabs {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-settings-tab {
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid #2a3c50;
+  border-radius: 999px;
+  background: #101824;
+  color: #9db8d2;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.session-settings-tab.active {
+  border-color: #4d7da3;
+  background: #183044;
+  color: #eef5ff;
+}
+
 .session-settings-layout {
   margin-top: 10px;
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(420px, 1.4fr);
-  gap: 10px;
-  align-items: start;
+  display: block;
   max-height: calc(100vh - 240px);
   overflow: auto;
   padding-right: 4px;
@@ -1613,6 +1635,10 @@ button:hover {
   border-radius: 10px;
   background: #111a26;
   padding: 10px;
+}
+
+.session-settings-section[hidden] {
+  display: none !important;
 }
 
 .session-settings-section-title {
@@ -1659,6 +1685,7 @@ button:hover {
 .session-start-cwd,
 .session-start-command,
 .session-start-env,
+.session-note-input,
 .session-tags-input,
 .session-input-safety-preset {
   width: 100%;
@@ -1671,7 +1698,8 @@ button:hover {
 }
 
 .session-start-command,
-.session-start-env {
+.session-start-env,
+.session-note-input {
   resize: vertical;
 }
 
@@ -1739,10 +1767,26 @@ button:hover {
   gap: 10px;
 }
 
+.session-settings-footer-meta {
+  min-width: 0;
+}
+
+.session-settings-feedback,
 .session-settings-status {
   margin: 0;
   font-size: 12px;
   color: #92a4bb;
+}
+
+.session-settings-feedback {
+  min-height: 16px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.session-settings-feedback.error {
+  color: #f8a5a5;
 }
 
 .session-settings-status.dirty {
@@ -1764,8 +1808,9 @@ button:hover {
 }
 
 @media (max-width: 1000px) {
-  .session-settings-layout {
-    grid-template-columns: 1fr;
+  .session-settings-footer {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

@@ -21,13 +21,21 @@ export function createSessionCardFactoryController(options = {}) {
     const closeBtn = node.querySelector(".session-close");
     const settingsDialog = node.querySelector(".session-settings-dialog");
     const settingsDismissBtn = node.querySelector(".session-settings-dismiss");
+    const settingsTabStartupBtn = node.querySelector(".session-settings-tab-startup");
+    const settingsTabNoteBtn = node.querySelector(".session-settings-tab-note");
+    const settingsTabThemeBtn = node.querySelector(".session-settings-tab-theme");
+    const settingsPanelStartup = node.querySelector(".session-settings-panel-startup");
+    const settingsPanelNote = node.querySelector(".session-settings-panel-note");
+    const settingsPanelTheme = node.querySelector(".session-settings-panel-theme");
     const startCwdInput = node.querySelector(".session-start-cwd");
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
+    const sessionNoteInput = node.querySelector(".session-note-input");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
     const inputSafetyPresetSelect = node.querySelector(".session-input-safety-preset");
     const sessionTagsInput = node.querySelector(".session-tags-input");
     const startFeedback = node.querySelector(".session-start-feedback");
+    const settingsFeedback = node.querySelector(".session-settings-feedback");
     const tagListEl = node.querySelector(".session-tag-list");
     const themeCategory = node.querySelector(".session-theme-category");
     const themeSearch = node.querySelector(".session-theme-search");
@@ -93,13 +101,21 @@ export function createSessionCardFactoryController(options = {}) {
       closeBtn,
       settingsDialog,
       settingsDismissBtn,
+      settingsTabStartupBtn,
+      settingsTabNoteBtn,
+      settingsTabThemeBtn,
+      settingsPanelStartup,
+      settingsPanelNote,
+      settingsPanelTheme,
       startCwdInput,
       startCommandInput,
       startEnvInput,
+      sessionNoteInput,
       sessionSendTerminatorSelect,
       inputSafetyPresetSelect,
       sessionTagsInput,
       startFeedback,
+      settingsFeedback,
       tagListEl,
       themeCategory,
       themeSearch,

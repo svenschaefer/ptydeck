@@ -70,6 +70,7 @@ test("session-card-render controller updates visibility and metadata", () => {
     renderSessionTagList: () => calls.push("tags"),
     renderSessionNote: () => calls.push("note"),
     syncSessionStartupControls: () => calls.push("startup"),
+    syncSessionNoteControls: () => calls.push("note-sync"),
     syncSessionThemeControls: () => calls.push("theme"),
     setSettingsDirty: () => calls.push("dirty:false")
   });
@@ -124,6 +125,7 @@ test("session-card-render controller only syncs settings controls while dialog i
   const controller = createSessionCardRenderController({
     setSessionCardVisibility: () => {},
     syncSessionStartupControls: () => calls.push("startup"),
+    syncSessionNoteControls: () => calls.push("note-sync"),
     syncSessionInputSafetyControls: () => calls.push("input-safety"),
     syncSessionThemeControls: () => calls.push("theme"),
     setSettingsDirty: () => calls.push("dirty:false")
@@ -139,7 +141,7 @@ test("session-card-render controller only syncs settings controls while dialog i
     nextVisible: true
   });
 
-  assert.deepEqual(calls, ["startup", "input-safety", "theme", "dirty:false"]);
+  assert.deepEqual(calls, ["startup", "note-sync", "input-safety", "theme", "dirty:false"]);
 });
 
 test("session-card-render controller restores terminal focus when a render interrupts a focused terminal", () => {

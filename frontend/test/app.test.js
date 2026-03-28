@@ -378,7 +378,12 @@ function createTerminalCardTemplateNode() {
   const settingsDismiss = new FakeElement({ className: "session-settings-dismiss", tagName: "button" });
   const settingsTitle = new FakeElement({ className: "session-settings-title", tagName: "p" });
   const settingsHint = new FakeElement({ className: "session-settings-hint", tagName: "p" });
-  const startControls = new FakeElement({ className: "session-startup-controls", tagName: "div" });
+  const settingsTabs = new FakeElement({ className: "session-settings-tabs", tagName: "div" });
+  const settingsTabStartup = new FakeElement({ className: "session-settings-tab session-settings-tab-startup", tagName: "button" });
+  const settingsTabNote = new FakeElement({ className: "session-settings-tab session-settings-tab-note", tagName: "button" });
+  const settingsTabTheme = new FakeElement({ className: "session-settings-tab session-settings-tab-theme", tagName: "button" });
+  const settingsLayout = new FakeElement({ className: "session-settings-layout", tagName: "div" });
+  const startControls = new FakeElement({ className: "session-settings-section session-settings-panel-startup session-startup-controls", tagName: "div" });
   const startCwdLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startCwd = new FakeElement({ className: "session-start-cwd", tagName: "input" });
   startCwd.value = "";
@@ -397,8 +402,13 @@ function createTerminalCardTemplateNode() {
   const inputSafetyLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const inputSafetyPreset = new FakeElement({ className: "session-input-safety-preset", tagName: "select" });
   inputSafetyPreset.value = "off";
-  const startFeedback = new FakeElement({ className: "session-start-feedback", tagName: "p" });
-  const themeControls = new FakeElement({ className: "session-theme-controls", tagName: "div" });
+  const noteControls = new FakeElement({ className: "session-settings-section session-settings-panel-note session-note-controls", tagName: "div" });
+  noteControls.hidden = true;
+  const noteLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const noteInput = new FakeElement({ className: "session-note-input", tagName: "textarea" });
+  noteInput.value = "";
+  const themeControls = new FakeElement({ className: "session-settings-section session-settings-panel-theme session-theme-controls", tagName: "div" });
+  themeControls.hidden = true;
   const themeCategoryLabel = new FakeElement({ className: "session-theme-label", tagName: "label" });
   const themeCategory = new FakeElement({ className: "session-theme-category", tagName: "select" });
   themeCategory.value = "all";
@@ -415,6 +425,8 @@ function createTerminalCardTemplateNode() {
   const themeFg = new FakeElement({ className: "session-theme-fg", tagName: "input" });
   themeFg.value = "#d8dee9";
   const settingsFooter = new FakeElement({ className: "session-settings-footer", tagName: "div" });
+  const settingsFooterMeta = new FakeElement({ className: "session-settings-footer-meta", tagName: "div" });
+  const startFeedback = new FakeElement({ className: "session-start-feedback session-settings-feedback", tagName: "p" });
   const settingsStatus = new FakeElement({ className: "session-settings-status", tagName: "p" });
   const settingsCancel = new FakeElement({ className: "session-settings-cancel", tagName: "button" });
   const settingsApply = new FakeElement({ className: "session-settings-apply", tagName: "button" });
@@ -434,6 +446,10 @@ function createTerminalCardTemplateNode() {
   settingsPanel.appendChild(settingsDismiss);
   settingsPanel.appendChild(settingsTitle);
   settingsPanel.appendChild(settingsHint);
+  settingsTabs.appendChild(settingsTabStartup);
+  settingsTabs.appendChild(settingsTabNote);
+  settingsTabs.appendChild(settingsTabTheme);
+  settingsPanel.appendChild(settingsTabs);
   startControls.appendChild(startCwdLabel);
   startControls.appendChild(startCwd);
   startControls.appendChild(startCommandLabel);
@@ -446,8 +462,10 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startSendTerminator);
   startControls.appendChild(inputSafetyLabel);
   startControls.appendChild(inputSafetyPreset);
-  startControls.appendChild(startFeedback);
-  settingsPanel.appendChild(startControls);
+  noteControls.appendChild(noteLabel);
+  noteControls.appendChild(noteInput);
+  settingsLayout.appendChild(startControls);
+  settingsLayout.appendChild(noteControls);
   themeControls.appendChild(themeCategoryLabel);
   themeControls.appendChild(themeCategory);
   themeControls.appendChild(themeSearchLabel);
@@ -458,10 +476,13 @@ function createTerminalCardTemplateNode() {
   themeControls.appendChild(themeBg);
   themeControls.appendChild(themeFgLabel);
   themeControls.appendChild(themeFg);
-  settingsFooter.appendChild(settingsStatus);
+  settingsLayout.appendChild(themeControls);
+  settingsPanel.appendChild(settingsLayout);
+  settingsFooterMeta.appendChild(startFeedback);
+  settingsFooterMeta.appendChild(settingsStatus);
+  settingsFooter.appendChild(settingsFooterMeta);
   settingsFooter.appendChild(settingsCancel);
   settingsFooter.appendChild(settingsApply);
-  settingsPanel.appendChild(themeControls);
   settingsPanel.appendChild(rename);
   settingsPanel.appendChild(close);
   settingsPanel.appendChild(settingsFooter);
@@ -1074,10 +1095,19 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
       };
       const nextActiveThemeProfile = payload.activeThemeProfile || payload.themeProfile || baseSession.activeThemeProfile;
       const nextInactiveThemeProfile = payload.inactiveThemeProfile || payload.themeProfile || baseSession.inactiveThemeProfile;
+      const normalizedNote =
+        typeof payload.note === "string"
+          ? payload.note
+            .replace(/\r\n?/g, "\n")
+            .split("\n")
+            .map((line) => line.trim())
+            .join("\n")
+            .trim()
+          : "";
       return makeJsonResponse(200, {
         ...baseSession,
         name: payload.name || baseSession.name,
-        note: typeof payload.note === "string" && payload.note.trim() ? payload.note.trim() : undefined,
+        note: normalizedNote || undefined,
         startCwd: payload.startCwd || baseSession.startCwd,
         startCommand: payload.startCommand || baseSession.startCommand,
         env: payload.env || baseSession.env,

@@ -153,6 +153,9 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     syncSessionStartupControls(entry, session) {
       calls.push(["sync-startup", entry.id, session.id]);
     },
+    syncSessionNoteControls(entry, session) {
+      calls.push(["sync-note", entry.id, session.id]);
+    },
     readSessionStartupFromControls(entry) {
       calls.push(["read-startup", entry.id]);
       return {
@@ -162,6 +165,18 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
         sendTerminator: "crlf",
         tagResult: { ok: true, tags: ["ops"] }
       };
+    },
+    readSessionNoteFromControls(entry) {
+      calls.push(["read-note", entry.id]);
+      return "first line\nsecond line";
+    },
+    normalizeSessionNoteText(value) {
+      calls.push(["normalize-note", value]);
+      return String(value || "").replace(/\r\n?/g, "\n").trim();
+    },
+    setActiveSettingsTab(entry, tab) {
+      calls.push(["tab", entry.id, tab]);
+      return tab;
     },
     isSessionSettingsDirty(entry, session) {
       calls.push(["dirty", entry.id, session.id]);
@@ -200,6 +215,7 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
   controller.syncSessionThemeControls({ id: "entry-1" }, "s1");
   controller.setStartupSettingsFeedback({ id: "entry-1" }, "Saved", false);
   controller.syncSessionStartupControls({ id: "entry-1" }, { id: "s1" });
+  controller.syncSessionNoteControls({ id: "entry-1" }, { id: "s1" });
   assert.deepEqual(controller.readSessionStartupFromControls({ id: "entry-1" }), {
     startCwd: "/workspace",
     startCommand: "npm run dev",
@@ -207,6 +223,9 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     sendTerminator: "crlf",
     tagResult: { ok: true, tags: ["ops"] }
   });
+  assert.equal(controller.readSessionNoteFromControls({ id: "entry-1" }), "first line\nsecond line");
+  assert.equal(controller.normalizeSessionNoteText("line one\r\nline two"), "line one\nline two");
+  assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "note"), "note");
   assert.equal(controller.isSessionSettingsDirty({ id: "entry-1" }, { id: "s1" }), true);
 
   assert.deepEqual(calls, [
@@ -222,7 +241,11 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     ["sync-theme", "entry-1", "s1"],
     ["feedback", "entry-1", "Saved", false],
     ["sync-startup", "entry-1", "s1"],
+    ["sync-note", "entry-1", "s1"],
     ["read-startup", "entry-1"],
+    ["read-note", "entry-1"],
+    ["normalize-note", "line one\r\nline two"],
+    ["tab", "entry-1", "note"],
     ["dirty", "entry-1", "s1"]
   ]);
 });

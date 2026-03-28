@@ -12,13 +12,12 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes).
-- Active scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`.
-- Queued next wave after that: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
-- Queued scoped tasks after that: `QLT-161`, `QLT-162`.
+- Active release wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
+- Active scoped tasks: `QLT-161`, `QLT-162`.
 - Queued next wave after that: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
 - Queued scoped tasks after that: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
-- Latest completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
+- Latest completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
+- Previous completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
 - Previous completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
 - Previous completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
@@ -63,28 +62,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Active)
+### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Active)
 
-- Active scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`
-
-Dependencies:
-
-- `QLT-158` lands first because the current backend note normalization collapses all whitespace to one line, so multiline note editing cannot be delivered as a frontend-only UX change.
-- `QLT-159` follows `QLT-158` and reuses the authoritative persisted multiline-note contract while reorganizing session settings into tabs and moving note editing into a dedicated tab.
-- `QLT-160` closes after `QLT-158` and `QLT-159`, so regression coverage locks multiline persistence, tabbed settings UX, and first-line-only header rendering against the final contract.
-
-Exit criteria:
-
-- Session notes can persist multiline text without collapsing line breaks away.
-- Session settings are organized into tabs, including a dedicated note tab for editing multiline notes.
-- Session headers show only the first note line with truncation/ellipsis behavior, while the full note remains available via tooltip.
-- Regression coverage exists for persistence, settings UX, and header rendering behavior.
-
-## Queued Next Wave
-
-### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Queued)
-
-- Queued scoped tasks: `QLT-161`, `QLT-162`
+- Active scoped tasks: `QLT-161`, `QLT-162`
 
 Dependencies:
 
@@ -96,6 +76,8 @@ Exit criteria:
 - Pressing `Ctrl-C` on the terminal surface no longer silently guesses between clipboard copy and terminal cancel when the shortcut is ambiguous.
 - The operator gets an explicit `Copy` versus `Cancel` choice, and the chosen action is carried out deterministically.
 - Regression coverage exists for the prompt behavior and for non-regression of the terminal interrupt path.
+
+## Queued Next Wave
 
 ### v0.4.0-H46 - Deck Sidebar Action Consolidation (Queued)
 
@@ -118,6 +100,25 @@ Exit criteria:
 - Regression coverage exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
 
 ## Latest Completed Wave
+
+### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Completed)
+
+- Completed scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`
+
+Dependencies:
+
+- `QLT-158` landed first because multiline note editing could not be delivered correctly while backend note normalization still collapsed line breaks away.
+- `QLT-159` followed `QLT-158`, reusing the authoritative persisted multiline-note contract while reorganizing session settings into tabs and moving note editing into a dedicated tab.
+- `QLT-160` closed after `QLT-158` and `QLT-159`, locking multiline persistence, tabbed settings UX, and first-line-only header rendering against the final contract.
+
+Exit criteria:
+
+- Session notes persist multiline text without collapsing line breaks away.
+- Session settings are organized into tabs, including a dedicated note tab for editing multiline notes.
+- Session headers show only the first note line with truncation and ellipsis behavior, while the full note remains available via tooltip.
+- Regression coverage exists for persistence, settings UX, and header rendering behavior.
+
+## Previous Completed Wave
 
 ### v0.4.0-H43 - Command Surface Consistency (Completed)
 

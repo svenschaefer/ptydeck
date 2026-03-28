@@ -160,6 +160,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     id: "s1",
     startCwd: "/workspace",
     startCommand: "npm run dev",
+    note: "first line\nsecond line",
     inputSafetyProfile: {
       requireValidShellSyntax: false
     },
@@ -198,10 +199,17 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     classList: new FakeClassList()
   };
   const entry = {
+    settingsTabStartupBtn: createInput(),
+    settingsTabNoteBtn: createInput(),
+    settingsTabThemeBtn: createInput(),
+    settingsPanelStartup: { hidden: false },
+    settingsPanelNote: { hidden: true },
+    settingsPanelTheme: { hidden: true },
     themeSlotSelect: createInput("active"),
     startCwdInput: createInput("/workspace"),
     startCommandInput: createInput("npm run dev"),
     startEnvInput: createInput("FOO=bar"),
+    sessionNoteInput: createInput("first line\nsecond line"),
     sessionTagsInput: createInput("ops"),
     sessionSendTerminatorSelect: createInput("crlf"),
     inputSafetyPresetSelect: createInput("off"),
@@ -214,6 +222,11 @@ test("session-settings state controller detects startup/theme/terminator dirtine
 
   assert.equal(controller.isSessionSettingsDirty(entry, session), false);
 
+  controller.setActiveSettingsTab(entry, "note");
+  assert.equal(entry.settingsPanelStartup.hidden, true);
+  assert.equal(entry.settingsPanelNote.hidden, false);
+  assert.equal(entry.settingsTabNoteBtn.classList.contains("active"), true);
+
   entry.themeSlotSelect.value = "inactive";
   entry.themeInputs.background.value = "#222222";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
@@ -223,12 +236,28 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   entry.sessionSendTerminatorSelect.value = "lf";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
   entry.sessionSendTerminatorSelect.value = "crlf";
+  entry.sessionNoteInput.value = "first line\nupdated";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+  entry.sessionNoteInput.value = "first line\nsecond line";
   entry.inputSafetyPresetSelect.value = "shell_strict";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
 
   controller.setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
   assert.equal(startFeedback.textContent, "Failed to save settings.");
   assert.equal(startFeedback.classList.contains("error"), true);
+});
+
+test("session-settings state controller syncs and reads multiline session notes", () => {
+  const controller = createSessionSettingsStateController({});
+  const entry = {
+    sessionNoteInput: createInput("")
+  };
+
+  controller.syncSessionNoteControls(entry, {
+    note: "  first line  \r\n second line  "
+  });
+  assert.equal(entry.sessionNoteInput.value, "first line\nsecond line");
+  assert.equal(controller.readSessionNoteFromControls(entry), "first line\nsecond line");
 });
 
 test("session-settings state controller syncs and reads input safety presets", () => {

@@ -131,7 +131,12 @@ function normalizeSessionNote(note) {
   if (typeof note !== "string") {
     return undefined;
   }
-  const normalized = note.replace(/\s+/g, " ").trim();
+  const normalized = note
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
   if (!normalized) {
     return undefined;
   }
