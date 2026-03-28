@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H47` (Session File Transfer Baseline).
+- Active scoped tasks: `REM-006A`, `REM-006B`, `REM-006C`.
 - Latest completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
 - Previous completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
 - Previous completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
@@ -59,6 +59,24 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave
+
+### v0.4.0-H47 - Session File Transfer Baseline (Active)
+
+- Active scoped tasks: `REM-006A`, `REM-006B`, `REM-006C`
+
+Dependencies:
+
+- `REM-006A` lands first so the backend defines one authoritative upload/download contract, transfer capability policy, and path/size guardrail model before any frontend workflow depends on it.
+- `REM-006B` follows `REM-006A`, so slash-command and operator workflows bind to the final backend transfer semantics instead of inventing another local or shell-mediated path.
+- `REM-006C` closes after `REM-006A` and `REM-006B`, so regression coverage locks the actual backend/frontend file-transfer contract end to end.
+
+Exit criteria:
+
+- Backend exposes bounded upload and download endpoints for session-scoped file transfer with deterministic normalization and rejection behavior.
+- Frontend exposes operator file-transfer workflows through slash commands with explicit status and rejection feedback.
+- Regression coverage exists for allowed/denied transfers, path normalization, size guardrails, and end-to-end success behavior.
 
 ## Latest Completed Wave
 
@@ -1148,14 +1166,16 @@ Exit criteria:
 
 ## Current Status
 
-- Latest completed milestone: `v0.4.0-H14` (Frontend Quick-ID Swap Command)
-- Next milestone in progress: none currently
+- Latest completed milestone: `v0.4.0-H46` (Deck Sidebar Action Consolidation)
+- Next milestone in progress: `v0.4.0-H47` (Session File Transfer Baseline)
 - Queued next milestone: none currently
 - Blockers: none currently
 
 ### Active Open Tasks (Execution Queue)
 
-- `QLT-139`
+- `REM-006A`
+- `REM-006B`
+- `REM-006C`
 
 ### v0.3.0-H15 - Auth Transport and Mode Hardening
 

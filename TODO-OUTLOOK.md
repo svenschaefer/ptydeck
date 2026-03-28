@@ -135,5 +135,6 @@ Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current nea
 Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current scope):
 
 - Inspiration source: [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
-- [ ] `REM-006` Owner `BE`: Add controlled session file-transfer support with explicit upload/download permission model, progress reporting, and large-transfer guardrails.
+- Promoted to active delivery in `v0.4.0-H47`:
+  - `REM-006A`, `REM-006B`, `REM-006C`
 - [ ] `REM-007` Owner `FE`: Add session/deck sharing UX with explicit read-only spectator mode and visible control/write-permission state.
