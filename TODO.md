@@ -14,11 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-153` Owner `FE`: Standardize single-session slash-command targeting on explicit `@target /command ...` routing so historical selector arguments behind commands like `/note`, `/rename`, `/replay`, `/settings`, and similar active-session overrides are replaced by one canonical session-targeting model, while concise active-target forms like `/note test` remain supported.
-- `QLT-154` Owner `FE`: Resolve the current `@` namespace conflict between session-target routing and custom-command scope tokens (`@global`, `@project`, `@session:<selector>`) so the command grammar, help, and autocomplete remain unambiguous under the new canonical `@target` model.
-- `QLT-155` Owner `FE`: Rationalize `>` quick-switch semantics so it stays session-first navigation by default, with any remaining deck-targeting or cross-deck targeting forms made explicit and consistent instead of sharing an overloaded mental model with plain session switching.
-- `QLT-156` Owner `FE`: Rewrite command help, usage strings, autocomplete hints, examples, and command-palette descriptions so `@`, `>`, and `/` present one coherent mental model and no longer advertise deprecated selector-after-slash forms such as `/note 3 test` or `/note active test`.
-- `QLT-157` Owner `QA`: Add regression coverage for the unified `@` / `>` / `/` grammar, including parser conflicts, deprecated-form rejection or migration behavior, help/autocomplete alignment, and direct-routing versus active-target shorthand semantics.
 - `QLT-158` Owner `BE`: Extend the persisted session-note contract so notes can store deterministic multiline text instead of being collapsed to one whitespace-normalized line, while preserving explicit empty-note clearing semantics and restart persistence.
 - `QLT-159` Owner `FE`: Rework the session-settings dialog into organized tabs, add a dedicated note-editing tab that supports multiline note editing, and render the session-header note as first-line-only with ellipsis truncation plus a tooltip containing the full note text.
 - `QLT-160` Owner `QA`: Add regression coverage for multiline session-note persistence, tabbed session-settings behavior, note editing/apply flows, and first-line truncation plus full-tooltip rendering in the session header.

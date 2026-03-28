@@ -231,7 +231,7 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "switch active session",
     example: "/switch 1",
-    usage: "/switch <id>",
+    usage: "/switch <sessionSelector>",
     args: [{ provider: "session-selector" }]
   }),
   swap: freezeCommandDefinition({
@@ -277,12 +277,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/rename",
     kind: "command",
     description: "rename a session",
-    example: "/rename 1 api",
-    usage: [
-      "/rename <name>",
-      "/rename <selector> <name>"
-    ],
-    args: [{ provider: "session-selector", optional: true }]
+    example: "/rename api",
+    usage: "/rename <name>"
   }),
   restart: freezeCommandDefinition({
     key: "slash:restart",
@@ -300,9 +296,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/note",
     kind: "command",
     description: "set or clear a persisted session note",
-    example: "/note 7 needs review",
-    usage: "/note <selector|active> [text...]",
-    args: [{ provider: "session-selector" }]
+    example: "/note needs review",
+    usage: "/note [text...]"
   }),
   connection: freezeCommandDefinition({
     key: "slash:connection",
@@ -311,11 +306,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage saved connection profiles",
     example: "/connection apply ops-shell",
-    summary: "/connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>",
+    summary: "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>",
     usage: [
       "/connection list",
       "/connection save <name>",
-      "/connection save <selector|active> <name>",
       "/connection show <profile>",
       "/connection apply <profile>",
       "/connection rename <profile> <name>",
@@ -336,13 +330,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/connection save",
         kind: "subcommand",
         description: "save a session launch preset as a connection profile",
-        example: "/connection save active ops shell",
+        example: "/connection save ops-shell",
         key: "slash:connection:save",
-        usage: [
-          "/connection save <name>",
-          "/connection save <selector|active> <name>"
-        ],
-        args: [{ provider: "session-selector", optional: true }]
+        usage: "/connection save <name>"
       },
       show: {
         insertText: "show",
@@ -388,12 +378,12 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/replay",
     kind: "command",
     description: "view, export, or copy the retained replay tail for a session",
-    example: "/replay view 7",
-    summary: "/replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]",
+    example: "/replay view",
+    summary: "/replay view | /replay export | /replay copy",
     usage: [
-      "/replay view [selector|active]",
-      "/replay export [selector|active]",
-      "/replay copy [selector|active]"
+      "/replay view",
+      "/replay export",
+      "/replay copy"
     ],
     subcommands: {
       view: {
@@ -401,30 +391,27 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/replay view",
         kind: "subcommand",
         description: "open the retained replay tail in the reading viewer",
-        example: "/replay view 7",
+        example: "/replay view",
         key: "slash:replay:view",
-        usage: "/replay view [selector|active]",
-        args: [{ provider: "session-selector", optional: true }]
+        usage: "/replay view"
       },
       export: {
         insertText: "export",
         label: "/replay export",
         kind: "subcommand",
         description: "download the retained replay tail",
-        example: "/replay export 7",
+        example: "/replay export",
         key: "slash:replay:export",
-        usage: "/replay export [selector|active]",
-        args: [{ provider: "session-selector", optional: true }]
+        usage: "/replay export"
       },
       copy: {
         insertText: "copy",
         label: "/replay copy",
         kind: "subcommand",
         description: "copy the retained replay tail to the clipboard",
-        example: "/replay copy active",
+        example: "/replay copy",
         key: "slash:replay:copy",
-        usage: "/replay copy [selector|active]",
-        args: [{ provider: "session-selector", optional: true }]
+        usage: "/replay copy"
       }
     }
   }),
@@ -434,10 +421,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/settings",
     kind: "command",
     description: "inspect or apply session settings",
-    example: "/settings show 1",
+    example: "/settings show",
     usage: [
-      "/settings show [selector]",
-      "/settings apply <selector|active> <json>"
+      "/settings show",
+      "/settings apply <json>"
     ],
     subcommands: {
       show: {
@@ -445,20 +432,18 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/settings show",
         kind: "subcommand",
         description: "show session settings",
-        example: "/settings show 1",
+        example: "/settings show",
         key: "slash:settings:show",
-        usage: "/settings show [selector]",
-        args: [{ provider: "session-selector", optional: true }]
+        usage: "/settings show"
       },
       apply: {
         insertText: "apply",
         label: "/settings apply",
         kind: "subcommand",
         description: "apply JSON settings patch",
-        example: "/settings apply 1 {\"startCwd\":\"~\"}",
+        example: "/settings apply {\"startCwd\":\"~\"}",
         key: "slash:settings:apply",
-        usage: "/settings apply <selector|active> <json>",
-        args: [{ provider: "session-selector" }]
+        usage: "/settings apply <json>"
       }
     }
   }),
@@ -637,10 +622,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     label: "/custom",
     kind: "command",
     description: "manage custom commands",
-    example: "/custom show @project deploy",
+    example: "/custom show scope:project deploy",
     usage: [
-      "/custom [plain|template] [@global|@project|@session:<selector>] <name> <text>",
-      "/custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
+      "/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text>",
+      "/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
     ],
     subcommands: {
       show: {
@@ -648,9 +633,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/custom show",
         kind: "subcommand",
         description: "show custom command",
-        example: "/custom show @project deploy",
+        example: "/custom show scope:project deploy",
         key: "slash:custom:show",
-        usage: "/custom show [@global|@project|@session:<selector>] <name>",
+        usage: "/custom show [scope:global|scope:project|scope:session:<selector>] <name>",
         args: [{ provider: "custom-command-reference" }]
       },
       preview: {
@@ -658,9 +643,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/custom preview",
         kind: "subcommand",
         description: "preview custom command rendering",
-        example: "/custom preview @session:7 deploy env=prod -- 7",
+        example: "/custom preview scope:session:7 deploy env=prod -- 7",
         key: "slash:custom:preview",
-        usage: "/custom preview [@global|@project|@session:<selector>] <name> [key=value ...] [-- <targetSelector>]",
+        usage: "/custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>]",
         args: [{ provider: "custom-command-reference" }]
       },
       remove: {
@@ -668,9 +653,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         label: "/custom remove",
         kind: "subcommand",
         description: "delete custom command",
-        example: "/custom remove @project deploy",
+        example: "/custom remove scope:project deploy",
         key: "slash:custom:remove",
-        usage: "/custom remove [@global|@project|@session:<selector>] <name>",
+        usage: "/custom remove [scope:global|scope:project|scope:session:<selector>] <name>",
         args: [{ provider: "custom-command-reference" }]
       }
     }
@@ -900,6 +885,22 @@ export function getSlashCommandUsage(commandName, subcommandName = "", systemSla
 }
 
 export function createCommandTopicHelpText(commandName, subcommandName = "", systemSlashCommands = []) {
+  const normalizedCommandName = normalizeLower(commandName);
+  if (normalizedCommandName === "@") {
+    return [
+      "@",
+      "Usage: @<sessionSelector> /<command> ...",
+      "Route a single-session slash command to another session without changing the active session.",
+      "Examples: @3 /note test · @ops /rename api-shell"
+    ].join("\n");
+  }
+  if (normalizedCommandName === ">") {
+    return [
+      ">",
+      "Usage: >sessionSelector",
+      "Quick-switch the active session. Session selectors win by default; use 'deck:<deckSelector>' for a deck or '<deckSelector>::<sessionSelector>' for an explicit cross-deck session."
+    ].join("\n");
+  }
   const registry = createSlashCommandRegistry(systemSlashCommands);
   const command = registry.get(commandName);
   if (!command) {

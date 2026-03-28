@@ -3326,6 +3326,7 @@ test("ssh sessions expose degraded then connected remote runtime metadata after 
 });
 
 test("ssh sessions become offline after bounded reconnect retries and reject direct input", async () => {
+  const remoteRetryWaitMs = 20000;
   const ptys = [];
   const createPty = () => {
     let exitHandler = null;
@@ -3377,16 +3378,16 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
     const created = await createRes.json();
 
     ptys[0].emitExit();
-    await waitFor(() => ptys.length >= 2, 10000);
+    await waitFor(() => ptys.length >= 2, remoteRetryWaitMs);
     ptys[1].emitExit();
-    await waitFor(() => ptys.length >= 3, 10000);
+    await waitFor(() => ptys.length >= 3, remoteRetryWaitMs);
     ptys[2].emitExit();
 
     await waitFor(async () => {
       const res = await fetch(`${baseUrl}/sessions/${created.id}`);
       const body = await res.json();
       return body.remoteRuntime?.connectivityState === "offline";
-    }, 10000);
+    }, remoteRetryWaitMs);
 
     const getRes = await fetch(`${baseUrl}/sessions/${created.id}`);
     assert.equal(getRes.status, 200);

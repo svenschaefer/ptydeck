@@ -1695,9 +1695,9 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.commandInput.value = "/rename renamed-active";
   fixture.elements.sendCommand.click();
   await tick();
-  assert.match(fixture.elements.commandFeedback.textContent, /^Renamed active session to renamed-active\.$/);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Renamed session [1] to renamed-active.");
 
-  fixture.elements.commandInput.value = "/rename 1 renamed-target";
+  fixture.elements.commandInput.value = "@1 /rename renamed-target";
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /^Renamed session \[1\] to renamed-target\.$/);
@@ -1781,7 +1781,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.match(
     fixture.elements.commandInput.value,
-    /^\/(switch 1|rename renamed-active|rename 1 renamed-target)$/
+    /^(\/switch 1|\/rename renamed-active|@1 \/rename renamed-target)$/
   );
   fixture.elements.commandInput.dispatchEvent({
     type: "keydown",
@@ -2609,7 +2609,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     },
     sendTerminator: "lf"
   };
-  fixture.elements.commandInput.value = `/settings apply 1 ${JSON.stringify(slashSettingsPayload)}`;
+  fixture.elements.commandInput.value = `@1 /settings apply ${JSON.stringify(slashSettingsPayload)}`;
   fixture.elements.sendCommand.click();
   await tick();
   const latestSlashSettingsCall = updateSessionCalls[updateSessionCalls.length - 1];
@@ -2629,26 +2629,32 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   });
   assert.equal(
     fixture.elements.commandFeedback.textContent,
-    "Applied settings to 1 session(s): startCwd, startCommand, env, tags, themeProfile, sendTerminator."
+    "Applied settings to [1] two: startCwd, startCommand, env, tags, themeProfile, sendTerminator."
   );
-  fixture.elements.commandInput.value = "/settings show 1";
+  fixture.elements.commandInput.value = "@1 /settings show";
   fixture.elements.sendCommand.click();
   await tick();
   assert.match(fixture.elements.commandFeedback.textContent, /sendTerminator=lf/);
   assert.match(fixture.elements.commandFeedback.textContent, /"slash"/);
-  fixture.elements.commandInput.value = "/note 1 needs review";
+  fixture.elements.commandInput.value = "@1 /note needs review";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(secondNote.textContent, "needs review");
   assert.equal(secondNote.hidden, false);
   assert.equal(fixture.elements.commandFeedback.textContent, "Updated note for [1] two.");
-  fixture.elements.commandInput.value = "/note 1";
+  fixture.elements.commandInput.value = "@1 /note";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(secondNote.textContent, "");
   assert.equal(secondNote.hidden, true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Cleared note for [1] two.");
-  fixture.elements.commandInput.value = "/replay export 1";
+  fixture.elements.commandInput.value = "@1 /note routed review";
+  fixture.elements.sendCommand.click();
+  await tick();
+  assert.equal(secondNote.textContent, "routed review");
+  assert.equal(secondNote.hidden, false);
+  assert.equal(fixture.elements.commandFeedback.textContent, "Updated note for [1] two.");
+  fixture.elements.commandInput.value = "@1 /replay export";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(
@@ -2658,7 +2664,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(createdObjectUrls.length > 0, true);
   assert.deepEqual(createdObjectUrls[createdObjectUrls.length - 1].parts, ["line one\nline two\n"]);
   assert.equal(revokedObjectUrls[revokedObjectUrls.length - 1], `blob:replay-${createdObjectUrls.length}`);
-  fixture.elements.commandInput.value = "/replay view 1";
+  fixture.elements.commandInput.value = "@1 /replay view";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Opened replay viewer for [1] two.");
@@ -2672,11 +2678,11 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.replayViewerCopy.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Copied replay tail for [1] two (18/32 chars retained, truncated).");
-  fixture.elements.commandInput.value = "/replay view 1";
+  fixture.elements.commandInput.value = "@1 /replay view";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Opened replay viewer for [1] two.");
-  fixture.elements.commandInput.value = "/replay export 1";
+  fixture.elements.commandInput.value = "@1 /replay export";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(
@@ -2686,7 +2692,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   fixture.elements.replayViewerClose.click();
   await tick();
   assert.equal(fixture.elements.replayViewerDialog.open, false);
-  fixture.elements.commandInput.value = '/settings apply 1 {"unknown":1}';
+  fixture.elements.commandInput.value = '@1 /settings apply {"unknown":1}';
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Unknown settings key(s): unknown");
@@ -2776,12 +2782,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(unrestoredCard.classList.contains("active"), true);
   assert.equal(fixture.elements.commandFeedback.textContent, "Sent to [2] one.");
 
-  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"crlf"}';
+  fixture.elements.commandInput.value = '@s-1 /settings apply {"sendTerminator":"crlf"}';
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(
     fixture.elements.commandFeedback.textContent,
-    "Applied settings to 1 session(s): sendTerminator."
+    "Applied settings to [2] one: sendTerminator."
   );
   fixture.elements.commandInput.value = "@s-1 echo alpha";
   fixture.elements.sendCommand.click();
@@ -2809,7 +2815,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.deepEqual(overlappedCustomTargets, ["ops", "s-1", "s-2"]);
   assert.equal(fixture.elements.commandFeedback.textContent, "Executed /blockcmd on 3 sessions.");
 
-  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"lf"}';
+  fixture.elements.commandInput.value = '@s-1 /settings apply {"sendTerminator":"lf"}';
   fixture.elements.sendCommand.click();
   await tick();
   fixture.elements.commandInput.value = "@s-1 line1\nline2";
@@ -2821,7 +2827,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.deepEqual(inputPayloads[inputPayloads.length - 1], { sessionId: "s-1", data: "line 1\nline 2\n" });
 
-  fixture.elements.commandInput.value = '/settings apply s-1 {"sendTerminator":"cr"}';
+  fixture.elements.commandInput.value = '@s-1 /settings apply {"sendTerminator":"cr"}';
   fixture.elements.sendCommand.click();
   await tick();
   fixture.elements.commandInput.value = "@s-1 line1\nline2";
@@ -2896,7 +2902,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /exit code 17/i);
   assert.match(exitedSecondCard.querySelector(".session-unrestored-hint").textContent, /SIGTERM/i);
 
-  fixture.elements.commandInput.value = "/rename 1 renamed-exited";
+  fixture.elements.commandInput.value = "@1 /rename renamed-exited";
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Rename blocked for exited session [1] two.");
@@ -2906,7 +2912,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Restart blocked for exited session [1] two.");
 
-  fixture.elements.commandInput.value = '/settings apply 1 {"sendTerminator":"lf"}';
+  fixture.elements.commandInput.value = '@1 /settings apply {"sendTerminator":"lf"}';
   fixture.elements.sendCommand.click();
   await tick();
   assert.equal(fixture.elements.commandFeedback.textContent, "Settings apply blocked for exited session [1] two.");

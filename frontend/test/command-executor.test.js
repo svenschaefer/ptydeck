@@ -102,18 +102,18 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(moveUsage, "Usage: /move <sessionSelector> <deckSelector>");
 
   const switchUsage = await executor.execute({ command: "switch", args: [], raw: "/switch" });
-  assert.equal(switchUsage, "Usage: /switch <id>");
+  assert.equal(switchUsage, "Usage: /switch <sessionSelector>");
 
   const swapUsage = await executor.execute({ command: "swap", args: ["1"], raw: "/swap 1" });
   assert.equal(swapUsage, "Usage: /swap <selectorA> <selectorB>");
 
   const noteUsage = await executor.execute({ command: "note", args: [], raw: "/note" });
-  assert.equal(noteUsage, "Usage: /note <selector|active> [text...]");
+  assert.equal(noteUsage, "No active session for /note.");
 
   const connectionUsage = await executor.execute({ command: "connection", args: ["wat"], raw: "/connection wat" });
   assert.equal(
     connectionUsage,
-    "Usage: /connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>"
+    "Usage: /connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
@@ -129,21 +129,21 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(broadcastUsage, "Usage: /broadcast status | /broadcast off | /broadcast group [group]");
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
-  assert.equal(replayUsage, "Usage: /replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
+  assert.equal(replayUsage, "Usage: /replay view | /replay export | /replay copy");
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
-  assert.equal(renameUsage, "Usage: /rename <name> | /rename <selector> <name>");
+  assert.equal(renameUsage, "Usage: /rename <name>");
 
   const settingsUsage = await executor.execute({ command: "settings", args: [], raw: "/settings" });
-  assert.equal(settingsUsage, "Usage: /settings show [selector] | /settings apply <selector|active> <json>");
+  assert.equal(settingsUsage, "Usage: /settings show | /settings apply <json>");
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
-  assert.equal(customShowUsage, "Usage: /custom show [@global|@project|@session:<selector>] <name>");
+  assert.equal(customShowUsage, "Usage: /custom show [scope:global|scope:project|scope:session:<selector>] <name>");
 
   const customPreviewUsage = await executor.execute({ command: "custom", args: ["preview"], raw: "/custom preview" });
   assert.equal(
     customPreviewUsage,
-    "Usage: /custom preview [@global|@project|@session:<selector>] <name> [key=value ...] [-- <targetSelector>]"
+    "Usage: /custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>]"
   );
 
   const runUsage = await executor.execute({ command: "run", args: [], raw: "/run" });
@@ -727,23 +727,100 @@ test("command executor updates and clears persisted session notes", async () => 
 
   const setFeedback = await executor.execute({
     command: "note",
-    args: ["8", "needs", "review"],
-    raw: "/note 8 needs review"
+    args: ["needs", "review"],
+    raw: "/note needs review"
   });
-  assert.equal(setFeedback, "Updated note for [8] two.");
+  assert.equal(setFeedback, "Updated note for [7] one.");
 
   const clearFeedback = await executor.execute({
     command: "note",
-    args: ["active"],
-    raw: "/note active"
+    args: [],
+    raw: "/note"
   });
   assert.equal(clearFeedback, "Cleared note for [7] one.");
 
   assert.deepEqual(calls, [
-    ["patch", "s2", "needs review"],
-    ["event", "session.updated", "s2", "needs review"],
+    ["patch", "s1", "needs review"],
+    ["event", "session.updated", "s1", "needs review"],
     ["patch", "s1", ""],
     ["event", "session.updated", "s1", ""]
+  ]);
+});
+
+test("command executor accepts direct-targeted note commands without selector args", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload.note]);
+        return { ...sessions.find((session) => session.id === sessionId), note: payload.note };
+      }
+    },
+    systemSlashCommands: ["note", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.id, event.session.note]),
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s1" ? "7" : "8"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  const feedback = await executor.execute({
+    command: "note",
+    args: ["needs", "review"],
+    raw: "/note needs review",
+    targetSelector: "8"
+  });
+
+  assert.equal(feedback, "Updated note for [8] two.");
+  assert.deepEqual(calls, [
+    ["patch", "s2", "needs review"],
+    ["event", "session.updated", "s2", "needs review"]
   ]);
 });
 
@@ -1022,7 +1099,82 @@ test("command executor opens the replay viewer for an explicitly selected sessio
     }
   });
 
-  const feedback = await executor.execute({ command: "replay", args: ["view", "8"], raw: "/replay view 8" });
+  const feedback = await executor.execute({ command: "replay", args: ["view"], raw: "/replay view", targetSelector: "8" });
+
+  assert.equal(feedback, "Opened replay viewer for [8] two.");
+  assert.deepEqual(calls, [["view", "s2"]]);
+});
+
+test("command executor opens the replay viewer for a direct-targeted session without selector args", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    openSessionReplayViewer: async (currentSession) => {
+      calls.push(["view", currentSession.id]);
+      return {
+        feedback: "Opened replay viewer for [8] two."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({
+    command: "replay",
+    args: ["view"],
+    raw: "/replay view",
+    targetSelector: "8"
+  });
 
   assert.equal(feedback, "Opened replay viewer for [8] two.");
   assert.deepEqual(calls, [["view", "s2"]]);
@@ -1092,7 +1244,12 @@ test("command executor copies retained replay tails for an explicitly selected s
     }
   });
 
-  const feedback = await executor.execute({ command: "replay", args: ["copy", "8"], raw: "/replay copy 8" });
+  const feedback = await executor.execute({
+    command: "replay",
+    args: ["copy"],
+    raw: "/replay copy",
+    targetSelector: "8"
+  });
 
   assert.equal(feedback, "Copied replay tail for [8] two (0 chars retained).");
   assert.deepEqual(calls, [["copy", "s2"]]);
@@ -1155,11 +1312,11 @@ test("command executor applies input safety presets through settings payloads", 
 
   const feedback = await executor.execute({
     command: "settings",
-    args: ["apply", "active"],
-    raw: "/settings apply active {\"inputSafetyPreset\":\"shell_strict\"}"
+    args: ["apply", "{\"inputSafetyPreset\":\"shell_strict\"}"],
+    raw: "/settings apply {\"inputSafetyPreset\":\"shell_strict\"}"
   });
 
-  assert.equal(feedback, "Applied settings to 1 session(s): inputSafetyProfile.");
+  assert.equal(feedback, "Applied settings to [7] one: inputSafetyProfile.");
   assert.deepEqual(calls, [
     [
       "patch",
@@ -1191,6 +1348,74 @@ test("command executor applies input safety presets through settings payloads", 
         pasteLineConfirmThreshold: 3
       }
     ]
+  ]);
+});
+
+test("command executor applies settings to a direct-targeted session without selector args", async () => {
+  const calls = [];
+  const sessions = [{ id: "s1", name: "one", deckId: "default" }];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload.tags]);
+        return { ...sessions[0], ...payload };
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.tags]),
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => (selector === "7" ? { sessions, error: "" } : { sessions: [], error: `Unknown session identifier: ${selector}` }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    parseSettingsPayload: () => ({ ok: true, payload: { tags: ["ops"] } }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  const feedback = await executor.execute({
+    command: "settings",
+    args: ["apply", "{\"tags\":[\"ops\"]}"],
+    raw: "/settings apply {\"tags\":[\"ops\"]}",
+    targetSelector: "7"
+  });
+
+  assert.equal(feedback, "Applied settings to [7] one: tags.");
+  assert.deepEqual(calls, [
+    ["patch", "s1", ["ops"]],
+    ["event", "session.updated", ["ops"]]
   ]);
 });
 
@@ -1479,5 +1704,5 @@ test("command executor requires explicit scope when removing an ambiguous scoped
     raw: "/custom remove deploy"
   });
 
-  assert.equal(feedback, "Multiple scoped custom commands share /deploy. Use @global, @project, or @session:<selector>.");
+  assert.equal(feedback, "Multiple scoped custom commands share /deploy. Use scope:global, scope:project, or scope:session:<selector>.");
 });

@@ -37,7 +37,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(sessionSwapAlias);
   assert.ok(run);
   assert.equal(deck.summary, "/deck list|new|rename|switch|delete");
-  assert.equal(connection.summary, "/connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
+  assert.equal(connection.summary, "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
   assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(broadcast.summary, "/broadcast status | /broadcast off | /broadcast group [group]");
@@ -45,27 +45,27 @@ test("command schema exposes declarative command metadata and distinct help/usag
     swap.args,
     [{ provider: "session-selector", optional: false }, { provider: "session-selector", optional: false }]
   );
-  assert.equal(note.args[0].provider, "session-selector");
+  assert.equal(note.args, undefined);
   assert.deepEqual(deck.subcommands.switch.args, [{ provider: "deck-selector", optional: false }]);
   assert.deepEqual(layout.subcommands.apply.usage, ["/layout apply <profile>"]);
   assert.deepEqual(layout.subcommands.save.usage, ["/layout save <name>"]);
   assert.deepEqual(connection.subcommands.apply.usage, ["/connection apply <profile>"]);
-  assert.deepEqual(connection.subcommands.save.usage, ["/connection save <name>", "/connection save <selector|active> <name>"]);
+  assert.deepEqual(connection.subcommands.save.usage, ["/connection save <name>"]);
   assert.equal(deckSwitchAlias.aliasOf, "/deck switch");
   assert.deepEqual(deckSwitchAlias.argsPrefix, ["switch"]);
   assert.equal(sessionSwapAlias.aliasOf, "/swap");
   assert.deepEqual(run.usage, ["/run + newline-separated slash commands", "/cmd1 + newline + /cmd2"]);
-  assert.equal(replay.subcommands.view.args[0].provider, "session-selector");
-  assert.equal(replay.subcommands.export.args[0].provider, "session-selector");
-  assert.equal(settings.subcommands.show.args[0].provider, "session-selector");
+  assert.equal(replay.subcommands.view.args, undefined);
+  assert.equal(replay.subcommands.export.args, undefined);
+  assert.equal(settings.subcommands.show.args, undefined);
   assert.equal(getSlashCommandUsage("deck"), "/deck list | /deck new <name> | /deck rename <name> | /deck rename <deckSelector> <name> | /deck switch <deckSelector> | /deck delete [deckSelector] [force]");
   assert.equal(getSlashCommandUsage("swap"), "/swap <selectorA> <selectorB>");
-  assert.equal(getSlashCommandUsage("note"), "/note <selector|active> [text...]");
-  assert.equal(getSlashCommandUsage("connection"), "/connection list | /connection save <name> | /connection save <selector|active> <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
+  assert.equal(getSlashCommandUsage("note"), "/note [text...]");
+  assert.equal(getSlashCommandUsage("connection"), "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
   assert.equal(getSlashCommandUsage("layout"), "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
-  assert.equal(getSlashCommandUsage("replay"), "/replay view [selector|active] | /replay export [selector|active] | /replay copy [selector|active]");
+  assert.equal(getSlashCommandUsage("replay"), "/replay view | /replay export | /replay copy");
   assert.equal(getSlashCommandUsage("deck.switch"), "/deck.switch <deckSelector>");
 });
 
@@ -92,6 +92,18 @@ test("command schema formats topic help text for commands and subcommands", () =
 
   const aliasHelp = createCommandTopicHelpText("deck.switch", "", ["deck", "help"]);
   assert.equal(aliasHelp, ["/deck.switch", "Usage: /deck.switch <deckSelector>", "switch active deck", "Alias for: /deck switch"].join("\n"));
+
+  const directTargetHelp = createCommandTopicHelpText("@", "", ["help"]);
+  assert.equal(
+    directTargetHelp,
+    ["@", "Usage: @<sessionSelector> /<command> ...", "Route a single-session slash command to another session without changing the active session.", "Examples: @3 /note test · @ops /rename api-shell"].join("\n")
+  );
+
+  const quickSwitchHelp = createCommandTopicHelpText(">", "", ["help"]);
+  assert.equal(
+    quickSwitchHelp,
+    [">", "Usage: >sessionSelector", "Quick-switch the active session. Session selectors win by default; use 'deck:<deckSelector>' for a deck or '<deckSelector>::<sessionSelector>' for an explicit cross-deck session."].join("\n")
+  );
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
@@ -101,7 +113,7 @@ test("command schema registry resolves declarative command definitions by name",
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);
   assert.deepEqual(registry.get("workspace")?.subcommands?.apply?.usage, ["/workspace apply <preset>"]);
   assert.deepEqual(registry.get("broadcast")?.subcommands?.group?.usage, ["/broadcast group [group]"]);
-  assert.equal(registry.get("settings")?.subcommands?.apply?.args?.[0]?.provider, "session-selector");
+  assert.equal(registry.get("settings")?.subcommands?.apply?.args, undefined);
   assert.equal(registry.get("deck.switch")?.aliasOf, "/deck switch");
   assert.deepEqual(registry.resolve("deck.switch"), {
     entry: registry.get("deck.switch"),

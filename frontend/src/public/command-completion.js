@@ -440,7 +440,9 @@ export function createSuggestionProviderRegistry(options = {}) {
         continue;
       }
       const insertText =
-        command.scope === "session" ? `@session:${getSessionToken(command.sessionId) || command.sessionId} ${command.name}` : `@${command.scope} ${command.name}`;
+        command.scope === "session"
+          ? `scope:session:${getSessionToken(command.sessionId) || command.sessionId} ${command.name}`
+          : `scope:${command.scope} ${command.name}`;
       pushCandidate(candidates, seen, {
         insertText,
         label: `/${command.name}`,

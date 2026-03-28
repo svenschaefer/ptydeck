@@ -191,6 +191,29 @@ export function createCommandComposerRuntimeController(options = {}) {
     };
   }
 
+  function isPotentialDirectTargetControlPayload(payload) {
+    const firstLine = String(payload || "")
+      .split(/\r?\n/, 1)[0]
+      .trimStart();
+    return /^\/[A-Za-z][A-Za-z0-9._-]*(?:\s|$)/.test(firstLine);
+  }
+
+  function resolveDirectTargetedControlInput(rawInput) {
+    const directRouting = parseDirectTargetRoutingInput(rawInput);
+    if (!directRouting.matched || !isPotentialDirectTargetControlPayload(directRouting.payload)) {
+      return null;
+    }
+    const nested = interpretComposerInput(directRouting.payload);
+    if (nested.kind !== "control" && nested.kind !== "control-script") {
+      return null;
+    }
+    return {
+      ...nested,
+      raw: directRouting.payload,
+      targetSelector: directRouting.targetToken
+    };
+  }
+
   async function executeSendPlan(plan) {
     if (!plan || !Array.isArray(plan.targetSessions) || plan.targetSessions.length === 0) {
       return;
@@ -249,7 +272,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
     clearPendingSend({ renderAfterClear: false });
 
-    const interpreted = interpretComposerInput(command);
+    const interpreted = resolveDirectTargetedControlInput(command) || interpretComposerInput(command);
     if (interpreted.kind === "quick-switch") {
       const state = getState();
       const resolved = resolveQuickSwitchTarget(interpreted.selector, state.sessions);

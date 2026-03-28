@@ -12,15 +12,14 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H43` (Command Surface Consistency).
-- Active scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`.
-- Queued next wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes).
-- Queued scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`.
+- Active release wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes).
+- Active scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`.
 - Queued next wave after that: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
 - Queued scoped tasks after that: `QLT-161`, `QLT-162`.
 - Queued next wave after that: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
 - Queued scoped tasks after that: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
-- Latest completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
+- Latest completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
+- Previous completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
 - Previous completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -64,31 +63,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H43 - Command Surface Consistency (Active)
+### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Active)
 
-- Active scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`
-
-Dependencies:
-
-- `QLT-153` follows `v0.4.0-H42` so persisted quick-ID ordering is in place first, then single-session slash-command targeting can consistently prefer `@target` forms against stable quick IDs.
-- `QLT-154` follows `QLT-153` because the `@` namespace collision with custom-command scope tokens can only be resolved cleanly once the canonical session-targeting form is defined.
-- `QLT-155` follows `QLT-153` and `QLT-154` so `>` quick-switch semantics are rationalized against the final `@` and `/` targeting model instead of another intermediate grammar.
-- `QLT-156` follows `QLT-153`, `QLT-154`, and `QLT-155`, so help, autocomplete, palette descriptions, and examples document the final command surface rather than transitional syntax.
-- `QLT-157` closes after `QLT-153` through `QLT-156`, so regression coverage locks the final unified grammar and help surfaces end to end.
-
-Exit criteria:
-
-- Single-session slash commands consistently use explicit `@target /command ...` targeting instead of selector arguments after `/command`.
-- The `@` grammar is unambiguous despite the existing custom-command scope system.
-- `>` remains a clear session-first switching shortcut, with any deck-oriented variants made explicit rather than implicit.
-- Help, autocomplete, and command-palette surfaces document the same model and stop advertising deprecated selector-after-slash forms.
-- Regression coverage exists for grammar, parser conflicts, help alignment, and shorthand/direct-target behavior.
-
-## Queued Next Wave
-
-### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Queued)
-
-- Queued scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`
+- Active scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`
 
 Dependencies:
 
@@ -102,6 +79,8 @@ Exit criteria:
 - Session settings are organized into tabs, including a dedicated note tab for editing multiline notes.
 - Session headers show only the first note line with truncation/ellipsis behavior, while the full note remains available via tooltip.
 - Regression coverage exists for persistence, settings UX, and header rendering behavior.
+
+## Queued Next Wave
 
 ### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Queued)
 
@@ -139,6 +118,26 @@ Exit criteria:
 - Regression coverage exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
 
 ## Latest Completed Wave
+
+### v0.4.0-H43 - Command Surface Consistency (Completed)
+
+- Completed scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`
+
+Dependencies:
+
+- `QLT-153` followed `v0.4.0-H42` so persisted quick-ID ordering was in place first, then single-session slash-command targeting could consistently prefer `@target` forms against stable quick IDs.
+- `QLT-154` followed `QLT-153`, resolving the `@` namespace collision with custom-command scope tokens after the canonical session-targeting form was defined.
+- `QLT-155` followed `QLT-153` and `QLT-154`, rationalizing `>` quick-switch semantics against the final `@` and `/` targeting model instead of another intermediate grammar.
+- `QLT-156` followed `QLT-153`, `QLT-154`, and `QLT-155`, so help, autocomplete, palette descriptions, and examples now document the final command surface rather than transitional syntax.
+- `QLT-157` closed after `QLT-153` through `QLT-156`, so regression coverage now locks the unified grammar and help surfaces end to end.
+
+Exit criteria:
+
+- Single-session slash commands now consistently use explicit `@target /command ...` targeting instead of selector arguments after `/command`.
+- The `@` grammar is now unambiguous despite the existing custom-command scope system.
+- `>` remains a clear session-first switching shortcut, with deck-oriented variants explicit instead of implicit.
+- Help, autocomplete, and command-palette surfaces now document the same model and stop advertising deprecated selector-after-slash forms.
+- Regression coverage now exists for grammar, parser conflicts, help alignment, and shorthand/direct-target behavior.
 
 ### v0.4.0-H42 - Persisted Quick-ID Swap Ordering (Completed)
 

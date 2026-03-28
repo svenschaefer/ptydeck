@@ -251,8 +251,8 @@ test("command palette opens from the global shortcut and fills the composer for 
     }
   });
 
-  assert.equal(composerValue, "/note <selector|active> [text...]");
-  assert.equal(commandInput.value, "/note <selector|active> [text...]");
+  assert.equal(composerValue, "/note [text...]");
+  assert.equal(commandInput.value, "/note [text...]");
   assert.equal(controller.isOpen(), false);
 });
 

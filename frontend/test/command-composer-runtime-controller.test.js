@@ -324,6 +324,89 @@ test("command-composer runtime controller records one submission per direct-rout
   ]);
 });
 
+test("command-composer runtime controller routes direct-target slash commands through the control plane", async () => {
+  const calls = [];
+  let value = "@ops /note needs review";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: (raw) => {
+      if (raw === value) {
+        return { kind: "terminal", data: raw };
+      }
+      return { kind: "control", command: "note", args: ["needs", "review"], raw };
+    },
+    parseDirectTargetRoutingInput: () => ({ matched: true, payload: "/note needs review", targetToken: "ops" }),
+    executeControlCommand: async (interpreted) => {
+      calls.push(["control", interpreted.command, interpreted.targetSelector, interpreted.raw]);
+      return "Updated note for [7] ops.";
+    },
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    resetSlashHistoryNavigationState: () => calls.push(["history-reset"]),
+    recordSlashHistory: (raw) => calls.push(["history", raw]),
+    render: () => calls.push(["render"])
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["control", "note", "ops", "/note needs review"],
+    ["feedback", "Updated note for [7] ops."],
+    ["history", "@ops /note needs review"],
+    ["value", ""],
+    ["history-reset"],
+    ["render"]
+  ]);
+});
+
+test("command-composer runtime controller keeps path-like direct routes in terminal mode", async () => {
+  const calls = [];
+  let value = "@ops /tmp/work.log";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "terminal", data: value }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    parseDirectTargetRoutingInput: () => ({ matched: true, payload: "/tmp/work.log", targetToken: "ops" }),
+    resolveTargetSelectors: () => ({ sessions: [{ id: "s1", name: "one" }], error: "" }),
+    getActiveDeck: () => ({ id: "default" }),
+    isSessionActionBlocked: () => false,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
+      calls.push(["send", sessionId, payload]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordCommandSubmission: () => null,
+    formatSessionToken: (sessionId) => sessionId,
+    formatSessionDisplayName: (session) => session.name,
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandPreview: () => {},
+    clearCommandSuggestions: () => {},
+    clearError: () => {},
+    resetSlashHistoryNavigationState: () => {},
+    render: () => {}
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["send", "s1", "/tmp/work.log"],
+    ["value", ""],
+    ["feedback", "Sent to [s1] one."]
+  ]);
+});
+
 test("command-composer runtime controller sends to active broadcast targets and bypasses them for direct routes", async () => {
   const calls = [];
   let value = "npm test";

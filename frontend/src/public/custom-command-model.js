@@ -130,21 +130,21 @@ export function compareCustomCommandRecords(leftValue, rightValue) {
 
 export function parseCustomCommandScopeToken(token) {
   const normalized = normalizeText(token);
-  if (!normalized.startsWith("@")) {
+  if (!normalized.toLowerCase().startsWith("scope:")) {
     return null;
   }
-  const payload = normalizeLower(normalized.slice(1));
+  const payload = normalizeLower(normalized.slice("scope:".length));
   if (payload === "global" || payload === "project") {
     return { ok: true, scope: payload, sessionSelector: "" };
   }
   if (payload.startsWith("session:")) {
-    const sessionSelector = normalizeText(normalized.slice("@session:".length));
+    const sessionSelector = normalizeText(normalized.slice("scope:session:".length));
     if (!sessionSelector) {
-      return { ok: false, error: "Scope token '@session:<selector>' requires a non-empty selector." };
+      return { ok: false, error: "Scope token 'scope:session:<selector>' requires a non-empty selector." };
     }
     return { ok: true, scope: "session", sessionSelector };
   }
-  return { ok: false, error: "Invalid scope token. Use @global, @project, or @session:<selector>." };
+  return { ok: false, error: "Invalid scope token. Use scope:global, scope:project, or scope:session:<selector>." };
 }
 
 function parseScopedCustomCommandHeaderTokens(tokens, usageText) {
@@ -163,6 +163,9 @@ function parseScopedCustomCommandHeaderTokens(tokens, usageText) {
   let scope = DEFAULT_CUSTOM_COMMAND_SCOPE;
   let sessionSelector = "";
   if (parts[offset]?.startsWith("@")) {
+    return { ok: false, error: "Invalid scope token. Use scope:global, scope:project, or scope:session:<selector>." };
+  }
+  if (parts[offset]?.toLowerCase().startsWith("scope:")) {
     const parsedScope = parseCustomCommandScopeToken(parts[offset]);
     if (!parsedScope?.ok) {
       return parsedScope || { ok: false, error: usageText };
@@ -245,7 +248,7 @@ function parseCustomCommandHeader(header, usageText) {
   const parts = raw.split(/\s+/).filter(Boolean);
   return parseScopedCustomCommandHeaderTokens(
     parts,
-    "Block definition header must be '/custom [template] [@global|@project|@session:<selector>] <name>' only."
+    "Block definition header must be '/custom [template] [scope:global|scope:project|scope:session:<selector>] <name>' only."
   );
 }
 
@@ -268,6 +271,9 @@ function parseInlineCustomCommand(afterPrefix, usageText) {
   let scope = DEFAULT_CUSTOM_COMMAND_SCOPE;
   let sessionSelector = "";
   if (parts[offset]?.startsWith("@")) {
+    return { ok: false, error: "Invalid scope token. Use scope:global, scope:project, or scope:session:<selector>." };
+  }
+  if (parts[offset]?.toLowerCase().startsWith("scope:")) {
     const parsedScope = parseCustomCommandScopeToken(parts[offset]);
     if (!parsedScope?.ok) {
       return parsedScope || { ok: false, error: usageText };
@@ -291,7 +297,7 @@ function parseInlineCustomCommand(afterPrefix, usageText) {
 
 export function parseCustomCommandDefinition(
   rawInput,
-  usageText = "Usage: /custom [plain|template] [@global|@project|@session:<selector>] <name> <text> | /custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
+  usageText = "Usage: /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
 ) {
   const raw = String(rawInput || "").replaceAll("\r\n", "\n");
   const trimmedStart = raw.trimStart();
@@ -483,6 +489,9 @@ export function parseCustomCommandReferenceArgs(args = [], options = {}) {
   let scope = null;
   let sessionSelector = "";
   if (parts[offset].startsWith("@")) {
+    return { ok: false, error: "Invalid scope token. Use scope:global, scope:project, or scope:session:<selector>." };
+  }
+  if (parts[offset].toLowerCase().startsWith("scope:")) {
     const parsedScope = parseCustomCommandScopeToken(parts[offset]);
     if (!parsedScope?.ok) {
       return parsedScope || { ok: false, error: "Invalid scope token." };

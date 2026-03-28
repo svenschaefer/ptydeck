@@ -51,7 +51,6 @@ export function createCommandExecutor(options = {}) {
   const removeCustomCommandState = options.removeCustomCommandState;
   const parseCustomDefinition = options.parseCustomDefinition;
   const upsertCustomCommandState = options.upsertCustomCommandState;
-  const resolveSettingsTargets = options.resolveSettingsTargets;
   const parseSettingsPayload = options.parseSettingsPayload;
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode;
   const setSessionSendTerminator = options.setSessionSendTerminator;
@@ -129,6 +128,7 @@ export function createCommandExecutor(options = {}) {
       /^Deck '.+' is not empty\./,
       /^Scoped custom command /,
       /^Custom command not found:/,
+      /^Custom command definition error:/,
       /^Multiple scoped custom commands share /,
       /^Field '.+'/
     ].some((pattern) => pattern.test(text));
@@ -223,6 +223,22 @@ export function createCommandExecutor(options = {}) {
     return { error: "", session: resolvedTargets.sessions[0] };
   }
 
+  function resolveDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
+    const targetSelector = String(interpreted?.targetSelector || "").trim();
+    if (!targetSelector) {
+      return { error: "", session: null };
+    }
+    return resolveSingleSessionForCommand(targetSelector, sessions, activeSessionId, missingActiveMessage, selectorLabel);
+  }
+
+  function resolveActiveOrDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
+    const directTarget = resolveDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel);
+    if (directTarget.error || directTarget.session) {
+      return directTarget;
+    }
+    return resolveSingleSessionForCommand("", sessions, activeSessionId, missingActiveMessage, selectorLabel);
+  }
+
   function resolveCustomCommandTargets(selectorText, sessions, activeSessionId, missingActiveMessage) {
     const normalizedSelector = String(selectorText || "").trim();
     if (!normalizedSelector) {
@@ -296,13 +312,13 @@ export function createCommandExecutor(options = {}) {
     if (matches.length === 0) {
       return { error: `Custom command not found: /${reference.name}`, custom: null, exactSession: null };
     }
-    if (exactRequired && matches.length > 1) {
-      return {
-        error: `Multiple scoped custom commands share /${reference.name}. Use @global, @project, or @session:<selector>.`,
-        custom: null,
-        exactSession: null
-      };
-    }
+      if (exactRequired && matches.length > 1) {
+        return {
+        error: `Multiple scoped custom commands share /${reference.name}. Use scope:global, scope:project, or scope:session:<selector>.`,
+          custom: null,
+          exactSession: null
+        };
+      }
     if (activeSessionId) {
       const effective = resolveCustomCommandForSession(commands, reference.name, activeSessionId);
       if (effective) {
@@ -313,7 +329,7 @@ export function createCommandExecutor(options = {}) {
       return { error: "", custom: matches[0], exactSession: null };
     }
     return {
-      error: `Multiple scoped custom commands share /${reference.name}. Use @global, @project, or @session:<selector>.`,
+      error: `Multiple scoped custom commands share /${reference.name}. Use scope:global, scope:project, or scope:session:<selector>.`,
       custom: null,
       exactSession: null
     };
@@ -774,40 +790,24 @@ export function createCommandExecutor(options = {}) {
       if (args.length === 0) {
         return formatUsage("rename");
       }
-
-      if (args.length === 1) {
-        if (!activeSessionId) {
-          return "No active session to rename.";
-        }
-        const name = args[0].trim();
-        if (!name) {
-          return formatUsage("rename");
-        }
-        const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
-        if (isSessionExited(activeSession)) {
-          return getBlockedSessionActionMessage([activeSession], "Rename");
-        }
-        const updated = await api.updateSession(activeSessionId, { name });
-        applyRuntimeEvent({ type: "session.updated", session: updated });
-        return `Renamed active session to ${updated.name}.`;
+      const resolvedTarget = resolveActiveOrDirectTargetSession(
+        interpreted,
+        sessions,
+        activeSessionId,
+        "No active session to rename.",
+        "Rename selector"
+      );
+      if (resolvedTarget.error) {
+        return resolvedTarget.error;
       }
-
-      const selectorText = args[0];
-      const name = args.slice(1).join(" ").trim();
+      const name = args.join(" ").trim();
       if (!name) {
         return formatUsage("rename");
       }
-      const resolvedTargets = resolveTargetSelectors(selectorText, sessions, { source: "slash" });
-      if (resolvedTargets.error) {
-        return resolvedTargets.error;
+      if (isSessionExited(resolvedTarget.session)) {
+        return getBlockedSessionActionMessage([resolvedTarget.session], "Rename");
       }
-      if (resolvedTargets.sessions.length !== 1) {
-        return "Rename selector must resolve to exactly one session.";
-      }
-      if (isSessionExited(resolvedTargets.sessions[0])) {
-        return getBlockedSessionActionMessage(resolvedTargets.sessions, "Rename");
-      }
-      const updated = await api.updateSession(resolvedTargets.sessions[0].id, { name });
+      const updated = await api.updateSession(resolvedTarget.session.id, { name });
       applyRuntimeEvent({ type: "session.updated", session: updated });
       return `Renamed session [${formatSessionToken(updated.id)}] to ${updated.name}.`;
     }
@@ -818,6 +818,19 @@ export function createCommandExecutor(options = {}) {
       }
       let targetSessions = [];
       if (args.length === 0) {
+        const directTarget = resolveDirectTargetSession(
+          interpreted,
+          sessions,
+          activeSessionId,
+          "No active session to restart.",
+          "Restart selector"
+        );
+        if (directTarget.error) {
+          return directTarget.error;
+        }
+        if (directTarget.session) {
+          targetSessions = [directTarget.session];
+        } else {
         if (!activeSessionId) {
           return "No active session to restart.";
         }
@@ -826,6 +839,7 @@ export function createCommandExecutor(options = {}) {
           return "No active session to restart.";
         }
         targetSessions = [activeSession];
+        }
       } else {
         const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
         if (resolvedTargets.error) {
@@ -855,12 +869,8 @@ export function createCommandExecutor(options = {}) {
     }
 
     if (command === "note") {
-      if (args.length === 0) {
-        return formatUsage("note");
-      }
-
-      const resolvedTarget = resolveSingleSessionForCommand(
-        args[0],
+      const resolvedTarget = resolveActiveOrDirectTargetSession(
+        interpreted,
         sessions,
         activeSessionId,
         "No active session for /note.",
@@ -869,8 +879,7 @@ export function createCommandExecutor(options = {}) {
       if (resolvedTarget.error) {
         return resolvedTarget.error;
       }
-
-      const note = args.slice(1).join(" ").trim();
+      const note = args.join(" ").trim();
       const updated = await api.updateSession(resolvedTarget.session.id, { note });
       applyRuntimeEvent({ type: "session.updated", session: updated });
       if (updated?.note) {
@@ -881,12 +890,11 @@ export function createCommandExecutor(options = {}) {
 
     if (command === "replay") {
       const subcommand = String(args[0] || "").trim().toLowerCase();
-      if (subcommand !== "view" && subcommand !== "export" && subcommand !== "copy") {
+      if ((subcommand !== "view" && subcommand !== "export" && subcommand !== "copy") || args.length !== 1) {
         return formatUsage("replay");
       }
-      const selectorText = args[1] || "active";
-      const resolvedTarget = resolveSingleSessionForCommand(
-        selectorText,
+      const resolvedTarget = resolveActiveOrDirectTargetSession(
+        interpreted,
         sessions,
         activeSessionId,
         "No active session for /replay.",
@@ -982,51 +990,18 @@ export function createCommandExecutor(options = {}) {
         if (rest.length === 0) {
           return formatUsage("connection", "save");
         }
-        let targetSession = null;
-        let name = "";
-        if (rest.length === 1) {
-          const resolvedTarget = resolveSingleSessionForCommand(
-            "",
-            sessions,
-            activeSessionId,
-            "No active session to save as a connection profile.",
-            "Connection profile session selector"
-          );
-          if (resolvedTarget.error || !resolvedTarget.session) {
-            return resolvedTarget.error || "No active session to save as a connection profile.";
-          }
-          targetSession = resolvedTarget.session;
-          name = rest[0].trim();
-        } else {
-          const selectorToken = String(rest[0] || "").trim();
-          const resolvedTarget = resolveSingleSessionForCommand(
-            selectorToken,
-            sessions,
-            activeSessionId,
-            "No active session to save as a connection profile.",
-            "Connection profile session selector"
-          );
-          const selectorWasExplicit =
-            selectorToken.toLowerCase() === "active" ||
-            (!resolvedTarget.error && !!resolvedTarget.session);
-          if (selectorWasExplicit) {
-            targetSession = resolvedTarget.session;
-            name = rest.slice(1).join(" ").trim();
-          } else {
-            const activeTarget = resolveSingleSessionForCommand(
-              "",
-              sessions,
-              activeSessionId,
-              "No active session to save as a connection profile.",
-              "Connection profile session selector"
-            );
-            if (activeTarget.error || !activeTarget.session) {
-              return activeTarget.error || "No active session to save as a connection profile.";
-            }
-            targetSession = activeTarget.session;
-            name = rest.join(" ").trim();
-          }
+        const resolvedTarget = resolveActiveOrDirectTargetSession(
+          interpreted,
+          sessions,
+          activeSessionId,
+          "No active session to save as a connection profile.",
+          "Connection profile session selector"
+        );
+        if (resolvedTarget.error) {
+          return resolvedTarget.error;
         }
+        const targetSession = resolvedTarget.session;
+        const name = rest.join(" ").trim();
         if (!name) {
           return formatUsage("connection", "save");
         }
@@ -1298,37 +1273,34 @@ export function createCommandExecutor(options = {}) {
     }
 
     if (command === "settings") {
-      const showMatch = /^\/settings\s+show(?:\s+([^\s]+))?\s*$/i.exec(interpreted.raw || "");
+      if (args.length === 0) {
+        return formatUsage("settings");
+      }
+      const resolvedTarget = resolveActiveOrDirectTargetSession(
+        interpreted,
+        sessions,
+        activeSessionId,
+        "No active session for /settings.",
+        "Settings selector"
+      );
+      if (resolvedTarget.error) {
+        return resolvedTarget.error;
+      }
+      const showMatch = /^\/settings\s+show\s*$/i.exec(interpreted.raw || "");
       if (showMatch) {
-        const selectorText = showMatch[1] || "active";
-        const resolvedTargets = resolveSettingsTargets(selectorText, sessions, activeSessionId);
-        if (resolvedTargets.error) {
-          return resolvedTargets.error;
-        }
-        return resolvedTargets.sessions.map((session) => formatSessionSettingsReport(session)).join("\n\n");
+        return formatSessionSettingsReport(resolvedTarget.session);
       }
 
-      const applyMatch = /^\/settings\s+apply\s+([^\s]+)\s+([\s\S]+)$/i.exec(interpreted.raw || "");
+      const applyMatch = /^\/settings\s+apply\s+([\s\S]+)$/i.exec(interpreted.raw || "");
       if (!applyMatch) {
         return formatUsage("settings");
       }
-      const selectorText = applyMatch[1];
-      const parsedPayload = parseSettingsPayload(applyMatch[2]);
+      const parsedPayload = parseSettingsPayload(applyMatch[1]);
       if (!parsedPayload.ok) {
         return parsedPayload.error;
       }
-
-      const resolvedTargets = resolveSettingsTargets(selectorText, sessions, activeSessionId);
-      if (resolvedTargets.error) {
-        return resolvedTargets.error;
-      }
-      const targets = resolvedTargets.sessions;
-      if (targets.length === 0) {
-        return "No target sessions resolved for /settings apply.";
-      }
-      const blockedTargets = targets.filter((session) => isSessionExited(session));
-      if (blockedTargets.length > 0) {
-        return getBlockedSessionActionMessage(blockedTargets, "Settings apply");
+      if (isSessionExited(resolvedTarget.session)) {
+        return getBlockedSessionActionMessage([resolvedTarget.session], "Settings apply");
       }
 
       const payload = parsedPayload.payload;
@@ -1404,21 +1376,17 @@ export function createCommandExecutor(options = {}) {
       }
 
       if (hasPatch) {
-        const updatedSessions = await Promise.all(targets.map((session) => api.updateSession(session.id, patch)));
-        for (const updated of updatedSessions) {
-          applyRuntimeEvent({ type: "session.updated", session: updated });
-        }
+        const updated = await api.updateSession(resolvedTarget.session.id, patch);
+        applyRuntimeEvent({ type: "session.updated", session: updated });
       }
       if (hasTerminator) {
-        for (const session of targets) {
-          setSessionSendTerminator(session.id, sendTerminatorMode);
-        }
+        setSessionSendTerminator(resolvedTarget.session.id, sendTerminatorMode);
       }
       const appliedKeys = [
         ...Object.keys(patch),
         ...(hasTerminator ? ["sendTerminator"] : [])
       ];
-      return `Applied settings to ${targets.length} session(s): ${appliedKeys.join(", ")}.`;
+      return `Applied settings to [${formatSessionToken(resolvedTarget.session.id)}] ${formatSessionDisplayName(resolvedTarget.session)}: ${appliedKeys.join(", ")}.`;
     }
 
     const allCustomCommands = listNormalizedCustomCommands();

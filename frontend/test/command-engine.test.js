@@ -118,7 +118,7 @@ test("command engine derives schema-backed size and custom usage errors", () => 
   assert.deepEqual(engine.parseCustomDefinition("/custom"), {
     ok: false,
     error:
-      "Usage: /custom [plain|template] [@global|@project|@session:<selector>] <name> <text> | /custom [plain|template] [@global|@project|@session:<selector>] <name> + block"
+      "Usage: /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text> | /custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> + block"
   });
 });
 
@@ -180,10 +180,10 @@ test("command engine resolves declarative provider autocomplete for command argu
   assert.equal(moveContext.matches[0].insertText, "ops");
   assert.equal(moveContext.matches[0].kind, "deck");
 
-  const settingsContext = engine.parseAutocompleteContext("/settings show ");
-  assert.equal(settingsContext.replacePrefix, "/settings show ");
+  const switchContext = engine.parseAutocompleteContext("/switch ");
+  assert.equal(switchContext.replacePrefix, "/switch ");
   assert.deepEqual(
-    settingsContext.matches.map((candidate) => candidate.insertText),
+    switchContext.matches.map((candidate) => candidate.insertText),
     ["1", "alpha", "sess-1-abcdef", "2", "beta", "sess-2-fedcba"]
   );
 });

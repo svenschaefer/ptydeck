@@ -31,14 +31,14 @@ test("custom command model normalizes default project scope and precedence metad
 });
 
 test("custom command model parses scoped custom-command references", () => {
-  assert.deepEqual(parseCustomCommandReferenceArgs(["@global", "deploy"]), {
+  assert.deepEqual(parseCustomCommandReferenceArgs(["scope:global", "deploy"]), {
     ok: true,
     name: "deploy",
     scope: "global",
     sessionSelector: "",
     rest: []
   });
-  assert.deepEqual(parseCustomCommandReferenceArgs(["@session:7", "deploy", "env=prod"]), {
+  assert.deepEqual(parseCustomCommandReferenceArgs(["scope:session:7", "deploy", "env=prod"]), {
     ok: true,
     name: "deploy",
     scope: "session",

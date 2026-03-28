@@ -41,7 +41,7 @@ test("slash command specs expose declarative metadata for command and subcommand
   assert.ok(deckSwitchAlias);
   assert.ok(runSpec);
   assert.equal(deckSpec.subcommands.switch.args[0].provider, "deck-selector");
-  assert.equal(settingsSpec.subcommands.show.args[0].provider, "session-selector");
+  assert.equal(settingsSpec.subcommands.show.args, undefined);
   assert.deepEqual(deckSwitchAlias.args, [{ provider: "deck-selector", optional: false }]);
   assert.deepEqual(runSpec.usage, ["/run + newline-separated slash commands", "/cmd1 + newline + /cmd2"]);
 });
@@ -104,7 +104,7 @@ test("suggestion provider registry exposes scoped custom-command references dete
   const refs = registry.provide("custom-command-reference", "d");
   assert.deepEqual(
     refs.map((candidate) => candidate.insertText),
-    ["@global deploy", "@project deploy", "@session:2 deploy"]
+    ["scope:global deploy", "scope:project deploy", "scope:session:2 deploy"]
   );
 
   const unique = registry.provide("custom-command-reference", "sy");
