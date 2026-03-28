@@ -1,8 +1,8 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
@@ -109,6 +109,10 @@ const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
 const SESSION_REPLAY_EXPORT_CONTENT_TYPE = "text/plain; charset=utf-8";
+const DEFAULT_SESSION_FILE_TRANSFER_MAX_BYTES = 256 * 1024;
+const SESSION_FILE_TRANSFER_PATH_MAX_LENGTH = 512;
+const SESSION_FILE_TRANSFER_CONTENT_TYPE = "application/octet-stream";
+const SESSION_FILE_TRANSFER_ENCODING = "base64";
 const SESSION_QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SESSION_QUICK_ID_FALLBACK = "?";
 const DEFAULT_SESSION_THEME_PROFILE = {
@@ -139,6 +143,75 @@ function decodePathParam(value, name) {
   } catch {
     throw new ApiError(400, "ValidationError", `Invalid path parameter encoding for '${name}'.`);
   }
+}
+
+function isBase64Content(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  if (!value) {
+    return true;
+  }
+  return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
+}
+
+function expandHomePath(value) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "~") {
+    return homedir();
+  }
+  if (normalized.startsWith("~/")) {
+    return join(homedir(), normalized.slice(2));
+  }
+  return resolve(normalized);
+}
+
+function normalizeSessionTransferPath(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) {
+    throw new ApiError(400, "ValidationError", "Field 'path' must be a non-empty relative path.");
+  }
+  if (raw.length > SESSION_FILE_TRANSFER_PATH_MAX_LENGTH) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'path' exceeds maximum length (${SESSION_FILE_TRANSFER_PATH_MAX_LENGTH}).`
+    );
+  }
+  if (raw.includes("\u0000")) {
+    throw new ApiError(400, "ValidationError", "Field 'path' contains unsupported control characters.");
+  }
+  if (raw.startsWith("/") || /^[A-Za-z]:[\\/]/.test(raw)) {
+    throw new ApiError(400, "ValidationError", "Field 'path' must be relative to the session root.");
+  }
+  const normalized = posix.normalize(raw.replaceAll("\\", "/"));
+  if (!normalized || normalized === "." || normalized === ".." || normalized.startsWith("../")) {
+    throw new ApiError(400, "ValidationError", "Field 'path' must stay within the session root.");
+  }
+  if (normalized.endsWith("/")) {
+    throw new ApiError(400, "ValidationError", "Field 'path' must reference a file path, not a directory.");
+  }
+  return normalized.replace(/^(?:\.\/)+/, "");
+}
+
+function ensurePathWithinRoot(rootPath, candidatePath, fieldName = "path") {
+  const relativePath = relative(rootPath, candidatePath);
+  if (!relativePath || relativePath === ".") {
+    return;
+  }
+  if (relativePath === ".." || relativePath.startsWith(`..${posix.sep}`) || relativePath.startsWith("../")) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldName}' must stay within the session root.`);
+  }
+}
+
+function decodeBase64FileContent(value) {
+  if (!isBase64Content(value)) {
+    throw new ApiError(400, "ValidationError", "Field 'contentBase64' must be a valid base64 string.");
+  }
+  return Buffer.from(String(value || ""), "base64");
 }
 
 function parseJsonBody(req, maxBodyBytes) {
@@ -366,6 +439,16 @@ function route(pathname, method) {
     return { kind: "getSessionReplayExport", params: { sessionId: replayExportMatch[1] } };
   }
 
+  const fileTransferUploadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/upload$/);
+  if (fileTransferUploadMatch && method === "POST") {
+    return { kind: "uploadSessionFile", params: { sessionId: fileTransferUploadMatch[1] } };
+  }
+
+  const fileTransferDownloadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/download$/);
+  if (fileTransferDownloadMatch && method === "POST") {
+    return { kind: "downloadSessionFile", params: { sessionId: fileTransferDownloadMatch[1] } };
+  }
+
   const resizeMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
   if (resizeMatch && method === "POST") {
     return { kind: "resize", params: { sessionId: resizeMatch[1] } };
@@ -418,6 +501,12 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/replay-export$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/replay-export";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/upload$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/file-transfer/upload";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/download$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/file-transfer/download";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/resize$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/resize";
@@ -2251,6 +2340,10 @@ export function createRuntime(config) {
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
   const sshKnownHostsPath = join(dirname(config.dataPath), "ssh_known_hosts");
+  const sessionFileTransferMaxBytes =
+    Number.isInteger(config.sessionFileTransferMaxBytes) && config.sessionFileTransferMaxBytes > 0
+      ? config.sessionFileTransferMaxBytes
+      : DEFAULT_SESSION_FILE_TRANSFER_MAX_BYTES;
   const sessionReplayPersistMaxChars =
     Number.isInteger(config.sessionReplayPersistMaxChars) && config.sessionReplayPersistMaxChars >= 0
       ? config.sessionReplayPersistMaxChars
@@ -2745,6 +2838,9 @@ export function createRuntime(config) {
     if (kind === "getSessionReplayExport") {
       return "sessions:read";
     }
+    if (kind === "downloadSessionFile") {
+      return "sessions:read";
+    }
     if (kind === "createSession") {
       return "sessions:create";
     }
@@ -2756,6 +2852,7 @@ export function createRuntime(config) {
     }
     if (
       kind === "updateSession" ||
+      kind === "uploadSessionFile" ||
       kind === "input" ||
       kind === "resize" ||
       kind === "restart" ||
@@ -4053,6 +4150,159 @@ export function createRuntime(config) {
     };
   }
 
+  function resolveSessionTransferRootOrThrow(session) {
+    const rawRoot =
+      typeof session?.meta?.cwd === "string" && session.meta.cwd.trim()
+        ? session.meta.cwd
+        : typeof session?.meta?.startCwd === "string" && session.meta.startCwd.trim()
+          ? session.meta.startCwd
+          : "";
+    const expandedRoot = expandHomePath(rawRoot);
+    if (!expandedRoot) {
+      throw new ApiError(409, "FileTransferUnavailable", `Session '${session?.id || ""}' has no local transfer root.`);
+    }
+    return expandedRoot;
+  }
+
+  async function getTransferCapableSessionOrThrow(sessionId) {
+    const apiSession = getApiSessionOrThrow(sessionId);
+    if (apiSession.kind !== SESSION_KIND_LOCAL) {
+      throw new ApiError(
+        409,
+        "FileTransferUnsupported",
+        `Session '${sessionId}' does not support backend file transfer in the H47 baseline.`
+      );
+    }
+    let session = null;
+    try {
+      session = manager.get(sessionId);
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 404) {
+        throw new ApiError(
+          409,
+          "FileTransferUnavailable",
+          `Session '${sessionId}' is not currently available for file transfer.`
+        );
+      }
+      throw error;
+    }
+    const rootPath = resolveSessionTransferRootOrThrow(session);
+    let rootRealPath = "";
+    try {
+      rootRealPath = await realpath(rootPath);
+    } catch {
+      throw new ApiError(
+        409,
+        "FileTransferUnavailable",
+        `Session '${sessionId}' transfer root is unavailable on the local filesystem.`
+      );
+    }
+    return { apiSession, session, rootPath: rootRealPath };
+  }
+
+  async function resolveSessionTransferTargetOrThrow(sessionId, transferPath, { allowMissing = false } = {}) {
+    const { apiSession, session, rootPath } = await getTransferCapableSessionOrThrow(sessionId);
+    const normalizedPath = normalizeSessionTransferPath(transferPath);
+    const absolutePath = resolve(rootPath, normalizedPath);
+    ensurePathWithinRoot(rootPath, absolutePath);
+    if (!allowMissing) {
+      let targetRealPath = "";
+      try {
+        targetRealPath = await realpath(absolutePath);
+      } catch (error) {
+        if (error && error.code === "ENOENT") {
+          throw new ApiError(404, "FileNotFound", `File '${normalizedPath}' was not found for session '${sessionId}'.`);
+        }
+        throw error;
+      }
+      ensurePathWithinRoot(rootPath, targetRealPath);
+      return { apiSession, session, rootPath, normalizedPath, absolutePath: targetRealPath };
+    }
+    return { apiSession, session, rootPath, normalizedPath, absolutePath };
+  }
+
+  async function buildSessionFileDownloadOrThrow(sessionId, transferPath) {
+    const target = await resolveSessionTransferTargetOrThrow(sessionId, transferPath);
+    let stats = null;
+    try {
+      stats = await stat(target.absolutePath);
+    } catch (error) {
+      if (error && error.code === "ENOENT") {
+        throw new ApiError(404, "FileNotFound", `File '${target.normalizedPath}' was not found for session '${sessionId}'.`);
+      }
+      throw error;
+    }
+    if (!stats.isFile()) {
+      throw new ApiError(400, "ValidationError", `Field 'path' must reference a file inside the session root.`);
+    }
+    if (stats.size > sessionFileTransferMaxBytes) {
+      throw new ApiError(
+        413,
+        "FileTransferTooLarge",
+        `File '${target.normalizedPath}' exceeds the transfer limit (${sessionFileTransferMaxBytes} bytes).`
+      );
+    }
+    const content = await readFile(target.absolutePath);
+    return {
+      sessionId: target.apiSession.id,
+      path: target.normalizedPath,
+      fileName: basename(target.normalizedPath) || "download.bin",
+      contentType: SESSION_FILE_TRANSFER_CONTENT_TYPE,
+      encoding: SESSION_FILE_TRANSFER_ENCODING,
+      contentBase64: content.toString("base64"),
+      sizeBytes: content.length
+    };
+  }
+
+  async function uploadSessionFileOrThrow(sessionId, transferPath, contentBase64) {
+    const target = await resolveSessionTransferTargetOrThrow(sessionId, transferPath, { allowMissing: true });
+    const content = decodeBase64FileContent(contentBase64);
+    if (content.length > sessionFileTransferMaxBytes) {
+      throw new ApiError(
+        413,
+        "FileTransferTooLarge",
+        `Upload '${target.normalizedPath}' exceeds the transfer limit (${sessionFileTransferMaxBytes} bytes).`
+      );
+    }
+
+    const targetDir = dirname(target.absolutePath);
+    await mkdir(targetDir, { recursive: true });
+    let targetDirRealPath = "";
+    try {
+      targetDirRealPath = await realpath(targetDir);
+    } catch {
+      throw new ApiError(409, "FileTransferUnavailable", `Failed to prepare upload path '${target.normalizedPath}'.`);
+    }
+    ensurePathWithinRoot(target.rootPath, targetDirRealPath);
+
+    let created = true;
+    try {
+      const existingStats = await stat(target.absolutePath);
+      if (!existingStats.isFile()) {
+        throw new ApiError(400, "ValidationError", `Field 'path' must reference a file path inside the session root.`);
+      }
+      const targetRealPath = await realpath(target.absolutePath);
+      ensurePathWithinRoot(target.rootPath, targetRealPath);
+      created = false;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      if (!error || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    await writeFile(target.absolutePath, content);
+    return {
+      sessionId: target.apiSession.id,
+      path: target.normalizedPath,
+      fileName: basename(target.normalizedPath) || "upload.bin",
+      sizeBytes: content.length,
+      created
+    };
+  }
+
 function tryCreateRestoredSession({
   session,
   kind,
@@ -4701,6 +4951,13 @@ function tryCreateRestoredSession({
         return;
       }
 
+      if (match.kind === "downloadSessionFile") {
+        const payload = await buildSessionFileDownloadOrThrow(match.params.sessionId, body.path);
+        validateResponse({ statusCode: 200, body: payload, expect: "sessionFileDownload" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
       if (match.kind === "deleteSession") {
         manager.delete(match.params.sessionId);
         sessionDeckAssignments.delete(match.params.sessionId);
@@ -4833,6 +5090,13 @@ function tryCreateRestoredSession({
       if (match.kind === "input") {
         manager.sendInput(match.params.sessionId, body.data);
         writeJson(req, res, 204);
+        return;
+      }
+
+      if (match.kind === "uploadSessionFile") {
+        const payload = await uploadSessionFileOrThrow(match.params.sessionId, body.path, body.contentBase64);
+        validateResponse({ statusCode: 200, body: payload, expect: "sessionFileUpload" });
+        writeJson(req, res, 200, payload);
         return;
       }
 

@@ -861,6 +861,96 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/file-transfer/download:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: downloadSessionFile
+      summary: Download a bounded file payload relative to the current local session root.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionFileDownloadRequest'
+      responses:
+        '200':
+          description: File payload downloaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionFileDownload'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session or file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Transfer unsupported or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: File exceeds transfer size limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/file-transfer/upload:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: uploadSessionFile
+      summary: Upload a bounded file payload relative to the current local session root.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionFileUploadRequest'
+      responses:
+        '200':
+          description: File payload uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionFileUpload'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Transfer unsupported or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: File exceeds transfer size limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/input:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -1682,6 +1772,71 @@ components:
           minimum: 0
         truncated:
           type: boolean
+    SessionFileDownloadRequest:
+      type: object
+      required:
+        - path
+      properties:
+        path:
+          type: string
+    SessionFileUploadRequest:
+      type: object
+      required:
+        - path
+        - contentBase64
+      properties:
+        path:
+          type: string
+        contentBase64:
+          type: string
+    SessionFileUpload:
+      type: object
+      required:
+        - sessionId
+        - path
+        - fileName
+        - sizeBytes
+        - created
+      properties:
+        sessionId:
+          type: string
+        path:
+          type: string
+        fileName:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
+        created:
+          type: boolean
+    SessionFileDownload:
+      type: object
+      required:
+        - sessionId
+        - path
+        - fileName
+        - contentType
+        - encoding
+        - contentBase64
+        - sizeBytes
+      properties:
+        sessionId:
+          type: string
+        path:
+          type: string
+        fileName:
+          type: string
+        contentType:
+          type: string
+        encoding:
+          type: string
+          enum:
+            - base64
+        contentBase64:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
     SshTrustEntry:
       type: object
       required:

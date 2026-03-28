@@ -454,6 +454,52 @@ test("api client calls session replay export endpoint", async () => {
   assert.equal(payload.fileName, "abc.txt");
 });
 
+test("api client calls session file transfer endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).includes("/download")
+          ? {
+              sessionId: "abc",
+              path: "logs/output.txt",
+              fileName: "output.txt",
+              contentType: "application/octet-stream",
+              encoding: "base64",
+              contentBase64: "dXBkYXRlZA==",
+              sizeBytes: 7
+            }
+          : {
+              sessionId: "abc",
+              path: "logs/output.txt",
+              fileName: "output.txt",
+              sizeBytes: 7,
+              created: true
+            }
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const uploadPayload = await api.uploadSessionFile("abc", {
+    path: "logs/output.txt",
+    contentBase64: "dXBkYXRlZA=="
+  });
+  const downloadPayload = await api.downloadSessionFile("abc", "logs/output.txt");
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/file-transfer/upload");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.body, JSON.stringify({ path: "logs/output.txt", contentBase64: "dXBkYXRlZA==" }));
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/sessions/abc/file-transfer/download");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[1].options.body, JSON.stringify({ path: "logs/output.txt" }));
+  assert.equal(uploadPayload.created, true);
+  assert.equal(downloadPayload.fileName, "output.txt");
+});
+
 test("api client calls restart session endpoint", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H47` (Session File Transfer Baseline).
-- Active scoped tasks: `REM-006A`, `REM-006B`, `REM-006C`.
-- Latest completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
+- Active release wave: `v0.4.0-H48` (Read-Only Sharing Baseline).
+- Active scoped tasks: `REM-007A`, `REM-007B`, `REM-007C`.
+- Latest completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
+- Previous completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
 - Previous completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
 - Previous completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
 - Previous completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
@@ -62,23 +63,41 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H47 - Session File Transfer Baseline (Active)
+### v0.4.0-H48 - Read-Only Sharing Baseline (Active)
 
-- Active scoped tasks: `REM-006A`, `REM-006B`, `REM-006C`
+- Active scoped tasks: `REM-007A`, `REM-007B`, `REM-007C`
 
 Dependencies:
 
-- `REM-006A` lands first so the backend defines one authoritative upload/download contract, transfer capability policy, and path/size guardrail model before any frontend workflow depends on it.
-- `REM-006B` follows `REM-006A`, so slash-command and operator workflows bind to the final backend transfer semantics instead of inventing another local or shell-mediated path.
-- `REM-006C` closes after `REM-006A` and `REM-006B`, so regression coverage locks the actual backend/frontend file-transfer contract end to end.
+- `REM-007A` lands first so the backend defines one authoritative sharing and spectator-permission contract before the frontend invents another local-only share model.
+- `REM-007B` follows `REM-007A`, so sharing UI and spectator-state rendering bind to the final backend permission model instead of implying write control locally.
+- `REM-007C` closes after `REM-007A` and `REM-007B`, so regression coverage locks read-only enforcement and share lifecycle behavior end to end.
 
 Exit criteria:
 
-- Backend exposes bounded upload and download endpoints for session-scoped file transfer with deterministic normalization and rejection behavior.
-- Frontend exposes operator file-transfer workflows through slash commands with explicit status and rejection feedback.
-- Regression coverage exists for allowed/denied transfers, path normalization, size guardrails, and end-to-end success behavior.
+- Backend exposes a deterministic session/deck sharing contract with explicit read-only spectator semantics and revocation support.
+- Frontend exposes operator sharing workflows plus visible permission state so spectators are clearly separated from controlling operators.
+- Regression coverage exists for share lifecycle behavior, read-only enforcement, and reconnect/reload consistency.
 
 ## Latest Completed Wave
+
+### v0.4.0-H47 - Session File Transfer Baseline (Completed)
+
+- Completed scoped tasks: `REM-006A`, `REM-006B`, `REM-006C`
+
+Dependencies:
+
+- `REM-006A` landed first so the backend now defines one authoritative upload/download contract, transfer capability policy, and path/size guardrail model before frontend workflows depend on it.
+- `REM-006B` followed `REM-006A`, so slash-command and operator workflows now bind to the final backend transfer semantics instead of another local or shell-mediated path.
+- `REM-006C` closed after `REM-006A` and `REM-006B`, so regression coverage now locks the actual backend/frontend file-transfer contract end to end.
+
+Exit criteria:
+
+- Backend now exposes bounded upload and download endpoints for session-scoped file transfer with deterministic normalization and rejection behavior.
+- Frontend now exposes operator file-transfer workflows through slash commands with explicit status and rejection feedback.
+- Regression coverage now exists for allowed/denied transfers, path normalization, size guardrails, and end-to-end success behavior.
+
+## Previous Completed Wave
 
 ### v0.4.0-H46 - Deck Sidebar Action Consolidation (Completed)
 

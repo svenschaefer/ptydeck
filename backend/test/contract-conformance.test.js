@@ -83,6 +83,8 @@ function runtimeOperationKeys() {
     "POST /sessions",
     "GET /sessions/{sessionId}",
     "GET /sessions/{sessionId}/replay-export",
+    "POST /sessions/{sessionId}/file-transfer/download",
+    "POST /sessions/{sessionId}/file-transfer/upload",
     "PATCH /sessions/{sessionId}",
     "DELETE /sessions/{sessionId}",
     "POST /sessions/{sessionId}/input",
@@ -179,6 +181,23 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /sessions/{sessionId}/replay-export").has(replayExportRes.status));
+
+    const fileUploadRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        path: "contract.txt",
+        contentBase64: Buffer.from("contract", "utf8").toString("base64")
+      })
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/file-transfer/upload").has(fileUploadRes.status));
+
+    const fileDownloadRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/file-transfer/download`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ path: "contract.txt" })
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/file-transfer/download").has(fileDownloadRes.status));
 
     const swapQuickIdRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/swap-quick-id`, {
       method: "POST",
@@ -367,6 +386,20 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       body: JSON.stringify({ data: "echo hi\n" })
     });
     assert.ok(operations.get("POST /sessions/{sessionId}/input").has(inputMissingRes.status));
+
+    const downloadMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/file-transfer/download`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ path: "missing.txt" })
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/file-transfer/download").has(downloadMissingRes.status));
+
+    const uploadMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/file-transfer/upload`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ path: "missing.txt", contentBase64: "" })
+    });
+    assert.ok(operations.get("POST /sessions/{sessionId}/file-transfer/upload").has(uploadMissingRes.status));
 
     const resizeMissingRes = await contractFetch(`${baseUrl}/sessions/missing-id/resize`, {
       method: "POST",

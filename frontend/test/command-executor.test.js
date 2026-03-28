@@ -19,7 +19,7 @@ function createExecutor() {
         return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
       }
     },
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "replay", "settings", "custom", "help", "run"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "settings", "custom", "help", "run"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -73,7 +73,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast replay settings custom help run"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast replay transfer settings custom help run"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -130,6 +130,9 @@ test("command executor help and usage strings derive from declarative schema met
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(replayUsage, "Usage: /replay view | /replay export | /replay copy");
+
+  const transferUsage = await executor.execute({ command: "transfer", args: [], raw: "/transfer" });
+  assert.equal(transferUsage, "Usage: /transfer upload [path] | /transfer download <path>");
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
   assert.equal(renameUsage, "Usage: /rename <name>");
@@ -1103,6 +1106,143 @@ test("command executor opens the replay viewer for an explicitly selected sessio
 
   assert.equal(feedback, "Opened replay viewer for [8] two.");
   assert.deepEqual(calls, [["view", "s2"]]);
+});
+
+test("command executor uploads a picked file to the active session by default", async () => {
+  const calls = [];
+  const session = { id: "s1", name: "one", deckId: "default" };
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [session],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["transfer", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    uploadSessionFile: async (currentSession, options) => {
+      calls.push(["upload", currentSession.id, options]);
+      return {
+        feedback: "Uploaded logs/output.txt to [7] one (7 bytes)."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({ command: "transfer", args: ["upload", "logs/output.txt"], raw: "/transfer upload logs/output.txt" });
+
+  assert.equal(feedback, "Uploaded logs/output.txt to [7] one (7 bytes).");
+  assert.deepEqual(calls, [["upload", "s1", { remotePath: "logs/output.txt" }]]);
+});
+
+test("command executor downloads a file for an explicitly selected session", async () => {
+  const calls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["transfer", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (currentSession) => currentSession.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    downloadSessionFile: async (currentSession, options) => {
+      calls.push(["download", currentSession.id, options]);
+      return {
+        feedback: "Downloaded logs/output.txt from [8] two (7 bytes)."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({
+    command: "transfer",
+    args: ["download", "logs/output.txt"],
+    raw: "/transfer download logs/output.txt",
+    targetSelector: "8"
+  });
+
+  assert.equal(feedback, "Downloaded logs/output.txt from [8] two (7 bytes).");
+  assert.deepEqual(calls, [["download", "s2", { remotePath: "logs/output.txt" }]]);
 });
 
 test("command executor opens the replay viewer for a direct-targeted session without selector args", async () => {

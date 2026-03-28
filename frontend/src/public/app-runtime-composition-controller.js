@@ -34,6 +34,7 @@ import {
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
+import { createFileTransferRuntimeController } from "./file-transfer-runtime-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createReplayExportRuntimeController } from "./replay-export-runtime-controller.js";
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
@@ -91,6 +92,15 @@ const replayExportRuntimeController = createReplayExportRuntimeController({
   URLRef: window?.URL || globalThis.URL || null,
   BlobCtor: window?.Blob || globalThis.Blob,
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
+});
+const fileTransferRuntimeController = createFileTransferRuntimeController({
+  api,
+  documentRef: document,
+  windowRef: window,
+  URLRef: window?.URL || globalThis.URL || null,
+  BlobCtor: window?.Blob || globalThis.Blob,
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
 });
@@ -327,6 +337,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "workspace",
   "broadcast",
   "replay",
+  "transfer",
   "settings",
   "custom",
   "help",
@@ -1141,6 +1152,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
+  uploadSessionFile: (session, options) => fileTransferRuntimeController.uploadSessionFile(session, options),
+  downloadSessionFile: (session, options) => fileTransferRuntimeController.downloadSessionFile(session, options),
   runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),
   stopWorkflow: () => slashWorkflowRuntimeController?.stopActiveWorkflow?.() === true,
   interruptWorkflowSession: () => slashWorkflowRuntimeController?.interruptWorkflowSession?.() || Promise.resolve(""),

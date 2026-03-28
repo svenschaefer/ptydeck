@@ -415,6 +415,39 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  transfer: freezeCommandDefinition({
+    key: "slash:transfer",
+    insertText: "transfer",
+    label: "/transfer",
+    kind: "command",
+    description: "upload or download bounded files for one session",
+    example: "/transfer download logs/output.txt",
+    summary: "/transfer upload [path] | /transfer download <path>",
+    usage: [
+      "/transfer upload [path]",
+      "/transfer download <path>"
+    ],
+    subcommands: {
+      upload: {
+        insertText: "upload",
+        label: "/transfer upload",
+        kind: "subcommand",
+        description: "pick a local file and upload it into the target session root",
+        example: "/transfer upload logs/output.txt",
+        key: "slash:transfer:upload",
+        usage: "/transfer upload [path]"
+      },
+      download: {
+        insertText: "download",
+        label: "/transfer download",
+        kind: "subcommand",
+        description: "download a bounded file from the target session root",
+        example: "/transfer download logs/output.txt",
+        key: "slash:transfer:download",
+        usage: "/transfer download <path>"
+      }
+    }
+  }),
   settings: freezeCommandDefinition({
     key: "slash:settings",
     insertText: "settings",
@@ -722,6 +755,8 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "replay.view", command: "replay", subcommand: "view" },
   { alias: "replay.export", command: "replay", subcommand: "export" },
   { alias: "replay.copy", command: "replay", subcommand: "copy" },
+  { alias: "transfer.upload", command: "transfer", subcommand: "upload" },
+  { alias: "transfer.download", command: "transfer", subcommand: "download" },
   { alias: "settings.show", command: "settings", subcommand: "show" },
   { alias: "settings.apply", command: "settings", subcommand: "apply" },
   { alias: "broadcast.status", command: "broadcast", subcommand: "status" },

@@ -2620,6 +2620,162 @@ test("session replay export endpoint returns not found for unknown sessions", as
   }
 });
 
+test("session file transfer upload and download endpoints normalize paths and persist local files", async () => {
+  const sessionRoot = await mkdtemp(join(tmpdir(), "ptydeck-transfer-root-"));
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory(),
+    sessionFileTransferMaxBytes: 64
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", cwd: sessionRoot })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const uploadRes = await fetch(`${baseUrl}/sessions/${created.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "./logs/../logs/output.txt",
+        contentBase64: Buffer.from("hello transfer", "utf8").toString("base64")
+      })
+    });
+    assert.equal(uploadRes.status, 200);
+    const uploadPayload = await uploadRes.json();
+    assert.equal(uploadPayload.sessionId, created.id);
+    assert.equal(uploadPayload.path, "logs/output.txt");
+    assert.equal(uploadPayload.fileName, "output.txt");
+    assert.equal(uploadPayload.sizeBytes, "hello transfer".length);
+    assert.equal(uploadPayload.created, true);
+
+    const uploadOverwriteRes = await fetch(`${baseUrl}/sessions/${created.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "logs/output.txt",
+        contentBase64: Buffer.from("updated", "utf8").toString("base64")
+      })
+    });
+    assert.equal(uploadOverwriteRes.status, 200);
+    const overwritePayload = await uploadOverwriteRes.json();
+    assert.equal(overwritePayload.created, false);
+
+    const stored = await readFile(join(sessionRoot, "logs", "output.txt"), "utf8");
+    assert.equal(stored, "updated");
+
+    const downloadRes = await fetch(`${baseUrl}/sessions/${created.id}/file-transfer/download`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "logs/output.txt" })
+    });
+    assert.equal(downloadRes.status, 200);
+    const downloadPayload = await downloadRes.json();
+    assert.equal(downloadPayload.sessionId, created.id);
+    assert.equal(downloadPayload.path, "logs/output.txt");
+    assert.equal(downloadPayload.fileName, "output.txt");
+    assert.equal(downloadPayload.contentType, "application/octet-stream");
+    assert.equal(downloadPayload.encoding, "base64");
+    assert.equal(downloadPayload.sizeBytes, "updated".length);
+    assert.equal(Buffer.from(downloadPayload.contentBase64, "base64").toString("utf8"), "updated");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session file transfer endpoints reject traversal, missing files, oversize payloads, and ssh sessions", async () => {
+  const sessionRoot = await mkdtemp(join(tmpdir(), "ptydeck-transfer-root-"));
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory(),
+    sessionFileTransferMaxBytes: 4
+  });
+
+  try {
+    const localCreateRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh", cwd: sessionRoot })
+    });
+    assert.equal(localCreateRes.status, 201);
+    const localSession = await localCreateRes.json();
+
+    const traversalRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "../escape.txt",
+        contentBase64: Buffer.from("nope", "utf8").toString("base64")
+      })
+    });
+    assert.equal(traversalRes.status, 400);
+    const traversalBody = await traversalRes.json();
+    assert.equal(traversalBody.error, "ValidationError");
+
+    const missingDownloadRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/download`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "missing.txt" })
+    });
+    assert.equal(missingDownloadRes.status, 404);
+    const missingDownloadBody = await missingDownloadRes.json();
+    assert.equal(missingDownloadBody.error, "FileNotFound");
+
+    const oversizeUploadRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "large.txt",
+        contentBase64: Buffer.from("12345", "utf8").toString("base64")
+      })
+    });
+    assert.equal(oversizeUploadRes.status, 413);
+    const oversizeUploadBody = await oversizeUploadRes.json();
+    assert.equal(oversizeUploadBody.error, "FileTransferTooLarge");
+
+    await writeFile(join(sessionRoot, "big.txt"), "12345", "utf8");
+    const oversizeDownloadRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/download`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "big.txt" })
+    });
+    assert.equal(oversizeDownloadRes.status, 413);
+    const oversizeDownloadBody = await oversizeDownloadRes.json();
+    assert.equal(oversizeDownloadBody.error, "FileTransferTooLarge");
+
+    const sshCreateRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "privateKey"
+        }
+      })
+    });
+    assert.equal(sshCreateRes.status, 201);
+    const sshSession = await sshCreateRes.json();
+
+    const sshTransferRes = await fetch(`${baseUrl}/sessions/${sshSession.id}/file-transfer/download`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "remote.txt" })
+    });
+    assert.equal(sshTransferRes.status, 409);
+    const sshTransferBody = await sshTransferRes.json();
+    assert.equal(sshTransferBody.error, "FileTransferUnsupported");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session create persists immediately before response completes", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

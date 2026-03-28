@@ -197,6 +197,50 @@ test("validateRequest accepts quick-id swap payload", () => {
   });
 });
 
+test("validateRequest accepts session file-transfer payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/upload",
+      params: { sessionId: "a" },
+      body: {
+        path: "logs/output.txt",
+        contentBase64: "aGVsbG8="
+      }
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/download",
+      params: { sessionId: "a" },
+      body: {
+        path: "logs/output.txt"
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid session file-transfer payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/upload",
+      params: { sessionId: "a" },
+      body: {
+        path: "logs/output.txt",
+        contentBase64: "*not-base64*"
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/download",
+      params: { sessionId: "a" },
+      body: {}
+    });
+  });
+});
+
 test("validateResponse accepts quick-id swap payload", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -241,6 +285,35 @@ test("validateResponse accepts quick-id swap payload", () => {
           createdAt: 1,
           updatedAt: 2
         }
+      }
+    });
+  });
+});
+
+test("validateResponse accepts session file-transfer payloads", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionFileUpload",
+      body: {
+        sessionId: "a",
+        path: "logs/output.txt",
+        fileName: "output.txt",
+        sizeBytes: 7,
+        created: true
+      }
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionFileDownload",
+      body: {
+        sessionId: "a",
+        path: "logs/output.txt",
+        fileName: "output.txt",
+        contentType: "application/octet-stream",
+        encoding: "base64",
+        contentBase64: "dXBkYXRlZA==",
+        sizeBytes: 7
       }
     });
   });

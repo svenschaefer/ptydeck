@@ -68,6 +68,10 @@ export function createCommandExecutor(options = {}) {
     typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
   const exportSessionReplayCopy =
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
+  const uploadSessionFile =
+    typeof options.uploadSessionFile === "function" ? options.uploadSessionFile : async () => null;
+  const downloadSessionFile =
+    typeof options.downloadSessionFile === "function" ? options.downloadSessionFile : async () => null;
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
   const listLayoutProfiles = typeof options.listLayoutProfiles === "function" ? options.listLayoutProfiles : () => [];
@@ -911,6 +915,34 @@ export function createCommandExecutor(options = {}) {
         subcommand === "copy"
           ? await exportSessionReplayCopy(resolvedTarget.session)
           : await exportSessionReplayDownload(resolvedTarget.session);
+      return outcome?.feedback || "";
+    }
+
+    if (command === "transfer") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      if (subcommand !== "upload" && subcommand !== "download") {
+        return formatUsage("transfer");
+      }
+      const resolvedTarget = resolveActiveOrDirectTargetSession(
+        interpreted,
+        sessions,
+        activeSessionId,
+        "No active session for /transfer.",
+        "Transfer selector"
+      );
+      if (resolvedTarget.error) {
+        return resolvedTarget.error;
+      }
+      if (subcommand === "upload") {
+        const remotePath = args.slice(1).join(" ").trim();
+        const outcome = await uploadSessionFile(resolvedTarget.session, { remotePath });
+        return outcome?.feedback || "";
+      }
+      const remotePath = args.slice(1).join(" ").trim();
+      if (!remotePath) {
+        return formatUsage("transfer", "download");
+      }
+      const outcome = await downloadSessionFile(resolvedTarget.session, { remotePath });
       return outcome?.feedback || "";
     }
 

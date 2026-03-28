@@ -119,6 +119,10 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
+  const uploadSessionFile =
+    typeof options.uploadSessionFile === "function" ? options.uploadSessionFile : async () => null;
+  const downloadSessionFile =
+    typeof options.downloadSessionFile === "function" ? options.downloadSessionFile : async () => null;
   const runWorkflowDetailed =
     typeof options.runWorkflowDetailed === "function" ? options.runWorkflowDetailed : null;
   const stopWorkflow = typeof options.stopWorkflow === "function" ? options.stopWorkflow : () => false;
@@ -233,7 +237,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       disableBroadcast: () => broadcastInputRuntimeController?.disableBroadcast?.() || "Broadcast mode disabled.",
       openSessionReplayViewer,
       exportSessionReplayDownload,
-      exportSessionReplayCopy
+      exportSessionReplayCopy,
+      uploadSessionFile,
+      downloadSessionFile
     });
 
     authBootstrapRuntimeController = createAuthBootstrapRuntimeController({

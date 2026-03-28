@@ -14,9 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `REM-006A` Owner `BE`: Add a backend session file-transfer contract for bounded upload and download operations against normalized session-scoped paths, with deterministic size/path guardrails, explicit transfer-capability checks, and stable API error semantics instead of ad hoc shell-mediated file copies.
-- `REM-006B` Owner `FE`: Add frontend slash-command workflows for session file upload and download on top of the backend transfer contract, with explicit operator feedback for transfer target, rejection reason, and completion state instead of silent terminal-side assumptions.
-- `REM-006C` Owner `QA`: Add regression coverage for session file-transfer allow/deny behavior, path normalization, size guardrails, upload/download success paths, and end-to-end frontend/backend contract parity.
+- `REM-007A` Owner `BE`: Add a backend sharing contract for session- and deck-scoped spectator links with explicit read-only permission mode, normalized target references, bounded token lifecycle metadata, revocation support, and deterministic access-state exposure instead of ad hoc copy/paste URL sharing.
+- `REM-007B` Owner `FE`: Add frontend sharing workflows for creating, joining, inspecting, and revoking read-only spectator access for sessions and decks, with visible permission-state rendering so spectators never appear to have control/write capability they do not actually have.
+- `REM-007C` Owner `QA`: Add regression coverage for session/deck sharing create/join/revoke flows, read-only enforcement, visible permission-state behavior, and reload/reconnect consistency across the shared spectator path.
 
 ## Active Ownership Role
 

@@ -10,7 +10,7 @@ import {
 } from "../src/public/command-schema.js";
 
 test("command schema exposes declarative command metadata and distinct help/usage surfaces", () => {
-  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "settings", "help", "run"]);
+  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "settings", "help", "run"]);
   const deck = schema.find((entry) => entry.insertText === "deck");
   const swap = schema.find((entry) => entry.insertText === "swap");
   const note = schema.find((entry) => entry.insertText === "note");
@@ -19,6 +19,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   const workspace = schema.find((entry) => entry.insertText === "workspace");
   const broadcast = schema.find((entry) => entry.insertText === "broadcast");
   const replay = schema.find((entry) => entry.insertText === "replay");
+  const transfer = schema.find((entry) => entry.insertText === "transfer");
   const settings = schema.find((entry) => entry.insertText === "settings");
   const deckSwitchAlias = schema.find((entry) => entry.insertText === "deck.switch");
   const sessionSwapAlias = schema.find((entry) => entry.insertText === "session.swap");
@@ -32,6 +33,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(workspace);
   assert.ok(broadcast);
   assert.ok(replay);
+  assert.ok(transfer);
   assert.ok(settings);
   assert.ok(deckSwitchAlias);
   assert.ok(sessionSwapAlias);
@@ -41,6 +43,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(broadcast.summary, "/broadcast status | /broadcast off | /broadcast group [group]");
+  assert.equal(transfer.summary, "/transfer upload [path] | /transfer download <path>");
   assert.deepEqual(
     swap.args,
     [{ provider: "session-selector", optional: false }, { provider: "session-selector", optional: false }]
@@ -66,15 +69,16 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
   assert.equal(getSlashCommandUsage("replay"), "/replay view | /replay export | /replay copy");
+  assert.equal(getSlashCommandUsage("transfer"), "/transfer upload [path] | /transfer download <path>");
   assert.equal(getSlashCommandUsage("deck.switch"), "/deck.switch <deckSelector>");
 });
 
 test("command schema formats command help text from declarative command summaries", () => {
-  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "custom", "help", "run"]);
+  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "custom", "help", "run"]);
   assert.match(helpText, /^Commands: /);
   assert.equal(
     helpText,
-    "Commands: @ > / new deck swap note connection layout workspace broadcast replay custom help run"
+    "Commands: @ > / new deck swap note connection layout workspace broadcast replay transfer custom help run"
   );
 });
 

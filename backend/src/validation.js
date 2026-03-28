@@ -35,6 +35,7 @@ const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
 const SESSION_KIND_VALUES = new Set(["local", "ssh"]);
 const REMOTE_AUTH_METHOD_VALUES = new Set(["password", "privateKey", "keyboardInteractive"]);
 const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
+const BASE64_CONTENT_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 function isRemoteConnection(value) {
   return (
@@ -642,6 +643,30 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/download$/)) {
+    if (!params.sessionId || typeof params.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body) || typeof body.path !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'path' must be a string.");
+    }
+  }
+
+  if (method === "POST" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/upload$/)) {
+    if (!params.sessionId || typeof params.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body) || typeof body.path !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'path' must be a string.");
+    }
+    if (
+      typeof body.contentBase64 !== "string" ||
+      (body.contentBase64 !== "" && !BASE64_CONTENT_PATTERN.test(body.contentBase64))
+    ) {
+      throw new ApiError(400, "ValidationError", "Field 'contentBase64' must be a valid base64 string.");
+    }
+  }
+
   if (method === "PUT" && pathname.match(/^\/api\/v1\/custom-commands\/[^/]+$/)) {
     if (!params.commandName || typeof params.commandName !== "string") {
       throw new ApiError(400, "ValidationError", "Missing commandName path parameter.");
@@ -957,6 +982,32 @@ function isSessionReplayExport(value) {
   );
 }
 
+function isSessionFileUpload(value) {
+  return (
+    isObject(value) &&
+    typeof value.sessionId === "string" &&
+    typeof value.path === "string" &&
+    typeof value.fileName === "string" &&
+    Number.isInteger(value.sizeBytes) &&
+    value.sizeBytes >= 0 &&
+    typeof value.created === "boolean"
+  );
+}
+
+function isSessionFileDownload(value) {
+  return (
+    isObject(value) &&
+    typeof value.sessionId === "string" &&
+    typeof value.path === "string" &&
+    typeof value.fileName === "string" &&
+    typeof value.contentType === "string" &&
+    value.encoding === "base64" &&
+    typeof value.contentBase64 === "string" &&
+    Number.isInteger(value.sizeBytes) &&
+    value.sizeBytes >= 0
+  );
+}
+
 export function validateResponse({ statusCode, body, expect }) {
   if (expect === "session" && !isSession(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match Session schema.");
@@ -984,6 +1035,14 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "sessionReplayExport" && !isSessionReplayExport(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match SessionReplayExport schema.");
+  }
+
+  if (expect === "sessionFileUpload" && !isSessionFileUpload(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SessionFileUpload schema.");
+  }
+
+  if (expect === "sessionFileDownload" && !isSessionFileDownload(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SessionFileDownload schema.");
   }
 
   if (expect === "sessionQuickIdSwap" && !isSessionQuickIdSwap(body)) {

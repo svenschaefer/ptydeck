@@ -147,6 +147,10 @@ export function loadConfig(env = process.env) {
     env.SESSION_REPLAY_PERSIST_MAX_CHARS || 0,
     "SESSION_REPLAY_PERSIST_MAX_CHARS"
   );
+  const sessionFileTransferMaxBytes = parsePositiveInt(
+    env.SESSION_FILE_TRANSFER_MAX_BYTES || 256 * 1024,
+    "SESSION_FILE_TRANSFER_MAX_BYTES"
+  );
   if (sessionReplayPersistMaxChars > sessionReplayMemoryMaxChars) {
     throw new Error("SESSION_REPLAY_PERSIST_MAX_CHARS must be less than or equal to SESSION_REPLAY_MEMORY_MAX_CHARS.");
   }
@@ -191,6 +195,7 @@ export function loadConfig(env = process.env) {
     sessionMaxLifetimeMs,
     sessionReplayMemoryMaxChars,
     sessionReplayPersistMaxChars,
+    sessionFileTransferMaxBytes,
     sessionActivityQuietMs,
     remoteReconnectMaxAttempts,
     remoteReconnectDelayMs,

@@ -106,7 +106,7 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Backend per-session dual-theme contract via REST (`activeThemeProfile`, `inactiveThemeProfile`, plus legacy `themeProfile` compatibility) with full palette fields (`background`, `foreground`, `cursor`, ANSI 16 colors) and deterministic normalization/defaulting
 - Central command input targeting the active session
 - Global command palette via `Ctrl/Cmd+K`, with deterministic fuzzy search across slash commands, saved custom commands, sessions, and decks, exact-prefix priority, browser-local recency personalization for otherwise-comparable matches, and keyboard-only selection (`ArrowUp`, `ArrowDown`, `Enter`, `Esc`)
-- Command-plane controls via slash commands: `/new [shell]`, `/size <cols> <rows>` or `/size c<cols>` or `/size r<rows>`, `/filter [id/tag[,id/tag...]]`, `/close [selector[,selector...]]`, `/switch <sessionSelector>`, `/swap <selectorA> <selectorB>`, `/next`, `/prev`, `/list`, `/rename <name>` (active session) or `@<sessionSelector> /rename <name>`, `/restart [selector[,selector...]]`, `/note [text...]` (active session) or `@<sessionSelector> /note [text...]`, `/connection list`, `/connection save <name>` (active session) or `@<sessionSelector> /connection save <name>`, `/connection show <profile>`, `/connection apply <profile>`, `/connection rename <profile> <name>`, `/connection delete <profile>`, `/layout list`, `/layout save <name>`, `/layout apply <profile>`, `/layout rename <profile> <name>`, `/layout delete <profile>`, `/workspace list`, `/workspace save <name>`, `/workspace apply <preset>`, `/workspace rename <preset> <name>`, `/workspace delete <preset>`, `/broadcast status`, `/broadcast off`, `/broadcast group [group]`, `/replay view`, `/replay export`, `/replay copy`, `/settings show`, `/settings apply <json>`, `/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text>`, `/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name>` block mode, `/custom list`, `/custom show [scope:global|scope:project|scope:session:<selector>] <name>`, `/custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>]`, `/custom remove [scope:global|scope:project|scope:session:<selector>] <name>`, `/run`, `/help`, `/help <topic>`, `/help <topic> <subcommand>`, equivalent namespaced aliases such as `/session.new`, `/deck.switch`, `/replay.export`, `/custom.show`, and `/connection.apply`, and custom execution via `/<customName> [target]` for plain commands or `/<customName> [key=value ...] [-- <targetSelector>]` for template commands, with target-session precedence `session > project > global`
+- Command-plane controls via slash commands: `/new [shell]`, `/size <cols> <rows>` or `/size c<cols>` or `/size r<rows>`, `/filter [id/tag[,id/tag...]]`, `/close [selector[,selector...]]`, `/switch <sessionSelector>`, `/swap <selectorA> <selectorB>`, `/next`, `/prev`, `/list`, `/rename <name>` (active session) or `@<sessionSelector> /rename <name>`, `/restart [selector[,selector...]]`, `/note [text...]` (active session) or `@<sessionSelector> /note [text...]`, `/connection list`, `/connection save <name>` (active session) or `@<sessionSelector> /connection save <name>`, `/connection show <profile>`, `/connection apply <profile>`, `/connection rename <profile> <name>`, `/connection delete <profile>`, `/layout list`, `/layout save <name>`, `/layout apply <profile>`, `/layout rename <profile> <name>`, `/layout delete <profile>`, `/workspace list`, `/workspace save <name>`, `/workspace apply <preset>`, `/workspace rename <preset> <name>`, `/workspace delete <preset>`, `/broadcast status`, `/broadcast off`, `/broadcast group [group]`, `/replay view`, `/replay export`, `/replay copy`, `/transfer upload [path]`, `/transfer download <path>`, `/settings show`, `/settings apply <json>`, `/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name> <text>`, `/custom [plain|template] [scope:global|scope:project|scope:session:<selector>] <name>` block mode, `/custom list`, `/custom show [scope:global|scope:project|scope:session:<selector>] <name>`, `/custom preview [scope:global|scope:project|scope:session:<selector>] <name> [key=value ...] [-- <targetSelector>]`, `/custom remove [scope:global|scope:project|scope:session:<selector>] <name>`, `/run`, `/help`, `/help <topic>`, `/help <topic> <subcommand>`, equivalent namespaced aliases such as `/session.new`, `/deck.switch`, `/replay.export`, `/custom.show`, and `/connection.apply`, and custom execution via `/<customName> [target]` for plain commands or `/<customName> [key=value ...] [-- <targetSelector>]` for template commands, with target-session precedence `session > project > global`
 - `@<sessionSelector> /<command> ...` is the canonical way to route a single-session slash command to a non-active session; `>` remains the quick-switch shortcut for changing the active session.
 - Sessions support one optional persisted multiline note; `/note` clears the active-session note, `@<sessionSelector> /note` clears another session's note, the session settings dialog exposes a dedicated multiline note editor, and a non-empty note is rendered as a first-line compact preview inside the session header with a tooltip for the full note text
 - Sessions also support one persisted per-terminal input-safety preset/profile; shell-oriented sessions can opt into syntax-gated or stricter guarded-send behavior with inline confirmation before risky sends and risky paste-triggered terminal input
@@ -378,6 +378,43 @@ Frontend operator workflow:
   - `/replay copy`
   - `@<sessionSelector> /replay view|export|copy`
 - Frontend feedback surfaces retained-size and truncation state explicitly, for example `18/32 chars retained, truncated`.
+
+### Session File Transfer Contract
+
+The backend now exposes a bounded file-transfer baseline for session-scoped files:
+
+- Routes:
+  - `POST /api/v1/sessions/{sessionId}/file-transfer/upload`
+  - `POST /api/v1/sessions/{sessionId}/file-transfer/download`
+- Scope: normalized relative paths under the session root only
+- Guardrails:
+  - absolute paths are rejected
+  - traversal attempts are rejected
+  - directory-like targets are rejected
+  - transfer size is bounded by `SESSION_FILE_TRANSFER_MAX_BYTES`
+- Current baseline capability:
+  - local sessions are supported
+  - SSH sessions fail closed with an explicit unsupported-transfer error until a later remote-transfer slice lands
+
+Upload request payload:
+
+- `path`
+- `contentBase64`
+
+Download request payload:
+
+- `path`
+
+Frontend operator workflow:
+
+- Slash commands now support:
+  - `/transfer upload [path]`
+  - `/transfer download <path>`
+  - `@<sessionSelector> /transfer upload [path]`
+  - `@<sessionSelector> /transfer download <path>`
+- Upload opens the local file picker and sends one bounded base64 payload to the backend contract.
+- Download writes a browser file download from the returned bounded payload.
+- Feedback is explicit about target session, path, and transferred size.
 
 ## Slash Workflows
 
