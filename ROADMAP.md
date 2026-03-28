@@ -14,8 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering).
 - Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`.
-- Queued next wave: `v0.4.0-H43` (Command Targeting Consistency).
-- Queued scoped task: `QLT-153`.
+- Queued next wave: `v0.4.0-H43` (Command Surface Consistency).
+- Queued scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`.
 - Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -75,23 +75,29 @@ Exit criteria:
 - Frontend deck/session ordering surfaces consume the same persisted quick-ID contract consistently across reloads and reconnects.
 - Regression coverage exists for swap persistence, restore/reload behavior, and ordering normalization/conflict handling.
 
-## Latest Completed Wave
-
 ## Queued Next Wave
 
-### v0.4.0-H43 - Command Targeting Consistency (Queued)
+### v0.4.0-H43 - Command Surface Consistency (Queued)
 
-- Queued scoped task: `QLT-153`
+- Queued scoped tasks: `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`
 
 Dependencies:
 
-- `QLT-153` follows `v0.4.0-H42` so persisted quick-ID ordering is in place first, then command-targeting syntax can consistently prefer `@target` forms against stable quick IDs.
+- `QLT-153` follows `v0.4.0-H42` so persisted quick-ID ordering is in place first, then single-session slash-command targeting can consistently prefer `@target` forms against stable quick IDs.
+- `QLT-154` follows `QLT-153` because the `@` namespace collision with custom-command scope tokens can only be resolved cleanly once the canonical session-targeting form is defined.
+- `QLT-155` follows `QLT-153` and `QLT-154` so `>` quick-switch semantics are rationalized against the final `@` and `/` targeting model instead of another intermediate grammar.
+- `QLT-156` follows `QLT-153`, `QLT-154`, and `QLT-155`, so help, autocomplete, palette descriptions, and examples document the final command surface rather than transitional syntax.
+- `QLT-157` closes after `QLT-153` through `QLT-156`, so regression coverage locks the final unified grammar and help surfaces end to end.
 
 Exit criteria:
 
-- Slash-command help and usage consistently prefer explicit `@target /command ...` targeting instead of selector arguments after `/command`.
-- Active-target shorthand forms like `/note test` remain supported.
-- Redundant `/note active ...` style usage is removed from guidance/help surfaces.
+- Single-session slash commands consistently use explicit `@target /command ...` targeting instead of selector arguments after `/command`.
+- The `@` grammar is unambiguous despite the existing custom-command scope system.
+- `>` remains a clear session-first switching shortcut, with any deck-oriented variants made explicit rather than implicit.
+- Help, autocomplete, and command-palette surfaces document the same model and stop advertising deprecated selector-after-slash forms.
+- Regression coverage exists for grammar, parser conflicts, help alignment, and shorthand/direct-target behavior.
+
+## Latest Completed Wave
 
 ### v0.4.0-H40 - Saved Connection Profiles (Completed)
 
