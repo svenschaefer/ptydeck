@@ -12,11 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
-- Active scoped tasks: `QLT-161`, `QLT-162`.
-- Queued next wave after that: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
-- Queued scoped tasks after that: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
-- Latest completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
+- Active release wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
+- Active scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
+- Latest completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
+- Previous completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
 - Previous completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
 - Previous completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
 - Previous completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
@@ -62,26 +61,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Active)
+### v0.4.0-H46 - Deck Sidebar Action Consolidation (Active)
 
-- Active scoped tasks: `QLT-161`, `QLT-162`
-
-Dependencies:
-
-- `QLT-161` lands first so terminal-surface `Ctrl-C` intent disambiguation has one authoritative FE behavior before any test matrix locks it in.
-- `QLT-162` closes after `QLT-161`, so regression coverage can assert the actual copy-versus-cancel UX, clipboard behavior, and terminal pass-through semantics end to end.
-
-Exit criteria:
-
-- Pressing `Ctrl-C` on the terminal surface no longer silently guesses between clipboard copy and terminal cancel when the shortcut is ambiguous.
-- The operator gets an explicit `Copy` versus `Cancel` choice, and the chosen action is carried out deterministically.
-- Regression coverage exists for the prompt behavior and for non-regression of the terminal interrupt path.
-
-## Queued Next Wave
-
-### v0.4.0-H46 - Deck Sidebar Action Consolidation (Queued)
-
-- Queued scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`
+- Active scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`
 
 Dependencies:
 
@@ -101,6 +83,23 @@ Exit criteria:
 
 ## Latest Completed Wave
 
+### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Completed)
+
+- Completed scoped tasks: `QLT-161`, `QLT-162`
+
+Dependencies:
+
+- `QLT-161` landed first so terminal-surface `Ctrl-C` intent disambiguation now has one authoritative FE behavior before the regression matrix locks it in.
+- `QLT-162` closed after `QLT-161`, so regression coverage now asserts the actual copy-versus-cancel UX, clipboard behavior, and terminal pass-through semantics end to end.
+
+Exit criteria:
+
+- Pressing `Ctrl-C` on the terminal surface no longer silently guesses between clipboard copy and terminal cancel when the shortcut is ambiguous.
+- The operator now gets an explicit `Copy` versus `Cancel` choice, and the chosen action is carried out deterministically.
+- Regression coverage now exists for the prompt behavior and for non-regression of the terminal interrupt path.
+
+## Previous Completed Wave
+
 ### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Completed)
 
 - Completed scoped tasks: `QLT-158`, `QLT-159`, `QLT-160`
@@ -117,8 +116,6 @@ Exit criteria:
 - Session settings are organized into tabs, including a dedicated note tab for editing multiline notes.
 - Session headers show only the first note line with truncation and ellipsis behavior, while the full note remains available via tooltip.
 - Regression coverage exists for persistence, settings UX, and header rendering behavior.
-
-## Previous Completed Wave
 
 ### v0.4.0-H43 - Command Surface Consistency (Completed)
 

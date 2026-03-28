@@ -14,8 +14,6 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-161` Owner `FE`: Intercept terminal-surface `Ctrl-C` locally and prompt whether the operator intended `Copy` or `Cancel`, then perform clipboard copy or pass the terminal cancel/interrupt action through according to the explicit choice instead of guessing silently.
-- `QLT-162` Owner `QA`: Add regression coverage for terminal `Ctrl-C` disambiguation, including copy-versus-cancel choice handling, clipboard integration, and no-regression behavior when no ambiguity prompt should appear.
 - `QLT-163` Owner `FE`: Remove the standalone left-sidebar `Rename Deck` and `Delete Deck` buttons, and expose those deck-management actions through a settings icon rendered inside the currently selected deck button so deck-local actions live with the active deck affordance instead of in a separate global button stack.
 - `QLT-164` Owner `FE`: Rework the top sidebar action row so `New Deck` and `New Session` are displayed side by side, replacing the current vertically separated layout while keeping deck creation and session creation equally discoverable.
 - `QLT-165` Owner `QA`: Add regression coverage for the consolidated deck-action UX, including active-deck settings-icon visibility, rename/delete access through deck settings, and the simplified top action-row layout.

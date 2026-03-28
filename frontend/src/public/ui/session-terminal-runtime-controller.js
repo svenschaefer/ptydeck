@@ -21,6 +21,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
           await navigatorRef.clipboard.writeText(String(text ?? ""));
           return true;
         };
+  const canWriteClipboardText =
+    typeof options.canWriteClipboardText === "function"
+      ? options.canWriteClipboardText
+      : () => !!navigatorRef?.clipboard && typeof navigatorRef.clipboard.writeText === "function";
   const readClipboardText =
     typeof options.readClipboardText === "function"
       ? options.readClipboardText
@@ -31,6 +35,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
           const text = await navigatorRef.clipboard.readText();
           return typeof text === "string" ? text : String(text ?? "");
         };
+  const requestTerminalCtrlCAction =
+    typeof options.requestTerminalCtrlCAction === "function"
+      ? options.requestTerminalCtrlCAction
+      : async () => "cancel";
 
   function getTerminalSelection(terminal) {
     if (!terminal) {
@@ -58,7 +66,49 @@ export function createSessionTerminalRuntimeController(options = {}) {
       return () => {};
     }
 
+    let ctrlCIntentPending = false;
+
     const handleKeydown = (event) => {
+      const isCtrlC =
+        event &&
+        String(event.key || "").toLowerCase() === "c" &&
+        event.ctrlKey === true &&
+        event.metaKey !== true &&
+        event.altKey !== true;
+      if (isCtrlC) {
+        if (!hasTerminalSelection(terminal) || canWriteClipboardText() !== true) {
+          return;
+        }
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        if (ctrlCIntentPending) {
+          return;
+        }
+        ctrlCIntentPending = true;
+        const selection = getTerminalSelection(terminal);
+        Promise.resolve(requestTerminalCtrlCAction({ session, selection }))
+          .then((action) => {
+            if (action === "copy" && selection) {
+              return Promise.resolve(writeClipboardText(selection)).then((copied) => {
+                if (copied) {
+                  debugLog("clipboard.copy.terminal", { sessionId: session.id, length: selection.length, source: "ctrl-c" });
+                }
+                terminal.focus?.();
+              });
+            }
+            if (action === "cancel") {
+              onTerminalData(session.id, "\u0003");
+              debugLog("terminal.cancel.ctrl-c", { sessionId: session.id });
+              terminal.focus?.();
+            }
+            return undefined;
+          })
+          .catch(() => {})
+          .finally(() => {
+            ctrlCIntentPending = false;
+          });
+        return;
+      }
       if (!event || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
         return;
       }

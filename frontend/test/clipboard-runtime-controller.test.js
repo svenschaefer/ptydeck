@@ -19,6 +19,8 @@ test("clipboard-runtime controller proxies clipboard read and write operations",
     }
   });
 
+  assert.equal(controller.canWriteText(), true);
+  assert.equal(controller.canReadText(), true);
   assert.equal(await controller.writeText("copied"), true);
   assert.equal(await controller.readText(), "clipboard value");
   assert.deepEqual(calls, [["write", "copied"], ["read"]]);
@@ -27,6 +29,8 @@ test("clipboard-runtime controller proxies clipboard read and write operations",
 test("clipboard-runtime controller degrades safely when clipboard API is unavailable", async () => {
   const controller = createClipboardRuntimeController({ navigatorRef: {} });
 
+  assert.equal(controller.canWriteText(), false);
+  assert.equal(controller.canReadText(), false);
   assert.equal(await controller.writeText("copied"), false);
   assert.equal(await controller.readText(), "");
 });

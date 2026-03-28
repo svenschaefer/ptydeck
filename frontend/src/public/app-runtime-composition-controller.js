@@ -13,6 +13,7 @@ import { createControlPaneRuntimeController } from "./control-pane-runtime-contr
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
 import { createStore } from "./store.js";
+import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
@@ -171,6 +172,10 @@ const replayViewerRefreshBtn = document.getElementById("replay-viewer-refresh");
 const replayViewerDownloadBtn = document.getElementById("replay-viewer-download");
 const replayViewerCopyBtn = document.getElementById("replay-viewer-copy");
 const replayViewerCloseBtn = document.getElementById("replay-viewer-close");
+const terminalCtrlCDialogEl = document.getElementById("terminal-ctrl-c-dialog");
+const terminalCtrlCMessageEl = document.getElementById("terminal-ctrl-c-message");
+const terminalCtrlCCopyBtn = document.getElementById("terminal-ctrl-c-copy");
+const terminalCtrlCCancelBtn = document.getElementById("terminal-ctrl-c-cancel");
 const commandPaletteDialogEl = document.getElementById("command-palette-dialog");
 const commandPaletteMetaEl = document.getElementById("command-palette-meta");
 const commandPaletteInputEl = document.getElementById("command-palette-input");
@@ -194,6 +199,12 @@ const terminalSearchPrevBtn = document.getElementById("terminal-search-prev");
 const terminalSearchNextBtn = document.getElementById("terminal-search-next");
 const terminalSearchClearBtn = document.getElementById("terminal-search-clear");
 const terminalSearchStatusEl = document.getElementById("terminal-search-status");
+const terminalCtrlCRuntimeController = createTerminalCtrlCRuntimeController({
+  dialogEl: terminalCtrlCDialogEl,
+  messageEl: terminalCtrlCMessageEl,
+  copyBtn: terminalCtrlCCopyBtn,
+  cancelBtn: terminalCtrlCCancelBtn
+});
 
 const terminals = new Map();
 const terminalObservers = new Map();
@@ -838,7 +849,10 @@ sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
   terminalFontSize: TERMINAL_FONT_SIZE,
   terminalLineHeight: TERMINAL_LINE_HEIGHT,
   terminalFontFamily: TERMINAL_FONT_FAMILY,
+  canWriteClipboardText: () => clipboardRuntimeController.canWriteText(),
   readClipboardText: () => clipboardRuntimeController.readText(),
+  requestTerminalCtrlCAction: ({ session, selection }) =>
+    terminalCtrlCRuntimeController.requestIntent({ session, selection }),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   debugLog
 });

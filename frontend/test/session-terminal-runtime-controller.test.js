@@ -88,6 +88,12 @@ function createKeyEvent(key) {
   };
 }
 
+function createCtrlCEvent() {
+  const event = createKeyEvent("c");
+  event.ctrlKey = true;
+  return event;
+}
+
 function createMouseEvent(type, button) {
   return {
     type,
@@ -384,4 +390,210 @@ test("session-terminal-runtime controller routes clipboard paste events through 
   assert.equal(pasteEvent.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "echo hi"]]);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller prompts for Ctrl-C intent when terminal selection makes copy ambiguous", async () => {
+  const clipboardWrites = [];
+  const promptCalls = [];
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    requestTerminalCtrlCAction: async ({ session, selection }) => {
+      promptCalls.push([session.id, selection]);
+      return "copy";
+    },
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1", name: "one" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "selected text";
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(ctrlCEvent.defaultPrevented, true);
+  assert.deepEqual(promptCalls, [["s1", "selected text"]]);
+  assert.deepEqual(clipboardWrites, ["selected text"]);
+  assert.deepEqual(terminalWrites, []);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller sends terminal cancel after Ctrl-C prompt chooses cancel", async () => {
+  const clipboardWrites = [];
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    requestTerminalCtrlCAction: async () => "cancel",
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "selected text";
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(ctrlCEvent.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, []);
+  assert.deepEqual(terminalWrites, [["s1", "\u0003"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller leaves unambiguous Ctrl-C untouched when nothing is selected", () => {
+  let promptCalled = false;
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    canWriteClipboardText: () => true,
+    requestTerminalCtrlCAction: async () => {
+      promptCalled = true;
+      return "copy";
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+
+  assert.equal(ctrlCEvent.defaultPrevented, false);
+  assert.equal(promptCalled, false);
+  assert.deepEqual(terminalWrites, []);
 });
