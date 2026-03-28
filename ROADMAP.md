@@ -20,6 +20,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Queued scoped tasks after that: `QLT-158`, `QLT-159`, `QLT-160`.
 - Queued next wave after that: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt).
 - Queued scoped tasks after that: `QLT-161`, `QLT-162`.
+- Queued next wave after that: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
+- Queued scoped tasks after that: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
 - Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -132,6 +134,26 @@ Exit criteria:
 - Pressing `Ctrl-C` on the terminal surface no longer silently guesses between clipboard copy and terminal cancel when the shortcut is ambiguous.
 - The operator gets an explicit `Copy` versus `Cancel` choice, and the chosen action is carried out deterministically.
 - Regression coverage exists for the prompt behavior and for non-regression of the terminal interrupt path.
+
+### v0.4.0-H46 - Deck Sidebar Action Consolidation (Queued)
+
+- Queued scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`
+
+Dependencies:
+
+- `QLT-163` lands first so deck rename/delete actions move into one active-deck-local settings affordance before the sidebar action row is simplified around it.
+- `QLT-164` follows `QLT-163`, so the new top-row `New Deck` plus `New Session` layout is introduced against the final deck-action ownership model instead of another intermediate button stack.
+- `QLT-166` follows `v0.4.0-H42` and `QLT-163`, so deck settings reuse the persisted quick-ID ordering contract and the final deck-settings entrypoint instead of inventing another local-only swap surface.
+- `QLT-165` closes after `QLT-163` and `QLT-164`, so regression coverage locks the final sidebar affordances, active-deck behavior, and simplified action-row layout end to end.
+- `QLT-167` closes after `QLT-166`, so regression coverage can assert deck-settings swap visibility and management against the actual persisted swap contract.
+
+Exit criteria:
+
+- Standalone left-sidebar `Rename Deck` and `Delete Deck` buttons are removed.
+- The currently selected deck button exposes a settings affordance that reaches rename/delete deck actions.
+- The top sidebar actions present `New Deck` and `New Session` side by side.
+- The new deck-settings surface exposes the persisted quick-ID ordering state and allows swap/reorder management there in addition to slash-command usage.
+- Regression coverage exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
 
 ## Latest Completed Wave
 
