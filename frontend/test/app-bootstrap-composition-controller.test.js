@@ -166,8 +166,6 @@ function createBaseOptions(overrides = {}) {
       },
       createBtn: {},
       deckCreateBtn: {},
-      deckRenameBtn: {},
-      deckDeleteBtn: {},
       sendBtn: {},
       layoutRuntimeController,
       workspacePresetRuntimeController,

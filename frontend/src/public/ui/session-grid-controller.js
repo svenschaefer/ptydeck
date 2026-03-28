@@ -1,7 +1,5 @@
 export function createSessionGridController(options = {}) {
   const defaultDeckId = String(options.defaultDeckId || "").trim();
-  const deckRenameBtn = options.deckRenameBtn || null;
-  const deckDeleteBtn = options.deckDeleteBtn || null;
   const terminals = options.terminals;
   const terminalObservers = options.terminalObservers;
   const resizeTimers = options.resizeTimers;
@@ -129,13 +127,6 @@ export function createSessionGridController(options = {}) {
     });
 
     renderDeckTabs(orderedSessions);
-    const hasDecks = state.decks.length > 0;
-    if (deckRenameBtn) {
-      deckRenameBtn.disabled = !hasDecks;
-    }
-    if (deckDeleteBtn) {
-      deckDeleteBtn.disabled = !activeDeck || activeDeck.id === defaultDeckId;
-    }
 
     const sessionFilterText = getSessionFilterText();
     const visibilityState =

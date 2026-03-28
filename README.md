@@ -93,6 +93,8 @@ It is designed for deterministic, controlled interaction with shell processes, w
 - Per-session settings include configurable command submit terminator with deterministic modes: `auto` (default, `CR`), `crlf`, `lf`, `cr`
 - Quick-ID labels per terminal (`1..9`, `A..Z`) shown next to session names
 - `/swap <selectorA> <selectorB>` swaps backend-persisted quick IDs, immediately reorders session surfaces by quick-ID order, and survives reloads, reconnects, backend restart/restore, and cross-browser/operator views through the shared backend session contract
+- The sidebar now places `New Deck` and `New Session` side by side at the top instead of splitting deck creation into a separate lower button stack
+- The active deck now exposes deck-local settings through a gear icon inside the selected deck tab, with rename/delete actions and a visible deck-local session-order list that can swap adjacent persisted quick-ID positions without relying only on `/swap`
 - Per-terminal settings entry on each terminal card (gear icon) with a tabbed session-scoped settings dialog (`Startup`, `Note`, `Theme`)
 - Terminal `Rename` and `Delete` actions are available inside each session settings dialog (removed from direct toolbar); delete requires explicit user confirmation
 - Per-session startup settings form in terminal settings (`Working Directory`, `Start Command Line`, `Environment Variables`) with unified dialog-level `Apply Changes`/`Cancel`, dirty-state indicator, and explicit save feedback

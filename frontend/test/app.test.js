@@ -516,8 +516,6 @@ function createDocumentFixture() {
   const createSession = new FakeElement({ id: "create-session", tagName: "button" });
   const deckTabs = new FakeElement({ id: "deck-tabs" });
   const deckCreate = new FakeElement({ id: "deck-create", tagName: "button" });
-  const deckRename = new FakeElement({ id: "deck-rename", tagName: "button" });
-  const deckDelete = new FakeElement({ id: "deck-delete", tagName: "button" });
   const settingsCols = new FakeElement({ id: "settings-cols", tagName: "input" });
   settingsCols.value = "80";
   const settingsRows = new FakeElement({ id: "settings-rows", tagName: "input" });
@@ -601,8 +599,6 @@ function createDocumentFixture() {
     createSession,
     deckTabs,
     deckCreate,
-    deckRename,
-    deckDelete,
     settingsCols,
     settingsRows,
     settingsApply,
@@ -664,8 +660,6 @@ function createDocumentFixture() {
       createSession,
       deckTabs,
       deckCreate,
-      deckRename,
-      deckDelete,
       settingsCols,
       settingsRows,
       settingsApply,
@@ -783,6 +777,34 @@ function findDeckSessionButton(deckTabs, deckId, sessionId) {
     }
   }
   return null;
+}
+
+function findDeckSettingsButton(deckTabs, deckId) {
+  const group = findDeckGroup(deckTabs, deckId);
+  return group?.querySelector(".deck-tab-settings") || null;
+}
+
+function findDeckSettingsPanel(deckTabs, deckId) {
+  const group = findDeckGroup(deckTabs, deckId);
+  return group?.querySelector(".deck-settings-panel") || null;
+}
+
+function listElementsByClass(root, className) {
+  const matches = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.shift();
+    if (!current || !Array.isArray(current.children)) {
+      continue;
+    }
+    for (const child of current.children) {
+      if (child.classList?.contains(className)) {
+        matches.push(child);
+      }
+      stack.push(child);
+    }
+  }
+  return matches;
 }
 
 function listTerminalCards(root) {
@@ -1870,9 +1892,25 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(listTerminalCards(fixture.elements.terminalGrid)[0].querySelector(".session-quick-id").textContent, "1");
   assert.equal(listTerminalCards(fixture.elements.terminalGrid)[1].querySelector(".session-quick-id").textContent, "2");
 
-  fixture.elements.commandInput.value = "/swap 1 2";
-  fixture.elements.sendCommand.click();
+  const defaultDeckSettingsButton = findDeckSettingsButton(fixture.elements.deckTabs, "default");
+  assert.ok(defaultDeckSettingsButton);
+  defaultDeckSettingsButton.click();
   await tick();
+  const defaultDeckSettingsPanel = findDeckSettingsPanel(fixture.elements.deckTabs, "default");
+  assert.ok(defaultDeckSettingsPanel);
+  const defaultDeckOrderRows = listElementsByClass(defaultDeckSettingsPanel, "deck-settings-order-row");
+  assert.equal(defaultDeckOrderRows.length, 2);
+  assert.equal(defaultDeckOrderRows[0].getAttribute("data-session-id"), "s-1");
+  assert.equal(defaultDeckOrderRows[1].getAttribute("data-session-id"), "s-2");
+  const moveFirstSessionDownBtn = defaultDeckOrderRows[0]
+    .querySelector(".deck-settings-order-actions")
+    ?.children.find((entry) => entry.textContent === "↓");
+  assert.ok(moveFirstSessionDownBtn);
+  moveFirstSessionDownBtn.click();
+  await waitFor(
+    () => findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1")?.querySelector(".session-quick-id")?.textContent === "2",
+    { timeoutMs: 200, intervalMs: 5 }
+  );
   assert.equal(fixture.elements.commandFeedback.textContent, "Swapped quick IDs: [1] one <-> [2] two.");
   assert.equal(
     findDeckSessionButton(fixture.elements.deckTabs, "default", "s-1").querySelector(".session-quick-id").textContent,

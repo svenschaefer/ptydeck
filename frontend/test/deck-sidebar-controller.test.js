@@ -219,3 +219,169 @@ test("deck-sidebar controller applies deck session group resolution before rende
     ["s-2"]
   );
 });
+
+test("deck-sidebar controller exposes active-deck settings and routes rename/delete through the settings panel", async () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+  const calls = [];
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => String(sessionId || ""),
+    formatSessionDisplayName: (session) => session.name,
+    onRenameDeck: async (deck) => {
+      calls.push(["rename", deck.id]);
+    },
+    onDeleteDeck: async (deck) => {
+      calls.push(["delete", deck.id]);
+    },
+    canDeleteDeck: (deck) => deck.id !== "default"
+  });
+
+  controller.render({
+    decks: [
+      { id: "default", name: "Default" },
+      { id: "ops", name: "Ops" }
+    ],
+    sessions: [],
+    activeDeckId: "ops",
+    activeSessionId: ""
+  });
+
+  const settingsButton = findFirst(container, (el) => el.className === "deck-tab-settings");
+  assert.ok(settingsButton);
+  settingsButton.click();
+
+  const settingsPanel = findFirst(container, (el) => el.className === "deck-settings-panel");
+  assert.ok(settingsPanel);
+  const renameButton = findFirst(settingsPanel, (el) => el.tagName === "button" && el.textContent === "Rename Deck");
+  const deleteButton = findFirst(settingsPanel, (el) => el.tagName === "button" && el.textContent === "Delete Deck");
+  assert.ok(renameButton);
+  assert.ok(deleteButton);
+  assert.equal(deleteButton.disabled, false);
+
+  renameButton.click();
+  deleteButton.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(calls, [
+    ["rename", "ops"],
+    ["delete", "ops"]
+  ]);
+});
+
+test("deck-sidebar controller disables delete in active deck settings for the default deck", () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => String(sessionId || ""),
+    formatSessionDisplayName: (session) => session.name,
+    canDeleteDeck: (deck) => deck.id !== "default"
+  });
+
+  controller.render({
+    decks: [{ id: "default", name: "Default" }],
+    sessions: [],
+    activeDeckId: "default",
+    activeSessionId: ""
+  });
+
+  const settingsButton = findFirst(container, (el) => el.className === "deck-tab-settings");
+  assert.ok(settingsButton);
+  settingsButton.click();
+
+  const deleteButton = findFirst(container, (el) => el.tagName === "button" && el.textContent === "Delete Deck");
+  assert.ok(deleteButton);
+  assert.equal(deleteButton.disabled, true);
+});
+
+test("deck-sidebar controller exposes visible deck session order and swaps adjacent sessions from settings", async () => {
+  const container = new FakeElement("div");
+  const documentRef = {
+    createElement(tag) {
+      return new FakeElement(tag);
+    }
+  };
+  const swapCalls = [];
+
+  const controller = createDeckSidebarController({
+    containerEl: container,
+    documentRef,
+    resolveSessionDeckId: (session) => session.deckId,
+    ensureQuickId: (sessionId) => (sessionId === "s-1" ? "1" : sessionId === "s-2" ? "2" : "3"),
+    formatSessionDisplayName: (session) => session.name,
+    onSwapDeckSessions: async (leftSession, rightSession) => {
+      swapCalls.push([leftSession.id, rightSession.id]);
+    }
+  });
+
+  controller.render({
+    decks: [{ id: "ops", name: "Ops" }],
+    sessions: [
+      { id: "s-1", name: "One", deckId: "ops" },
+      { id: "s-2", name: "Two", deckId: "ops" },
+      { id: "s-3", name: "Three", deckId: "ops" }
+    ],
+    activeDeckId: "ops",
+    activeSessionId: "s-2"
+  });
+
+  const settingsButton = findFirst(container, (el) => el.className === "deck-tab-settings");
+  assert.ok(settingsButton);
+  settingsButton.click();
+
+  const orderRows = [];
+  (function collect(root) {
+    if (!root) {
+      return;
+    }
+    if (root.className === "deck-settings-order-row") {
+      orderRows.push(root);
+    }
+    for (const child of root.children || []) {
+      collect(child);
+    }
+  })(container);
+
+  assert.equal(orderRows.length, 3);
+  assert.equal(orderRows[0].getAttribute("data-session-id"), "s-1");
+  assert.equal(orderRows[1].getAttribute("data-session-id"), "s-2");
+  assert.equal(orderRows[2].getAttribute("data-session-id"), "s-3");
+
+  const upButton = findFirst(orderRows[1], (el) => el.tagName === "button" && el.textContent === "↑");
+  const downButton = findFirst(orderRows[1], (el) => el.tagName === "button" && el.textContent === "↓");
+  const firstUpButton = findFirst(orderRows[0], (el) => el.tagName === "button" && el.textContent === "↑");
+  const lastDownButton = findFirst(orderRows[2], (el) => el.tagName === "button" && el.textContent === "↓");
+
+  assert.ok(upButton);
+  assert.ok(downButton);
+  assert.ok(firstUpButton);
+  assert.ok(lastDownButton);
+  assert.equal(firstUpButton.disabled, true);
+  assert.equal(lastDownButton.disabled, true);
+
+  upButton.click();
+  downButton.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(swapCalls, [
+    ["s-2", "s-1"],
+    ["s-2", "s-3"]
+  ]);
+});

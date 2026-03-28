@@ -113,8 +113,6 @@ test("app lifecycle controller wires create-session flow and moves session into 
 test("app lifecycle controller binds deck/send actions and window cleanup hooks", async () => {
   const listeners = new Map();
   const deckCreateBtn = createEventTarget();
-  const deckRenameBtn = createEventTarget();
-  const deckDeleteBtn = createEventTarget();
   const startupWarmupSkipBtn = createEventTarget();
   const sendBtn = createEventTarget();
   const commandGuardSendOnceBtn = createEventTarget();
@@ -143,8 +141,6 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
       }
     },
     deckCreateBtn,
-    deckRenameBtn,
-    deckDeleteBtn,
     startupWarmupSkipBtn,
     sendBtn,
     commandGuardSendOnceBtn,
@@ -153,10 +149,6 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     workflowInterruptBtn,
     workflowKillBtn,
     createDeckFlow: async () => {},
-    renameDeckFlow: async () => {
-      throw new Error("rename failed");
-    },
-    deleteDeckFlow: async () => {},
     submitCommand: async () => {
       sendCalls += 1;
     },
@@ -207,8 +199,6 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   controller.bindWindowEvents();
 
   await deckCreateBtn.dispatch("click");
-  await deckRenameBtn.dispatch("click");
-  await deckDeleteBtn.dispatch("click");
   await startupWarmupSkipBtn.dispatch("click");
   await sendBtn.dispatch("click");
   await commandGuardSendOnceBtn.dispatch("click");
@@ -217,14 +207,14 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
   await workflowInterruptBtn.dispatch("click");
   await workflowKillBtn.dispatch("click");
 
-  assert.equal(clearCalls, 5);
+  assert.equal(clearCalls, 4);
   assert.equal(sendCalls, 1);
   assert.equal(confirmCalls, 1);
   assert.equal(cancelCalls, 1);
   assert.equal(stopCalls, 1);
   assert.equal(interruptCalls, 1);
   assert.equal(killCalls, 1);
-  assert.deepEqual(errors, ["rename failed"]);
+  assert.deepEqual(errors, []);
   assert.deepEqual(feedback, [
     "Workflow stop requested.",
     "Interrupted workflow session [7] ops.",

@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation).
-- Active scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`.
-- Latest completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
+- Previous completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
 - Previous completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
 - Previous completed wave: `v0.4.0-H43` (Command Surface Consistency, `QLT-153`, `QLT-154`, `QLT-155`, `QLT-156`, `QLT-157`).
 - Previous completed wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering, `QLT-150`, `QLT-151`, `QLT-152`).
@@ -59,29 +60,28 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave
+## Latest Completed Wave
 
-### v0.4.0-H46 - Deck Sidebar Action Consolidation (Active)
+### v0.4.0-H46 - Deck Sidebar Action Consolidation (Completed)
 
-- Active scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`
+- Completed scoped tasks: `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`
 
 Dependencies:
 
-- `QLT-163` lands first so deck rename/delete actions move into one active-deck-local settings affordance before the sidebar action row is simplified around it.
-- `QLT-164` follows `QLT-163`, so the new top-row `New Deck` plus `New Session` layout is introduced against the final deck-action ownership model instead of another intermediate button stack.
-- `QLT-166` follows `v0.4.0-H42` and `QLT-163`, so deck settings reuse the persisted quick-ID ordering contract and the final deck-settings entrypoint instead of inventing another local-only swap surface.
-- `QLT-165` closes after `QLT-163` and `QLT-164`, so regression coverage locks the final sidebar affordances, active-deck behavior, and simplified action-row layout end to end.
-- `QLT-167` closes after `QLT-166`, so regression coverage can assert deck-settings swap visibility and management against the actual persisted swap contract.
+- `QLT-163` landed first so deck rename/delete actions now live behind one active-deck-local settings affordance instead of a separate global button stack.
+- `QLT-164` followed `QLT-163`, so the top-row `New Deck` plus `New Session` layout now reflects the final deck-action ownership model.
+- `QLT-166` reused the completed `v0.4.0-H42` persisted quick-ID ordering contract inside the new deck-settings entrypoint instead of introducing another local-only swap surface.
+- `QLT-165` and `QLT-167` now close the wave with regression coverage for the consolidated deck-action UX and the deck-settings swap management path.
 
 Exit criteria:
 
 - Standalone left-sidebar `Rename Deck` and `Delete Deck` buttons are removed.
-- The currently selected deck button exposes a settings affordance that reaches rename/delete deck actions.
-- The top sidebar actions present `New Deck` and `New Session` side by side.
-- The new deck-settings surface exposes the persisted quick-ID ordering state and allows swap/reorder management there in addition to slash-command usage.
-- Regression coverage exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
+- The currently selected deck button now exposes a settings affordance that reaches rename/delete deck actions.
+- The top sidebar actions now present `New Deck` and `New Session` side by side.
+- The deck-settings surface now exposes persisted quick-ID ordering and allows swap/reorder management there in addition to slash-command usage.
+- Regression coverage now exists for deck-action access, active-deck affordances, top-row layout behavior, and deck-settings swap management.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H45 - Terminal Ctrl-C Intent Prompt (Completed)
 
@@ -97,8 +97,6 @@ Exit criteria:
 - Pressing `Ctrl-C` on the terminal surface no longer silently guesses between clipboard copy and terminal cancel when the shortcut is ambiguous.
 - The operator now gets an explicit `Copy` versus `Cancel` choice, and the chosen action is carried out deterministically.
 - Regression coverage now exists for the prompt behavior and for non-regression of the terminal interrupt path.
-
-## Previous Completed Wave
 
 ### v0.4.0-H44 - Session Settings Tabs and Multiline Notes (Completed)
 

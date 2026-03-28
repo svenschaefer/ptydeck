@@ -110,8 +110,6 @@ const sidebarLauncherBtn = document.getElementById("sidebar-launcher");
 const createBtn = document.getElementById("create-session");
 const deckTabsEl = document.getElementById("deck-tabs");
 const deckCreateBtn = document.getElementById("deck-create");
-const deckRenameBtn = document.getElementById("deck-rename");
-const deckDeleteBtn = document.getElementById("deck-delete");
 const settingsColsEl = document.getElementById("settings-cols");
 const settingsRowsEl = document.getElementById("settings-rows");
 const settingsApplyBtn = document.getElementById("settings-apply");
@@ -971,13 +969,59 @@ deckSidebarController = createDeckSidebarController({
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName(session) || "",
   getSessionActivityIndicatorState: sessionUiFacadeController.getSessionActivityIndicatorState,
   onActivateDeck: (deckId) => appLayoutDeckFacadeController?.setActiveDeck(deckId),
-  onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session)
+  onActivateSession: (session) => commandTargetRuntimeController?.activateSessionTarget(session),
+  onRenameDeck: async () => {
+    try {
+      await appLayoutDeckFacadeController?.renameDeckFlow?.();
+      appRuntimeStateController?.clearError?.();
+    } catch (error) {
+      appCommandUiFacadeController?.setError?.(
+        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to rename deck.") || "Failed to rename deck."
+      );
+    }
+  },
+  onDeleteDeck: async () => {
+    try {
+      await appLayoutDeckFacadeController?.deleteDeckFlow?.();
+      appRuntimeStateController?.clearError?.();
+    } catch (error) {
+      appCommandUiFacadeController?.setError?.(
+        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to delete deck.") || "Failed to delete deck."
+      );
+    }
+  },
+  onSwapDeckSessions: async (leftSession, rightSession) => {
+    const leftId = String(leftSession?.id || "").trim();
+    const rightId = String(rightSession?.id || "").trim();
+    if (!leftId || !rightId || leftId === rightId) {
+      return;
+    }
+    const leftTokenBefore = appSessionRuntimeFacadeController?.formatSessionToken?.(leftId) || "?";
+    const rightTokenBefore = appSessionRuntimeFacadeController?.formatSessionToken?.(rightId) || "?";
+    try {
+      const result = await api.swapSessionQuickIds(leftId, rightId);
+      if (!result?.leftSession || !result?.rightSession) {
+        throw new Error("Failed to swap session quick IDs.");
+      }
+      appSessionRuntimeFacadeController?.applyRuntimeEvent?.({ type: "session.updated", session: result.leftSession });
+      appSessionRuntimeFacadeController?.applyRuntimeEvent?.({ type: "session.updated", session: result.rightSession });
+      appCommandUiFacadeController?.setCommandFeedback?.(
+        `Swapped quick IDs: [${leftTokenBefore}] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(leftSession) || ""} <-> [${rightTokenBefore}] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(rightSession) || ""}.`
+      );
+      appRuntimeStateController?.clearError?.();
+      appCommandUiFacadeController?.render?.();
+    } catch (error) {
+      appCommandUiFacadeController?.setError?.(
+        appCommandUiFacadeController?.getErrorMessage?.(error, "Failed to swap session quick IDs.") ||
+          "Failed to swap session quick IDs."
+      );
+    }
+  },
+  canDeleteDeck: (deck) => String(deck?.id || "") !== DEFAULT_DECK_ID
 });
 
 sessionGridController = createSessionGridController({
   defaultDeckId: DEFAULT_DECK_ID,
-  deckRenameBtn,
-  deckDeleteBtn,
   terminals,
   terminalObservers,
   resizeTimers,
@@ -1072,8 +1116,6 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
     }),
   createBtn,
   deckCreateBtn,
-  deckRenameBtn,
-  deckDeleteBtn,
   startupWarmupSkipBtn,
   sendBtn,
   layoutRuntimeController,

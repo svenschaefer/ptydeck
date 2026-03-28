@@ -84,8 +84,6 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const createBtn = options.createBtn || null;
   const deckCreateBtn = options.deckCreateBtn || null;
-  const deckRenameBtn = options.deckRenameBtn || null;
-  const deckDeleteBtn = options.deckDeleteBtn || null;
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
   const workflowStopBtn = options.workflowStopBtn || null;
@@ -352,8 +350,6 @@ export function createAppBootstrapCompositionController(options = {}) {
       windowRef,
       createBtn,
       deckCreateBtn,
-      deckRenameBtn,
-      deckDeleteBtn,
       startupWarmupSkipBtn,
       sendBtn,
       workflowStopBtn,
@@ -370,8 +366,6 @@ export function createAppBootstrapCompositionController(options = {}) {
       getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage?.(err, fallback) || fallback,
       debugLog,
       createDeckFlow: () => appLayoutDeckFacadeController?.createDeckFlow?.(),
-      renameDeckFlow: () => appLayoutDeckFacadeController?.renameDeckFlow?.(),
-      deleteDeckFlow: () => appLayoutDeckFacadeController?.deleteDeckFlow?.(),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
       confirmPendingCommandSend: () => commandComposerRuntimeController?.confirmPendingSend?.(),
       cancelPendingCommandSend: () => commandComposerRuntimeController?.cancelPendingSend?.(),

@@ -2,8 +2,6 @@ export function createAppLifecycleController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const createBtn = options.createBtn || null;
   const deckCreateBtn = options.deckCreateBtn || null;
-  const deckRenameBtn = options.deckRenameBtn || null;
-  const deckDeleteBtn = options.deckDeleteBtn || null;
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
   const commandGuardSendOnceBtn = options.commandGuardSendOnceBtn || null;
@@ -22,8 +20,6 @@ export function createAppLifecycleController(options = {}) {
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
   const debugLog = typeof options.debugLog === "function" ? options.debugLog : () => {};
   const createDeckFlow = typeof options.createDeckFlow === "function" ? options.createDeckFlow : () => Promise.resolve();
-  const renameDeckFlow = typeof options.renameDeckFlow === "function" ? options.renameDeckFlow : () => Promise.resolve();
-  const deleteDeckFlow = typeof options.deleteDeckFlow === "function" ? options.deleteDeckFlow : () => Promise.resolve();
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
   const confirmPendingCommandSend =
     typeof options.confirmPendingCommandSend === "function" ? options.confirmPendingCommandSend : () => Promise.resolve(false);
@@ -106,8 +102,6 @@ export function createAppLifecycleController(options = {}) {
       createBtn.addEventListener("click", handleCreateSession);
     }
     bindAsyncClick(deckCreateBtn, createDeckFlow, "Failed to create deck.");
-    bindAsyncClick(deckRenameBtn, renameDeckFlow, "Failed to rename deck.");
-    bindAsyncClick(deckDeleteBtn, deleteDeckFlow, "Failed to delete deck.");
     if (startupWarmupSkipBtn && typeof startupWarmupSkipBtn.addEventListener === "function") {
       startupWarmupSkipBtn.addEventListener("click", () => {
         skipStartupWarmupWait();
