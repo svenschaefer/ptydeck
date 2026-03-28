@@ -14,6 +14,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering).
 - Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`.
+- Queued next wave: `v0.4.0-H43` (Command Targeting Consistency).
+- Queued scoped task: `QLT-153`.
 - Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -74,6 +76,22 @@ Exit criteria:
 - Regression coverage exists for swap persistence, restore/reload behavior, and ordering normalization/conflict handling.
 
 ## Latest Completed Wave
+
+## Queued Next Wave
+
+### v0.4.0-H43 - Command Targeting Consistency (Queued)
+
+- Queued scoped task: `QLT-153`
+
+Dependencies:
+
+- `QLT-153` follows `v0.4.0-H42` so persisted quick-ID ordering is in place first, then command-targeting syntax can consistently prefer `@target` forms against stable quick IDs.
+
+Exit criteria:
+
+- Slash-command help and usage consistently prefer explicit `@target /command ...` targeting instead of selector arguments after `/command`.
+- Active-target shorthand forms like `/note test` remain supported.
+- Redundant `/note active ...` style usage is removed from guidance/help surfaces.
 
 ### v0.4.0-H40 - Saved Connection Profiles (Completed)
 

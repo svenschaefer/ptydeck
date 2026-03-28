@@ -17,6 +17,7 @@ Completed work belongs in `DONE.md`.
 - `QLT-150` Owner `BE`: Add a persisted quick-ID ordering contract so manual `/swap` operations are stored in backend state, restored across backend restarts, and exposed deterministically alongside sessions/decks instead of remaining browser-local only.
 - `QLT-151` Owner `FE`: Rewire `/swap` and the frontend session-ordering/runtime surfaces to use the backend-backed persisted quick-ID ordering model so swapped IDs survive reloads, reconnects, and cross-browser/operator views consistently.
 - `QLT-152` Owner `QA`: Add regression coverage for persisted quick-ID swap behavior across reload, reconnect, restart restore, deck ordering, and conflict/normalization edge cases.
+- `QLT-153` Owner `FE`: Standardize slash-command targeting on explicit `@target` routing in command input so selector arguments behind slash commands are deprecated in favor of forms like `@3 /note test`, while keeping concise active-target forms like `/note test` and removing `/note active ...` style redundancy from help and guidance.
 
 ## Active Ownership Role
 
