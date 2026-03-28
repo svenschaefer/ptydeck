@@ -12,8 +12,8 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: none currently.
-- Active scoped tasks: none currently.
+- Active release wave: `v0.4.0-H42` (Persisted Quick-ID Swap Ordering).
+- Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`.
 - Latest completed wave: `v0.4.0-H40` (Saved Connection Profiles, `REM-004A`, `REM-004B`, `REM-004C`).
 - Previous completed wave: `v0.4.0-H39` (Remote Reconnect Contract, `REM-005`).
 - Previous completed wave: `v0.4.0-H38` (Remote SSH Session Foundation, `REM-001`, `REM-002`, `REM-003`, `REM-009`).
@@ -54,6 +54,24 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H3` (Terminal Interaction Ergonomics, `QLT-123` and `QLT-124`).
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
+
+## Active Wave
+
+### v0.4.0-H42 - Persisted Quick-ID Swap Ordering (Active)
+
+- Active scoped tasks: `QLT-150`, `QLT-151`, `QLT-152`
+
+Dependencies:
+
+- `QLT-150` lands first so persisted quick-ID ordering and normalization live in one backend-owned contract before the frontend stops relying on browser-local swap persistence.
+- `QLT-151` follows `QLT-150` and reuses that persisted contract for `/swap`, deck/session ordering, and restored UI state instead of inventing a second frontend-only persistence path.
+- `QLT-152` closes after `QLT-150` and `QLT-151`, so regression coverage locks restart/reload/reconnect ordering behavior against the actual persisted model.
+
+Exit criteria:
+
+- Manual `/swap` operations persist outside one browser storage context and survive backend restart/restore.
+- Frontend deck/session ordering surfaces consume the same persisted quick-ID contract consistently across reloads and reconnects.
+- Regression coverage exists for swap persistence, restore/reload behavior, and ordering normalization/conflict handling.
 
 ## Latest Completed Wave
 
