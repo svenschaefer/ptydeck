@@ -1615,11 +1615,11 @@ test("command executor applies input safety presets through settings payloads", 
         confirmOnIncompleteShellConstruct: true,
         confirmOnNaturalLanguageInput: true,
         confirmOnDangerousShellCommand: true,
-        confirmOnMultilineInput: true,
-        confirmOnRecentTargetSwitch: true,
-        targetSwitchGraceMs: 6000,
-        pasteLengthConfirmThreshold: 200,
-        pasteLineConfirmThreshold: 3
+        confirmOnMultilineInput: false,
+        confirmOnRecentTargetSwitch: false,
+        targetSwitchGraceMs: 4000,
+        pasteLengthConfirmThreshold: 400,
+        pasteLineConfirmThreshold: 5
       }
     ],
     [
@@ -1630,11 +1630,11 @@ test("command executor applies input safety presets through settings payloads", 
         confirmOnIncompleteShellConstruct: true,
         confirmOnNaturalLanguageInput: true,
         confirmOnDangerousShellCommand: true,
-        confirmOnMultilineInput: true,
-        confirmOnRecentTargetSwitch: true,
-        targetSwitchGraceMs: 6000,
-        pasteLengthConfirmThreshold: 200,
-        pasteLineConfirmThreshold: 3
+        confirmOnMultilineInput: false,
+        confirmOnRecentTargetSwitch: false,
+        targetSwitchGraceMs: 4000,
+        pasteLengthConfirmThreshold: 400,
+        pasteLineConfirmThreshold: 5
       }
     ]
   ]);

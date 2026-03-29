@@ -20,9 +20,10 @@ test("input safety profile normalizes defaults and detects presets", () => {
   assert.equal(detectSessionInputSafetyPreset(balanced), "shell_balanced");
 
   const strict = buildSessionInputSafetyProfileFromPreset("shell_strict");
-  assert.equal(strict.confirmOnMultilineInput, true);
-  assert.equal(strict.pasteLengthConfirmThreshold, 200);
-  assert.equal(strict.pasteLineConfirmThreshold, 3);
+  assert.equal(strict.confirmOnMultilineInput, false);
+  assert.equal(strict.confirmOnRecentTargetSwitch, false);
+  assert.equal(strict.pasteLengthConfirmThreshold, 400);
+  assert.equal(strict.pasteLineConfirmThreshold, 5);
   assert.equal(detectSessionInputSafetyPreset(strict), "shell_strict");
 });
 

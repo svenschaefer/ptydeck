@@ -35,6 +35,101 @@ const NATURAL_LANGUAGE_STOPWORDS = new Set([
   "you"
 ]);
 
+const NON_COMMAND_NATURAL_LANGUAGE_HEADS = new Set([
+  "please",
+  "can",
+  "could",
+  "would",
+  "should",
+  "how",
+  "what",
+  "why",
+  "when",
+  "where",
+  "who",
+  "inspect",
+  "fix",
+  "review",
+  "explain",
+  "summarize",
+  "summarise",
+  "analyze",
+  "analyse",
+  "look",
+  "update",
+  "write",
+  "tell"
+]);
+
+const COMMON_SHELL_COMMAND_HEADS = new Set([
+  "awk",
+  "bash",
+  "brew",
+  "bun",
+  "cargo",
+  "cat",
+  "cd",
+  "chmod",
+  "chown",
+  "cp",
+  "curl",
+  "cut",
+  "dd",
+  "docker",
+  "echo",
+  "env",
+  "export",
+  "find",
+  "fish",
+  "git",
+  "go",
+  "grep",
+  "head",
+  "jq",
+  "kill",
+  "kubectl",
+  "less",
+  "ls",
+  "make",
+  "mkdir",
+  "more",
+  "mv",
+  "node",
+  "npm",
+  "perl",
+  "pnpm",
+  "printf",
+  "ps",
+  "pwd",
+  "pytest",
+  "python",
+  "read",
+  "rm",
+  "rsync",
+  "scp",
+  "sed",
+  "sh",
+  "sleep",
+  "sort",
+  "source",
+  "ssh",
+  "sudo",
+  "tail",
+  "tar",
+  "tee",
+  "test",
+  "touch",
+  "tr",
+  "uname",
+  "uniq",
+  "unset",
+  "wc",
+  "wget",
+  "xargs",
+  "yarn",
+  "zsh"
+]);
+
 const DANGEROUS_COMMAND_MATCHERS = [
   {
     code: "dangerous_shell_command",
@@ -91,6 +186,39 @@ function hasShellSignal(text) {
   );
 }
 
+function extractWordTokens(text) {
+  return String(text || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^a-z0-9._/+:-]+|[^a-z0-9._/+:-]+$/g, ""))
+    .filter(Boolean);
+}
+
+function isShellAssignmentToken(token) {
+  return /^[A-Za-z_][A-Za-z0-9_]*=.*/.test(String(token || ""));
+}
+
+function looksLikePathCommand(token) {
+  return /^(~?\/|\.{1,2}\/)/.test(String(token || ""));
+}
+
+function looksLikeShellCommandHead(token) {
+  const normalized = String(token || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (COMMON_SHELL_COMMAND_HEADS.has(normalized)) {
+    return true;
+  }
+  if (looksLikePathCommand(normalized)) {
+    return true;
+  }
+  if (normalized.includes("/") || normalized.includes("\\")) {
+    return true;
+  }
+  return isShellAssignmentToken(token);
+}
+
 export function isLikelyNaturalLanguageInput(text) {
   const normalized = String(text || "").trim();
   if (!normalized) {
@@ -99,16 +227,24 @@ export function isLikelyNaturalLanguageInput(text) {
   if (hasShellSignal(normalized)) {
     return false;
   }
-  const words = normalized
-    .toLowerCase()
-    .split(/\s+/)
-    .map((word) => word.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ""))
-    .filter(Boolean);
-  if (words.length < 4) {
+  const words = extractWordTokens(normalized);
+  if (words.length === 0) {
     return false;
   }
+  if (looksLikeShellCommandHead(words[0])) {
+    return false;
+  }
+  if (/^(can|could|would|should)\s+you\b/i.test(normalized)) {
+    return true;
+  }
+  if (/^(i|we)\s+(need|want)\b/i.test(normalized)) {
+    return true;
+  }
+  if (NON_COMMAND_NATURAL_LANGUAGE_HEADS.has(words[0])) {
+    return true;
+  }
   const stopwordCount = words.filter((word) => NATURAL_LANGUAGE_STOPWORDS.has(word)).length;
-  return stopwordCount >= 2;
+  return words.length >= 5 && stopwordCount / words.length >= 0.5;
 }
 
 export function classifyDangerousShellCommand(text) {
@@ -247,6 +383,9 @@ export function analyzeShellSyntax(text) {
     if (/\s/.test(char)) {
       pushToken(currentToken);
       currentToken = "";
+      if (char === "\n") {
+        tokens.push("\n");
+      }
       trailingBackslash = false;
       continue;
     }
@@ -279,95 +418,79 @@ export function analyzeShellSyntax(text) {
     };
   }
 
+  let atCommandStart = true;
+  const setCommandStart = () => {
+    atCommandStart = true;
+  };
+  const leaveCommandStart = () => {
+    atCommandStart = false;
+  };
+
   for (const token of tokens) {
+    if (token === "\n" || token === ";" || token === "&&" || token === "||" || token === "|") {
+      setCommandStart();
+      continue;
+    }
     const normalized = token.toLowerCase();
-    if (normalized === "if") {
+    if (atCommandStart && normalized === "if") {
       blocks.push({ type: "if", thenSeen: false });
       continue;
     }
-    if (normalized === "then") {
+    if (atCommandStart && normalized === "then") {
       const target = [...blocks].reverse().find((entry) => entry.type === "if" && entry.thenSeen === false);
-      if (!target) {
-        return {
-          valid: false,
-          incomplete: false,
-          code: "invalid_shell_syntax",
-          label: "Input is not valid shell syntax for the selected session profile."
-        };
+      if (target) {
+        target.thenSeen = true;
+        continue;
       }
-      target.thenSeen = true;
-      continue;
     }
-    if (normalized === "fi") {
+    if (atCommandStart && normalized === "fi") {
       const targetIndex = [...blocks].map((entry) => entry.type).lastIndexOf("if");
-      if (targetIndex < 0) {
-        return {
-          valid: false,
-          incomplete: false,
-          code: "invalid_shell_syntax",
-          label: "Input is not valid shell syntax for the selected session profile."
-        };
+      if (targetIndex >= 0) {
+        blocks.splice(targetIndex, 1);
+        continue;
       }
-      blocks.splice(targetIndex, 1);
-      continue;
     }
-    if (["for", "while", "until", "select"].includes(normalized)) {
+    if (atCommandStart && ["for", "while", "until", "select"].includes(normalized)) {
       blocks.push({ type: "loop", doSeen: false });
       continue;
     }
-    if (normalized === "do") {
+    if (atCommandStart && normalized === "do") {
       const target = [...blocks].reverse().find((entry) => entry.type === "loop" && entry.doSeen === false);
       if (target) {
         target.doSeen = true;
+        continue;
       }
-      continue;
     }
-    if (normalized === "done") {
+    if (atCommandStart && normalized === "done") {
       const targetIndex = [...blocks].map((entry) => entry.type).lastIndexOf("loop");
-      if (targetIndex < 0) {
-        return {
-          valid: false,
-          incomplete: false,
-          code: "invalid_shell_syntax",
-          label: "Input is not valid shell syntax for the selected session profile."
-        };
+      if (targetIndex >= 0) {
+        blocks.splice(targetIndex, 1);
+        continue;
       }
-      blocks.splice(targetIndex, 1);
-      continue;
     }
-    if (normalized === "case") {
+    if (atCommandStart && normalized === "case") {
       blocks.push({ type: "case" });
       continue;
     }
-    if (normalized === "esac") {
+    if (atCommandStart && normalized === "esac") {
       const targetIndex = [...blocks].map((entry) => entry.type).lastIndexOf("case");
-      if (targetIndex < 0) {
-        return {
-          valid: false,
-          incomplete: false,
-          code: "invalid_shell_syntax",
-          label: "Input is not valid shell syntax for the selected session profile."
-        };
+      if (targetIndex >= 0) {
+        blocks.splice(targetIndex, 1);
+        continue;
       }
-      blocks.splice(targetIndex, 1);
-      continue;
     }
-    if (token === "{") {
+    if (atCommandStart && token === "{") {
       blocks.push({ type: "brace" });
       continue;
     }
-    if (token === "}") {
+    if (atCommandStart && token === "}") {
       const targetIndex = [...blocks].map((entry) => entry.type).lastIndexOf("brace");
-      if (targetIndex < 0) {
-        return {
-          valid: false,
-          incomplete: false,
-          code: "invalid_shell_syntax",
-          label: "Input is not valid shell syntax for the selected session profile."
-        };
+      if (targetIndex >= 0) {
+        blocks.splice(targetIndex, 1);
+        continue;
       }
-      blocks.splice(targetIndex, 1);
     }
+    leaveCommandStart();
   }
 
   if (blocks.length > 0) {

@@ -52,12 +52,7 @@ const PRESET_DEFINITIONS = {
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnNaturalLanguageInput: true,
-      confirmOnDangerousShellCommand: true,
-      confirmOnMultilineInput: true,
-      confirmOnRecentTargetSwitch: true,
-      targetSwitchGraceMs: 6000,
-      pasteLengthConfirmThreshold: 200,
-      pasteLineConfirmThreshold: 3
+      confirmOnDangerousShellCommand: true
     }
   },
   agent: {

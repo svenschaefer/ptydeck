@@ -17,14 +17,29 @@ test("command send safety controller detects shell syntax and natural language s
     code: "valid_shell_syntax",
     label: ""
   });
+  assert.deepEqual(analyzeShellSyntax("echo done"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
   assert.deepEqual(analyzeShellSyntax("if true; then"), {
     valid: false,
     incomplete: true,
     code: "incomplete_shell_construct",
     label: "Input looks like an incomplete shell construct."
   });
+  assert.deepEqual(analyzeShellSyntax("if true\nthen\necho ok\nfi"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
   assert.equal(isLikelyNaturalLanguageInput("please inspect the failing tests and fix them"), true);
+  assert.equal(isLikelyNaturalLanguageInput("fix tests"), true);
+  assert.equal(isLikelyNaturalLanguageInput("what changed"), true);
   assert.equal(isLikelyNaturalLanguageInput("git status"), false);
+  assert.equal(isLikelyNaturalLanguageInput("grep the pattern in file.txt"), false);
   assert.deepEqual(classifyDangerousShellCommand("git reset --hard HEAD"), {
     matched: true,
     code: "dangerous_shell_command",
@@ -72,4 +87,45 @@ test("command send safety controller evaluates per-session risks and grouped con
     ["dangerous_shell_command"]
   );
   assert.deepEqual(grouped.reasons[0].targets, ["[7] ops-shell", "[8] build-shell"]);
+});
+
+test("command send safety controller keeps common shell commands clear while catching terse natural language in strict mode", () => {
+  const profile = buildSessionInputSafetyProfileFromPresetKey("shell_strict");
+  const session = {
+    id: "s1",
+    name: "ops-shell",
+    inputSafetyProfile: profile
+  };
+
+  const prose = evaluateSessionSendSafety({
+    session,
+    text: "fix tests",
+    recentTargetSwitchAt: 0,
+    nowMs: 10000
+  });
+  assert.deepEqual(
+    prose.reasons.map((entry) => entry.code),
+    ["natural_language_input"]
+  );
+
+  const shellCommand = evaluateSessionSendSafety({
+    session,
+    text: "grep the pattern in file.txt",
+    recentTargetSwitchAt: 0,
+    nowMs: 10000
+  });
+  assert.equal(shellCommand.requiresConfirmation, false);
+  assert.deepEqual(shellCommand.reasons, []);
+
+  const multilineShellBlock = evaluateSessionSendSafety({
+    session,
+    text:
+      "npm run rollout:gcp-hosted:wsl -- --environment dev --source-commit-sha af0ed75\n" +
+      "npm run -s check:hosted:dev:sweep\n" +
+      "npm run -s check:runner-api:interactive-startup:dev",
+    recentTargetSwitchAt: 9500,
+    nowMs: 10000
+  });
+  assert.equal(multilineShellBlock.requiresConfirmation, false);
+  assert.deepEqual(multilineShellBlock.reasons, []);
 });
