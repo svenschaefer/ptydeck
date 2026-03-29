@@ -1,3 +1,5 @@
+import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
+
 export function formatSessionDisplayName(session) {
   return session?.name || String(session?.id || "").slice(0, 8);
 }
@@ -238,6 +240,7 @@ export function createSessionViewModel(options = {}) {
       startCwd: typeof session?.startCwd === "string" ? session.startCwd : "",
       startCommand: typeof session?.startCommand === "string" ? session.startCommand : "",
       env: session?.env && typeof session.env === "object" ? session.env : {},
+      mouseForwardingMode: normalizeSessionMouseForwardingMode(session?.mouseForwardingMode),
       tags: normalizeSessionTags(session?.tags)
     };
   }

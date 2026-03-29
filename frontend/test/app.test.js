@@ -393,6 +393,9 @@ function createTerminalCardTemplateNode() {
   const startEnvLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startEnv = new FakeElement({ className: "session-start-env", tagName: "textarea" });
   startEnv.value = "";
+  const mouseForwardingLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
+  const mouseForwardingMode = new FakeElement({ className: "session-mouse-forwarding-mode", tagName: "select" });
+  mouseForwardingMode.value = "off";
   const startTagsLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startTags = new FakeElement({ className: "session-tags-input", tagName: "input" });
   startTags.value = "";
@@ -501,6 +504,8 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startCommand);
   startControls.appendChild(startEnvLabel);
   startControls.appendChild(startEnv);
+  startControls.appendChild(mouseForwardingLabel);
+  startControls.appendChild(mouseForwardingMode);
   startControls.appendChild(startTagsLabel);
   startControls.appendChild(startTags);
   startControls.appendChild(startSendTerminatorLabel);
@@ -1123,6 +1128,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
                 state: "active",
                 shell: "bash",
                 cwd: "~",
+                mouseForwardingMode: "off",
                 tags: [],
                 createdAt: Date.now(),
                 updatedAt: Date.now()
@@ -1145,6 +1151,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         state: "active",
         shell: "bash",
         cwd: "~",
+        mouseForwardingMode: "off",
         name: sessionId === "s-2" ? "two" : sessionId === "ops" ? "ops-node" : "one",
         tags: sessionId === "s-2" ? ["beta", "ops"] : sessionId === "ops" ? ["ops"] : [],
         createdAt: Date.now(),
@@ -1167,6 +1174,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         startCwd: "~",
         startCommand: "",
         env: {},
+        mouseForwardingMode: "off",
         tags: sessionId === "s-2" ? ["beta", "ops"] : sessionId === "ops" ? ["ops"] : [],
         themeProfile: undefined,
         activeThemeProfile: undefined,
@@ -1192,6 +1200,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         startCwd: payload.startCwd || baseSession.startCwd,
         startCommand: payload.startCommand || baseSession.startCommand,
         env: payload.env || baseSession.env,
+        mouseForwardingMode: payload.mouseForwardingMode || baseSession.mouseForwardingMode,
         tags: Array.isArray(payload.tags) ? payload.tags : baseSession.tags,
         themeProfile: nextActiveThemeProfile || baseSession.themeProfile,
         activeThemeProfile: nextActiveThemeProfile,
@@ -1216,6 +1225,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
           state: "active",
           shell: "bash",
           cwd: "~",
+          mouseForwardingMode: "off",
           name: leftSessionId === "s-2" ? "two" : "one",
           tags: leftSessionId === "s-2" ? ["beta", "ops"] : [],
           createdAt: Date.now(),
@@ -1228,6 +1238,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
           state: "active",
           shell: "bash",
           cwd: "~",
+          mouseForwardingMode: "off",
           name: rightSessionId === "s-2" ? "two" : "one",
           tags: rightSessionId === "s-2" ? ["beta", "ops"] : [],
           createdAt: Date.now(),
@@ -1273,6 +1284,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
         state: "active",
         shell: "bash",
         cwd: "~",
+        mouseForwardingMode: "off",
         name: sessionId === "s-2" ? "two" : "one",
         tags: sessionId === "s-2" ? ["beta", "ops"] : [],
         createdAt: Date.now(),
@@ -2629,6 +2641,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   const secondStartCwd = secondSettingsPanel.querySelector(".session-start-cwd");
   const secondStartCommand = secondSettingsPanel.querySelector(".session-start-command");
   const secondStartEnv = secondSettingsPanel.querySelector(".session-start-env");
+  const secondMouseForwardingMode = secondSettingsPanel.querySelector(".session-mouse-forwarding-mode");
   const secondTags = secondSettingsPanel.querySelector(".session-tags-input");
   const secondSendTerminator = secondSettingsPanel.querySelector(".session-send-terminator");
   const secondSettingsApply = secondSettingsPanel.querySelector(".session-settings-apply");
@@ -2691,6 +2704,8 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   secondStartCommand.dispatchEvent({ type: "input" });
   secondStartEnv.value = "APP_MODE=dev\nFEATURE_X=1";
   secondStartEnv.dispatchEvent({ type: "input" });
+  secondMouseForwardingMode.value = "application";
+  secondMouseForwardingMode.dispatchEvent({ type: "change" });
   secondTags.value = "ops prod";
   secondTags.dispatchEvent({ type: "input" });
   secondSettingsApply.click();
@@ -2704,6 +2719,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     APP_MODE: "dev",
     FEATURE_X: "1"
   });
+  assert.equal(latestSettingsCall.payload.mouseForwardingMode, "application");
   assert.deepEqual(latestSettingsCall.payload.tags, ["ops", "prod"]);
   assert.deepEqual(latestSettingsCall.payload.inputSafetyProfile, {
     requireValidShellSyntax: false,

@@ -181,6 +181,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     startCwd: "/workspace",
     startCommand: "npm run dev",
     note: "first line\nsecond line",
+    mouseForwardingMode: "off",
     inputSafetyProfile: {
       requireValidShellSyntax: false
     },
@@ -229,6 +230,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     startCwdInput: createInput("/workspace"),
     startCommandInput: createInput("npm run dev"),
     startEnvInput: createInput("FOO=bar"),
+    mouseForwardingModeSelect: createInput("off"),
     sessionNoteInput: createInput("first line\nsecond line"),
     sessionTagsInput: createInput("ops"),
     sessionSendTerminatorSelect: createInput("crlf"),
@@ -256,6 +258,9 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   entry.sessionSendTerminatorSelect.value = "lf";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
   entry.sessionSendTerminatorSelect.value = "crlf";
+  entry.mouseForwardingModeSelect.value = "application";
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+  entry.mouseForwardingModeSelect.value = "off";
   entry.sessionNoteInput.value = "first line\nupdated";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
   entry.sessionNoteInput.value = "first line\nsecond line";
@@ -265,6 +270,44 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   controller.setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
   assert.equal(startFeedback.textContent, "Failed to save settings.");
   assert.equal(startFeedback.classList.contains("error"), true);
+});
+
+test("session-settings state controller syncs and reads mouse forwarding mode", () => {
+  const controller = createSessionSettingsStateController({
+    formatSessionEnv: () => "",
+    formatSessionTags: () => "",
+    parseSessionEnv: () => ({ ok: true, env: {} }),
+    parseSessionTags: () => ({ ok: true, tags: [] }),
+    getSessionSendTerminator: () => "auto"
+  });
+  const entry = {
+    startCwdInput: createInput(""),
+    startCommandInput: createInput(""),
+    startEnvInput: createInput(""),
+    mouseForwardingModeSelect: createInput("application"),
+    sessionTagsInput: createInput(""),
+    sessionSendTerminatorSelect: createInput("auto")
+  };
+
+  controller.syncSessionStartupControls(entry, {
+    id: "s1",
+    cwd: "/workspace",
+    startCommand: "echo hi",
+    env: {},
+    mouseForwardingMode: "application",
+    tags: []
+  });
+
+  assert.equal(entry.startCwdInput.value, "/workspace");
+  assert.equal(entry.mouseForwardingModeSelect.value, "application");
+  assert.deepEqual(controller.readSessionStartupFromControls(entry), {
+    startCwd: "/workspace",
+    startCommand: "echo hi",
+    envResult: { ok: true, env: {} },
+    mouseForwardingMode: "application",
+    sendTerminator: "auto",
+    tagResult: { ok: true, tags: [] }
+  });
 });
 
 test("session-settings state controller syncs and reads multiline session notes", () => {

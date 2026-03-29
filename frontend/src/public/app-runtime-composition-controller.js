@@ -892,6 +892,7 @@ sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
   terminalFontSize: TERMINAL_FONT_SIZE,
   terminalLineHeight: TERMINAL_LINE_HEIGHT,
   terminalFontFamily: TERMINAL_FONT_FAMILY,
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   canWriteClipboardText: () => clipboardRuntimeController.canWriteText(),
   readClipboardText: () => clipboardRuntimeController.readText(),
   requestTerminalCtrlCAction: ({ session, selection }) =>

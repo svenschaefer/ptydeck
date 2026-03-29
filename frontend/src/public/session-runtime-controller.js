@@ -1,4 +1,10 @@
 import { hasMeaningfulStreamActivity } from "./terminal-stream.js";
+import {
+  SESSION_MOUSE_FORWARDING_MODE_OFF,
+  getMouseTrackingResetSequence,
+  normalizeSessionMouseForwardingMode,
+  stripMouseTrackingControlSequences
+} from "./session-mouse-forwarding.js";
 
 export function createSessionRuntimeController(options = {}) {
   const store = options.store || null;
@@ -92,24 +98,36 @@ export function createSessionRuntimeController(options = {}) {
     if (!entry || typeof data !== "string" || data.length === 0) {
       return false;
     }
+    const session = getSessionById(sessionId);
+    const nextMouseForwardingMode = normalizeSessionMouseForwardingMode(session?.mouseForwardingMode);
+    if (entry.mouseForwardingMode !== nextMouseForwardingMode) {
+      if (entry.mouseForwardingMode && nextMouseForwardingMode === SESSION_MOUSE_FORWARDING_MODE_OFF) {
+        entry.terminal.write(getMouseTrackingResetSequence());
+      }
+      entry.mouseForwardingMode = nextMouseForwardingMode;
+    }
+    const writeData =
+      nextMouseForwardingMode === SESSION_MOUSE_FORWARDING_MODE_OFF ? stripMouseTrackingControlSequences(data) : data;
     if (entry.isVisible === false) {
       entry.pendingViewportSync = true;
     }
     const terminal = entry.terminal;
-    terminal.write(data, () => {
-      entry.searchRevision = (Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0) + 1;
-      if (entry.isVisible !== false) {
-        syncTerminalScrollArea(terminal);
-      }
-      refreshTerminalViewport(terminal);
-      if (entry.isVisible !== false) {
-        syncTerminalScrollArea(terminal);
-      }
-      if (getActiveSessionId() === sessionId && terminalSearchState.query) {
-        syncActiveTerminalSearch({ preserveSelection: true });
-      }
-    });
-    if (options.markActivity !== false && hasMeaningfulStreamActivity(data)) {
+    if (writeData) {
+      terminal.write(writeData, () => {
+        entry.searchRevision = (Number.isInteger(entry.searchRevision) ? entry.searchRevision : 0) + 1;
+        if (entry.isVisible !== false) {
+          syncTerminalScrollArea(terminal);
+        }
+        refreshTerminalViewport(terminal);
+        if (entry.isVisible !== false) {
+          syncTerminalScrollArea(terminal);
+        }
+        if (getActiveSessionId() === sessionId && terminalSearchState.query) {
+          syncActiveTerminalSearch({ preserveSelection: true });
+        }
+      });
+    }
+    if (options.markActivity !== false && hasMeaningfulStreamActivity(writeData)) {
       markSessionActivity(sessionId);
     }
     return true;
@@ -139,6 +157,17 @@ export function createSessionRuntimeController(options = {}) {
 
   function upsertSession(nextSession) {
     store?.upsertSession(nextSession);
+    const entry = terminals.get(nextSession?.id);
+    if (!entry) {
+      return;
+    }
+    const nextMouseForwardingMode = normalizeSessionMouseForwardingMode(nextSession?.mouseForwardingMode);
+    if (entry.mouseForwardingMode !== nextMouseForwardingMode) {
+      if (entry.mouseForwardingMode && nextMouseForwardingMode === SESSION_MOUSE_FORWARDING_MODE_OFF) {
+        entry.terminal.write(getMouseTrackingResetSequence());
+      }
+      entry.mouseForwardingMode = nextMouseForwardingMode;
+    }
   }
 
   function ensureSessionRuntime(session) {

@@ -14,8 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `UX-018` Owner `FE`: Add controlled xterm mouse-forwarding behavior plus session-settings controls so sessions can opt into mouse forwarding while preserving the existing selection/copy/middle-click paste UX when forwarding is disabled.
-- `UX-019` Owner `QA`: Add regression coverage for mouse-forwarding persistence, enabled-versus-disabled terminal behavior, selection/copy non-regression, and restart/reload consistency.
+- none currently
 
 ## Active Ownership Role
 

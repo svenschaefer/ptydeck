@@ -1,3 +1,8 @@
+import {
+  SESSION_MOUSE_FORWARDING_MODE_APPLICATION,
+  normalizeSessionMouseForwardingMode
+} from "../session-mouse-forwarding.js";
+
 export function createSessionTerminalRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const navigatorRef = options.navigatorRef || windowRef.navigator || globalThis.navigator || null;
@@ -39,6 +44,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     typeof options.requestTerminalCtrlCAction === "function"
       ? options.requestTerminalCtrlCAction
       : async () => "cancel";
+  const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
 
   function getTerminalSelection(terminal) {
     if (!terminal) {
@@ -67,6 +73,12 @@ export function createSessionTerminalRuntimeController(options = {}) {
     }
 
     let ctrlCIntentPending = false;
+    let suppressNextPaste = false;
+
+    function isMouseForwardingEnabled() {
+      const currentSession = getSessionById(session.id) || session;
+      return normalizeSessionMouseForwardingMode(currentSession?.mouseForwardingMode) === SESSION_MOUSE_FORWARDING_MODE_APPLICATION;
+    }
 
     const handleKeydown = (event) => {
       const isCtrlC =
@@ -134,6 +146,13 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button !== 1) {
         return;
       }
+      if (isMouseForwardingEnabled()) {
+        suppressNextPaste = true;
+        setTimeoutFn(() => {
+          suppressNextPaste = false;
+        }, 0);
+        return;
+      }
       event.preventDefault?.();
       event.stopPropagation?.();
       Promise.resolve(readClipboardText())
@@ -149,6 +168,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     const handlePaste = (event) => {
+      if (suppressNextPaste && isMouseForwardingEnabled()) {
+        suppressNextPaste = false;
+        return;
+      }
       const text = event?.clipboardData?.getData?.("text") || "";
       if (!text) {
         return;
@@ -162,6 +185,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
 
     const handleAuxClick = (event) => {
       if (!event || event.button !== 1) {
+        return;
+      }
+      if (isMouseForwardingEnabled()) {
         return;
       }
       event.preventDefault?.();
@@ -235,6 +261,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       startCwdInput: refs.startCwdInput,
       startCommandInput: refs.startCommandInput,
       startEnvInput: refs.startEnvInput,
+      mouseForwardingModeSelect: refs.mouseForwardingModeSelect,
       sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
       inputSafetyControls: refs.inputSafetyControls,
       sessionTagsInput: refs.sessionTagsInput,

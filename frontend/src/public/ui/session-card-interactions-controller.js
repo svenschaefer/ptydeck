@@ -62,6 +62,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startCwdInput: refs.startCwdInput,
           startCommandInput: refs.startCommandInput,
           startEnvInput: refs.startEnvInput,
+          mouseForwardingModeSelect: refs.mouseForwardingModeSelect,
           sessionNoteInput: refs.sessionNoteInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
           inputSafetyControls: refs.inputSafetyControls,
@@ -161,6 +162,7 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.startCwdInput?.addEventListener("input", markDirtyFromControls);
     refs.startCommandInput?.addEventListener("input", markDirtyFromControls);
     refs.startEnvInput?.addEventListener("input", markDirtyFromControls);
+    refs.mouseForwardingModeSelect?.addEventListener("change", markDirtyFromControls);
     refs.sessionNoteInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionTagsInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionSendTerminatorSelect?.addEventListener("change", markDirtyFromControls);
@@ -263,6 +265,7 @@ export function createSessionCardInteractionsController(options = {}) {
         startCwdInput: refs.startCwdInput,
         startCommandInput: refs.startCommandInput,
         startEnvInput: refs.startEnvInput,
+        mouseForwardingModeSelect: refs.mouseForwardingModeSelect,
         sessionNoteInput: refs.sessionNoteInput,
         sessionTagsInput: refs.sessionTagsInput,
         sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect
@@ -318,6 +321,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startCwd: startupDraft.startCwd,
           startCommand: startupDraft.startCommand,
           env: startupDraft.envResult.env,
+          mouseForwardingMode: startupDraft.mouseForwardingMode,
           note,
           tags: startupDraft.tagResult.tags,
           activeThemeProfile,
@@ -344,6 +348,7 @@ export function createSessionCardInteractionsController(options = {}) {
             startCwdInput: refs.startCwdInput,
             startCommandInput: refs.startCommandInput,
             startEnvInput: refs.startEnvInput,
+            mouseForwardingModeSelect: refs.mouseForwardingModeSelect,
             sessionNoteInput: refs.sessionNoteInput,
             sessionTagsInput: refs.sessionTagsInput,
             sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,

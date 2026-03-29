@@ -52,6 +52,7 @@ function createNodeStub() {
     ".session-start-cwd",
     ".session-start-command",
     ".session-start-env",
+    ".session-mouse-forwarding-mode",
     ".session-note-input",
     ".session-send-terminator",
     ".session-tags-input",
@@ -130,6 +131,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.settingsTabThemeBtn);
   assert.ok(result.settingsPanelNote);
   assert.ok(result.sessionNoteInput);
+  assert.ok(result.mouseForwardingModeSelect);
   assert.ok(result.themeSlotSelect);
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);

@@ -30,6 +30,7 @@ export function createSessionCardFactoryController(options = {}) {
     const startCwdInput = node.querySelector(".session-start-cwd");
     const startCommandInput = node.querySelector(".session-start-command");
     const startEnvInput = node.querySelector(".session-start-env");
+    const mouseForwardingModeSelect = node.querySelector(".session-mouse-forwarding-mode");
     const sessionNoteInput = node.querySelector(".session-note-input");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
     const inputSafetyRequireValidShellSyntax = node.querySelector(".session-input-safety-require-valid-shell-syntax");
@@ -133,6 +134,7 @@ export function createSessionCardFactoryController(options = {}) {
       startCwdInput,
       startCommandInput,
       startEnvInput,
+      mouseForwardingModeSelect,
       sessionNoteInput,
       sessionSendTerminatorSelect,
       inputSafetyControls,

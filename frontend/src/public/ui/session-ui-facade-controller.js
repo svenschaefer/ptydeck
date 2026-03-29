@@ -13,6 +13,7 @@ function createDefaultStartupReadResult() {
     startCwd: "",
     startCommand: "",
     envResult: { ok: true, env: {} },
+    mouseForwardingMode: "off",
     sendTerminator: "auto",
     tagResult: { ok: true, tags: [] }
   };
@@ -23,6 +24,7 @@ function createDefaultSessionStartupState() {
     startCwd: "",
     startCommand: "",
     env: {},
+    mouseForwardingMode: "off",
     tags: []
   };
 }

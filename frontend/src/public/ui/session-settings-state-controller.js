@@ -3,6 +3,7 @@ import {
   SESSION_INPUT_SAFETY_BOOLEAN_KEYS,
   SESSION_INPUT_SAFETY_INTEGER_DEFAULTS
 } from "../input-safety-profile.js";
+import { normalizeSessionMouseForwardingMode } from "../session-mouse-forwarding.js";
 
 const THEME_SLOT_OPTIONS = Object.freeze([
   { value: "active", label: "Active" },
@@ -367,6 +368,9 @@ export function createSessionSettingsStateController(options = {}) {
     entry.startCwdInput.value = startCwd;
     entry.startCommandInput.value = typeof session.startCommand === "string" ? session.startCommand : "";
     entry.startEnvInput.value = formatSessionEnv(session.env);
+    if (entry.mouseForwardingModeSelect) {
+      entry.mouseForwardingModeSelect.value = normalizeSessionMouseForwardingMode(session?.mouseForwardingMode);
+    }
     if (entry.sessionTagsInput) {
       entry.sessionTagsInput.value = formatSessionTags(session.tags);
     }
@@ -461,12 +465,14 @@ export function createSessionSettingsStateController(options = {}) {
     const startCwd = String(entry?.startCwdInput?.value || "").trim();
     const startCommand = String(entry?.startCommandInput?.value || "");
     const envResult = parseSessionEnv(String(entry?.startEnvInput?.value || ""));
+    const mouseForwardingMode = normalizeSessionMouseForwardingMode(entry?.mouseForwardingModeSelect?.value);
     const sendTerminator = normalizeSendTerminatorMode(String(entry?.sessionSendTerminatorSelect?.value || "").toLowerCase());
     const tagResult = parseSessionTags(String(entry?.sessionTagsInput?.value || ""));
     return {
       startCwd,
       startCommand,
       envResult,
+      mouseForwardingMode,
       sendTerminator,
       tagResult
     };
@@ -539,6 +545,9 @@ export function createSessionSettingsStateController(options = {}) {
       return true;
     }
     if (currentStartup.startCommand !== draftStartup.startCommand) {
+      return true;
+    }
+    if (normalizeSessionMouseForwardingMode(currentStartup.mouseForwardingMode) !== draftStartup.mouseForwardingMode) {
       return true;
     }
     if (!areStringMapsEqual(currentStartup.env, draftStartup.envResult.env)) {

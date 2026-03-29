@@ -70,7 +70,7 @@ Promoted and completed in `v0.4.0-H21`:
 
 ## Extensibility
 
-- Promoted to active delivery in `v0.4.0-H52`:
+- Promoted and completed in `v0.4.0-H52`:
   - `UX-017`, `UX-018`, `UX-019`
 - [ ] Add plugin interface for project-specific automations.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
@@ -116,7 +116,7 @@ Promoted and completed in `v0.4.0-H37`:
 
 - `SWF-007`, `SWF-008`
 
-Promoted to active delivery in `v0.4.0-H38`:
+Promoted and completed in `v0.4.0-H38`:
 
 - `REM-001`, `REM-002`, `REM-003`, `REM-009`
 
@@ -130,14 +130,14 @@ Deferred out of current near-term scope after `v0.4.0-H40` reprioritization:
 - [ ] `REM-008B` Owner `FE`: Add frontend operator workflows for theme import/export, including slash-command entry points plus session-settings UI for importing a supported external theme payload into the active or inactive theme slot and exporting the current slot in a selected external format with explicit validation feedback.
 - [ ] `REM-008C` Owner `QA`: Add regression coverage for theme import/export parsing, invalid payload rejection, deterministic slot mapping, and roundtrip fidelity across the supported external theme formats.
 
-Promoted to active delivery in `v0.4.0-H49`:
+Promoted and completed in `v0.4.0-H49`:
 
 - `SWF-004`
 
 Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current scope):
 
 - Inspiration source: [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
-- Promoted to active delivery in `v0.4.0-H47`:
+- Promoted and completed in `v0.4.0-H47`:
   - `REM-006A`, `REM-006B`, `REM-006C`
 - Promoted and completed in `v0.4.0-H48`:
   - `REM-007A`, `REM-007B`, `REM-007C`

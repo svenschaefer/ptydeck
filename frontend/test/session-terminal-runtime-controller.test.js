@@ -149,6 +149,7 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     startCwdInput: {},
     startCommandInput: {},
     startEnvInput: {},
+    mouseForwardingModeSelect: {},
     sessionSendTerminatorSelect: {},
     sessionTagsInput: {},
     startFeedback: {},
@@ -183,6 +184,7 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(terminalObservers.has("s1"), true);
   assert.equal(entry.isVisible, true);
   assert.equal(entry.pendingViewportSync, false);
+  assert.equal(entry.mouseForwardingModeSelect, refs.mouseForwardingModeSelect);
   assert.deepEqual(timers, [120, 400, 900]);
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [
@@ -318,6 +320,66 @@ test("session-terminal-runtime controller pastes clipboard text into the termina
   assert.equal(middleDown.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "pwd\n"]]);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller does not intercept middle click when mouse forwarding is enabled", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "pwd\n",
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "application" })
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  controller.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "application" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: () => pasted.push(["data"]),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const middleDown = createMouseEvent("mousedown", 1);
+  refs.mount.dispatchEvent(middleDown);
+  await Promise.resolve();
+
+  assert.equal(middleDown.defaultPrevented, false);
+  assert.deepEqual(pasted, []);
 });
 
 test("session-terminal-runtime controller routes clipboard paste events through guarded paste handling", () => {

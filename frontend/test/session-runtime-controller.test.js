@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createSessionRuntimeController } from "../src/public/session-runtime-controller.js";
+import { getMouseTrackingResetSequence } from "../src/public/session-mouse-forwarding.js";
 import { createStore } from "../src/public/store.js";
 
 function createTerminal() {
@@ -150,6 +151,33 @@ test("session-runtime controller appends chunks and retries replay for late term
   controller.replaySnapshotOutputs([{ sessionId: "late", data: "chunk" }]);
   assert.ok(callbacks.includes("retry"));
   assert.deepEqual(terminals.get("late").terminal.writes, ["chunk"]);
+});
+
+test("session-runtime controller strips mouse-tracking control sequences when forwarding is off", () => {
+  const terminals = new Map();
+  const terminal = createTerminal();
+  const controller = createSessionRuntimeController({
+    terminals,
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "off" })
+  });
+  terminals.set("s1", { terminal, isVisible: true, searchRevision: 0, mouseForwardingMode: "off" });
+
+  assert.equal(controller.appendTerminalChunk("s1", "\u001b[?1000hvisible\u001b[?1006h"), true);
+  assert.deepEqual(terminal.writes, ["visible"]);
+});
+
+test("session-runtime controller resets mouse tracking when switching back to off", () => {
+  const terminals = new Map();
+  const terminal = createTerminal();
+  const controller = createSessionRuntimeController({
+    terminals,
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "off" })
+  });
+  terminals.set("s1", { terminal, isVisible: true, searchRevision: 0, mouseForwardingMode: "application" });
+
+  controller.upsertSession({ id: "s1", mouseForwardingMode: "off" });
+
+  assert.deepEqual(terminal.writes, [getMouseTrackingResetSequence()]);
 });
 
 test("session-runtime controller updates session lifecycle and delegates runtime/view-model helpers", () => {

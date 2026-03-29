@@ -162,6 +162,7 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
         startCwd: "/workspace",
         startCommand: "npm run dev",
         envResult: { ok: true, env: { FOO: "bar" } },
+        mouseForwardingMode: "off",
         sendTerminator: "crlf",
         tagResult: { ok: true, tags: ["ops"] }
       };
@@ -220,6 +221,7 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     startCwd: "/workspace",
     startCommand: "npm run dev",
     envResult: { ok: true, env: { FOO: "bar" } },
+    mouseForwardingMode: "off",
     sendTerminator: "crlf",
     tagResult: { ok: true, tags: ["ops"] }
   });
@@ -293,6 +295,7 @@ test("session-ui facade controller delegates meta rendering and falls back safel
     startCwd: "",
     startCommand: "",
     envResult: { ok: true, env: {} },
+    mouseForwardingMode: "off",
     sendTerminator: "auto",
     tagResult: { ok: true, tags: [] }
   });

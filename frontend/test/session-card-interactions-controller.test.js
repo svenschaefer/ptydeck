@@ -48,7 +48,8 @@ test("session-card-interactions controller wires focus and settings dialog contr
     focusBtn: createEventTarget(),
     settingsBtn: createEventTarget(),
     settingsDismissBtn: createEventTarget(),
-    settingsDialog: createEventTarget()
+    settingsDialog: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off")
   };
 
   controller.bindSessionCardInteractions({
@@ -125,6 +126,7 @@ test("session-card-interactions controller handles theme select changes through 
     startCwdInput: createEventTarget("/tmp"),
     startCommandInput: createEventTarget(""),
     startEnvInput: createEventTarget(""),
+    mouseForwardingModeSelect: createEventTarget("off"),
     sessionSendTerminatorSelect: createEventTarget("auto"),
     sessionTagsInput: createEventTarget("")
   };
@@ -173,6 +175,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
       envResult: { ok: true, env: {} },
       tagResult: { ok: true, tags: [] },
       startCommand: "",
+      mouseForwardingMode: "off",
       sendTerminator: "auto"
     }),
     readSessionInputSafetyFromControls: () => ({
@@ -188,6 +191,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("off"),
     themeSlotSelect: createEventTarget("active"),
     themeSelect: createEventTarget("custom"),
     themeCategory: createEventTarget("all"),
@@ -288,6 +292,7 @@ test("session-card-interactions controller applies valid settings and persists s
       envResult: { ok: true, env: { A: "1" } },
       tagResult: { ok: true, tags: ["x"] },
       startCommand: "echo hi",
+      mouseForwardingMode: "application",
       sendTerminator: "crlf"
     }),
     readSessionInputSafetyFromControls: () => ({
@@ -302,6 +307,7 @@ test("session-card-interactions controller applies valid settings and persists s
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("application"),
     inputSafetyControls: createInputSafetyControls(),
     themeSelect: createEventTarget("custom"),
     themeCategory: createEventTarget("all"),
@@ -323,6 +329,7 @@ test("session-card-interactions controller applies valid settings and persists s
     api: {
       async updateSession(sessionId, payload) {
         calls.push(`api:${sessionId}:${payload.startCwd}:${payload.startCommand}`);
+        calls.push(`mouse:${payload.mouseForwardingMode}`);
         calls.push(payload.inputSafetyProfile);
         return { id: sessionId, ...payload };
       }
@@ -347,6 +354,7 @@ test("session-card-interactions controller applies valid settings and persists s
     "sync-theme",
     "clear-error",
     "api:s1:/tmp:echo hi",
+    "mouse:application",
     {
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true
@@ -365,6 +373,7 @@ test("session-card-interactions controller restores draft state on settings canc
   const refs = {
     focusBtn: createEventTarget(),
     settingsCancelBtn: createEventTarget(),
+    mouseForwardingModeSelect: createEventTarget("application"),
     inputSafetyControls: createInputSafetyControls(),
     startCwdInput: createEventTarget("/tmp"),
     startCommandInput: createEventTarget(""),
