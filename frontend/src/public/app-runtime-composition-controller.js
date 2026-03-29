@@ -1224,6 +1224,7 @@ slashWorkflowRuntimeController = createSlashWorkflowRuntimeController({
   requestRender: () => appCommandUiFacadeController?.render?.(),
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  getTerminalEntry: (sessionId) => terminals.get(sessionId) || null,
   apiInterruptSession: (sessionId) => api.interruptSession(sessionId),
   apiKillSession: (sessionId) => api.killSession(sessionId),
   debugLog

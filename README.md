@@ -442,6 +442,10 @@ Behavior:
   - `Interrupt`
   - `Kill Session`
 - Live workflow waits remain intentionally constrained to deterministic runtime signals that do not reintroduce the removed stream-interpretation layer.
+- Supported workflow wait sources now map to one explicit adapter layer:
+  - `status`, `summary`, `exit-code`, and `session-state` read store-backed session state and artifacts.
+  - `line` and `visible-line` read the mounted xterm buffer directly.
+  - Terminal-backed sources fail explicitly when no mounted terminal buffer is available instead of falling back to heuristic stream scanning.
 - The workflow runtime now enforces deterministic guardrails for workflow step count, maximum wait duration, and bounded captured source text instead of allowing unbounded waits or oversized observed values.
 
 ## Working Directory Tracking

@@ -22,6 +22,7 @@ function createControllerContext(overrides = {}) {
 
   const uiStates = [];
   const calls = [];
+  const terminalEntries = overrides.terminalEntries || new Map();
   const controller = createSlashWorkflowRuntimeController({
     store,
     executeControlCommandDetailed: async (interpreted) => {
@@ -39,10 +40,11 @@ function createControllerContext(overrides = {}) {
     formatSessionDisplayName: (session) => session.name,
     apiInterruptSession: async (sessionId) => calls.push(["interrupt", sessionId]),
     apiKillSession: async (sessionId) => calls.push(["kill", sessionId]),
+    getTerminalEntry: (sessionId) => terminalEntries.get(sessionId) || null,
     ...overrides
   });
 
-  return { store, uiStates, calls, controller };
+  return { store, uiStates, calls, controller, terminalEntries };
 }
 
 test("slash-workflow runtime controller executes multiline slash workflows through the workflow engine", async () => {
@@ -81,7 +83,7 @@ test("slash-workflow runtime controller strips /run and stops waiting workflows 
   assert.equal(calls.some((entry) => entry[0] === "execute"), false);
 });
 
-test("slash-workflow runtime controller fails unsupported wait sources without reviving stream scanning", async () => {
+test("slash-workflow runtime controller reports terminal-backed wait sources explicitly when no terminal is mounted", async () => {
   const { controller } = createControllerContext();
 
   const result = await controller.runWorkflowDetailed({
@@ -92,7 +94,7 @@ test("slash-workflow runtime controller fails unsupported wait sources without r
 
   assert.equal(result.ok, false);
   assert.equal(result.status, "failed");
-  assert.match(result.feedback, /line/);
+  assert.equal(result.failure.code, "workflow.source_unavailable");
 });
 
 test("slash-workflow runtime controller exposes interrupt and kill actions for the bound workflow session", async () => {
@@ -151,6 +153,74 @@ test("slash-workflow runtime controller resolves wait conditions on PTY-exit sta
   const result = await pending;
   assert.equal(result.ok, true);
   assert.equal(result.status, "succeeded");
+});
+
+test("slash-workflow runtime controller resolves line and summary waits through explicit source adapters", async () => {
+  const terminal = {
+    rows: 3,
+    buffer: {
+      active: {
+        ydisp: 0,
+        baseY: 0,
+        length: 1,
+        getLine(index) {
+          const lines = [index === 0 ? "boot" : ""];
+          const text = lines[index];
+          if (typeof text !== "string") {
+            return null;
+          }
+          return {
+            translateToString() {
+              return text;
+            }
+          };
+        }
+      }
+    }
+  };
+  const terminalEntries = new Map([["s1", { terminal }]]);
+  const { controller, store } = createControllerContext({ terminalEntries });
+
+  const linePending = controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until line /^done$/ timeout 5s"
+  });
+
+  terminal.buffer.active.length = 2;
+  terminal.buffer.active.baseY = 1;
+  terminal.buffer.active.ydisp = 1;
+  terminal.buffer.active.getLine = (index) => {
+    const lines = ["boot", "done"];
+    const text = lines[index];
+    if (typeof text !== "string") {
+      return null;
+    }
+    return {
+      translateToString() {
+        return text;
+      }
+    };
+  };
+  store.markSessionActivity("s1", { timestamp: 5 });
+  const lineResult = await linePending;
+  assert.equal(lineResult.ok, true);
+  assert.equal(lineResult.status, "succeeded");
+
+  const summaryPending = controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until summary /^all green$/ timeout 5s"
+  });
+  store.applySessionInterpretationActions("s1", [
+    {
+      type: "upsertSessionArtifact",
+      artifact: { id: "summary", kind: "summary", title: "Summary", text: "all green" }
+    }
+  ]);
+  const summaryResult = await summaryPending;
+  assert.equal(summaryResult.ok, true);
+  assert.equal(summaryResult.status, "succeeded");
 });
 
 test("slash-workflow runtime controller enforces the maximum wait timeout guardrail", async () => {

@@ -12,10 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H49` (Workflow Data-Source Adapters).
-- Active scoped tasks: `SWF-004`.
-- Queued next wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
-- Latest completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
+- Active release wave: `v0.4.0-H50` (Explicit Input-Safety Options).
+- Active scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`.
+- Latest completed wave: `v0.4.0-H49` (Workflow Data-Source Adapters, `SWF-004`).
+- Previous completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
 - Previous completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
 - Previous completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
 - Previous completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
@@ -65,25 +65,9 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H49 - Workflow Data-Source Adapters (Active)
+### v0.4.0-H50 - Explicit Input-Safety Options (Active)
 
-- Active scoped tasks: `SWF-004`
-
-Dependencies:
-
-- `SWF-004` follows the completed workflow runtime and guardrail waves (`v0.4.0-H34` through `v0.4.0-H37`) so data-source reads bind to the existing control-plane/workflow contracts instead of reviving the removed stream-interpretation side channel.
-
-Exit criteria:
-
-- Workflow steps can read deterministic session/workspace data sources such as `line`, `visible-line`, `status`, `summary`, `exit-code`, and `session-state` through one explicit adapter layer.
-- Missing data and unsupported source cases are reported explicitly instead of silently falling back to heuristic stream interpretation.
-- The adapter layer stays compatible with the current streamlined frontend runtime and does not reintroduce plugin-style stream scanning into normal terminal activity handling.
-
-## Queued Next Wave
-
-### v0.4.0-H50 - Explicit Input-Safety Options (Queued)
-
-- Queued scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`
+- Active scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`
 
 Dependencies:
 
@@ -98,6 +82,22 @@ Exit criteria:
 - Regression coverage exists for direct option editing, persisted roundtrip behavior, and the removal of preset-based UX paths.
 
 ## Latest Completed Wave
+
+### v0.4.0-H49 - Workflow Data-Source Adapters (Completed)
+
+- Completed scoped tasks: `SWF-004`
+
+Dependencies:
+
+- `SWF-004` followed the completed workflow runtime and guardrail waves (`v0.4.0-H34` through `v0.4.0-H37`) so data-source reads bind to the existing control-plane/workflow contracts instead of reviving the removed stream-interpretation side channel.
+
+Exit criteria:
+
+- Workflow steps can read deterministic session/workspace data sources such as `line`, `visible-line`, `status`, `summary`, `exit-code`, and `session-state` through one explicit adapter layer.
+- Missing data and unsupported source cases are reported explicitly instead of silently falling back to heuristic stream interpretation.
+- The adapter layer stays compatible with the current streamlined frontend runtime and does not reintroduce plugin-style stream scanning into normal terminal activity handling.
+
+## Previous Completed Wave
 
 ### v0.4.0-H48 - Read-Only Sharing Baseline (Completed)
 

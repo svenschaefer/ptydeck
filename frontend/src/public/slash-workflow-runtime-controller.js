@@ -1,5 +1,6 @@
 import { createSlashWorkflowEngine } from "./slash-workflow-engine.js";
 import { parseSlashWorkflow } from "./slash-workflow-parser.js";
+import { createSlashWorkflowSourceAdapter } from "./slash-workflow-source-adapter.js";
 import { createSlashWorkflowWaitStepRunner } from "./slash-workflow-waits.js";
 
 function normalizeText(value) {
@@ -156,9 +157,15 @@ export function createSlashWorkflowRuntimeController(options = {}) {
   const apiInterruptSession =
     typeof options.apiInterruptSession === "function" ? options.apiInterruptSession : async () => {};
   const apiKillSession = typeof options.apiKillSession === "function" ? options.apiKillSession : async () => {};
+  const getTerminalEntry =
+    typeof options.getTerminalEntry === "function" ? options.getTerminalEntry : () => null;
   const maxWorkflowSteps = normalizePositiveInteger(options.maxWorkflowSteps, 64);
   const maxWaitTimeoutMs = normalizePositiveInteger(options.maxWaitTimeoutMs, 30 * 60 * 1000);
   const maxCaptureChars = normalizePositiveInteger(options.maxCaptureChars, 4096);
+  const workflowSourceAdapter = createSlashWorkflowSourceAdapter({
+    store,
+    getTerminalEntry
+  });
 
   let engine = null;
   let unsubscribeEngine = null;
@@ -212,41 +219,6 @@ export function createSlashWorkflowRuntimeController(options = {}) {
     engine = null;
   }
 
-  function subscribeSessionValue(sessionId, readValue, { emitInitial = true, includeMissing = false } = {}) {
-    if (!sessionId) {
-      return null;
-    }
-    return (listener) => {
-      if (typeof listener !== "function") {
-        return () => {};
-      }
-      let previousValue = Symbol("unset");
-      const emitValue = (snapshot, { initial = false } = {}) => {
-        const sessions = Array.isArray(snapshot?.sessions) ? snapshot.sessions : [];
-        const session = sessions.find((entry) => entry.id === sessionId) || null;
-        if (!session && includeMissing !== true) {
-          return;
-        }
-        const nextValue = session ? readValue(session) : "";
-        if (!initial && nextValue === previousValue) {
-          return;
-        }
-        previousValue = nextValue;
-        listener(nextValue);
-      };
-      if (emitInitial) {
-        emitValue(getStoreState(), { initial: true });
-      }
-      const unsubscribe =
-        typeof store?.subscribe === "function"
-          ? store.subscribe((snapshot) => {
-              emitValue(snapshot, { initial: false });
-            })
-          : () => {};
-      return typeof unsubscribe === "function" ? unsubscribe : () => {};
-    };
-  }
-
   function createActivitySubscription(sessionId) {
     if (!sessionId) {
       return null;
@@ -280,31 +252,18 @@ export function createSlashWorkflowRuntimeController(options = {}) {
 
   function resolveSourceSubscription(source) {
     const normalizedSource = normalizeText(source).toLowerCase();
-    if (!boundSessionId) {
-      throw createWorkflowRuntimeError(
-        "workflow.target_required",
-        "Workflow waits require an active session target when started from the composer."
-      );
+    try {
+      return workflowSourceAdapter.resolveSubscription(boundSessionId, normalizedSource);
+    } catch (error) {
+      if (error?.code === "workflow.target_required" || error?.code === "workflow.source_unavailable") {
+        throw createWorkflowRuntimeError(error.code, error.message, {
+          source: normalizedSource,
+          sessionId: boundSessionId || "",
+          cause: error
+        });
+      }
+      throw error;
     }
-    if (normalizedSource === "session-state") {
-      return subscribeSessionValue(boundSessionId, (session) => {
-        const lifecycleState = normalizeText(session.lifecycleState).toLowerCase();
-        const state = normalizeText(session.state).toLowerCase();
-        return lifecycleState || state;
-      });
-    }
-    if (normalizedSource === "exit-code") {
-      return subscribeSessionValue(boundSessionId, (session) => {
-        return Number.isInteger(session.exitCode) ? String(session.exitCode) : "";
-      });
-    }
-    if (normalizedSource === "status") {
-      return subscribeSessionValue(boundSessionId, (session) => normalizeText(session.statusText));
-    }
-    throw createWorkflowRuntimeError(
-      "workflow.source_unavailable",
-      `Workflow source '${normalizedSource}' is not available in the live runtime without stream scanning.`
-    );
   }
 
   function createWorkflowEngine() {
