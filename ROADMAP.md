@@ -14,6 +14,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 - Active release wave: `v0.4.0-H49` (Workflow Data-Source Adapters).
 - Active scoped tasks: `SWF-004`.
+- Queued next wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
 - Latest completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
 - Previous completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
 - Previous completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
@@ -77,6 +78,24 @@ Exit criteria:
 - Workflow steps can read deterministic session/workspace data sources such as `line`, `visible-line`, `status`, `summary`, `exit-code`, and `session-state` through one explicit adapter layer.
 - Missing data and unsupported source cases are reported explicitly instead of silently falling back to heuristic stream interpretation.
 - The adapter layer stays compatible with the current streamlined frontend runtime and does not reintroduce plugin-style stream scanning into normal terminal activity handling.
+
+## Queued Next Wave
+
+### v0.4.0-H50 - Explicit Input-Safety Options (Queued)
+
+- Queued scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`
+
+Dependencies:
+
+- `QLT-168` follows the existing send-safety contract because the backend already persists the real `inputSafetyProfile` fields; the follow-up is to expose those flags directly in the frontend instead of routing operators through preset labels.
+- `QLT-169` follows `QLT-168`, so command help, `/settings apply`, and other operator-facing strings document the final explicit-option model instead of one more transitional preset vocabulary.
+- `QLT-170` closes after `QLT-168` and `QLT-169`, so regression coverage locks the explicit-option UX and removal of preset-facing command/help behavior against the final model.
+
+Exit criteria:
+
+- Session input safety is configured through explicit option controls only, not through selectable preset names.
+- Frontend help, settings, and command feedback no longer advertise or depend on preset terminology such as `off`, `shell_balanced`, or `shell_strict`.
+- Regression coverage exists for direct option editing, persisted roundtrip behavior, and the removal of preset-based UX paths.
 
 ## Latest Completed Wave
 
