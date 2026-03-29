@@ -288,6 +288,82 @@ test("WS emits session events and reconnect receives snapshot", async () => {
   }
 });
 
+test("WS snapshot and session events preserve trace and correlation continuity", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
+  const events = [];
+
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+    const snapshot = events.find((event) => event.type === "snapshot");
+    assert.equal(typeof snapshot.trace?.traceId, "string");
+    assert.equal(typeof snapshot.trace?.correlationId, "string");
+    assert.equal(snapshot.trace?.source, "ws");
+    assert.equal(typeof snapshot.trace?.connectionId, "string");
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ptydeck-correlation-id": "corr-create-session"
+      },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    const createTraceId = createRes.headers.get("x-ptydeck-trace-id") || "";
+    assert.match(createTraceId, /^req-/);
+
+    await waitFor(() =>
+      events.some((event) => event.type === "session.created" && event.session?.id === created.id)
+    );
+    const createdEvent = events.find((event) => event.type === "session.created" && event.session?.id === created.id);
+    assert.equal(createdEvent.trace?.correlationId, "corr-create-session");
+    assert.equal(createdEvent.trace?.parentTraceId, createTraceId);
+    assert.equal(createdEvent.trace?.sessionId, created.id);
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ptydeck-correlation-id": "corr-session-input"
+      },
+      body: JSON.stringify({ data: "echo TRACE_OK\n" })
+    });
+    assert.equal(inputRes.status, 204);
+    const inputTraceId = inputRes.headers.get("x-ptydeck-trace-id") || "";
+    assert.match(inputTraceId, /^req-/);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.data" &&
+          event.sessionId === created.id &&
+          typeof event.data === "string" &&
+          event.data.includes("TRACE_OK")
+      )
+    );
+    const dataEvent = events.find(
+      (event) =>
+        event.type === "session.data" &&
+        event.sessionId === created.id &&
+        typeof event.data === "string" &&
+        event.data.includes("TRACE_OK")
+    );
+    assert.equal(dataEvent.trace?.correlationId, "corr-session-input");
+    assert.equal(dataEvent.trace?.parentTraceId, inputTraceId);
+    assert.equal(dataEvent.trace?.sessionId, created.id);
+
+    ws.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("WS emits authoritative deck and session metadata events", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime();
   const events = [];

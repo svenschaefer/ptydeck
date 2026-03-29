@@ -10,6 +10,7 @@ export function createWsRuntimeController(options = {}) {
   const pushSessionData = options.pushSessionData || (() => {});
   const observeSessionData = options.observeSessionData || (() => {});
   const applyRuntimeEvent = options.applyRuntimeEvent || (() => false);
+  const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const getWsAuthToken = options.getWsAuthToken || (() => "");
   const createWsTicket = options.createWsTicket || (() => Promise.resolve({ ticket: "" }));
   const bootstrapDevAuthToken = options.bootstrapDevAuthToken || (() => Promise.resolve(false));
@@ -24,7 +25,21 @@ export function createWsRuntimeController(options = {}) {
         }
       },
       onMessage(event) {
-        log("ws.event", { type: event.type, sessionId: event.sessionId || null });
+        const trace = event && typeof event === "object" && event.trace && typeof event.trace === "object" ? event.trace : null;
+        if (trace) {
+          recordTrace({
+            source: "ws",
+            type: event.type,
+            sessionId: event.sessionId || event.session?.id || trace.sessionId || "",
+            trace
+          });
+        }
+        log("ws.event", {
+          type: event.type,
+          sessionId: event.sessionId || null,
+          traceId: trace?.traceId || "",
+          correlationId: trace?.correlationId || ""
+        });
         if (event.type === "session.data") {
           observeSessionData(event.sessionId, event.data);
           if (hasTerminal(event.sessionId)) {

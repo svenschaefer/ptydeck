@@ -3506,4 +3506,6 @@ test("app runtime composition exposes stream debug trace API when query debug ov
 
   assert.equal(typeof win.__PTYDECK_STREAM_DEBUG__?.getSessionTrace, "function");
   assert.equal(typeof win.__PTYDECK_STREAM_DEBUG__?.listSessionIds, "function");
+  assert.equal(typeof win.__PTYDECK_TRACE_DEBUG__?.listEntries, "function");
+  assert.equal(typeof win.__PTYDECK_TRACE_DEBUG__?.findByCorrelationId, "function");
 });

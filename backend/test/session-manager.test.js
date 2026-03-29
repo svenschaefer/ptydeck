@@ -1113,7 +1113,13 @@ test("SessionManager closes idle sessions via guardrail enforcement", () => {
   currentTime = 1_500;
   manager.enforceGuardrails(currentTime);
   assert.equal(manager.list().length, 0);
-  assert.deepEqual(closed, [{ sessionId: created.id, reason: "idle-timeout" }]);
+  assert.equal(closed.length, 1);
+  assert.equal(closed[0].sessionId, created.id);
+  assert.equal(closed[0].reason, "idle-timeout");
+  assert.equal(closed[0].trace.sessionId, created.id);
+  assert.equal(closed[0].trace.source, "rest");
+  assert.equal(typeof closed[0].trace.traceId, "string");
+  assert.equal(typeof closed[0].trace.correlationId, "string");
 });
 
 test("SessionManager closes over-lifetime sessions via guardrail enforcement", () => {
@@ -1135,5 +1141,11 @@ test("SessionManager closes over-lifetime sessions via guardrail enforcement", (
   currentTime = 5_300;
   manager.enforceGuardrails(currentTime);
   assert.equal(manager.list().length, 0);
-  assert.deepEqual(closed, [{ sessionId: created.id, reason: "max-lifetime" }]);
+  assert.equal(closed.length, 1);
+  assert.equal(closed[0].sessionId, created.id);
+  assert.equal(closed[0].reason, "max-lifetime");
+  assert.equal(closed[0].trace.sessionId, created.id);
+  assert.equal(closed[0].trace.source, "rest");
+  assert.equal(typeof closed[0].trace.traceId, "string");
+  assert.equal(typeof closed[0].trace.correlationId, "string");
 });

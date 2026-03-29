@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H51` (Distributed Tracing Across REST, WS, and PTY).
-- Active scoped tasks: `OBS-005A`, `OBS-005B`, `OBS-005C`.
-- Latest completed wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
+- Active release wave: none currently.
+- Active scoped tasks: none currently.
+- Latest completed wave: `v0.4.0-H51` (Distributed Tracing Across REST, WS, and PTY, `OBS-005A`, `OBS-005B`, `OBS-005C`).
+- Previous completed wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
 - Previous completed wave: `v0.4.0-H49` (Workflow Data-Source Adapters, `SWF-004`).
 - Previous completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
 - Previous completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
@@ -64,11 +65,11 @@ This file defines execution order, release versions, and dependencies for tasks 
 - Previous completed wave before that: `v0.4.0-H2` (Layered Frontend Architecture Completion, `ARC-009` ... `ARC-012`).
 - Earlier completed wave before that: `v0.4.0-H1` (Observability Expansion, `OBS-001` ... `OBS-004`).
 
-## Active Wave
+## Latest Completed Wave
 
-### v0.4.0-H51 - Distributed Tracing Across REST, WS, and PTY (Active)
+### v0.4.0-H51 - Distributed Tracing Across REST, WS, and PTY (Completed)
 
-- Active scoped tasks: `OBS-005A`, `OBS-005B`, `OBS-005C`
+- Completed scoped tasks: `OBS-005A`, `OBS-005B`, `OBS-005C`
 
 Dependencies:
 
@@ -82,7 +83,7 @@ Exit criteria:
 - Frontend surfaces enough trace metadata in runtime/debug paths to correlate one operator action or session flow across request, socket, and terminal-runtime boundaries without reviving hidden stream scanning.
 - Regression coverage exists for trace propagation, continuity across request/connection/session boundaries, missing-trace fallback behavior, and no-regression behavior for shared/spectator flows.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H50 - Explicit Input-Safety Options (Completed)
 

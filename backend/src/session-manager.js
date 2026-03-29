@@ -64,6 +64,73 @@ const REMOTE_CONNECTIVITY_OFFLINE = "offline";
 const DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS = 3;
 const DEFAULT_REMOTE_RECONNECT_DELAY_MS = 1500;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
+const TRACE_TOKEN_MAX_LENGTH = 128;
+
+function normalizeTraceToken(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.trim();
+  if (!normalized || normalized.length > TRACE_TOKEN_MAX_LENGTH) {
+    return "";
+  }
+  return normalized;
+}
+
+function normalizeTraceSeed(trace) {
+  if (!trace || typeof trace !== "object" || Array.isArray(trace)) {
+    return null;
+  }
+  const traceId = normalizeTraceToken(trace.traceId);
+  const correlationId = normalizeTraceToken(trace.correlationId);
+  const requestId = normalizeTraceToken(trace.requestId);
+  const connectionId = normalizeTraceToken(trace.connectionId);
+  const sessionId = normalizeTraceToken(trace.sessionId);
+  const deckId = normalizeTraceToken(trace.deckId);
+  const source = normalizeTraceToken(trace.source);
+  const normalized = {
+    ...(traceId ? { traceId } : {}),
+    ...(correlationId ? { correlationId } : {}),
+    ...(requestId ? { requestId } : {}),
+    ...(connectionId ? { connectionId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+    ...(deckId ? { deckId } : {}),
+    ...(source ? { source } : {})
+  };
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+function createTraceEnvelope(createTraceId, seed, overrides = {}) {
+  const normalizedSeed = normalizeTraceSeed(seed);
+  const normalizedOverrides = normalizeTraceSeed(overrides);
+  const traceId = typeof createTraceId === "function" ? normalizeTraceToken(createTraceId()) : "";
+  const correlationId =
+    normalizedOverrides?.correlationId ||
+    normalizedSeed?.correlationId ||
+    traceId ||
+    normalizeTraceToken(randomUUID());
+  const parentTraceId = normalizedOverrides?.traceId || normalizedSeed?.traceId || "";
+  return {
+    traceId: traceId || normalizeTraceToken(randomUUID()),
+    correlationId,
+    ...(parentTraceId ? { parentTraceId } : {}),
+    ...(normalizedOverrides?.requestId || normalizedSeed?.requestId
+      ? { requestId: normalizedOverrides?.requestId || normalizedSeed?.requestId }
+      : {}),
+    ...(normalizedOverrides?.connectionId || normalizedSeed?.connectionId
+      ? { connectionId: normalizedOverrides?.connectionId || normalizedSeed?.connectionId }
+      : {}),
+    ...(normalizedOverrides?.sessionId || normalizedSeed?.sessionId
+      ? { sessionId: normalizedOverrides?.sessionId || normalizedSeed?.sessionId }
+      : {}),
+    ...(normalizedOverrides?.deckId || normalizedSeed?.deckId
+      ? { deckId: normalizedOverrides?.deckId || normalizedSeed?.deckId }
+      : {}),
+    ...(normalizedOverrides?.source || normalizedSeed?.source
+      ? { source: normalizedOverrides?.source || normalizedSeed?.source }
+      : {})
+  };
+}
 
 function normalizeSessionEnv(env) {
   if (!env || typeof env !== "object" || Array.isArray(env)) {
@@ -487,7 +554,8 @@ export class SessionManager {
     sshKnownHostsPath = DEFAULT_SSH_KNOWN_HOSTS_PATH,
     nowFn = now,
     setTimeoutFn = setTimeout,
-    clearTimeoutFn = clearTimeout
+    clearTimeoutFn = clearTimeout,
+    createTraceId = randomUUID
   } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
@@ -523,6 +591,7 @@ export class SessionManager {
       Number.isInteger(remoteReconnectStableMs) && remoteReconnectStableMs > 0
         ? remoteReconnectStableMs
         : DEFAULT_REMOTE_RECONNECT_STABLE_MS;
+    this.createTraceId = typeof createTraceId === "function" ? createTraceId : randomUUID;
     this.nowFn = typeof nowFn === "function" ? nowFn : now;
     this.setTimeoutFn = typeof setTimeoutFn === "function" ? setTimeoutFn : setTimeout;
     this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
@@ -542,7 +611,26 @@ export class SessionManager {
     if (!session?.meta) {
       return;
     }
-    this.events.emit("session.updated", { session: session.meta });
+    this.events.emit("session.updated", {
+      session: session.meta,
+      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        sessionId: session.id,
+        source: session.traceSeed?.source || "pty"
+      })
+    });
+  }
+
+  updateSessionTraceSeed(session, trace, overrides = {}) {
+    if (!session) {
+      return null;
+    }
+    const nextTraceSeed = {
+      ...(normalizeTraceSeed(session.traceSeed) || {}),
+      ...(normalizeTraceSeed(trace) || {}),
+      ...(normalizeTraceSeed(overrides) || {})
+    };
+    session.traceSeed = normalizeTraceSeed(nextTraceSeed);
+    return session.traceSeed;
   }
 
   clearSessionActivityTimer(session) {
@@ -590,11 +678,17 @@ export class SessionManager {
     session.meta.activityUpdatedAt = timestamp;
     session.meta.activityCompletedAt = null;
     session.meta.updatedAt = timestamp;
+    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: "pty"
+    });
+    this.updateSessionTraceSeed(session, trace, { source: "pty" });
     this.events.emit("session.activity.started", {
       sessionId: session.id,
       activityState: session.meta.activityState,
       activityUpdatedAt: session.meta.activityUpdatedAt,
-      session: session.meta
+      session: session.meta,
+      trace
     });
   }
 
@@ -607,12 +701,18 @@ export class SessionManager {
     session.meta.activityUpdatedAt = timestamp;
     session.meta.activityCompletedAt = timestamp;
     session.meta.updatedAt = timestamp;
+    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: "pty"
+    });
+    this.updateSessionTraceSeed(session, trace, { source: "pty" });
     this.events.emit("session.activity.completed", {
       sessionId: session.id,
       activityState: session.meta.activityState,
       activityUpdatedAt: session.meta.activityUpdatedAt,
       activityCompletedAt: session.meta.activityCompletedAt,
-      session: session.meta
+      session: session.meta,
+      trace
     });
   }
 
@@ -714,19 +814,28 @@ export class SessionManager {
       if (cleaned) {
         const timestamp = this.nowFn();
         if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== REMOTE_CONNECTIVITY_CONNECTED) {
-          this.markRemoteSessionConnected(session, timestamp);
-        }
-        session.lastActivityAt = timestamp;
-        if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
-          this.emitSessionActivityStarted(session, timestamp);
-        } else {
-          session.meta.updatedAt = timestamp;
-        }
+        this.markRemoteSessionConnected(session, timestamp);
+      }
+      session.lastActivityAt = timestamp;
+      const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        sessionId: session.id,
+        source: "pty"
+      });
+      this.updateSessionTraceSeed(session, trace, { source: "pty" });
+      if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
+        this.emitSessionActivityStarted(session, timestamp);
+      } else {
+        session.meta.updatedAt = timestamp;
+      }
         const replayOutput = this.buildReplayRetentionResult(`${session.outputBuffer}${cleaned}`);
         session.outputBuffer = replayOutput.value;
         session.outputTruncated = session.outputTruncated === true || replayOutput.truncated === true;
         this.scheduleSessionActivityCompletion(session);
-        this.events.emit("session.data", { sessionId: session.id, data: cleaned });
+        this.events.emit("session.data", {
+          sessionId: session.id,
+          data: cleaned,
+          trace
+        });
       }
     });
 
@@ -871,12 +980,18 @@ export class SessionManager {
     session.meta.exitSignal = exitSignal;
     session.meta.exitedAt = exitTimestamp;
     session.meta.updatedAt = exitTimestamp;
+    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: session.traceSeed?.source || "pty"
+    });
+    this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "pty" });
     this.events.emit("session.exit", {
       sessionId: session.id,
       exitCode: session.meta.exitCode,
       signal: session.meta.exitSignal,
       exitedAt: session.meta.exitedAt,
-      updatedAt: session.meta.updatedAt
+      updatedAt: session.meta.updatedAt,
+      trace
     });
     if (current === session) {
       this.sessions.delete(session.id);
@@ -952,13 +1067,25 @@ export class SessionManager {
     const timestamp = this.nowFn();
     session.meta.state = SESSION_STATE_RUNNING;
     session.meta.startedAt = Number.isInteger(session.meta.startedAt) ? session.meta.startedAt : timestamp;
+    const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: session.traceSeed?.source || "rest"
+    });
+    this.updateSessionTraceSeed(session, trace, { source: session.traceSeed?.source || "rest" });
     this.events.emit("session.started", {
       sessionId: session.id,
       startedAt: session.meta.startedAt,
       updatedAt: session.meta.updatedAt,
-      session: session.meta
+      session: session.meta,
+      trace
     });
-    this.events.emit("session.updated", { session: session.meta });
+    this.events.emit("session.updated", {
+      session: session.meta,
+      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        sessionId: session.id,
+        source: session.traceSeed?.source || "rest"
+      })
+    });
     return session.meta;
   }
 
@@ -984,7 +1111,8 @@ export class SessionManager {
     activeThemeProfile,
     inactiveThemeProfile,
     createdAt,
-    updatedAt
+    updatedAt,
+    trace
   } = {}) {
     if (this.sessionMaxConcurrent > 0 && this.sessions.size >= this.sessionMaxConcurrent) {
       throw new ApiError(
@@ -1059,6 +1187,7 @@ export class SessionManager {
       expectedExitReason: "",
       lastActivityAt: initialActivityTimestamp,
       remoteSecret: normalizedRemoteSecret,
+      traceSeed: normalizeTraceSeed(trace),
       meta: {
         id,
         kind: normalizedKind,
@@ -1097,42 +1226,59 @@ export class SessionManager {
 
     this.sessions.set(id, session);
     this.attachPtyProcess(session, launchBundle);
-    this.events.emit("session.created", { session: session.meta });
+    const createdTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: session.traceSeed?.source || "rest"
+    });
+    this.updateSessionTraceSeed(session, createdTrace, { source: session.traceSeed?.source || "rest" });
+    this.events.emit("session.created", { session: session.meta, trace: createdTrace });
     this.transitionToRunning(session);
     return session.meta;
   }
 
-  delete(sessionId) {
-    this.closeWithReason(sessionId, "deleted");
+  delete(sessionId, options = {}) {
+    this.closeWithReason(sessionId, "deleted", options);
   }
 
-  sendInput(sessionId, data) {
+  sendInput(sessionId, data, options = {}) {
     const session = this.get(sessionId);
     if (!session.ptyProcess) {
       throw this.buildReconnectUnavailableError(session);
     }
+    this.updateSessionTraceSeed(session, options.trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
     session.ptyProcess.write(data);
     const timestamp = this.nowFn();
     session.lastActivityAt = timestamp;
     session.meta.updatedAt = timestamp;
   }
 
-  resize(sessionId, cols, rows) {
+  resize(sessionId, cols, rows, options = {}) {
     const session = this.get(sessionId);
     if (!session.ptyProcess) {
       throw this.buildReconnectUnavailableError(session);
     }
+    this.updateSessionTraceSeed(session, options.trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
     session.ptyProcess.resize(cols, rows);
     const timestamp = this.nowFn();
     session.lastActivityAt = timestamp;
     session.meta.updatedAt = timestamp;
   }
 
-  signal(sessionId, signal) {
+  signal(sessionId, signal, options = {}) {
     const session = this.get(sessionId);
     if (!session.ptyProcess) {
       throw this.buildReconnectUnavailableError(session);
     }
+    this.updateSessionTraceSeed(session, options.trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
     this.clearExpectedExitReason(session);
     session.expectedExitReason = signal || "signal";
     session.expectedExitReasonTimer = this.setTimeoutFn(() => {
@@ -1145,20 +1291,24 @@ export class SessionManager {
     session.meta.updatedAt = timestamp;
   }
 
-  interrupt(sessionId) {
-    this.signal(sessionId, "SIGINT");
+  interrupt(sessionId, options = {}) {
+    this.signal(sessionId, "SIGINT", options);
   }
 
-  terminate(sessionId) {
-    this.signal(sessionId, "SIGTERM");
+  terminate(sessionId, options = {}) {
+    this.signal(sessionId, "SIGTERM", options);
   }
 
-  kill(sessionId) {
-    this.signal(sessionId, "SIGKILL");
+  kill(sessionId, options = {}) {
+    this.signal(sessionId, "SIGKILL", options);
   }
 
-  updateSession(sessionId, patch = {}) {
+  updateSession(sessionId, patch = {}, options = {}) {
     const session = this.get(sessionId);
+    this.updateSessionTraceSeed(session, options.trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
     const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : session.meta.kind);
     const nextRemoteAuth =
       patch.remoteAuth !== undefined || patch.kind !== undefined
@@ -1274,10 +1424,11 @@ export class SessionManager {
     return this.updateSession(sessionId, { name });
   }
 
-  restart(sessionId) {
+  restart(sessionId, options = {}) {
     const session = this.get(sessionId);
     const snapshot = { ...session.meta };
-    this.delete(sessionId);
+    const trace = normalizeTraceSeed(options.trace);
+    this.delete(sessionId, { trace });
     return this.create({
       id: snapshot.id,
       kind: snapshot.kind,
@@ -1298,12 +1449,17 @@ export class SessionManager {
       activeThemeProfile: snapshot.activeThemeProfile,
       inactiveThemeProfile: snapshot.inactiveThemeProfile,
       createdAt: snapshot.createdAt,
-      updatedAt: this.nowFn()
+      updatedAt: this.nowFn(),
+      trace
     });
   }
 
-  closeWithReason(sessionId, reason) {
+  closeWithReason(sessionId, reason, options = {}) {
     const session = this.get(sessionId);
+    this.updateSessionTraceSeed(session, options.trace, {
+      sessionId,
+      source: options.trace?.source || "rest"
+    });
     this.clearSessionActivityTimer(session);
     this.clearRemoteReconnectTimers(session);
     this.clearExpectedExitReason(session);
@@ -1314,7 +1470,14 @@ export class SessionManager {
       ptyProcess.kill();
     }
     this.sessions.delete(sessionId);
-    this.events.emit("session.closed", { sessionId, reason });
+    this.events.emit("session.closed", {
+      sessionId,
+      reason,
+      trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        sessionId,
+        source: session.traceSeed?.source || "rest"
+      })
+    });
   }
 
   enforceGuardrails(currentTime = this.nowFn()) {

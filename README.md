@@ -75,6 +75,7 @@ http://127.0.0.1:18081/?debug=1
 Browser console will print `ptydeck` events for REST calls, WebSocket state/messages, render cycles, and terminal resize actions.
 Backend lifecycle/request logs are also written to `/tmp/ptydeck-backend-debug.log`.
 For dev-server injected runtime config, you can also set `FRONTEND_DEBUG_LOGS=1` before `npm run dev`.
+In debug mode, the browser also exposes `window.__PTYDECK_TRACE_DEBUG__` with bounded persisted REST/WS trace records, including `listEntries()`, `findByCorrelationId(correlationId)`, and `clear()` for end-to-end correlation checks.
 
 ## Overview
 

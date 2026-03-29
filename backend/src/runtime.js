@@ -122,6 +122,9 @@ const DEFAULT_SHARE_LINK_TTL_SECONDS = 24 * 60 * 60;
 const MAX_SHARE_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const SESSION_QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SESSION_QUICK_ID_FALLBACK = "?";
+const TRACE_HEADER_ID = "x-ptydeck-trace-id";
+const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
+const TRACE_TOKEN_MAX_LENGTH = 128;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
   foreground: "#d8dee9",
@@ -150,6 +153,57 @@ function decodePathParam(value, name) {
   } catch {
     throw new ApiError(400, "ValidationError", `Invalid path parameter encoding for '${name}'.`);
   }
+}
+
+function normalizeTraceToken(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.trim();
+  if (!normalized || normalized.length > TRACE_TOKEN_MAX_LENGTH) {
+    return "";
+  }
+  return normalized;
+}
+
+function buildRequestTraceContext(req, requestContext, pathname = "") {
+  const requestId = `req-${crypto.randomUUID()}`;
+  const incomingCorrelationId = normalizeTraceToken(req.headers?.[TRACE_HEADER_CORRELATION_ID]);
+  const correlationId = incomingCorrelationId || requestId;
+  return {
+    traceId: requestId,
+    requestId,
+    correlationId,
+    source: "rest",
+    method: typeof req?.method === "string" ? req.method : "GET",
+    pathname: typeof pathname === "string" ? pathname : "",
+    clientIp: typeof requestContext?.clientIp === "string" ? requestContext.clientIp : "",
+    protocol: typeof requestContext?.protocol === "string" ? requestContext.protocol : "",
+    trustedProxy: requestContext?.trustedProxy === true
+  };
+}
+
+function normalizeTraceSeed(trace) {
+  if (!trace || typeof trace !== "object" || Array.isArray(trace)) {
+    return null;
+  }
+  const traceId = normalizeTraceToken(trace.traceId);
+  const correlationId = normalizeTraceToken(trace.correlationId);
+  const requestId = normalizeTraceToken(trace.requestId);
+  const connectionId = normalizeTraceToken(trace.connectionId);
+  const sessionId = normalizeTraceToken(trace.sessionId);
+  const deckId = normalizeTraceToken(trace.deckId);
+  const source = normalizeTraceToken(trace.source);
+  const normalized = {
+    ...(traceId ? { traceId } : {}),
+    ...(correlationId ? { correlationId } : {}),
+    ...(requestId ? { requestId } : {}),
+    ...(connectionId ? { connectionId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+    ...(deckId ? { deckId } : {}),
+    ...(source ? { source } : {})
+  };
+  return Object.keys(normalized).length ? normalized : null;
 }
 
 function isBase64Content(value) {
@@ -2436,7 +2490,8 @@ export function createRuntime(config) {
     remoteReconnectMaxAttempts: config.remoteReconnectMaxAttempts,
     remoteReconnectDelayMs: config.remoteReconnectDelayMs,
     remoteReconnectStableMs: config.remoteReconnectStableMs,
-    sshKnownHostsPath
+    sshKnownHostsPath,
+    createTraceId: () => createTraceId("mgr")
   });
   const persistence = new JsonPersistence(config.dataPath, {
     encryptionProvider: config.dataEncryptionProvider || null
@@ -2527,12 +2582,68 @@ export function createRuntime(config) {
     ? config.corsAllowedOrigins.filter((origin) => typeof origin === "string" && origin)
     : [config.corsOrigin || "*"].filter(Boolean);
 
-  function logDebug(event, details = {}) {
+  function createTraceId(prefix = "trc") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  function createTraceEnvelope(seed, overrides = {}) {
+    const normalizedSeed = normalizeTraceSeed(seed);
+    const normalizedOverrides = normalizeTraceSeed(overrides);
+    const traceId = createTraceId("trc");
+    const correlationId =
+      normalizedOverrides?.correlationId ||
+      normalizedSeed?.correlationId ||
+      traceId;
+    const parentTraceId = normalizedOverrides?.traceId || normalizedSeed?.traceId || "";
+    return {
+      traceId,
+      correlationId,
+      ...(parentTraceId ? { parentTraceId } : {}),
+      ...(normalizedOverrides?.requestId || normalizedSeed?.requestId
+        ? { requestId: normalizedOverrides?.requestId || normalizedSeed?.requestId }
+        : {}),
+      ...(normalizedOverrides?.connectionId || normalizedSeed?.connectionId
+        ? { connectionId: normalizedOverrides?.connectionId || normalizedSeed?.connectionId }
+        : {}),
+      ...(normalizedOverrides?.sessionId || normalizedSeed?.sessionId
+        ? { sessionId: normalizedOverrides?.sessionId || normalizedSeed?.sessionId }
+        : {}),
+      ...(normalizedOverrides?.deckId || normalizedSeed?.deckId
+        ? { deckId: normalizedOverrides?.deckId || normalizedSeed?.deckId }
+        : {}),
+      ...(normalizedOverrides?.source || normalizedSeed?.source
+        ? { source: normalizedOverrides?.source || normalizedSeed?.source }
+        : {})
+    };
+  }
+
+  function buildTraceHeaders(traceContext) {
+    const normalizedTrace = normalizeTraceSeed(traceContext);
+    if (!normalizedTrace) {
+      return {};
+    }
+    return {
+      ...(normalizedTrace.traceId ? { [TRACE_HEADER_ID]: normalizedTrace.traceId } : {}),
+      ...(normalizedTrace.correlationId ? { [TRACE_HEADER_CORRELATION_ID]: normalizedTrace.correlationId } : {})
+    };
+  }
+
+  function logDebug(event, details = {}, traceContext = null) {
     if (!debugLogs) {
       return;
     }
     const timestamp = new Date().toISOString();
-    const line = `[ptydeck-backend][${timestamp}] ${event} ${JSON.stringify(details)}`;
+    const normalizedTrace = normalizeTraceSeed(traceContext);
+    const line = `[ptydeck-backend][${timestamp}] ${event} ${JSON.stringify({
+      ...details,
+      ...(normalizedTrace?.traceId ? { traceId: normalizedTrace.traceId } : {}),
+      ...(normalizedTrace?.correlationId ? { correlationId: normalizedTrace.correlationId } : {}),
+      ...(normalizedTrace?.requestId ? { requestId: normalizedTrace.requestId } : {}),
+      ...(normalizedTrace?.connectionId ? { connectionId: normalizedTrace.connectionId } : {}),
+      ...(normalizedTrace?.sessionId ? { sessionId: normalizedTrace.sessionId } : {}),
+      ...(normalizedTrace?.deckId ? { deckId: normalizedTrace.deckId } : {}),
+      ...(normalizedTrace?.source ? { traceSource: normalizedTrace.source } : {})
+    })}`;
     console.log(line);
     if (config.debugLogFile) {
       appendFile(config.debugLogFile, `${line}\n`).catch(() => {
@@ -2541,7 +2652,7 @@ export function createRuntime(config) {
     }
   }
 
-  function buildCorsHeaders(req) {
+  function buildCorsHeaders(req, traceContext = null) {
     const requestOrigin = typeof req.headers.origin === "string" ? req.headers.origin : "";
     const allowAnyOrigin = corsAllowedOrigins.includes("*");
     const allowedOrigin = resolveAllowedRequestOrigin(requestOrigin);
@@ -2550,7 +2661,9 @@ export function createRuntime(config) {
       ...buildSecurityHeaders(),
       "content-type": "application/json",
       "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization"
+      "access-control-allow-headers": `content-type,authorization,${TRACE_HEADER_CORRELATION_ID}`,
+      "access-control-expose-headers": `${TRACE_HEADER_ID},${TRACE_HEADER_CORRELATION_ID}`,
+      ...buildTraceHeaders(traceContext)
     };
 
     if (allowedOrigin) {
@@ -2582,8 +2695,8 @@ export function createRuntime(config) {
     };
   }
 
-  function writeJson(req, res, statusCode, body) {
-    res.writeHead(statusCode, buildCorsHeaders(req));
+  function writeJson(req, res, statusCode, body, traceContext = null) {
+    res.writeHead(statusCode, buildCorsHeaders(req, traceContext));
 
     if (body === undefined) {
       res.end();
@@ -4802,10 +4915,41 @@ function tryCreateRestoredSession({
     return payload;
   }
 
-  function broadcast(payload) {
+  function inferTraceContextFromPayload(payload) {
+    const normalizedPayloadTrace = normalizeTraceSeed(payload?.trace);
+    const sessionId =
+      normalizedPayloadTrace?.sessionId ||
+      normalizeTraceToken(payload?.session?.id) ||
+      normalizeTraceToken(payload?.sessionId);
+    const deckId =
+      normalizedPayloadTrace?.deckId ||
+      normalizeTraceToken(payload?.session?.deckId) ||
+      normalizeTraceToken(payload?.deck?.id) ||
+      normalizeTraceToken(payload?.deckId);
+    return {
+      ...(sessionId ? { sessionId } : {}),
+      ...(deckId ? { deckId } : {})
+    };
+  }
+
+  function withTracePayload(payload, traceSeed = null) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return payload;
+    }
+    if (normalizeTraceSeed(payload.trace)) {
+      return payload;
+    }
+    return {
+      ...payload,
+      trace: createTraceEnvelope(traceSeed, inferTraceContextFromPayload(payload))
+    };
+  }
+
+  function broadcast(payload, traceSeed = null) {
+    const tracedPayload = withTracePayload(payload, traceSeed);
     for (const socket of sockets) {
       if (socket.readyState === socket.OPEN) {
-        const filteredPayload = filterPayloadForAuth(payload, socket.auth || null);
+        const filteredPayload = filterPayloadForAuth(tracedPayload, socket.auth || null);
         if (!filteredPayload) {
           continue;
         }
@@ -4814,21 +4958,21 @@ function tryCreateRestoredSession({
     }
   }
 
-  function broadcastSessionUpdated(sessionId) {
+  function broadcastSessionUpdated(sessionId, traceSeed = null) {
     broadcast({
       type: "session.updated",
       session: getApiSessionOrThrow(sessionId)
-    });
+    }, traceSeed);
   }
 
   manager.on("session.activity.started", (event) => {
-    logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null });
+    logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null }, event.trace);
     reconcileStartupWarmup();
     persistSoon();
   });
 
   manager.on("session.activity.completed", async (event) => {
-    logDebug("session.event", { type: "session.activity.completed", sessionId: event.sessionId || null });
+    logDebug("session.event", { type: "session.activity.completed", sessionId: event.sessionId || null }, event.trace);
     reconcileStartupWarmup();
     try {
       await persistNow("session.activity.completed");
@@ -4837,42 +4981,51 @@ function tryCreateRestoredSession({
         type: "session.activity.completed",
         sessionId: event.sessionId,
         activityCompletedAt: event.activityCompletedAt,
-        session: apiSession
-      });
+        session: apiSession,
+        trace: normalizeTraceSeed(event.trace)
+      }, event.trace);
     } catch (error) {
       console.error("failed to persist session activity completion", error);
     }
   });
 
-  function broadcastDeckUpsert(type, deck) {
+  function broadcastDeckUpsert(type, deck, traceSeed = null) {
     broadcast({
       type,
       deck: toApiDeck(deck)
-    });
+    }, traceSeed);
   }
 
-  function broadcastDeckDeleted(deckId, fallbackDeckId = DEFAULT_DECK_ID) {
+  function broadcastDeckDeleted(deckId, fallbackDeckId = DEFAULT_DECK_ID, traceSeed = null) {
     broadcast({
       type: "deck.deleted",
       deckId,
       fallbackDeckId
-    });
+    }, traceSeed);
   }
 
   const wsEventNames = ["session.created", "session.started", "session.updated", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
       if (eventName !== "session.data") {
-        logDebug("session.event", { type: eventName, sessionId: event.session?.id || event.sessionId || null });
+        logDebug(
+          "session.event",
+          {
+            type: eventName,
+            sessionId: event.session?.id || event.sessionId || null,
+            deckId: event.session?.deckId || null
+          },
+          event.trace
+        );
       }
       if ((eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") && event && event.session) {
         broadcast({
           type: eventName,
           ...event,
           session: toApiSession(event.session)
-        });
+        }, event.trace);
       } else {
-        broadcast({ type: eventName, ...event });
+        broadcast({ type: eventName, ...event }, event.trace);
       }
       if (eventName === "session.created") {
         metrics.sessionsCreatedTotal += 1;
@@ -4895,6 +5048,8 @@ function tryCreateRestoredSession({
     const methodForLog = req.method || "GET";
     let pathnameForLog = req.url || "/";
     let normalizedMetricsPathForLog = pathnameForLog;
+    let requestTraceContext = null;
+    let writeJsonResponse = (statusCode, body) => writeJson(req, res, statusCode, body, requestTraceContext);
     res.on("finish", () => {
       const durationMs = Date.now() - startedAt;
       const statusCode = String(res.statusCode);
@@ -4913,7 +5068,7 @@ function tryCreateRestoredSession({
         pathname: pathnameForLog,
         statusCode: res.statusCode,
         durationMs
-      });
+      }, requestTraceContext);
     });
 
     try {
@@ -4921,17 +5076,18 @@ function tryCreateRestoredSession({
       const parsedUrl = new URL(req.url || "/", `${requestContext.protocol}://${requestContext.host}`);
       pathnameForLog = parsedUrl.pathname;
       normalizedMetricsPathForLog = normalizeMetricsPath(parsedUrl.pathname);
+      requestTraceContext = buildRequestTraceContext(req, requestContext, parsedUrl.pathname);
       logDebug("http.request.start", {
         method: methodForLog,
         pathname: pathnameForLog,
         clientIp: requestContext.clientIp,
         protocol: requestContext.protocol,
         trustedProxy: requestContext.trustedProxy
-      });
+      }, requestTraceContext);
 
       if (req.method === "OPTIONS") {
         ensureTlsIngress(requestContext);
-        writeJson(req, res, 204);
+        writeJsonResponse(204);
         return;
       }
 
@@ -4949,12 +5105,12 @@ function tryCreateRestoredSession({
       ensureTlsIngress(requestContext);
 
       if (match.kind === "health") {
-        writeJson(req, res, 200, { status: "ok" });
+        writeJsonResponse(200, { status: "ok" });
         return;
       }
 
       if (match.kind === "ready") {
-        writeJson(req, res, 200, buildReadyPayload());
+        writeJsonResponse(200, buildReadyPayload());
         return;
       }
 
@@ -4962,6 +5118,7 @@ function tryCreateRestoredSession({
         const payload = renderMetrics();
         res.writeHead(200, {
           ...buildSecurityHeaders(),
+          ...buildTraceHeaders(requestTraceContext),
           "content-type": "text/plain; version=0.0.4; charset=utf-8",
           "cache-control": "no-store"
         });
@@ -4993,7 +5150,7 @@ function tryCreateRestoredSession({
           scope: requestedScopes.join(" ")
         };
         validateResponse({ statusCode: 200, body: payload, expect: "authToken" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse(200, payload);
         return;
       }
 
@@ -5001,7 +5158,7 @@ function tryCreateRestoredSession({
         const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
         const payload = issueWsTicket(auth);
         validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse(200, payload);
         return;
       }
 
@@ -5013,7 +5170,7 @@ function tryCreateRestoredSession({
       if (match.kind === "listShares") {
         const payload = listShareLinks();
         validateResponse({ statusCode: 200, body: payload, expect: "shareLinkList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse(200, payload);
         return;
       }
 
@@ -5021,14 +5178,14 @@ function tryCreateRestoredSession({
         const payload = createShareLink(body, auth, req, requestContext);
         validateResponse({ statusCode: 201, body: payload, expect: "shareLink" });
         await persistNow("share-link.create");
-        writeJson(req, res, 201, payload);
+        writeJsonResponse(201, payload);
         return;
       }
 
       if (match.kind === "getShareLink") {
         const payload = getApiShareLinkOrThrow(match.params.shareId);
         validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse(200, payload);
         return;
       }
 
@@ -5036,7 +5193,7 @@ function tryCreateRestoredSession({
         const payload = revokeShareLink(match.params.shareId);
         validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
         await persistNow("share-link.revoke");
-        writeJson(req, res, 200, payload);
+        writeJsonResponse(200, payload);
         return;
       }
 
@@ -5048,7 +5205,7 @@ function tryCreateRestoredSession({
           sessionId
         });
         validateResponse({ statusCode: 200, body: payload, expect: "customCommandList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5060,7 +5217,7 @@ function tryCreateRestoredSession({
           sessionId
         });
         validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5076,9 +5233,9 @@ function tryCreateRestoredSession({
         broadcast({
           type: existed ? "custom-command.updated" : "custom-command.created",
           command: payload
-        });
+        }, requestTraceContext);
         await persistNow("custom-command.upsert");
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5092,16 +5249,16 @@ function tryCreateRestoredSession({
         broadcast({
           type: "custom-command.deleted",
           command: deletedCommand
-        });
+        }, requestTraceContext);
         await persistNow("custom-command.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "listDecks") {
         const payload = listDecks(auth);
         validateResponse({ statusCode: 200, body: payload, expect: "deckList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5109,15 +5266,15 @@ function tryCreateRestoredSession({
         const payload = createDeck(body);
         validateResponse({ statusCode: 201, body: payload, expect: "deck" });
         await persistNow("deck.create");
-        broadcastDeckUpsert("deck.created", payload);
-        writeJson(req, res, 201, payload);
+        broadcastDeckUpsert("deck.created", payload, requestTraceContext);
+        writeJsonResponse( 201, payload);
         return;
       }
 
       if (match.kind === "getDeck") {
         const payload = toApiDeck(getDeckOrThrow(match.params.deckId, auth));
         validateResponse({ statusCode: 200, body: payload, expect: "deck" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5125,8 +5282,8 @@ function tryCreateRestoredSession({
         const payload = updateDeck(match.params.deckId, body);
         validateResponse({ statusCode: 200, body: payload, expect: "deck" });
         await persistNow("deck.update");
-        broadcastDeckUpsert("deck.updated", payload);
-        writeJson(req, res, 200, payload);
+        broadcastDeckUpsert("deck.updated", payload, requestTraceContext);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5135,25 +5292,33 @@ function tryCreateRestoredSession({
         const result = deleteDeck(match.params.deckId, { force });
         await persistNow("deck.delete");
         for (const sessionId of result.reassignedSessionIds) {
-          broadcastSessionUpdated(sessionId);
+          broadcastSessionUpdated(sessionId, {
+            ...requestTraceContext,
+            sessionId,
+            deckId: result.fallbackDeckId
+          });
         }
-        broadcastDeckDeleted(result.deckId, result.fallbackDeckId);
-        writeJson(req, res, 204);
+        broadcastDeckDeleted(result.deckId, result.fallbackDeckId, requestTraceContext);
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "moveSessionToDeck") {
         moveSessionToDeck(match.params.sessionId, match.params.deckId);
         await persistNow("deck.move-session");
-        broadcastSessionUpdated(match.params.sessionId);
-        writeJson(req, res, 204);
+        broadcastSessionUpdated(match.params.sessionId, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId,
+          deckId: match.params.deckId
+        });
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "listLayoutProfiles") {
         const payload = listLayoutProfiles();
         validateResponse({ statusCode: 200, body: payload, expect: "layoutProfileList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5161,14 +5326,14 @@ function tryCreateRestoredSession({
         const payload = createLayoutProfile(body);
         validateResponse({ statusCode: 201, body: payload, expect: "layoutProfile" });
         await persistNow("layout-profile.create");
-        writeJson(req, res, 201, payload);
+        writeJsonResponse( 201, payload);
         return;
       }
 
       if (match.kind === "getLayoutProfile") {
         const payload = toApiLayoutProfile(getLayoutProfileOrThrow(match.params.profileId));
         validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5176,21 +5341,21 @@ function tryCreateRestoredSession({
         const payload = updateLayoutProfile(match.params.profileId, body);
         validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
         await persistNow("layout-profile.update");
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "deleteLayoutProfile") {
         deleteLayoutProfile(match.params.profileId);
         await persistNow("layout-profile.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "listConnectionProfiles") {
         const payload = listConnectionProfiles();
         validateResponse({ statusCode: 200, body: payload, expect: "connectionProfileList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5198,14 +5363,14 @@ function tryCreateRestoredSession({
         const payload = createConnectionProfile(body);
         validateResponse({ statusCode: 201, body: payload, expect: "connectionProfile" });
         await persistNow("connection-profile.create");
-        writeJson(req, res, 201, payload);
+        writeJsonResponse( 201, payload);
         return;
       }
 
       if (match.kind === "getConnectionProfile") {
         const payload = toApiConnectionProfile(getConnectionProfileOrThrow(match.params.profileId));
         validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5213,21 +5378,21 @@ function tryCreateRestoredSession({
         const payload = updateConnectionProfile(match.params.profileId, body);
         validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
         await persistNow("connection-profile.update");
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "deleteConnectionProfile") {
         deleteConnectionProfile(match.params.profileId);
         await persistNow("connection-profile.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "listWorkspacePresets") {
         const payload = listWorkspacePresets();
         validateResponse({ statusCode: 200, body: payload, expect: "workspacePresetList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5235,14 +5400,14 @@ function tryCreateRestoredSession({
         const payload = createWorkspacePreset(body);
         validateResponse({ statusCode: 201, body: payload, expect: "workspacePreset" });
         await persistNow("workspace-preset.create");
-        writeJson(req, res, 201, payload);
+        writeJsonResponse( 201, payload);
         return;
       }
 
       if (match.kind === "getWorkspacePreset") {
         const payload = toApiWorkspacePreset(getWorkspacePresetOrThrow(match.params.presetId));
         validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5250,21 +5415,21 @@ function tryCreateRestoredSession({
         const payload = updateWorkspacePreset(match.params.presetId, body);
         validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
         await persistNow("workspace-preset.update");
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "deleteWorkspacePreset") {
         deleteWorkspacePreset(match.params.presetId);
         await persistNow("workspace-preset.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "listSshTrustEntries") {
         const payload = listSshTrustEntries();
         validateResponse({ statusCode: 200, body: payload, expect: "sshTrustEntryList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5273,7 +5438,7 @@ function tryCreateRestoredSession({
         await syncSshKnownHostsFile();
         await persistNow(created ? "ssh-trust-entry.create" : "ssh-trust-entry.reuse");
         validateResponse({ statusCode: created ? 201 : 200, body: entry, expect: "sshTrustEntry" });
-        writeJson(req, res, created ? 201 : 200, entry);
+        writeJsonResponse( created ? 201 : 200, entry);
         return;
       }
 
@@ -5281,7 +5446,7 @@ function tryCreateRestoredSession({
         deleteSshTrustEntry(match.params.entryId);
         await syncSshKnownHostsFile();
         await persistNow("ssh-trust-entry.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
@@ -5290,7 +5455,7 @@ function tryCreateRestoredSession({
         const deckIdFilter = typeof requestedDeckId === "string" && requestedDeckId.trim() ? requestedDeckId.trim() : "";
         const payload = listApiSessions(auth, { deckId: deckIdFilter || undefined });
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
@@ -5352,7 +5517,8 @@ function tryCreateRestoredSession({
             tags,
             themeProfile: themeSlots.themeProfile,
             activeThemeProfile: themeSlots.activeThemeProfile,
-            inactiveThemeProfile: themeSlots.inactiveThemeProfile
+            inactiveThemeProfile: themeSlots.inactiveThemeProfile,
+            trace: requestTraceContext
           });
         } catch (error) {
           deleteSessionQuickIdToken(sessionId);
@@ -5368,33 +5534,38 @@ function tryCreateRestoredSession({
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
-        writeJson(req, res, 201, apiPayload);
+        writeJsonResponse( 201, apiPayload);
         return;
       }
 
       if (match.kind === "getSession") {
         const payload = getApiSessionOrThrow(match.params.sessionId, auth);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "getSessionReplayExport") {
         const payload = buildSessionReplayExportOrThrow(match.params.sessionId);
         validateResponse({ statusCode: 200, body: payload, expect: "sessionReplayExport" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "downloadSessionFile") {
         const payload = await buildSessionFileDownloadOrThrow(match.params.sessionId, body.path);
         validateResponse({ statusCode: 200, body: payload, expect: "sessionFileDownload" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "deleteSession") {
-        manager.delete(match.params.sessionId);
+        manager.delete(match.params.sessionId, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
         sessionDeckAssignments.delete(match.params.sessionId);
         deleteSessionQuickIdToken(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
@@ -5402,12 +5573,15 @@ function tryCreateRestoredSession({
           broadcast({
             type: "custom-command.deleted",
             command: deletedCommand
+          }, {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
           });
         }
         cleanupLayoutProfiles();
         cleanupWorkspacePresets();
         await persistNow("session.delete");
-        writeJson(req, res, 204);
+        writeJsonResponse( 204);
         return;
       }
 
@@ -5418,12 +5592,20 @@ function tryCreateRestoredSession({
         broadcast({
           type: "session.updated",
           session: result.leftSession
+        }, {
+          ...requestTraceContext,
+          sessionId: result.leftSession.id,
+          deckId: result.leftSession.deckId
         });
         broadcast({
           type: "session.updated",
           session: result.rightSession
+        }, {
+          ...requestTraceContext,
+          sessionId: result.rightSession.id,
+          deckId: result.rightSession.deckId
         });
-        writeJson(req, res, 200, result);
+        writeJsonResponse( 200, result);
         return;
       }
 
@@ -5510,62 +5692,101 @@ function tryCreateRestoredSession({
         if (!Object.keys(patch).length) {
           throw new ApiError(400, "ValidationError", "No updatable session fields provided.");
         }
-        const payload = manager.updateSession(match.params.sessionId, patch);
+        const payload = manager.updateSession(match.params.sessionId, patch, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.update");
         broadcast({
           type: "session.updated",
           session: apiPayload
+        }, {
+          ...requestTraceContext,
+          sessionId: apiPayload.id,
+          deckId: apiPayload.deckId
         });
-        writeJson(req, res, 200, apiPayload);
+        writeJsonResponse( 200, apiPayload);
         return;
       }
 
       if (match.kind === "input") {
-        manager.sendInput(match.params.sessionId, body.data);
-        writeJson(req, res, 204);
+        manager.sendInput(match.params.sessionId, body.data, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "uploadSessionFile") {
         const payload = await uploadSessionFileOrThrow(match.params.sessionId, body.path, body.contentBase64);
         validateResponse({ statusCode: 200, body: payload, expect: "sessionFileUpload" });
-        writeJson(req, res, 200, payload);
+        writeJsonResponse( 200, payload);
         return;
       }
 
       if (match.kind === "resize") {
-        manager.resize(match.params.sessionId, body.cols, body.rows);
-        writeJson(req, res, 204);
+        manager.resize(match.params.sessionId, body.cols, body.rows, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "restart") {
-        const payload = manager.restart(match.params.sessionId);
+        const payload = manager.restart(match.params.sessionId, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
         assignSessionQuickIdToken(payload.id, payload.quickIdToken);
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 200, body: apiPayload, expect: "session" });
         await persistNow("session.restart");
-        writeJson(req, res, 200, apiPayload);
+        writeJsonResponse( 200, apiPayload);
         return;
       }
 
       if (match.kind === "interrupt") {
-        manager.interrupt(match.params.sessionId);
-        writeJson(req, res, 204);
+        manager.interrupt(match.params.sessionId, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "terminate") {
-        manager.terminate(match.params.sessionId);
-        writeJson(req, res, 204);
+        manager.terminate(match.params.sessionId, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
+        writeJsonResponse( 204);
         return;
       }
 
       if (match.kind === "kill") {
-        manager.kill(match.params.sessionId);
-        writeJson(req, res, 204);
+        manager.kill(match.params.sessionId, {
+          trace: {
+            ...requestTraceContext,
+            sessionId: match.params.sessionId
+          }
+        });
+        writeJsonResponse( 204);
         return;
       }
 
@@ -5573,14 +5794,14 @@ function tryCreateRestoredSession({
     } catch (err) {
       const mapped = toErrorResponse(err);
       validateResponse({ statusCode: mapped.statusCode, body: mapped.body, expect: "error" });
-      writeJson(req, res, mapped.statusCode, mapped.body);
+      writeJsonResponse( mapped.statusCode, mapped.body);
       logDebug("http.request.error", {
         method: methodForLog,
         pathname: pathnameForLog,
         statusCode: mapped.statusCode,
         error: mapped.body.error,
         message: mapped.body.message
-      });
+      }, requestTraceContext);
     }
   });
 
@@ -5588,9 +5809,10 @@ function tryCreateRestoredSession({
     const requestContext = resolveRequestContext(request, config.trustedProxy);
     const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
     const requestOrigin = typeof request.headers.origin === "string" ? request.headers.origin : "";
+    const upgradeTraceContext = buildRequestTraceContext(request, requestContext, requestUrl.pathname);
     if (requestUrl.pathname !== "/ws") {
       recordWsError("upgrade_path_rejected");
-      logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname });
+      logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname }, upgradeTraceContext);
       socket.destroy();
       return;
     }
@@ -5603,7 +5825,7 @@ function tryCreateRestoredSession({
         clientIp: requestContext.clientIp,
         trustedProxy: requestContext.trustedProxy,
         protocol: requestContext.protocol
-      });
+      }, upgradeTraceContext);
       recordWsError("upgrade_tls_rejected");
       socket.write(
         `HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(payload)}`
@@ -5621,7 +5843,7 @@ function tryCreateRestoredSession({
         clientIp: requestContext.clientIp,
         trustedProxy: requestContext.trustedProxy,
         origin: requestOrigin || null
-      });
+      }, upgradeTraceContext);
       recordWsError("upgrade_origin_rejected");
       socket.write(
         `HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nConnection: close\r\nVary: Origin\r\n\r\n${JSON.stringify(payload)}`
@@ -5639,7 +5861,7 @@ function tryCreateRestoredSession({
       logDebug("ws.upgrade.rate_limited", {
         clientIp: requestContext.clientIp,
         trustedProxy: requestContext.trustedProxy
-      });
+      }, upgradeTraceContext);
       recordWsError("upgrade_rate_limited");
       socket.write(
         `HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nConnection: close\r\nRetry-After: ${wsRateLimitResult.retryAfterSeconds}\r\n\r\n${JSON.stringify(payload)}`
@@ -5669,7 +5891,7 @@ function tryCreateRestoredSession({
           statusCode: mapped.statusCode,
           error: mapped.body.error,
           message: mapped.body.message
-        });
+        }, upgradeTraceContext);
         recordWsError("upgrade_auth_rejected");
         socket.write(
           `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
@@ -5699,6 +5921,12 @@ function tryCreateRestoredSession({
       wsClientState.acceptedConnections += 1;
       wsClientState.activeConnections += 1;
       wsClientConnections.set(normalizedClientIp, wsClientState);
+      ws.connectionId = createTraceId("ws");
+      ws.traceContext = {
+        ...upgradeTraceContext,
+        connectionId: ws.connectionId,
+        source: "ws"
+      };
       ws.clientIp = normalizedClientIp;
       ws.auth = wsAuth;
       ws.isAlive = true;
@@ -5707,7 +5935,7 @@ function tryCreateRestoredSession({
         clientIp: requestContext.clientIp,
         protocol: requestContext.protocol,
         trustedProxy: requestContext.trustedProxy
-      });
+      }, ws.traceContext);
 
       ws.on("pong", () => {
         ws.isAlive = true;
@@ -5726,7 +5954,7 @@ function tryCreateRestoredSession({
           wsClientState.lastDisconnectReason = disconnectReason;
           wsClientConnections.set(clientIp, wsClientState);
         }
-        logDebug("ws.client.closed", { socketCount: sockets.size });
+        logDebug("ws.client.closed", { socketCount: sockets.size }, ws.traceContext || upgradeTraceContext);
       });
       ws.on("error", () => {
         recordWsError("socket_error");
@@ -5734,13 +5962,13 @@ function tryCreateRestoredSession({
 
       const snapshot = manager.getSnapshot();
       const snapshotPayload = filterPayloadForAuth(
-        {
+        withTracePayload({
           type: "snapshot",
           sessions: listApiSessions(ws.auth || null),
           outputs: snapshot.outputs,
           customCommands: listCustomCommands(),
           decks: listDecks(ws.auth || null)
-        },
+        }, ws.traceContext),
         ws.auth || null
       );
       ws.send(JSON.stringify(snapshotPayload));
@@ -5748,7 +5976,7 @@ function tryCreateRestoredSession({
         sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
         outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
         customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
-      });
+      }, snapshotPayload.trace || ws.traceContext);
     });
   });
 

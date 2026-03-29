@@ -10,6 +10,9 @@ class ApiClientError extends Error {
   }
 }
 
+const TRACE_HEADER_ID = "x-ptydeck-trace-id";
+const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
+
 function withJson(body) {
   return {
     method: "POST",
@@ -43,6 +46,23 @@ async function parseJsonSafe(response) {
   }
 }
 
+function readResponseHeader(response, name) {
+  const getter = response?.headers && typeof response.headers.get === "function" ? response.headers.get.bind(response.headers) : null;
+  if (!getter) {
+    return "";
+  }
+  const value = getter(name);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function buildResponseTraceMeta(response, payload = {}) {
+  return {
+    ...payload,
+    traceId: readResponseHeader(response, TRACE_HEADER_ID),
+    correlationId: readResponseHeader(response, TRACE_HEADER_CORRELATION_ID)
+  };
+}
+
 async function readResponse(response, { expectJson = true } = {}) {
   if (!response.ok) {
     const payload = await parseJsonSafe(response);
@@ -65,6 +85,7 @@ export function createApiClient(baseUrl, options = {}) {
   const debug = options.debug === true;
   const log = typeof options.log === "function" ? options.log : () => {};
   const onUnauthorized = typeof options.onUnauthorized === "function" ? options.onUnauthorized : null;
+  const onTrace = typeof options.onTrace === "function" ? options.onTrace : null;
   let authToken = typeof options.authToken === "string" ? options.authToken.trim() : "";
   let unauthorizedRefreshPromise = null;
   const readyUrl = new URL("/ready", baseUrl).toString();
@@ -110,9 +131,13 @@ export function createApiClient(baseUrl, options = {}) {
         ...fetchOptions,
         headers
       });
+      const traceMeta = buildResponseTraceMeta(res, { source: "rest", method, path, status: res.status });
+      if (onTrace) {
+        onTrace(traceMeta);
+      }
       const data = await readResponse(res, { expectJson });
       if (debug) {
-        log("api.request.ok", { method, path, status: res.status, durationMs: Date.now() - startedAt });
+        log("api.request.ok", { ...traceMeta, durationMs: Date.now() - startedAt });
       }
       return data;
     } catch (err) {
@@ -160,9 +185,13 @@ export function createApiClient(baseUrl, options = {}) {
         ...fetchOptions,
         headers
       });
+      const traceMeta = buildResponseTraceMeta(res, { source: "rest", method, url: normalizedUrl, status: res.status });
+      if (onTrace) {
+        onTrace(traceMeta);
+      }
       const data = await readResponse(res, { expectJson });
       if (debug) {
-        log("api.request.ok", { method, url: normalizedUrl, status: res.status, durationMs: Date.now() - startedAt });
+        log("api.request.ok", { ...traceMeta, durationMs: Date.now() - startedAt });
       }
       return data;
     } catch (err) {

@@ -64,6 +64,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const config = options.config || { wsUrl: "" };
   const debugLogs = options.debugLogs === true;
   const debugLog = typeof options.debugLog === "function" ? options.debugLog : () => {};
+  const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const uiState = options.uiState || {};
   const commandInput = options.commandInput || { value: "" };
   const terminals = options.terminals || new Map();
@@ -287,6 +288,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       wsUrl: config.wsUrl,
       debug: debugLogs,
       log: debugLog,
+      recordTrace,
       setConnectionState: (status) => store?.setConnectionState?.(status),
       getRuntimeBootstrapSource: () => appRuntimeStateController?.getRuntimeBootstrapSource?.() || "pending",
       onRuntimeConnected: () => appRuntimeStateController?.markRuntimeConnected?.(),

@@ -21,6 +21,7 @@ import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
+import { createTraceDebugController } from "./trace-debug-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
   getTerminalCellHeightPx,
@@ -72,6 +73,7 @@ const debugLog = (event, details = {}) => {
 const api = createApiClient(config.apiBaseUrl, {
   debug: debugLogs,
   log: debugLog,
+  onTrace: (meta) => traceDebugController.record("api.response", meta),
   async onUnauthorized() {
     const refreshed = await appRuntimeStateController?.bootstrapDevAuthToken();
     if (!refreshed) {
@@ -106,6 +108,11 @@ const fileTransferRuntimeController = createFileTransferRuntimeController({
 });
 const streamDebugTraceController = debugLogs
   ? createStreamDebugTraceController({
+      windowRef: window
+    })
+  : { record() {}, dispose() {} };
+const traceDebugController = debugLogs
+  ? createTraceDebugController({
       windowRef: window
     })
   : { record() {}, dispose() {} };
@@ -1145,6 +1152,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   terminals,
   terminalObservers,
   getTerminalSettings: () => terminalSettings,
+  recordTrace: (entry) => traceDebugController.record("ws.event", entry),
   defaultDeckId: DEFAULT_DECK_ID,
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
@@ -1199,7 +1207,10 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   interruptWorkflowSession: () => slashWorkflowRuntimeController?.interruptWorkflowSession?.() || Promise.resolve(""),
   killWorkflowSession: () => slashWorkflowRuntimeController?.killWorkflowSession?.() || Promise.resolve(""),
   disposeWorkflowRuntime: () => slashWorkflowRuntimeController?.dispose?.(),
-  disposeStreamDebugTrace: () => streamDebugTraceController.dispose(),
+  disposeStreamDebugTrace: () => {
+    streamDebugTraceController.dispose();
+    traceDebugController.dispose();
+  },
   devAuthRefreshMinDelayMs: DEV_AUTH_REFRESH_MIN_DELAY_MS,
   devAuthRefreshSafetyMs: DEV_AUTH_REFRESH_SAFETY_MS,
   devAuthRetryDelayMs: DEV_AUTH_RETRY_DELAY_MS

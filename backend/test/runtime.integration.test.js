@@ -2038,6 +2038,32 @@ test("OPTIONS advertises PATCH/PUT and authorization header for CORS preflight",
   }
 });
 
+test("REST responses expose trace headers and preserve correlation fallback semantics", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const explicitCorrelationRes = await fetch(`${baseUrl}/sessions`, {
+      headers: {
+        "x-ptydeck-correlation-id": "corr-rest-explicit"
+      }
+    });
+    assert.equal(explicitCorrelationRes.status, 200);
+    const explicitTraceId = explicitCorrelationRes.headers.get("x-ptydeck-trace-id") || "";
+    const explicitCorrelationId = explicitCorrelationRes.headers.get("x-ptydeck-correlation-id") || "";
+    assert.match(explicitTraceId, /^req-/);
+    assert.equal(explicitCorrelationId, "corr-rest-explicit");
+
+    const fallbackRes = await fetch(`${baseUrl}/sessions`);
+    assert.equal(fallbackRes.status, 200);
+    const fallbackTraceId = fallbackRes.headers.get("x-ptydeck-trace-id") || "";
+    const fallbackCorrelationId = fallbackRes.headers.get("x-ptydeck-correlation-id") || "";
+    assert.match(fallbackTraceId, /^req-/);
+    assert.equal(fallbackCorrelationId, fallbackTraceId);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("CORS allowlist echoes allowed origin and omits disallowed origin", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
     corsOrigin: "https://app.example.com",

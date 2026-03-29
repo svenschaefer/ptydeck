@@ -5,6 +5,7 @@ import { createWsRuntimeController } from "../src/public/ws-runtime-controller.j
 
 test("ws-runtime controller wires state transitions, session-data routing, and runtime events", async () => {
   const calls = [];
+  const traceEntries = [];
   let capturedHandlers = null;
   let capturedOptions = null;
   const client = { close() {} };
@@ -19,6 +20,7 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
     debug: true,
     log: (event, payload) => calls.push(["log", event, payload.status || payload.type || payload.sessionId || ""]),
     setConnectionState: (status) => calls.push(["state", status]),
+    recordTrace: (entry) => traceEntries.push(entry),
     getRuntimeBootstrapSource: () => "rest",
     onRuntimeConnected: () => calls.push(["ready"]),
     hasTerminal: (sessionId) => sessionId === "s1",
@@ -33,7 +35,12 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
   assert.deepEqual(await capturedOptions.protocolsProvider(), ["ptydeck.v1"]);
 
   capturedHandlers.onState("connected");
-  capturedHandlers.onMessage({ type: "session.data", sessionId: "s1", data: "pwd\n" });
+  capturedHandlers.onMessage({
+    type: "session.data",
+    sessionId: "s1",
+    data: "pwd\n",
+    trace: { traceId: "trc-1", correlationId: "corr-1", sessionId: "s1" }
+  });
   capturedHandlers.onMessage({ type: "deck.updated", deck: { id: "d1" } });
 
   assert.deepEqual(calls, [
@@ -45,6 +52,14 @@ test("ws-runtime controller wires state transitions, session-data routing, and r
     ["data", "s1", "pwd\n"],
     ["log", "ws.event", "deck.updated"],
     ["event", "deck.updated"]
+  ]);
+  assert.deepEqual(traceEntries, [
+    {
+      source: "ws",
+      type: "session.data",
+      sessionId: "s1",
+      trace: { traceId: "trc-1", correlationId: "corr-1", sessionId: "s1" }
+    }
   ]);
 });
 

@@ -2,6 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createApiClient } from "../src/public/api-client.js";
 
+function createHeaders(headers = {}) {
+  const normalized = new Map(
+    Object.entries(headers).map(([key, value]) => [String(key).toLowerCase(), String(value)])
+  );
+  return {
+    get(name) {
+      return normalized.get(String(name).toLowerCase()) || null;
+    }
+  };
+}
+
 test("api client calls list sessions endpoint", async () => {
   const calls = [];
   global.fetch = async (url) => {
@@ -59,6 +70,35 @@ test("api client calls ready endpoint outside api v1 base path", async () => {
   assert.equal(calls[0].url, "http://localhost:18080/ready");
   assert.equal(payload.status, "starting");
   assert.equal(payload.phase, "starting_sessions");
+});
+
+test("api client reports trace metadata from response headers", async () => {
+  const traceEvents = [];
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    headers: createHeaders({
+      "x-ptydeck-trace-id": "trc-1",
+      "x-ptydeck-correlation-id": "corr-1"
+    }),
+    json: async () => []
+  });
+
+  const api = createApiClient("http://localhost:18080/api/v1", {
+    onTrace: (meta) => traceEvents.push(meta)
+  });
+  await api.listSessions();
+
+  assert.deepEqual(traceEvents, [
+    {
+      source: "rest",
+      method: "GET",
+      path: "/sessions",
+      status: 200,
+      traceId: "trc-1",
+      correlationId: "corr-1"
+    }
+  ]);
 });
 
 test("api client calls deck lifecycle and move endpoints", async () => {
