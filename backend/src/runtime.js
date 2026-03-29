@@ -14,6 +14,7 @@ import {
   DEFAULT_SESSION_INPUT_SAFETY_PROFILE,
   normalizeSessionInputSafetyProfile
 } from "./session-input-safety-profile.js";
+import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import { SessionManager } from "./session-manager.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
@@ -4755,6 +4756,7 @@ function tryCreateRestoredSession({
   remoteSecret,
   env,
   note,
+  mouseForwardingMode,
   inputSafetyProfile,
   tags,
   themeProfile,
@@ -4776,6 +4778,7 @@ function tryCreateRestoredSession({
       replayOutputTruncated,
       env,
       note,
+      mouseForwardingMode,
       inputSafetyProfile,
       tags,
       themeProfile,
@@ -5493,6 +5496,7 @@ function tryCreateRestoredSession({
         const remoteSecret = normalizeSessionRemoteSecret(body?.remoteSecret, remoteAuth, kind, { strict: true });
         const themeSlots = normalizeSessionThemeSlots(mergedBody, { strict: true });
         const note = normalizeSessionNote(mergedBody?.note, { strict: true });
+        const mouseForwardingMode = normalizeSessionMouseForwardingMode(mergedBody?.mouseForwardingMode, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(mergedBody?.inputSafetyProfile, { strict: true });
         const tags = normalizeSessionTags(mergedBody?.tags, { strict: true });
         const sessionId = crypto.randomUUID();
@@ -5513,6 +5517,7 @@ function tryCreateRestoredSession({
             startCommand: startupConfig.startCommand,
             env: startupConfig.env,
             note,
+            mouseForwardingMode,
             inputSafetyProfile,
             tags,
             themeProfile: themeSlots.themeProfile,
@@ -5682,6 +5687,9 @@ function tryCreateRestoredSession({
         }
         if (body?.note !== undefined) {
           patch.note = normalizeSessionNote(body.note, { strict: true });
+        }
+        if (body?.mouseForwardingMode !== undefined) {
+          patch.mouseForwardingMode = normalizeSessionMouseForwardingMode(body.mouseForwardingMode, { strict: true });
         }
         if (body?.inputSafetyProfile !== undefined) {
           patch.inputSafetyProfile = normalizeSessionInputSafetyProfile(body.inputSafetyProfile, { strict: true });
@@ -6172,6 +6180,7 @@ function tryCreateRestoredSession({
           { strict: false }
         );
         const note = normalizeSessionNote(session.note, { strict: false });
+        const mouseForwardingMode = normalizeSessionMouseForwardingMode(session.mouseForwardingMode, { strict: false });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile, { strict: false });
         const tags = normalizeSessionTags(session.tags, { strict: false });
         const quickIdToken = assignSessionQuickIdToken(session.id, session.quickIdToken);
@@ -6198,6 +6207,7 @@ function tryCreateRestoredSession({
           startCommand: startupConfig.startCommand,
           env: startupConfig.env,
           ...(note ? { note } : {}),
+          mouseForwardingMode,
           quickIdToken,
           inputSafetyProfile,
           tags,
@@ -6246,6 +6256,7 @@ function tryCreateRestoredSession({
               env: startupConfig.env,
               quickIdToken,
               note,
+              mouseForwardingMode,
               inputSafetyProfile,
               tags,
               themeProfile: themeSlots.themeProfile,

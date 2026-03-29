@@ -277,6 +277,7 @@ test("session startup settings persist through patch and apply on restart", asyn
         shell: "sh",
         name: "ops-shell",
         note: "needs review\r\ncapture logs",
+        mouseForwardingMode: "application",
         inputSafetyProfile: {
           requireValidShellSyntax: true,
           confirmOnIncompleteShellConstruct: true,
@@ -319,6 +320,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     const created = await createRes.json();
     assert.equal(created.state, "running");
     assert.equal(created.note, "needs review\ncapture logs");
+    assert.equal(created.mouseForwardingMode, "application");
     assert.equal(created.inputSafetyProfile.requireValidShellSyntax, true);
     assert.equal(created.inputSafetyProfile.confirmOnNaturalLanguageInput, false);
     assert.equal(created.startCwd, "/tmp");
@@ -333,6 +335,7 @@ test("session startup settings persist through patch and apply on restart", asyn
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         note: "capture restart logs\nbefore restart",
+        mouseForwardingMode: "off",
         inputSafetyProfile: {
           requireValidShellSyntax: false,
           confirmOnIncompleteShellConstruct: true,
@@ -375,6 +378,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     const patched = await patchRes.json();
     assert.equal(patched.state, "running");
     assert.equal(patched.note, "capture restart logs\nbefore restart");
+    assert.equal(patched.mouseForwardingMode, "off");
     assert.equal(patched.inputSafetyProfile.requireValidShellSyntax, false);
     assert.equal(patched.inputSafetyProfile.confirmOnMultilineInput, true);
     assert.equal(patched.inputSafetyProfile.targetSwitchGraceMs, 5000);
@@ -393,6 +397,7 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
     assert.equal(restarted.note, "capture restart logs\nbefore restart");
+    assert.equal(restarted.mouseForwardingMode, "off");
     assert.equal(restarted.inputSafetyProfile.requireValidShellSyntax, false);
     assert.equal(restarted.inputSafetyProfile.confirmOnRecentTargetSwitch, true);
     assert.equal(restarted.cwd, "/var/tmp");
@@ -404,6 +409,62 @@ test("session startup settings persist through patch and apply on restart", asyn
     assert.equal(restarted.themeProfile.cursor, "#aaffaa");
   } finally {
     await runtime.stop();
+  }
+});
+
+test("session mouse forwarding mode persists across backend restart restore", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-mouse-forwarding-"));
+  const dataPath = join(dir, "sessions.json");
+
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+
+  let createdId = "";
+  try {
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        shell: "sh",
+        mouseForwardingMode: "application"
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdId = created.id;
+    assert.equal(created.mouseForwardingMode, "application");
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024
+  });
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const restoredRes = await fetch(`${baseUrlB}/sessions/${createdId}`);
+    assert.equal(restoredRes.status, 200);
+    const restored = await restoredRes.json();
+    assert.equal(restored.mouseForwardingMode, "application");
+  } finally {
+    await runtimeB.stop();
   }
 });
 

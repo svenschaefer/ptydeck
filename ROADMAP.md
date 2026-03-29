@@ -13,7 +13,7 @@ This file defines execution order, release versions, and dependencies for tasks 
 ## Current Execution Status
 
 - Active release wave: `v0.4.0-H52` (Controlled Mouse Forwarding Baseline).
-- Active scoped tasks: `UX-017`, `UX-018`, `UX-019`.
+- Active scoped tasks: `UX-018`, `UX-019`.
 - Latest completed wave: `v0.4.0-H51` (Distributed Tracing Across REST, WS, and PTY, `OBS-005A`, `OBS-005B`, `OBS-005C`).
 - Previous completed wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
 - Previous completed wave: `v0.4.0-H49` (Workflow Data-Source Adapters, `SWF-004`).
@@ -69,11 +69,12 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ### v0.4.0-H52 - Controlled Mouse Forwarding Baseline (Active)
 
-- Active scoped tasks: `UX-017`, `UX-018`, `UX-019`
+- Completed in-wave: `UX-017`
+- Remaining active tasks: `UX-018`, `UX-019`
 
 Dependencies:
 
-- `UX-017` lands first so one backend-owned per-session mouse-forwarding contract exists before the frontend exposes a toggle or runtime behavior that would otherwise drift into browser-local state.
+- `UX-017` landed first, so one backend-owned per-session mouse-forwarding contract now exists before the frontend exposes a toggle or runtime behavior that would otherwise drift into browser-local state.
 - `UX-018` follows `UX-017`, so xterm runtime behavior, selection semantics, and session-settings UX can bind to the authoritative persisted setting instead of inventing another local toggle model.
 - `UX-019` closes after `UX-017` and `UX-018`, so regression coverage locks enabled/disabled forwarding behavior, persistence, and non-regression of current clipboard/selection paths against the final contract.
 

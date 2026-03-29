@@ -4,6 +4,7 @@ import {
   SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS,
   SESSION_INPUT_SAFETY_PROFILE_KEYS
 } from "./session-input-safety-profile.js";
+import { SESSION_MOUSE_FORWARDING_MODE_VALUES } from "./session-mouse-forwarding.js";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -141,6 +142,10 @@ function isInputSafetyProfile(value) {
     }
   }
   return keys.every((key) => SESSION_INPUT_SAFETY_PROFILE_KEYS.includes(key));
+}
+
+function isMouseForwardingMode(value) {
+  return typeof value === "string" && SESSION_MOUSE_FORWARDING_MODE_VALUES.includes(value);
 }
 
 function isDeck(value) {
@@ -397,6 +402,13 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body?.note !== undefined && typeof body.note !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
     }
+    if (body?.mouseForwardingMode !== undefined && !isMouseForwardingMode(body.mouseForwardingMode)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'mouseForwardingMode' must be one of: ${SESSION_MOUSE_FORWARDING_MODE_VALUES.join(", ")}.`
+      );
+    }
     if (body?.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
     }
@@ -437,6 +449,7 @@ export function validateRequest({ method, pathname, params, query, body }) {
       body.startCwd === undefined &&
       body.startCommand === undefined &&
       body.note === undefined &&
+      body.mouseForwardingMode === undefined &&
       body.inputSafetyProfile === undefined &&
       body.env === undefined &&
       body.tags === undefined &&
@@ -469,6 +482,13 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.note !== undefined && typeof body.note !== "string") {
       throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
+    }
+    if (body.mouseForwardingMode !== undefined && !isMouseForwardingMode(body.mouseForwardingMode)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        `Field 'mouseForwardingMode' must be one of: ${SESSION_MOUSE_FORWARDING_MODE_VALUES.join(", ")}.`
+      );
     }
     if (body.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
@@ -937,6 +957,7 @@ function isSession(value) {
     typeof value.shell === "string" &&
     (value.name === undefined || typeof value.name === "string") &&
     (value.note === undefined || typeof value.note === "string") &&
+    isMouseForwardingMode(value.mouseForwardingMode) &&
     (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
     (value.remoteAuth === undefined || isRemoteAuth(value.remoteAuth)) &&
     (value.remoteRuntime === undefined || isRemoteRuntime(value.remoteRuntime)) &&

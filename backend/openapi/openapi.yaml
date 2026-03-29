@@ -1763,6 +1763,8 @@ components:
           type: string
         note:
           type: string
+        mouseForwardingMode:
+          $ref: '#/components/schemas/SessionMouseForwardingMode'
         inputSafetyProfile:
           $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
@@ -2069,6 +2071,8 @@ components:
           type: string
         note:
           type: string
+        mouseForwardingMode:
+          $ref: '#/components/schemas/SessionMouseForwardingMode'
         inputSafetyProfile:
           $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
@@ -2108,6 +2112,8 @@ components:
           type: string
         note:
           type: string
+        mouseForwardingMode:
+          $ref: '#/components/schemas/SessionMouseForwardingMode'
         inputSafetyProfile:
           $ref: '#/components/schemas/SessionInputSafetyProfile'
         startCwd:
@@ -2128,6 +2134,11 @@ components:
           $ref: '#/components/schemas/SessionThemeProfile'
         inactiveThemeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
+    SessionMouseForwardingMode:
+      type: string
+      enum:
+        - off
+        - application
     SessionInputSafetyProfile:
       type: object
       required:

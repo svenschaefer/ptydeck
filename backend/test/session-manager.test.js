@@ -76,6 +76,7 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(created.startCwd, "/tmp");
   assert.equal(created.startCommand, "");
   assert.equal(created.note, undefined);
+  assert.equal(created.mouseForwardingMode, "off");
   assert.deepEqual(created.env, {});
   assert.equal(typeof created.inputSafetyProfile, "object");
   assert.equal(created.inputSafetyProfile.requireValidShellSyntax, false);
@@ -915,6 +916,28 @@ test("SessionManager stores, updates, and restarts session input safety profiles
   assert.deepEqual(restarted.inputSafetyProfile, INPUT_SAFETY_PROFILE);
 });
 
+test("SessionManager stores, updates, and restarts mouse forwarding mode", () => {
+  const queued = createQueuedFakePtyFactory();
+  const manager = new SessionManager({
+    createPty: () => queued.createPty()
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash",
+    mouseForwardingMode: "application"
+  });
+  assert.equal(created.mouseForwardingMode, "application");
+
+  const updated = manager.updateSession(created.id, {
+    mouseForwardingMode: "off"
+  });
+  assert.equal(updated.mouseForwardingMode, "off");
+
+  const restarted = manager.restart(created.id);
+  assert.equal(restarted.mouseForwardingMode, "off");
+});
+
 test("SessionManager injects cwd marker into bash PROMPT_COMMAND", () => {
   const originalPromptCommand = process.env.PROMPT_COMMAND;
   const fakePty = createFakePty();
@@ -992,6 +1015,7 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.startCwd, "/var/tmp");
   assert.equal(restarted.startCommand, "echo START");
   assert.equal(restarted.note, "keep this");
+  assert.equal(restarted.mouseForwardingMode, "off");
   assert.deepEqual(restarted.env, { FOO: "BAR" });
   assert.deepEqual(restarted.inputSafetyProfile, INPUT_SAFETY_PROFILE);
   assert.deepEqual(restarted.tags, []);

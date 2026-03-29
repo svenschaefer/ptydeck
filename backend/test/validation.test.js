@@ -96,6 +96,7 @@ test("validateResponse checks session list schema", () => {
           cwd: "/tmp",
           shell: "bash",
           note: "needs review",
+          mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",
           startCommand: "",
@@ -126,6 +127,7 @@ test("validateResponse accepts ssh session remote runtime metadata", () => {
         kind: "ssh",
         cwd: "~/workspace",
         shell: "ssh",
+        mouseForwardingMode: "application",
         remoteConnection: {
           host: "example.internal",
           port: 22,
@@ -255,6 +257,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           kind: "local",
           cwd: "/tmp",
           shell: "bash",
+          mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",
           startCommand: "",
@@ -274,6 +277,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           kind: "local",
           cwd: "/tmp",
           shell: "bash",
+          mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",
           startCommand: "",
@@ -341,6 +345,7 @@ test("validateRequest accepts valid session patch payload", () => {
       body: {
         name: "renamed",
         note: "needs review",
+        mouseForwardingMode: "application",
         inputSafetyProfile: INPUT_SAFETY_PROFILE,
         startCwd: "/tmp",
         startCommand: "echo hi",
@@ -371,6 +376,20 @@ test("validateRequest accepts ssh session create payload", () => {
         remoteSecret: "super-secret",
         startCwd: "~",
         startCommand: "hostname"
+      }
+    });
+  });
+});
+
+test("validateRequest rejects invalid mouse forwarding mode", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        shell: "sh",
+        mouseForwardingMode: "always"
       }
     });
   });

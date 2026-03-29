@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
+import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import { createShellAdapter } from "./shell-adapter.js";
 
 function now() {
@@ -1105,6 +1106,7 @@ export class SessionManager {
     replayOutput = "",
     replayOutputTruncated = false,
     note,
+    mouseForwardingMode,
     inputSafetyProfile,
     tags = [],
     themeProfile = {},
@@ -1137,6 +1139,7 @@ export class SessionManager {
     const normalizedStartCommand = typeof startCommand === "string" ? startCommand : "";
     const normalizedEnv = normalizeSessionEnv(env);
     const normalizedNote = normalizeSessionNote(note);
+    const normalizedMouseForwardingMode = normalizeSessionMouseForwardingMode(mouseForwardingMode, { strict: false });
     const normalizedInputSafetyProfile = normalizeSessionInputSafetyProfile(inputSafetyProfile, { strict: false });
     const normalizedTags = normalizeSessionTags(tags);
     const normalizedQuickIdToken = normalizeQuickIdToken(quickIdToken);
@@ -1201,6 +1204,7 @@ export class SessionManager {
         startCommand: normalizedStartCommand,
         env: normalizedEnv,
         ...(normalizedNote ? { note: normalizedNote } : {}),
+        mouseForwardingMode: normalizedMouseForwardingMode,
         inputSafetyProfile: normalizedInputSafetyProfile,
         tags: normalizedTags,
         ...(normalizedKind === SESSION_KIND_SSH
@@ -1389,6 +1393,9 @@ export class SessionManager {
         delete session.meta.note;
       }
     }
+    if (patch.mouseForwardingMode !== undefined) {
+      session.meta.mouseForwardingMode = normalizeSessionMouseForwardingMode(patch.mouseForwardingMode, { strict: false });
+    }
     if (patch.inputSafetyProfile !== undefined) {
       session.meta.inputSafetyProfile = normalizeSessionInputSafetyProfile(patch.inputSafetyProfile, { strict: false });
     }
@@ -1443,6 +1450,7 @@ export class SessionManager {
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
       note: snapshot.note,
+      mouseForwardingMode: snapshot.mouseForwardingMode,
       inputSafetyProfile: snapshot.inputSafetyProfile,
       tags: snapshot.tags || [],
       themeProfile: snapshot.themeProfile || {},

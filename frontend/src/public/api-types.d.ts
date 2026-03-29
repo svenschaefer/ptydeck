@@ -13,6 +13,8 @@ export type RemoteAuth = {
   privateKeyPath?: string;
 };
 
+export type SessionMouseForwardingMode = "off" | "application";
+
 export type SessionInputSafetyProfile = {
   requireValidShellSyntax: boolean;
   confirmOnIncompleteShellConstruct: boolean;
@@ -78,6 +80,7 @@ export type Session = {
   remoteConnection?: RemoteConnection;
   remoteAuth?: RemoteAuth;
   tags: string[];
+  mouseForwardingMode: SessionMouseForwardingMode;
   inputSafetyProfile: SessionInputSafetyProfile;
   name?: string;
   startCwd?: string;
@@ -103,6 +106,7 @@ export type CreateSessionRequest = {
   remoteAuth?: RemoteAuth;
   remoteSecret?: string;
   name?: string;
+  mouseForwardingMode?: SessionMouseForwardingMode;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
   startCommand?: string;
@@ -119,6 +123,7 @@ export type UpdateSessionRequest = {
   remoteAuth?: RemoteAuth;
   remoteSecret?: string;
   name?: string;
+  mouseForwardingMode?: SessionMouseForwardingMode;
   inputSafetyProfile?: SessionInputSafetyProfile;
   startCwd?: string;
   startCommand?: string;
