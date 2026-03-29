@@ -70,7 +70,8 @@ Promoted and completed in `v0.4.0-H21`:
 
 ## Extensibility
 
-- [ ] Add optional controlled mouse forwarding.
+- Promoted to active delivery in `v0.4.0-H52`:
+  - `UX-017`, `UX-018`, `UX-019`
 - [ ] Add plugin interface for project-specific automations.
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
