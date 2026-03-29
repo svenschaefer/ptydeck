@@ -1,8 +1,7 @@
 import {
-  buildSessionInputSafetyProfileFromPreset,
-  detectSessionInputSafetyPreset,
-  listSessionInputSafetyPresetOptions,
-  normalizeSessionInputSafetyProfile
+  normalizeSessionInputSafetyProfile,
+  SESSION_INPUT_SAFETY_BOOLEAN_KEYS,
+  SESSION_INPUT_SAFETY_INTEGER_DEFAULTS
 } from "../input-safety-profile.js";
 
 const THEME_SLOT_OPTIONS = Object.freeze([
@@ -32,10 +31,6 @@ export function createSessionSettingsStateController(options = {}) {
   const normalizeSessionStartupFromSession = options.normalizeSessionStartupFromSession || (() => ({}));
   const terminals = options.terminals || new Map();
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
-  const inputSafetyPresetOptions = Array.isArray(options.inputSafetyPresetOptions)
-    ? options.inputSafetyPresetOptions
-    : listSessionInputSafetyPresetOptions();
-
   function isValidHexColor(value) {
     return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
   }
@@ -447,14 +442,19 @@ export function createSessionSettingsStateController(options = {}) {
   }
 
   function syncSessionInputSafetyControls(entry, session) {
-    if (!entry?.inputSafetyPresetSelect) {
-      return;
+    const profile = normalizeSessionInputSafetyProfile(session?.inputSafetyProfile);
+    for (const key of SESSION_INPUT_SAFETY_BOOLEAN_KEYS) {
+      const control = entry?.inputSafetyControls?.[key];
+      if (control) {
+        control.checked = profile[key] === true;
+      }
     }
-    setSelectOptions(
-      entry.inputSafetyPresetSelect,
-      inputSafetyPresetOptions,
-      detectSessionInputSafetyPreset(session?.inputSafetyProfile)
-    );
+    for (const [key, fallback] of Object.entries(SESSION_INPUT_SAFETY_INTEGER_DEFAULTS)) {
+      const control = entry?.inputSafetyControls?.[key];
+      if (control) {
+        control.value = String(profile[key] ?? fallback);
+      }
+    }
   }
 
   function readSessionStartupFromControls(entry) {
@@ -473,11 +473,20 @@ export function createSessionSettingsStateController(options = {}) {
   }
 
   function readSessionInputSafetyFromControls(entry, session) {
-    const selectedPreset = String(entry?.inputSafetyPresetSelect?.value || "").trim() || "off";
-    if (selectedPreset === "custom") {
-      return normalizeSessionInputSafetyProfile(session?.inputSafetyProfile);
+    const currentProfile = normalizeSessionInputSafetyProfile(session?.inputSafetyProfile);
+    const nextProfile = {};
+
+    for (const key of SESSION_INPUT_SAFETY_BOOLEAN_KEYS) {
+      const control = entry?.inputSafetyControls?.[key];
+      nextProfile[key] = control ? control.checked === true : currentProfile[key];
     }
-    return buildSessionInputSafetyProfileFromPreset(selectedPreset);
+
+    for (const [key, fallback] of Object.entries(SESSION_INPUT_SAFETY_INTEGER_DEFAULTS)) {
+      const control = entry?.inputSafetyControls?.[key];
+      nextProfile[key] = control ? control.value : currentProfile[key] ?? fallback;
+    }
+
+    return normalizeSessionInputSafetyProfile(nextProfile);
   }
 
   function areStringMapsEqual(left, right) {

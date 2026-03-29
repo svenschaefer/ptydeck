@@ -321,7 +321,7 @@ test("session-grid controller mounts new cards into split-layout parking and del
         startCommandInput: {},
         startEnvInput: {},
         sessionSendTerminatorSelect: {},
-        inputSafetyPresetSelect: {},
+        inputSafetyControls: {},
         sessionTagsInput: {},
         startFeedback: {},
         tagListEl: {},

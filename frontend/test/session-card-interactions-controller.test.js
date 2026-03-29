@@ -7,6 +7,7 @@ function createEventTarget(value = "") {
   const listeners = new Map();
   return {
     value,
+    checked: false,
     listeners,
     addEventListener(type, handler) {
       listeners.set(String(type), handler);
@@ -18,6 +19,25 @@ function createEventTarget(value = "") {
       }
       return handler(event);
     }
+  };
+}
+
+function createInputSafetyControls(overrides = {}) {
+  return {
+    requireValidShellSyntax: { ...createEventTarget(), checked: false, ...overrides.requireValidShellSyntax },
+    confirmOnIncompleteShellConstruct: {
+      ...createEventTarget(),
+      checked: false,
+      ...overrides.confirmOnIncompleteShellConstruct
+    },
+    confirmOnNaturalLanguageInput: { ...createEventTarget(), checked: false, ...overrides.confirmOnNaturalLanguageInput },
+    confirmOnDangerousShellCommand: { ...createEventTarget(), checked: false, ...overrides.confirmOnDangerousShellCommand },
+    confirmOnMultilineInput: { ...createEventTarget(), checked: false, ...overrides.confirmOnMultilineInput },
+    confirmOnRecentTargetSwitch: { ...createEventTarget(), checked: false, ...overrides.confirmOnRecentTargetSwitch },
+    targetSwitchGraceMs: createEventTarget("4000"),
+    pasteLengthConfirmThreshold: createEventTarget("400"),
+    pasteLineConfirmThreshold: createEventTarget("5"),
+    ...overrides
   };
 }
 
@@ -172,7 +192,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
     themeSelect: createEventTarget("custom"),
     themeCategory: createEventTarget("all"),
     themeSearch: createEventTarget(""),
-    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
+    inputSafetyControls: createInputSafetyControls(),
     startFeedback: {}
   };
 
@@ -282,7 +302,7 @@ test("session-card-interactions controller applies valid settings and persists s
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
-    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
+    inputSafetyControls: createInputSafetyControls(),
     themeSelect: createEventTarget("custom"),
     themeCategory: createEventTarget("all"),
     themeSearch: createEventTarget(""),
@@ -345,7 +365,7 @@ test("session-card-interactions controller restores draft state on settings canc
   const refs = {
     focusBtn: createEventTarget(),
     settingsCancelBtn: createEventTarget(),
-    inputSafetyPresetSelect: createEventTarget("shell_balanced"),
+    inputSafetyControls: createInputSafetyControls(),
     startCwdInput: createEventTarget("/tmp"),
     startCommandInput: createEventTarget(""),
     startEnvInput: createEventTarget(""),

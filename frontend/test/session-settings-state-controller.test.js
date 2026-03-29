@@ -58,8 +58,28 @@ function createFakeDocument() {
 function createInput(value = "") {
   return {
     value,
+    checked: false,
     disabled: false,
     classList: new FakeClassList()
+  };
+}
+
+function createInputSafetyControls(overrides = {}) {
+  return {
+    requireValidShellSyntax: { ...createInput(), checked: false, ...overrides.requireValidShellSyntax },
+    confirmOnIncompleteShellConstruct: {
+      ...createInput(),
+      checked: false,
+      ...overrides.confirmOnIncompleteShellConstruct
+    },
+    confirmOnNaturalLanguageInput: { ...createInput(), checked: false, ...overrides.confirmOnNaturalLanguageInput },
+    confirmOnDangerousShellCommand: { ...createInput(), checked: false, ...overrides.confirmOnDangerousShellCommand },
+    confirmOnMultilineInput: { ...createInput(), checked: false, ...overrides.confirmOnMultilineInput },
+    confirmOnRecentTargetSwitch: { ...createInput(), checked: false, ...overrides.confirmOnRecentTargetSwitch },
+    targetSwitchGraceMs: createInput("4000"),
+    pasteLengthConfirmThreshold: createInput("400"),
+    pasteLineConfirmThreshold: createInput("5"),
+    ...overrides
   };
 }
 
@@ -212,7 +232,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     sessionNoteInput: createInput("first line\nsecond line"),
     sessionTagsInput: createInput("ops"),
     sessionSendTerminatorSelect: createInput("crlf"),
-    inputSafetyPresetSelect: createInput("off"),
+    inputSafetyControls: createInputSafetyControls(),
     themeInputs: {
       background: createInput("#111111"),
       foreground: createInput("#eeeeee")
@@ -239,7 +259,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   entry.sessionNoteInput.value = "first line\nupdated";
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
   entry.sessionNoteInput.value = "first line\nsecond line";
-  entry.inputSafetyPresetSelect.value = "shell_strict";
+  entry.inputSafetyControls.requireValidShellSyntax.checked = true;
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
 
   controller.setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
@@ -260,28 +280,32 @@ test("session-settings state controller syncs and reads multiline session notes"
   assert.equal(controller.readSessionNoteFromControls(entry), "first line\nsecond line");
 });
 
-test("session-settings state controller syncs and reads input safety presets", () => {
-  const controller = createSessionSettingsStateController({
-    documentRef: createFakeDocument()
-  });
+test("session-settings state controller syncs and reads explicit input safety controls", () => {
+  const controller = createSessionSettingsStateController({});
   const entry = {
-    inputSafetyPresetSelect: new FakeSelect()
+    inputSafetyControls: createInputSafetyControls()
   };
   const session = {
     id: "s1",
     inputSafetyProfile: {
       requireValidShellSyntax: true,
-      confirmOnIncompleteShellConstruct: true
+      confirmOnIncompleteShellConstruct: true,
+      confirmOnDangerousShellCommand: true,
+      targetSwitchGraceMs: 2222
     }
   };
 
   controller.syncSessionInputSafetyControls(entry, session);
-  assert.equal(entry.inputSafetyPresetSelect.value, "shell_syntax_gated");
-  assert.equal(entry.inputSafetyPresetSelect.children.length, 6);
+  assert.equal(entry.inputSafetyControls.requireValidShellSyntax.checked, true);
+  assert.equal(entry.inputSafetyControls.confirmOnIncompleteShellConstruct.checked, true);
+  assert.equal(entry.inputSafetyControls.confirmOnDangerousShellCommand.checked, true);
+  assert.equal(entry.inputSafetyControls.targetSwitchGraceMs.value, "2222");
 
-  entry.inputSafetyPresetSelect.value = "shell_balanced";
+  entry.inputSafetyControls.confirmOnNaturalLanguageInput.checked = true;
+  entry.inputSafetyControls.pasteLengthConfirmThreshold.value = "123";
   const profile = controller.readSessionInputSafetyFromControls(entry, session);
   assert.equal(profile.requireValidShellSyntax, true);
   assert.equal(profile.confirmOnDangerousShellCommand, true);
-  assert.equal(profile.confirmOnRecentTargetSwitch, true);
+  assert.equal(profile.confirmOnNaturalLanguageInput, true);
+  assert.equal(profile.pasteLengthConfirmThreshold, 123);
 });

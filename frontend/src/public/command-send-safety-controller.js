@@ -1,8 +1,4 @@
-import {
-  buildSessionInputSafetyProfileFromPreset,
-  detectSessionInputSafetyPreset,
-  normalizeSessionInputSafetyProfile
-} from "./input-safety-profile.js";
+import { normalizeSessionInputSafetyProfile } from "./input-safety-profile.js";
 
 const NATURAL_LANGUAGE_STOPWORDS = new Set([
   "a",
@@ -552,7 +548,6 @@ export function evaluateSessionSendSafety({
   nowMs = Date.now()
 } = {}) {
   const profile = normalizeSessionInputSafetyProfile(session?.inputSafetyProfile);
-  const preset = detectSessionInputSafetyPreset(profile);
   const reasons = [];
   const normalizedText = String(text || "");
   const trimmedText = normalizedText.trim();
@@ -616,7 +611,6 @@ export function evaluateSessionSendSafety({
 
   return {
     sessionId: session?.id || "",
-    preset,
     profile,
     syntaxAnalysis,
     reasons: deduped,
@@ -674,8 +668,4 @@ export function evaluateSendSafety({
           ? `Confirmation required before sending to ${flaggedTargets[0].targetLabel}.`
           : `Confirmation required before sending to ${flaggedTargets.length} sessions.`
   };
-}
-
-export function buildSessionInputSafetyProfileFromPresetKey(presetKey) {
-  return buildSessionInputSafetyProfileFromPreset(presetKey);
 }

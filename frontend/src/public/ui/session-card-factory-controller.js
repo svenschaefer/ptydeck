@@ -32,7 +32,19 @@ export function createSessionCardFactoryController(options = {}) {
     const startEnvInput = node.querySelector(".session-start-env");
     const sessionNoteInput = node.querySelector(".session-note-input");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
-    const inputSafetyPresetSelect = node.querySelector(".session-input-safety-preset");
+    const inputSafetyRequireValidShellSyntax = node.querySelector(".session-input-safety-require-valid-shell-syntax");
+    const inputSafetyConfirmIncompleteShellConstruct = node.querySelector(
+      ".session-input-safety-confirm-incomplete-shell-construct"
+    );
+    const inputSafetyConfirmNaturalLanguageInput = node.querySelector(".session-input-safety-confirm-natural-language-input");
+    const inputSafetyConfirmDangerousShellCommand = node.querySelector(
+      ".session-input-safety-confirm-dangerous-shell-command"
+    );
+    const inputSafetyConfirmMultilineInput = node.querySelector(".session-input-safety-confirm-multiline-input");
+    const inputSafetyConfirmRecentTargetSwitch = node.querySelector(".session-input-safety-confirm-recent-target-switch");
+    const inputSafetyTargetSwitchGraceMs = node.querySelector(".session-input-safety-target-switch-grace-ms");
+    const inputSafetyPasteLengthConfirmThreshold = node.querySelector(".session-input-safety-paste-length-threshold");
+    const inputSafetyPasteLineConfirmThreshold = node.querySelector(".session-input-safety-paste-line-threshold");
     const sessionTagsInput = node.querySelector(".session-tags-input");
     const startFeedback = node.querySelector(".session-start-feedback");
     const settingsFeedback = node.querySelector(".session-settings-feedback");
@@ -51,6 +63,17 @@ export function createSessionCardFactoryController(options = {}) {
     const themeInputs = {
       background: themeBg,
       foreground: themeFg
+    };
+    const inputSafetyControls = {
+      requireValidShellSyntax: inputSafetyRequireValidShellSyntax,
+      confirmOnIncompleteShellConstruct: inputSafetyConfirmIncompleteShellConstruct,
+      confirmOnNaturalLanguageInput: inputSafetyConfirmNaturalLanguageInput,
+      confirmOnDangerousShellCommand: inputSafetyConfirmDangerousShellCommand,
+      confirmOnMultilineInput: inputSafetyConfirmMultilineInput,
+      confirmOnRecentTargetSwitch: inputSafetyConfirmRecentTargetSwitch,
+      targetSwitchGraceMs: inputSafetyTargetSwitchGraceMs,
+      pasteLengthConfirmThreshold: inputSafetyPasteLengthConfirmThreshold,
+      pasteLineConfirmThreshold: inputSafetyPasteLineConfirmThreshold
     };
     for (const key of themeProfileKeys) {
       if (themeInputs[key]) {
@@ -112,7 +135,7 @@ export function createSessionCardFactoryController(options = {}) {
       startEnvInput,
       sessionNoteInput,
       sessionSendTerminatorSelect,
-      inputSafetyPresetSelect,
+      inputSafetyControls,
       sessionTagsInput,
       startFeedback,
       settingsFeedback,

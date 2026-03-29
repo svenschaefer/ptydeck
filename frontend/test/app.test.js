@@ -399,9 +399,54 @@ function createTerminalCardTemplateNode() {
   const startSendTerminatorLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
   const startSendTerminator = new FakeElement({ className: "session-send-terminator", tagName: "select" });
   startSendTerminator.value = "auto";
-  const inputSafetyLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
-  const inputSafetyPreset = new FakeElement({ className: "session-input-safety-preset", tagName: "select" });
-  inputSafetyPreset.value = "off";
+  const inputSafetyTitle = new FakeElement({ className: "session-settings-section-title session-input-safety-title", tagName: "p" });
+  const inputSafetyGrid = new FakeElement({ className: "session-input-safety-grid", tagName: "div" });
+  const inputSafetyRequireValid = new FakeElement({
+    className: "session-input-safety-require-valid-shell-syntax",
+    tagName: "input"
+  });
+  inputSafetyRequireValid.checked = false;
+  const inputSafetyConfirmIncomplete = new FakeElement({
+    className: "session-input-safety-confirm-incomplete-shell-construct",
+    tagName: "input"
+  });
+  inputSafetyConfirmIncomplete.checked = false;
+  const inputSafetyConfirmNaturalLanguage = new FakeElement({
+    className: "session-input-safety-confirm-natural-language-input",
+    tagName: "input"
+  });
+  inputSafetyConfirmNaturalLanguage.checked = false;
+  const inputSafetyConfirmDangerous = new FakeElement({
+    className: "session-input-safety-confirm-dangerous-shell-command",
+    tagName: "input"
+  });
+  inputSafetyConfirmDangerous.checked = false;
+  const inputSafetyConfirmMultiline = new FakeElement({
+    className: "session-input-safety-confirm-multiline-input",
+    tagName: "input"
+  });
+  inputSafetyConfirmMultiline.checked = false;
+  const inputSafetyConfirmRecentTarget = new FakeElement({
+    className: "session-input-safety-confirm-recent-target-switch",
+    tagName: "input"
+  });
+  inputSafetyConfirmRecentTarget.checked = false;
+  const inputSafetyThresholdGrid = new FakeElement({ className: "session-input-safety-threshold-grid", tagName: "div" });
+  const inputSafetyTargetSwitchGrace = new FakeElement({
+    className: "session-input-safety-target-switch-grace-ms",
+    tagName: "input"
+  });
+  inputSafetyTargetSwitchGrace.value = "4000";
+  const inputSafetyPasteLength = new FakeElement({
+    className: "session-input-safety-paste-length-threshold",
+    tagName: "input"
+  });
+  inputSafetyPasteLength.value = "400";
+  const inputSafetyPasteLines = new FakeElement({
+    className: "session-input-safety-paste-line-threshold",
+    tagName: "input"
+  });
+  inputSafetyPasteLines.value = "5";
   const noteControls = new FakeElement({ className: "session-settings-section session-settings-panel-note session-note-controls", tagName: "div" });
   noteControls.hidden = true;
   const noteLabel = new FakeElement({ className: "session-startup-label", tagName: "label" });
@@ -460,8 +505,18 @@ function createTerminalCardTemplateNode() {
   startControls.appendChild(startTags);
   startControls.appendChild(startSendTerminatorLabel);
   startControls.appendChild(startSendTerminator);
-  startControls.appendChild(inputSafetyLabel);
-  startControls.appendChild(inputSafetyPreset);
+  inputSafetyGrid.appendChild(inputSafetyRequireValid);
+  inputSafetyGrid.appendChild(inputSafetyConfirmIncomplete);
+  inputSafetyGrid.appendChild(inputSafetyConfirmNaturalLanguage);
+  inputSafetyGrid.appendChild(inputSafetyConfirmDangerous);
+  inputSafetyGrid.appendChild(inputSafetyConfirmMultiline);
+  inputSafetyGrid.appendChild(inputSafetyConfirmRecentTarget);
+  inputSafetyThresholdGrid.appendChild(inputSafetyTargetSwitchGrace);
+  inputSafetyThresholdGrid.appendChild(inputSafetyPasteLength);
+  inputSafetyThresholdGrid.appendChild(inputSafetyPasteLines);
+  startControls.appendChild(inputSafetyTitle);
+  startControls.appendChild(inputSafetyGrid);
+  startControls.appendChild(inputSafetyThresholdGrid);
   noteControls.appendChild(noteLabel);
   noteControls.appendChild(noteInput);
   settingsLayout.appendChild(startControls);

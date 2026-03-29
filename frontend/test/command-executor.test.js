@@ -1544,9 +1544,15 @@ test("command executor copies retained replay tails for an explicitly selected s
   assert.deepEqual(calls, [["copy", "s2"]]);
 });
 
-test("command executor applies input safety presets through settings payloads", async () => {
+test("command executor applies explicit input safety profiles through settings payloads", async () => {
   const calls = [];
   const sessions = [{ id: "s1", name: "one", deckId: "default" }];
+  const requestedProfile = {
+    requireValidShellSyntax: true,
+    confirmOnIncompleteShellConstruct: true,
+    confirmOnNaturalLanguageInput: true,
+    confirmOnDangerousShellCommand: true
+  };
   const executor = createCommandExecutor({
     store: {
       getState() {
@@ -1586,7 +1592,7 @@ test("command executor applies input safety presets through settings payloads", 
     applyTerminalSizeSettings: () => {},
     setSessionFilterText: () => {},
     resolveSettingsTargets: () => ({ sessions, error: "" }),
-    parseSettingsPayload: () => ({ ok: true, payload: { inputSafetyPreset: "shell_strict" } }),
+    parseSettingsPayload: () => ({ ok: true, payload: { inputSafetyProfile: requestedProfile } }),
     normalizeSendTerminatorMode: () => "auto",
     setSessionSendTerminator: () => {},
     getSessionSendTerminator: () => "auto",
@@ -1601,8 +1607,8 @@ test("command executor applies input safety presets through settings payloads", 
 
   const feedback = await executor.execute({
     command: "settings",
-    args: ["apply", "{\"inputSafetyPreset\":\"shell_strict\"}"],
-    raw: "/settings apply {\"inputSafetyPreset\":\"shell_strict\"}"
+    args: ["apply", "{\"inputSafetyProfile\":{\"requireValidShellSyntax\":true}}"],
+    raw: "/settings apply {\"inputSafetyProfile\":{\"requireValidShellSyntax\":true}}"
   });
 
   assert.equal(feedback, "Applied settings to [7] one: inputSafetyProfile.");

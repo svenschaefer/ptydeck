@@ -14,9 +14,9 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-168` Owner `FE`: Remove send-safety presets from the session-settings UX and replace them with explicit per-session input-safety option controls for the existing `inputSafetyProfile` fields, including the numeric threshold fields, so operators configure the real guard flags directly instead of selecting bundled preset labels.
-- `QLT-169` Owner `FE`: Remove preset terminology and preset-only command-surface affordances from help, `/settings apply`, composer/status surfaces, and related frontend messaging so input safety is described and edited only through explicit option fields instead of `off` / `shell_balanced` / `shell_strict` preset names.
-- `QLT-170` Owner `QA`: Add regression coverage for explicit input-safety option editing, persisted per-session roundtrip behavior, removal of preset-based UI/help flows, and deterministic handling of direct flag edits versus historical preset-derived profiles.
+- `OBS-005A` Owner `BE`: Add a backend distributed-tracing baseline that issues deterministic trace and correlation IDs across REST requests, WebSocket connection/session event flows, and PTY/session lifecycle logging, with explicit log field names and stable linkage between request, connection, session, and deck context.
+- `OBS-005B` Owner `FE`: Thread backend trace and correlation metadata through the frontend REST/WS runtime and debug surfaces so operator-visible diagnostics can correlate one session/action path across request, websocket, and terminal-runtime events without reintroducing stream-scanning heuristics.
+- `OBS-005C` Owner `QA`: Add regression coverage for distributed trace propagation across REST, WS, and PTY paths, including request/connection correlation continuity, missing-trace fallback behavior, and no-regression validation for shared/spectator flows.
 
 ## Active Ownership Role
 

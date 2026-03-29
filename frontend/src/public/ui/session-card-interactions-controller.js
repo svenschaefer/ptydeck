@@ -64,7 +64,7 @@ export function createSessionCardInteractionsController(options = {}) {
           startEnvInput: refs.startEnvInput,
           sessionNoteInput: refs.sessionNoteInput,
           sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
-          inputSafetyPresetSelect: refs.inputSafetyPresetSelect,
+          inputSafetyControls: refs.inputSafetyControls,
           sessionTagsInput: refs.sessionTagsInput,
           themeInputs: refs.themeInputs
         },
@@ -164,7 +164,10 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.sessionNoteInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionTagsInput?.addEventListener("input", markDirtyFromControls);
     refs.sessionSendTerminatorSelect?.addEventListener("change", markDirtyFromControls);
-    refs.inputSafetyPresetSelect?.addEventListener("change", markDirtyFromControls);
+    for (const control of Object.values(refs.inputSafetyControls || {})) {
+      control?.addEventListener?.("input", markDirtyFromControls);
+      control?.addEventListener?.("change", markDirtyFromControls);
+    }
     refs.themeSlotSelect?.addEventListener("change", () => {
       updateSessionThemeDraftFromControls(refs, session.id, {
         selectedSlot: normalizeThemeSlot(refs.themeSlotSelect?.value)
@@ -269,7 +272,7 @@ export function createSessionCardInteractionsController(options = {}) {
       });
       const inputSafetyProfile = readSessionInputSafetyFromControls(
         {
-          inputSafetyPresetSelect: refs.inputSafetyPresetSelect
+          inputSafetyControls: refs.inputSafetyControls
         },
         currentSession
       );
@@ -344,7 +347,7 @@ export function createSessionCardInteractionsController(options = {}) {
             sessionNoteInput: refs.sessionNoteInput,
             sessionTagsInput: refs.sessionTagsInput,
             sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
-            inputSafetyPresetSelect: refs.inputSafetyPresetSelect
+            inputSafetyControls: refs.inputSafetyControls
           },
           freshSession
         );

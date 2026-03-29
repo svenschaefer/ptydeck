@@ -3,51 +3,68 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_SESSION_INPUT_SAFETY_PROFILE,
+  SESSION_INPUT_SAFETY_BOOLEAN_KEYS,
+  SESSION_INPUT_SAFETY_INTEGER_DEFAULTS,
   areSessionInputSafetyProfilesEqual,
-  buildSessionInputSafetyProfileFromPreset,
-  detectSessionInputSafetyPreset,
-  listSessionInputSafetyPresetOptions,
   normalizeSessionInputSafetyProfile
 } from "../src/public/input-safety-profile.js";
 
-test("input safety profile normalizes defaults and detects presets", () => {
+test("input safety profile normalizes defaults and explicit option values", () => {
   assert.deepEqual(normalizeSessionInputSafetyProfile(null), DEFAULT_SESSION_INPUT_SAFETY_PROFILE);
 
-  const balanced = buildSessionInputSafetyProfileFromPreset("shell_balanced");
-  assert.equal(balanced.requireValidShellSyntax, true);
-  assert.equal(balanced.confirmOnDangerousShellCommand, true);
-  assert.equal(balanced.confirmOnRecentTargetSwitch, true);
-  assert.equal(detectSessionInputSafetyPreset(balanced), "shell_balanced");
+  const normalized = normalizeSessionInputSafetyProfile({
+    requireValidShellSyntax: true,
+    confirmOnDangerousShellCommand: true,
+    targetSwitchGraceMs: "1234",
+    pasteLengthConfirmThreshold: 222,
+    pasteLineConfirmThreshold: "7"
+  });
 
-  const strict = buildSessionInputSafetyProfileFromPreset("shell_strict");
-  assert.equal(strict.confirmOnMultilineInput, false);
-  assert.equal(strict.confirmOnRecentTargetSwitch, false);
-  assert.equal(strict.pasteLengthConfirmThreshold, 400);
-  assert.equal(strict.pasteLineConfirmThreshold, 5);
-  assert.equal(detectSessionInputSafetyPreset(strict), "shell_strict");
+  assert.equal(normalized.requireValidShellSyntax, true);
+  assert.equal(normalized.confirmOnDangerousShellCommand, true);
+  assert.equal(normalized.targetSwitchGraceMs, 1234);
+  assert.equal(normalized.pasteLengthConfirmThreshold, 222);
+  assert.equal(normalized.pasteLineConfirmThreshold, 7);
 });
 
-test("input safety profile equality and options handle custom values", () => {
+test("input safety profile equality uses the explicit boolean and integer field sets", () => {
   const custom = normalizeSessionInputSafetyProfile({
     requireValidShellSyntax: true,
-    pasteLengthConfirmThreshold: "111",
+    confirmOnNaturalLanguageInput: true,
+    pasteLengthConfirmThreshold: 111,
     pasteLineConfirmThreshold: 2
   });
-  assert.equal(custom.pasteLengthConfirmThreshold, 111);
-  assert.equal(custom.pasteLineConfirmThreshold, 2);
-  assert.equal(detectSessionInputSafetyPreset(custom), "custom");
+
   assert.equal(
     areSessionInputSafetyProfilesEqual(custom, {
       requireValidShellSyntax: true,
+      confirmOnNaturalLanguageInput: true,
       pasteLengthConfirmThreshold: 111,
       pasteLineConfirmThreshold: 2
     }),
     true
   );
 
-  const options = listSessionInputSafetyPresetOptions();
-  assert.deepEqual(
-    options.map((entry) => entry.value),
-    ["off", "shell_syntax_gated", "shell_balanced", "shell_strict", "agent", "custom"]
+  assert.equal(
+    areSessionInputSafetyProfilesEqual(custom, {
+      requireValidShellSyntax: true,
+      pasteLengthConfirmThreshold: 111,
+      pasteLineConfirmThreshold: 2
+    }),
+    false
   );
+
+  assert.deepEqual(SESSION_INPUT_SAFETY_BOOLEAN_KEYS, [
+    "requireValidShellSyntax",
+    "confirmOnIncompleteShellConstruct",
+    "confirmOnNaturalLanguageInput",
+    "confirmOnDangerousShellCommand",
+    "confirmOnMultilineInput",
+    "confirmOnRecentTargetSwitch"
+  ]);
+  assert.deepEqual(SESSION_INPUT_SAFETY_INTEGER_DEFAULTS, {
+    targetSwitchGraceMs: 4000,
+    pasteLengthConfirmThreshold: 400,
+    pasteLineConfirmThreshold: 5
+  });
 });

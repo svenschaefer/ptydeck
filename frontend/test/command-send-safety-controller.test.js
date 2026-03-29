@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 
 import {
   analyzeShellSyntax,
-  buildSessionInputSafetyProfileFromPresetKey,
   classifyDangerousShellCommand,
   evaluateSendSafety,
   evaluateSessionSendSafety,
   isLikelyNaturalLanguageInput
 } from "../src/public/command-send-safety-controller.js";
+import { normalizeSessionInputSafetyProfile } from "../src/public/input-safety-profile.js";
 
 test("command send safety controller detects shell syntax and natural language signals", () => {
   assert.deepEqual(analyzeShellSyntax("echo hi"), {
@@ -48,7 +48,13 @@ test("command send safety controller detects shell syntax and natural language s
 });
 
 test("command send safety controller evaluates per-session risks and grouped confirmation reasons", () => {
-  const profile = buildSessionInputSafetyProfileFromPresetKey("shell_balanced");
+  const profile = normalizeSessionInputSafetyProfile({
+    requireValidShellSyntax: true,
+    confirmOnIncompleteShellConstruct: true,
+    confirmOnNaturalLanguageInput: true,
+    confirmOnDangerousShellCommand: true,
+    confirmOnRecentTargetSwitch: true
+  });
   const session = {
     id: "s1",
     name: "ops-shell",
@@ -90,7 +96,12 @@ test("command send safety controller evaluates per-session risks and grouped con
 });
 
 test("command send safety controller keeps common shell commands clear while catching terse natural language in strict mode", () => {
-  const profile = buildSessionInputSafetyProfileFromPresetKey("shell_strict");
+  const profile = normalizeSessionInputSafetyProfile({
+    requireValidShellSyntax: true,
+    confirmOnIncompleteShellConstruct: true,
+    confirmOnNaturalLanguageInput: true,
+    confirmOnDangerousShellCommand: true
+  });
   const session = {
     id: "s1",
     name: "ops-shell",

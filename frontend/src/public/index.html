@@ -315,17 +315,43 @@
                 <option value="cr2">CR2 (\\r\\r)</option>
                 <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
               </select>
-              <label class="session-startup-label">Send Safety Preset</label>
-              <select class="session-input-safety-preset">
-                <option value="off">Off</option>
-                <option value="shell_syntax_gated">Shell Syntax Gated</option>
-                <option value="shell_balanced">Shell Balanced</option>
-                <option value="shell_strict">Shell Strict</option>
-                <option value="agent">Agent</option>
-                <option value="custom">Custom</option>
-              </select>
+              <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
+              <div class="session-input-safety-grid">
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
+                  <span>Require valid shell syntax</span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
+                  <span>Confirm incomplete shell constructs</span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
+                  <span>Confirm natural-language input</span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
+                  <span>Confirm dangerous shell commands</span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
+                  <span>Confirm multiline or large paste input</span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
+                  <span>Confirm recent target switches</span>
+                </label>
+              </div>
+              <div class="session-input-safety-threshold-grid">
+                <label class="session-startup-label">Target Switch Grace (ms)</label>
+                <input class="session-input-safety-target-switch-grace-ms" type="number" min="0" step="1" value="4000" />
+                <label class="session-startup-label">Paste Length Threshold</label>
+                <input class="session-input-safety-paste-length-threshold" type="number" min="0" step="1" value="400" />
+                <label class="session-startup-label">Paste Line Threshold</label>
+                <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
+              </div>
               <p class="session-settings-inline-hint">
-                Safety presets control parser-backed shell validation and confirmation rules per session.
+                Configure explicit parser-backed validation and confirmation checks per session.
               </p>
             </section>
             <section class="session-settings-section session-settings-panel-note session-note-controls" hidden>

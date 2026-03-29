@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H50` (Explicit Input-Safety Options).
-- Active scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`.
-- Latest completed wave: `v0.4.0-H49` (Workflow Data-Source Adapters, `SWF-004`).
+- Active release wave: `v0.4.0-H51` (Distributed Tracing Across REST, WS, and PTY).
+- Active scoped tasks: `OBS-005A`, `OBS-005B`, `OBS-005C`.
+- Latest completed wave: `v0.4.0-H50` (Explicit Input-Safety Options, `QLT-168`, `QLT-169`, `QLT-170`).
+- Previous completed wave: `v0.4.0-H49` (Workflow Data-Source Adapters, `SWF-004`).
 - Previous completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
 - Previous completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
 - Previous completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
@@ -65,15 +66,33 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H50 - Explicit Input-Safety Options (Active)
+### v0.4.0-H51 - Distributed Tracing Across REST, WS, and PTY (Active)
 
-- Active scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`
+- Active scoped tasks: `OBS-005A`, `OBS-005B`, `OBS-005C`
 
 Dependencies:
 
-- `QLT-168` follows the existing send-safety contract because the backend already persists the real `inputSafetyProfile` fields; the follow-up is to expose those flags directly in the frontend instead of routing operators through preset labels.
-- `QLT-169` follows `QLT-168`, so command help, `/settings apply`, and other operator-facing strings document the final explicit-option model instead of one more transitional preset vocabulary.
-- `QLT-170` closes after `QLT-168` and `QLT-169`, so regression coverage locks the explicit-option UX and removal of preset-facing command/help behavior against the final model.
+- `OBS-005A` lands first so one backend-owned trace and correlation contract exists across REST requests, WebSocket flows, PTY/session lifecycle events, and log fields before frontend/runtime diagnostics bind to it.
+- `OBS-005B` follows `OBS-005A`, so the frontend can thread and expose the authoritative backend trace metadata instead of inventing a parallel browser-only tracing vocabulary.
+- `OBS-005C` closes after `OBS-005A` and `OBS-005B`, so regression coverage locks propagation, continuity, and fallback behavior across the final backend/frontend trace model.
+
+Exit criteria:
+
+- Backend emits deterministic trace and correlation identifiers across REST, WebSocket, and PTY/session lifecycle paths with explicit linkage fields.
+- Frontend surfaces enough trace metadata in runtime/debug paths to correlate one operator action or session flow across request, socket, and terminal-runtime boundaries without reviving hidden stream scanning.
+- Regression coverage exists for trace propagation, continuity across request/connection/session boundaries, missing-trace fallback behavior, and no-regression behavior for shared/spectator flows.
+
+## Latest Completed Wave
+
+### v0.4.0-H50 - Explicit Input-Safety Options (Completed)
+
+- Completed scoped tasks: `QLT-168`, `QLT-169`, `QLT-170`
+
+Dependencies:
+
+- `QLT-168` followed the existing send-safety contract because the backend already persisted the real `inputSafetyProfile` fields; the closeout exposed those flags directly in the frontend instead of routing operators through preset labels.
+- `QLT-169` followed `QLT-168`, so command help, `/settings apply`, and other operator-facing strings now document the final explicit-option model instead of a transitional preset vocabulary.
+- `QLT-170` closed after `QLT-168` and `QLT-169`, so regression coverage now locks the explicit-option UX and removal of preset-facing command/help behavior against the final model.
 
 Exit criteria:
 
@@ -81,7 +100,7 @@ Exit criteria:
 - Frontend help, settings, and command feedback no longer advertise or depend on preset terminology such as `off`, `shell_balanced`, or `shell_strict`.
 - Regression coverage exists for direct option editing, persisted roundtrip behavior, and the removal of preset-based UX paths.
 
-## Latest Completed Wave
+## Previous Completed Wave
 
 ### v0.4.0-H49 - Workflow Data-Source Adapters (Completed)
 

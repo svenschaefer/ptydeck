@@ -65,7 +65,8 @@ Promoted and completed in `v0.4.0-H21`:
 
 - Promoted to active delivery (`v0.4.0-H1` in `TODO.md` / `ROADMAP.md`):
   - `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`
-- [ ] Add distributed tracing across REST, WS, and PTY pathways.
+- Promoted to active delivery (`v0.4.0-H51` in `TODO.md` / `ROADMAP.md`):
+  - `OBS-005A`, `OBS-005B`, `OBS-005C`
 
 ## Extensibility
 

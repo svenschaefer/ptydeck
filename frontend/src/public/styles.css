@@ -1843,7 +1843,9 @@ button:hover {
 .session-start-env,
 .session-note-input,
 .session-tags-input,
-.session-input-safety-preset {
+.session-input-safety-target-switch-grace-ms,
+.session-input-safety-paste-length-threshold,
+.session-input-safety-paste-line-threshold {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1875,6 +1877,34 @@ button:hover {
   font-size: 11px;
   line-height: 1.4;
   color: var(--muted);
+}
+
+.session-input-safety-title {
+  margin-top: 8px;
+}
+
+.session-input-safety-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.session-input-safety-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.session-input-safety-check input {
+  margin: 0;
+}
+
+.session-input-safety-threshold-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
 
 .session-start-feedback.error {
