@@ -51,6 +51,10 @@ function runtimeOperationKeys() {
   return new Set([
     "POST /auth/dev-token",
     "POST /auth/ws-ticket",
+    "GET /shares",
+    "POST /shares",
+    "GET /shares/{shareId}",
+    "POST /shares/{shareId}/revoke",
     "GET /custom-commands",
     "GET /custom-commands/{commandName}",
     "PUT /custom-commands/{commandName}",
@@ -222,6 +226,34 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       body: JSON.stringify({ id: "ops", name: "Ops" })
     });
     assert.ok(operations.get("POST /decks").has(createDeckRes.status));
+
+    const listSharesRes = await contractFetch(`${baseUrl}/shares`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /shares").has(listSharesRes.status));
+
+    const createShareRes = await contractFetch(`${baseUrl}/shares`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        targetType: "session",
+        targetId: createdSession.id,
+        expiresInSeconds: 3600
+      })
+    });
+    assert.ok(operations.get("POST /shares").has(createShareRes.status));
+    const createdShare = await createShareRes.json();
+
+    const getShareRes = await contractFetch(`${baseUrl}/shares/${createdShare.id}`, {
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("GET /shares/{shareId}").has(getShareRes.status));
+
+    const revokeShareRes = await contractFetch(`${baseUrl}/shares/${createdShare.id}/revoke`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+    });
+    assert.ok(operations.get("POST /shares/{shareId}/revoke").has(revokeShareRes.status));
 
     const getDeckRes = await contractFetch(`${baseUrl}/decks/ops`, {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }

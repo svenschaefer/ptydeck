@@ -292,7 +292,8 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         createdAt: 12,
         updatedAt: 13
       }
-    ]
+    ],
+    shareLinks: []
   };
 
   await persistence.saveState(state);
@@ -319,6 +320,7 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     connectionProfiles: [],
     layoutProfiles: [],
     workspacePresets: [],
-    sshTrustEntries: []
+    sshTrustEntries: [],
+    shareLinks: []
   });
 });

@@ -19,6 +19,11 @@ export function createAppLifecycleController(options = {}) {
   const clearUiError = typeof options.clearUiError === "function" ? options.clearUiError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
   const debugLog = typeof options.debugLog === "function" ? options.debugLog : () => {};
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   const createDeckFlow = typeof options.createDeckFlow === "function" ? options.createDeckFlow : () => Promise.resolve();
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
   const confirmPendingCommandSend =
@@ -64,6 +69,10 @@ export function createAppLifecycleController(options = {}) {
   const disposeTerminals = typeof options.disposeTerminals === "function" ? options.disposeTerminals : () => {};
 
   async function handleCreateSession() {
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return;
+    }
     try {
       debugLog("sessions.create.start");
       const createdSession = await api.createSession();
@@ -88,6 +97,10 @@ export function createAppLifecycleController(options = {}) {
       return;
     }
     element.addEventListener("click", async () => {
+      if (isReadOnlyMode()) {
+        setError(getReadOnlyModeMessage());
+        return;
+      }
       try {
         await handler();
         clearUiError();
@@ -109,6 +122,10 @@ export function createAppLifecycleController(options = {}) {
     }
     if (sendBtn && typeof sendBtn.addEventListener === "function") {
       sendBtn.addEventListener("click", () => {
+        if (isReadOnlyMode()) {
+          setError(getReadOnlyModeMessage());
+          return;
+        }
         submitCommand().catch(() => {
           setError("Failed to send command.");
         });
@@ -116,6 +133,10 @@ export function createAppLifecycleController(options = {}) {
     }
     if (commandGuardSendOnceBtn && typeof commandGuardSendOnceBtn.addEventListener === "function") {
       commandGuardSendOnceBtn.addEventListener("click", () => {
+        if (isReadOnlyMode()) {
+          setError(getReadOnlyModeMessage());
+          return;
+        }
         confirmPendingCommandSend().catch(() => {
           setError("Failed to send guarded command.");
         });
@@ -139,6 +160,10 @@ export function createAppLifecycleController(options = {}) {
     }
     if (workflowInterruptBtn && typeof workflowInterruptBtn.addEventListener === "function") {
       workflowInterruptBtn.addEventListener("click", () => {
+        if (isReadOnlyMode()) {
+          setError(getReadOnlyModeMessage());
+          return;
+        }
         interruptWorkflowSession()
           .then((message) => {
             clearUiError();
@@ -151,6 +176,10 @@ export function createAppLifecycleController(options = {}) {
     }
     if (workflowKillBtn && typeof workflowKillBtn.addEventListener === "function") {
       workflowKillBtn.addEventListener("click", () => {
+        if (isReadOnlyMode()) {
+          setError(getReadOnlyModeMessage());
+          return;
+        }
         killWorkflowSession()
           .then((message) => {
             clearUiError();

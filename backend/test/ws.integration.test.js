@@ -44,6 +44,59 @@ async function createStartedRuntime(overrides = {}) {
   };
 }
 
+function createEchoPtyFactory() {
+  return () => {
+    let exitHandler = null;
+    let dataHandler = null;
+    return {
+      onExit(handler) {
+        exitHandler = handler;
+      },
+      onData(handler) {
+        dataHandler = handler;
+      },
+      write(data) {
+        if (dataHandler) {
+          dataHandler(String(data));
+        }
+      },
+      resize() {},
+      kill() {
+        if (exitHandler) {
+          exitHandler({ exitCode: 0, signal: 0 });
+        }
+      }
+    };
+  };
+}
+
+async function issueDevToken(baseUrl, scopes) {
+  const body = Array.isArray(scopes) ? { scopes } : {};
+  const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  assert.equal(tokenRes.status, 200);
+  const tokenPayload = await tokenRes.json();
+  assert.equal(typeof tokenPayload.accessToken, "string");
+  return tokenPayload.accessToken;
+}
+
+function createAuthHeaders(accessToken, { json = false } = {}) {
+  return {
+    authorization: `Bearer ${accessToken}`,
+    ...(json ? { "content-type": "application/json" } : {})
+  };
+}
+
+function extractShareToken(joinUrl) {
+  const token = new URL(joinUrl).searchParams.get("share_token");
+  assert.equal(typeof token, "string");
+  assert.ok(token);
+  return token;
+}
+
 function assertDeckShape(deck) {
   assert.equal(typeof deck?.id, "string");
   assert.equal(typeof deck?.name, "string");
@@ -592,6 +645,152 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     assert.match(metricsText, /ptydeck_ws_errors_by_reason_total\{reason="upgrade_auth_rejected"\} [1-9]\d*/);
 
     authedWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("WS spectator shares receive filtered snapshot and session events", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
+    createPty: createEchoPtyFactory(),
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const operatorToken = await issueDevToken(baseUrl);
+    const operatorJsonHeaders = createAuthHeaders(operatorToken, { json: true });
+
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ id: "ops", name: "Ops" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createSharedSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "shared-session" })
+    });
+    assert.equal(createSharedSessionRes.status, 201);
+    const sharedSession = await createSharedSessionRes.json();
+
+    const createHiddenSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "hidden-session" })
+    });
+    assert.equal(createHiddenSessionRes.status, 201);
+    const hiddenSession = await createHiddenSessionRes.json();
+
+    const moveSharedRes = await fetch(`${baseUrl}/decks/ops/sessions/${sharedSession.id}:move`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(moveSharedRes.status, 204);
+
+    const createCustomCommandRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ content: "echo DOCU\n" })
+    });
+    assert.equal(createCustomCommandRes.status, 200);
+
+    const sharedInputRes = await fetch(`${baseUrl}/sessions/${sharedSession.id}/input`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ data: "SHARED-SNAPSHOT\n" })
+    });
+    assert.equal(sharedInputRes.status, 204);
+
+    const hiddenInputRes = await fetch(`${baseUrl}/sessions/${hiddenSession.id}/input`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ data: "HIDDEN-SNAPSHOT\n" })
+    });
+    assert.equal(hiddenInputRes.status, 204);
+
+    const createShareRes = await fetch(`${baseUrl}/shares`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({
+        targetType: "deck",
+        targetId: "ops",
+        expiresInSeconds: 3600
+      })
+    });
+    assert.equal(createShareRes.status, 201);
+    const createdShare = await createShareRes.json();
+    const spectatorToken = extractShareToken(createdShare.joinUrl);
+
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: createAuthHeaders(spectatorToken, { json: true }),
+      body: JSON.stringify({})
+    });
+    assert.equal(wsTicketRes.status, 200);
+    const wsTicketPayload = await wsTicketRes.json();
+
+    const events = [];
+    const spectatorWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${wsTicketPayload.ticket}`]);
+    spectatorWs.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+    const snapshot = events.find((event) => event.type === "snapshot");
+    assert.deepEqual(snapshot.sessions.map((session) => session.id), [sharedSession.id]);
+    assert.deepEqual(snapshot.decks.map((deck) => deck.id), ["ops"]);
+    assert.deepEqual(snapshot.customCommands, []);
+    assert.ok(snapshot.outputs.every((entry) => entry.sessionId === sharedSession.id));
+    assert.ok(snapshot.outputs.some((entry) => typeof entry.data === "string" && entry.data.includes("SHARED-SNAPSHOT")));
+    assert.ok(snapshot.outputs.every((entry) => !String(entry.data || "").includes("HIDDEN-SNAPSHOT")));
+
+    const sharedFollowupRes = await fetch(`${baseUrl}/sessions/${sharedSession.id}/input`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ data: "SHARED-LIVE\n" })
+    });
+    assert.equal(sharedFollowupRes.status, 204);
+
+    const hiddenFollowupRes = await fetch(`${baseUrl}/sessions/${hiddenSession.id}/input`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ data: "HIDDEN-LIVE\n" })
+    });
+    assert.equal(hiddenFollowupRes.status, 204);
+
+    await waitFor(() =>
+      events.some(
+        (event) =>
+          event.type === "session.data" &&
+          event.sessionId === sharedSession.id &&
+          typeof event.data === "string" &&
+          event.data.includes("SHARED-LIVE")
+      )
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    assert.equal(
+      events.some(
+        (event) =>
+          event.type === "session.data" &&
+          event.sessionId === hiddenSession.id &&
+          typeof event.data === "string" &&
+          event.data.includes("HIDDEN-LIVE")
+      ),
+      false
+    );
+    assert.equal(events.some((event) => String(event.type || "").startsWith("custom-command.")), false);
+
+    spectatorWs.close();
   } finally {
     await runtime.stop();
   }

@@ -245,3 +245,58 @@ test("app lifecycle controller binds deck/send actions and window cleanup hooks"
     "terminals"
   ]);
 });
+
+test("app lifecycle controller blocks write actions in read-only spectator mode", async () => {
+  const createBtn = createEventTarget();
+  const deckCreateBtn = createEventTarget();
+  const sendBtn = createEventTarget();
+  const commandGuardSendOnceBtn = createEventTarget();
+  const errors = [];
+  let createCalls = 0;
+  let deckCreateCalls = 0;
+  let sendCalls = 0;
+  let confirmCalls = 0;
+
+  const controller = createAppLifecycleController({
+    createBtn,
+    deckCreateBtn,
+    sendBtn,
+    commandGuardSendOnceBtn,
+    isReadOnlyMode: () => true,
+    getReadOnlyModeMessage: () => "Spectator · Read-only deck ops. Write actions are disabled.",
+    api: {
+      async createSession() {
+        createCalls += 1;
+        return { id: "s-1", deckId: "default" };
+      }
+    },
+    createDeckFlow: async () => {
+      deckCreateCalls += 1;
+    },
+    submitCommand: async () => {
+      sendCalls += 1;
+    },
+    confirmPendingCommandSend: async () => {
+      confirmCalls += 1;
+      return true;
+    },
+    setError: (message) => errors.push(message)
+  });
+
+  controller.bindUiEvents();
+  await createBtn.dispatch("click");
+  await deckCreateBtn.dispatch("click");
+  await sendBtn.dispatch("click");
+  await commandGuardSendOnceBtn.dispatch("click");
+
+  assert.equal(createCalls, 0);
+  assert.equal(deckCreateCalls, 0);
+  assert.equal(sendCalls, 0);
+  assert.equal(confirmCalls, 0);
+  assert.deepEqual(errors, [
+    "Spectator · Read-only deck ops. Write actions are disabled.",
+    "Spectator · Read-only deck ops. Write actions are disabled.",
+    "Spectator · Read-only deck ops. Write actions are disabled.",
+    "Spectator · Read-only deck ops. Write actions are disabled."
+  ]);
+});

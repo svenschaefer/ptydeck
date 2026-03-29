@@ -355,6 +355,22 @@ export function createApiClient(baseUrl, options = {}) {
     async createWsTicket(payload = {}) {
       return request("/auth/ws-ticket", withJson(payload));
     },
+    async listShares() {
+      return request("/shares");
+    },
+    async createShareLink(payload = {}) {
+      return request("/shares", withJson(payload));
+    },
+    async getShareLink(shareId) {
+      return request(`/shares/${encodeURIComponent(shareId)}`);
+    },
+    async revokeShareLink(shareId) {
+      return request(`/shares/${encodeURIComponent(shareId)}/revoke`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
     async upsertCustomCommand(commandName, payload) {
       const body =
         payload && typeof payload === "object" && !Array.isArray(payload)

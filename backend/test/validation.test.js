@@ -450,6 +450,69 @@ test("validateRequest accepts valid ws ticket request payload", () => {
   });
 });
 
+test("validateRequest accepts share lifecycle payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: undefined
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: {
+        targetType: "session",
+        targetId: "session-1",
+        expiresInSeconds: 3600
+      }
+    });
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/shares/share-0123456789abcdef01234567",
+      params: { shareId: "share-0123456789abcdef01234567" },
+      body: undefined
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/shares/share-0123456789abcdef01234567/revoke",
+      params: { shareId: "share-0123456789abcdef01234567" },
+      body: {}
+    });
+  });
+});
+
+test("validateRequest rejects invalid share lifecycle payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: {}
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: {
+        targetType: "workspace",
+        targetId: "default"
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/shares/share-0123456789abcdef01234567",
+      params: {},
+      body: undefined
+    });
+  });
+});
+
 test("validateResponse accepts auth token response", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -475,6 +538,48 @@ test("validateResponse accepts ws ticket response", () => {
         tokenType: "WsTicket",
         expiresIn: 30
       }
+    });
+  });
+});
+
+test("validateResponse accepts share link payloads", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "shareLink",
+      body: {
+        id: "share-0123456789abcdef01234567",
+        targetType: "session",
+        targetId: "session-1",
+        permissionMode: "read_only",
+        createdAt: 1,
+        updatedAt: 2,
+        expiresAt: 3,
+        revokedAt: null,
+        creatorSubject: "dev-user",
+        creatorTenantId: "dev",
+        active: true,
+        joinUrl: "http://example.invalid/?share_token=abc"
+      }
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "shareLinkList",
+      body: [
+        {
+          id: "share-0123456789abcdef01234567",
+          targetType: "deck",
+          targetId: "ops",
+          permissionMode: "read_only",
+          createdAt: 1,
+          updatedAt: 2,
+          expiresAt: 3,
+          revokedAt: 4,
+          creatorSubject: "dev-user",
+          creatorTenantId: "dev",
+          active: false
+        }
+      ]
     });
   });
 });

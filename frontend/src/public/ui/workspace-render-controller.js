@@ -1,5 +1,6 @@
 export function createWorkspaceRenderController(options = {}) {
   const stateEl = options.stateEl || null;
+  const accessStateEl = options.accessStateEl || null;
   const emptyStateEl = options.emptyStateEl || null;
   const statusMessageEl = options.statusMessageEl || null;
   const commandTargetEl = options.commandTargetEl || null;
@@ -19,6 +20,10 @@ export function createWorkspaceRenderController(options = {}) {
   const workflowStopBtn = options.workflowStopBtn || null;
   const workflowInterruptBtn = options.workflowInterruptBtn || null;
   const workflowKillBtn = options.workflowKillBtn || null;
+  const createBtn = options.createBtn || null;
+  const deckCreateBtn = options.deckCreateBtn || null;
+  const commandInput = options.commandInput || null;
+  const sendBtn = options.sendBtn || null;
   const startupWarmupGateEl = options.startupWarmupGateEl || null;
   const startupWarmupMessageEl = options.startupWarmupMessageEl || null;
   const startupWarmupDetailEl = options.startupWarmupDetailEl || null;
@@ -94,6 +99,8 @@ export function createWorkspaceRenderController(options = {}) {
 
   function renderStatus({
     connectionState = "",
+    accessSummary = "",
+    readOnlySpectator = false,
     loading = false,
     startupGateActive = false,
     startupGateMessage = "",
@@ -121,6 +128,16 @@ export function createWorkspaceRenderController(options = {}) {
   }) {
     if (stateEl) {
       stateEl.textContent = connectionState;
+    }
+    if (accessStateEl) {
+      const normalizedAccessSummary = String(accessSummary || "").trim();
+      accessStateEl.hidden = !normalizedAccessSummary;
+      accessStateEl.textContent = normalizedAccessSummary;
+      if (normalizedAccessSummary) {
+        accessStateEl.setAttribute("title", normalizedAccessSummary);
+      } else {
+        accessStateEl.removeAttribute("title");
+      }
     }
     if (statusMessageEl) {
       if (startupGateActive) {
@@ -186,6 +203,25 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (workflowKillBtn) {
       workflowKillBtn.disabled = workflowCanKill !== true;
+    }
+    if (createBtn) {
+      createBtn.disabled = readOnlySpectator === true;
+    }
+    if (deckCreateBtn) {
+      deckCreateBtn.disabled = readOnlySpectator === true;
+    }
+    if (sendBtn) {
+      sendBtn.disabled = readOnlySpectator === true;
+    }
+    if (commandInput) {
+      commandInput.disabled = readOnlySpectator === true;
+      if (readOnlySpectator === true) {
+        commandInput.setAttribute("aria-disabled", "true");
+        commandInput.setAttribute("title", accessSummary || "Read-only spectator mode.");
+      } else {
+        commandInput.removeAttribute("aria-disabled");
+        commandInput.removeAttribute("title");
+      }
     }
     if (startupWarmupGateEl) {
       startupWarmupGateEl.hidden = startupGateActive !== true;

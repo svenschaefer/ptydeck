@@ -204,3 +204,42 @@ test("auth-bootstrap runtime controller schedules retry after transient dev toke
   assert.equal(windowRef.timers.length, 1);
   assert.equal(windowRef.timers[0].delay, 45_000);
 });
+
+test("auth-bootstrap runtime controller uses share token from URL and marks spectator access state", async () => {
+  const accessStates = [];
+  const authTokens = [];
+  const shareToken =
+    "eyJhbGciOiJub25lIn0.eyJhY2Nlc3NNb2RlIjoic3BlY3RhdG9yIiwicGVybWlzc2lvbk1vZGUiOiJyZWFkX29ubHkiLCJzaGFyZUxpbmtJZCI6InNoYXJlLTEiLCJzaGFyZVRhcmdldFR5cGUiOiJzZXNzaW9uIiwic2hhcmVUYXJnZXRJZCI6InMtMSJ9.";
+  const windowRef = {
+    location: {
+      search: `?share_token=${shareToken}`
+    }
+  };
+  const controller = createAuthBootstrapRuntimeController({
+    windowRef,
+    api: {
+      async createDevToken() {
+        throw new Error("dev token endpoint must not be used for share bootstrap");
+      },
+      setAuthToken(token) {
+        authTokens.push(token);
+      }
+    },
+    setAccessState: (state) => accessStates.push(state)
+  });
+
+  const refreshed = await controller.bootstrapDevAuthToken({ reason: "bootstrap" });
+
+  assert.equal(refreshed, true);
+  assert.deepEqual(authTokens, [shareToken]);
+  assert.deepEqual(accessStates, [
+    {
+      accessMode: "spectator",
+      readOnly: true,
+      shareLinkId: "share-1",
+      targetType: "session",
+      targetId: "s-1",
+      summary: "Spectator · Read-only session s-1"
+    }
+  ]);
+});

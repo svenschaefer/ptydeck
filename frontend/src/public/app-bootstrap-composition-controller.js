@@ -80,6 +80,12 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
   const writeClipboardText =
     typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
+  const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
   const disposeStreamDebugTrace =
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const createBtn = options.createBtn || null;
@@ -123,6 +129,9 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.uploadSessionFile === "function" ? options.uploadSessionFile : async () => null;
   const downloadSessionFile =
     typeof options.downloadSessionFile === "function" ? options.downloadSessionFile : async () => null;
+  const listShares = typeof options.listShares === "function" ? options.listShares : async () => [];
+  const createShareLink = typeof options.createShareLink === "function" ? options.createShareLink : async () => null;
+  const revokeShareLink = typeof options.revokeShareLink === "function" ? options.revokeShareLink : async () => null;
   const runWorkflowDetailed =
     typeof options.runWorkflowDetailed === "function" ? options.runWorkflowDetailed : null;
   const stopWorkflow = typeof options.stopWorkflow === "function" ? options.stopWorkflow : () => false;
@@ -238,6 +247,10 @@ export function createAppBootstrapCompositionController(options = {}) {
       openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy,
+      listShares,
+      createShareLink,
+      revokeShareLink,
+      writeClipboardText,
       uploadSessionFile,
       downloadSessionFile
     });
@@ -253,6 +266,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       setSessions: (sessions) => store?.setSessions?.(sessions || []),
       setUiError: (message) => appRuntimeStateController?.setUiError?.(message),
       markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady?.(source),
+      setAccessState,
       debugLog,
       devAuthRefreshMinDelayMs: options.devAuthRefreshMinDelayMs,
       devAuthRefreshSafetyMs: options.devAuthRefreshSafetyMs,
@@ -340,6 +354,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       getLastActiveSessionSwitchAt: () => commandTargetRuntimeController?.getLastActiveSessionSwitchAt?.() || 0,
       getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
       isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
+      isReadOnlyMode,
+      getReadOnlyModeMessage,
       getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
       apiSendInput: api?.sendInput?.bind(api),
       sendInputWithConfiguredTerminator,
@@ -371,6 +387,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       clearUiError: () => appRuntimeStateController?.clearError?.(),
       getErrorMessage: (err, fallback) => appCommandUiFacadeController?.getErrorMessage?.(err, fallback) || fallback,
       debugLog,
+      isReadOnlyMode,
+      getReadOnlyModeMessage,
       createDeckFlow: () => appLayoutDeckFacadeController?.createDeckFlow?.(),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
       confirmPendingCommandSend: () => commandComposerRuntimeController?.confirmPendingSend?.(),

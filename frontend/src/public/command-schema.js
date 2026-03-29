@@ -649,6 +649,60 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       }
     }
   }),
+  share: freezeCommandDefinition({
+    key: "slash:share",
+    insertText: "share",
+    label: "/share",
+    kind: "command",
+    description: "manage read-only spectator shares for sessions and decks",
+    example: "/share session",
+    summary: "/share list | /share session | /share deck | /share revoke <shareId>",
+    usage: [
+      "/share list",
+      "/share session",
+      "/share deck [deckSelector]",
+      "/share revoke <shareId>"
+    ],
+    subcommands: {
+      list: {
+        insertText: "list",
+        label: "/share list",
+        kind: "subcommand",
+        description: "list active and revoked share links",
+        example: "/share list",
+        key: "slash:share:list",
+        usage: "/share list"
+      },
+      session: {
+        insertText: "session",
+        label: "/share session",
+        kind: "subcommand",
+        description: "create a read-only spectator link for one session",
+        example: "/share session",
+        key: "slash:share:session",
+        usage: "/share session"
+      },
+      deck: {
+        insertText: "deck",
+        label: "/share deck",
+        kind: "subcommand",
+        description: "create a read-only spectator link for the active or selected deck",
+        example: "/share deck ops",
+        key: "slash:share:deck",
+        usage: "/share deck [deckSelector]",
+        args: [{ provider: "deck-selector", optional: true }]
+      },
+      revoke: {
+        insertText: "revoke",
+        label: "/share revoke",
+        kind: "subcommand",
+        description: "revoke an existing spectator link",
+        example: "/share revoke share-0123456789abcdef01234567",
+        key: "slash:share:revoke",
+        usage: "/share revoke <shareId>"
+      }
+    }
+  }),
   custom: freezeCommandDefinition({
     key: "slash:custom",
     insertText: "custom",
@@ -762,6 +816,10 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "broadcast.status", command: "broadcast", subcommand: "status" },
   { alias: "broadcast.off", command: "broadcast", subcommand: "off" },
   { alias: "broadcast.group", command: "broadcast", subcommand: "group" },
+  { alias: "share.list", command: "share", subcommand: "list" },
+  { alias: "share.session", command: "share", subcommand: "session" },
+  { alias: "share.deck", command: "share", subcommand: "deck" },
+  { alias: "share.revoke", command: "share", subcommand: "revoke" },
   { alias: "custom.show", command: "custom", subcommand: "show" },
   { alias: "custom.preview", command: "custom", subcommand: "preview" },
   { alias: "custom.remove", command: "custom", subcommand: "remove" }

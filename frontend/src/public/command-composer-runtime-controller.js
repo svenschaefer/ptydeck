@@ -57,6 +57,11 @@ export function createCommandComposerRuntimeController(options = {}) {
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "CR");
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   const apiSendInput = options.apiSendInput || (() => Promise.resolve());
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator || (() => Promise.resolve());
   const recordCommandSubmission = options.recordCommandSubmission || (() => null);
@@ -368,6 +373,10 @@ export function createCommandComposerRuntimeController(options = {}) {
       setCommandFeedback(plan.error);
       return;
     }
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return;
+    }
 
     const guardResult = evaluateSendSafety({
       sessions: plan.targetSessions,
@@ -405,6 +414,10 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (!pendingSend?.plan) {
       return false;
     }
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return false;
+    }
     const plan = pendingSend.plan;
     try {
       await executeSendPlan(plan);
@@ -430,6 +443,10 @@ export function createCommandComposerRuntimeController(options = {}) {
       if (plan?.error) {
         setCommandFeedback(plan.error);
       }
+      return false;
+    }
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
       return false;
     }
 

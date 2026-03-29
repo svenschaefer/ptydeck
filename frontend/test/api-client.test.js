@@ -264,6 +264,48 @@ test("api client calls workspace preset lifecycle endpoints", async () => {
   assert.equal(calls[3].options.method, "DELETE");
 });
 
+test("api client calls share lifecycle endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    const method = options.method || "GET";
+    return {
+      ok: true,
+      status: method === "POST" && String(url).endsWith("/shares") ? 201 : 200,
+      json: async () => ({
+        id: "share-0123456789abcdef01234567",
+        targetType: "session",
+        targetId: "s-1",
+        permissionMode: "read_only",
+        createdAt: 1,
+        updatedAt: 1,
+        expiresAt: 2,
+        revokedAt: null,
+        creatorSubject: "dev-user",
+        creatorTenantId: "dev",
+        active: true,
+        joinUrl: "http://example.invalid/?share_token=abc"
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  await api.listShares();
+  await api.createShareLink({ targetType: "session", targetId: "s-1", permissionMode: "read_only" });
+  await api.getShareLink("share-0123456789abcdef01234567");
+  await api.revokeShareLink("share-0123456789abcdef01234567");
+
+  assert.equal(calls.length, 4);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/shares");
+  assert.equal((calls[0].options.method || "GET"), "GET");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/shares");
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/shares/share-0123456789abcdef01234567");
+  assert.equal((calls[2].options.method || "GET"), "GET");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/shares/share-0123456789abcdef01234567/revoke");
+  assert.equal(calls[3].options.method, "POST");
+});
+
 test("api client includes bearer auth header when token is set", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

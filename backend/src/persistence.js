@@ -79,7 +79,8 @@ export class JsonPersistence {
           connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
-          sshTrustEntries: []
+          sshTrustEntries: [],
+          shareLinks: []
         };
       }
       if (parsed && Array.isArray(parsed.sessions) && Array.isArray(parsed.customCommands)) {
@@ -91,7 +92,8 @@ export class JsonPersistence {
           connectionProfiles: Array.isArray(parsed.connectionProfiles) ? parsed.connectionProfiles : [],
           layoutProfiles: Array.isArray(parsed.layoutProfiles) ? parsed.layoutProfiles : [],
           workspacePresets: Array.isArray(parsed.workspacePresets) ? parsed.workspacePresets : [],
-          sshTrustEntries: Array.isArray(parsed.sshTrustEntries) ? parsed.sshTrustEntries : []
+          sshTrustEntries: Array.isArray(parsed.sshTrustEntries) ? parsed.sshTrustEntries : [],
+          shareLinks: Array.isArray(parsed.shareLinks) ? parsed.shareLinks : []
         };
       }
       if (
@@ -113,7 +115,8 @@ export class JsonPersistence {
             connectionProfiles: [],
             layoutProfiles: [],
             workspacePresets: [],
-            sshTrustEntries: []
+            sshTrustEntries: [],
+            shareLinks: []
           };
         }
         if (
@@ -129,7 +132,8 @@ export class JsonPersistence {
             connectionProfiles: Array.isArray(decryptedParsed.connectionProfiles) ? decryptedParsed.connectionProfiles : [],
             layoutProfiles: Array.isArray(decryptedParsed.layoutProfiles) ? decryptedParsed.layoutProfiles : [],
             workspacePresets: Array.isArray(decryptedParsed.workspacePresets) ? decryptedParsed.workspacePresets : [],
-            sshTrustEntries: Array.isArray(decryptedParsed.sshTrustEntries) ? decryptedParsed.sshTrustEntries : []
+            sshTrustEntries: Array.isArray(decryptedParsed.sshTrustEntries) ? decryptedParsed.sshTrustEntries : [],
+            shareLinks: Array.isArray(decryptedParsed.shareLinks) ? decryptedParsed.shareLinks : []
           };
         }
         return {
@@ -140,7 +144,8 @@ export class JsonPersistence {
           connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
-          sshTrustEntries: []
+          sshTrustEntries: [],
+          shareLinks: []
         };
       }
       return {
@@ -151,7 +156,8 @@ export class JsonPersistence {
         connectionProfiles: [],
         layoutProfiles: [],
         workspacePresets: [],
-        sshTrustEntries: []
+        sshTrustEntries: [],
+        shareLinks: []
       };
     } catch (err) {
       if (err && typeof err === "object" && err.code === "ENOENT") {
@@ -163,7 +169,8 @@ export class JsonPersistence {
           connectionProfiles: [],
           layoutProfiles: [],
           workspacePresets: [],
-          sshTrustEntries: []
+          sshTrustEntries: [],
+          shareLinks: []
         };
       }
       throw err;
@@ -178,7 +185,8 @@ export class JsonPersistence {
       connectionProfiles: [],
       layoutProfiles: [],
       workspacePresets: [],
-      sshTrustEntries: []
+      sshTrustEntries: [],
+      shareLinks: []
     });
   }
 
@@ -190,7 +198,8 @@ export class JsonPersistence {
     connectionProfiles,
     layoutProfiles,
     workspacePresets,
-    sshTrustEntries
+    sshTrustEntries,
+    shareLinks
   }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -203,7 +212,8 @@ export class JsonPersistence {
         connectionProfiles: Array.isArray(connectionProfiles) ? connectionProfiles : [],
         layoutProfiles: Array.isArray(layoutProfiles) ? layoutProfiles : [],
         workspacePresets: Array.isArray(workspacePresets) ? workspacePresets : [],
-        sshTrustEntries: Array.isArray(sshTrustEntries) ? sshTrustEntries : []
+        sshTrustEntries: Array.isArray(sshTrustEntries) ? sshTrustEntries : [],
+        shareLinks: Array.isArray(shareLinks) ? shareLinks : []
       },
       null,
       2

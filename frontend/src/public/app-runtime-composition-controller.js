@@ -113,6 +113,7 @@ const store = createStore();
 
 const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
 const stateEl = document.getElementById("connection-state");
+const accessStateEl = document.getElementById("access-state");
 const gridEl = document.getElementById("terminal-grid");
 const sidebarToggleBtn = document.getElementById("sidebar-toggle");
 const sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
@@ -336,6 +337,7 @@ const SYSTEM_SLASH_COMMANDS = [
   "layout",
   "workspace",
   "broadcast",
+  "share",
   "replay",
   "transfer",
   "settings",
@@ -402,6 +404,9 @@ appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
 const uiState = {
   loading: true,
   error: "",
+  accessMode: "operator",
+  readOnlyMode: false,
+  accessSummary: "",
   commandFeedback: "",
   commandInlineHint: "",
   commandInlineHintPrefixPx: 0,
@@ -426,6 +431,24 @@ const uiState = {
   startupGateDetail: "",
   startupGateCanSkip: false
 };
+
+function setAccessState(nextState = {}) {
+  uiState.accessMode = typeof nextState.accessMode === "string" ? nextState.accessMode : "operator";
+  uiState.readOnlyMode = nextState.readOnly === true;
+  uiState.accessSummary = typeof nextState.summary === "string" ? nextState.summary : "";
+  appCommandUiFacadeController?.render?.();
+}
+
+function isReadOnlyMode() {
+  return uiState.readOnlyMode === true;
+}
+
+function getReadOnlyModeMessage() {
+  if (uiState.accessSummary) {
+    return `${uiState.accessSummary}. Write actions are disabled.`;
+  }
+  return "Read-only spectator mode. Write actions are disabled.";
+}
 const terminalSearchState = {
   query: "",
   sessionId: "",
@@ -752,6 +775,8 @@ runtimeEventController = createRuntimeEventController({
   getUnrestoredSessionMessage: sessionUiFacadeController.getUnrestoredSessionMessage,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
+  isReadOnlyMode,
+  getReadOnlyModeMessage,
   setError: (message) => appCommandUiFacadeController?.setError(message),
   sendInput: (sessionId, data) => api.sendInput(sessionId, data)
 });
@@ -833,7 +858,9 @@ sessionCardRenderController = createSessionCardRenderController({
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
-  applyThemeForSession: sessionUiFacadeController.applyThemeForSession
+  applyThemeForSession: sessionUiFacadeController.applyThemeForSession,
+  isReadOnlyMode,
+  getReadOnlyModeMessage
 });
 
 sessionTerminalResizeController = createSessionTerminalResizeController({
@@ -902,6 +929,7 @@ sessionSettingsDialogController = createSessionSettingsDialogController({
 
 workspaceRenderController = createWorkspaceRenderController({
   stateEl,
+  accessStateEl,
   emptyStateEl,
   statusMessageEl,
   commandTargetEl,
@@ -921,6 +949,10 @@ workspaceRenderController = createWorkspaceRenderController({
   workflowStopBtn,
   workflowInterruptBtn,
   workflowKillBtn,
+  createBtn,
+  deckCreateBtn,
+  commandInput,
+  sendBtn,
   startupWarmupGateEl,
   startupWarmupMessageEl,
   startupWarmupDetailEl,
@@ -1028,7 +1060,9 @@ deckSidebarController = createDeckSidebarController({
       );
     }
   },
-  canDeleteDeck: (deck) => String(deck?.id || "") !== DEFAULT_DECK_ID
+  canDeleteDeck: (deck) => String(deck?.id || "") !== DEFAULT_DECK_ID,
+  isReadOnlyMode,
+  getReadOnlyModeMessage
 });
 
 sessionGridController = createSessionGridController({
@@ -1149,9 +1183,15 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   recordDiscoveryUsage: (key) => commandDiscoveryUsageStore.record(key),
   readClipboardText: () => clipboardRuntimeController.readText(),
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
+  isReadOnlyMode,
+  getReadOnlyModeMessage,
+  setAccessState,
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
+  listShares: () => api.listShares(),
+  createShareLink: (payload) => api.createShareLink(payload),
+  revokeShareLink: (shareId) => api.revokeShareLink(shareId),
   uploadSessionFile: (session, options) => fileTransferRuntimeController.uploadSessionFile(session, options),
   downloadSessionFile: (session, options) => fileTransferRuntimeController.downloadSessionFile(session, options),
   runWorkflowDetailed: (interpreted) => slashWorkflowRuntimeController?.runWorkflowDetailed?.(interpreted),

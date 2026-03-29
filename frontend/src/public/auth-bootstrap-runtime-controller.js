@@ -1,3 +1,5 @@
+import { getShareTokenFromLocation, parseAccessStateFromToken } from "./share-access-state.js";
+
 export function createAuthBootstrapRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const setTimeoutFn =
@@ -22,6 +24,7 @@ export function createAuthBootstrapRuntimeController(options = {}) {
   const setUiError = options.setUiError || (() => {});
   const markRuntimeBootstrapReady = options.markRuntimeBootstrapReady || (() => {});
   const debugLog = options.debugLog || (() => {});
+  const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
   const devAuthRefreshMinDelayMs = Number(options.devAuthRefreshMinDelayMs) || 15_000;
   const devAuthRefreshSafetyMs = Number(options.devAuthRefreshSafetyMs) || 60_000;
   const devAuthRetryDelayMs = Number(options.devAuthRetryDelayMs) || 30_000;
@@ -140,6 +143,16 @@ export function createAuthBootstrapRuntimeController(options = {}) {
       return devAuthRefreshPromise;
     }
     const reason = typeof options.reason === "string" && options.reason ? options.reason : "bootstrap";
+    const shareToken = getShareTokenFromLocation(windowRef);
+    if (shareToken) {
+      wsAuthToken = shareToken;
+      api.setAuthToken(wsAuthToken);
+      clearAuthRefreshTimer();
+      wsAuthTokenExpiresAtMs = 0;
+      setAccessState(parseAccessStateFromToken(shareToken));
+      debugLog("auth.share_token.ok", { reason });
+      return true;
+    }
     devAuthRefreshPromise = (async () => {
       try {
         const payload = await api.createDevToken();
@@ -147,6 +160,7 @@ export function createAuthBootstrapRuntimeController(options = {}) {
           wsAuthToken = payload.accessToken.trim();
           api.setAuthToken(wsAuthToken);
           scheduleDevAuthRefresh(payload.expiresIn);
+          setAccessState(parseAccessStateFromToken(wsAuthToken));
           debugLog("auth.dev_token.ok", {
             reason,
             expiresIn: payload.expiresIn || 0,
@@ -160,6 +174,14 @@ export function createAuthBootstrapRuntimeController(options = {}) {
         if (status === 404 || status === 405) {
           clearAuthRefreshTimer();
           wsAuthTokenExpiresAtMs = 0;
+          setAccessState({
+            accessMode: "operator",
+            readOnly: false,
+            shareLinkId: "",
+            targetType: "",
+            targetId: "",
+            summary: ""
+          });
           debugLog("auth.dev_token.unavailable", { reason });
           return false;
         }

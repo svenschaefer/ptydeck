@@ -104,6 +104,10 @@ export function createCommandExecutor(options = {}) {
   const getBroadcastStatus = typeof options.getBroadcastStatus === "function" ? options.getBroadcastStatus : () => "Broadcast: off.";
   const enableGroupBroadcast = typeof options.enableGroupBroadcast === "function" ? options.enableGroupBroadcast : async () => "";
   const disableBroadcast = typeof options.disableBroadcast === "function" ? options.disableBroadcast : async () => "";
+  const listShares = typeof options.listShares === "function" ? options.listShares : async () => [];
+  const createShareLink = typeof options.createShareLink === "function" ? options.createShareLink : async () => null;
+  const revokeShareLink = typeof options.revokeShareLink === "function" ? options.revokeShareLink : async () => null;
+  const writeClipboardText = typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
   const slashCommandRegistry = createSlashCommandRegistry(systemSlashCommands);
 
   function buildCommandExecutionResult(ok, feedback) {
@@ -202,6 +206,48 @@ export function createCommandExecutor(options = {}) {
       `activeThemeProfile=${JSON.stringify(launch.activeThemeProfile || {})}`,
       `inactiveThemeProfile=${JSON.stringify(launch.inactiveThemeProfile || {})}`
     ].join("\n");
+  }
+
+  function formatShareTargetLabel(shareLink, sessions, decks) {
+    if (!shareLink || typeof shareLink !== "object") {
+      return "unknown";
+    }
+    if (shareLink.targetType === "session") {
+      const session = Array.isArray(sessions) ? sessions.find((entry) => entry.id === shareLink.targetId) || null : null;
+      if (session) {
+        return `session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`;
+      }
+      return `session ${shareLink.targetId || "unknown"}`;
+    }
+    if (shareLink.targetType === "deck") {
+      const deck = Array.isArray(decks) ? decks.find((entry) => entry.id === shareLink.targetId) || null : null;
+      if (deck) {
+        return `deck [${deck.id}] ${deck.name}`;
+      }
+      return `deck ${shareLink.targetId || "unknown"}`;
+    }
+    return "unknown";
+  }
+
+  function formatShareLinkStatus(shareLink) {
+    if (!shareLink || typeof shareLink !== "object") {
+      return "unknown";
+    }
+    if (shareLink.revokedAt) {
+      return "revoked";
+    }
+    if (shareLink.active === true) {
+      return "active";
+    }
+    return "expired";
+  }
+
+  function formatShareLinkSummary(shareLink, sessions, decks) {
+    const targetLabel = formatShareTargetLabel(shareLink, sessions, decks);
+    const permissionMode = String(shareLink?.permissionMode || "read_only");
+    const shareStatus = formatShareLinkStatus(shareLink);
+    const expiresAt = Number.isInteger(shareLink?.expiresAt) ? new Date(shareLink.expiresAt).toISOString() : "-";
+    return `[${shareLink?.id || "unknown"}] ${targetLabel} · ${permissionMode} · ${shareStatus} · expires=${expiresAt}`;
   }
 
   function resolveSingleSessionForCommand(selectorText, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
@@ -1166,6 +1212,92 @@ export function createCommandExecutor(options = {}) {
         return enableGroupBroadcast(selector);
       }
       return formatUsage("broadcast");
+    }
+
+    if (command === "share") {
+      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const rest = args.slice(1);
+
+      if (!subcommand || subcommand === "list") {
+        const shares = await listShares();
+        if (!Array.isArray(shares) || shares.length === 0) {
+          return "No share links available.";
+        }
+        return shares.map((shareLink) => formatShareLinkSummary(shareLink, sessions, decks)).join("\n");
+      }
+
+      if (subcommand === "session") {
+        if (rest.length > 0) {
+          return formatUsage("share", "session");
+        }
+        const resolvedTarget = resolveActiveOrDirectTargetSession(
+          interpreted,
+          sessions,
+          activeSessionId,
+          "No active session for /share session.",
+          "Share session selector"
+        );
+        if (resolvedTarget.error) {
+          return resolvedTarget.error;
+        }
+        const shareLink = await createShareLink({
+          targetType: "session",
+          targetId: resolvedTarget.session.id,
+          permissionMode: "read_only"
+        });
+        const copied = shareLink?.joinUrl ? await writeClipboardText(shareLink.joinUrl) : false;
+        const summary = formatShareLinkSummary(shareLink, sessions, decks);
+        if (shareLink?.joinUrl) {
+          return `${summary}${copied ? "\nCopied join URL to clipboard." : ""}\n${shareLink.joinUrl}`;
+        }
+        return summary;
+      }
+
+      if (subcommand === "deck") {
+        if (rest.length > 1) {
+          return formatUsage("share", "deck");
+        }
+        const activeDeck = getActiveDeck();
+        if (!activeDeck && rest.length === 0) {
+          return "No active deck for /share deck.";
+        }
+        let targetDeck = activeDeck;
+        if (rest.length === 1) {
+          const resolvedDeck = resolveDeckToken(rest[0], decks);
+          if (!resolvedDeck.deck) {
+            return resolvedDeck.error;
+          }
+          targetDeck = resolvedDeck.deck;
+        }
+        if (!targetDeck) {
+          return "No active deck for /share deck.";
+        }
+        const shareLink = await createShareLink({
+          targetType: "deck",
+          targetId: targetDeck.id,
+          permissionMode: "read_only"
+        });
+        const copied = shareLink?.joinUrl ? await writeClipboardText(shareLink.joinUrl) : false;
+        const summary = formatShareLinkSummary(shareLink, sessions, decks);
+        if (shareLink?.joinUrl) {
+          return `${summary}${copied ? "\nCopied join URL to clipboard." : ""}\n${shareLink.joinUrl}`;
+        }
+        return summary;
+      }
+
+      if (subcommand === "revoke") {
+        if (rest.length !== 1) {
+          return formatUsage("share", "revoke");
+        }
+        const shareId = String(rest[0] || "").trim();
+        if (!shareId) {
+          return formatUsage("share", "revoke");
+        }
+        const shareLink = await revokeShareLink(shareId);
+        return `Revoked ${formatShareLinkSummary(shareLink, sessions, decks)}.`;
+      }
+
+      return formatUsage("share");
     }
 
     if (command === "custom") {

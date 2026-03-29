@@ -122,6 +122,15 @@ body {
   text-transform: uppercase;
 }
 
+.access-state[hidden] {
+  display: none !important;
+}
+
+.pill.access-state {
+  border-color: rgba(250, 189, 47, 0.45);
+  color: var(--warn);
+}
+
 .sidebar-toggle-btn,
 .sidebar-launcher {
   width: 30px;

@@ -71,6 +71,26 @@ test("runtime-event controller guards direct terminal input for unrestored and e
   assert.deepEqual(sendCalls, [["s3", "pwd"]]);
 });
 
+test("runtime-event controller blocks direct terminal input in read-only spectator mode", async () => {
+  const errors = [];
+  const sendCalls = [];
+  const controller = createRuntimeEventController({
+    isReadOnlyMode: () => true,
+    getReadOnlyModeMessage: () => "Spectator · Read-only session s-1. Write actions are disabled.",
+    setError: (message) => errors.push(message),
+    sendInput: (sessionId, data) => {
+      sendCalls.push([sessionId, data]);
+      return Promise.resolve();
+    }
+  });
+
+  controller.handleSessionTerminalInput("s-1", "pwd");
+  await Promise.resolve();
+
+  assert.deepEqual(errors, ["Spectator · Read-only session s-1. Write actions are disabled."]);
+  assert.deepEqual(sendCalls, []);
+});
+
 test("runtime-event controller applies representative runtime updates and deck fallback defaults", () => {
   const calls = [];
   const sessions = new Map([["s2", { id: "s2", name: "two" }]]);

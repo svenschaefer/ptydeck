@@ -168,6 +168,8 @@ export function createSessionGridController(options = {}) {
     });
     workspaceRenderController?.renderStatus({
       connectionState: state.connectionState,
+      accessSummary: uiState.accessSummary,
+      readOnlySpectator: uiState.readOnlyMode === true,
       loading: uiState.loading,
       startupGateActive: uiState.startupGateActive,
       startupGateMessage: uiState.startupGateMessage,

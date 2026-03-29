@@ -22,6 +22,11 @@ export function createRuntimeEventController(options = {}) {
   const getUnrestoredSessionMessage = options.getUnrestoredSessionMessage || (() => "");
   const isSessionExited = options.isSessionExited || (() => false);
   const getExitedSessionMessage = options.getExitedSessionMessage || (() => "");
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   const setError = options.setError || (() => {});
   const sendInput = options.sendInput || (() => Promise.resolve());
 
@@ -40,6 +45,10 @@ export function createRuntimeEventController(options = {}) {
 
   function handleSessionTerminalInput(sessionId, data) {
     setActiveSession(sessionId);
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return;
+    }
     const latestSession = getSessionById(sessionId);
     if (isSessionUnrestored(latestSession)) {
       setError(getUnrestoredSessionMessage(latestSession));

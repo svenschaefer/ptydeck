@@ -604,6 +604,42 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "GET" && pathname === "/api/v1/shares") {
+    if (body !== undefined) {
+      throw new ApiError(400, "ValidationError", "GET /shares does not accept a request body.");
+    }
+  }
+
+  if (method === "POST" && pathname === "/api/v1/shares") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (body.targetType !== "session" && body.targetType !== "deck") {
+      throw new ApiError(400, "ValidationError", "Field 'targetType' must be 'session' or 'deck'.");
+    }
+    if (typeof body.targetId !== "string" || !body.targetId.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'targetId' must be a non-empty string.");
+    }
+    if (body.expiresInSeconds !== undefined && !Number.isInteger(body.expiresInSeconds)) {
+      throw new ApiError(400, "ValidationError", "Field 'expiresInSeconds' must be an integer.");
+    }
+  }
+
+  if (method === "GET" && pathname.match(/^\/api\/v1\/shares\/[^/]+$/)) {
+    if (!params.shareId || typeof params.shareId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing shareId path parameter.");
+    }
+  }
+
+  if (method === "POST" && pathname.match(/^\/api\/v1\/shares\/[^/]+\/revoke$/)) {
+    if (!params.shareId || typeof params.shareId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing shareId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
+
   if (method === "GET" && pathname === "/api/v1/custom-commands") {
     if (query?.scope !== undefined && !CUSTOM_COMMAND_SCOPE_VALUES.has(query.scope)) {
       throw new ApiError(400, "ValidationError", "Query parameter 'scope' must be 'global', 'project', or 'session'.");
@@ -942,6 +978,24 @@ function isWsTicket(value) {
   );
 }
 
+function isShareLink(value) {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    (value.targetType === "session" || value.targetType === "deck") &&
+    typeof value.targetId === "string" &&
+    value.permissionMode === "read_only" &&
+    Number.isInteger(value.createdAt) &&
+    Number.isInteger(value.updatedAt) &&
+    Number.isInteger(value.expiresAt) &&
+    (value.revokedAt === null || Number.isInteger(value.revokedAt)) &&
+    typeof value.creatorSubject === "string" &&
+    typeof value.creatorTenantId === "string" &&
+    typeof value.active === "boolean" &&
+    (value.joinUrl === undefined || typeof value.joinUrl === "string")
+  );
+}
+
 function isCustomCommand(value) {
   return (
     isObject(value) &&
@@ -1031,6 +1085,16 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "wsTicket" && !isWsTicket(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match WsTicketResponse schema.");
+  }
+
+  if (expect === "shareLink" && !isShareLink(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match ShareLink schema.");
+  }
+
+  if (expect === "shareLinkList") {
+    if (!Array.isArray(body) || !body.every((item) => isShareLink(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match ShareLink[] schema.");
+    }
   }
 
   if (expect === "sessionReplayExport" && !isSessionReplayExport(body)) {

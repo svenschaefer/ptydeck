@@ -19,7 +19,7 @@ function createExecutor() {
         return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
       }
     },
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "settings", "custom", "help", "run"],
+    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "custom", "help", "run"],
     getActiveDeck: () => ({ id: "default", name: "Default" }),
     getSessionCountForDeck: () => 0,
     applyRuntimeEvent: () => {},
@@ -63,7 +63,11 @@ function createExecutor() {
     deleteWorkspacePreset: async () => "",
     getBroadcastStatus: () => "Broadcast: off.",
     enableGroupBroadcast: async () => "",
-    disableBroadcast: async () => "Broadcast mode disabled."
+    disableBroadcast: async () => "Broadcast mode disabled.",
+    listShares: async () => [],
+    createShareLink: async () => null,
+    revokeShareLink: async () => null,
+    writeClipboardText: async () => false
   });
 }
 
@@ -73,7 +77,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast replay transfer settings custom help run"
+    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast share replay transfer settings custom help run"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
@@ -128,11 +132,18 @@ test("command executor help and usage strings derive from declarative schema met
   const broadcastUsage = await executor.execute({ command: "broadcast", args: ["wat"], raw: "/broadcast wat" });
   assert.equal(broadcastUsage, "Usage: /broadcast status | /broadcast off | /broadcast group [group]");
 
+  const shareUsage = await executor.execute({ command: "share", args: ["wat"], raw: "/share wat" });
+  assert.equal(shareUsage, "Usage: /share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
+
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
   assert.equal(replayUsage, "Usage: /replay view | /replay export | /replay copy");
 
   const transferUsage = await executor.execute({ command: "transfer", args: [], raw: "/transfer" });
   assert.equal(transferUsage, "Usage: /transfer upload [path] | /transfer download <path>");
+
+  const shareTopicHelp = await executor.execute({ command: "help", args: ["share"], raw: "/help share" });
+  assert.match(shareTopicHelp, /^\/share$/m);
+  assert.match(shareTopicHelp, /Subcommands: list session deck revoke/);
 
   const renameUsage = await executor.execute({ command: "rename", args: [], raw: "/rename" });
   assert.equal(renameUsage, "Usage: /rename <name>");
@@ -151,6 +162,144 @@ test("command executor help and usage strings derive from declarative schema met
 
   const runUsage = await executor.execute({ command: "run", args: [], raw: "/run" });
   assert.equal(runUsage, "Usage: /run + newline-separated slash commands | /cmd1 + newline + /cmd2");
+});
+
+test("command executor manages share links through shared runtime hooks", async () => {
+  const createCalls = [];
+  const revokeCalls = [];
+  const clipboardWrites = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [
+            { id: "s-1", deckId: "default", name: "one" },
+            { id: "s-2", deckId: "ops", name: "two" }
+          ],
+          decks: [
+            { id: "default", name: "Default" },
+            { id: "ops", name: "Ops" }
+          ],
+          activeSessionId: "s-1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["share", "help"],
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    getSessionCountForDeck: () => 0,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: (session) => String(session?.deckId || "default"),
+    formatSessionToken: (id) => (id === "s-1" ? "1" : id === "s-2" ? "2" : String(id || "")),
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    sortSessionsByQuickId: (sessions) => (Array.isArray(sessions) ? sessions.slice() : []),
+    swapSessionTokens: () => false,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector, sessions) => ({
+      sessions: sessions.filter((session) => (selector === "2" ? session.id === "s-2" : false)),
+      error: ""
+    }),
+    resolveDeckToken: (token, decks) => ({
+      deck: decks.find((deck) => deck.id === token) || null,
+      error: `Unknown deck: ${token}`
+    }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    listShares: async () => [
+      {
+        id: "share-1",
+        targetType: "session",
+        targetId: "s-1",
+        permissionMode: "read_only",
+        expiresAt: 1_700_000_000_000,
+        revokedAt: null,
+        active: true
+      }
+    ],
+    createShareLink: async (payload) => {
+      createCalls.push(payload);
+      return {
+        id: "share-2",
+        targetType: payload.targetType,
+        targetId: payload.targetId,
+        permissionMode: "read_only",
+        expiresAt: 1_700_000_000_000,
+        revokedAt: null,
+        active: true,
+        joinUrl: "http://example.invalid/?share_token=abc"
+      };
+    },
+    revokeShareLink: async (shareId) => {
+      revokeCalls.push(shareId);
+      return {
+        id: shareId,
+        targetType: "deck",
+        targetId: "ops",
+        permissionMode: "read_only",
+        expiresAt: 1_700_000_000_000,
+        revokedAt: 1_700_000_000_100,
+        active: false
+      };
+    },
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+
+  const listFeedback = await executor.execute({ command: "share", args: ["list"], raw: "/share list" });
+  assert.match(listFeedback, /^\[share-1\] session \[1\] one · read_only · active · expires=/);
+
+  const sessionFeedback = await executor.execute({ command: "share", args: ["session"], raw: "/share session" });
+  assert.deepEqual(createCalls[0], {
+    targetType: "session",
+    targetId: "s-1",
+    permissionMode: "read_only"
+  });
+  assert.deepEqual(clipboardWrites, ["http://example.invalid/?share_token=abc"]);
+  assert.match(sessionFeedback, /^\[share-2\] session \[1\] one · read_only · active · expires=/);
+  assert.match(sessionFeedback, /Copied join URL to clipboard\./);
+
+  const deckFeedback = await executor.execute({ command: "share", args: ["deck"], raw: "/share deck" });
+  assert.deepEqual(createCalls[1], {
+    targetType: "deck",
+    targetId: "ops",
+    permissionMode: "read_only"
+  });
+  assert.match(deckFeedback, /^\[share-2\] deck \[ops\] Ops · read_only · active · expires=/);
+
+  const revokeFeedback = await executor.execute({
+    command: "share",
+    args: ["revoke", "share-2"],
+    raw: "/share revoke share-2"
+  });
+  assert.deepEqual(revokeCalls, ["share-2"]);
+  assert.equal(
+    revokeFeedback,
+    "Revoked [share-2] deck [ops] Ops · read_only · revoked · expires=2023-11-14T22:13:20.000Z."
+  );
 });
 
 test("command executor resolves namespaced aliases through the canonical command path", async () => {

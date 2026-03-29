@@ -10,7 +10,7 @@ import {
 } from "../src/public/command-schema.js";
 
 test("command schema exposes declarative command metadata and distinct help/usage surfaces", () => {
-  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "settings", "help", "run"]);
+  const schema = createSlashCommandSchema(["deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "help", "run"]);
   const deck = schema.find((entry) => entry.insertText === "deck");
   const swap = schema.find((entry) => entry.insertText === "swap");
   const note = schema.find((entry) => entry.insertText === "note");
@@ -18,6 +18,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   const layout = schema.find((entry) => entry.insertText === "layout");
   const workspace = schema.find((entry) => entry.insertText === "workspace");
   const broadcast = schema.find((entry) => entry.insertText === "broadcast");
+  const share = schema.find((entry) => entry.insertText === "share");
   const replay = schema.find((entry) => entry.insertText === "replay");
   const transfer = schema.find((entry) => entry.insertText === "transfer");
   const settings = schema.find((entry) => entry.insertText === "settings");
@@ -32,6 +33,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(layout);
   assert.ok(workspace);
   assert.ok(broadcast);
+  assert.ok(share);
   assert.ok(replay);
   assert.ok(transfer);
   assert.ok(settings);
@@ -43,6 +45,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(broadcast.summary, "/broadcast status | /broadcast off | /broadcast group [group]");
+  assert.equal(share.summary, "/share list | /share session | /share deck | /share revoke <shareId>");
   assert.equal(transfer.summary, "/transfer upload [path] | /transfer download <path>");
   assert.deepEqual(
     swap.args,
@@ -68,17 +71,18 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("layout"), "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
   assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
   assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
+  assert.equal(getSlashCommandUsage("share"), "/share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
   assert.equal(getSlashCommandUsage("replay"), "/replay view | /replay export | /replay copy");
   assert.equal(getSlashCommandUsage("transfer"), "/transfer upload [path] | /transfer download <path>");
   assert.equal(getSlashCommandUsage("deck.switch"), "/deck.switch <deckSelector>");
 });
 
 test("command schema formats command help text from declarative command summaries", () => {
-  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "replay", "transfer", "custom", "help", "run"]);
+  const helpText = createCommandHelpText(["new", "deck", "swap", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "custom", "help", "run"]);
   assert.match(helpText, /^Commands: /);
   assert.equal(
     helpText,
-    "Commands: @ > / new deck swap note connection layout workspace broadcast replay transfer custom help run"
+    "Commands: @ > / new deck swap note connection layout workspace broadcast share replay transfer custom help run"
   );
 });
 
@@ -108,15 +112,20 @@ test("command schema formats topic help text for commands and subcommands", () =
     quickSwitchHelp,
     [">", "Usage: >sessionSelector", "Quick-switch the active session. Session selectors win by default; use 'deck:<deckSelector>' for a deck or '<deckSelector>::<sessionSelector>' for an explicit cross-deck session."].join("\n")
   );
+
+  const shareHelp = createCommandTopicHelpText("share", "", ["share", "help"]);
+  assert.match(shareHelp, /^\/share$/m);
+  assert.match(shareHelp, /Subcommands: list session deck revoke/);
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
-  const registry = createSlashCommandRegistry(["deck", "connection", "layout", "workspace", "broadcast", "settings", "help"]);
+  const registry = createSlashCommandRegistry(["deck", "connection", "layout", "workspace", "broadcast", "share", "settings", "help"]);
   assert.equal(registry.get("deck")?.insertText, "deck");
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);
   assert.deepEqual(registry.get("workspace")?.subcommands?.apply?.usage, ["/workspace apply <preset>"]);
   assert.deepEqual(registry.get("broadcast")?.subcommands?.group?.usage, ["/broadcast group [group]"]);
+  assert.deepEqual(registry.get("share")?.subcommands?.deck?.usage, ["/share deck [deckSelector]"]);
   assert.equal(registry.get("settings")?.subcommands?.apply?.args, undefined);
   assert.equal(registry.get("deck.switch")?.aliasOf, "/deck switch");
   assert.deepEqual(registry.resolve("deck.switch"), {

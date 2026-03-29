@@ -41,7 +41,8 @@ export function createDevToken({
   subject = "dev-user",
   tenantId = "dev",
   scopes = [],
-  ttlSeconds = 900
+  ttlSeconds = 900,
+  extraClaims = {}
 }) {
   const now = Math.floor(Date.now() / 1000);
   const normalizedScopes = normalizeScopes(scopes);
@@ -56,7 +57,8 @@ export function createDevToken({
     tenantId,
     scope: normalizedScopes.join(" "),
     iat: now,
-    exp: now + ttlSeconds
+    exp: now + ttlSeconds,
+    ...(extraClaims && typeof extraClaims === "object" && !Array.isArray(extraClaims) ? extraClaims : {})
   };
 
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
@@ -111,7 +113,13 @@ export function verifyDevToken(token, { secret, issuer, audience }) {
   return {
     subject: typeof payload.sub === "string" ? payload.sub : "",
     tenantId: typeof payload.tenantId === "string" ? payload.tenantId : "",
-    scopes: normalizeScopes(payload.scope)
+    scopes: normalizeScopes(payload.scope),
+    accessMode: typeof payload.accessMode === "string" ? payload.accessMode : "operator",
+    permissionMode: typeof payload.permissionMode === "string" ? payload.permissionMode : "",
+    shareLinkId: typeof payload.shareLinkId === "string" ? payload.shareLinkId : "",
+    shareTargetType: typeof payload.shareTargetType === "string" ? payload.shareTargetType : "",
+    shareTargetId: typeof payload.shareTargetId === "string" ? payload.shareTargetId : "",
+    shareTokenId: typeof payload.shareTokenId === "string" ? payload.shareTokenId : ""
   };
 }
 

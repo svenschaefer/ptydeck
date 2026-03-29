@@ -16,6 +16,11 @@ export function createSessionCardRenderController(options = {}) {
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
   const applyThemeForSession = options.applyThemeForSession || (() => {});
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   const getActiveElement =
     typeof options.getActiveElement === "function" ? options.getActiveElement : () => documentRef?.activeElement || null;
   const refocusTerminal =
@@ -44,6 +49,8 @@ export function createSessionCardRenderController(options = {}) {
     const stateBadgeText = getSessionStateBadgeText(session);
     const stateHintText = getSessionStateHintText(session);
     const wasVisible = entry.isVisible !== false;
+    const readOnlyMode = isReadOnlyMode();
+    const readOnlyMessage = readOnlyMode ? getReadOnlyModeMessage() : "";
 
     entry.element.classList.toggle("active", activeSessionId === session.id);
     entry.element.classList.toggle("unrestored", isSessionUnrestored(session));
@@ -73,6 +80,18 @@ export function createSessionCardRenderController(options = {}) {
 
     renderSessionTagList(entry, session);
     renderSessionNote(entry, session);
+
+    for (const control of [entry.settingsBtn, entry.renameBtn, entry.closeBtn, entry.settingsApplyBtn]) {
+      if (!control) {
+        continue;
+      }
+      control.disabled = readOnlyMode;
+      if (readOnlyMessage) {
+        control.setAttribute("title", readOnlyMessage);
+      } else {
+        control.removeAttribute("title");
+      }
+    }
 
     if (!entry.settingsDirty && entry.settingsDialog?.open === true) {
       syncSessionStartupControls(entry, session);

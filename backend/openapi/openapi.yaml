@@ -68,6 +68,93 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /shares:
+    get:
+      operationId: listShares
+      summary: List persisted read-only share links.
+      responses:
+        '200':
+          description: Share link list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShareLink'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+    post:
+      operationId: createShareLink
+      summary: Create a read-only spectator share link for a session or deck.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShareLinkRequest'
+      responses:
+        '201':
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLink'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /shares/{shareId}:
+    parameters:
+      - $ref: '#/components/parameters/shareId'
+    get:
+      operationId: getShareLink
+      summary: Get share link metadata by id.
+      responses:
+        '200':
+          description: Share link found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLink'
+        '404':
+          description: Share link not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /shares/{shareId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/shareId'
+    post:
+      operationId: revokeShareLink
+      summary: Revoke a read-only spectator share link.
+      responses:
+        '200':
+          description: Share link revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLink'
+        '404':
+          description: Share link not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /custom-commands:
     get:
       operationId: listCustomCommands
@@ -1166,6 +1253,12 @@ components:
       required: true
       schema:
         type: string
+    shareId:
+      name: shareId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Deck:
       type: object
@@ -2204,6 +2297,72 @@ components:
         expiresIn:
           type: integer
           format: int64
+    CreateShareLinkRequest:
+      type: object
+      required:
+        - targetType
+        - targetId
+      properties:
+        targetType:
+          type: string
+          enum:
+            - session
+            - deck
+        targetId:
+          type: string
+        expiresInSeconds:
+          type: integer
+          format: int64
+    ShareLink:
+      type: object
+      required:
+        - id
+        - targetType
+        - targetId
+        - permissionMode
+        - createdAt
+        - updatedAt
+        - expiresAt
+        - revokedAt
+        - creatorSubject
+        - creatorTenantId
+        - active
+      properties:
+        id:
+          type: string
+        targetType:
+          type: string
+          enum:
+            - session
+            - deck
+        targetId:
+          type: string
+        permissionMode:
+          type: string
+          enum:
+            - read_only
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+        expiresAt:
+          type: integer
+          format: int64
+        revokedAt:
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+        creatorSubject:
+          type: string
+        creatorTenantId:
+          type: string
+        active:
+          type: boolean
+        joinUrl:
+          type: string
   responses:
     TlsRequired:
       description: TLS is required for this endpoint.

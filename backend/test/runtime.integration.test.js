@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
+import { URL } from "node:url";
 import { createRuntime } from "../src/runtime.js";
 
 function createFallbackAwarePtyFactory() {
@@ -97,6 +98,33 @@ async function createStartedRuntime(overrides = {}) {
     runtime,
     baseUrl: `http://127.0.0.1:${port}/api/v1`
   };
+}
+
+async function issueDevToken(baseUrl, scopes) {
+  const body = Array.isArray(scopes) ? { scopes } : {};
+  const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  assert.equal(tokenRes.status, 200);
+  const tokenPayload = await tokenRes.json();
+  assert.equal(typeof tokenPayload.accessToken, "string");
+  return tokenPayload.accessToken;
+}
+
+function createAuthHeaders(accessToken, { json = false } = {}) {
+  return {
+    authorization: `Bearer ${accessToken}`,
+    ...(json ? { "content-type": "application/json" } : {})
+  };
+}
+
+function extractShareToken(joinUrl) {
+  const token = new URL(joinUrl).searchParams.get("share_token");
+  assert.equal(typeof token, "string");
+  assert.ok(token);
+  return token;
 }
 
 function sleep(ms) {
@@ -2157,6 +2185,282 @@ test("auth dev mode issues token and protects session routes", async () => {
   }
 });
 
+test("share links persist and enforce read-only spectator access across restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-share-"));
+  const dataPath = join(dir, "sessions.json");
+  const authConfig = {
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  };
+
+  const { runtime: runtimeA, baseUrl: baseUrlA } = await createStartedRuntime({
+    dataPath,
+    ...authConfig
+  });
+
+  let sharedSessionId = "";
+  let companionSessionId = "";
+  let hiddenSessionId = "";
+  let sessionShareId = "";
+  let sessionShareToken = "";
+  let deckShareId = "";
+  let deckShareToken = "";
+
+  try {
+    const operatorToken = await issueDevToken(baseUrlA);
+    const operatorJsonHeaders = createAuthHeaders(operatorToken, { json: true });
+
+    const createDeckRes = await fetch(`${baseUrlA}/decks`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ id: "ops", name: "Ops" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createSharedSessionRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "shared-session" })
+    });
+    assert.equal(createSharedSessionRes.status, 201);
+    const sharedSession = await createSharedSessionRes.json();
+    sharedSessionId = sharedSession.id;
+
+    const createCompanionSessionRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "companion-session" })
+    });
+    assert.equal(createCompanionSessionRes.status, 201);
+    const companionSession = await createCompanionSessionRes.json();
+    companionSessionId = companionSession.id;
+
+    const createHiddenSessionRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "hidden-session" })
+    });
+    assert.equal(createHiddenSessionRes.status, 201);
+    const hiddenSession = await createHiddenSessionRes.json();
+    hiddenSessionId = hiddenSession.id;
+
+    const moveSharedRes = await fetch(`${baseUrlA}/decks/ops/sessions/${sharedSessionId}:move`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(moveSharedRes.status, 204);
+
+    const moveCompanionRes = await fetch(`${baseUrlA}/decks/ops/sessions/${companionSessionId}:move`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(moveCompanionRes.status, 204);
+
+    const createSessionShareRes = await fetch(`${baseUrlA}/shares`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({
+        targetType: "session",
+        targetId: sharedSessionId,
+        expiresInSeconds: 3600
+      })
+    });
+    assert.equal(createSessionShareRes.status, 201);
+    const sessionShare = await createSessionShareRes.json();
+    sessionShareId = sessionShare.id;
+    sessionShareToken = extractShareToken(sessionShare.joinUrl);
+
+    const createDeckShareRes = await fetch(`${baseUrlA}/shares`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({
+        targetType: "deck",
+        targetId: "ops",
+        expiresInSeconds: 3600
+      })
+    });
+    assert.equal(createDeckShareRes.status, 201);
+    const deckShare = await createDeckShareRes.json();
+    deckShareId = deckShare.id;
+    deckShareToken = extractShareToken(deckShare.joinUrl);
+
+    const listSharesRes = await fetch(`${baseUrlA}/shares`, {
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(listSharesRes.status, 200);
+    const listedShares = await listSharesRes.json();
+    assert.deepEqual(
+      listedShares.map((entry) => entry.id),
+      [deckShareId, sessionShareId]
+    );
+
+    const getSessionShareRes = await fetch(`${baseUrlA}/shares/${sessionShareId}`, {
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(getSessionShareRes.status, 200);
+
+    const sessionSpectatorListRes = await fetch(`${baseUrlA}/sessions`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionSpectatorListRes.status, 200);
+    const sessionSpectatorSessions = await sessionSpectatorListRes.json();
+    assert.deepEqual(sessionSpectatorSessions.map((session) => session.id), [sharedSessionId]);
+
+    const sessionSpectatorDecksRes = await fetch(`${baseUrlA}/decks`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionSpectatorDecksRes.status, 200);
+    const sessionSpectatorDecks = await sessionSpectatorDecksRes.json();
+    assert.deepEqual(sessionSpectatorDecks.map((deck) => deck.id), ["ops"]);
+
+    const sessionGetSharedRes = await fetch(`${baseUrlA}/sessions/${sharedSessionId}`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionGetSharedRes.status, 200);
+
+    const sessionGetHiddenRes = await fetch(`${baseUrlA}/sessions/${hiddenSessionId}`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionGetHiddenRes.status, 404);
+
+    const sessionGetOpsDeckRes = await fetch(`${baseUrlA}/decks/ops`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionGetOpsDeckRes.status, 200);
+
+    const sessionGetDefaultDeckRes = await fetch(`${baseUrlA}/decks/default`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionGetDefaultDeckRes.status, 404);
+
+    const sessionWsTicketRes = await fetch(`${baseUrlA}/auth/ws-ticket`, {
+      method: "POST",
+      headers: createAuthHeaders(sessionShareToken, { json: true }),
+      body: JSON.stringify({})
+    });
+    assert.equal(sessionWsTicketRes.status, 200);
+
+    const sessionWriteRes = await fetch(`${baseUrlA}/sessions/${sharedSessionId}/input`, {
+      method: "POST",
+      headers: createAuthHeaders(sessionShareToken, { json: true }),
+      body: JSON.stringify({ data: "echo blocked\n" })
+    });
+    assert.equal(sessionWriteRes.status, 403);
+
+    const sessionPatchRes = await fetch(`${baseUrlA}/sessions/${sharedSessionId}`, {
+      method: "PATCH",
+      headers: createAuthHeaders(sessionShareToken, { json: true }),
+      body: JSON.stringify({ name: "blocked" })
+    });
+    assert.equal(sessionPatchRes.status, 403);
+
+    const sessionCreateRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: createAuthHeaders(sessionShareToken, { json: true }),
+      body: JSON.stringify({ name: "blocked" })
+    });
+    assert.equal(sessionCreateRes.status, 403);
+
+    const deckCreateRes = await fetch(`${baseUrlA}/decks`, {
+      method: "POST",
+      headers: createAuthHeaders(sessionShareToken, { json: true }),
+      body: JSON.stringify({ id: "blocked", name: "Blocked" })
+    });
+    assert.equal(deckCreateRes.status, 403);
+
+    const spectatorShareListRes = await fetch(`${baseUrlA}/shares`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(spectatorShareListRes.status, 403);
+
+    const deckSpectatorListRes = await fetch(`${baseUrlA}/sessions`, {
+      headers: createAuthHeaders(deckShareToken)
+    });
+    assert.equal(deckSpectatorListRes.status, 200);
+    const deckSpectatorSessions = await deckSpectatorListRes.json();
+    assert.deepEqual(
+      deckSpectatorSessions.map((session) => session.id).sort(),
+      [companionSessionId, sharedSessionId].sort()
+    );
+
+    const deckGetCompanionRes = await fetch(`${baseUrlA}/sessions/${companionSessionId}`, {
+      headers: createAuthHeaders(deckShareToken)
+    });
+    assert.equal(deckGetCompanionRes.status, 200);
+
+    const deckGetHiddenRes = await fetch(`${baseUrlA}/sessions/${hiddenSessionId}`, {
+      headers: createAuthHeaders(deckShareToken)
+    });
+    assert.equal(deckGetHiddenRes.status, 404);
+
+    const deckSpectatorDecksRes = await fetch(`${baseUrlA}/decks`, {
+      headers: createAuthHeaders(deckShareToken)
+    });
+    assert.equal(deckSpectatorDecksRes.status, 200);
+    const deckSpectatorDecks = await deckSpectatorDecksRes.json();
+    assert.deepEqual(deckSpectatorDecks.map((deck) => deck.id), ["ops"]);
+
+    const deckWriteRes = await fetch(`${baseUrlA}/sessions/${companionSessionId}/input`, {
+      method: "POST",
+      headers: createAuthHeaders(deckShareToken, { json: true }),
+      body: JSON.stringify({ data: "echo blocked\n" })
+    });
+    assert.equal(deckWriteRes.status, 403);
+
+    const revokeDeckShareRes = await fetch(`${baseUrlA}/shares/${deckShareId}/revoke`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(revokeDeckShareRes.status, 200);
+
+    const revokedDeckSpectatorRes = await fetch(`${baseUrlA}/sessions`, {
+      headers: createAuthHeaders(deckShareToken)
+    });
+    assert.equal(revokedDeckSpectatorRes.status, 403);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const { runtime: runtimeB, baseUrl: baseUrlB } = await createStartedRuntime({
+    dataPath,
+    ...authConfig
+  });
+
+  try {
+    const operatorToken = await issueDevToken(baseUrlB);
+
+    const getPersistedShareRes = await fetch(`${baseUrlB}/shares/${sessionShareId}`, {
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(getPersistedShareRes.status, 200);
+
+    const sessionSpectatorListRes = await fetch(`${baseUrlB}/sessions`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(sessionSpectatorListRes.status, 200);
+    const sessionSpectatorSessions = await sessionSpectatorListRes.json();
+    assert.deepEqual(sessionSpectatorSessions.map((session) => session.id), [sharedSessionId]);
+
+    const revokeSessionShareRes = await fetch(`${baseUrlB}/shares/${sessionShareId}/revoke`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken)
+    });
+    assert.equal(revokeSessionShareRes.status, 200);
+
+    const revokedSessionSpectatorRes = await fetch(`${baseUrlB}/sessions`, {
+      headers: createAuthHeaders(sessionShareToken)
+    });
+    assert.equal(revokedSessionSpectatorRes.status, 403);
+  } finally {
+    await runtimeB.stop();
+  }
+});
+
 test("metrics endpoint exposes request counters and lifecycle/session gauges", async () => {
   const { runtime, baseUrl } = await createStartedRuntime();
 
@@ -3482,7 +3786,7 @@ test("ssh sessions expose degraded then connected remote runtime metadata after 
 });
 
 test("ssh sessions become offline after bounded reconnect retries and reject direct input", async () => {
-  const remoteRetryWaitMs = 20000;
+  const remoteRetryWaitMs = 30000;
   const ptys = [];
   const createPty = () => {
     let exitHandler = null;

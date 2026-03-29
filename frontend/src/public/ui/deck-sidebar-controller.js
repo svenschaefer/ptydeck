@@ -19,6 +19,11 @@ export function createDeckSidebarController(options = {}) {
   const onSwapDeckSessions =
     typeof options.onSwapDeckSessions === "function" ? options.onSwapDeckSessions : () => Promise.resolve();
   const canDeleteDeck = typeof options.canDeleteDeck === "function" ? options.canDeleteDeck : () => true;
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function"
+      ? options.getReadOnlyModeMessage
+      : () => "Read-only spectator mode. Write actions are disabled.";
   let openSettingsDeckId = "";
   let lastRenderState = null;
 
@@ -44,6 +49,8 @@ export function createDeckSidebarController(options = {}) {
     const sessions = sortSessionsByQuickId(Array.isArray(state.sessions) ? state.sessions : []);
     const activeDeckId = String(state.activeDeckId || "");
     const activeSessionId = String(state.activeSessionId || "");
+    const readOnlyMode = isReadOnlyMode();
+    const readOnlyMessage = readOnlyMode ? getReadOnlyModeMessage() : "";
     const hasOpenSettingsDeck = decks.some((deck) => deck.id === openSettingsDeckId);
     if (!hasOpenSettingsDeck || openSettingsDeckId !== activeDeckId) {
       openSettingsDeckId = "";
@@ -93,7 +100,14 @@ export function createDeckSidebarController(options = {}) {
         settingsBtn.setAttribute("aria-label", `Open settings for deck ${deck.name}`);
         settingsBtn.setAttribute("title", `Open settings for deck ${deck.name}`);
         settingsBtn.textContent = "⚙";
+        settingsBtn.disabled = readOnlyMode;
+        if (readOnlyMessage) {
+          settingsBtn.setAttribute("title", readOnlyMessage);
+        }
         settingsBtn.addEventListener("click", () => {
+          if (readOnlyMode) {
+            return;
+          }
           openSettingsDeckId = openSettingsDeckId === deck.id ? "" : deck.id;
           render(lastRenderState || state);
         });
@@ -123,7 +137,11 @@ export function createDeckSidebarController(options = {}) {
         const renameBtn = documentRef.createElement("button");
         renameBtn.type = "button";
         renameBtn.textContent = "Rename Deck";
+        renameBtn.disabled = readOnlyMode;
         renameBtn.addEventListener("click", () => {
+          if (readOnlyMode) {
+            return;
+          }
           openSettingsDeckId = "";
           render(lastRenderState || state);
           void onRenameDeck(deck);
@@ -133,8 +151,11 @@ export function createDeckSidebarController(options = {}) {
         const deleteBtn = documentRef.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.textContent = "Delete Deck";
-        deleteBtn.disabled = canDeleteDeck(deck) !== true;
+        deleteBtn.disabled = readOnlyMode || canDeleteDeck(deck) !== true;
         deleteBtn.addEventListener("click", () => {
+          if (readOnlyMode) {
+            return;
+          }
           openSettingsDeckId = "";
           render(lastRenderState || state);
           void onDeleteDeck(deck);
@@ -177,9 +198,9 @@ export function createDeckSidebarController(options = {}) {
             upBtn.type = "button";
             upBtn.textContent = "↑";
             upBtn.setAttribute("aria-label", `Move ${formatSessionDisplayName(session)} up`);
-            upBtn.disabled = !previousSession;
+            upBtn.disabled = readOnlyMode || !previousSession;
             upBtn.addEventListener("click", () => {
-              if (!previousSession) {
+              if (readOnlyMode || !previousSession) {
                 return;
               }
               void onSwapDeckSessions(session, previousSession);
@@ -190,9 +211,9 @@ export function createDeckSidebarController(options = {}) {
             downBtn.type = "button";
             downBtn.textContent = "↓";
             downBtn.setAttribute("aria-label", `Move ${formatSessionDisplayName(session)} down`);
-            downBtn.disabled = !nextSession;
+            downBtn.disabled = readOnlyMode || !nextSession;
             downBtn.addEventListener("click", () => {
-              if (!nextSession) {
+              if (readOnlyMode || !nextSession) {
                 return;
               }
               void onSwapDeckSessions(session, nextSession);

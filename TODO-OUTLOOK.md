@@ -128,14 +128,14 @@ Deferred out of current near-term scope after `v0.4.0-H40` reprioritization:
 - [ ] `REM-008B` Owner `FE`: Add frontend operator workflows for theme import/export, including slash-command entry points plus session-settings UI for importing a supported external theme payload into the active or inactive theme slot and exporting the current slot in a selected external format with explicit validation feedback.
 - [ ] `REM-008C` Owner `QA`: Add regression coverage for theme import/export parsing, invalid payload rejection, deterministic slot mapping, and roundtrip fidelity across the supported external theme formats.
 
-Deferred from `docs/Slash Workflow Chains.md` (mid/long-term, not in current near-term scope):
+Promoted to active delivery in `v0.4.0-H49`:
 
-- [ ] `SWF-004` Owner `FE`: Add workflow data-source adapters (`line`, `visible-line`, `status`, `summary`, `exit-code`, `session-state`) over the existing stream/interpretation layer with deterministic source contracts and no hidden heuristic side effects in the execution layer.
+- `SWF-004`
 
 Deferred from external terminal/SSH tool survey (kept out of `TODO.md` current scope):
 
 - Inspiration source: [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
 - Promoted to active delivery in `v0.4.0-H47`:
   - `REM-006A`, `REM-006B`, `REM-006C`
-- Promoted to active delivery in `v0.4.0-H48`:
+- Promoted and completed in `v0.4.0-H48`:
   - `REM-007A`, `REM-007B`, `REM-007C`

@@ -113,6 +113,13 @@ const DEFAULT_SESSION_FILE_TRANSFER_MAX_BYTES = 256 * 1024;
 const SESSION_FILE_TRANSFER_PATH_MAX_LENGTH = 512;
 const SESSION_FILE_TRANSFER_CONTENT_TYPE = "application/octet-stream";
 const SESSION_FILE_TRANSFER_ENCODING = "base64";
+const SHARE_LINK_ID_PATTERN = /^share-[a-f0-9]{24}$/;
+const SHARE_LINK_TARGET_TYPE_SESSION = "session";
+const SHARE_LINK_TARGET_TYPE_DECK = "deck";
+const SHARE_LINK_TARGET_TYPE_VALUES = new Set([SHARE_LINK_TARGET_TYPE_SESSION, SHARE_LINK_TARGET_TYPE_DECK]);
+const SHARE_LINK_PERMISSION_MODE_READ_ONLY = "read_only";
+const DEFAULT_SHARE_LINK_TTL_SECONDS = 24 * 60 * 60;
+const MAX_SHARE_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const SESSION_QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SESSION_QUICK_ID_FALLBACK = "?";
 const DEFAULT_SESSION_THEME_PROFILE = {
@@ -290,6 +297,12 @@ function route(pathname, method) {
   if (pathname === "/api/v1/auth/ws-ticket" && method === "POST") {
     return { kind: "wsTicket" };
   }
+  if (pathname === "/api/v1/shares" && method === "GET") {
+    return { kind: "listShares" };
+  }
+  if (pathname === "/api/v1/shares" && method === "POST") {
+    return { kind: "createShareLink" };
+  }
   if (pathname === "/api/v1/custom-commands" && method === "GET") {
     return { kind: "listCustomCommands" };
   }
@@ -413,6 +426,16 @@ function route(pathname, method) {
     };
   }
 
+  const shareLinkMatch = pathname.match(/^\/api\/v1\/shares\/([^/]+)$/);
+  if (shareLinkMatch && method === "GET") {
+    return { kind: "getShareLink", params: { shareId: decodePathParam(shareLinkMatch[1], "shareId") } };
+  }
+
+  const revokeShareLinkMatch = pathname.match(/^\/api\/v1\/shares\/([^/]+)\/revoke$/);
+  if (revokeShareLinkMatch && method === "POST") {
+    return { kind: "revokeShareLink", params: { shareId: decodePathParam(revokeShareLinkMatch[1], "shareId") } };
+  }
+
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
   if (getSessionMatch && method === "GET") {
     return { kind: "getSession", params: { sessionId: getSessionMatch[1] } };
@@ -489,6 +512,12 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/workspace-presets\/[^/]+$/.test(pathname)) {
     return "/api/v1/workspace-presets/{presetId}";
+  }
+  if (/^\/api\/v1\/shares\/[^/]+\/revoke$/.test(pathname)) {
+    return "/api/v1/shares/{shareId}/revoke";
+  }
+  if (/^\/api\/v1\/shares\/[^/]+$/.test(pathname)) {
+    return "/api/v1/shares/{shareId}";
   }
   if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
     return "/api/v1/custom-commands/{commandName}";
@@ -2335,6 +2364,54 @@ function parseBooleanQueryParam(value, fieldName) {
   throw new ApiError(400, "ValidationError", `Query parameter '${fieldName}' must be 'true' or 'false'.`);
 }
 
+function normalizeShareLinkTargetType(value, { strict = true } = {}) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (SHARE_LINK_TARGET_TYPE_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(400, "ValidationError", "Field 'targetType' must be 'session' or 'deck'.");
+  }
+  return "";
+}
+
+function normalizeShareLinkTargetId(value, { strict = true } = {}) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(400, "ValidationError", "Field 'targetId' must be a non-empty string.");
+  }
+  return "";
+}
+
+function normalizeShareLinkTtlSeconds(value, { strict = true } = {}) {
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_SHARE_LINK_TTL_SECONDS;
+  }
+  const normalized = Number(value);
+  if (Number.isInteger(normalized) && normalized >= 60 && normalized <= MAX_SHARE_LINK_TTL_SECONDS) {
+    return normalized;
+  }
+  if (strict) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'expiresInSeconds' must be an integer between 60 and ${MAX_SHARE_LINK_TTL_SECONDS}.`
+    );
+  }
+  return DEFAULT_SHARE_LINK_TTL_SECONDS;
+}
+
+function buildShareLinkId() {
+  return `share-${crypto.randomBytes(12).toString("hex")}`;
+}
+
+function buildShareTokenId() {
+  return crypto.randomBytes(12).toString("base64url");
+}
+
 export function createRuntime(config) {
   const maxBodyBytes =
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
@@ -2382,6 +2459,7 @@ export function createRuntime(config) {
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
+  const shareLinks = new Map();
   const sessionDeckAssignments = new Map();
   const sessionQuickIdAssignments = new Map();
   const sessionQuickIdRank = new Map(SESSION_QUICK_ID_POOL.map((token, index) => [token, index]));
@@ -2722,7 +2800,13 @@ export function createRuntime(config) {
       auth: {
         subject: auth.subject,
         tenantId: auth.tenantId,
-        scopes: Array.isArray(auth.scopes) ? auth.scopes.slice() : []
+        scopes: Array.isArray(auth.scopes) ? auth.scopes.slice() : [],
+        accessMode: typeof auth.accessMode === "string" ? auth.accessMode : "operator",
+        permissionMode: typeof auth.permissionMode === "string" ? auth.permissionMode : "",
+        shareLinkId: typeof auth.shareLinkId === "string" ? auth.shareLinkId : "",
+        shareTargetType: typeof auth.shareTargetType === "string" ? auth.shareTargetType : "",
+        shareTargetId: typeof auth.shareTargetId === "string" ? auth.shareTargetId : "",
+        shareTokenId: typeof auth.shareTokenId === "string" ? auth.shareTokenId : ""
       }
     });
     return {
@@ -2730,6 +2814,64 @@ export function createRuntime(config) {
       tokenType: "WsTicket",
       expiresIn: authWsTicketTtlSeconds
     };
+  }
+
+  function isSpectatorAuth(auth) {
+    return (
+      auth &&
+      auth.accessMode === "spectator" &&
+      auth.permissionMode === SHARE_LINK_PERMISSION_MODE_READ_ONLY &&
+      typeof auth.shareLinkId === "string" &&
+      auth.shareLinkId
+    );
+  }
+
+  function getShareLinkOrThrow(shareId) {
+    const normalizedShareId = typeof shareId === "string" ? shareId.trim() : "";
+    const shareLink = shareLinks.get(normalizedShareId);
+    if (!shareLink) {
+      throw new ApiError(404, "ShareLinkNotFound", `Share link '${normalizedShareId}' was not found.`);
+    }
+    return shareLink;
+  }
+
+  function ensureShareLinkAuthActive(auth) {
+    if (!isSpectatorAuth(auth)) {
+      return null;
+    }
+    const shareLink = getShareLinkOrThrow(auth.shareLinkId);
+    if (shareLink.permissionMode !== SHARE_LINK_PERMISSION_MODE_READ_ONLY) {
+      throw new ApiError(403, "Forbidden", "Share link permission mode is not supported.");
+    }
+    if (shareLink.revokedAt) {
+      throw new ApiError(403, "Forbidden", "Share link has been revoked.");
+    }
+    if (shareLink.expiresAt <= Date.now()) {
+      throw new ApiError(403, "Forbidden", "Share link has expired.");
+    }
+    if (shareLink.tokenId !== auth.shareTokenId) {
+      throw new ApiError(403, "Forbidden", "Share link token is no longer active.");
+    }
+    if (shareLink.targetType !== auth.shareTargetType || shareLink.targetId !== auth.shareTargetId) {
+      throw new ApiError(403, "Forbidden", "Share link target does not match token claims.");
+    }
+    return shareLink;
+  }
+
+  function ensureShareRouteAllowed(auth, kind) {
+    if (!isSpectatorAuth(auth)) {
+      return;
+    }
+    if (
+      kind === "listSessions" ||
+      kind === "getSession" ||
+      kind === "listDecks" ||
+      kind === "getDeck" ||
+      kind === "wsTicket"
+    ) {
+      return;
+    }
+    throw new ApiError(403, "Forbidden", "Read-only spectator access does not allow this action.");
   }
 
   function recordWsError(reason) {
@@ -2802,6 +2944,12 @@ export function createRuntime(config) {
   }
 
   function requiredScopeForRoute(kind) {
+    if (kind === "listShares" || kind === "getShareLink") {
+      return "sessions:read";
+    }
+    if (kind === "createShareLink" || kind === "revokeShareLink") {
+      return "sessions:write";
+    }
     if (kind === "listDecks" || kind === "getDeck") {
       return "sessions:read";
     }
@@ -2865,7 +3013,7 @@ export function createRuntime(config) {
     return "";
   }
 
-  function authenticateRequest(req, parsedUrl, requiredScope) {
+  function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "") {
     if (!config.authEnabled) {
       return null;
     }
@@ -2875,7 +3023,9 @@ export function createRuntime(config) {
       issuer: config.authIssuer,
       audience: config.authAudience
     });
+    ensureShareLinkAuthActive(auth);
     ensureScope(auth, requiredScope);
+    ensureShareRouteAllowed(auth, routeKind);
     return auth;
   }
 
@@ -3033,14 +3183,20 @@ export function createRuntime(config) {
     };
   }
 
-  function listDecks() {
+  function listDecks(auth = null) {
     ensureDefaultDeck();
-    return Array.from(decks.values()).sort(compareDeckEntries).map(toApiDeck);
+    return Array.from(decks.values())
+      .filter((deck) => isDeckVisibleToAuth(deck, auth))
+      .sort(compareDeckEntries)
+      .map(toApiDeck);
   }
 
-  function getDeckOrThrow(deckId) {
+  function getDeckOrThrow(deckId, auth = null) {
     const deck = decks.get(deckId);
     if (!deck) {
+      throw new ApiError(404, "DeckNotFound", `Deck '${deckId}' was not found.`);
+    }
+    if (!isDeckVisibleToAuth(deck, auth)) {
       throw new ApiError(404, "DeckNotFound", `Deck '${deckId}' was not found.`);
     }
     return deck;
@@ -3159,6 +3315,102 @@ export function createRuntime(config) {
       fallbackDeckId: DEFAULT_DECK_ID,
       reassignedSessionIds: force ? affectedSessionIds : []
     };
+  }
+
+  function normalizeShareLinkEntity(input, auth, { strict = true } = {}) {
+    if (!isPlainObject(input)) {
+      if (strict) {
+        throw new ApiError(400, "ValidationError", "Body must be an object.");
+      }
+      return null;
+    }
+    const targetType = normalizeShareLinkTargetType(input.targetType, { strict });
+    const targetId = normalizeShareLinkTargetId(input.targetId, { strict });
+    if (!targetType || !targetId) {
+      return null;
+    }
+    if (targetType === SHARE_LINK_TARGET_TYPE_SESSION) {
+      getApiSessionOrThrow(targetId);
+    } else {
+      getDeckOrThrow(targetId);
+    }
+    const ttlSeconds = normalizeShareLinkTtlSeconds(input.expiresInSeconds, { strict });
+    const now = Date.now();
+    return {
+      id: buildShareLinkId(),
+      targetType,
+      targetId,
+      permissionMode: SHARE_LINK_PERMISSION_MODE_READ_ONLY,
+      tokenId: buildShareTokenId(),
+      creatorSubject: typeof auth?.subject === "string" ? auth.subject : "",
+      creatorTenantId: typeof auth?.tenantId === "string" ? auth.tenantId : "",
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: now + (ttlSeconds * 1000),
+      revokedAt: null
+    };
+  }
+
+  function buildShareLinkBaseUrl(req, requestContext) {
+    const requestOrigin = typeof req?.headers?.origin === "string" ? req.headers.origin.trim() : "";
+    if (requestOrigin) {
+      return requestOrigin;
+    }
+    const normalizedHost = typeof requestContext?.host === "string" ? requestContext.host.trim() : "";
+    const appHost =
+      normalizedHost.startsWith("api.") && normalizedHost.length > 4 ? normalizedHost.slice(4) : normalizedHost;
+    const protocol = requestContext?.protocol === "https" ? "https" : "http";
+    return `${protocol}://${appHost}`;
+  }
+
+  function buildShareLinkJoinUrl(shareLink, req, requestContext) {
+    const expiresInSeconds = Math.max(1, Math.floor((shareLink.expiresAt - Date.now()) / 1000));
+    const accessToken = createDevToken({
+      secret: config.authDevSecret,
+      issuer: config.authIssuer,
+      audience: config.authAudience,
+      subject: `share:${shareLink.id}`,
+      tenantId: shareLink.creatorTenantId || "share",
+      scopes: ["sessions:read", "ws:connect"],
+      ttlSeconds: expiresInSeconds,
+      extraClaims: {
+        accessMode: "spectator",
+        permissionMode: shareLink.permissionMode,
+        shareLinkId: shareLink.id,
+        shareTargetType: shareLink.targetType,
+        shareTargetId: shareLink.targetId,
+        shareTokenId: shareLink.tokenId
+      }
+    });
+    const baseUrl = buildShareLinkBaseUrl(req, requestContext);
+    return `${baseUrl}/?share_token=${encodeURIComponent(accessToken)}`;
+  }
+
+  function listShareLinks() {
+    return Array.from(shareLinks.values()).sort(compareShareLinkEntries).map((shareLink) => toApiShareLink(shareLink));
+  }
+
+  function createShareLink(body, auth, req, requestContext) {
+    const shareLink = normalizeShareLinkEntity(body, auth, { strict: true });
+    shareLinks.set(shareLink.id, shareLink);
+    return toApiShareLink(shareLink, {
+      joinUrl: buildShareLinkJoinUrl(shareLink, req, requestContext)
+    });
+  }
+
+  function getApiShareLinkOrThrow(shareId) {
+    return toApiShareLink(getShareLinkOrThrow(shareId));
+  }
+
+  function revokeShareLink(shareId) {
+    const existing = getShareLinkOrThrow(shareId);
+    const next = {
+      ...existing,
+      revokedAt: existing.revokedAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    shareLinks.set(next.id, next);
+    return toApiShareLink(next);
   }
 
   function toApiConnectionProfile(profile) {
@@ -4031,6 +4283,69 @@ export function createRuntime(config) {
     };
   }
 
+  function toApiShareLink(shareLink, options = {}) {
+    const now = Date.now();
+    return {
+      id: shareLink.id,
+      targetType: shareLink.targetType,
+      targetId: shareLink.targetId,
+      permissionMode: shareLink.permissionMode,
+      createdAt: shareLink.createdAt,
+      updatedAt: shareLink.updatedAt,
+      expiresAt: shareLink.expiresAt,
+      revokedAt: shareLink.revokedAt || null,
+      creatorSubject: shareLink.creatorSubject,
+      creatorTenantId: shareLink.creatorTenantId,
+      active: !shareLink.revokedAt && shareLink.expiresAt > now,
+      ...(options.joinUrl ? { joinUrl: options.joinUrl } : {})
+    };
+  }
+
+  function compareShareLinkEntries(left, right) {
+    if (left.createdAt !== right.createdAt) {
+      return right.createdAt - left.createdAt;
+    }
+    return left.id.localeCompare(right.id, "en-US", { sensitivity: "base" });
+  }
+
+  function getSpectatorTargetSession(auth) {
+    if (!isSpectatorAuth(auth) || auth.shareTargetType !== SHARE_LINK_TARGET_TYPE_SESSION) {
+      return null;
+    }
+    try {
+      return toApiSession(manager.get(auth.shareTargetId).meta);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const unrestored = unrestoredSessions.get(auth.shareTargetId);
+    return unrestored ? toApiSession(unrestored, "unrestored") : null;
+  }
+
+  function isSessionVisibleToAuth(session, auth) {
+    if (!isSpectatorAuth(auth)) {
+      return true;
+    }
+    const apiSession = session?.deckId ? session : toApiSession(session, session?.state);
+    if (auth.shareTargetType === SHARE_LINK_TARGET_TYPE_SESSION) {
+      return apiSession.id === auth.shareTargetId;
+    }
+    return apiSession.deckId === auth.shareTargetId;
+  }
+
+  function isDeckVisibleToAuth(deck, auth) {
+    if (!isSpectatorAuth(auth)) {
+      return true;
+    }
+    const deckId = typeof deck === "string" ? deck : deck?.id;
+    if (auth.shareTargetType === SHARE_LINK_TARGET_TYPE_DECK) {
+      return deckId === auth.shareTargetId;
+    }
+    const targetSession = getSpectatorTargetSession(auth);
+    return Boolean(targetSession) && targetSession.deckId === deckId;
+  }
+
   function snapshotRuntimeState() {
     const snapshot = manager.getSnapshot({
       outputMaxChars: sessionReplayPersistMaxChars,
@@ -4055,7 +4370,10 @@ export function createRuntime(config) {
       connectionProfiles: Array.from(connectionProfiles.values()).map(toApiConnectionProfile),
       layoutProfiles: Array.from(layoutProfiles.values()).map(toApiLayoutProfile),
       workspacePresets: Array.from(workspacePresets.values()).map(toApiWorkspacePreset),
-      sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry)
+      sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry),
+      shareLinks: Array.from(shareLinks.values())
+        .sort(compareShareLinkEntries)
+        .map((entry) => ({ ...entry }))
     };
   }
 
@@ -4067,12 +4385,12 @@ export function createRuntime(config) {
     };
   }
 
-  function listApiSessions({ deckId } = {}) {
+  function listApiSessions(auth = null, { deckId } = {}) {
     const payload = [];
     const seen = new Set();
     for (const session of manager.list()) {
       const apiSession = toApiSession(session);
-      if (!deckId || apiSession.deckId === deckId) {
+      if ((!deckId || apiSession.deckId === deckId) && isSessionVisibleToAuth(apiSession, auth)) {
         payload.push(apiSession);
       }
       seen.add(session.id);
@@ -4082,17 +4400,21 @@ export function createRuntime(config) {
         continue;
       }
       const apiSession = toApiSession(session, "unrestored");
-      if (!deckId || apiSession.deckId === deckId) {
+      if ((!deckId || apiSession.deckId === deckId) && isSessionVisibleToAuth(apiSession, auth)) {
         payload.push(apiSession);
       }
     }
     return payload;
   }
 
-  function getApiSessionOrThrow(sessionId) {
+  function getApiSessionOrThrow(sessionId, auth = null) {
     try {
       const active = manager.get(sessionId).meta;
-      return toApiSession(active);
+      const apiSession = toApiSession(active);
+      if (!isSessionVisibleToAuth(apiSession, auth)) {
+        throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+      }
+      return apiSession;
     } catch (error) {
       if (!(error instanceof ApiError) || error.statusCode !== 404) {
         throw error;
@@ -4100,7 +4422,10 @@ export function createRuntime(config) {
     }
     const unrestored = unrestoredSessions.get(sessionId);
     if (unrestored) {
-      return toApiSession(unrestored, "unrestored");
+      const apiSession = toApiSession(unrestored, "unrestored");
+      if (isSessionVisibleToAuth(apiSession, auth)) {
+        return apiSession;
+      }
     }
     throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
   }
@@ -4357,7 +4682,8 @@ function tryCreateRestoredSession({
         deckCount: state.decks.length,
         connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
-        sshTrustEntryCount: state.sshTrustEntries.length
+        sshTrustEntryCount: state.sshTrustEntries.length,
+        shareLinkCount: state.shareLinks.length
       });
       await persistence.saveState(state);
       logDebug("persist.save.ok", {
@@ -4367,7 +4693,8 @@ function tryCreateRestoredSession({
         deckCount: state.decks.length,
         connectionProfileCount: state.connectionProfiles.length,
         workspacePresetCount: state.workspacePresets.length,
-        sshTrustEntryCount: state.sshTrustEntries.length
+        sshTrustEntryCount: state.sshTrustEntries.length,
+        shareLinkCount: state.shareLinks.length
       });
     };
 
@@ -4401,11 +4728,88 @@ function tryCreateRestoredSession({
     }, 100);
   }
 
+  function filterOutputsForAuth(outputs, auth) {
+    if (!Array.isArray(outputs) || !isSpectatorAuth(auth)) {
+      return Array.isArray(outputs) ? outputs.slice() : [];
+    }
+    return outputs.filter((entry) => {
+      if (!entry || typeof entry.sessionId !== "string") {
+        return false;
+      }
+      if (auth.shareTargetType === SHARE_LINK_TARGET_TYPE_SESSION) {
+        return entry.sessionId === auth.shareTargetId;
+      }
+      try {
+        const session = getApiSessionOrThrow(entry.sessionId);
+        return isSessionVisibleToAuth(session, auth);
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  function filterPayloadForAuth(payload, auth) {
+    if (!isSpectatorAuth(auth)) {
+      return payload;
+    }
+    if (!payload || typeof payload !== "object") {
+      return null;
+    }
+    if (payload.type === "snapshot") {
+      return {
+        ...payload,
+        sessions: Array.isArray(payload.sessions) ? payload.sessions.filter((session) => isSessionVisibleToAuth(session, auth)) : [],
+        outputs: filterOutputsForAuth(payload.outputs, auth),
+        customCommands: [],
+        decks: Array.isArray(payload.decks) ? payload.decks.filter((deck) => isDeckVisibleToAuth(deck, auth)) : []
+      };
+    }
+    if (
+      payload.type === "session.created" ||
+      payload.type === "session.started" ||
+      payload.type === "session.updated" ||
+      payload.type === "session.activity.completed"
+    ) {
+      return isSessionVisibleToAuth(payload.session, auth) ? payload : null;
+    }
+    if (
+      payload.type === "session.data" ||
+      payload.type === "session.exit" ||
+      payload.type === "session.closed"
+    ) {
+      return payload.sessionId === auth.shareTargetId ||
+        (auth.shareTargetType === SHARE_LINK_TARGET_TYPE_DECK &&
+          (() => {
+            try {
+              const session = getApiSessionOrThrow(payload.sessionId);
+              return isSessionVisibleToAuth(session, auth);
+            } catch {
+              return false;
+            }
+          })())
+        ? payload
+        : null;
+    }
+    if (payload.type === "deck.created" || payload.type === "deck.updated") {
+      return isDeckVisibleToAuth(payload.deck, auth) ? payload : null;
+    }
+    if (payload.type === "deck.deleted") {
+      return isDeckVisibleToAuth(payload.deckId, auth) ? payload : null;
+    }
+    if (payload.type?.startsWith?.("custom-command.")) {
+      return null;
+    }
+    return payload;
+  }
+
   function broadcast(payload) {
-    const message = JSON.stringify(payload);
     for (const socket of sockets) {
       if (socket.readyState === socket.OPEN) {
-        socket.send(message);
+        const filteredPayload = filterPayloadForAuth(payload, socket.auth || null);
+        if (!filteredPayload) {
+          continue;
+        }
+        socket.send(JSON.stringify(filteredPayload));
       }
     }
   }
@@ -4594,15 +4998,46 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "wsTicket") {
-        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
+        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
         const payload = issueWsTicket(auth);
         validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
         writeJson(req, res, 200, payload);
         return;
       }
 
+      let auth = null;
       if (match.kind !== "notFound") {
-        authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind));
+        auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
+      }
+
+      if (match.kind === "listShares") {
+        const payload = listShareLinks();
+        validateResponse({ statusCode: 200, body: payload, expect: "shareLinkList" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "createShareLink") {
+        const payload = createShareLink(body, auth, req, requestContext);
+        validateResponse({ statusCode: 201, body: payload, expect: "shareLink" });
+        await persistNow("share-link.create");
+        writeJson(req, res, 201, payload);
+        return;
+      }
+
+      if (match.kind === "getShareLink") {
+        const payload = getApiShareLinkOrThrow(match.params.shareId);
+        validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
+        writeJson(req, res, 200, payload);
+        return;
+      }
+
+      if (match.kind === "revokeShareLink") {
+        const payload = revokeShareLink(match.params.shareId);
+        validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
+        await persistNow("share-link.revoke");
+        writeJson(req, res, 200, payload);
+        return;
       }
 
       if (match.kind === "listCustomCommands") {
@@ -4664,7 +5099,7 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "listDecks") {
-        const payload = listDecks();
+        const payload = listDecks(auth);
         validateResponse({ statusCode: 200, body: payload, expect: "deckList" });
         writeJson(req, res, 200, payload);
         return;
@@ -4680,7 +5115,7 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "getDeck") {
-        const payload = toApiDeck(getDeckOrThrow(match.params.deckId));
+        const payload = toApiDeck(getDeckOrThrow(match.params.deckId, auth));
         validateResponse({ statusCode: 200, body: payload, expect: "deck" });
         writeJson(req, res, 200, payload);
         return;
@@ -4853,7 +5288,7 @@ function tryCreateRestoredSession({
       if (match.kind === "listSessions") {
         const requestedDeckId = parsedUrl.searchParams.get("deckId");
         const deckIdFilter = typeof requestedDeckId === "string" && requestedDeckId.trim() ? requestedDeckId.trim() : "";
-        const payload = listApiSessions({ deckId: deckIdFilter || undefined });
+        const payload = listApiSessions(auth, { deckId: deckIdFilter || undefined });
         validateResponse({ statusCode: 200, body: payload, expect: "sessionList" });
         writeJson(req, res, 200, payload);
         return;
@@ -4938,7 +5373,7 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "getSession") {
-        const payload = getApiSessionOrThrow(match.params.sessionId);
+        const payload = getApiSessionOrThrow(match.params.sessionId, auth);
         validateResponse({ statusCode: 200, body: payload, expect: "session" });
         writeJson(req, res, 200, payload);
         return;
@@ -5213,6 +5648,7 @@ function tryCreateRestoredSession({
       return;
     }
 
+    let wsAuth = null;
     if (config.authEnabled) {
       try {
         const token = resolveBearerToken(request, requestUrl);
@@ -5223,7 +5659,10 @@ function tryCreateRestoredSession({
               audience: config.authAudience
             })
           : consumeWsTicket(resolveWsTicketFromProtocols(request));
+        ensureShareLinkAuthActive(auth);
         ensureScope(auth, "ws:connect");
+        ensureShareRouteAllowed(auth, "wsTicket");
+        wsAuth = auth;
       } catch (err) {
         const mapped = toErrorResponse(err);
         logDebug("ws.upgrade.auth_rejected", {
@@ -5261,6 +5700,7 @@ function tryCreateRestoredSession({
       wsClientState.activeConnections += 1;
       wsClientConnections.set(normalizedClientIp, wsClientState);
       ws.clientIp = normalizedClientIp;
+      ws.auth = wsAuth;
       ws.isAlive = true;
       logDebug("ws.upgrade.accepted", {
         socketCount: sockets.size,
@@ -5293,21 +5733,21 @@ function tryCreateRestoredSession({
       });
 
       const snapshot = manager.getSnapshot();
-      const snapshotSessions = listApiSessions();
-      const customCommandSnapshot = listCustomCommands();
-      ws.send(
-        JSON.stringify({
+      const snapshotPayload = filterPayloadForAuth(
+        {
           type: "snapshot",
-          sessions: snapshotSessions,
+          sessions: listApiSessions(ws.auth || null),
           outputs: snapshot.outputs,
-          customCommands: customCommandSnapshot,
-          decks: listDecks()
-        })
+          customCommands: listCustomCommands(),
+          decks: listDecks(ws.auth || null)
+        },
+        ws.auth || null
       );
+      ws.send(JSON.stringify(snapshotPayload));
       logDebug("ws.snapshot.sent", {
-        sessionCount: snapshotSessions.length,
-        outputCount: snapshot.outputs.length,
-        customCommandCount: customCommandSnapshot.length
+        sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
+        outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
+        customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
       });
     });
   });
@@ -5364,6 +5804,7 @@ function tryCreateRestoredSession({
     layoutProfiles.clear();
     workspacePresets.clear();
     sshTrustEntries.clear();
+    shareLinks.clear();
     sessionDeckAssignments.clear();
     sessionQuickIdAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
@@ -5432,6 +5873,37 @@ function tryCreateRestoredSession({
       }
       sshTrustEntries.set(normalizedEntry.id, normalizedEntry);
     }
+    for (const persistedShareLink of Array.isArray(persistedState.shareLinks) ? persistedState.shareLinks : []) {
+      if (
+        !persistedShareLink ||
+        typeof persistedShareLink.id !== "string" ||
+        !SHARE_LINK_ID_PATTERN.test(persistedShareLink.id) ||
+        !SHARE_LINK_TARGET_TYPE_VALUES.has(persistedShareLink.targetType) ||
+        typeof persistedShareLink.targetId !== "string" ||
+        !persistedShareLink.targetId ||
+        persistedShareLink.permissionMode !== SHARE_LINK_PERMISSION_MODE_READ_ONLY ||
+        typeof persistedShareLink.tokenId !== "string" ||
+        !persistedShareLink.tokenId ||
+        !Number.isInteger(persistedShareLink.createdAt) ||
+        !Number.isInteger(persistedShareLink.updatedAt) ||
+        !Number.isInteger(persistedShareLink.expiresAt)
+      ) {
+        continue;
+      }
+      shareLinks.set(persistedShareLink.id, {
+        id: persistedShareLink.id,
+        targetType: persistedShareLink.targetType,
+        targetId: persistedShareLink.targetId,
+        permissionMode: SHARE_LINK_PERMISSION_MODE_READ_ONLY,
+        tokenId: persistedShareLink.tokenId,
+        creatorSubject: typeof persistedShareLink.creatorSubject === "string" ? persistedShareLink.creatorSubject : "",
+        creatorTenantId: typeof persistedShareLink.creatorTenantId === "string" ? persistedShareLink.creatorTenantId : "",
+        createdAt: persistedShareLink.createdAt,
+        updatedAt: persistedShareLink.updatedAt,
+        expiresAt: persistedShareLink.expiresAt,
+        revokedAt: Number.isInteger(persistedShareLink.revokedAt) ? persistedShareLink.revokedAt : null
+      });
+    }
     await syncSshKnownHostsFile();
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {
@@ -5441,7 +5913,8 @@ function tryCreateRestoredSession({
       persistedConnectionProfileCount: Array.isArray(persistedState.connectionProfiles) ? persistedState.connectionProfiles.length : 0,
       persistedLayoutProfileCount: Array.isArray(persistedState.layoutProfiles) ? persistedState.layoutProfiles.length : 0,
       persistedWorkspacePresetCount: Array.isArray(persistedState.workspacePresets) ? persistedState.workspacePresets.length : 0,
-      persistedSshTrustEntryCount: Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries.length : 0
+      persistedSshTrustEntryCount: Array.isArray(persistedState.sshTrustEntries) ? persistedState.sshTrustEntries.length : 0,
+      persistedShareLinkCount: Array.isArray(persistedState.shareLinks) ? persistedState.shareLinks.length : 0
     });
     for (const session of persistedState.sessions) {
       try {

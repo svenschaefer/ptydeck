@@ -14,9 +14,7 @@ Completed work belongs in `DONE.md`.
 
 ## Active Open Tasks (Current)
 
-- `REM-007A` Owner `BE`: Add a backend sharing contract for session- and deck-scoped spectator links with explicit read-only permission mode, normalized target references, bounded token lifecycle metadata, revocation support, and deterministic access-state exposure instead of ad hoc copy/paste URL sharing.
-- `REM-007B` Owner `FE`: Add frontend sharing workflows for creating, joining, inspecting, and revoking read-only spectator access for sessions and decks, with visible permission-state rendering so spectators never appear to have control/write capability they do not actually have.
-- `REM-007C` Owner `QA`: Add regression coverage for session/deck sharing create/join/revoke flows, read-only enforcement, visible permission-state behavior, and reload/reconnect consistency across the shared spectator path.
+- `SWF-004` Owner `FE`: Add workflow data-source adapters (`line`, `visible-line`, `status`, `summary`, `exit-code`, `session-state`) over the existing workflow/runtime surfaces with deterministic source contracts, explicit missing-data behavior, and no hidden stream-scanning heuristics leaking back into the execution layer.
 
 ## Active Ownership Role
 

@@ -12,9 +12,10 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Current Execution Status
 
-- Active release wave: `v0.4.0-H48` (Read-Only Sharing Baseline).
-- Active scoped tasks: `REM-007A`, `REM-007B`, `REM-007C`.
-- Latest completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
+- Active release wave: `v0.4.0-H49` (Workflow Data-Source Adapters).
+- Active scoped tasks: `SWF-004`.
+- Latest completed wave: `v0.4.0-H48` (Read-Only Sharing Baseline, `REM-007A`, `REM-007B`, `REM-007C`).
+- Previous completed wave: `v0.4.0-H47` (Session File Transfer Baseline, `REM-006A`, `REM-006B`, `REM-006C`).
 - Previous completed wave: `v0.4.0-H46` (Deck Sidebar Action Consolidation, `QLT-163`, `QLT-164`, `QLT-165`, `QLT-166`, `QLT-167`).
 - Previous completed wave: `v0.4.0-H45` (Terminal Ctrl-C Intent Prompt, `QLT-161`, `QLT-162`).
 - Previous completed wave: `v0.4.0-H44` (Session Settings Tabs and Multiline Notes, `QLT-158`, `QLT-159`, `QLT-160`).
@@ -63,23 +64,39 @@ This file defines execution order, release versions, and dependencies for tasks 
 
 ## Active Wave
 
-### v0.4.0-H48 - Read-Only Sharing Baseline (Active)
+### v0.4.0-H49 - Workflow Data-Source Adapters (Active)
 
-- Active scoped tasks: `REM-007A`, `REM-007B`, `REM-007C`
+- Active scoped tasks: `SWF-004`
 
 Dependencies:
 
-- `REM-007A` lands first so the backend defines one authoritative sharing and spectator-permission contract before the frontend invents another local-only share model.
-- `REM-007B` follows `REM-007A`, so sharing UI and spectator-state rendering bind to the final backend permission model instead of implying write control locally.
-- `REM-007C` closes after `REM-007A` and `REM-007B`, so regression coverage locks read-only enforcement and share lifecycle behavior end to end.
+- `SWF-004` follows the completed workflow runtime and guardrail waves (`v0.4.0-H34` through `v0.4.0-H37`) so data-source reads bind to the existing control-plane/workflow contracts instead of reviving the removed stream-interpretation side channel.
 
 Exit criteria:
 
-- Backend exposes a deterministic session/deck sharing contract with explicit read-only spectator semantics and revocation support.
-- Frontend exposes operator sharing workflows plus visible permission state so spectators are clearly separated from controlling operators.
-- Regression coverage exists for share lifecycle behavior, read-only enforcement, and reconnect/reload consistency.
+- Workflow steps can read deterministic session/workspace data sources such as `line`, `visible-line`, `status`, `summary`, `exit-code`, and `session-state` through one explicit adapter layer.
+- Missing data and unsupported source cases are reported explicitly instead of silently falling back to heuristic stream interpretation.
+- The adapter layer stays compatible with the current streamlined frontend runtime and does not reintroduce plugin-style stream scanning into normal terminal activity handling.
 
 ## Latest Completed Wave
+
+### v0.4.0-H48 - Read-Only Sharing Baseline (Completed)
+
+- Completed scoped tasks: `REM-007A`, `REM-007B`, `REM-007C`
+
+Dependencies:
+
+- `REM-007A` landed first so the backend now defines one authoritative sharing and spectator-permission contract before the frontend sharing workflows and spectator-state rendering bind to it.
+- `REM-007B` followed `REM-007A`, so operator sharing UI, share-token bootstrap, and visible read-only spectator-state rendering now reuse the final backend permission model instead of implying write control locally.
+- `REM-007C` closed after `REM-007A` and `REM-007B`, so regression coverage now locks read-only enforcement, filtered snapshot/event visibility, and share lifecycle behavior end to end.
+
+Exit criteria:
+
+- Backend now exposes a deterministic session/deck sharing contract with explicit read-only spectator semantics, bounded share-token lifecycle metadata, revocation support, and filtered REST/WS visibility for shared targets only.
+- Frontend now exposes operator sharing workflows plus visible permission state so spectators are clearly separated from controlling operators and cannot trigger write actions through the normal UI.
+- Regression coverage now exists for share lifecycle behavior, read-only enforcement, filtered snapshot/event visibility, and reconnect/reload/restart consistency.
+
+## Previous Completed Wave
 
 ### v0.4.0-H47 - Session File Transfer Baseline (Completed)
 
