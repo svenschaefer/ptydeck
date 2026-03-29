@@ -2,6 +2,7 @@ node_modules/
 coverage/
 .npm/
 backend/data/
+backend/bin/
 local-config/
 artifacts/
 backups/
