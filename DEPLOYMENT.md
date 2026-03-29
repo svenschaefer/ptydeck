@@ -704,6 +704,6 @@ CI/non-prod enforcement:
 
 - [ ] `main` branch is up to date
 - [ ] Quality gate passed
-- [ ] `TODO.md`, `ROADMAP.md`, and `DONE.md` updated
+- [ ] `TODO.md`, `ROADMAP.md`, and `CHANGELOG.md` updated
 - [ ] `CODEX_CONTEXT.md` updated if architecture/process changed
 - [ ] Deployment smoke checks passed

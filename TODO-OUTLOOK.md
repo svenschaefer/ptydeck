@@ -1,12 +1,12 @@
 # TODO-OUTLOOK - Mid and Long Term
 
 Items in this file are intentionally not part of near-term delivery in `TODO.md`.
+Completed release and promotion history lives in `CHANGELOG.md`.
 
 This file is structured into:
 
 - Future epics: larger themes that are not yet cut into near-term tasks
 - Deferred explicit backlog: concrete tasks with IDs that remain intentionally out of current delivery
-- Promotion history: outlook items that were promoted earlier and are now completed
 
 ## Future Epics
 
@@ -66,72 +66,3 @@ Notes:
 
 - The `REM-008*` block was deliberately moved back out of near-term delivery after `v0.4.0-H40`.
 - External terminal and SSH command-surface inspiration continues to include [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
-
-## Promotion History
-
-### Product and UX
-
-- Promoted and completed in `v0.4.0-H29`:
-  - `UX-014`, `UX-015`, `UX-016`
-- Promoted and completed in `v0.4.0-H28`:
-  - `UX-011`, `UX-012`, `UX-013`
-- Promoted and completed in `v0.4.0-H27`:
-  - `UX-008`, `UX-009`, `UX-010`
-- Promoted and completed in `v0.4.0-H26`:
-  - `UX-005`, `UX-006`, `UX-007`
-- Promoted and completed in `v0.4.0-H23`:
-  - `UX-002`, `UX-003`, `UX-004`
-- Promoted and completed in `v0.4.0-H22`:
-  - `UX-001`
-
-### Developer Productivity
-
-- Promoted and completed in `v0.4.0-H21`:
-  - `DPR-001`, `DPR-002`
-
-### Observability
-
-- Promoted and completed in `v0.4.0-H1`:
-  - `OBS-001`, `OBS-002`, `OBS-003`, `OBS-004`
-- Promoted and completed in `v0.4.0-H51`:
-  - `OBS-005A`, `OBS-005B`, `OBS-005C`
-
-### Extensibility, Commands, and Workflows
-
-- Promoted and completed in `v0.4.0-H52`:
-  - `UX-017`, `UX-018`, `UX-019`
-- Promoted and completed in `v0.4.0-H49`:
-  - `SWF-004`
-- Promoted and completed in `v0.4.0-H37`:
-  - `SWF-007`, `SWF-008`
-- Promoted and completed in `v0.4.0-H36`:
-  - `SWF-006`
-- Promoted and completed in `v0.4.0-H35`:
-  - `SWF-005`
-- Promoted and completed in `v0.4.0-H34`:
-  - `SWF-001`, `SWF-002`, `SWF-003`
-- Promoted and completed in `v0.4.0-H33`:
-  - `CMD-010`, `CMD-011`, `CMD-012`
-- Promoted and completed in `v0.4.0-H32`:
-  - `CMD-007`, `CMD-008`, `CMD-009`
-- Promoted and completed in `v0.4.0-H31`:
-  - `CMD-004`, `CMD-005`, `CMD-006`
-- Promoted and completed in `v0.4.0-H30`:
-  - `CMD-001`, `CMD-002`, `CMD-003`
-- Promoted and completed in `v0.4.0-H20`:
-  - `REP-004`, `REP-005`
-- Promoted and completed in `v0.4.0-H19`:
-  - `REP-001`, `REP-002`, `REP-003`
-- Promoted and completed in `v0.4.0-H18`:
-  - `DRV-001`, `DRV-002`, `DRV-005`
-
-### Remote and SSH
-
-- Promoted and completed in `v0.4.0-H48`:
-  - `REM-007A`, `REM-007B`, `REM-007C`
-- Promoted and completed in `v0.4.0-H47`:
-  - `REM-006A`, `REM-006B`, `REM-006C`
-- Promoted and completed in `v0.4.0-H40`:
-  - `REM-004A`, `REM-004B`, `REM-004C`
-- Promoted and completed in `v0.4.0-H38`:
-  - `REM-001`, `REM-002`, `REM-003`, `REM-009`

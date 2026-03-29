@@ -1,8 +1,10 @@
-# DONE - ptydeck
+# CHANGELOG - ptydeck
 
-Completed and verified topics belong here.
+Completed and validated release history belongs here.
 
 ## 2026-03-29
+
+- [x] Documentation governance refactor completed: completed-wave history now lives in `CHANGELOG.md`, `ROADMAP.md` now carries active and queued execution order only, `TODO-OUTLOOK.md` now carries only future epics and deferred explicit backlog, and `CODEX_CONTEXT.md` now keeps only current persistent architecture/governance context instead of duplicating completed-wave history.
 
 - [x] `UX-017` is now completed as part of `v0.4.0-H52`: the backend session contract now persists one explicit per-session `mouseForwardingMode` field with deterministic normalized values (`off`, `application`), default-off behavior, request/response validation, OpenAPI exposure, and restart-safe restore semantics.
 - [x] The H52 backend contract slice added `backend/src/session-mouse-forwarding.js` and updated `backend/src/session-manager.js`, `backend/src/runtime.js`, `backend/src/validation.js`, and `backend/openapi/openapi.yaml` so create, patch, restart, restore, and response paths all share the same authoritative `mouseForwardingMode` normalization and do not fall back to frontend-local shadow state.
@@ -666,7 +668,7 @@ Completed and verified topics belong here.
 - [x] Added focused regression coverage for the new workspace render controller in `frontend/test/workspace-render-controller.test.js`.
 - [x] Frontend build/lint script coverage updated so `src/public/ui/workspace-render-controller.js` is included in syntax-check gates.
 - [x] Validation for this ARC-010 step passed with `npm --prefix frontend run lint` and targeted tests/coverage: `node --test frontend/test/workspace-render-controller.test.js frontend/test/layout-settings-controller.test.js frontend/test/session-card-meta-controller.test.js` and `node --test --experimental-test-coverage frontend/test/workspace-render-controller.test.js frontend/test/layout-settings-controller.test.js frontend/test/session-card-meta-controller.test.js`.
-- [x] Documentation governance cleanup completed: `TODO.md` now contains open tasks only (`ARC-010` ... `ARC-012`) and no longer mixes in completed `[x]` task history; completed history remains in `DONE.md`.
+- [x] Documentation governance cleanup completed: `TODO.md` now contains open tasks only (`ARC-010` ... `ARC-012`) and no longer mixes in completed `[x]` task history; completed history remains in `CHANGELOG.md`.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` was re-aligned against `docs/*.md`, and explicit deferred review-derived tasks (`DRV-001` ... `DRV-005`) were added for shell-adapter CWD tracking, replay-retention policy, command-schema formalization, command/output correlation, and shell-compatibility QA coverage.
 - [x] Context persistence sync completed: `CODEX_CONTEXT.md` now records the docs-vs-outlook alignment and the new `DRV-*` deferred planning baseline.
 - [x] Documentation sync pass completed: `TODO-OUTLOOK.md` now captures deferred slash-workflow-chain follow-ups as explicit owned tasks (`SWF-001` ... `SWF-008`) instead of leaving the concept only in `docs/`.
@@ -806,7 +808,7 @@ Completed and verified topics belong here.
 - [x] Frontend command registry/state resolution, selector/autocomplete parsing, session-view normalization, and command-suggestion rendering now live behind explicit module boundaries instead of being embedded directly in the app runtime file.
 - [x] Frontend unit coverage was expanded for the new module surfaces (`command-engine`, `session-view-model`, `terminal-stream`, `ui/components`) and frontend `build`/`lint` now syntax-check the extracted files directly.
 - [x] Validation for `QLT-100` passed: `npm --prefix frontend run lint`, `npm --prefix frontend run test`, `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
-- [x] The deferred-planning document was renamed from `OUTLOOK-TODO.md` to `TODO-OUTLOOK.md`, and repository references were synchronized (`AGENTS.md`, `CODEX_CONTEXT.md`, `docs/README.md`, `TODO.md`, `DONE.md`).
+- [x] The deferred-planning document was renamed from `OUTLOOK-TODO.md` to `TODO-OUTLOOK.md`, and repository references were synchronized (`AGENTS.md`, `CODEX_CONTEXT.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`).
 - [x] External terminal/SSH tool survey follow-up was captured as explicit medium-term backlog in `TODO-OUTLOOK.md` (`REM-001` ... `REM-009`) instead of expanding the active near-term `TODO.md` scope.
 - [x] The same external-tool survey also produced one near-term active-scope UX backlog item set in `TODO.md`/`ROADMAP.md`: terminal output search/find (`QLT-110`, `QLT-111`), which is now implemented and validated.
 - [x] `QLT-102` completed: the left sidebar now renders deck-local terminal navigation beneath each deck entry, with indented clickable session buttons and visible quick IDs alongside session names.
@@ -986,7 +988,7 @@ Completed and verified topics belong here.
 - [x] Frontend settings layout rebalanced for modern usability: startup + theme remain primary content sections while session actions moved into dialog header actions.
 - [x] Frontend hotfix: command-composer inline slash hint now uses the exact same font family, size, line-height, and spacing as the textarea input text.
 - [x] Documentation sync pass completed for `CODEX_CONTEXT.md` (current state/wording/date alignment).
-- [x] Repository markdown governance check completed: `TODO.md` (what), `ROADMAP.md` (order/version/dependencies), `DONE.md`, and `CODEX_CONTEXT.md` are aligned; open-task ownership is explicit.
+- [x] Repository markdown governance check completed: `TODO.md` (what), `ROADMAP.md` (order/version/dependencies), `CHANGELOG.md`, and `CODEX_CONTEXT.md` are aligned; open-task ownership is explicit.
 - [x] Frontend hotfix: slash-suggestion typography and inline-hint offset were aligned with composer text metrics to remove visual font/position drift.
 - [x] Frontend hotfix: command status/feedback block was moved from workspace top into the composer area, then compacted to avoid vertical bloat.
 - [x] Frontend hotfix: composer layout split into meta + entry rows so the `Send` button is height-bound to the textarea row only.
@@ -1004,11 +1006,11 @@ Completed and verified topics belong here.
 ## 2026-03-22
 
 - [x] Initial `README.md` drafted with architecture, protocol, and operational concepts.
-- [x] Initial planning set created: `TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`.
+- [x] Initial planning set created: `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`.
 - [x] Documentation normalized to US English and ownership model defined.
 - [x] `CODEX_CONTEXT.md` created to persist project context for future Codex runs.
 - [x] `DOC-001` completed: `CODEX_CONTEXT.md` synchronized with current architecture, ownership model, and process rules.
-- [x] `DOC-002` completed: planning docs (`TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`) aligned and kept consistent.
+- [x] `DOC-002` completed: planning docs (`TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`) aligned and kept consistent.
 - [x] Git repository initialized in `/home/wsl/workspace/code/ptydeck`.
 - [x] `v0.1.0` baseline delivery completed: `BE-001`, `BE-002`, `FE-001`, `INT-001`, `INT-002`, `INT-009` implemented.
 - [x] CI baseline implemented (`INT-003`) with lint, test, and build jobs for backend and frontend.
@@ -1398,6 +1400,6 @@ Completed and verified topics belong here.
 
 ## Maintenance Rules
 
-- Move tasks to `DONE.md` only after implementation and verification.
+- Move tasks to `CHANGELOG.md` only after implementation and verification.
 - Keep entries factual and traceable to commits.
 - Keep chronological order by date.

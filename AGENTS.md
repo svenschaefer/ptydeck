@@ -34,9 +34,9 @@ This file documents the active roles, responsibilities, and collaboration rules 
 ## 3. Source-of-Truth Documents
 
 - `TODO.md`: explicit, concrete tasks only (what to build)
-- `ROADMAP.md`: ordering, versions, dependencies, release flow
-- `DONE.md`: completed and verified work only
-- `TODO-OUTLOOK.md`: mid/long-term items only
+- `ROADMAP.md`: active and queued ordering, versions, and dependencies
+- `CHANGELOG.md`: completed and validated release history only
+- `TODO-OUTLOOK.md`: future epics and deferred explicit backlog only
 - `CODEX_CONTEXT.md`: persistent project context and governance
 - `DEPLOYMENT.md`: production/deployment runbook
 
@@ -46,7 +46,7 @@ This file documents the active roles, responsibilities, and collaboration rules 
 - Do not mark tasks as done before implementation + validation.
 - Keep strict planning-document separation:
   - `TODO.md` must contain open tasks only.
-  - `DONE.md` must contain completed/validated work only.
+  - `CHANGELOG.md` must contain completed and validated release history only.
 - Update `ROADMAP.md` when task sequencing/dependencies change.
 - Update `CODEX_CONTEXT.md` for architecture/process/governance changes.
 - Keep ownership explicit on all tasks in `TODO.md`.
@@ -70,7 +70,7 @@ This file documents the active roles, responsibilities, and collaboration rules 
    - `npm run test:coverage:check` (or documented equivalent for the current scope)
 5. Fix issues until validation is green.
 6. Confirm no hanging/background validation processes remain.
-7. Update docs (`TODO.md`, `DONE.md`, `ROADMAP.md`, `CODEX_CONTEXT.md`, and others as needed).
+7. Update docs (`TODO.md`, `CHANGELOG.md`, `ROADMAP.md`, `TODO-OUTLOOK.md`, `CODEX_CONTEXT.md`, and others as needed).
 8. Commit with clear message and push.
 
 ## 7. Runtime Notes

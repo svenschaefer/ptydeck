@@ -2,7 +2,7 @@
 
 This file defines concrete, open implementation tasks only.
 Ordering, versions, and dependency sequencing live in `ROADMAP.md`.
-Completed work belongs in `DONE.md`.
+Completed work belongs in `CHANGELOG.md`.
 
 ## Ownership Model
 
@@ -18,4 +18,4 @@ Completed work belongs in `DONE.md`.
 
 ## Active Ownership Role
 
-- `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `DONE.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.
+- `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.

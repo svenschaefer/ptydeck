@@ -10,9 +10,9 @@ The imported review notes are useful inputs, but they are not the authoritative 
 Authoritative repository documents remain:
 
 - `TODO.md` for explicit implementation tasks
-- `ROADMAP.md` for ordering, versions, and dependencies
-- `DONE.md` for completed work
-- `TODO-OUTLOOK.md` for deferred mid/long-term items
+- `ROADMAP.md` for active and queued ordering, versions, and dependencies
+- `CHANGELOG.md` for completed and validated release history
+- `TODO-OUTLOOK.md` for future epics and deferred explicit backlog
 - `CODEX_CONTEXT.md` for persistent project context
 - `docs/adr/` for durable architecture/development decisions that require ADR treatment
 
