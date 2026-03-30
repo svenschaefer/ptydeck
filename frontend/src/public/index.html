@@ -117,31 +117,28 @@
         </button>
         <div id="workspace-shell" class="workspace-shell">
           <section id="control-pane" class="control-pane">
-            <div class="control-pane-head">
-              <div class="control-pane-heading">
-                <p class="control-pane-title">Control Plane</p>
-                <p id="control-pane-status" class="control-pane-status"></p>
-              </div>
-              <div class="control-pane-actions">
-                <label class="control-pane-position-wrap">
-                  <span>Position</span>
-                  <select id="control-pane-position" aria-label="Control pane position">
-                    <option value="bottom">Bottom</option>
-                    <option value="top">Top</option>
-                    <option value="left">Left</option>
-                    <option value="right">Right</option>
-                  </select>
-                </label>
-                <button id="control-pane-toggle" type="button">Hide</button>
-              </div>
-            </div>
             <div class="control-pane-body">
               <section class="command-row">
                 <div class="command-input-column">
                   <div class="command-meta">
-                    <p id="status-message" class="status-message"></p>
-                    <p id="command-target" class="command-target"></p>
-                    <p id="command-feedback" class="command-feedback"></p>
+                    <div class="command-meta-main">
+                      <p id="status-message" class="status-message"></p>
+                      <p id="command-target" class="command-target"></p>
+                      <p id="command-feedback" class="command-feedback"></p>
+                    </div>
+                    <div class="command-meta-actions">
+                      <p id="control-pane-status" class="control-pane-status"></p>
+                      <label class="control-pane-position-wrap">
+                        <span>Position</span>
+                        <select id="control-pane-position" aria-label="Control pane position">
+                          <option value="bottom">Bottom</option>
+                          <option value="top">Top</option>
+                          <option value="left">Left</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </label>
+                      <button id="control-pane-toggle" type="button">Hide</button>
+                    </div>
                   </div>
                   <div class="command-entry-row">
                     <div class="command-input-wrap">
