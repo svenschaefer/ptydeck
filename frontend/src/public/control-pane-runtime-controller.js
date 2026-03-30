@@ -12,13 +12,13 @@ function normalizeControlPaneSize(value) {
   if (Number.isInteger(normalized) && normalized >= 120 && normalized <= 960) {
     return normalized;
   }
-  return 240;
+  return 185;
 }
 
 function clampControlPaneSize(value) {
   const normalized = Number.parseInt(String(value ?? ""), 10);
   if (!Number.isInteger(normalized)) {
-    return 240;
+    return 185;
   }
   return Math.max(120, Math.min(960, normalized));
 }

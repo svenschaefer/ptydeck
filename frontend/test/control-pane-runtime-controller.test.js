@@ -117,7 +117,7 @@ test("control pane runtime controller toggles visibility and renders status", ()
   assert.deepEqual(controller.getState(), {
     controlPaneVisible: true,
     controlPanePosition: "bottom",
-    controlPaneSize: 240
+    controlPaneSize: 185
   });
   assert.equal(controlPaneEl.hidden, false);
   assert.equal(launcherEl.hidden, true);

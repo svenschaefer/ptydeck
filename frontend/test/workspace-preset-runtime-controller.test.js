@@ -310,7 +310,7 @@ test("workspace preset runtime controller normalizes stale references and resolv
   assert.equal(normalized.layoutProfileId, "");
   assert.equal(normalized.controlPaneVisible, false);
   assert.equal(normalized.controlPanePosition, "left");
-  assert.equal(normalized.controlPaneSize, 240);
+  assert.equal(normalized.controlPaneSize, 185);
   assert.equal(normalized.deckGroups.ghost, undefined);
   assert.deepEqual(normalized.deckGroups.ops.groups[0].sessionIds, ["s2"]);
   assert.equal(normalized.deckSplitLayouts.ghost, undefined);

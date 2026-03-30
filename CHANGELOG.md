@@ -4,6 +4,7 @@ Completed and validated release history belongs here.
 
 ## 2026-03-30
 
+- [x] Reduced the default control-pane size baseline from `240px` to `185px` for the new five-row command composer, updating the CSS default plus the control-pane, layout-profile, and workspace-preset runtime normalizers so fresh state and fallback-normalized persisted state converge on the same smaller default.
 - [x] Removed the redundant `Pane main` chrome from single-pane split layouts: `frontend/src/public/split-layout-runtime-controller.js` now hides the split-pane header whenever a deck has only one pane, so the unsplit terminal area no longer wastes vertical space on title/meta/action chrome while multi-pane layouts keep their existing pane controls.
 - [x] Fixed the remaining single-pane split-header visibility bug in `frontend/src/public/styles.css` by adding an explicit `.split-pane-head[hidden] { display: none; }` rule; the previous controller change was setting the `hidden` attribute correctly, but the author-level `.split-pane-head { display: flex; }` rule was overriding the browser default hidden behavior.
 - [x] Reduced left-sidebar overload by removing the `Connections` and `Workspace` management panels from `frontend/src/public/index.html`; the underlying saved connection-profile and workspace-preset/group runtimes remain available through the existing slash-command/runtime surfaces, and a follow-up re-entry task is now queued for a clearer dedicated management surface outside the sidebar.

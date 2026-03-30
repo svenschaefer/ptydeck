@@ -92,7 +92,7 @@ function normalizeControlPaneSize(value) {
   if (Number.isInteger(normalized) && normalized >= 120 && normalized <= 960) {
     return normalized;
   }
-  return 240;
+  return 185;
 }
 
 function normalizeControlPaneState(source) {
