@@ -4,6 +4,7 @@ Completed and validated release history belongs here.
 
 ## 2026-03-30
 
+- [x] Tightened two remaining control-pane typography/layout details in `frontend/src/public/styles.css`: `.command-feedback` now uses `line-height: 1` and can wrap up to two lines instead of being forced onto one truncated line, and `.control-pane-meta` now uses the smaller `padding: 4px 16px` chrome requested for the compact control-pane layout.
 - [x] Reduced the default control-pane size baseline from `240px` to `185px` for the new five-row command composer, updating the CSS default plus the control-pane, layout-profile, and workspace-preset runtime normalizers so fresh state and fallback-normalized persisted state converge on the same smaller default.
 - [x] Removed the redundant `Pane main` chrome from single-pane split layouts: `frontend/src/public/split-layout-runtime-controller.js` now hides the split-pane header whenever a deck has only one pane, so the unsplit terminal area no longer wastes vertical space on title/meta/action chrome while multi-pane layouts keep their existing pane controls.
 - [x] Fixed the remaining single-pane split-header visibility bug in `frontend/src/public/styles.css` by adding an explicit `.split-pane-head[hidden] { display: none; }` rule; the previous controller change was setting the `hidden` attribute correctly, but the author-level `.split-pane-head { display: flex; }` rule was overriding the browser default hidden behavior.

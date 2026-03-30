@@ -285,7 +285,7 @@ body {
 }
 
 .control-pane-meta {
-  padding: 8px 14px;
+  padding: 4px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -809,8 +809,12 @@ body {
   min-height: 0;
   color: #8ec07c;
   font-size: 12px;
-  line-height: 1.35;
-  white-space: nowrap;
+  line-height: 1;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  word-break: break-word;
   overflow: hidden;
   text-overflow: ellipsis;
 }
