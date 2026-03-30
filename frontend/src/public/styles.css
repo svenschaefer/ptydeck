@@ -1112,6 +1112,10 @@ button:hover {
   background: rgba(16, 25, 36, 0.82);
 }
 
+.split-pane-head[hidden] {
+  display: none;
+}
+
 .split-pane-heading {
   display: grid;
   gap: 2px;
