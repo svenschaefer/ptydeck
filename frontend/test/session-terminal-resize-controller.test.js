@@ -204,3 +204,55 @@ test("session-terminal-resize controller uses runtime cell metrics for width and
   assert.equal(terminals.get("s1").mount.style.width, "680px");
   assert.equal(terminals.get("s1").mount.style.height, "270px");
 });
+
+test("session-terminal-resize controller reapplies mount geometry when runtime metrics appear later", () => {
+  const windowRef = createFakeWindow();
+  const resizeCalls = [];
+  let runtimeCellHeightPx = 0;
+  let runtimeCellWidthPx = 0;
+  const entry = {
+    mount: { clientWidth: 640, clientHeight: 320, style: {} },
+    element: { style: {} },
+    terminal: {
+      resize(cols, rows) {
+        resizeCalls.push(`${cols}x${rows}`);
+      }
+    }
+  };
+  const terminals = new Map([["s1", entry]]);
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    terminals,
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    getSessionById: (sessionId) => ({ id: sessionId, deckId: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionTerminalGeometry: () => ({ cols: 80, rows: 24 }),
+    computeFixedMountHeightPx: () => 240,
+    computeFixedCardWidthPx: () => 820,
+    getTerminalCellHeightPx: () => runtimeCellHeightPx,
+    getTerminalCellWidthPx: () => runtimeCellWidthPx,
+    terminalCardHorizontalChromePx: 20,
+    terminalMountVerticalChromePx: 18,
+    api: {
+      resizeSession() {
+        return Promise.resolve();
+      }
+    }
+  });
+
+  controller.applyResizeForSession("s1");
+  assert.equal(entry.mount.style.height, "240px");
+  assert.equal(entry.mount.style.width, "800px");
+  assert.equal(entry.element.style.width, "820px");
+  assert.deepEqual(resizeCalls, ["80x24"]);
+
+  runtimeCellHeightPx = 10.5;
+  runtimeCellWidthPx = 8.5;
+  controller.applyResizeForSession("s1");
+
+  assert.equal(entry.mount.style.height, "270px");
+  assert.equal(entry.mount.style.width, "680px");
+  assert.equal(entry.element.style.width, "700px");
+  assert.deepEqual(resizeCalls, ["80x24"]);
+});

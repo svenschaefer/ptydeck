@@ -96,13 +96,14 @@ export function createSessionTerminalResizeController(options = {}) {
       return;
     }
 
+    applyMountHeight(entry, cols, rows);
+
     const previous = terminalSizes.get(sessionId);
     if (!options.force && previous && previous.cols === cols && previous.rows === rows) {
       return;
     }
 
     terminalSizes.set(sessionId, { cols, rows });
-    applyMountHeight(entry, cols, rows);
     entry.terminal.resize(cols, rows);
     debugLog("terminal.resize.local", { sessionId, cols, rows });
 
