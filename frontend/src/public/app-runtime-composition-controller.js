@@ -22,6 +22,7 @@ import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-c
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createTraceDebugController } from "./trace-debug-controller.js";
+import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
   getTerminalCellHeightPx,
@@ -141,9 +142,11 @@ const layoutProfileStatusEl = document.getElementById("layout-profile-status");
 const connectionProfileSelectEl = document.getElementById("connection-profile-select");
 const connectionProfileSaveBtn = document.getElementById("connection-profile-save");
 const connectionProfileApplyBtn = document.getElementById("connection-profile-apply");
+const connectionProfileDuplicateBtn = document.getElementById("connection-profile-duplicate");
 const connectionProfileRenameBtn = document.getElementById("connection-profile-rename");
 const connectionProfileDeleteBtn = document.getElementById("connection-profile-delete");
 const connectionProfileStatusEl = document.getElementById("connection-profile-status");
+const connectionProfileSummaryEl = document.getElementById("connection-profile-summary");
 const workspacePresetSelectEl = document.getElementById("workspace-preset-select");
 const workspacePresetSaveBtn = document.getElementById("workspace-preset-save");
 const workspacePresetApplyBtn = document.getElementById("workspace-preset-apply");
@@ -156,6 +159,8 @@ const workspacePresetGroupRenameBtn = document.getElementById("workspace-group-r
 const workspacePresetGroupDeleteBtn = document.getElementById("workspace-group-delete");
 const workspacePresetGroupClearBtn = document.getElementById("workspace-group-clear");
 const workspacePresetStatusEl = document.getElementById("workspace-preset-status");
+const workspacePresetSummaryEl = document.getElementById("workspace-preset-summary");
+const workspaceGroupSummaryEl = document.getElementById("workspace-group-summary");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
@@ -200,6 +205,14 @@ const commandPaletteInputEl = document.getElementById("command-palette-input");
 const commandPaletteResultsEl = document.getElementById("command-palette-results");
 const commandPaletteEmptyEl = document.getElementById("command-palette-empty");
 const commandPaletteCloseBtn = document.getElementById("command-palette-close");
+const workspaceManagerOpenBtn = document.getElementById("workspace-manager-open");
+const workspaceManagerDialogEl = document.getElementById("workspace-manager-dialog");
+const workspaceManagerCloseBtn = document.getElementById("workspace-manager-close");
+const workspaceManagerMetaEl = document.getElementById("workspace-manager-meta");
+const workspaceManagerConnectionsTabBtn = document.getElementById("workspace-manager-tab-connections");
+const workspaceManagerWorkspaceTabBtn = document.getElementById("workspace-manager-tab-workspace");
+const workspaceManagerConnectionsPanelEl = document.getElementById("workspace-manager-panel-connections");
+const workspaceManagerWorkspacePanelEl = document.getElementById("workspace-manager-panel-workspace");
 const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
 const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
@@ -396,6 +409,7 @@ let commandPaletteRuntimeController = null;
 let controlPaneRuntimeController = null;
 let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
+let workspaceManagerRuntimeController = null;
 let broadcastInputRuntimeController = null;
 let splitLayoutRuntimeController = null;
 let slashWorkflowRuntimeController = null;
@@ -514,6 +528,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
   getControlPaneRuntimeController: () => controlPaneRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
+  getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
   getCommandExecutor: () => commandExecutor
 });
 
@@ -643,6 +658,7 @@ connectionProfileRuntimeController = createConnectionProfileRuntimeController({
   selectEl: connectionProfileSelectEl,
   saveBtn: connectionProfileSaveBtn,
   applyBtn: connectionProfileApplyBtn,
+  duplicateBtn: connectionProfileDuplicateBtn,
   renameBtn: connectionProfileRenameBtn,
   deleteBtn: connectionProfileDeleteBtn,
   statusEl: connectionProfileStatusEl,
@@ -703,6 +719,26 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   requestRender: () => appCommandUiFacadeController?.render?.(),
   getDeckSplitLayouts: () => splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
   setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
+});
+
+workspaceManagerRuntimeController = createWorkspaceManagerRuntimeController({
+  dialogEl: workspaceManagerDialogEl,
+  openBtn: workspaceManagerOpenBtn,
+  closeBtn: workspaceManagerCloseBtn,
+  metaEl: workspaceManagerMetaEl,
+  connectionsTabBtn: workspaceManagerConnectionsTabBtn,
+  workspaceTabBtn: workspaceManagerWorkspaceTabBtn,
+  connectionsPanelEl: workspaceManagerConnectionsPanelEl,
+  workspacePanelEl: workspaceManagerWorkspacePanelEl,
+  connectionSelectEl: connectionProfileSelectEl,
+  workspacePresetSelectEl,
+  workspaceGroupSelectEl: workspacePresetGroupSelectEl,
+  connectionSummaryEl: connectionProfileSummaryEl,
+  workspacePresetSummaryEl,
+  workspaceGroupSummaryEl,
+  getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
+  getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
+  getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID
 });
 
 broadcastInputRuntimeController = createBroadcastInputRuntimeController({
@@ -1180,6 +1216,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   layoutProfileRuntimeController,
   connectionProfileRuntimeController,
   workspacePresetRuntimeController,
+  workspaceManagerRuntimeController,
   broadcastInputRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,

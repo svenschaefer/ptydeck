@@ -256,6 +256,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const selectEl = options.selectEl || null;
   const saveBtn = options.saveBtn || null;
   const applyBtn = options.applyBtn || null;
+  const duplicateBtn = options.duplicateBtn || null;
   const renameBtn = options.renameBtn || null;
   const deleteBtn = options.deleteBtn || null;
   const statusEl = options.statusEl || null;
@@ -313,6 +314,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
     }
     if (renameBtn) {
       renameBtn.disabled = profiles.length === 0;
+    }
+    if (duplicateBtn) {
+      duplicateBtn.disabled = profiles.length === 0;
     }
     if (deleteBtn) {
       deleteBtn.disabled = profiles.length === 0;
@@ -466,6 +470,23 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return `Renamed connection profile [${updated.id}] to ${updated.name}.`;
   }
 
+  async function duplicateProfileById(profileId, name) {
+    const profile = getProfile(profileId);
+    if (!profile) {
+      throw new Error(`Unknown connection profile: ${profileId}`);
+    }
+    const normalizedName = normalizeText(name);
+    if (!normalizedName) {
+      throw new Error("Connection profile name is required.");
+    }
+    const created = await api.createConnectionProfile({
+      name: normalizedName,
+      launch: profile.launch
+    });
+    const duplicated = upsertProfile(created);
+    return `Duplicated connection profile [${profile.id}] ${profile.name} as [${duplicated.id}] ${duplicated.name}.`;
+  }
+
   async function deleteProfileById(profileId) {
     const profile = getProfile(profileId);
     if (!profile) {
@@ -535,6 +556,22 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return feedback;
   }
 
+  async function duplicateSelectedProfileFlow(name) {
+    const profile = getSelectedProfile();
+    if (!profile) {
+      return "";
+    }
+    const defaultName = `${profile.name} Copy`;
+    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Connection profile name", defaultName));
+    if (!input) {
+      return "";
+    }
+    const feedback = await duplicateProfileById(profile.id, input);
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
   async function deleteSelectedProfileFlow() {
     const profile = getSelectedProfile();
     if (!profile) {
@@ -561,6 +598,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
     applyBtn?.addEventListener?.("click", () => {
       applySelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to apply connection profile.")));
     });
+    duplicateBtn?.addEventListener?.("click", () => {
+      duplicateSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to duplicate connection profile.")));
+    });
     renameBtn?.addEventListener?.("click", () => {
       renameSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to rename connection profile.")));
     });
@@ -574,6 +614,8 @@ export function createConnectionProfileRuntimeController(options = {}) {
   return {
     listProfiles,
     getProfile,
+    getSelectedProfile,
+    getSelectedProfileId: () => selectedProfileId,
     resolveProfile,
     replaceProfiles,
     upsertProfile,
@@ -582,10 +624,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     createProfileFromSession,
     applyProfileById,
     renameProfileById,
+    duplicateProfileById,
     deleteProfileById,
     loadProfiles,
     createProfileFlow,
     applySelectedProfileFlow,
+    duplicateSelectedProfileFlow,
     renameSelectedProfileFlow,
     deleteSelectedProfileFlow,
     bindUiEvents,

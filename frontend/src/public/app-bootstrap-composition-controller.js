@@ -100,6 +100,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const layoutProfileRuntimeController = options.layoutProfileRuntimeController || null;
   const connectionProfileRuntimeController = options.connectionProfileRuntimeController || null;
   const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
+  const workspaceManagerRuntimeController = options.workspaceManagerRuntimeController || null;
   const broadcastInputRuntimeController = options.broadcastInputRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
   const sessionTerminalResizeController = options.sessionTerminalResizeController || null;
@@ -458,6 +459,7 @@ export function createAppBootstrapCompositionController(options = {}) {
     layoutProfileRuntimeController?.bindUiEvents?.();
     connectionProfileRuntimeController?.bindUiEvents?.();
     workspacePresetRuntimeController?.bindUiEvents?.();
+    workspaceManagerRuntimeController?.bindUiEvents?.();
     terminalSearchController?.bindUiEvents?.();
     terminalSearchController?.updateUi?.();
     commandComposerAutocompleteController.bindUiEvents?.();

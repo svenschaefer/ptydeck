@@ -177,6 +177,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   const calls = [];
   const selectEl = createElement("select");
   const statusEl = createElement("p");
+  const duplicateBtn = createElement("button");
   let activeSessionId = "s-local";
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
@@ -192,6 +193,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
     documentRef: createDocumentRef(),
     selectEl,
     statusEl,
+    duplicateBtn,
     api: {
       async listConnectionProfiles() {
         calls.push(["list"]);
@@ -219,8 +221,9 @@ test("connection profile runtime controller manages backend-backed lifecycle and
       },
       async createConnectionProfile(payload) {
         calls.push(["create", payload]);
+        const createdId = payload.name === "Ops SSH Copy" ? "ops-ssh-copy" : "local-dev";
         return {
-          id: "local-dev",
+          id: createdId,
           name: payload.name,
           createdAt: 2,
           updatedAt: 2,
@@ -318,6 +321,13 @@ test("connection profile runtime controller manages backend-backed lifecycle and
 
   const renameFeedback = await controller.renameProfileById("ops-ssh", "Ops SSH Prod");
   assert.equal(renameFeedback, "Renamed connection profile [ops-ssh] to Ops SSH Prod.");
+
+  const duplicateFeedback = await controller.duplicateProfileById("ops-ssh", "Ops SSH Copy");
+  assert.equal(
+    duplicateFeedback,
+    "Duplicated connection profile [ops-ssh] Ops SSH Prod as [ops-ssh-copy] Ops SSH Copy."
+  );
+  assert.equal(controller.getSelectedProfileId(), "ops-ssh-copy");
 
   const deleteFeedback = await controller.deleteProfileById("ops-ssh");
   assert.equal(deleteFeedback, "Deleted connection profile [ops-ssh] Ops SSH Prod.");

@@ -619,6 +619,37 @@ function createDocumentFixture() {
   const commandPaletteEmpty = new FakeElement({ id: "command-palette-empty", tagName: "p" });
   commandPaletteEmpty.hidden = true;
   const commandPaletteClose = new FakeElement({ id: "command-palette-close", tagName: "button" });
+  const workspaceManagerOpen = new FakeElement({ id: "workspace-manager-open", tagName: "button" });
+  const workspaceManagerDialog = new FakeElement({ id: "workspace-manager-dialog", tagName: "dialog" });
+  const workspaceManagerClose = new FakeElement({ id: "workspace-manager-close", tagName: "button" });
+  const workspaceManagerMeta = new FakeElement({ id: "workspace-manager-meta", tagName: "p" });
+  const workspaceManagerTabConnections = new FakeElement({ id: "workspace-manager-tab-connections", tagName: "button" });
+  const workspaceManagerTabWorkspace = new FakeElement({ id: "workspace-manager-tab-workspace", tagName: "button" });
+  const workspaceManagerPanelConnections = new FakeElement({ id: "workspace-manager-panel-connections", tagName: "section" });
+  const workspaceManagerPanelWorkspace = new FakeElement({ id: "workspace-manager-panel-workspace", tagName: "section" });
+  workspaceManagerPanelWorkspace.hidden = true;
+  const connectionProfileSelect = new FakeElement({ id: "connection-profile-select", tagName: "select" });
+  const connectionProfileSave = new FakeElement({ id: "connection-profile-save", tagName: "button" });
+  const connectionProfileApply = new FakeElement({ id: "connection-profile-apply", tagName: "button" });
+  const connectionProfileDuplicate = new FakeElement({ id: "connection-profile-duplicate", tagName: "button" });
+  const connectionProfileRename = new FakeElement({ id: "connection-profile-rename", tagName: "button" });
+  const connectionProfileDelete = new FakeElement({ id: "connection-profile-delete", tagName: "button" });
+  const connectionProfileStatus = new FakeElement({ id: "connection-profile-status", tagName: "p" });
+  const connectionProfileSummary = new FakeElement({ id: "connection-profile-summary", tagName: "p" });
+  const workspacePresetSelect = new FakeElement({ id: "workspace-preset-select", tagName: "select" });
+  const workspacePresetSave = new FakeElement({ id: "workspace-preset-save", tagName: "button" });
+  const workspacePresetApply = new FakeElement({ id: "workspace-preset-apply", tagName: "button" });
+  const workspacePresetRename = new FakeElement({ id: "workspace-preset-rename", tagName: "button" });
+  const workspacePresetDelete = new FakeElement({ id: "workspace-preset-delete", tagName: "button" });
+  const workspaceGroupSelect = new FakeElement({ id: "workspace-group-select", tagName: "select" });
+  const workspaceGroupSave = new FakeElement({ id: "workspace-group-save", tagName: "button" });
+  const workspaceGroupApply = new FakeElement({ id: "workspace-group-apply", tagName: "button" });
+  const workspaceGroupRename = new FakeElement({ id: "workspace-group-rename", tagName: "button" });
+  const workspaceGroupDelete = new FakeElement({ id: "workspace-group-delete", tagName: "button" });
+  const workspaceGroupClear = new FakeElement({ id: "workspace-group-clear", tagName: "button" });
+  const workspacePresetStatus = new FakeElement({ id: "workspace-preset-status", tagName: "p" });
+  const workspacePresetSummary = new FakeElement({ id: "workspace-preset-summary", tagName: "p" });
+  const workspaceGroupSummary = new FakeElement({ id: "workspace-group-summary", tagName: "p" });
   replayViewerDialog.appendChild(replayViewerTitle);
   replayViewerDialog.appendChild(replayViewerMeta);
   replayViewerDialog.appendChild(replayViewerStatus);
@@ -632,6 +663,11 @@ function createDocumentFixture() {
   commandPaletteDialog.appendChild(commandPaletteResults);
   commandPaletteDialog.appendChild(commandPaletteEmpty);
   commandPaletteDialog.appendChild(commandPaletteClose);
+  workspaceManagerDialog.appendChild(workspaceManagerMeta);
+  workspaceManagerDialog.appendChild(workspaceManagerTabConnections);
+  workspaceManagerDialog.appendChild(workspaceManagerTabWorkspace);
+  workspaceManagerDialog.appendChild(workspaceManagerPanelConnections);
+  workspaceManagerDialog.appendChild(workspaceManagerPanelWorkspace);
   const template = {
     id: "terminal-card-template",
     content: {
@@ -697,7 +733,37 @@ function createDocumentFixture() {
     commandPaletteInput,
     commandPaletteResults,
     commandPaletteEmpty,
-    commandPaletteClose
+    commandPaletteClose,
+    workspaceManagerOpen,
+    workspaceManagerDialog,
+    workspaceManagerClose,
+    workspaceManagerMeta,
+    workspaceManagerTabConnections,
+    workspaceManagerTabWorkspace,
+    workspaceManagerPanelConnections,
+    workspaceManagerPanelWorkspace,
+    connectionProfileSelect,
+    connectionProfileSave,
+    connectionProfileApply,
+    connectionProfileDuplicate,
+    connectionProfileRename,
+    connectionProfileDelete,
+    connectionProfileStatus,
+    connectionProfileSummary,
+    workspacePresetSelect,
+    workspacePresetSave,
+    workspacePresetApply,
+    workspacePresetRename,
+    workspacePresetDelete,
+    workspaceGroupSelect,
+    workspaceGroupSave,
+    workspaceGroupApply,
+    workspaceGroupRename,
+    workspaceGroupDelete,
+    workspaceGroupClear,
+    workspacePresetStatus,
+    workspacePresetSummary,
+    workspaceGroupSummary
   ]) {
     byId.set(element.id, element);
   }
@@ -758,7 +824,37 @@ function createDocumentFixture() {
       commandPaletteInput,
       commandPaletteResults,
       commandPaletteEmpty,
-      commandPaletteClose
+      commandPaletteClose,
+      workspaceManagerOpen,
+      workspaceManagerDialog,
+      workspaceManagerClose,
+      workspaceManagerMeta,
+      workspaceManagerTabConnections,
+      workspaceManagerTabWorkspace,
+      workspaceManagerPanelConnections,
+      workspaceManagerPanelWorkspace,
+      connectionProfileSelect,
+      connectionProfileSave,
+      connectionProfileApply,
+      connectionProfileDuplicate,
+      connectionProfileRename,
+      connectionProfileDelete,
+      connectionProfileStatus,
+      connectionProfileSummary,
+      workspacePresetSelect,
+      workspacePresetSave,
+      workspacePresetApply,
+      workspacePresetRename,
+      workspacePresetDelete,
+      workspaceGroupSelect,
+      workspaceGroupSave,
+      workspaceGroupApply,
+      workspaceGroupRename,
+      workspaceGroupDelete,
+      workspaceGroupClear,
+      workspacePresetStatus,
+      workspacePresetSummary,
+      workspaceGroupSummary
     },
     document: {
       getElementById(id) {
@@ -1358,6 +1454,14 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.statusMessage.textContent, "Loading sessions...");
   await sleep(320);
   assert.equal(listSessionsCalls, 1);
+
+  fixture.elements.workspaceManagerOpen.click();
+  assert.equal(fixture.elements.workspaceManagerDialog.open, true);
+  fixture.elements.workspaceManagerTabWorkspace.click();
+  assert.equal(fixture.elements.workspaceManagerPanelConnections.hidden, true);
+  assert.equal(fixture.elements.workspaceManagerPanelWorkspace.hidden, false);
+  fixture.elements.workspaceManagerClose.click();
+  assert.equal(fixture.elements.workspaceManagerDialog.open, false);
 
   fixture.elements.createSession.click();
   await waitFor(() => fixture.elements.statusMessage.textContent === "Failed to create session.");

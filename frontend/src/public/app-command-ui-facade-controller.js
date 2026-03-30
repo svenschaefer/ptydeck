@@ -24,6 +24,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     typeof options.getWorkspacePresetRuntimeController === "function"
       ? options.getWorkspacePresetRuntimeController
       : () => null;
+  const getWorkspaceManagerRuntimeController =
+    typeof options.getWorkspaceManagerRuntimeController === "function"
+      ? options.getWorkspaceManagerRuntimeController
+      : () => null;
   const getConnectionProfileRuntimeController =
     typeof options.getConnectionProfileRuntimeController === "function"
       ? options.getConnectionProfileRuntimeController
@@ -129,6 +133,7 @@ export function createAppCommandUiFacadeController(options = {}) {
     getConnectionProfileRuntimeController()?.render?.();
     getControlPaneRuntimeController()?.render?.();
     getWorkspacePresetRuntimeController()?.render?.();
+    getWorkspaceManagerRuntimeController()?.render?.();
   }
 
   async function executeControlCommand(interpreted) {

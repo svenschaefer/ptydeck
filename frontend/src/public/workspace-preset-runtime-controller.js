@@ -1163,6 +1163,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   return {
     listPresets,
     getPreset,
+    getSelectedPreset,
+    getSelectedPresetId: () => selectedPresetId,
     replacePresets,
     upsertPreset,
     removePreset,
