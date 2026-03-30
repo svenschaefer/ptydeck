@@ -4,7 +4,7 @@ function normalizeLower(value) {
 
 function normalizeControlPanePosition(value) {
   const normalized = normalizeLower(value);
-  return ["top", "bottom", "left", "right"].includes(normalized) ? normalized : "bottom";
+  return ["top", "bottom"].includes(normalized) ? normalized : "bottom";
 }
 
 function normalizeControlPaneSize(value) {
@@ -39,18 +39,6 @@ function setClassState(element, className, active) {
   element.classList.toggle(className, active === true);
 }
 
-function formatStatusText(storedPosition, effectivePosition, size, visible) {
-  if (visible !== true) {
-    return "Hidden";
-  }
-  const capitalizedStored = storedPosition.charAt(0).toUpperCase() + storedPosition.slice(1);
-  const capitalizedEffective = effectivePosition.charAt(0).toUpperCase() + effectivePosition.slice(1);
-  if (storedPosition !== effectivePosition) {
-    return `${capitalizedStored} saved · ${capitalizedEffective} active · ${size}px`;
-  }
-  return `${capitalizedEffective} · ${size}px`;
-}
-
 export function createControlPaneRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis.window || null;
   const workspaceShellEl = options.workspaceShellEl || null;
@@ -68,22 +56,8 @@ export function createControlPaneRuntimeController(options = {}) {
   let controlPaneState = normalizeControlPaneState(options.initialState);
   let lastRenderKey = "";
 
-  function getResponsiveWidth() {
-    const shellWidth = Number(workspaceShellEl?.clientWidth || 0);
-    if (shellWidth > 0) {
-      return shellWidth;
-    }
-    const windowWidth = Number(windowRef?.innerWidth || 0);
-    return windowWidth > 0 ? windowWidth : 0;
-  }
-
   function getEffectivePosition() {
-    const storedPosition = controlPaneState.controlPanePosition;
-    const responsiveWidth = getResponsiveWidth();
-    if ((storedPosition === "left" || storedPosition === "right") && responsiveWidth > 0 && responsiveWidth <= 900) {
-      return "bottom";
-    }
-    return storedPosition;
+    return controlPaneState.controlPanePosition;
   }
 
   function applyRenderedState() {
@@ -101,22 +75,14 @@ export function createControlPaneRuntimeController(options = {}) {
       workspaceShellEl.style?.setProperty?.("--control-pane-size-px", `${controlPaneState.controlPaneSize}px`);
       setClassState(workspaceShellEl, "control-pane-hidden", controlPaneState.controlPaneVisible !== true);
       setClassState(workspaceShellEl, "control-pane-visible", controlPaneState.controlPaneVisible === true);
-      setClassState(workspaceShellEl, "control-pane-pos-top", controlPaneState.controlPaneVisible === true && effectivePosition === "top");
-      setClassState(
-        workspaceShellEl,
-        "control-pane-pos-bottom",
-        controlPaneState.controlPaneVisible === true && effectivePosition === "bottom"
-      );
-      setClassState(workspaceShellEl, "control-pane-pos-left", controlPaneState.controlPaneVisible === true && effectivePosition === "left");
-      setClassState(
-        workspaceShellEl,
-        "control-pane-pos-right",
-        controlPaneState.controlPaneVisible === true && effectivePosition === "right"
-      );
+      setClassState(workspaceShellEl, "control-pane-pos-top", effectivePosition === "top");
+      setClassState(workspaceShellEl, "control-pane-pos-bottom", effectivePosition === "bottom");
+      setClassState(workspaceShellEl, "control-pane-pos-left", false);
+      setClassState(workspaceShellEl, "control-pane-pos-right", false);
     }
 
     if (controlPaneEl) {
-      controlPaneEl.hidden = controlPaneState.controlPaneVisible !== true;
+      controlPaneEl.hidden = false;
       if (controlPaneEl.dataset) {
         controlPaneEl.dataset.position = controlPaneState.controlPanePosition;
         controlPaneEl.dataset.effectivePosition = effectivePosition;
@@ -124,7 +90,7 @@ export function createControlPaneRuntimeController(options = {}) {
     }
 
     if (controlPaneLauncherBtn) {
-      controlPaneLauncherBtn.hidden = controlPaneState.controlPaneVisible === true;
+      controlPaneLauncherBtn.hidden = true;
     }
 
     if (controlPaneToggleBtn) {
@@ -140,12 +106,7 @@ export function createControlPaneRuntimeController(options = {}) {
     }
 
     if (controlPaneStatusEl) {
-      controlPaneStatusEl.textContent = formatStatusText(
-        controlPaneState.controlPanePosition,
-        effectivePosition,
-        controlPaneState.controlPaneSize,
-        controlPaneState.controlPaneVisible
-      );
+      controlPaneStatusEl.textContent = "";
     }
 
     if (controlPaneResizeHandleEl) {
@@ -214,11 +175,7 @@ export function createControlPaneRuntimeController(options = {}) {
 
       const onPointerMove = (moveEvent) => {
         let nextSize = controlPaneState.controlPaneSize;
-        if (effectivePosition === "left") {
-          nextSize = moveEvent.clientX - rect.left;
-        } else if (effectivePosition === "right") {
-          nextSize = rect.right - moveEvent.clientX;
-        } else if (effectivePosition === "top") {
+        if (effectivePosition === "top") {
           nextSize = moveEvent.clientY - rect.top;
         } else {
           nextSize = rect.bottom - moveEvent.clientY;

@@ -363,6 +363,7 @@ export function createSessionCardInteractionsController(options = {}) {
       applyThemeForSession(session.id);
       setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "");
       setSettingsDirty(getEntry(), false);
+      closeSettingsDialog(refs.settingsDialog);
     });
   }
 

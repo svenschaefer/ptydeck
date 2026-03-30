@@ -146,18 +146,27 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     sessionStatusEl: {},
     sessionArtifactsEl: {},
     settingsDialog: {},
+    settingsTabStartupBtn: {},
+    settingsTabNoteBtn: {},
+    settingsTabThemeBtn: {},
+    settingsPanelStartup: {},
+    settingsPanelNote: {},
+    settingsPanelTheme: {},
     startCwdInput: {},
     startCommandInput: {},
     startEnvInput: {},
     mouseForwardingModeSelect: {},
+    sessionNoteInput: {},
     sessionSendTerminatorSelect: {},
     sessionTagsInput: {},
     startFeedback: {},
     tagListEl: {},
     settingsApplyBtn: {},
+    settingsCancelBtn: {},
     settingsStatus: {},
     themeCategory: {},
     themeSearch: {},
+    themeSlotSelect: {},
     themeSelect: {},
     themeBg: {},
     themeFg: {},
@@ -185,6 +194,11 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(entry.isVisible, true);
   assert.equal(entry.pendingViewportSync, false);
   assert.equal(entry.mouseForwardingModeSelect, refs.mouseForwardingModeSelect);
+  assert.equal(entry.settingsTabNoteBtn, refs.settingsTabNoteBtn);
+  assert.equal(entry.settingsPanelTheme, refs.settingsPanelTheme);
+  assert.equal(entry.sessionNoteInput, refs.sessionNoteInput);
+  assert.equal(entry.themeSlotSelect, refs.themeSlotSelect);
+  assert.equal(entry.settingsCancelBtn, refs.settingsCancelBtn);
   assert.deepEqual(timers, [120, 400, 900]);
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [

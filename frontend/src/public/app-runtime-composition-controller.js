@@ -172,6 +172,7 @@ const commandGuardReasonsEl = document.getElementById("command-guard-reasons");
 const commandGuardPreviewEl = document.getElementById("command-guard-preview");
 const commandGuardSendOnceBtn = document.getElementById("command-guard-send-once");
 const commandGuardCancelBtn = document.getElementById("command-guard-cancel");
+const workflowRuntimePanelEl = document.getElementById("workflow-runtime-panel");
 const workflowStatusEl = document.getElementById("workflow-status");
 const workflowTargetEl = document.getElementById("workflow-target");
 const workflowProgressEl = document.getElementById("workflow-progress");
@@ -952,6 +953,7 @@ workspaceRenderController = createWorkspaceRenderController({
   commandGuardSummaryEl,
   commandGuardReasonsEl,
   commandGuardPreviewEl,
+  workflowPanelEl: workflowRuntimePanelEl,
   workflowStatusEl,
   workflowTargetEl,
   workflowProgressEl,

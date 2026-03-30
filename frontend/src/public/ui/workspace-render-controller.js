@@ -12,6 +12,7 @@ export function createWorkspaceRenderController(options = {}) {
   const commandGuardSummaryEl = options.commandGuardSummaryEl || null;
   const commandGuardReasonsEl = options.commandGuardReasonsEl || null;
   const commandGuardPreviewEl = options.commandGuardPreviewEl || null;
+  const workflowPanelEl = options.workflowPanelEl || null;
   const workflowStatusEl = options.workflowStatusEl || null;
   const workflowTargetEl = options.workflowTargetEl || null;
   const workflowProgressEl = options.workflowProgressEl || null;
@@ -126,6 +127,15 @@ export function createWorkspaceRenderController(options = {}) {
     workflowCanInterrupt = false,
     workflowCanKill = false
   }) {
+    const workflowVisible =
+      Boolean(workflowResult) ||
+      workflowCanStop === true ||
+      workflowCanInterrupt === true ||
+      workflowCanKill === true ||
+      workflowStatus !== "Workflow: ready." ||
+      workflowTarget !== "Target: no workflow session." ||
+      workflowProgress !== "Progress: 0/0." ||
+      workflowDetail !== "Detail: no workflow running.";
     if (stateEl) {
       stateEl.textContent = connectionState;
     }
@@ -179,6 +189,9 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (commandGuardPreviewEl) {
       commandGuardPreviewEl.textContent = commandGuardPreview || "";
+    }
+    if (workflowPanelEl) {
+      workflowPanelEl.hidden = workflowVisible !== true;
     }
     if (workflowStatusEl) {
       workflowStatusEl.textContent = workflowStatus || "Workflow: ready.";

@@ -39,6 +39,7 @@ test("workspace render controller shows spectator access state and disables writ
   const commandGuardSummaryEl = createElement();
   const commandGuardReasonsEl = createElement();
   const commandGuardPreviewEl = createElement();
+  const workflowPanelEl = createElement();
   const workflowStatusEl = createElement();
   const workflowTargetEl = createElement();
   const workflowProgressEl = createElement();
@@ -69,6 +70,7 @@ test("workspace render controller shows spectator access state and disables writ
     commandGuardSummaryEl,
     commandGuardReasonsEl,
     commandGuardPreviewEl,
+    workflowPanelEl,
     workflowStatusEl,
     workflowTargetEl,
     workflowProgressEl,
@@ -99,9 +101,48 @@ test("workspace render controller shows spectator access state and disables writ
   assert.equal(stateEl.textContent, "connected");
   assert.equal(accessStateEl.hidden, false);
   assert.equal(accessStateEl.textContent, "Spectator · Read-only deck ops");
+  assert.equal(workflowPanelEl.hidden, true);
   assert.equal(createBtn.disabled, true);
   assert.equal(deckCreateBtn.disabled, true);
   assert.equal(sendBtn.disabled, true);
   assert.equal(commandInput.disabled, true);
   assert.equal(commandInput.getAttribute("title"), "Spectator · Read-only deck ops");
+});
+
+test("workspace render controller only shows workflow panel for active or completed workflow state", () => {
+  const workflowPanelEl = createElement();
+  const workflowStatusEl = createElement();
+  const workflowTargetEl = createElement();
+  const workflowProgressEl = createElement();
+  const workflowDetailEl = createElement();
+  const workflowResultEl = createElement();
+
+  const controller = createWorkspaceRenderController({
+    workflowPanelEl,
+    workflowStatusEl,
+    workflowTargetEl,
+    workflowProgressEl,
+    workflowDetailEl,
+    workflowResultEl
+  });
+
+  controller.renderStatus({});
+  assert.equal(workflowPanelEl.hidden, true);
+
+  controller.renderStatus({
+    workflowStatus: "Workflow: running.",
+    workflowTarget: "Target: [4] ops.",
+    workflowProgress: "Progress: 1/3.",
+    workflowDetail: "Detail: waiting.",
+    workflowCanStop: true
+  });
+  assert.equal(workflowPanelEl.hidden, false);
+
+  controller.renderStatus({});
+  assert.equal(workflowPanelEl.hidden, true);
+
+  controller.renderStatus({
+    workflowResult: "Workflow succeeded after 3/3 step(s)."
+  });
+  assert.equal(workflowPanelEl.hidden, false);
 });

@@ -43,6 +43,16 @@
         <section class="deck-bar">
           <div id="deck-tabs" class="deck-tabs"></div>
         </section>
+        <section class="terminal-search-panel">
+          <h2>Find</h2>
+          <div class="terminal-search-row">
+            <input id="terminal-search-input" type="text" placeholder="Find in active terminal" />
+            <button id="terminal-search-prev" type="button">Prev</button>
+            <button id="terminal-search-next" type="button">Next</button>
+            <button id="terminal-search-clear" type="button">Clear</button>
+            <p id="terminal-search-status" class="terminal-search-status"></p>
+          </div>
+        </section>
         <section class="settings-panel">
           <h2>Settings</h2>
           <div class="settings-grid">
@@ -117,29 +127,29 @@
         </button>
         <div id="workspace-shell" class="workspace-shell">
           <section id="control-pane" class="control-pane">
+            <div class="control-pane-meta">
+              <div class="command-meta">
+                <div class="command-meta-main">
+                  <p id="status-message" class="status-message"></p>
+                  <p id="command-target" class="command-target"></p>
+                  <p id="command-feedback" class="command-feedback"></p>
+                </div>
+                <div class="command-meta-actions">
+                  <p id="control-pane-status" class="control-pane-status"></p>
+                  <label class="control-pane-position-wrap">
+                    <span>Position</span>
+                    <select id="control-pane-position" aria-label="Control pane position">
+                      <option value="bottom">Bottom</option>
+                      <option value="top">Top</option>
+                    </select>
+                  </label>
+                  <button id="control-pane-toggle" type="button">Hide</button>
+                </div>
+              </div>
+            </div>
             <div class="control-pane-body">
               <section class="command-row">
                 <div class="command-input-column">
-                  <div class="command-meta">
-                    <div class="command-meta-main">
-                      <p id="status-message" class="status-message"></p>
-                      <p id="command-target" class="command-target"></p>
-                      <p id="command-feedback" class="command-feedback"></p>
-                    </div>
-                    <div class="command-meta-actions">
-                      <p id="control-pane-status" class="control-pane-status"></p>
-                      <label class="control-pane-position-wrap">
-                        <span>Position</span>
-                        <select id="control-pane-position" aria-label="Control pane position">
-                          <option value="bottom">Bottom</option>
-                          <option value="top">Top</option>
-                          <option value="left">Left</option>
-                          <option value="right">Right</option>
-                        </select>
-                      </label>
-                      <button id="control-pane-toggle" type="button">Hide</button>
-                    </div>
-                  </div>
                   <div class="command-entry-row">
                     <div class="command-input-wrap">
                       <textarea
@@ -161,7 +171,7 @@
                       <button id="command-guard-cancel" type="button">Cancel</button>
                     </div>
                   </section>
-                  <section class="workflow-runtime-panel">
+                  <section id="workflow-runtime-panel" class="workflow-runtime-panel" hidden>
                     <div class="workflow-runtime-head">
                       <p class="workflow-runtime-title">Workflow</p>
                       <div class="workflow-runtime-actions">
@@ -177,16 +187,6 @@
                     <p id="workflow-result" class="workflow-runtime-result"></p>
                   </section>
                   <pre id="command-suggestions" class="command-suggestions" hidden></pre>
-                </div>
-              </section>
-              <section class="terminal-search-panel control-pane-search-panel">
-                <h2>Find</h2>
-                <div class="terminal-search-row">
-                  <input id="terminal-search-input" type="text" placeholder="Find in active terminal" />
-                  <button id="terminal-search-prev" type="button">Prev</button>
-                  <button id="terminal-search-next" type="button">Next</button>
-                  <button id="terminal-search-clear" type="button">Clear</button>
-                  <p id="terminal-search-status" class="terminal-search-status"></p>
                 </div>
               </section>
             </div>

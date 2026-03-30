@@ -121,21 +121,27 @@ test("control pane runtime controller toggles visibility and renders status", ()
   });
   assert.equal(controlPaneEl.hidden, false);
   assert.equal(launcherEl.hidden, true);
-  assert.equal(statusEl.textContent, "Bottom · 240px");
+  assert.equal(statusEl.textContent, "");
+  assert.equal(toggleEl.textContent, "Hide");
 
   toggleEl.click();
   assert.equal(controller.getState().controlPaneVisible, false);
-  assert.equal(controlPaneEl.hidden, true);
-  assert.equal(launcherEl.hidden, false);
-  assert.equal(statusEl.textContent, "Hidden");
+  assert.equal(controlPaneEl.hidden, false);
+  assert.equal(launcherEl.hidden, true);
+  assert.equal(statusEl.textContent, "");
+  assert.equal(toggleEl.textContent, "Show");
 
   launcherEl.click();
   assert.equal(controller.getState().controlPaneVisible, true);
-  assert.equal(controlPaneEl.hidden, false);
   assert.equal(launcherEl.hidden, true);
+
+  toggleEl.click();
+  assert.equal(controller.getState().controlPaneVisible, false);
+  assert.equal(controlPaneEl.hidden, false);
+  assert.equal(toggleEl.textContent, "Show");
 });
 
-test("control pane runtime controller applies responsive bottom fallback for narrow widths", () => {
+test("control pane runtime controller normalizes unsupported side positions to bottom", () => {
   const windowRef = createWindowRef();
   const workspaceShellEl = new FakeElement({ width: 780, height: 720 });
   const controlPaneEl = new FakeElement();
@@ -156,11 +162,13 @@ test("control pane runtime controller applies responsive bottom fallback for nar
     controlPaneSize: 360
   });
 
-  assert.equal(controller.getState().controlPanePosition, "right");
+  assert.equal(controller.getState().controlPanePosition, "bottom");
   assert.equal(controller.getEffectivePosition(), "bottom");
-  assert.equal(controlPaneEl.dataset.position, "right");
+  assert.equal(controlPaneEl.dataset.position, "bottom");
   assert.equal(controlPaneEl.dataset.effectivePosition, "bottom");
   assert.equal(workspaceShellEl.classList.contains("control-pane-pos-bottom"), true);
+  assert.equal(workspaceShellEl.classList.contains("control-pane-pos-left"), false);
+  assert.equal(workspaceShellEl.classList.contains("control-pane-pos-right"), false);
 });
 
 test("control pane runtime controller resizes and clamps pane size", () => {
@@ -184,15 +192,15 @@ test("control pane runtime controller resizes and clamps pane size", () => {
 
   controller.setState({
     controlPaneVisible: true,
-    controlPanePosition: "left",
+    controlPanePosition: "top",
     controlPaneSize: 240
   });
 
-  resizeHandleEl.dispatch("pointerdown", { clientX: 240, clientY: 0 });
-  windowRef.dispatch("pointermove", { clientX: 80, clientY: 0 });
+  resizeHandleEl.dispatch("pointerdown", { clientX: 0, clientY: 240 });
+  windowRef.dispatch("pointermove", { clientX: 0, clientY: 80 });
   assert.equal(controller.getState().controlPaneSize, 120);
 
-  windowRef.dispatch("pointermove", { clientX: 640, clientY: 0 });
+  windowRef.dispatch("pointermove", { clientX: 0, clientY: 640 });
   assert.equal(controller.getState().controlPaneSize, 640);
 
   windowRef.dispatch("pointerup", {});

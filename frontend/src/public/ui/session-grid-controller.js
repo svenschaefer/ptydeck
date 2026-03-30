@@ -314,6 +314,7 @@ export function createSessionGridController(options = {}) {
           settingsFeedback: refs.settingsFeedback,
           tagListEl: refs.tagListEl,
           settingsApplyBtn: refs.settingsApplyBtn,
+          settingsCancelBtn: refs.settingsCancelBtn,
           settingsStatus: refs.settingsStatus,
           themeCategory: refs.themeCategory,
           themeSearch: refs.themeSearch,

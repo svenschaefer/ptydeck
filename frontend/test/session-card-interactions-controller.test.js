@@ -43,12 +43,17 @@ function createInputSafetyControls(overrides = {}) {
 
 test("session-card-interactions controller wires focus and settings dialog controls", async () => {
   const calls = [];
-  const controller = createSessionCardInteractionsController({});
+  const controller = createSessionCardInteractionsController({
+    setActiveSettingsTab: (_entry, tab) => calls.push(`tab:${tab}`)
+  });
   const refs = {
     focusBtn: createEventTarget(),
     settingsBtn: createEventTarget(),
     settingsDismissBtn: createEventTarget(),
     settingsDialog: createEventTarget(),
+    settingsTabStartupBtn: createEventTarget(),
+    settingsTabNoteBtn: createEventTarget(),
+    settingsTabThemeBtn: createEventTarget(),
     mouseForwardingModeSelect: createEventTarget("off")
   };
 
@@ -69,6 +74,9 @@ test("session-card-interactions controller wires focus and settings dialog contr
 
   await refs.focusBtn.emit("click");
   await refs.settingsBtn.emit("click");
+  await refs.settingsTabNoteBtn.emit("click");
+  await refs.settingsTabThemeBtn.emit("click");
+  await refs.settingsTabStartupBtn.emit("click");
   await refs.settingsDismissBtn.emit("click");
   await refs.settingsDialog.emit("cancel", { preventDefault: () => calls.push("prevent") });
 
@@ -77,8 +85,12 @@ test("session-card-interactions controller wires focus and settings dialog contr
     "sync-startup",
     "sync-input-safety",
     "sync-theme",
+    "tab:startup",
     "dirty:false",
     "toggle",
+    "tab:note",
+    "tab:theme",
+    "tab:startup",
     "close",
     "prevent",
     "close"
@@ -401,11 +413,20 @@ test("session-card-interactions controller restores draft state on settings canc
     applyThemeForSession: (sessionId) => calls.push(`theme:${sessionId}`),
     setStartupSettingsFeedback: (_entry, message) => calls.push(`feedback:${message}`),
     getEntry: () => ({ id: "entry" }),
-    setSettingsDirty: (_entry, dirty) => calls.push(`dirty:${dirty}`)
+    setSettingsDirty: (_entry, dirty) => calls.push(`dirty:${dirty}`),
+    closeSettingsDialog: () => calls.push("close-dialog")
   });
 
   await refs.settingsCancelBtn.emit("click");
 
   assert.equal(drafts.has("s1"), false);
-  assert.deepEqual(calls, ["sync-startup", "sync-input-safety", "sync-theme", "theme:s1", "feedback:", "dirty:false"]);
+  assert.deepEqual(calls, [
+    "sync-startup",
+    "sync-input-safety",
+    "sync-theme",
+    "theme:s1",
+    "feedback:",
+    "dirty:false",
+    "close-dialog"
+  ]);
 });

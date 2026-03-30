@@ -257,14 +257,6 @@ body {
   --control-pane-size-px: 240px;
 }
 
-.workspace-shell.control-pane-pos-left {
-  flex-direction: row;
-}
-
-.workspace-shell.control-pane-pos-right {
-  flex-direction: row-reverse;
-}
-
 .workspace-shell.control-pane-pos-top {
   flex-direction: column;
 }
@@ -283,13 +275,6 @@ body {
   overflow: hidden;
 }
 
-.workspace-shell.control-pane-pos-left .control-pane,
-.workspace-shell.control-pane-pos-right .control-pane {
-  flex: 0 0 var(--control-pane-size-px);
-  width: var(--control-pane-size-px);
-  max-width: min(960px, 70vw);
-}
-
 .workspace-shell.control-pane-pos-top .control-pane,
 .workspace-shell.control-pane-pos-bottom .control-pane {
   flex: 0 0 var(--control-pane-size-px);
@@ -298,7 +283,22 @@ body {
 }
 
 .workspace-shell.control-pane-hidden .control-pane {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: none;
+}
+
+.workspace-shell.control-pane-hidden .control-pane-body {
   display: none;
+}
+
+.control-pane-meta {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-shell.control-pane-hidden .control-pane-meta {
+  border-bottom: 0;
 }
 
 .control-pane-status {
@@ -309,14 +309,6 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.control-pane-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .control-pane-position-wrap {
@@ -358,12 +350,6 @@ body {
 
 .workspace-shell.control-pane-hidden .control-pane-resize-handle {
   display: none;
-}
-
-.workspace-shell.control-pane-pos-left .control-pane-resize-handle,
-.workspace-shell.control-pane-pos-right .control-pane-resize-handle {
-  width: 8px;
-  cursor: col-resize;
 }
 
 .workspace-shell.control-pane-pos-top .control-pane-resize-handle,
@@ -642,25 +628,6 @@ body {
   display: none;
 }
 
-.control-pane-launcher {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 25;
-  display: inline-flex;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  color: #8bb6ff;
-}
-
-.control-pane-launcher[hidden] {
-  display: none !important;
-}
-
 .app-shell.sidebar-collapsed .sidebar-launcher {
   display: inline-flex;
 }
@@ -879,12 +846,6 @@ body {
   color: #70839a;
 }
 
-.command-meta-actions .control-pane-status:not(:empty)::after {
-  content: "·";
-  margin-left: 8px;
-  color: #70839a;
-}
-
 .command-meta-actions .control-pane-position-wrap {
   font-size: 11px;
 }
@@ -963,6 +924,10 @@ body {
   border: 1px solid rgba(139, 182, 255, 0.18);
   border-radius: 8px;
   background: rgba(16, 25, 36, 0.74);
+}
+
+.workflow-runtime-panel[hidden] {
+  display: none !important;
 }
 
 .workflow-runtime-head {
@@ -1255,10 +1220,6 @@ button:hover {
 .empty-state {
   margin: 0 18px 18px;
   color: var(--muted);
-}
-
-.control-pane-search-panel {
-  margin-top: 0;
 }
 
 .terminal-card {
@@ -2045,18 +2006,6 @@ button:hover {
   .sidebar-launcher {
     top: 6px;
     left: 6px;
-  }
-
-  .control-pane-launcher {
-    top: 6px;
-    right: 6px;
-  }
-
-  .workspace-shell.control-pane-pos-left,
-  .workspace-shell.control-pane-pos-right,
-  .workspace-shell.control-pane-pos-top,
-  .workspace-shell.control-pane-pos-bottom {
-    flex-direction: column-reverse;
   }
 
   .workspace-shell.control-pane-visible .control-pane {
