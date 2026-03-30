@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-03-30 (sidebar/control-plane cleanup updated; `CHANGELOG.md` owns completed release history; there is currently no active delivery wave and `v0.4.0-H53` is queued in `ROADMAP.md`.)
+Last updated: 2026-03-30 (sidebar/control-plane cleanup updated; `CHANGELOG.md` owns completed release history; there is currently no active delivery wave and `v0.4.0-H53` is queued in `ROADMAP.md` as a split secondary-management-surface wave.)
 
 Documentation sync status: repository markdown files are aligned on 2026-03-30. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-03-30. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- The next queued wave is `v0.4.0-H53` with `UX-020`.
+- The next queued wave is `v0.4.0-H53` with `UX-020A`, `UX-020B`, `UX-020C`, and `UX-020D`.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -40,6 +40,7 @@ Documentation sync status: repository markdown files are aligned on 2026-03-30. 
 - Session-scoped file transfer exists through the bounded backend contract and `/transfer` workflows.
 - Controlled mouse forwarding exists as per-session `mouseForwardingMode` (`off|application`), defaulting to `off`.
 - The left sidebar is intentionally reduced to connection state, deck/session navigation, `New Deck` / `New Session`, `Find`, `Settings`, and `Layouts`; saved connection-profile and workspace-preset/group management remain available through existing runtime/slash-command surfaces for now and are queued for a cleaner re-entry outside the sidebar.
+- The queued `H53` direction is a single dedicated secondary management surface with explicit entry points and separate `Connections` / `Workspace Presets` tabs, rather than reintroducing multiple sidebar panels.
 
 ## Quality and Operational Rules
 

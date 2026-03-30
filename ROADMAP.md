@@ -20,8 +20,15 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Detail
 
 - `v0.4.0-H53`
-  - `UX-020`
-  - Dependencies: none.
+  - `UX-020A`
+  - `UX-020B`
+  - `UX-020C`
+  - `UX-020D`
+  - Dependencies:
+    - `UX-020A` first.
+    - `UX-020B` after `UX-020A`.
+    - `UX-020C` after `UX-020A`.
+    - `UX-020D` after `UX-020B` and `UX-020C`.
 
 ## Sequencing Rules
 
