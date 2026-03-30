@@ -14,7 +14,8 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- `UX-020` Owner `FE`
+  Reintroduce saved connection-profile and workspace-preset/group management through a dedicated secondary management surface outside the left sidebar, with a clearer information architecture, explicit entry points, and full parity for the existing slash-command/runtime capabilities that were intentionally removed from the sidebar during the 2026-03-30 cleanup.
 
 ## Active Ownership Role
 

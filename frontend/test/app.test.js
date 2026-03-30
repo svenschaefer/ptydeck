@@ -567,7 +567,6 @@ function createDocumentFixture() {
   const sidebarLauncher = new FakeElement({ id: "sidebar-launcher", tagName: "button" });
   const workspaceShell = new FakeElement({ id: "workspace-shell", clientWidth: 1100, clientHeight: 720 });
   workspaceShell.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1100, bottom: 720, width: 1100, height: 720 });
-  const executionPane = new FakeElement({ id: "execution-pane" });
   const controlPane = new FakeElement({ id: "control-pane" });
   const controlPaneLauncher = new FakeElement({ id: "control-pane-launcher", tagName: "button" });
   controlPaneLauncher.hidden = true;
@@ -652,7 +651,6 @@ function createDocumentFixture() {
     sidebarToggleIcon,
     sidebarLauncher,
     workspaceShell,
-    executionPane,
     controlPane,
     controlPaneLauncher,
     controlPaneToggle,
@@ -714,7 +712,6 @@ function createDocumentFixture() {
       sidebarToggleIcon,
       sidebarLauncher,
       workspaceShell,
-      executionPane,
       controlPane,
       controlPaneLauncher,
       controlPaneToggle,

@@ -1,8 +1,8 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-03-29 (documentation governance refactor completed; `CHANGELOG.md` now owns completed release history; there is currently no active delivery wave in `TODO.md` / `ROADMAP.md`.)
+Last updated: 2026-03-30 (sidebar/control-plane cleanup updated; `CHANGELOG.md` owns completed release history; there is currently no active delivery wave and `v0.4.0-H53` is queued in `ROADMAP.md`.)
 
-Documentation sync status: repository markdown files are aligned on 2026-03-29. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
+Documentation sync status: repository markdown files are aligned on 2026-03-30. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
 ## Current Documentation Contract
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-03-29. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- New near-term work must be promoted from `TODO-OUTLOOK.md` into `TODO.md` and `ROADMAP.md` before implementation.
+- The next queued wave is `v0.4.0-H53` with `UX-020`.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -39,6 +39,7 @@ Documentation sync status: repository markdown files are aligned on 2026-03-29. 
 - Read-only sharing exists for session/deck spectator access.
 - Session-scoped file transfer exists through the bounded backend contract and `/transfer` workflows.
 - Controlled mouse forwarding exists as per-session `mouseForwardingMode` (`off|application`), defaulting to `off`.
+- The left sidebar is intentionally reduced to connection state, deck/session navigation, `New Deck` / `New Session`, `Find`, `Settings`, and `Layouts`; saved connection-profile and workspace-preset/group management remain available through existing runtime/slash-command surfaces for now and are queued for a cleaner re-entry outside the sidebar.
 
 ## Quality and Operational Rules
 

@@ -205,7 +205,6 @@ const startupWarmupMessageEl = document.getElementById("startup-warmup-message")
 const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
 const startupWarmupSkipBtn = document.getElementById("startup-warmup-skip");
 const workspaceShellEl = document.getElementById("workspace-shell");
-const executionPaneEl = document.getElementById("execution-pane");
 const controlPaneEl = document.getElementById("control-pane");
 const controlPaneLauncherBtn = document.getElementById("control-pane-launcher");
 const controlPaneToggleBtn = document.getElementById("control-pane-toggle");
@@ -594,7 +593,6 @@ appLayoutDeckFacadeController = createAppLayoutDeckFacadeController({
 controlPaneRuntimeController = createControlPaneRuntimeController({
   windowRef: window,
   workspaceShellEl,
-  executionPaneEl,
   controlPaneEl,
   controlPaneLauncherBtn,
   controlPaneToggleBtn,
