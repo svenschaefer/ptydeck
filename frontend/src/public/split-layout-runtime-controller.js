@@ -756,6 +756,7 @@ export function createSplitLayoutRuntimeController(options = {}) {
 
     paneRefs.set(paneId, {
       paneEl,
+      headEl,
       titleEl,
       metaEl,
       bodyEl,
@@ -818,6 +819,9 @@ export function createSplitLayoutRuntimeController(options = {}) {
     const paneCount = collectPaneIds(entry.root).length;
     for (const [paneId, refs] of paneRefs.entries()) {
       const assignedSessions = (entry.paneSessions[paneId] || []).map((sessionId) => sortedSessions.find((session) => session.id === sessionId)).filter(Boolean);
+      if (refs.headEl) {
+        refs.headEl.hidden = paneCount <= 1;
+      }
       if (refs.titleEl) {
         refs.titleEl.textContent = `Pane ${paneId}`;
       }

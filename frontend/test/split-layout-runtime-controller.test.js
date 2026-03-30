@@ -230,3 +230,38 @@ test("split-layout runtime orders pane contents by current quick-id session orde
   assert.deepEqual(body.children, [node2, node1]);
   assert.deepEqual(controller.getDeckSplitLayout("ops").paneSessions.main, ["s2", "s1"]);
 });
+
+test("split-layout runtime hides pane chrome for single-pane layouts", () => {
+  const gridEl = new FakeElement("main");
+  const controller = createSplitLayoutRuntimeController({
+    documentRef: createDocumentRef(),
+    gridEl,
+    defaultDeckId: "default",
+    sortSessionsByQuickId: (sessions) => sessions.slice()
+  });
+
+  controller.replaceDeckSplitLayouts({
+    ops: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["s1"] }
+    }
+  });
+
+  const node1 = new FakeElement("article");
+  const terminals = new Map([["s1", { element: node1 }]]);
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: [{ id: "s1" }],
+    deckSessions: [{ id: "s1", name: "one" }],
+    activeSessionId: "s1",
+    terminals
+  });
+
+  const paneEl = node1.parentNode?.parentNode || null;
+  const headEl = paneEl?.children?.[0] || null;
+
+  assert.ok(paneEl);
+  assert.ok(headEl);
+  assert.equal(headEl.hidden, true);
+});
