@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-03-30
+
+- [x] Fixed fixed-size terminal geometry regressions across the split-layout and resize paths: `frontend/src/public/ui/layout-settings-controller.js` now rounds terminal width once after the total width calculation, `frontend/src/public/ui/session-terminal-resize-controller.js` now prefers live xterm cell metrics for runtime width/height sizing, and `frontend/src/public/styles.css` now lets fixed-size split panes wrap cards by their actual rendered widths instead of forcing CSS-grid tracks from a stale width estimate.
+- [x] Added regression coverage for the geometry fix in `frontend/test/layout-settings-controller.test.js`, `frontend/test/session-terminal-resize-controller.test.js`, and `frontend/test/terminal-compat.test.js`, including deterministic CSS width calculation, runtime cell-width sizing, and last-row protection.
+- [x] Validation for this frontend geometry fix passed with the targeted regressions (`node --test frontend/test/layout-settings-controller.test.js frontend/test/session-terminal-resize-controller.test.js frontend/test/terminal-compat.test.js frontend/test/app.test.js`) and the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`).
+- [x] Coverage after the fix validation step: backend `90.84%` lines and frontend `93.30%` lines on the final validated tree.
+
 ## 2026-03-29
 
 - [x] Documentation governance refactor completed: completed-wave history now lives in `CHANGELOG.md`, `ROADMAP.md` now carries active and queued execution order only, `TODO-OUTLOOK.md` now carries only future epics and deferred explicit backlog, and `CODEX_CONTEXT.md` now keeps only current persistent architecture/governance context instead of duplicating completed-wave history.

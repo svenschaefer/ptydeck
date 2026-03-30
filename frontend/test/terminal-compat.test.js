@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   getTerminalCellHeightPx,
+  getTerminalCellWidthPx,
   isTerminalAtBottom,
   refreshTerminalViewport,
   syncTerminalScrollArea
@@ -99,4 +100,24 @@ test("getTerminalCellHeightPx reads render dimensions through compatibility boun
     19.75
   );
   assert.equal(getTerminalCellHeightPx({}), 0);
+});
+
+test("getTerminalCellWidthPx reads render dimensions through compatibility boundary", () => {
+  assert.equal(
+    getTerminalCellWidthPx({
+      _core: {
+        _renderService: {
+          dimensions: {
+            css: {
+              cell: {
+                width: 8.5
+              }
+            }
+          }
+        }
+      }
+    }),
+    8.5
+  );
+  assert.equal(getTerminalCellWidthPx({}), 0);
 });

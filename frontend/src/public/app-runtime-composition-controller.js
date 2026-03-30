@@ -25,6 +25,7 @@ import { createTraceDebugController } from "./trace-debug-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
   getTerminalCellHeightPx,
+  getTerminalCellWidthPx,
   isTerminalAtBottom,
   refreshTerminalViewport,
   syncTerminalScrollArea
@@ -882,7 +883,9 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   computeFixedMountHeightPx: (rows) => appLayoutDeckFacadeController?.computeFixedMountHeightPx(rows),
   computeFixedCardWidthPx: (cols) => appLayoutDeckFacadeController?.computeFixedCardWidthPx(cols),
   getTerminalCellHeightPx,
+  getTerminalCellWidthPx,
   terminalCardHorizontalChromePx: TERMINAL_CARD_HORIZONTAL_CHROME_PX,
+  terminalMountVerticalChromePx: TERMINAL_MOUNT_VERTICAL_CHROME_PX,
   debugLog,
   api
 });

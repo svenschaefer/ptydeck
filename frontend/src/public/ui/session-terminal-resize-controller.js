@@ -10,7 +10,9 @@ export function createSessionTerminalResizeController(options = {}) {
   const computeFixedMountHeightPx = options.computeFixedMountHeightPx || (() => 120);
   const computeFixedCardWidthPx = options.computeFixedCardWidthPx || (() => 260);
   const getTerminalCellHeightPx = options.getTerminalCellHeightPx || (() => 0);
+  const getTerminalCellWidthPx = options.getTerminalCellWidthPx || (() => 0);
   const terminalCardHorizontalChromePx = Number(options.terminalCardHorizontalChromePx) || 0;
+  const terminalMountVerticalChromePx = Number(options.terminalMountVerticalChromePx) || 0;
   const debugLog = options.debugLog || (() => {});
   const api = options.api;
 
@@ -40,14 +42,16 @@ export function createSessionTerminalResizeController(options = {}) {
       return;
     }
     let mountHeightPx = computeFixedMountHeightPx(rows);
-    const cardWidthPx = computeFixedCardWidthPx(cols);
+    let cardWidthPx = computeFixedCardWidthPx(cols);
+    const runtimeCellWidthPx = getTerminalCellWidthPx(entry?.terminal);
+    if (runtimeCellWidthPx > 0) {
+      cardWidthPx = Math.max(260, Math.ceil(cols * runtimeCellWidthPx + terminalCardHorizontalChromePx));
+    }
     const mountWidthPx = Math.max(220, cardWidthPx - terminalCardHorizontalChromePx);
     const runtimeCellHeightPx = getTerminalCellHeightPx(entry?.terminal);
     if (runtimeCellHeightPx > 0) {
-      const currentlyVisibleRows = Math.floor(mountHeightPx / runtimeCellHeightPx);
-      if (currentlyVisibleRows < rows) {
-        mountHeightPx += Math.ceil((rows - currentlyVisibleRows) * runtimeCellHeightPx) + 2;
-      }
+      const runtimeMountHeightPx = Math.max(120, Math.ceil(rows * runtimeCellHeightPx + terminalMountVerticalChromePx));
+      mountHeightPx = Math.max(mountHeightPx, runtimeMountHeightPx);
     }
     entry.mount.style.height = `${mountHeightPx}px`;
     entry.mount.style.width = `${mountWidthPx}px`;

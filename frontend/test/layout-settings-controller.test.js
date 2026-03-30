@@ -105,8 +105,8 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   assert.equal(sidebarToggleBtn.hidden, false);
   assert.equal(sidebarLauncherBtn.hidden, true);
   assert.equal(sidebarToggleIcon.textContent, "⮜");
-  assert.ok(style.get("--ptydeck-terminal-card-width").endsWith("px"));
-  assert.ok(style.get("--ptydeck-terminal-mount-height").endsWith("px"));
+  assert.equal(style.get("--ptydeck-terminal-card-width"), "742px");
+  assert.equal(style.get("--ptydeck-terminal-mount-height"), "402px");
 
   settingsColsEl.value = "58";
   settingsRowsEl.value = "40";

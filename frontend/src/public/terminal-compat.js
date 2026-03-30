@@ -33,3 +33,8 @@ export function getTerminalCellHeightPx(terminal) {
   const height = Number(terminal?._core?._renderService?.dimensions?.css?.cell?.height) || 0;
   return height > 0 ? height : 0;
 }
+
+export function getTerminalCellWidthPx(terminal) {
+  const width = Number(terminal?._core?._renderService?.dimensions?.css?.cell?.width) || 0;
+  return width > 0 ? width : 0;
+}

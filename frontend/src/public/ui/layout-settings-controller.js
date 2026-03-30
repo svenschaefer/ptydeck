@@ -32,7 +32,8 @@ export function createLayoutSettingsController(options = {}) {
     }
     context.font = `${terminalFontSize}px ${terminalFontFamily}`;
     const metrics = context.measureText("W");
-    return Math.max(7, Math.ceil(metrics.width));
+    const width = Number(metrics.width);
+    return Math.max(7, Number.isFinite(width) ? width : 10);
   }
 
   function computeFixedMountHeightPx(rows) {
@@ -42,7 +43,9 @@ export function createLayoutSettingsController(options = {}) {
 
   function computeFixedCardWidthPx(cols) {
     const cellWidthPx = measureTerminalCellWidthPx();
-    return Math.max(260, Math.round(cols * cellWidthPx + cardHorizontalChromePx));
+    // Round once after computing the total terminal width. Rounding each cell up
+    // overestimates wide terminals and prevents side-by-side card layouts.
+    return Math.max(260, Math.ceil(cols * cellWidthPx + cardHorizontalChromePx));
   }
 
   function syncTerminalGeometryCss(terminalSettings) {
