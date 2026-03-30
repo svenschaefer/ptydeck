@@ -753,6 +753,7 @@ body {
   --command-composer-line-height: 1.35;
   --command-composer-border-width: 1px;
   --command-composer-padding: 10px;
+  --command-composer-min-height: 7.25rem;
   font-family: var(--command-composer-font-family);
   font-size: var(--command-composer-font-size);
   line-height: var(--command-composer-line-height);
@@ -769,7 +770,7 @@ body {
   background: #0f151f;
   color: var(--text);
   resize: vertical;
-  min-height: 10.5rem;
+  min-height: var(--command-composer-min-height);
   font-family: var(--command-composer-font-family);
   font-size: var(--command-composer-font-size);
   line-height: var(--command-composer-line-height);
@@ -806,7 +807,7 @@ body {
   align-self: stretch;
   min-width: 96px;
   height: 100%;
-  min-height: 10.5rem;
+  min-height: var(--command-composer-min-height);
 }
 
 .status-message {
