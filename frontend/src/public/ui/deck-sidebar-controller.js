@@ -27,6 +27,16 @@ export function createDeckSidebarController(options = {}) {
   let openSettingsDeckId = "";
   let lastRenderState = null;
 
+  function createSettingsIcon() {
+    if (!documentRef || typeof documentRef.createElement !== "function") {
+      return null;
+    }
+    const iconEl = documentRef.createElement("span");
+    iconEl.className = "icon-tabler-settings";
+    iconEl.setAttribute?.("aria-hidden", "true");
+    return iconEl;
+  }
+
   function getSessionCountForDeck(deckId, sessions) {
     return sessions.reduce((count, session) => (resolveSessionDeckId(session) === deckId ? count + 1 : count), 0);
   }
@@ -99,7 +109,10 @@ export function createDeckSidebarController(options = {}) {
         settingsBtn.className = "deck-tab-settings";
         settingsBtn.setAttribute("aria-label", `Open settings for deck ${deck.name}`);
         settingsBtn.setAttribute("title", `Open settings for deck ${deck.name}`);
-        settingsBtn.textContent = "⚙";
+        const settingsIconEl = createSettingsIcon();
+        if (settingsIconEl) {
+          settingsBtn.appendChild(settingsIconEl);
+        }
         settingsBtn.disabled = readOnlyMode;
         if (readOnlyMessage) {
           settingsBtn.setAttribute("title", readOnlyMessage);

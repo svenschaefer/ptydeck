@@ -16,6 +16,7 @@ Completed and validated release history belongs here.
 
 - [x] Fixed the session-settings dialog height jump across `Startup`, `Note`, and `Theme`: `frontend/src/public/ui/session-settings-state-controller.js`, `frontend/src/public/ui/session-card-interactions-controller.js`, `frontend/src/public/ui/session-card-factory-controller.js`, `frontend/src/public/ui/session-ui-facade-controller.js`, and `frontend/src/public/app-runtime-composition-controller.js` now measure the three settings panels and keep the dialog layout pinned to the largest currently needed panel height instead of letting the dialog resize per tab.
 - [x] Added regression coverage for the stable session-settings sizing path in `frontend/test/session-settings-state-controller.test.js`, `frontend/test/session-card-interactions-controller.test.js`, `frontend/test/session-card-factory-controller.test.js`, and the app-adjacent dialog tests in `frontend/test/app.test.js` and `frontend/test/session-settings-dialog-controller.test.js`.
+- [x] Replaced the remaining plain gear glyphs in the session-card and active-deck settings affordances with a shared inline SVG icon in a Tabler-style stroke treatment: `frontend/src/public/index.html`, `frontend/src/public/styles.css`, and `frontend/src/public/ui/deck-sidebar-controller.js` now render the settings affordance through one reusable masked icon instead of `⚙` / `&#9881;`.
 
 ## 2026-03-30
 
