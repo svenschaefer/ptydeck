@@ -44,6 +44,13 @@ function createInputSafetyControls(overrides = {}) {
 test("session-card-interactions controller wires focus and settings dialog controls", async () => {
   const calls = [];
   const controller = createSessionCardInteractionsController({
+    windowRef: {
+      requestAnimationFrame(callback) {
+        callback();
+        return 1;
+      }
+    },
+    stabilizeSettingsLayout: () => calls.push("stabilize"),
     setActiveSettingsTab: (_entry, tab) => calls.push(`tab:${tab}`)
   });
   const refs = {
@@ -88,9 +95,17 @@ test("session-card-interactions controller wires focus and settings dialog contr
     "tab:startup",
     "dirty:false",
     "toggle",
+    "stabilize",
+    "stabilize",
     "tab:note",
+    "stabilize",
+    "stabilize",
     "tab:theme",
+    "stabilize",
+    "stabilize",
     "tab:startup",
+    "stabilize",
+    "stabilize",
     "close",
     "prevent",
     "close"

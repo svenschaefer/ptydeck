@@ -12,6 +12,11 @@ Completed and validated release history belongs here.
 - [x] Validation for the `v0.4.0-H54` closeout passed with focused frontend regressions plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`); one first full `npm run test` attempt hit the known flaky backend SSH reconnect test, the isolated rerun of that exact backend test passed, and the authoritative full-suite rerun then passed cleanly with no leftover background validation processes after completion.
 - [x] Coverage after the `v0.4.0-H54` closeout step: backend coverage remained above threshold and frontend line coverage finished at `93.44%` on the final validated tree.
 
+## 2026-04-02
+
+- [x] Fixed the session-settings dialog height jump across `Startup`, `Note`, and `Theme`: `frontend/src/public/ui/session-settings-state-controller.js`, `frontend/src/public/ui/session-card-interactions-controller.js`, `frontend/src/public/ui/session-card-factory-controller.js`, `frontend/src/public/ui/session-ui-facade-controller.js`, and `frontend/src/public/app-runtime-composition-controller.js` now measure the three settings panels and keep the dialog layout pinned to the largest currently needed panel height instead of letting the dialog resize per tab.
+- [x] Added regression coverage for the stable session-settings sizing path in `frontend/test/session-settings-state-controller.test.js`, `frontend/test/session-card-interactions-controller.test.js`, `frontend/test/session-card-factory-controller.test.js`, and the app-adjacent dialog tests in `frontend/test/app.test.js` and `frontend/test/session-settings-dialog-controller.test.js`.
+
 ## 2026-03-30
 
 - [x] `UX-020A`, `UX-020B`, `UX-020C`, and `UX-020D` are now completed as `v0.4.0-H53`: saved connection-profile and workspace-preset/group management no longer rely on the removed sidebar panels and now live in one dedicated secondary management surface outside the sidebar.

@@ -903,6 +903,7 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   isSessionSettingsDirty: sessionUiFacadeController.isSessionSettingsDirty,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   setActiveSettingsTab: sessionUiFacadeController.setActiveSettingsTab,
+  stabilizeSettingsLayout: sessionUiFacadeController.stabilizeSettingsLayout,
   getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage(error, fallback) || fallback
 });

@@ -24,6 +24,7 @@ export function createSessionCardFactoryController(options = {}) {
     const settingsTabStartupBtn = node.querySelector(".session-settings-tab-startup");
     const settingsTabNoteBtn = node.querySelector(".session-settings-tab-note");
     const settingsTabThemeBtn = node.querySelector(".session-settings-tab-theme");
+    const settingsLayout = node.querySelector(".session-settings-layout");
     const settingsPanelStartup = node.querySelector(".session-settings-panel-startup");
     const settingsPanelNote = node.querySelector(".session-settings-panel-note");
     const settingsPanelTheme = node.querySelector(".session-settings-panel-theme");
@@ -128,6 +129,7 @@ export function createSessionCardFactoryController(options = {}) {
       settingsTabStartupBtn,
       settingsTabNoteBtn,
       settingsTabThemeBtn,
+      settingsLayout,
       settingsPanelStartup,
       settingsPanelNote,
       settingsPanelTheme,

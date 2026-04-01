@@ -60,7 +60,8 @@ function createInput(value = "") {
     value,
     checked: false,
     disabled: false,
-    classList: new FakeClassList()
+    classList: new FakeClassList(),
+    style: {}
   };
 }
 
@@ -270,6 +271,43 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   controller.setStartupSettingsFeedback({ startFeedback }, "Failed to save settings.", true);
   assert.equal(startFeedback.textContent, "Failed to save settings.");
   assert.equal(startFeedback.classList.contains("error"), true);
+});
+
+test("session-settings state controller stabilizes settings layout to the tallest tab panel", () => {
+  const controller = createSessionSettingsStateController();
+  const entry = {
+    settingsLayout: { style: {} },
+    settingsTabStartupBtn: createInput(),
+    settingsTabNoteBtn: createInput(),
+    settingsTabThemeBtn: createInput(),
+    settingsPanelStartup: {
+      hidden: false,
+      scrollHeight: 180,
+      offsetHeight: 180,
+      clientHeight: 180,
+      style: {}
+    },
+    settingsPanelNote: {
+      hidden: true,
+      scrollHeight: 240,
+      offsetHeight: 0,
+      clientHeight: 0,
+      style: {}
+    },
+    settingsPanelTheme: {
+      hidden: true,
+      scrollHeight: 312,
+      offsetHeight: 0,
+      clientHeight: 0,
+      style: {}
+    }
+  };
+
+  controller.setActiveSettingsTab(entry, "note");
+
+  assert.equal(entry.settingsPanelStartup.hidden, true);
+  assert.equal(entry.settingsPanelNote.hidden, false);
+  assert.equal(entry.settingsLayout.style.minHeight, "312px");
 });
 
 test("session-settings state controller syncs and reads mouse forwarding mode", () => {

@@ -424,6 +424,107 @@ export function createSessionSettingsStateController(options = {}) {
     }
   }
 
+  function readRenderedElementHeight(element) {
+    if (!element) {
+      return 0;
+    }
+    const heights = [
+      Number(element.scrollHeight) || 0,
+      Number(element.offsetHeight) || 0,
+      Number(element.clientHeight) || 0
+    ];
+    if (typeof element.getBoundingClientRect === "function") {
+      heights.push(Number(element.getBoundingClientRect().height) || 0);
+    }
+    return Math.max(...heights, 0);
+  }
+
+  function measureSettingsPanelHeight(panel) {
+    if (!panel) {
+      return 0;
+    }
+
+    const visibleHeight = readRenderedElementHeight(panel);
+    if (panel.hidden !== true && visibleHeight > 0) {
+      return visibleHeight;
+    }
+
+    const style = panel.style;
+    if (!style || typeof style !== "object") {
+      return visibleHeight;
+    }
+
+    const previous = {
+      hidden: panel.hidden === true,
+      display: style.display,
+      position: style.position,
+      visibility: style.visibility,
+      pointerEvents: style.pointerEvents,
+      width: style.width,
+      maxHeight: style.maxHeight,
+      height: style.height,
+      left: style.left,
+      top: style.top,
+      zIndex: style.zIndex
+    };
+
+    const parentWidth =
+      Number(panel.parentElement?.clientWidth) ||
+      Number(panel.parentElement?.offsetWidth) ||
+      Number(panel.parentNode?.clientWidth) ||
+      0;
+
+    panel.hidden = false;
+    style.display = "block";
+    style.position = "absolute";
+    style.visibility = "hidden";
+    style.pointerEvents = "none";
+    style.maxHeight = "none";
+    style.height = "auto";
+    style.left = "0";
+    style.top = "0";
+    style.zIndex = "-1";
+    if (parentWidth > 0) {
+      style.width = `${parentWidth}px`;
+    }
+
+    const measuredHeight = readRenderedElementHeight(panel);
+
+    panel.hidden = previous.hidden;
+    style.display = previous.display;
+    style.position = previous.position;
+    style.visibility = previous.visibility;
+    style.pointerEvents = previous.pointerEvents;
+    style.width = previous.width;
+    style.maxHeight = previous.maxHeight;
+    style.height = previous.height;
+    style.left = previous.left;
+    style.top = previous.top;
+    style.zIndex = previous.zIndex;
+
+    return measuredHeight;
+  }
+
+  function stabilizeSettingsLayout(entry) {
+    const layout = entry?.settingsLayout;
+    const style = layout?.style;
+    if (!layout || !style || typeof style !== "object") {
+      return 0;
+    }
+
+    const nextHeight = SETTINGS_TAB_VALUES.reduce((maxHeight, candidate) => {
+      const panel = getSettingsTabPanel(entry, candidate);
+      return Math.max(maxHeight, measureSettingsPanelHeight(panel));
+    }, 0);
+
+    if (!(nextHeight > 0)) {
+      return 0;
+    }
+
+    style.minHeight = `${Math.ceil(nextHeight)}px`;
+    return nextHeight;
+  }
+
   function setActiveSettingsTab(entry, tab) {
     if (!entry) {
       return "startup";
@@ -442,6 +543,7 @@ export function createSessionSettingsStateController(options = {}) {
         panel.hidden = !active;
       }
     }
+    stabilizeSettingsLayout(entry);
     return nextTab;
   }
 
@@ -601,6 +703,7 @@ export function createSessionSettingsStateController(options = {}) {
     readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
     normalizeSessionNoteText,
+    stabilizeSettingsLayout,
     setActiveSettingsTab,
     isSessionSettingsDirty
   };

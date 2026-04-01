@@ -279,6 +279,10 @@ export function createSessionUiFacadeController(options = {}) {
     return getSessionSettingsStateController()?.setActiveSettingsTab?.(entry, tab) || "startup";
   }
 
+  function stabilizeSettingsLayout(entry) {
+    return getSessionSettingsStateController()?.stabilizeSettingsLayout?.(entry) || 0;
+  }
+
   function setSettingsDirty(entry, dirty) {
     getSessionCardMetaController()?.setSettingsDirty?.(entry, dirty);
   }
@@ -336,6 +340,7 @@ export function createSessionUiFacadeController(options = {}) {
     readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
     normalizeSessionNoteText,
+    stabilizeSettingsLayout,
     setActiveSettingsTab,
     setSettingsDirty,
     isSessionSettingsDirty,

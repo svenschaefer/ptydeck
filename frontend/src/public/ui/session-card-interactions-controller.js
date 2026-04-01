@@ -20,6 +20,7 @@ export function createSessionCardInteractionsController(options = {}) {
   const isSessionSettingsDirty = options.isSessionSettingsDirty || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
   const setActiveSettingsTab = options.setActiveSettingsTab || (() => "startup");
+  const stabilizeSettingsLayout = options.stabilizeSettingsLayout || (() => 0);
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const getErrorMessage = options.getErrorMessage || ((error, fallback) => (error instanceof Error && error.message ? error.message : fallback));
 
@@ -85,6 +86,14 @@ export function createSessionCardInteractionsController(options = {}) {
       setSettingsDirty(entry, false);
     }
 
+    function scheduleSettingsLayoutStabilization() {
+      const entry = getEntry();
+      stabilizeSettingsLayout(entry);
+      if (typeof windowRef?.requestAnimationFrame === "function") {
+        windowRef.requestAnimationFrame(() => stabilizeSettingsLayout(getEntry()));
+      }
+    }
+
     function buildSettingsFeedbackEntry() {
       return {
         settingsFeedback: refs.settingsFeedback,
@@ -94,10 +103,14 @@ export function createSessionCardInteractionsController(options = {}) {
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
     refs.settingsBtn?.addEventListener("click", () => {
-      if (!refs.settingsDialog?.open) {
+      const wasOpen = refs.settingsDialog?.open === true;
+      if (!wasOpen) {
         syncSettingsDialogControls();
       }
       toggleSettingsDialog(refs.settingsDialog);
+      if (!wasOpen) {
+        scheduleSettingsLayoutStabilization();
+      }
     });
     refs.settingsDismissBtn?.addEventListener("click", () => closeSettingsDialog(refs.settingsDialog));
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {
@@ -108,9 +121,18 @@ export function createSessionCardInteractionsController(options = {}) {
         closeSettingsDialog(refs.settingsDialog);
       });
     }
-    refs.settingsTabStartupBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "startup"));
-    refs.settingsTabNoteBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "note"));
-    refs.settingsTabThemeBtn?.addEventListener("click", () => setActiveSettingsTab(getEntry(), "theme"));
+    refs.settingsTabStartupBtn?.addEventListener("click", () => {
+      setActiveSettingsTab(getEntry(), "startup");
+      scheduleSettingsLayoutStabilization();
+    });
+    refs.settingsTabNoteBtn?.addEventListener("click", () => {
+      setActiveSettingsTab(getEntry(), "note");
+      scheduleSettingsLayoutStabilization();
+    });
+    refs.settingsTabThemeBtn?.addEventListener("click", () => {
+      setActiveSettingsTab(getEntry(), "theme");
+      scheduleSettingsLayoutStabilization();
+    });
 
     refs.renameBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;
