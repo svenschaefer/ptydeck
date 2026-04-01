@@ -43,7 +43,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(deck.summary, "/deck list|new|rename|switch|delete");
   assert.equal(connection.summary, "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
   assert.equal(layout.summary, "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
-  assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
+  assert.equal(workspace.summary, "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...");
   assert.equal(broadcast.summary, "/broadcast status | /broadcast off | /broadcast group [group]");
   assert.equal(share.summary, "/share list | /share session | /share deck | /share revoke <shareId>");
   assert.equal(transfer.summary, "/transfer upload [path] | /transfer download <path>");
@@ -69,7 +69,8 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("note"), "/note [text...]");
   assert.equal(getSlashCommandUsage("connection"), "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>");
   assert.equal(getSlashCommandUsage("layout"), "/layout list | /layout save <name> | /layout apply <profile> | /layout rename <profile> <name> | /layout delete <profile>");
-  assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>");
+  assert.equal(getSlashCommandUsage("workspace"), "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear");
+  assert.equal(getSlashCommandUsage("workspace", "group"), "/workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear");
   assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
   assert.equal(getSlashCommandUsage("share"), "/share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
   assert.equal(getSlashCommandUsage("replay"), "/replay view | /replay export | /replay copy");
@@ -116,6 +117,16 @@ test("command schema formats topic help text for commands and subcommands", () =
   const shareHelp = createCommandTopicHelpText("share", "", ["share", "help"]);
   assert.match(shareHelp, /^\/share$/m);
   assert.match(shareHelp, /Subcommands: list session deck revoke/);
+
+  const workspaceGroupHelp = createCommandTopicHelpText("workspace", "group", ["workspace", "help"]);
+  assert.equal(
+    workspaceGroupHelp,
+    [
+      "/workspace group",
+      "Usage: /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear",
+      "manage deck-local workspace groups on the active deck"
+    ].join("\n")
+  );
 });
 
 test("command schema registry resolves declarative command definitions by name", () => {
@@ -124,6 +135,14 @@ test("command schema registry resolves declarative command definitions by name",
   assert.deepEqual(registry.get("connection")?.subcommands?.apply?.usage, ["/connection apply <profile>"]);
   assert.deepEqual(registry.get("layout")?.subcommands?.save?.usage, ["/layout save <name>"]);
   assert.deepEqual(registry.get("workspace")?.subcommands?.apply?.usage, ["/workspace apply <preset>"]);
+  assert.deepEqual(registry.get("workspace")?.subcommands?.group?.usage, [
+    "/workspace group list",
+    "/workspace group save <name>",
+    "/workspace group apply <group>",
+    "/workspace group rename <group> <name>",
+    "/workspace group delete <group>",
+    "/workspace group clear"
+  ]);
   assert.deepEqual(registry.get("broadcast")?.subcommands?.group?.usage, ["/broadcast group [group]"]);
   assert.deepEqual(registry.get("share")?.subcommands?.deck?.usage, ["/share deck [deckSelector]"]);
   assert.equal(registry.get("settings")?.subcommands?.apply?.args, undefined);

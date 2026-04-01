@@ -251,13 +251,34 @@
             </div>
             <select id="connection-profile-select" class="workspace-manager-select" aria-label="Saved connection profiles"></select>
             <div class="workspace-manager-actions">
-              <button id="connection-profile-save" type="button">Save From Active</button>
+              <button id="connection-profile-new" type="button">New Blank</button>
+              <button id="connection-profile-save" type="button">Load Active</button>
+              <button id="connection-profile-save-draft" type="button">Save Draft</button>
+              <button id="connection-profile-reset-draft" type="button">Reset</button>
               <button id="connection-profile-apply" type="button">Launch</button>
               <button id="connection-profile-duplicate" type="button">Duplicate</button>
               <button id="connection-profile-rename" type="button">Rename</button>
               <button id="connection-profile-delete" type="button">Delete</button>
             </div>
             <p id="connection-profile-summary" class="workspace-manager-summary"></p>
+            <div class="workspace-manager-editor">
+              <label class="workspace-manager-field" for="connection-profile-draft-name">Profile Name</label>
+              <input
+                id="connection-profile-draft-name"
+                class="workspace-manager-input"
+                type="text"
+                placeholder="Connection profile name"
+              />
+              <label class="workspace-manager-field" for="connection-profile-draft-launch">Launch JSON</label>
+              <textarea
+                id="connection-profile-draft-launch"
+                class="workspace-manager-textarea"
+                rows="16"
+                spellcheck="false"
+                placeholder='{"kind":"local","deckId":"default","shell":"bash","startCwd":"/"}'
+              ></textarea>
+              <p id="connection-profile-draft-status" class="workspace-manager-inline-note"></p>
+            </div>
           </section>
           <section id="workspace-manager-panel-workspace" class="workspace-manager-panel" hidden>
             <div class="workspace-manager-section-head">
@@ -268,10 +289,12 @@
             <div class="workspace-manager-actions">
               <button id="workspace-preset-save" type="button">Save Current</button>
               <button id="workspace-preset-apply" type="button">Apply</button>
+              <button id="workspace-preset-duplicate" type="button">Duplicate</button>
               <button id="workspace-preset-rename" type="button">Rename</button>
               <button id="workspace-preset-delete" type="button">Delete</button>
             </div>
             <p id="workspace-preset-summary" class="workspace-manager-summary"></p>
+            <pre id="workspace-preset-detail" class="workspace-manager-detail"></pre>
             <div class="workspace-manager-subsection">
               <div class="workspace-manager-section-head">
                 <p class="workspace-manager-section-title">Deck Groups</p>
@@ -285,6 +308,7 @@
                 <button id="workspace-group-delete" type="button">Delete</button>
                 <button id="workspace-group-clear" type="button">Clear</button>
               </div>
+              <p id="workspace-group-persistence" class="workspace-manager-inline-note"></p>
             </div>
           </section>
         </dialog>

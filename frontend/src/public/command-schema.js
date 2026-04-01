@@ -550,13 +550,19 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage persisted workspace presets",
     example: "/workspace apply ops",
-    summary: "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>",
+    summary: "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...",
     usage: [
       "/workspace list",
       "/workspace save <name>",
       "/workspace apply <preset>",
       "/workspace rename <preset> <name>",
-      "/workspace delete <preset>"
+      "/workspace delete <preset>",
+      "/workspace group list",
+      "/workspace group save <name>",
+      "/workspace group apply <group>",
+      "/workspace group rename <group> <name>",
+      "/workspace group delete <group>",
+      "/workspace group clear"
     ],
     subcommands: {
       list: {
@@ -603,6 +609,78 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/workspace delete ops",
         key: "slash:workspace:delete",
         usage: "/workspace delete <preset>"
+      },
+      group: {
+        insertText: "group",
+        label: "/workspace group",
+        kind: "subcommand",
+        description: "manage deck-local workspace groups on the active deck",
+        example: "/workspace group save build",
+        key: "slash:workspace:group",
+        usage: [
+          "/workspace group list",
+          "/workspace group save <name>",
+          "/workspace group apply <group>",
+          "/workspace group rename <group> <name>",
+          "/workspace group delete <group>",
+          "/workspace group clear"
+        ],
+        subcommands: {
+          list: {
+            insertText: "list",
+            label: "/workspace group list",
+            kind: "subcommand",
+            description: "list workspace groups for the active deck",
+            example: "/workspace group list",
+            key: "slash:workspace:group:list",
+            usage: "/workspace group list"
+          },
+          save: {
+            insertText: "save",
+            label: "/workspace group save",
+            kind: "subcommand",
+            description: "save the current filtered deck view as a workspace group",
+            example: "/workspace group save build",
+            key: "slash:workspace:group:save",
+            usage: "/workspace group save <name>"
+          },
+          apply: {
+            insertText: "apply",
+            label: "/workspace group apply",
+            kind: "subcommand",
+            description: "apply a workspace group on the active deck",
+            example: "/workspace group apply build",
+            key: "slash:workspace:group:apply",
+            usage: "/workspace group apply <group>"
+          },
+          rename: {
+            insertText: "rename",
+            label: "/workspace group rename",
+            kind: "subcommand",
+            description: "rename a workspace group on the active deck",
+            example: "/workspace group rename build build-main",
+            key: "slash:workspace:group:rename",
+            usage: "/workspace group rename <group> <name>"
+          },
+          delete: {
+            insertText: "delete",
+            label: "/workspace group delete",
+            kind: "subcommand",
+            description: "delete a workspace group on the active deck",
+            example: "/workspace group delete build",
+            key: "slash:workspace:group:delete",
+            usage: "/workspace group delete <group>"
+          },
+          clear: {
+            insertText: "clear",
+            label: "/workspace group clear",
+            kind: "subcommand",
+            description: "clear the active workspace group on the active deck",
+            example: "/workspace group clear",
+            key: "slash:workspace:group:clear",
+            usage: "/workspace group clear"
+          }
+        }
       }
     }
   }),

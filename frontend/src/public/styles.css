@@ -1759,7 +1759,67 @@ button:hover {
   color: #9db8d2;
   font-size: 12px;
   line-height: 1.45;
+  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.workspace-manager-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: #111a26;
+}
+
+.workspace-manager-field {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #89aac8;
+}
+
+.workspace-manager-input,
+.workspace-manager-textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0f151f;
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.workspace-manager-textarea,
+.workspace-manager-detail {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workspace-manager-textarea {
+  min-height: 240px;
+  resize: vertical;
+}
+
+.workspace-manager-inline-note {
+  margin: 0;
+  color: #9db8d2;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workspace-manager-detail {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: #111a26;
+  color: #9db8d2;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  max-height: 260px;
 }
 
 .replay-viewer-head {

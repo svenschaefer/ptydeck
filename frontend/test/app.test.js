@@ -629,16 +629,23 @@ function createDocumentFixture() {
   const workspaceManagerPanelWorkspace = new FakeElement({ id: "workspace-manager-panel-workspace", tagName: "section" });
   workspaceManagerPanelWorkspace.hidden = true;
   const connectionProfileSelect = new FakeElement({ id: "connection-profile-select", tagName: "select" });
+  const connectionProfileNew = new FakeElement({ id: "connection-profile-new", tagName: "button" });
   const connectionProfileSave = new FakeElement({ id: "connection-profile-save", tagName: "button" });
+  const connectionProfileSaveDraft = new FakeElement({ id: "connection-profile-save-draft", tagName: "button" });
+  const connectionProfileResetDraft = new FakeElement({ id: "connection-profile-reset-draft", tagName: "button" });
   const connectionProfileApply = new FakeElement({ id: "connection-profile-apply", tagName: "button" });
   const connectionProfileDuplicate = new FakeElement({ id: "connection-profile-duplicate", tagName: "button" });
   const connectionProfileRename = new FakeElement({ id: "connection-profile-rename", tagName: "button" });
   const connectionProfileDelete = new FakeElement({ id: "connection-profile-delete", tagName: "button" });
   const connectionProfileStatus = new FakeElement({ id: "connection-profile-status", tagName: "p" });
   const connectionProfileSummary = new FakeElement({ id: "connection-profile-summary", tagName: "p" });
+  const connectionProfileDraftName = new FakeElement({ id: "connection-profile-draft-name", tagName: "input" });
+  const connectionProfileDraftLaunch = new FakeElement({ id: "connection-profile-draft-launch", tagName: "textarea" });
+  const connectionProfileDraftStatus = new FakeElement({ id: "connection-profile-draft-status", tagName: "p" });
   const workspacePresetSelect = new FakeElement({ id: "workspace-preset-select", tagName: "select" });
   const workspacePresetSave = new FakeElement({ id: "workspace-preset-save", tagName: "button" });
   const workspacePresetApply = new FakeElement({ id: "workspace-preset-apply", tagName: "button" });
+  const workspacePresetDuplicate = new FakeElement({ id: "workspace-preset-duplicate", tagName: "button" });
   const workspacePresetRename = new FakeElement({ id: "workspace-preset-rename", tagName: "button" });
   const workspacePresetDelete = new FakeElement({ id: "workspace-preset-delete", tagName: "button" });
   const workspaceGroupSelect = new FakeElement({ id: "workspace-group-select", tagName: "select" });
@@ -649,7 +656,9 @@ function createDocumentFixture() {
   const workspaceGroupClear = new FakeElement({ id: "workspace-group-clear", tagName: "button" });
   const workspacePresetStatus = new FakeElement({ id: "workspace-preset-status", tagName: "p" });
   const workspacePresetSummary = new FakeElement({ id: "workspace-preset-summary", tagName: "p" });
+  const workspacePresetDetail = new FakeElement({ id: "workspace-preset-detail", tagName: "pre" });
   const workspaceGroupSummary = new FakeElement({ id: "workspace-group-summary", tagName: "p" });
+  const workspaceGroupPersistence = new FakeElement({ id: "workspace-group-persistence", tagName: "p" });
   replayViewerDialog.appendChild(replayViewerTitle);
   replayViewerDialog.appendChild(replayViewerMeta);
   replayViewerDialog.appendChild(replayViewerStatus);
@@ -743,16 +752,23 @@ function createDocumentFixture() {
     workspaceManagerPanelConnections,
     workspaceManagerPanelWorkspace,
     connectionProfileSelect,
+    connectionProfileNew,
     connectionProfileSave,
+    connectionProfileSaveDraft,
+    connectionProfileResetDraft,
     connectionProfileApply,
     connectionProfileDuplicate,
     connectionProfileRename,
     connectionProfileDelete,
     connectionProfileStatus,
     connectionProfileSummary,
+    connectionProfileDraftName,
+    connectionProfileDraftLaunch,
+    connectionProfileDraftStatus,
     workspacePresetSelect,
     workspacePresetSave,
     workspacePresetApply,
+    workspacePresetDuplicate,
     workspacePresetRename,
     workspacePresetDelete,
     workspaceGroupSelect,
@@ -763,7 +779,9 @@ function createDocumentFixture() {
     workspaceGroupClear,
     workspacePresetStatus,
     workspacePresetSummary,
-    workspaceGroupSummary
+    workspacePresetDetail,
+    workspaceGroupSummary,
+    workspaceGroupPersistence
   ]) {
     byId.set(element.id, element);
   }

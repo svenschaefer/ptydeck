@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-01 (H53 workspace-library management delivered; H54 queued as a focused Workspace Library UX follow-up; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-01 (H54 workspace-library follow-up delivered; no active near-term wave; `CHANGELOG.md` owns completed release history.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-01. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-01. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- The next queued release wave is `v0.4.0-H54` with `UX-021A`, `UX-021B`, `UX-021C`, and `UX-021D`.
+- There is no queued release wave currently.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -41,7 +41,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-01. 
 - Controlled mouse forwarding exists as per-session `mouseForwardingMode` (`off|application`), defaulting to `off`.
 - The left sidebar is intentionally reduced to connection state, deck/session navigation, `New Deck` / `New Session`, `Find`, `Settings`, and `Layouts`; saved connection-profile and workspace-preset/group management now live in a dedicated secondary management surface outside the sidebar, reachable through the `Manage` entry point in the control-pane meta strip.
 - The delivered management surface is a `Workspace Library` dialog with explicit `Connections` and `Workspace Presets` tabs, keeping the sidebar focused on navigation while preserving parity with the existing runtime and slash-command capabilities.
-- The queued H54 follow-up is intentionally narrow and code-review-driven: connection profiles still need a direct create/edit/detail workflow in the dialog, workspace presets still need duplication plus richer detail visibility, and deck-group management still needs clearer local-versus-persisted semantics plus slash-command parity.
+- The delivered H54 follow-up expanded that surface so connection profiles can now be created and edited directly in the dialog with a visible normalized launch payload, workspace presets now expose richer detail and duplication, and deck-group management now makes local-only versus persisted state explicit while matching the slash-command surface through `/workspace group ...`.
 
 ## Quality and Operational Rules
 

@@ -66,6 +66,10 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   const presetSelectEl = new FakeElement("select");
   const groupSelectEl = new FakeElement("select");
   const statusEl = new FakeElement("p");
+  const summaryEl = new FakeElement("p");
+  const detailEl = new FakeElement("pre");
+  const groupSummaryEl = new FakeElement("p");
+  const groupPersistenceEl = new FakeElement("p");
   const controller = createWorkspacePresetRuntimeController({
     documentRef: createDocumentRef(),
     api: {
@@ -100,7 +104,7 @@ test("workspace preset runtime controller manages preset lifecycle through backe
       async createWorkspacePreset(payload) {
         calls.push(["create", payload]);
         return {
-          id: "ops-2",
+          id: payload.name === "Ops Copy" ? "ops-copy" : "ops-2",
           name: payload.name,
           createdAt: 1,
           updatedAt: 2,
@@ -143,6 +147,7 @@ test("workspace preset runtime controller manages preset lifecycle through backe
     presetSelectEl,
     presetSaveBtn: new FakeElement("button"),
     presetApplyBtn: new FakeElement("button"),
+    presetDuplicateBtn: new FakeElement("button"),
     presetRenameBtn: new FakeElement("button"),
     presetDeleteBtn: new FakeElement("button"),
     groupSelectEl,
@@ -152,6 +157,10 @@ test("workspace preset runtime controller manages preset lifecycle through backe
     groupDeleteBtn: new FakeElement("button"),
     groupClearBtn: new FakeElement("button"),
     statusEl,
+    summaryEl,
+    detailEl,
+    groupSummaryEl,
+    groupPersistenceEl,
     getDecks: () => [{ id: "default" }, { id: "ops" }],
     getSessions: () => [{ id: "s1", deckId: "ops" }, { id: "s2", deckId: "ops" }],
     getActiveDeckId: () => activeDeckId,
@@ -176,6 +185,9 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   await controller.loadPresets();
   assert.equal(controller.listPresets().length, 1);
   assert.equal(presetSelectEl.children.length, 1);
+  assert.match(summaryEl.textContent, /Ops Workspace/);
+  assert.match(detailEl.textContent, /activeDeckId="ops"/);
+  assert.match(groupPersistenceEl.textContent, /persist into preset/i);
 
   controller.replaceWorkspaceState({
     activeDeckId: "ops",
@@ -235,6 +247,9 @@ test("workspace preset runtime controller manages preset lifecycle through backe
 
   const renameFeedback = await controller.renamePresetById("ops", "Ops Renamed");
   assert.equal(renameFeedback, "Renamed workspace preset [ops] to Ops Renamed.");
+
+  const duplicateFeedback = await controller.duplicatePresetById("ops", "Ops Copy");
+  assert.equal(duplicateFeedback, "Duplicated workspace preset [ops] Ops Renamed as [ops-copy] Ops Copy.");
 
   const deleteFeedback = await controller.deletePresetById("ops");
   assert.equal(deleteFeedback, "Deleted workspace preset [ops] Ops Renamed.");
@@ -334,5 +349,90 @@ test("workspace preset runtime controller normalizes stale references and resolv
   assert.deepEqual(
     resolved.map((session) => session.id),
     ["s2"]
+  );
+});
+
+test("workspace preset runtime controller exposes explicit deck-group lifecycle with persisted-vs-local feedback", async () => {
+  const feedback = [];
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    api: {
+      async updateWorkspacePreset(presetId, payload) {
+        return {
+          id: presetId,
+          name: "Ops Workspace",
+          updatedAt: 2,
+          createdAt: 1,
+          workspace: payload.workspace
+        };
+      }
+    },
+    presetSelectEl: new FakeElement("select"),
+    presetSaveBtn: new FakeElement("button"),
+    presetApplyBtn: new FakeElement("button"),
+    presetDuplicateBtn: new FakeElement("button"),
+    presetRenameBtn: new FakeElement("button"),
+    presetDeleteBtn: new FakeElement("button"),
+    groupSelectEl: new FakeElement("select"),
+    groupSaveBtn: new FakeElement("button"),
+    groupApplyBtn: new FakeElement("button"),
+    groupRenameBtn: new FakeElement("button"),
+    groupDeleteBtn: new FakeElement("button"),
+    groupClearBtn: new FakeElement("button"),
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [{ id: "s1", deckId: "ops" }, { id: "s2", deckId: "ops" }],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    setCommandFeedback: (message) => feedback.push(message)
+  });
+
+  controller.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckGroups: {},
+    deckSplitLayouts: {}
+  });
+
+  const localSave = await controller.saveGroupByName("Build");
+  assert.equal(
+    localSave,
+    "Saved workspace group [build] Build for deck [ops]. It is local-only until you save or select a workspace preset."
+  );
+  assert.equal(controller.resolveGroup("build", "ops").group?.id, "build");
+
+  controller.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: controller.getWorkspaceState()
+    }
+  ]);
+
+  const persistedApply = await controller.applyGroupById("build", "ops");
+  assert.equal(
+    persistedApply,
+    "Active workspace group for deck [ops] is now [build] and persisted into preset [ops] Ops Workspace."
+  );
+
+  const renamed = await controller.renameGroupById("build", "Build Main", "ops");
+  assert.equal(
+    renamed,
+    "Renamed workspace group [build] to Build Main and persisted it into preset [ops] Ops Workspace."
+  );
+
+  const cleared = await controller.clearGroupForDeck("ops");
+  assert.equal(
+    cleared,
+    "Cleared the active workspace group for deck [ops] and persisted it into preset [ops] Ops Workspace."
   );
 });

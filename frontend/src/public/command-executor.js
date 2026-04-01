@@ -98,6 +98,17 @@ export function createCommandExecutor(options = {}) {
   const applyWorkspacePreset = typeof options.applyWorkspacePreset === "function" ? options.applyWorkspacePreset : async () => "";
   const renameWorkspacePreset = typeof options.renameWorkspacePreset === "function" ? options.renameWorkspacePreset : async () => "";
   const deleteWorkspacePreset = typeof options.deleteWorkspacePreset === "function" ? options.deleteWorkspacePreset : async () => "";
+  const listWorkspaceGroupsForDeck =
+    typeof options.listWorkspaceGroupsForDeck === "function" ? options.listWorkspaceGroupsForDeck : () => [];
+  const resolveWorkspaceGroup =
+    typeof options.resolveWorkspaceGroup === "function"
+      ? options.resolveWorkspaceGroup
+      : () => ({ group: null, error: "Unknown workspace group." });
+  const saveWorkspaceGroup = typeof options.saveWorkspaceGroup === "function" ? options.saveWorkspaceGroup : async () => "";
+  const applyWorkspaceGroup = typeof options.applyWorkspaceGroup === "function" ? options.applyWorkspaceGroup : async () => "";
+  const renameWorkspaceGroup = typeof options.renameWorkspaceGroup === "function" ? options.renameWorkspaceGroup : async () => "";
+  const deleteWorkspaceGroup = typeof options.deleteWorkspaceGroup === "function" ? options.deleteWorkspaceGroup : async () => "";
+  const clearWorkspaceGroup = typeof options.clearWorkspaceGroup === "function" ? options.clearWorkspaceGroup : async () => "";
   const getBroadcastStatus = typeof options.getBroadcastStatus === "function" ? options.getBroadcastStatus : () => "Broadcast: off.";
   const enableGroupBroadcast = typeof options.enableGroupBroadcast === "function" ? options.enableGroupBroadcast : async () => "";
   const disableBroadcast = typeof options.disableBroadcast === "function" ? options.disableBroadcast : async () => "";
@@ -1135,6 +1146,7 @@ export function createCommandExecutor(options = {}) {
     if (command === "workspace") {
       const subcommand = String(args[0] || "").trim().toLowerCase();
       const rest = args.slice(1);
+      const activeDeckId = String(getActiveDeck()?.id || defaultDeckId).trim() || defaultDeckId;
       if (!subcommand || subcommand === "list") {
         const presets = listWorkspacePresets();
         if (!Array.isArray(presets) || presets.length === 0) {
@@ -1188,6 +1200,74 @@ export function createCommandExecutor(options = {}) {
           return resolved.error;
         }
         return deleteWorkspacePreset(resolved.preset.id);
+      }
+
+      if (subcommand === "group") {
+        const groupSubcommand = String(rest[0] || "").trim().toLowerCase();
+        const groupArgs = rest.slice(1);
+        if (!groupSubcommand || groupSubcommand === "list") {
+          const groups = listWorkspaceGroupsForDeck(activeDeckId);
+          if (!Array.isArray(groups) || groups.length === 0) {
+            return `No workspace groups on deck [${activeDeckId}].`;
+          }
+          return [`Deck [${activeDeckId}] workspace groups:`]
+            .concat(groups.map((group) => `[${group.id}] ${group.name} -> ${Array.isArray(group.sessionIds) ? group.sessionIds.length : 0} session(s)`))
+            .join("\n");
+        }
+
+        if (groupSubcommand === "save") {
+          const name = groupArgs.join(" ").trim();
+          if (!name) {
+            return formatUsage("workspace", "group");
+          }
+          return saveWorkspaceGroup(name, activeDeckId);
+        }
+
+        if (groupSubcommand === "apply") {
+          if (groupArgs.length !== 1) {
+            return formatUsage("workspace", "group");
+          }
+          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
+          if (!resolved.group) {
+            return resolved.error;
+          }
+          return applyWorkspaceGroup(resolved.group.id, activeDeckId);
+        }
+
+        if (groupSubcommand === "rename") {
+          if (groupArgs.length < 2) {
+            return formatUsage("workspace", "group");
+          }
+          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
+          if (!resolved.group) {
+            return resolved.error;
+          }
+          const name = groupArgs.slice(1).join(" ").trim();
+          if (!name) {
+            return formatUsage("workspace", "group");
+          }
+          return renameWorkspaceGroup(resolved.group.id, name, activeDeckId);
+        }
+
+        if (groupSubcommand === "delete") {
+          if (groupArgs.length !== 1) {
+            return formatUsage("workspace", "group");
+          }
+          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
+          if (!resolved.group) {
+            return resolved.error;
+          }
+          return deleteWorkspaceGroup(resolved.group.id, activeDeckId);
+        }
+
+        if (groupSubcommand === "clear") {
+          if (groupArgs.length !== 0) {
+            return formatUsage("workspace", "group");
+          }
+          return clearWorkspaceGroup(activeDeckId);
+        }
+
+        return formatUsage("workspace", "group");
       }
 
       return formatUsage("workspace");

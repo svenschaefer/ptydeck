@@ -177,7 +177,15 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   const calls = [];
   const selectEl = createElement("select");
   const statusEl = createElement("p");
+  const summaryEl = createElement("p");
+  const newBtn = createElement("button");
+  const saveBtn = createElement("button");
+  const saveDraftBtn = createElement("button");
+  const resetDraftBtn = createElement("button");
   const duplicateBtn = createElement("button");
+  const draftNameInputEl = createElement("input");
+  const draftLaunchTextareaEl = createElement("textarea");
+  const draftStatusEl = createElement("p");
   let activeSessionId = "s-local";
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
@@ -192,8 +200,16 @@ test("connection profile runtime controller manages backend-backed lifecycle and
     },
     documentRef: createDocumentRef(),
     selectEl,
+    newBtn,
+    saveBtn,
+    saveDraftBtn,
+    resetDraftBtn,
     statusEl,
+    summaryEl,
     duplicateBtn,
+    draftNameInputEl,
+    draftLaunchTextareaEl,
+    draftStatusEl,
     api: {
       async listConnectionProfiles() {
         calls.push(["list"]);
@@ -284,12 +300,14 @@ test("connection profile runtime controller manages backend-backed lifecycle and
     requestRender: () => calls.push(["render"]),
     formatSessionToken: (sessionId) => sessionId === "s-local" ? "1" : "8",
     formatSessionDisplayName: (session) => session?.name || session?.id || "",
-    normalizeThemeProfile: (profile) => profile
+    normalizeThemeProfile: (profile) => profile,
+    defaultThemeProfile: createThemeProfile("#090909")
   });
 
   await controller.loadProfiles();
   assert.equal(selectEl.children.length, 1);
   assert.equal(statusEl.textContent, "1 profile(s)");
+  assert.match(summaryEl.textContent, /Ops SSH/);
 
   const saveFeedback = await controller.createProfileFromSession("s-local", "Local Dev");
   assert.equal(saveFeedback, "Saved connection profile [local-dev] Local Dev from [1] s-local.");
@@ -308,6 +326,32 @@ test("connection profile runtime controller manages backend-backed lifecycle and
       inactiveThemeProfile: createThemeProfile("#030303")
     }
   });
+
+  const loadDraftFeedback = await controller.loadActiveDraftFlow();
+  assert.equal(loadDraftFeedback, "Loaded the active session into a new connection profile draft.");
+  assert.equal(draftNameInputEl.value, "s-local Profile");
+  assert.match(draftStatusEl.textContent, /unsaved draft/i);
+  draftNameInputEl.value = "Drafted Local";
+
+  const saveDraftFeedback = await controller.saveDraftFlow();
+  assert.equal(saveDraftFeedback, "Saved connection profile [local-dev] Drafted Local.");
+  const createCalls = calls.filter((entry) => entry[0] === "create");
+  assert.deepEqual(createCalls[1]?.[1], {
+    name: "Drafted Local",
+    launch: {
+      kind: "local",
+      deckId: "default",
+      shell: "bash",
+      startCwd: "/workspace",
+      startCommand: "npm run dev",
+      env: { NODE_ENV: "development" },
+      tags: ["local", "dev"],
+      themeProfile: createThemeProfile("#010101"),
+      activeThemeProfile: createThemeProfile("#020202"),
+      inactiveThemeProfile: createThemeProfile("#030303")
+    }
+  });
+  assert.match(draftStatusEl.textContent, /Editing saved profile \[local-dev\]/i);
 
   const applyFeedback = await controller.applyProfileById("ops-ssh");
   assert.equal(applyFeedback, "Started session [8] Ops SSH from connection profile [ops-ssh] Ops SSH.");

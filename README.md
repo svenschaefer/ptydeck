@@ -13,7 +13,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Session replay/export, file transfer, read-only sharing, and saved connection profiles
-- Dedicated `Workspace Library` manager for saved connections and workspace presets outside the sidebar
+- Dedicated `Workspace Library` manager for saved connections, direct connection-profile editing, workspace presets, and deck-group management outside the sidebar
 - Per-session safety controls, dual theme slots, multiline notes, and controlled mouse forwarding
 - REST + WebSocket backend with restart-safe persistence and deterministic contracts
 
@@ -32,7 +32,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Browser UI with `xterm.js`
 - Multi-session workspace rendering
 - Central command/composer flow plus slash-command plane
-- Decks, layout profiles, split-layout support, and a dedicated `Workspace Library` surface for saved connections and workspace presets
+- Decks, layout profiles, split-layout support, and a dedicated `Workspace Library` surface for saved connections, workspace presets, and deck-group management
 - Runtime/debug helpers for traceability and troubleshooting
 
 ## Quick Start
@@ -109,6 +109,14 @@ Save or apply workspace state:
 ```text
 /workspace save dev
 /workspace apply dev
+```
+
+Manage active-deck workspace groups:
+
+```text
+/workspace group list
+/workspace group save triage
+/workspace group apply triage
 ```
 
 Transfer a file from a session:

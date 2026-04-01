@@ -126,7 +126,7 @@ test("command executor help and usage strings derive from declarative schema met
   const workspaceUsage = await executor.execute({ command: "workspace", args: ["wat"], raw: "/workspace wat" });
   assert.equal(
     workspaceUsage,
-    "Usage: /workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset>"
+    "Usage: /workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
   );
 
   const broadcastUsage = await executor.execute({ command: "broadcast", args: ["wat"], raw: "/broadcast wat" });
@@ -647,6 +647,7 @@ test("command executor manages workspace presets through shared runtime hooks", 
       }
     }
   ];
+  const groups = [{ id: "ops", name: "Ops", sessionIds: ["s1"] }];
   const executor = createCommandExecutor({
     store: {
       getState() {
@@ -710,6 +711,29 @@ test("command executor manages workspace presets through shared runtime hooks", 
     deleteWorkspacePreset: async (presetId) => {
       calls.push(["delete", presetId]);
       return `Deleted workspace preset [${presetId}] Ops Workspace.`;
+    },
+    listWorkspaceGroupsForDeck: () => groups,
+    resolveWorkspaceGroup: (selector) =>
+      selector === "ops" ? { group: groups[0], error: "" } : { group: null, error: `Unknown workspace group: ${selector}` },
+    saveWorkspaceGroup: async (name, deckId) => {
+      calls.push(["group-save", deckId, name]);
+      return `Saved workspace group [ops] ${name} for deck [${deckId}].`;
+    },
+    applyWorkspaceGroup: async (groupId, deckId) => {
+      calls.push(["group-apply", deckId, groupId]);
+      return `Active workspace group for deck [${deckId}] is now [${groupId}].`;
+    },
+    renameWorkspaceGroup: async (groupId, name, deckId) => {
+      calls.push(["group-rename", deckId, groupId, name]);
+      return `Renamed workspace group [${groupId}] to ${name}.`;
+    },
+    deleteWorkspaceGroup: async (groupId, deckId) => {
+      calls.push(["group-delete", deckId, groupId]);
+      return `Deleted workspace group [${groupId}] Ops.`;
+    },
+    clearWorkspaceGroup: async (deckId) => {
+      calls.push(["group-clear", deckId]);
+      return `Cleared the active workspace group for deck [${deckId}].`;
     }
   });
 
@@ -733,11 +757,40 @@ test("command executor manages workspace presets through shared runtime hooks", 
     await executor.execute({ command: "workspace", args: ["delete", "ops"], raw: "/workspace delete ops" }),
     "Deleted workspace preset [ops] Ops Workspace."
   );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "list"], raw: "/workspace group list" }),
+    "Deck [default] workspace groups:\n[ops] Ops -> 1 session(s)"
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "save", "Build"], raw: "/workspace group save Build" }),
+    "Saved workspace group [ops] Build for deck [default]."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "apply", "ops"], raw: "/workspace group apply ops" }),
+    "Active workspace group for deck [default] is now [ops]."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "rename", "ops", "Ops", "Main"], raw: "/workspace group rename ops Ops Main" }),
+    "Renamed workspace group [ops] to Ops Main."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "delete", "ops"], raw: "/workspace group delete ops" }),
+    "Deleted workspace group [ops] Ops."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["group", "clear"], raw: "/workspace group clear" }),
+    "Cleared the active workspace group for deck [default]."
+  );
   assert.deepEqual(calls, [
     ["save", "Ops Workspace"],
     ["apply", "ops"],
     ["rename", "ops", "New Name"],
-    ["delete", "ops"]
+    ["delete", "ops"],
+    ["group-save", "default", "Build"],
+    ["group-apply", "default", "ops"],
+    ["group-rename", "default", "ops", "Ops Main"],
+    ["group-delete", "default", "ops"],
+    ["group-clear", "default"]
   ]);
 });
 

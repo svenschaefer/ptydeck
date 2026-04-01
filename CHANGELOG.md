@@ -2,6 +2,16 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-01
+
+- [x] `UX-021A`, `UX-021B`, `UX-021C`, and `UX-021D` are now completed as `v0.4.0-H54`: the `Workspace Library` follow-up is closed and the manager dialog now has direct editing and richer detail flows instead of only thin summary actions.
+- [x] The H54 connection-profile closeout expanded `frontend/src/public/connection-profile-runtime-controller.js`, `frontend/src/public/index.html`, `frontend/src/public/styles.css`, and `frontend/src/public/app-runtime-composition-controller.js` so the `Connections` tab now supports direct create/edit/reset/save draft flows, loading normalized launch settings from the active session, and inspecting the full normalized launch payload in the dialog instead of relying only on `Save From Active` plus one-line summaries.
+- [x] H54 workspace-preset follow-up work expanded `frontend/src/public/workspace-preset-runtime-controller.js` and the shared `Workspace Library` UI so the `Workspace Presets` tab now exposes richer preset detail visibility and a duplicate flow, keeping preset operations inside the dialog instead of forcing slash-command-only parity gaps.
+- [x] H54 deck-group management is now explicit and slash-command-complete: the `Workspace Library` now surfaces whether group edits are local-only or persisted into the selected preset, clarifies `Save Visible` / `Apply` / `Clear` behavior in the UI, and the slash-command surface now supports `/workspace group list|save|apply|rename|delete|clear` through updates in `frontend/src/public/command-schema.js`, `frontend/src/public/command-executor.js`, and `frontend/src/public/app-bootstrap-composition-controller.js`.
+- [x] H54 regression coverage now spans direct connection-profile draft editing, preset duplication and detail rendering, workspace-group persistence semantics, and slash-command parity across `frontend/test/connection-profile-runtime-controller.test.js`, `frontend/test/workspace-preset-runtime-controller.test.js`, `frontend/test/command-schema.test.js`, `frontend/test/command-executor.test.js`, `frontend/test/workspace-manager-runtime-controller.test.js`, and `frontend/test/app.test.js`.
+- [x] Validation for the `v0.4.0-H54` closeout passed with focused frontend regressions plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`); one first full `npm run test` attempt hit the known flaky backend SSH reconnect test, the isolated rerun of that exact backend test passed, and the authoritative full-suite rerun then passed cleanly with no leftover background validation processes after completion.
+- [x] Coverage after the `v0.4.0-H54` closeout step: backend coverage remained above threshold and frontend line coverage finished at `93.44%` on the final validated tree.
+
 ## 2026-03-30
 
 - [x] `UX-020A`, `UX-020B`, `UX-020C`, and `UX-020D` are now completed as `v0.4.0-H53`: saved connection-profile and workspace-preset/group management no longer rely on the removed sidebar panels and now live in one dedicated secondary management surface outside the sidebar.

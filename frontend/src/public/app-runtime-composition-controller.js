@@ -140,16 +140,23 @@ const layoutProfileRenameBtn = document.getElementById("layout-profile-rename");
 const layoutProfileDeleteBtn = document.getElementById("layout-profile-delete");
 const layoutProfileStatusEl = document.getElementById("layout-profile-status");
 const connectionProfileSelectEl = document.getElementById("connection-profile-select");
+const connectionProfileNewBtn = document.getElementById("connection-profile-new");
 const connectionProfileSaveBtn = document.getElementById("connection-profile-save");
+const connectionProfileSaveDraftBtn = document.getElementById("connection-profile-save-draft");
+const connectionProfileResetDraftBtn = document.getElementById("connection-profile-reset-draft");
 const connectionProfileApplyBtn = document.getElementById("connection-profile-apply");
 const connectionProfileDuplicateBtn = document.getElementById("connection-profile-duplicate");
 const connectionProfileRenameBtn = document.getElementById("connection-profile-rename");
 const connectionProfileDeleteBtn = document.getElementById("connection-profile-delete");
 const connectionProfileStatusEl = document.getElementById("connection-profile-status");
 const connectionProfileSummaryEl = document.getElementById("connection-profile-summary");
+const connectionProfileDraftNameEl = document.getElementById("connection-profile-draft-name");
+const connectionProfileDraftLaunchEl = document.getElementById("connection-profile-draft-launch");
+const connectionProfileDraftStatusEl = document.getElementById("connection-profile-draft-status");
 const workspacePresetSelectEl = document.getElementById("workspace-preset-select");
 const workspacePresetSaveBtn = document.getElementById("workspace-preset-save");
 const workspacePresetApplyBtn = document.getElementById("workspace-preset-apply");
+const workspacePresetDuplicateBtn = document.getElementById("workspace-preset-duplicate");
 const workspacePresetRenameBtn = document.getElementById("workspace-preset-rename");
 const workspacePresetDeleteBtn = document.getElementById("workspace-preset-delete");
 const workspacePresetGroupSelectEl = document.getElementById("workspace-group-select");
@@ -160,7 +167,9 @@ const workspacePresetGroupDeleteBtn = document.getElementById("workspace-group-d
 const workspacePresetGroupClearBtn = document.getElementById("workspace-group-clear");
 const workspacePresetStatusEl = document.getElementById("workspace-preset-status");
 const workspacePresetSummaryEl = document.getElementById("workspace-preset-summary");
+const workspacePresetDetailEl = document.getElementById("workspace-preset-detail");
 const workspaceGroupSummaryEl = document.getElementById("workspace-group-summary");
+const workspaceGroupPersistenceEl = document.getElementById("workspace-group-persistence");
 const commandInput = document.getElementById("command-input");
 const sendBtn = document.getElementById("send-command");
 const template = document.getElementById("terminal-card-template");
@@ -656,12 +665,19 @@ connectionProfileRuntimeController = createConnectionProfileRuntimeController({
   documentRef: document,
   api,
   selectEl: connectionProfileSelectEl,
+  newBtn: connectionProfileNewBtn,
   saveBtn: connectionProfileSaveBtn,
+  saveDraftBtn: connectionProfileSaveDraftBtn,
+  resetDraftBtn: connectionProfileResetDraftBtn,
   applyBtn: connectionProfileApplyBtn,
   duplicateBtn: connectionProfileDuplicateBtn,
   renameBtn: connectionProfileRenameBtn,
   deleteBtn: connectionProfileDeleteBtn,
   statusEl: connectionProfileStatusEl,
+  summaryEl: connectionProfileSummaryEl,
+  draftNameInputEl: connectionProfileDraftNameEl,
+  draftLaunchTextareaEl: connectionProfileDraftLaunchEl,
+  draftStatusEl: connectionProfileDraftStatusEl,
   getSessions: () => store.getState().sessions || [],
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
   getActiveSessionId: () => store.getState().activeSessionId || "",
@@ -677,7 +693,8 @@ connectionProfileRuntimeController = createConnectionProfileRuntimeController({
   normalizeThemeProfile: (value) =>
     sessionUiFacadeController?.normalizeThemeProfile?.(value) ||
     (value && typeof value === "object" && !Array.isArray(value) ? value : {}),
-  defaultDeckId: DEFAULT_DECK_ID
+  defaultDeckId: DEFAULT_DECK_ID,
+  defaultThemeProfile: DEFAULT_TERMINAL_THEME
 });
 
 workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
@@ -687,6 +704,7 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   presetSelectEl: workspacePresetSelectEl,
   presetSaveBtn: workspacePresetSaveBtn,
   presetApplyBtn: workspacePresetApplyBtn,
+  presetDuplicateBtn: workspacePresetDuplicateBtn,
   presetRenameBtn: workspacePresetRenameBtn,
   presetDeleteBtn: workspacePresetDeleteBtn,
   groupSelectEl: workspacePresetGroupSelectEl,
@@ -696,6 +714,10 @@ workspacePresetRuntimeController = createWorkspacePresetRuntimeController({
   groupDeleteBtn: workspacePresetGroupDeleteBtn,
   groupClearBtn: workspacePresetGroupClearBtn,
   statusEl: workspacePresetStatusEl,
+  summaryEl: workspacePresetSummaryEl,
+  detailEl: workspacePresetDetailEl,
+  groupSummaryEl: workspaceGroupSummaryEl,
+  groupPersistenceEl: workspaceGroupPersistenceEl,
   getDecks: () => store.getState().decks || [],
   getSessions: () => store.getState().sessions || [],
   getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,

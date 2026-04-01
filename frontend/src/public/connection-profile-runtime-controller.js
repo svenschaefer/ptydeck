@@ -89,7 +89,7 @@ function normalizeTagList(tags) {
   return normalized;
 }
 
-function normalizeConnectionProfileLaunch(launch) {
+export function normalizeConnectionProfileLaunch(launch) {
   if (!launch || typeof launch !== "object" || Array.isArray(launch)) {
     return null;
   }
@@ -249,17 +249,84 @@ export function formatConnectionProfileSummary(profile) {
   return `[${normalized.id}] ${normalized.name} -> ${parts.join(" ")}`;
 }
 
+export function formatConnectionProfileReport(profile) {
+  const normalized = normalizeConnectionProfileRecord(profile);
+  if (!normalized) {
+    return "";
+  }
+  const launch = normalized.launch;
+  return [
+    `[${normalized.id}] ${normalized.name}`,
+    `kind=${JSON.stringify(launch.kind)}`,
+    `deckId=${JSON.stringify(launch.deckId)}`,
+    `shell=${JSON.stringify(launch.shell)}`,
+    `startCwd=${JSON.stringify(launch.startCwd)}`,
+    `startCommand=${JSON.stringify(launch.startCommand || "")}`,
+    `env=${JSON.stringify(launch.env || {})}`,
+    `tags=${JSON.stringify(Array.isArray(launch.tags) ? launch.tags : [])}`,
+    `remoteConnection=${JSON.stringify(launch.remoteConnection || null)}`,
+    `remoteAuth=${JSON.stringify(launch.remoteAuth || null)}`,
+    `activeThemeProfile=${JSON.stringify(launch.activeThemeProfile || {})}`,
+    `inactiveThemeProfile=${JSON.stringify(launch.inactiveThemeProfile || {})}`
+  ].join("\n");
+}
+
+function buildBlankConnectionProfileLaunch(options = {}) {
+  const deckId = normalizeText(options.deckId) || "default";
+  const themeProfile =
+    cloneThemeProfile(options.themeProfile) ||
+    cloneThemeProfile(options.defaultThemeProfile) || {
+      background: "#0a0d12",
+      foreground: "#d8dee9",
+      cursor: "#8ec07c",
+      black: "#0a0d12",
+      red: "#fb4934",
+      green: "#8ec07c",
+      yellow: "#fabd2f",
+      blue: "#83a598",
+      magenta: "#b48ead",
+      cyan: "#8fbcbb",
+      white: "#d8dee9",
+      brightBlack: "#4b5563",
+      brightRed: "#ff6b5a",
+      brightGreen: "#a5d68a",
+      brightYellow: "#ffd36a",
+      brightBlue: "#98b6cc",
+      brightMagenta: "#c8a7d8",
+      brightCyan: "#a9d9d6",
+      brightWhite: "#f5f7fa"
+    };
+  return normalizeConnectionProfileLaunch({
+    kind: "local",
+    deckId,
+    shell: "bash",
+    startCwd: "/",
+    startCommand: "",
+    env: {},
+    tags: [],
+    activeThemeProfile: themeProfile || {},
+    inactiveThemeProfile: themeProfile || {}
+  });
+}
+
 export function createConnectionProfileRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || null;
   const api = options.api || {};
   const selectEl = options.selectEl || null;
+  const newBtn = options.newBtn || null;
   const saveBtn = options.saveBtn || null;
+  const saveDraftBtn = options.saveDraftBtn || null;
+  const resetDraftBtn = options.resetDraftBtn || null;
   const applyBtn = options.applyBtn || null;
   const duplicateBtn = options.duplicateBtn || null;
   const renameBtn = options.renameBtn || null;
   const deleteBtn = options.deleteBtn || null;
   const statusEl = options.statusEl || null;
+  const summaryEl = options.summaryEl || null;
+  const draftNameInputEl = options.draftNameInputEl || null;
+  const draftLaunchTextareaEl = options.draftLaunchTextareaEl || null;
+  const draftStatusEl = options.draftStatusEl || null;
   const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const getSessionById =
     typeof options.getSessionById === "function"
@@ -279,9 +346,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const normalizeThemeProfile =
     typeof options.normalizeThemeProfile === "function" ? options.normalizeThemeProfile : (value) => (value && typeof value === "object" ? value : {});
   const defaultDeckId = normalizeText(options.defaultDeckId) || "default";
+  const defaultThemeProfile =
+    cloneThemeProfile(options.defaultThemeProfile) || cloneThemeProfile(normalizeThemeProfile({})) || undefined;
 
   let profiles = [];
   let selectedProfileId = "";
+  let draftState = null;
 
   function setStatus(message) {
     if (statusEl) {
@@ -299,6 +369,124 @@ export function createConnectionProfileRuntimeController(options = {}) {
 
   function getSelectedProfile() {
     return getProfile(selectedProfileId);
+  }
+
+  function setDraftStatus(message) {
+    if (draftStatusEl) {
+      draftStatusEl.textContent = normalizeText(message);
+    }
+  }
+
+  function createDraftState(source = {}) {
+    const fallbackLaunch =
+      buildBlankConnectionProfileLaunch({
+        deckId: normalizeText(source.deckId) || defaultDeckId,
+        defaultThemeProfile
+      }) || {};
+    return {
+      mode: normalizeText(source.mode) || "blank",
+      profileId: normalizeText(source.profileId),
+      name: normalizeText(source.name),
+      launch: normalizeConnectionProfileLaunch(source.launch) || fallbackLaunch
+    };
+  }
+
+  function getDraftModeMessage() {
+    if (!draftState) {
+      return "";
+    }
+    if (draftState.mode === "profile" && draftState.profileId) {
+      const profile = getProfile(draftState.profileId);
+      return profile ? `Editing saved profile [${profile.id}] ${profile.name}.` : "Editing a saved profile draft.";
+    }
+    if (draftState.mode === "session") {
+      return "Loaded the active session into a new unsaved draft.";
+    }
+    return "Editing a new unsaved connection profile.";
+  }
+
+  function renderDraft() {
+    if (!draftState) {
+      return;
+    }
+    if (draftNameInputEl) {
+      draftNameInputEl.value = draftState.name;
+    }
+    if (draftLaunchTextareaEl) {
+      draftLaunchTextareaEl.value = JSON.stringify(draftState.launch || {}, null, 2);
+    }
+    if (summaryEl) {
+      const selectedProfile = getSelectedProfile();
+      summaryEl.textContent = selectedProfile
+        ? formatConnectionProfileSummary(selectedProfile)
+        : "No saved connection profile selected. The draft below can still be saved as a new profile.";
+    }
+    setDraftStatus(getDraftModeMessage());
+  }
+
+  function setDraftState(nextDraft) {
+    draftState = createDraftState(nextDraft);
+    renderDraft();
+    return draftState;
+  }
+
+  function resetDraftFromSelectedProfile() {
+    const selectedProfile = getSelectedProfile();
+    if (selectedProfile) {
+      return setDraftState({
+        mode: "profile",
+        profileId: selectedProfile.id,
+        name: selectedProfile.name,
+        launch: selectedProfile.launch
+      });
+    }
+    const activeSession = getSessionById(getActiveSessionId());
+    return setDraftState({
+      mode: "blank",
+      name: "New Connection",
+      deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
+      launch: buildBlankConnectionProfileLaunch({
+        deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
+        defaultThemeProfile
+      })
+    });
+  }
+
+  function loadDraftFromActiveSession(sessionOrId = undefined) {
+    const activeSessionId = getActiveSessionId();
+    const session = sessionOrId
+      ? (typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId)
+      : getSessionById(activeSessionId);
+    if (!session) {
+      throw new Error("No active session to load into a connection profile draft.");
+    }
+    const launch = getLaunchForSession(session);
+    if (!launch) {
+      throw new Error("Session launch settings are incomplete and cannot seed a connection profile draft.");
+    }
+    return setDraftState({
+      mode: "session",
+      profileId: "",
+      name: `${formatSessionDisplayName(session)} Profile`,
+      launch
+    });
+  }
+
+  function parseDraftLaunch() {
+    const raw = typeof draftLaunchTextareaEl?.value === "string" ? draftLaunchTextareaEl.value : "";
+    let parsed;
+    try {
+      parsed = JSON.parse(raw || "{}");
+    } catch (error) {
+      throw new Error(`Connection profile launch JSON is invalid: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const launch = normalizeConnectionProfileLaunch(parsed);
+    if (!launch) {
+      throw new Error(
+        "Connection profile launch JSON is incomplete. Required fields: shell, startCwd, activeThemeProfile, inactiveThemeProfile."
+      );
+    }
+    return launch;
   }
 
   function syncSelection() {
@@ -343,6 +531,11 @@ export function createConnectionProfileRuntimeController(options = {}) {
       }
     }
     syncSelection();
+    if (!draftState || (draftState.mode === "profile" && !getProfile(draftState.profileId))) {
+      resetDraftFromSelectedProfile();
+    } else {
+      renderDraft();
+    }
     setStatus(profiles.length > 0 ? `${profiles.length} profile(s)` : "No saved connection profiles.");
   }
 
@@ -497,6 +690,35 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return `Deleted connection profile [${profile.id}] ${profile.name}.`;
   }
 
+  async function saveDraftById() {
+    const name = normalizeText(draftNameInputEl?.value || draftState?.name);
+    if (!name) {
+      throw new Error("Connection profile name is required.");
+    }
+    const launch = parseDraftLaunch();
+    const existingProfileId = normalizeText(draftState?.profileId);
+    if (existingProfileId && getProfile(existingProfileId)) {
+      const updated = await api.updateConnectionProfile(existingProfileId, { name, launch });
+      const profile = upsertProfile(updated);
+      setDraftState({
+        mode: "profile",
+        profileId: profile?.id,
+        name: profile?.name,
+        launch: profile?.launch
+      });
+      return `Updated connection profile [${profile.id}] ${profile.name}.`;
+    }
+    const created = await api.createConnectionProfile({ name, launch });
+    const profile = upsertProfile(created);
+    setDraftState({
+      mode: "profile",
+      profileId: profile?.id,
+      name: profile?.name,
+      launch: profile?.launch
+    });
+    return `Saved connection profile [${profile.id}] ${profile.name}.`;
+  }
+
   async function loadProfiles() {
     if (typeof api.listConnectionProfiles !== "function") {
       replaceProfiles([]);
@@ -525,6 +747,47 @@ export function createConnectionProfileRuntimeController(options = {}) {
       return "";
     }
     const feedback = await createProfileFromSession(session, input);
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function newDraftFlow() {
+    const activeSession = getSessionById(getActiveSessionId());
+    setDraftState({
+      mode: "blank",
+      profileId: "",
+      name: "New Connection",
+      deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
+      launch: buildBlankConnectionProfileLaunch({
+        deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
+        defaultThemeProfile
+      })
+    });
+    const feedback = "Opened a new connection profile draft.";
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function loadActiveDraftFlow() {
+    loadDraftFromActiveSession();
+    const feedback = "Loaded the active session into a new connection profile draft.";
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function saveDraftFlow() {
+    const feedback = await saveDraftById();
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function resetDraftFlow() {
+    resetDraftFromSelectedProfile();
+    const feedback = "Reset the connection profile draft.";
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -591,9 +854,19 @@ export function createConnectionProfileRuntimeController(options = {}) {
     selectEl?.addEventListener?.("change", () => {
       selectedProfileId = normalizeText(selectEl.value);
       syncSelection();
+      resetDraftFromSelectedProfile();
+    });
+    newBtn?.addEventListener?.("click", () => {
+      newDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to open a new connection profile draft.")));
     });
     saveBtn?.addEventListener?.("click", () => {
-      createProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to save connection profile.")));
+      loadActiveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to load the active session into a connection profile draft.")));
+    });
+    saveDraftBtn?.addEventListener?.("click", () => {
+      saveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to save the connection profile draft.")));
+    });
+    resetDraftBtn?.addEventListener?.("click", () => {
+      resetDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to reset the connection profile draft.")));
     });
     applyBtn?.addEventListener?.("click", () => {
       applySelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to apply connection profile.")));
@@ -622,12 +895,19 @@ export function createConnectionProfileRuntimeController(options = {}) {
     removeProfile,
     getLaunchForSession,
     createProfileFromSession,
+    saveDraftById,
+    loadDraftFromActiveSession,
+    getDraftState: () => (draftState ? { ...draftState, launch: normalizeConnectionProfileLaunch(draftState.launch) } : null),
     applyProfileById,
     renameProfileById,
     duplicateProfileById,
     deleteProfileById,
     loadProfiles,
     createProfileFlow,
+    newDraftFlow,
+    loadActiveDraftFlow,
+    saveDraftFlow,
+    resetDraftFlow,
     applySelectedProfileFlow,
     duplicateSelectedProfileFlow,
     renameSelectedProfileFlow,
