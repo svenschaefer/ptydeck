@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; chunk-safe mouse-forwarding output filtering delivered; post-snapshot terminal stabilization delivered; session-settings dialog height stabilization delivered; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; chunk-safe mouse-forwarding output filtering delivered; post-snapshot terminal stabilization delivered; session-settings dialog height stabilization delivered; H57 guided management/settings UX follow-up queued; `CHANGELOG.md` owns completed release history.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-02. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- There is no queued release wave currently.
+- The next queued release wave is `v0.4.0-H57`.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -49,6 +49,10 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
   - `/connection ...` now supports blank profile creation, active-session draft loading, edited-draft mutation and save, detail inspection, and duplication through explicit slash subcommands.
   - `/workspace ...` now supports saved-preset detail inspection and duplication in addition to the earlier list/save/apply/rename/delete surface.
   - Operator-facing `/settings ...` is now typed and explicit across startup, note, theme, input safety, and mouse forwarding instead of relying on raw JSON mutation payloads as the documented primary path.
+- The queued H57 UX closeout exists because the delivered `Workspace Library` is functional but still too operator-oriented in several places:
+  - the `Connections` tab is still primarily understood as a raw launch-JSON editor instead of a guided create/edit flow;
+  - creating a new SSH session is not yet a self-explanatory UI path because auth-method choice, runtime-secret handling, and SSH host-key trust are not surfaced as one guided interaction model;
+  - the remaining settings surfaces (`Workspace Presets` / deck groups, fixed terminal `Settings` / `Layouts`, and deck/session settings labels) still need a final clarity pass so each surface reads as a usable v1 instead of internal tooling.
 - Help, usage, and autocomplete should continue to be treated as part of the command surface itself so the documented slash plane stays in parity with delivered behavior.
 - The H56 quality hardening closeout on 2026-04-02 delivered the identified near-term risk reductions:
   - backend session normalizers (`session-input-safety-profile.js`, `session-mouse-forwarding.js`) now have direct unit coverage for strict versus non-strict normalization and default fallback behavior;
