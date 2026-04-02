@@ -10,6 +10,7 @@ const MOUSE_TRACKING_PRIVATE_MODES = Object.freeze(["9", "1000", "1001", "1002",
 const MOUSE_TRACKING_PRIVATE_MODE_SET = new Set(MOUSE_TRACKING_PRIVATE_MODES);
 const MOUSE_TRACKING_SEQUENCE_PATTERN = /\u001b\[\?([0-9;]+)([hl])/g;
 const MOUSE_TRACKING_RESET_SEQUENCE = MOUSE_TRACKING_PRIVATE_MODES.map((mode) => `\u001b[?${mode}l`).join("");
+const INCOMPLETE_CSI_SEQUENCE_PATTERN = /^\u001b(?:\[[0-9:;<=>?]*)?$/;
 
 export function normalizeSessionMouseForwardingMode(value) {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -32,6 +33,38 @@ export function stripMouseTrackingControlSequences(chunk) {
     }
     return `\u001b[?${retainedModes.join(";")}${operation}`;
   });
+}
+
+function splitTrailingControlSequenceFragment(chunk) {
+  if (typeof chunk !== "string" || chunk.length === 0) {
+    return { output: "", pending: "" };
+  }
+  const lastEscapeIndex = chunk.lastIndexOf("\u001b");
+  if (lastEscapeIndex < 0) {
+    return { output: chunk, pending: "" };
+  }
+  const trailingFragment = chunk.slice(lastEscapeIndex);
+  if (!INCOMPLETE_CSI_SEQUENCE_PATTERN.test(trailingFragment)) {
+    return { output: chunk, pending: "" };
+  }
+  return {
+    output: chunk.slice(0, lastEscapeIndex),
+    pending: trailingFragment
+  };
+}
+
+export function filterMouseTrackingOutputChunk(chunk, pending = "") {
+  const nextChunk = typeof chunk === "string" ? chunk : "";
+  const pendingChunk = typeof pending === "string" ? pending : "";
+  const combined = pendingChunk + nextChunk;
+  if (!combined) {
+    return { output: "", pending: "" };
+  }
+  const split = splitTrailingControlSequenceFragment(combined);
+  return {
+    output: stripMouseTrackingControlSequences(split.output),
+    pending: split.pending
+  };
 }
 
 export function getMouseTrackingResetSequence() {

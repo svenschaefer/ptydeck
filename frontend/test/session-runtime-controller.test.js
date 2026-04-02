@@ -166,6 +166,27 @@ test("session-runtime controller strips mouse-tracking control sequences when fo
   assert.deepEqual(terminal.writes, ["visible"]);
 });
 
+test("session-runtime controller buffers split CSI fragments and strips split mouse-tracking sequences", () => {
+  const terminals = new Map();
+  const terminal = createTerminal();
+  const controller = createSessionRuntimeController({
+    terminals,
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "off" })
+  });
+  terminals.set("s1", {
+    terminal,
+    isVisible: true,
+    searchRevision: 0,
+    mouseForwardingMode: "off",
+    mouseForwardingOutputPending: ""
+  });
+
+  assert.equal(controller.appendTerminalChunk("s1", "\u001b[?100"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "0h\u001b[40;2"), true);
+  assert.equal(controller.appendTerminalChunk("s1", "Hdone"), true);
+  assert.deepEqual(terminal.writes, ["\u001b[40;2Hdone"]);
+});
+
 test("session-runtime controller resets mouse tracking when switching back to off", () => {
   const terminals = new Map();
   const terminal = createTerminal();

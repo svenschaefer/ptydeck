@@ -290,6 +290,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       pendingViewportSync: !initialVisible,
       followOnShow: true,
       searchRevision: 0,
+      mouseForwardingOutputPending: "",
       disposeClipboardBindings
     };
     terminals.set(session.id, entry);

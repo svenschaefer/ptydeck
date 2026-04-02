@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  filterMouseTrackingOutputChunk,
   getMouseTrackingResetSequence,
   normalizeSessionMouseForwardingMode,
   SESSION_MOUSE_FORWARDING_MODE_APPLICATION,
@@ -20,6 +21,28 @@ test("stripMouseTrackingControlSequences removes tracked modes and retains unrel
   assert.equal(stripMouseTrackingControlSequences("\u001b[?25;1000h"), "\u001b[?25h");
   assert.equal(stripMouseTrackingControlSequences(""), "");
   assert.equal(stripMouseTrackingControlSequences(null), "");
+});
+
+test("filterMouseTrackingOutputChunk buffers incomplete CSI fragments until the final byte arrives", () => {
+  assert.deepEqual(filterMouseTrackingOutputChunk("\u001b[40;2"), {
+    output: "",
+    pending: "\u001b[40;2"
+  });
+  assert.deepEqual(filterMouseTrackingOutputChunk("H", "\u001b[40;2"), {
+    output: "\u001b[40;2H",
+    pending: ""
+  });
+});
+
+test("filterMouseTrackingOutputChunk strips split mouse tracking sequences without leaking adjacent cursor moves", () => {
+  assert.deepEqual(filterMouseTrackingOutputChunk("\u001b[?100"), {
+    output: "",
+    pending: "\u001b[?100"
+  });
+  assert.deepEqual(filterMouseTrackingOutputChunk("0h\u001b[40;2H", "\u001b[?100"), {
+    output: "\u001b[40;2H",
+    pending: ""
+  });
 });
 
 test("getMouseTrackingResetSequence disables all supported tracked modes", () => {

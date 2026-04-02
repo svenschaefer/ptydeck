@@ -1,9 +1,9 @@
 import { hasMeaningfulStreamActivity } from "./terminal-stream.js";
 import {
   SESSION_MOUSE_FORWARDING_MODE_OFF,
+  filterMouseTrackingOutputChunk,
   getMouseTrackingResetSequence,
   normalizeSessionMouseForwardingMode,
-  stripMouseTrackingControlSequences
 } from "./session-mouse-forwarding.js";
 
 export function createSessionRuntimeController(options = {}) {
@@ -105,9 +105,16 @@ export function createSessionRuntimeController(options = {}) {
         entry.terminal.write(getMouseTrackingResetSequence());
       }
       entry.mouseForwardingMode = nextMouseForwardingMode;
+      entry.mouseForwardingOutputPending = "";
     }
-    const writeData =
-      nextMouseForwardingMode === SESSION_MOUSE_FORWARDING_MODE_OFF ? stripMouseTrackingControlSequences(data) : data;
+    let writeData = data;
+    if (nextMouseForwardingMode === SESSION_MOUSE_FORWARDING_MODE_OFF) {
+      const filtered = filterMouseTrackingOutputChunk(data, entry.mouseForwardingOutputPending);
+      entry.mouseForwardingOutputPending = filtered.pending;
+      writeData = filtered.output;
+    } else {
+      entry.mouseForwardingOutputPending = "";
+    }
     if (entry.isVisible === false) {
       entry.pendingViewportSync = true;
     }
@@ -167,6 +174,7 @@ export function createSessionRuntimeController(options = {}) {
         entry.terminal.write(getMouseTrackingResetSequence());
       }
       entry.mouseForwardingMode = nextMouseForwardingMode;
+      entry.mouseForwardingOutputPending = "";
     }
   }
 
