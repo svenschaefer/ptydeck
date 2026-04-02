@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; chunk-safe mouse-forwarding output filtering delivered; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; chunk-safe mouse-forwarding output filtering delivered; post-snapshot terminal stabilization delivered; `CHANGELOG.md` owns completed release history.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-02. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -40,6 +40,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
 - Session-scoped file transfer exists through the bounded backend contract and `/transfer` workflows.
 - Controlled mouse forwarding exists as per-session `mouseForwardingMode` (`off|application`), defaulting to `off`.
 - The frontend mouse-forwarding-off output sanitizer must remain chunk-safe: incomplete trailing `ESC[` / CSI fragments are buffered per terminal before mouse-tracking private-mode stripping so split PTY output cannot leak raw cursor-position fragments such as `40;2H` into the rendered terminal.
+- Authoritative runtime snapshots must trigger local-only terminal stabilization passes after replay so restored sessions come up visually stable after restart/reconnect: force resize plus viewport refresh must run without emitting backend resize traffic, and hidden terminals must be marked for deferred viewport sync on next reveal.
 - The left sidebar is intentionally reduced to connection state, deck/session navigation, `New Deck` / `New Session`, `Find`, `Settings`, and `Layouts`; saved connection-profile and workspace-preset/group management now live in a dedicated secondary management surface outside the sidebar, reachable through the `Manage` entry point in the control-pane meta strip.
 - The delivered management surface is a `Workspace Library` dialog with explicit `Connections` and `Workspace Presets` tabs, keeping the sidebar focused on navigation while preserving parity with the existing runtime and slash-command capabilities.
 - The delivered H54 follow-up expanded that surface so connection profiles can now be created and edited directly in the dialog with a visible normalized launch payload, workspace presets now expose richer detail and duplication, and deck-group management now makes local-only versus persisted state explicit while matching the slash-command surface through `/workspace group ...`.

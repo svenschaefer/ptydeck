@@ -82,6 +82,54 @@ test("session-terminal-resize controller resizes terminal, updates mount geometr
   assert.equal(debugCalls.at(-1), "terminal.resize.remote.start:s1:80x24");
 });
 
+test("session-terminal-resize controller supports local-only forced resize passes", () => {
+  const windowRef = createFakeWindow();
+  const apiCalls = [];
+  const debugCalls = [];
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    terminals: new Map([
+      [
+        "s1",
+        {
+          mount: { clientWidth: 640, clientHeight: 320, style: {} },
+          element: { style: {} },
+          terminal: {
+            resize(cols, rows) {
+              debugCalls.push(`resize:${cols}x${rows}`);
+            }
+          }
+        }
+      ]
+    ]),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    getSessionById: (sessionId) => ({ id: sessionId, deckId: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionTerminalGeometry: () => ({ cols: 80, rows: 24 }),
+    computeFixedMountHeightPx: (rows) => rows * 10,
+    computeFixedCardWidthPx: (cols) => cols * 5 + 20,
+    getTerminalCellHeightPx: () => 10,
+    terminalCardHorizontalChromePx: 20,
+    debugLog: (event, payload) => debugCalls.push(`${event}:${payload.sessionId}:${payload.cols}x${payload.rows}`),
+    api: {
+      resizeSession(sessionId, cols, rows) {
+        apiCalls.push(`${sessionId}:${cols}x${rows}`);
+        return Promise.resolve();
+      }
+    }
+  });
+
+  controller.applyResizeForSession("s1", { force: true, skipRemote: true });
+
+  assert.deepEqual(debugCalls, [
+    "resize:80x24",
+    "terminal.resize.local:s1:80x24"
+  ]);
+  assert.deepEqual(apiCalls, []);
+  assert.equal(windowRef.scheduled.length, 0);
+});
+
 test("session-terminal-resize controller clears pending resize timers for blocked sessions", () => {
   const windowRef = createFakeWindow();
   const resizeTimers = new Map([["s1", 77]]);

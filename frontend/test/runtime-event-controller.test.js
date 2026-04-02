@@ -14,7 +14,8 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
     scheduleCommandPreview: () => calls.push(["preview"]),
     scheduleCommandSuggestions: () => calls.push(["suggestions"]),
     clearError: () => calls.push(["clearError"]),
-    markRuntimeBootstrapReady: (source) => calls.push(["bootstrap", source])
+    markRuntimeBootstrapReady: (source) => calls.push(["bootstrap", source]),
+    scheduleSnapshotTerminalStabilization: (sessionIds) => calls.push(["stabilize", sessionIds])
   });
 
   const applied = controller.applyRuntimeEvent({
@@ -34,7 +35,8 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
     ["preview"],
     ["suggestions"],
     ["clearError"],
-    ["bootstrap", "ws"]
+    ["bootstrap", "ws"],
+    ["stabilize", ["s1", "s2"]]
   ]);
 });
 

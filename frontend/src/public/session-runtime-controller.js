@@ -17,6 +17,8 @@ export function createSessionRuntimeController(options = {}) {
     typeof options.refreshTerminalViewport === "function" ? options.refreshTerminalViewport : () => {};
   const syncTerminalScrollArea =
     typeof options.syncTerminalScrollArea === "function" ? options.syncTerminalScrollArea : () => {};
+  const applyResizeForSession =
+    typeof options.applyResizeForSession === "function" ? options.applyResizeForSession : () => {};
   const markSessionActivity =
     typeof options.markSessionActivity === "function" ? options.markSessionActivity : () => {};
   const syncActiveTerminalSearch =
@@ -162,6 +164,53 @@ export function createSessionRuntimeController(options = {}) {
     }
   }
 
+  function stabilizeTerminalAfterSnapshot(sessionId) {
+    const entry = terminals.get(sessionId);
+    if (!entry?.terminal) {
+      return false;
+    }
+    if (entry.isVisible === false) {
+      entry.pendingViewportSync = true;
+      return false;
+    }
+    applyResizeForSession(sessionId, { force: true, skipRemote: true });
+    syncTerminalScrollArea(entry.terminal);
+    refreshTerminalViewport(entry.terminal);
+    if (entry.followOnShow !== false && typeof entry.terminal.scrollToBottom === "function") {
+      entry.terminal.scrollToBottom();
+    }
+    syncTerminalScrollArea(entry.terminal);
+    entry.pendingViewportSync = false;
+    if (getActiveSessionId() === sessionId && terminalSearchState.query) {
+      syncActiveTerminalSearch({ preserveSelection: true });
+    }
+    return true;
+  }
+
+  function scheduleSnapshotTerminalStabilization(sessionIds = []) {
+    const normalizedIds =
+      Array.isArray(sessionIds) && sessionIds.length > 0
+        ? Array.from(
+            new Set(
+              sessionIds
+                .map((sessionId) => String(sessionId || "").trim())
+                .filter(Boolean)
+            )
+          )
+        : Array.from(terminals.keys());
+    const runPass = () => {
+      for (const sessionId of normalizedIds) {
+        stabilizeTerminalAfterSnapshot(sessionId);
+      }
+    };
+    runPass();
+    if (setTimeoutRef) {
+      setTimeoutRef(runPass, 120);
+      setTimeoutRef(runPass, 400);
+      setTimeoutRef(runPass, 900);
+    }
+  }
+
   function upsertSession(nextSession) {
     store?.upsertSession(nextSession);
     const entry = terminals.get(nextSession?.id);
@@ -280,6 +329,7 @@ export function createSessionRuntimeController(options = {}) {
     pruneQuickIds,
     appendTerminalChunk,
     replaySnapshotOutputs,
+    scheduleSnapshotTerminalStabilization,
     upsertSession,
     ensureSessionRuntime,
     disposeSessionRuntime,

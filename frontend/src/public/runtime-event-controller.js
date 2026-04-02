@@ -5,6 +5,7 @@ export function createRuntimeEventController(options = {}) {
   const replaceCustomCommandState = options.replaceCustomCommandState || (() => {});
   const setSessions = options.setSessions || (() => {});
   const replaySnapshotOutputs = options.replaySnapshotOutputs || (() => {});
+  const scheduleSnapshotTerminalStabilization = options.scheduleSnapshotTerminalStabilization || (() => {});
   const scheduleCommandPreview = options.scheduleCommandPreview || (() => {});
   const scheduleCommandSuggestions = options.scheduleCommandSuggestions || (() => {});
   const clearError = options.clearError || (() => {});
@@ -31,6 +32,9 @@ export function createRuntimeEventController(options = {}) {
   const sendInput = options.sendInput || (() => Promise.resolve());
 
   function applyRuntimeSnapshot(event) {
+    const sessionIds = Array.isArray(event.sessions)
+      ? event.sessions.map((session) => String(session?.id || "").trim()).filter(Boolean)
+      : [];
     if (Array.isArray(event.decks)) {
       setDecks(event.decks, { preferredActiveDeckId: getPreferredActiveDeckId() });
     }
@@ -41,6 +45,7 @@ export function createRuntimeEventController(options = {}) {
     scheduleCommandSuggestions();
     clearError();
     markRuntimeBootstrapReady("ws");
+    scheduleSnapshotTerminalStabilization(sessionIds);
   }
 
   function handleSessionTerminalInput(sessionId, data) {

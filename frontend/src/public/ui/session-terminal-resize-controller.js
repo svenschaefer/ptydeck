@@ -107,6 +107,10 @@ export function createSessionTerminalResizeController(options = {}) {
     entry.terminal.resize(cols, rows);
     debugLog("terminal.resize.local", { sessionId, cols, rows });
 
+    if (options.skipRemote === true) {
+      return;
+    }
+
     const pendingTimer = resizeTimers.get(sessionId);
     if (pendingTimer) {
       clearTimer(pendingTimer);

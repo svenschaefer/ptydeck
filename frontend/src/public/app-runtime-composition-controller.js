@@ -811,6 +811,7 @@ sessionRuntimeController = createSessionRuntimeController({
   syncTerminalScrollArea,
   markSessionActivity: (sessionId) => appSessionRuntimeFacadeController?.markSessionActivity(sessionId),
   syncActiveTerminalSearch: (options) => appCommandUiFacadeController?.syncActiveTerminalSearch(options),
+  applyResizeForSession: (sessionId, options) => appLayoutDeckFacadeController?.applyResizeForSession(sessionId, options),
   getActiveSessionId: () => store.getState().activeSessionId,
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   streamAdapter,
@@ -828,6 +829,8 @@ runtimeEventController = createRuntimeEventController({
   replaceCustomCommandState: (commands) => appCommandUiFacadeController?.replaceCustomCommands(commands),
   setSessions: (sessions) => store.setSessions(sessions),
   replaySnapshotOutputs: (outputs, attempt) => appSessionRuntimeFacadeController?.replaySnapshotOutputs(outputs, attempt),
+  scheduleSnapshotTerminalStabilization: (sessionIds) =>
+    appSessionRuntimeFacadeController?.scheduleSnapshotTerminalStabilization(sessionIds),
   scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview(),
   scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions(),
   clearError: () => appRuntimeStateController?.clearError(),

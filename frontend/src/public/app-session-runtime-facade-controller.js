@@ -87,6 +87,10 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     getSessionRuntimeController()?.replaySnapshotOutputs?.(outputs, attempt);
   }
 
+  function scheduleSnapshotTerminalStabilization(sessionIds = []) {
+    getSessionRuntimeController()?.scheduleSnapshotTerminalStabilization?.(sessionIds);
+  }
+
   function upsertSession(nextSession) {
     getSessionRuntimeController()?.upsertSession?.(nextSession);
   }
@@ -146,6 +150,7 @@ export function createAppSessionRuntimeFacadeController(options = {}) {
     pruneQuickIds,
     appendTerminalChunk,
     replaySnapshotOutputs,
+    scheduleSnapshotTerminalStabilization,
     upsertSession,
     ensureSessionRuntime,
     disposeSessionRuntime,

@@ -9,11 +9,15 @@ function createTerminal() {
   return {
     writes: [],
     clearSelectionCalls: 0,
+    scrollToBottomCalls: 0,
     write(data, callback) {
       this.writes.push(data);
       if (typeof callback === "function") {
         callback();
       }
+    },
+    scrollToBottom() {
+      this.scrollToBottomCalls += 1;
     }
   };
 }
@@ -199,6 +203,65 @@ test("session-runtime controller resets mouse tracking when switching back to of
   controller.upsertSession({ id: "s1", mouseForwardingMode: "off" });
 
   assert.deepEqual(terminal.writes, [getMouseTrackingResetSequence()]);
+});
+
+test("session-runtime controller stabilizes mounted terminals after runtime snapshots", () => {
+  const terminals = new Map();
+  const visibleTerminal = createTerminal();
+  const hiddenTerminal = createTerminal();
+  const callbacks = [];
+  const resizeCalls = [];
+  const controller = createSessionRuntimeController({
+    terminals,
+    terminalSearchState: { query: "needle" },
+    refreshTerminalViewport: () => callbacks.push("refresh"),
+    syncTerminalScrollArea: () => callbacks.push("scroll"),
+    syncActiveTerminalSearch: (payload) => callbacks.push(["search", payload.preserveSelection]),
+    applyResizeForSession: (sessionId, options) =>
+      resizeCalls.push([sessionId, options?.force === true, options?.skipRemote === true]),
+    getActiveSessionId: () => "s1",
+    windowRef: {
+      setTimeout(fn) {
+        callbacks.push("timer");
+        fn();
+        return 1;
+      }
+    }
+  });
+
+  terminals.set("s1", {
+    terminal: visibleTerminal,
+    isVisible: true,
+    pendingViewportSync: false,
+    followOnShow: true,
+    searchRevision: 0
+  });
+  terminals.set("s2", {
+    terminal: hiddenTerminal,
+    isVisible: false,
+    pendingViewportSync: false,
+    followOnShow: true,
+    searchRevision: 0
+  });
+
+  controller.scheduleSnapshotTerminalStabilization(["s1", "s2"]);
+
+  assert.deepEqual(resizeCalls, [
+    ["s1", true, true],
+    ["s1", true, true],
+    ["s1", true, true],
+    ["s1", true, true]
+  ]);
+  assert.equal(visibleTerminal.scrollToBottomCalls, 4);
+  assert.equal(terminals.get("s1").pendingViewportSync, false);
+  assert.equal(terminals.get("s2").pendingViewportSync, true);
+  assert.equal(callbacks.filter((entry) => entry === "timer").length, 3);
+  assert.equal(callbacks.filter((entry) => entry === "refresh").length, 4);
+  assert.equal(callbacks.filter((entry) => entry === "scroll").length, 8);
+  assert.equal(
+    callbacks.filter((entry) => Array.isArray(entry) && entry[0] === "search" && entry[1] === true).length,
+    4
+  );
 });
 
 test("session-runtime controller updates session lifecycle and delegates runtime/view-model helpers", () => {
