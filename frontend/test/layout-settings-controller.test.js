@@ -107,7 +107,6 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   assert.equal(sidebarToggleIcon.textContent, "");
   assert.equal(sidebarToggleIcon.classList.contains("icon-tabler"), true);
   assert.equal(sidebarToggleIcon.classList.contains("icon-tabler-caret-left-filled"), true);
-  assert.equal(sidebarToggleIcon.classList.contains("icon-tabler-sm"), true);
   assert.equal(style.get("--ptydeck-terminal-card-width"), "742px");
   assert.equal(style.get("--ptydeck-terminal-mount-height"), "402px");
 
