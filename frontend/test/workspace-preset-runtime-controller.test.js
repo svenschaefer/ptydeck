@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createWorkspacePresetRuntimeController } from "../src/public/workspace-preset-runtime-controller.js";
+import {
+  createWorkspacePresetRuntimeController,
+  formatWorkspacePresetDetail,
+  normalizeWorkspacePresetRecord,
+  resolveWorkspaceGroupToken
+} from "../src/public/workspace-preset-runtime-controller.js";
 
 class FakeElement {
   constructor(tagName = "div") {
@@ -435,4 +440,61 @@ test("workspace preset runtime controller exposes explicit deck-group lifecycle 
     cleared,
     "Cleared the active workspace group for deck [ops] and persisted it into preset [ops] Ops Workspace."
   );
+});
+
+test("workspace preset helpers normalize records and resolve ambiguous group selectors", () => {
+  const normalized = normalizeWorkspacePresetRecord({
+    id: "ops",
+    name: "Ops Workspace",
+    workspace: {
+      activeDeckId: "ops",
+      layoutProfileId: "focus",
+      controlPaneVisible: true,
+      controlPanePosition: "sideways",
+      controlPaneSize: 40,
+      deckGroups: {
+        ops: {
+          activeGroupId: "team",
+          groups: [
+            { id: "team", name: "Team", sessionIds: ["s1", "s1", "s2"] }
+          ]
+        }
+      }
+    }
+  });
+
+  assert.equal(normalized.workspace.controlPanePosition, "bottom");
+  assert.equal(normalized.workspace.controlPaneSize, 185);
+  assert.deepEqual(normalized.workspace.deckGroups.ops.groups[0].sessionIds, ["s1", "s2"]);
+  assert.match(formatWorkspacePresetDetail(normalized), /activeDeckId="ops"/);
+  assert.match(resolveWorkspaceGroupToken([
+    { id: "build-a", name: "Build Alpha" },
+    { id: "build-b", name: "Build Beta" }
+  ], "build").error, /Ambiguous workspace group/);
+});
+
+test("workspace preset runtime controller guards local-only group save and silent no-op rename paths", async () => {
+  const feedback = [];
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    presetSelectEl: new FakeElement("select"),
+    groupSelectEl: new FakeElement("select"),
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    setCommandFeedback: (message) => feedback.push(message)
+  });
+
+  await assert.rejects(() => controller.saveGroupByName("Filtered", "ops"), /No visible deck sessions/);
+  assert.equal(await controller.renameGroupById("", "Ignored", "ops"), "");
+  assert.equal(await controller.deleteGroupById("", "ops"), "");
+  assert.equal(feedback.length, 0);
 });

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 queued for quality and coverage hardening; shared SVG icon path standardized; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; `CHANGELOG.md` owns completed release history.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-02. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- The next queued release wave is `v0.4.0-H56`.
+- There is no queued release wave currently.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -47,12 +47,12 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
   - `/workspace ...` now supports saved-preset detail inspection and duplication in addition to the earlier list/save/apply/rename/delete surface.
   - Operator-facing `/settings ...` is now typed and explicit across startup, note, theme, input safety, and mouse forwarding instead of relying on raw JSON mutation payloads as the documented primary path.
 - Help, usage, and autocomplete should continue to be treated as part of the command surface itself so the documented slash plane stays in parity with delivered behavior.
-- A repo-wide quality scan on 2026-04-02 identified the next concrete hardening block for H56:
-  - backend session normalizers (`session-input-safety-profile.js`, `session-mouse-forwarding.js`) are still primarily covered indirectly through validation/runtime tests rather than direct unit tests;
-  - frontend helper modules for share-access parsing, mouse-forwarding sequence filtering, and command-suggestions state have no direct unit suite yet;
-  - `connection-profile-runtime-controller.js` and `workspace-preset-runtime-controller.js` remain large, branch-heavy runtime controllers with meaningful uncovered error and normalization paths;
-  - the generated `theme-library.js` catalog is large and currently lacks dedicated integrity checks;
-  - `app-runtime-composition-controller.js` remains a large composition root that should be covered through smaller extracted contract seams instead of relying mostly on broad app tests.
+- The H56 quality hardening closeout on 2026-04-02 delivered the identified near-term risk reductions:
+  - backend session normalizers (`session-input-safety-profile.js`, `session-mouse-forwarding.js`) now have direct unit coverage for strict versus non-strict normalization and default fallback behavior;
+  - frontend helper modules for share-access parsing, mouse-forwarding sequence filtering, and command-suggestion state now have dedicated direct tests instead of only indirect app/runtime coverage;
+  - `connection-profile-runtime-controller.js` and `workspace-preset-runtime-controller.js` now have additional direct coverage for update, cancellation, normalization, and local-only edge paths;
+  - the generated `theme-library.js` catalog now has dedicated integrity coverage for unique IDs, required color keys, and normalized hex payload shape;
+  - `app-runtime-composition-controller.js` now uses an extracted DOM-ref collection seam (`app-runtime-dom-refs.js`) with direct contract coverage instead of keeping that selector contract buried only inside broad app tests.
 
 ## Quality and Operational Rules
 

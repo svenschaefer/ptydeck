@@ -42,3 +42,63 @@ test("command suggestions controller updates UI state and applies selection", ()
   assert.equal(applied, 1);
   assert.ok(renderCount >= 2);
 });
+
+test("command suggestions controller clears state for empty matches and ignores empty accept", () => {
+  const uiState = {
+    commandSuggestions: "stale",
+    commandSuggestionSelectedIndex: 5,
+    commandInlineHint: "hint",
+    commandInlineHintPrefixPx: 99
+  };
+  let renderCount = 0;
+  const controller = createCommandSuggestionsController({
+    uiState,
+    render: () => {
+      renderCount += 1;
+    }
+  });
+
+  controller.set("/", [], 0);
+  assert.equal(uiState.commandSuggestions, "");
+  assert.equal(uiState.commandSuggestionSelectedIndex, -1);
+  assert.equal(controller.accept(), false);
+
+  controller.clear();
+  assert.equal(uiState.commandInlineHint, "");
+  assert.equal(uiState.commandInlineHintPrefixPx, 0);
+  assert.ok(renderCount >= 1);
+});
+
+test("command suggestions controller measures prefix width from the composer font", () => {
+  const commandInput = {};
+  const controller = createCommandSuggestionsController({
+    commandInput,
+    documentRef: {
+      createElement(tagName) {
+        assert.equal(tagName, "canvas");
+        return {
+          getContext() {
+            return {
+              font: "",
+              measureText(text) {
+                return { width: text.length * 9.2 };
+              }
+            };
+          }
+        };
+      }
+    },
+    windowRef: {
+      getComputedStyle() {
+        return {
+          fontStyle: "italic",
+          fontWeight: "700",
+          fontSize: "15px",
+          fontFamily: "monospace"
+        };
+      }
+    }
+  });
+
+  assert.equal(controller.measurePrefixWidthPx("/help"), 46);
+});

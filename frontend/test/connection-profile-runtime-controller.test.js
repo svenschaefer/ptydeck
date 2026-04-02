@@ -376,3 +376,128 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   const deleteFeedback = await controller.deleteProfileById("ops-ssh");
   assert.equal(deleteFeedback, "Deleted connection profile [ops-ssh] Ops SSH Prod.");
 });
+
+test("connection profile runtime controller updates saved drafts instead of creating duplicates", async () => {
+  const calls = [];
+  const draftNameInputEl = createElement("input");
+  const draftLaunchTextareaEl = createElement("textarea");
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl: createElement("select"),
+    statusEl: createElement("p"),
+    summaryEl: createElement("p"),
+    newBtn: createElement("button"),
+    saveBtn: createElement("button"),
+    saveDraftBtn: createElement("button"),
+    resetDraftBtn: createElement("button"),
+    applyBtn: createElement("button"),
+    duplicateBtn: createElement("button"),
+    renameBtn: createElement("button"),
+    deleteBtn: createElement("button"),
+    draftNameInputEl,
+    draftLaunchTextareaEl,
+    draftStatusEl: createElement("p"),
+    api: {
+      async updateConnectionProfile(profileId, payload) {
+        calls.push(["update", profileId, payload]);
+        return {
+          id: profileId,
+          name: payload.name,
+          createdAt: 1,
+          updatedAt: 2,
+          launch: payload.launch
+        };
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#111111")
+  });
+
+  controller.replaceProfiles([
+    {
+      id: "ops-local",
+      name: "Ops Local",
+      launch: {
+        kind: "local",
+        deckId: "ops",
+        shell: "bash",
+        startCwd: "/srv/ops",
+        startCommand: "",
+        env: { LANG: "en_US.UTF-8" },
+        tags: ["ops"],
+        activeThemeProfile: createThemeProfile("#111111"),
+        inactiveThemeProfile: createThemeProfile("#121212")
+      }
+    }
+  ]);
+  controller.setDraftState({
+    mode: "profile",
+    profileId: "ops-local",
+    name: "Ops Local",
+    launch: controller.getProfile("ops-local").launch
+  });
+  draftNameInputEl.value = "Ops Local Updated";
+
+  const feedback = await controller.saveDraftById();
+  assert.equal(feedback, "Updated connection profile [ops-local] Ops Local Updated.");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "update");
+  assert.equal(calls[0][1], "ops-local");
+  assert.equal(calls[0][2].name, "Ops Local Updated");
+});
+
+test("connection profile runtime controller reports apply cancellation when secret prompt is dismissed", async () => {
+  const calls = [];
+  const controller = createConnectionProfileRuntimeController({
+    windowRef: {
+      prompt() {
+        calls.push(["prompt"]);
+        return null;
+      }
+    },
+    documentRef: createDocumentRef(),
+    selectEl: createElement("select"),
+    statusEl: createElement("p"),
+    summaryEl: createElement("p"),
+    newBtn: createElement("button"),
+    saveBtn: createElement("button"),
+    saveDraftBtn: createElement("button"),
+    resetDraftBtn: createElement("button"),
+    applyBtn: createElement("button"),
+    duplicateBtn: createElement("button"),
+    renameBtn: createElement("button"),
+    deleteBtn: createElement("button"),
+    draftNameInputEl: createElement("input"),
+    draftLaunchTextareaEl: createElement("textarea"),
+    draftStatusEl: createElement("p"),
+    api: {
+      async createSession(payload) {
+        calls.push(["create-session", payload]);
+        throw new Error("should not be reached");
+      }
+    }
+  });
+
+  controller.replaceProfiles([
+    {
+      id: "ops-ssh",
+      name: "Ops SSH",
+      launch: {
+        kind: "ssh",
+        deckId: "ops",
+        shell: "ssh",
+        startCwd: "~",
+        startCommand: "",
+        env: {},
+        tags: [],
+        activeThemeProfile: createThemeProfile("#111111"),
+        inactiveThemeProfile: createThemeProfile("#121212"),
+        remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+        remoteAuth: { method: "password" }
+      }
+    }
+  ]);
+
+  const feedback = await controller.applyProfileById("ops-ssh");
+  assert.equal(feedback, "Connection profile apply cancelled for [ops-ssh] Ops SSH.");
+  assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
+});

@@ -2,6 +2,7 @@ import { createApiClient } from "./api-client.js";
 import { createAppBootstrapCompositionController } from "./app-bootstrap-composition-controller.js";
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
+import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
@@ -55,6 +56,8 @@ import { createSessionTerminalResizeController } from "./ui/session-terminal-res
 import { createSessionTerminalRuntimeController } from "./ui/session-terminal-runtime-controller.js";
 import { createTerminalSearchController } from "./ui/terminal-search-controller.js";
 import { createWorkspaceRenderController } from "./ui/workspace-render-controller.js";
+
+export { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 
 export function createAppRuntimeCompositionController({
   windowRef = globalThis.window,
@@ -120,124 +123,126 @@ const traceDebugController = debugLogs
   : { record() {}, dispose() {} };
 const store = createStore();
 
-const appShellEl = typeof document.querySelector === "function" ? document.querySelector(".app-shell") : null;
-const stateEl = document.getElementById("connection-state");
-const accessStateEl = document.getElementById("access-state");
-const gridEl = document.getElementById("terminal-grid");
-const sidebarToggleBtn = document.getElementById("sidebar-toggle");
-const sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
-const sidebarLauncherBtn = document.getElementById("sidebar-launcher");
-const createBtn = document.getElementById("create-session");
-const deckTabsEl = document.getElementById("deck-tabs");
-const deckCreateBtn = document.getElementById("deck-create");
-const settingsColsEl = document.getElementById("settings-cols");
-const settingsRowsEl = document.getElementById("settings-rows");
-const settingsApplyBtn = document.getElementById("settings-apply");
-const layoutProfileSelectEl = document.getElementById("layout-profile-select");
-const layoutProfileSaveBtn = document.getElementById("layout-profile-save");
-const layoutProfileApplyBtn = document.getElementById("layout-profile-apply");
-const layoutProfileRenameBtn = document.getElementById("layout-profile-rename");
-const layoutProfileDeleteBtn = document.getElementById("layout-profile-delete");
-const layoutProfileStatusEl = document.getElementById("layout-profile-status");
-const connectionProfileSelectEl = document.getElementById("connection-profile-select");
-const connectionProfileNewBtn = document.getElementById("connection-profile-new");
-const connectionProfileSaveBtn = document.getElementById("connection-profile-save");
-const connectionProfileSaveDraftBtn = document.getElementById("connection-profile-save-draft");
-const connectionProfileResetDraftBtn = document.getElementById("connection-profile-reset-draft");
-const connectionProfileApplyBtn = document.getElementById("connection-profile-apply");
-const connectionProfileDuplicateBtn = document.getElementById("connection-profile-duplicate");
-const connectionProfileRenameBtn = document.getElementById("connection-profile-rename");
-const connectionProfileDeleteBtn = document.getElementById("connection-profile-delete");
-const connectionProfileStatusEl = document.getElementById("connection-profile-status");
-const connectionProfileSummaryEl = document.getElementById("connection-profile-summary");
-const connectionProfileDraftNameEl = document.getElementById("connection-profile-draft-name");
-const connectionProfileDraftLaunchEl = document.getElementById("connection-profile-draft-launch");
-const connectionProfileDraftStatusEl = document.getElementById("connection-profile-draft-status");
-const workspacePresetSelectEl = document.getElementById("workspace-preset-select");
-const workspacePresetSaveBtn = document.getElementById("workspace-preset-save");
-const workspacePresetApplyBtn = document.getElementById("workspace-preset-apply");
-const workspacePresetDuplicateBtn = document.getElementById("workspace-preset-duplicate");
-const workspacePresetRenameBtn = document.getElementById("workspace-preset-rename");
-const workspacePresetDeleteBtn = document.getElementById("workspace-preset-delete");
-const workspacePresetGroupSelectEl = document.getElementById("workspace-group-select");
-const workspacePresetGroupSaveBtn = document.getElementById("workspace-group-save");
-const workspacePresetGroupApplyBtn = document.getElementById("workspace-group-apply");
-const workspacePresetGroupRenameBtn = document.getElementById("workspace-group-rename");
-const workspacePresetGroupDeleteBtn = document.getElementById("workspace-group-delete");
-const workspacePresetGroupClearBtn = document.getElementById("workspace-group-clear");
-const workspacePresetStatusEl = document.getElementById("workspace-preset-status");
-const workspacePresetSummaryEl = document.getElementById("workspace-preset-summary");
-const workspacePresetDetailEl = document.getElementById("workspace-preset-detail");
-const workspaceGroupSummaryEl = document.getElementById("workspace-group-summary");
-const workspaceGroupPersistenceEl = document.getElementById("workspace-group-persistence");
-const commandInput = document.getElementById("command-input");
-const sendBtn = document.getElementById("send-command");
-const template = document.getElementById("terminal-card-template");
-const emptyStateEl = document.getElementById("empty-state");
-const statusMessageEl = document.getElementById("status-message");
-const commandTargetEl = document.getElementById("command-target");
-const commandFeedbackEl = document.getElementById("command-feedback");
-const commandInlineHintEl = document.getElementById("command-inline-hint");
-const commandPreviewEl = document.getElementById("command-preview");
-const commandSuggestionsEl = document.getElementById("command-suggestions");
-const commandGuardEl = document.getElementById("command-guard");
-const commandGuardSummaryEl = document.getElementById("command-guard-summary");
-const commandGuardReasonsEl = document.getElementById("command-guard-reasons");
-const commandGuardPreviewEl = document.getElementById("command-guard-preview");
-const commandGuardSendOnceBtn = document.getElementById("command-guard-send-once");
-const commandGuardCancelBtn = document.getElementById("command-guard-cancel");
-const workflowRuntimePanelEl = document.getElementById("workflow-runtime-panel");
-const workflowStatusEl = document.getElementById("workflow-status");
-const workflowTargetEl = document.getElementById("workflow-target");
-const workflowProgressEl = document.getElementById("workflow-progress");
-const workflowDetailEl = document.getElementById("workflow-detail");
-const workflowResultEl = document.getElementById("workflow-result");
-const workflowStopBtn = document.getElementById("workflow-stop");
-const workflowInterruptBtn = document.getElementById("workflow-interrupt");
-const workflowKillBtn = document.getElementById("workflow-kill");
-const replayViewerDialogEl = document.getElementById("replay-viewer-dialog");
-const replayViewerTitleEl = document.getElementById("replay-viewer-title");
-const replayViewerMetaEl = document.getElementById("replay-viewer-meta");
-const replayViewerStatusEl = document.getElementById("replay-viewer-status");
-const replayViewerContentEl = document.getElementById("replay-viewer-content");
-const replayViewerRefreshBtn = document.getElementById("replay-viewer-refresh");
-const replayViewerDownloadBtn = document.getElementById("replay-viewer-download");
-const replayViewerCopyBtn = document.getElementById("replay-viewer-copy");
-const replayViewerCloseBtn = document.getElementById("replay-viewer-close");
-const terminalCtrlCDialogEl = document.getElementById("terminal-ctrl-c-dialog");
-const terminalCtrlCMessageEl = document.getElementById("terminal-ctrl-c-message");
-const terminalCtrlCCopyBtn = document.getElementById("terminal-ctrl-c-copy");
-const terminalCtrlCCancelBtn = document.getElementById("terminal-ctrl-c-cancel");
-const commandPaletteDialogEl = document.getElementById("command-palette-dialog");
-const commandPaletteMetaEl = document.getElementById("command-palette-meta");
-const commandPaletteInputEl = document.getElementById("command-palette-input");
-const commandPaletteResultsEl = document.getElementById("command-palette-results");
-const commandPaletteEmptyEl = document.getElementById("command-palette-empty");
-const commandPaletteCloseBtn = document.getElementById("command-palette-close");
-const workspaceManagerOpenBtn = document.getElementById("workspace-manager-open");
-const workspaceManagerDialogEl = document.getElementById("workspace-manager-dialog");
-const workspaceManagerCloseBtn = document.getElementById("workspace-manager-close");
-const workspaceManagerMetaEl = document.getElementById("workspace-manager-meta");
-const workspaceManagerConnectionsTabBtn = document.getElementById("workspace-manager-tab-connections");
-const workspaceManagerWorkspaceTabBtn = document.getElementById("workspace-manager-tab-workspace");
-const workspaceManagerConnectionsPanelEl = document.getElementById("workspace-manager-panel-connections");
-const workspaceManagerWorkspacePanelEl = document.getElementById("workspace-manager-panel-workspace");
-const startupWarmupGateEl = document.getElementById("startup-warmup-gate");
-const startupWarmupMessageEl = document.getElementById("startup-warmup-message");
-const startupWarmupDetailEl = document.getElementById("startup-warmup-detail");
-const startupWarmupSkipBtn = document.getElementById("startup-warmup-skip");
-const workspaceShellEl = document.getElementById("workspace-shell");
-const controlPaneEl = document.getElementById("control-pane");
-const controlPaneLauncherBtn = document.getElementById("control-pane-launcher");
-const controlPaneToggleBtn = document.getElementById("control-pane-toggle");
-const controlPanePositionSelectEl = document.getElementById("control-pane-position");
-const controlPaneStatusEl = document.getElementById("control-pane-status");
-const controlPaneResizeHandleEl = document.getElementById("control-pane-resize-handle");
-const terminalSearchInputEl = document.getElementById("terminal-search-input");
-const terminalSearchPrevBtn = document.getElementById("terminal-search-prev");
-const terminalSearchNextBtn = document.getElementById("terminal-search-next");
-const terminalSearchClearBtn = document.getElementById("terminal-search-clear");
-const terminalSearchStatusEl = document.getElementById("terminal-search-status");
+const {
+  appShellEl,
+  stateEl,
+  accessStateEl,
+  gridEl,
+  sidebarToggleBtn,
+  sidebarToggleIcon,
+  sidebarLauncherBtn,
+  createBtn,
+  deckTabsEl,
+  deckCreateBtn,
+  settingsColsEl,
+  settingsRowsEl,
+  settingsApplyBtn,
+  layoutProfileSelectEl,
+  layoutProfileSaveBtn,
+  layoutProfileApplyBtn,
+  layoutProfileRenameBtn,
+  layoutProfileDeleteBtn,
+  layoutProfileStatusEl,
+  connectionProfileSelectEl,
+  connectionProfileNewBtn,
+  connectionProfileSaveBtn,
+  connectionProfileSaveDraftBtn,
+  connectionProfileResetDraftBtn,
+  connectionProfileApplyBtn,
+  connectionProfileDuplicateBtn,
+  connectionProfileRenameBtn,
+  connectionProfileDeleteBtn,
+  connectionProfileStatusEl,
+  connectionProfileSummaryEl,
+  connectionProfileDraftNameEl,
+  connectionProfileDraftLaunchEl,
+  connectionProfileDraftStatusEl,
+  workspacePresetSelectEl,
+  workspacePresetSaveBtn,
+  workspacePresetApplyBtn,
+  workspacePresetDuplicateBtn,
+  workspacePresetRenameBtn,
+  workspacePresetDeleteBtn,
+  workspacePresetGroupSelectEl,
+  workspacePresetGroupSaveBtn,
+  workspacePresetGroupApplyBtn,
+  workspacePresetGroupRenameBtn,
+  workspacePresetGroupDeleteBtn,
+  workspacePresetGroupClearBtn,
+  workspacePresetStatusEl,
+  workspacePresetSummaryEl,
+  workspacePresetDetailEl,
+  workspaceGroupSummaryEl,
+  workspaceGroupPersistenceEl,
+  commandInput,
+  sendBtn,
+  template,
+  emptyStateEl,
+  statusMessageEl,
+  commandTargetEl,
+  commandFeedbackEl,
+  commandInlineHintEl,
+  commandPreviewEl,
+  commandSuggestionsEl,
+  commandGuardEl,
+  commandGuardSummaryEl,
+  commandGuardReasonsEl,
+  commandGuardPreviewEl,
+  commandGuardSendOnceBtn,
+  commandGuardCancelBtn,
+  workflowRuntimePanelEl,
+  workflowStatusEl,
+  workflowTargetEl,
+  workflowProgressEl,
+  workflowDetailEl,
+  workflowResultEl,
+  workflowStopBtn,
+  workflowInterruptBtn,
+  workflowKillBtn,
+  replayViewerDialogEl,
+  replayViewerTitleEl,
+  replayViewerMetaEl,
+  replayViewerStatusEl,
+  replayViewerContentEl,
+  replayViewerRefreshBtn,
+  replayViewerDownloadBtn,
+  replayViewerCopyBtn,
+  replayViewerCloseBtn,
+  terminalCtrlCDialogEl,
+  terminalCtrlCMessageEl,
+  terminalCtrlCCopyBtn,
+  terminalCtrlCCancelBtn,
+  commandPaletteDialogEl,
+  commandPaletteMetaEl,
+  commandPaletteInputEl,
+  commandPaletteResultsEl,
+  commandPaletteEmptyEl,
+  commandPaletteCloseBtn,
+  workspaceManagerOpenBtn,
+  workspaceManagerDialogEl,
+  workspaceManagerCloseBtn,
+  workspaceManagerMetaEl,
+  workspaceManagerConnectionsTabBtn,
+  workspaceManagerWorkspaceTabBtn,
+  workspaceManagerConnectionsPanelEl,
+  workspaceManagerWorkspacePanelEl,
+  startupWarmupGateEl,
+  startupWarmupMessageEl,
+  startupWarmupDetailEl,
+  startupWarmupSkipBtn,
+  workspaceShellEl,
+  controlPaneEl,
+  controlPaneLauncherBtn,
+  controlPaneToggleBtn,
+  controlPanePositionSelectEl,
+  controlPaneStatusEl,
+  controlPaneResizeHandleEl,
+  terminalSearchInputEl,
+  terminalSearchPrevBtn,
+  terminalSearchNextBtn,
+  terminalSearchClearBtn,
+  terminalSearchStatusEl
+} = collectAppRuntimeDomRefs(document);
 const terminalCtrlCRuntimeController = createTerminalCtrlCRuntimeController({
   dialogEl: terminalCtrlCDialogEl,
   messageEl: terminalCtrlCMessageEl,
