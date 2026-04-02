@@ -897,6 +897,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     createProfileFromSession,
     saveDraftById,
     loadDraftFromActiveSession,
+    setDraftState,
     getDraftState: () => (draftState ? { ...draftState, launch: normalizeConnectionProfileLaunch(draftState.launch) } : null),
     applyProfileById,
     renameProfileById,

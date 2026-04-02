@@ -108,6 +108,7 @@ Save or apply workspace state:
 
 ```text
 /workspace save dev
+/workspace show dev
 /workspace apply dev
 ```
 
@@ -117,6 +118,22 @@ Manage active-deck workspace groups:
 /workspace group list
 /workspace group save triage
 /workspace group apply triage
+```
+
+Work with connection-profile drafts from the command plane:
+
+```text
+/connection draft active
+/connection draft set {"startCwd":"/srv/app","tags":["ops"]}
+/connection draft save ops-shell
+```
+
+Edit session settings through typed slash commands:
+
+```text
+@4 /settings note set rollout host checks
+@4 /settings theme preset active night
+@4 /settings mouse-forwarding set application
 ```
 
 Transfer a file from a session:

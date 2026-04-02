@@ -1,8 +1,19 @@
 import { createCommandHelpText, createCommandTopicHelpText, createSlashCommandRegistry, getSlashCommandUsage } from "./command-schema.js";
-import { formatConnectionProfileSummary } from "./connection-profile-runtime-controller.js";
 import {
-  normalizeSessionInputSafetyProfile
+  formatConnectionProfileSummary,
+  normalizeConnectionProfileLaunch
+} from "./connection-profile-runtime-controller.js";
+import {
+  normalizeSessionInputSafetyProfile,
+  SESSION_INPUT_SAFETY_BOOLEAN_KEYS,
+  SESSION_INPUT_SAFETY_INTEGER_DEFAULTS
 } from "./input-safety-profile.js";
+import {
+  SESSION_MOUSE_FORWARDING_MODE_APPLICATION,
+  SESSION_MOUSE_FORWARDING_MODE_OFF,
+  normalizeSessionMouseForwardingMode
+} from "./session-mouse-forwarding.js";
+import { formatWorkspacePresetDetail } from "./workspace-preset-runtime-controller.js";
 import {
   analyzeCustomCommandTemplate,
   compareCustomCommandRecords,
@@ -52,6 +63,9 @@ export function createCommandExecutor(options = {}) {
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode;
   const setSessionSendTerminator = options.setSessionSendTerminator;
   const getSessionSendTerminator = options.getSessionSendTerminator;
+  const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys : [];
+  const defaultTerminalTheme = options.defaultTerminalTheme && typeof options.defaultTerminalTheme === "object" ? options.defaultTerminalTheme : {};
+  const terminalThemePresets = Array.isArray(options.terminalThemePresets) ? options.terminalThemePresets : [];
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator;
   const recordCommandSubmission =
     typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
@@ -82,10 +96,22 @@ export function createCommandExecutor(options = {}) {
     typeof options.createLayoutProfileFromCurrent === "function" ? options.createLayoutProfileFromCurrent : async () => "";
   const createConnectionProfileFromSession =
     typeof options.createConnectionProfileFromSession === "function" ? options.createConnectionProfileFromSession : async () => "";
+  const getConnectionProfileDraft =
+    typeof options.getConnectionProfileDraft === "function" ? options.getConnectionProfileDraft : () => null;
+  const setConnectionProfileDraft =
+    typeof options.setConnectionProfileDraft === "function" ? options.setConnectionProfileDraft : () => null;
+  const loadConnectionProfileDraftFromActive =
+    typeof options.loadConnectionProfileDraftFromActive === "function" ? options.loadConnectionProfileDraftFromActive : () => null;
+  const saveConnectionProfileDraft =
+    typeof options.saveConnectionProfileDraft === "function" ? options.saveConnectionProfileDraft : async () => "";
+  const resetConnectionProfileDraft =
+    typeof options.resetConnectionProfileDraft === "function" ? options.resetConnectionProfileDraft : async () => "";
   const applyLayoutProfile = typeof options.applyLayoutProfile === "function" ? options.applyLayoutProfile : async () => "";
   const applyConnectionProfile = typeof options.applyConnectionProfile === "function" ? options.applyConnectionProfile : async () => "";
   const renameLayoutProfile = typeof options.renameLayoutProfile === "function" ? options.renameLayoutProfile : async () => "";
   const renameConnectionProfile = typeof options.renameConnectionProfile === "function" ? options.renameConnectionProfile : async () => "";
+  const duplicateConnectionProfile =
+    typeof options.duplicateConnectionProfile === "function" ? options.duplicateConnectionProfile : async () => "";
   const deleteLayoutProfile = typeof options.deleteLayoutProfile === "function" ? options.deleteLayoutProfile : async () => "";
   const deleteConnectionProfile = typeof options.deleteConnectionProfile === "function" ? options.deleteConnectionProfile : async () => "";
   const listWorkspacePresets = typeof options.listWorkspacePresets === "function" ? options.listWorkspacePresets : () => [];
@@ -96,6 +122,8 @@ export function createCommandExecutor(options = {}) {
   const createWorkspacePresetFromCurrent =
     typeof options.createWorkspacePresetFromCurrent === "function" ? options.createWorkspacePresetFromCurrent : async () => "";
   const applyWorkspacePreset = typeof options.applyWorkspacePreset === "function" ? options.applyWorkspacePreset : async () => "";
+  const duplicateWorkspacePreset =
+    typeof options.duplicateWorkspacePreset === "function" ? options.duplicateWorkspacePreset : async () => "";
   const renameWorkspacePreset = typeof options.renameWorkspacePreset === "function" ? options.renameWorkspacePreset : async () => "";
   const deleteWorkspacePreset = typeof options.deleteWorkspacePreset === "function" ? options.deleteWorkspacePreset : async () => "";
   const listWorkspaceGroupsForDeck =
@@ -179,9 +207,11 @@ export function createCommandExecutor(options = {}) {
     const startCommand = typeof session.startCommand === "string" ? session.startCommand : "";
     const env = session?.env && typeof session.env === "object" ? session.env : {};
     const tags = normalizeSessionTags(session.tags);
+    const note = typeof session?.note === "string" ? session.note : "";
     const activeThemeProfile = normalizeThemeProfile(session.activeThemeProfile || session.themeProfile);
     const inactiveThemeProfile = normalizeThemeProfile(session.inactiveThemeProfile || session.themeProfile);
     const sendTerminator = getSessionSendTerminator(session.id);
+    const mouseForwardingMode = normalizeSessionMouseForwardingMode(session?.mouseForwardingMode);
     const inputSafetyProfile = normalizeSessionInputSafetyProfile(session.inputSafetyProfile);
     return [
       `[${token}] ${name}`,
@@ -189,7 +219,9 @@ export function createCommandExecutor(options = {}) {
       `startCommand=${JSON.stringify(startCommand)}`,
       `env=${JSON.stringify(env)}`,
       `tags=${JSON.stringify(tags)}`,
+      `note=${JSON.stringify(note)}`,
       `sendTerminator=${sendTerminator}`,
+      `mouseForwardingMode=${JSON.stringify(mouseForwardingMode)}`,
       `activeThemeProfile=${JSON.stringify(activeThemeProfile)}`,
       `inactiveThemeProfile=${JSON.stringify(inactiveThemeProfile)}`,
       `inputSafetyProfile=${JSON.stringify(inputSafetyProfile)}`
@@ -211,6 +243,205 @@ export function createCommandExecutor(options = {}) {
       `remoteAuth=${JSON.stringify(launch.remoteAuth || null)}`,
       `activeThemeProfile=${JSON.stringify(launch.activeThemeProfile || {})}`,
       `inactiveThemeProfile=${JSON.stringify(launch.inactiveThemeProfile || {})}`
+    ].join("\n");
+  }
+
+  function normalizeKeyword(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function isValidHexColor(value) {
+    return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim());
+  }
+
+  function parseBooleanToken(value) {
+    const normalized = normalizeKeyword(value);
+    if (["true", "1", "yes", "on", "enabled"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "off", "disabled"].includes(normalized)) {
+      return false;
+    }
+    return null;
+  }
+
+  function parseJsonObjectToken(text, label) {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(text || "").trim());
+    } catch (error) {
+      throw new Error(`${label} JSON is invalid: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`${label} JSON must be an object.`);
+    }
+    return parsed;
+  }
+
+  function formatConnectionDraftReport(draft) {
+    if (!draft || typeof draft !== "object") {
+      return "No connection profile draft available.";
+    }
+    const normalizedLaunch = normalizeConnectionProfileLaunch(draft.launch) || {};
+    return [
+      "Connection profile draft",
+      `mode=${JSON.stringify(String(draft.mode || "blank"))}`,
+      `profileId=${JSON.stringify(String(draft.profileId || ""))}`,
+      `name=${JSON.stringify(String(draft.name || ""))}`,
+      `launch=${JSON.stringify(normalizedLaunch, null, 2)}`
+    ].join("\n");
+  }
+
+  function resolveThemeSlotToken(value) {
+    return normalizeKeyword(value) === "inactive" ? "inactive" : "active";
+  }
+
+  function resolveThemeProfileKey(value) {
+    const normalized = normalizeKeyword(value);
+    const aliases = new Map([
+      ["bg", "background"],
+      ["background", "background"],
+      ["fg", "foreground"],
+      ["foreground", "foreground"],
+      ["cursor", "cursor"],
+      ["black", "black"],
+      ["red", "red"],
+      ["green", "green"],
+      ["yellow", "yellow"],
+      ["blue", "blue"],
+      ["magenta", "magenta"],
+      ["cyan", "cyan"],
+      ["white", "white"],
+      ["brightblack", "brightBlack"],
+      ["bright-black", "brightBlack"],
+      ["brightred", "brightRed"],
+      ["bright-red", "brightRed"],
+      ["brightgreen", "brightGreen"],
+      ["bright-green", "brightGreen"],
+      ["brightyellow", "brightYellow"],
+      ["bright-yellow", "brightYellow"],
+      ["brightblue", "brightBlue"],
+      ["bright-blue", "brightBlue"],
+      ["brightmagenta", "brightMagenta"],
+      ["bright-magenta", "brightMagenta"],
+      ["brightcyan", "brightCyan"],
+      ["bright-cyan", "brightCyan"],
+      ["brightwhite", "brightWhite"],
+      ["bright-white", "brightWhite"]
+    ]);
+    const resolved = aliases.get(normalized) || "";
+    return themeProfileKeys.includes(resolved) ? resolved : "";
+  }
+
+  function resolveThemePresetToken(value) {
+    const normalized = normalizeKeyword(value);
+    if (!normalized) {
+      return { preset: null, error: "Theme preset is required." };
+    }
+    const exactId = terminalThemePresets.find((entry) => normalizeKeyword(entry?.id) === normalized) || null;
+    if (exactId) {
+      return { preset: exactId, error: "" };
+    }
+    const exactName = terminalThemePresets.find((entry) => normalizeKeyword(entry?.name) === normalized) || null;
+    if (exactName) {
+      return { preset: exactName, error: "" };
+    }
+    const matches = terminalThemePresets.filter(
+      (entry) => normalizeKeyword(entry?.id).startsWith(normalized) || normalizeKeyword(entry?.name).startsWith(normalized)
+    );
+    if (matches.length === 1) {
+      return { preset: matches[0], error: "" };
+    }
+    if (matches.length > 1) {
+      return { preset: null, error: `Ambiguous theme preset: ${value}` };
+    }
+    return { preset: null, error: `Unknown theme preset: ${value}` };
+  }
+
+  function formatThemeSlotReport(session, slot) {
+    const normalizedSlot = resolveThemeSlotToken(slot);
+    const profile = normalizeThemeProfile(
+      normalizedSlot === "inactive" ? session?.inactiveThemeProfile || session?.themeProfile : session?.activeThemeProfile || session?.themeProfile
+    );
+    return `${normalizedSlot}ThemeProfile=${JSON.stringify(profile, null, 2)}`;
+  }
+
+  function formatInputSafetyFieldList() {
+    return [
+      "requireValidShellSyntax",
+      "confirmOnIncompleteShellConstruct",
+      "confirmOnNaturalLanguageInput",
+      "confirmOnDangerousShellCommand",
+      "confirmOnMultilineInput",
+      "confirmOnRecentTargetSwitch",
+      "targetSwitchGraceMs",
+      "pasteLengthConfirmThreshold",
+      "pasteLineConfirmThreshold"
+    ].join(", ");
+  }
+
+  function resolveInputSafetyField(value) {
+    const normalized = normalizeKeyword(value);
+    const aliases = new Map([
+      ["syntax", "requireValidShellSyntax"],
+      ["requirevalidshellsyntax", "requireValidShellSyntax"],
+      ["incomplete", "confirmOnIncompleteShellConstruct"],
+      ["confirmonincompleteshellconstruct", "confirmOnIncompleteShellConstruct"],
+      ["natural-language", "confirmOnNaturalLanguageInput"],
+      ["naturallanguage", "confirmOnNaturalLanguageInput"],
+      ["confirmonnaturallanguageinput", "confirmOnNaturalLanguageInput"],
+      ["dangerous", "confirmOnDangerousShellCommand"],
+      ["confirmondangerousshellcommand", "confirmOnDangerousShellCommand"],
+      ["multiline", "confirmOnMultilineInput"],
+      ["confirmonmultilineinput", "confirmOnMultilineInput"],
+      ["recent-target-switch", "confirmOnRecentTargetSwitch"],
+      ["recenttargetswitch", "confirmOnRecentTargetSwitch"],
+      ["confirmonrecenttargetswitch", "confirmOnRecentTargetSwitch"],
+      ["grace-ms", "targetSwitchGraceMs"],
+      ["targetswitchgracems", "targetSwitchGraceMs"],
+      ["paste-length", "pasteLengthConfirmThreshold"],
+      ["pastelengthconfirmthreshold", "pasteLengthConfirmThreshold"],
+      ["paste-lines", "pasteLineConfirmThreshold"],
+      ["pastelineconfirmthreshold", "pasteLineConfirmThreshold"]
+    ]);
+    const resolved = aliases.get(normalized) || "";
+    return SESSION_INPUT_SAFETY_BOOLEAN_KEYS.includes(resolved) || Object.prototype.hasOwnProperty.call(SESSION_INPUT_SAFETY_INTEGER_DEFAULTS, resolved)
+      ? resolved
+      : "";
+  }
+
+  async function applySessionSettingsPatch(session, patch, sendTerminatorMode = null) {
+    let effectiveSession = session;
+    if (Object.keys(patch).length > 0) {
+      effectiveSession = await api.updateSession(session.id, patch);
+      applyRuntimeEvent({ type: "session.updated", session: effectiveSession });
+    }
+    if (typeof sendTerminatorMode === "string") {
+      setSessionSendTerminator(session.id, sendTerminatorMode);
+    }
+    return effectiveSession;
+  }
+
+  function formatStartupSettingsReport(session) {
+    const startCwd = typeof session.startCwd === "string" && session.startCwd.trim() ? session.startCwd : session.cwd || "";
+    const startCommand = typeof session.startCommand === "string" ? session.startCommand : "";
+    const env = session?.env && typeof session.env === "object" ? session.env : {};
+    const tags = normalizeSessionTags(session.tags);
+    const sendTerminator = getSessionSendTerminator(session.id);
+    return [
+      `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`,
+      `startCwd=${JSON.stringify(startCwd)}`,
+      `startCommand=${JSON.stringify(startCommand)}`,
+      `env=${JSON.stringify(env)}`,
+      `tags=${JSON.stringify(tags)}`,
+      `sendTerminator=${sendTerminator}`
+    ].join("\n");
+  }
+
+  function formatSessionNoteReport(session) {
+    return [
+      `[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`,
+      `note=${JSON.stringify(typeof session?.note === "string" ? session.note : "")}`
     ].join("\n");
   }
 
@@ -1060,7 +1291,7 @@ export function createCommandExecutor(options = {}) {
     }
 
     if (command === "connection") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const subcommand = normalizeKeyword(args[0]);
       const rest = args.slice(1);
       if (!subcommand || subcommand === "list") {
         const profiles = listConnectionProfiles();
@@ -1068,6 +1299,22 @@ export function createCommandExecutor(options = {}) {
           return "No connection profiles available.";
         }
         return profiles.map((profile) => formatConnectionProfileSummary(profile)).join("\n");
+      }
+
+      if (subcommand === "new") {
+        const name = rest.join(" ").trim();
+        if (!name) {
+          return formatUsage("connection", "new");
+        }
+        const activeSession = getSessionById(activeSessionId, sessions);
+        setConnectionProfileDraft({
+          mode: "blank",
+          profileId: "",
+          name,
+          deckId: activeSession?.deckId || defaultDeckId,
+          launch: {}
+        });
+        return saveConnectionProfileDraft();
       }
 
       if (subcommand === "save") {
@@ -1114,6 +1361,21 @@ export function createCommandExecutor(options = {}) {
         return applyConnectionProfile(resolved.profile.id);
       }
 
+      if (subcommand === "duplicate") {
+        if (rest.length < 2) {
+          return formatUsage("connection", "duplicate");
+        }
+        const resolved = resolveConnectionProfile(rest[0]);
+        if (!resolved.profile) {
+          return resolved.error;
+        }
+        const name = rest.slice(1).join(" ").trim();
+        if (!name) {
+          return formatUsage("connection", "duplicate");
+        }
+        return duplicateConnectionProfile(resolved.profile.id, name);
+      }
+
       if (subcommand === "rename") {
         if (rest.length < 2) {
           return formatUsage("connection", "rename");
@@ -1140,11 +1402,94 @@ export function createCommandExecutor(options = {}) {
         return deleteConnectionProfile(resolved.profile.id);
       }
 
+      if (subcommand === "draft") {
+        const draftSubcommand = normalizeKeyword(rest[0]);
+        const draftArgs = rest.slice(1);
+        if (!draftSubcommand || draftSubcommand === "show") {
+          if (draftArgs.length > 0) {
+            return formatUsage("connection", "draft");
+          }
+          return formatConnectionDraftReport(getConnectionProfileDraft());
+        }
+
+        if (draftSubcommand === "new") {
+          const activeSession = getSessionById(activeSessionId, sessions);
+          const name = draftArgs.join(" ").trim() || "New Connection";
+          setConnectionProfileDraft({
+            mode: "blank",
+            profileId: "",
+            name,
+            deckId: activeSession?.deckId || defaultDeckId,
+            launch: {}
+          });
+          return "Opened a new connection profile draft.";
+        }
+
+        if (draftSubcommand === "active") {
+          if (draftArgs.length !== 0) {
+            return formatUsage("connection", "draft");
+          }
+          const resolvedTarget = resolveActiveOrDirectTargetSession(
+            interpreted,
+            sessions,
+            activeSessionId,
+            "No active session to load into a connection profile draft.",
+            "Connection draft selector"
+          );
+          if (resolvedTarget.error) {
+            return resolvedTarget.error;
+          }
+          loadConnectionProfileDraftFromActive(resolvedTarget.session);
+          return "Loaded the active session into a new connection profile draft.";
+        }
+
+        if (draftSubcommand === "set") {
+          const payloadText = draftArgs.join(" ").trim();
+          if (!payloadText) {
+            return formatUsage("connection", "draft");
+          }
+          const launch = normalizeConnectionProfileLaunch(parseJsonObjectToken(payloadText, "Connection draft launch"));
+          if (!launch) {
+            return "Connection draft launch JSON is incomplete. Required fields: shell, startCwd, activeThemeProfile, inactiveThemeProfile.";
+          }
+          const currentDraft = getConnectionProfileDraft() || {};
+          setConnectionProfileDraft({
+            mode: currentDraft.mode || "blank",
+            profileId: currentDraft.profileId || "",
+            name: currentDraft.name || "New Connection",
+            deckId: launch.deckId || currentDraft?.launch?.deckId || defaultDeckId,
+            launch
+          });
+          return "Updated the connection profile draft.";
+        }
+
+        if (draftSubcommand === "save") {
+          const name = draftArgs.join(" ").trim();
+          const currentDraft = getConnectionProfileDraft() || {};
+          if (name) {
+            setConnectionProfileDraft({
+              ...currentDraft,
+              name
+            });
+          }
+          return saveConnectionProfileDraft();
+        }
+
+        if (draftSubcommand === "reset") {
+          if (draftArgs.length !== 0) {
+            return formatUsage("connection", "draft");
+          }
+          return resetConnectionProfileDraft();
+        }
+
+        return formatUsage("connection", "draft");
+      }
+
       return formatUsage("connection");
     }
 
     if (command === "workspace") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
+      const subcommand = normalizeKeyword(args[0]);
       const rest = args.slice(1);
       const activeDeckId = String(getActiveDeck()?.id || defaultDeckId).trim() || defaultDeckId;
       if (!subcommand || subcommand === "list") {
@@ -1165,6 +1510,17 @@ export function createCommandExecutor(options = {}) {
         return createWorkspacePresetFromCurrent(name);
       }
 
+      if (subcommand === "show") {
+        if (rest.length !== 1) {
+          return formatUsage("workspace", "show");
+        }
+        const resolved = resolveWorkspacePreset(rest[0]);
+        if (!resolved.preset) {
+          return resolved.error;
+        }
+        return formatWorkspacePresetDetail(resolved.preset);
+      }
+
       if (subcommand === "apply") {
         if (rest.length !== 1) {
           return formatUsage("workspace", "apply");
@@ -1174,6 +1530,21 @@ export function createCommandExecutor(options = {}) {
           return resolved.error;
         }
         return applyWorkspacePreset(resolved.preset.id);
+      }
+
+      if (subcommand === "duplicate") {
+        if (rest.length < 2) {
+          return formatUsage("workspace", "duplicate");
+        }
+        const resolved = resolveWorkspacePreset(rest[0]);
+        if (!resolved.preset) {
+          return resolved.error;
+        }
+        const name = rest.slice(1).join(" ").trim();
+        if (!name) {
+          return formatUsage("workspace", "duplicate");
+        }
+        return duplicateWorkspacePreset(resolved.preset.id, name);
       }
 
       if (subcommand === "rename") {
@@ -1525,9 +1896,269 @@ export function createCommandExecutor(options = {}) {
       if (resolvedTarget.error) {
         return resolvedTarget.error;
       }
-      const showMatch = /^\/settings\s+show\s*$/i.exec(interpreted.raw || "");
-      if (showMatch) {
+      const subcommand = normalizeKeyword(args[0]);
+      const rest = args.slice(1);
+
+      if (subcommand === "show" && rest.length === 0) {
         return formatSessionSettingsReport(resolvedTarget.session);
+      }
+
+      if (subcommand === "startup") {
+        const startupSubcommand = normalizeKeyword(rest[0]);
+        const startupArgs = rest.slice(1);
+        if (!startupSubcommand || startupSubcommand === "show") {
+          if (startupArgs.length > 0) {
+            return formatUsage("settings", "startup");
+          }
+          return formatStartupSettingsReport(resolvedTarget.session);
+        }
+        if (isSessionExited(resolvedTarget.session)) {
+          return getBlockedSessionActionMessage([resolvedTarget.session], "Settings update");
+        }
+        if (startupSubcommand === "cwd") {
+          const nextValue = startupArgs.join(" ").trim();
+          if (!nextValue) {
+            return formatUsage("settings", "startup");
+          }
+          const patch = {
+            startCwd: normalizeKeyword(nextValue) === "clear" ? "" : nextValue
+          };
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, patch);
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: startCwd.`;
+        }
+        if (startupSubcommand === "command") {
+          const nextValue = startupArgs.join(" ");
+          if (!nextValue.trim()) {
+            return formatUsage("settings", "startup");
+          }
+          const patch = {
+            startCommand: normalizeKeyword(nextValue) === "clear" ? "" : nextValue
+          };
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, patch);
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: startCommand.`;
+        }
+        if (startupSubcommand === "env") {
+          const payloadText = startupArgs.join(" ").trim();
+          if (!payloadText) {
+            return formatUsage("settings", "startup");
+          }
+          const env = normalizeKeyword(payloadText) === "clear" ? {} : parseJsonObjectToken(payloadText, "Startup env");
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, { env });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: env.`;
+        }
+        if (startupSubcommand === "tags") {
+          const payloadText = startupArgs.join(" ").trim();
+          if (!payloadText) {
+            return formatUsage("settings", "startup");
+          }
+          const tags = normalizeKeyword(payloadText) === "clear"
+            ? []
+            : normalizeSessionTags(
+                payloadText
+                  .split(",")
+                  .map((entry) => entry.trim())
+                  .filter(Boolean)
+              );
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, { tags });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: tags.`;
+        }
+        if (startupSubcommand === "terminator") {
+          if (startupArgs.length !== 1) {
+            return formatUsage("settings", "startup");
+          }
+          const requested = normalizeKeyword(startupArgs[0]);
+          const sendTerminatorMode = normalizeSendTerminatorMode(requested);
+          if (requested !== sendTerminatorMode) {
+            return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2, cr_delay.";
+          }
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {}, sendTerminatorMode);
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: sendTerminator.`;
+        }
+        return formatUsage("settings", "startup");
+      }
+
+      if (subcommand === "note") {
+        const noteSubcommand = normalizeKeyword(rest[0]);
+        const noteArgs = rest.slice(1);
+        if (!noteSubcommand || noteSubcommand === "show") {
+          if (noteArgs.length > 0) {
+            return formatUsage("settings", "note");
+          }
+          return formatSessionNoteReport(resolvedTarget.session);
+        }
+        if (isSessionExited(resolvedTarget.session)) {
+          return getBlockedSessionActionMessage([resolvedTarget.session], "Settings update");
+        }
+        if (noteSubcommand === "set") {
+          const note = noteArgs.join(" ").trim();
+          if (!note) {
+            return formatUsage("settings", "note");
+          }
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, { note });
+          return `Updated note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+        }
+        if (noteSubcommand === "clear") {
+          if (noteArgs.length !== 0) {
+            return formatUsage("settings", "note");
+          }
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, { note: "" });
+          return `Cleared note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+        }
+        return formatUsage("settings", "note");
+      }
+
+      if (subcommand === "theme") {
+        const themeSubcommand = normalizeKeyword(rest[0]);
+        const themeArgs = rest.slice(1);
+        if (!themeSubcommand || themeSubcommand === "show") {
+          if (themeArgs.length > 1) {
+            return formatUsage("settings", "theme");
+          }
+          if (themeArgs.length === 1) {
+            return formatThemeSlotReport(resolvedTarget.session, themeArgs[0]);
+          }
+          return [
+            `[${formatSessionToken(resolvedTarget.session.id)}] ${formatSessionDisplayName(resolvedTarget.session)}`,
+            formatThemeSlotReport(resolvedTarget.session, "active"),
+            formatThemeSlotReport(resolvedTarget.session, "inactive")
+          ].join("\n");
+        }
+        if (isSessionExited(resolvedTarget.session)) {
+          return getBlockedSessionActionMessage([resolvedTarget.session], "Settings update");
+        }
+        if (themeSubcommand === "preset") {
+          if (themeArgs.length < 2) {
+            return formatUsage("settings", "theme");
+          }
+          const slot = resolveThemeSlotToken(themeArgs[0]);
+          const presetResolution = resolveThemePresetToken(themeArgs.slice(1).join(" "));
+          if (!presetResolution.preset) {
+            return presetResolution.error;
+          }
+          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {
+            [patchKey]: normalizeThemeProfile(presetResolution.preset.profile || defaultTerminalTheme)
+          });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${patchKey}.`;
+        }
+        if (themeSubcommand === "set") {
+          if (themeArgs.length !== 3) {
+            return formatUsage("settings", "theme");
+          }
+          const slot = resolveThemeSlotToken(themeArgs[0]);
+          const themeKey = resolveThemeProfileKey(themeArgs[1]);
+          if (!themeKey) {
+            return `Unknown theme key: ${themeArgs[1]}`;
+          }
+          if (!isValidHexColor(themeArgs[2])) {
+            return "Theme value must be a #rrggbb color.";
+          }
+          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+          const baseProfile = normalizeThemeProfile(
+            slot === "inactive"
+              ? resolvedTarget.session.inactiveThemeProfile || resolvedTarget.session.themeProfile
+              : resolvedTarget.session.activeThemeProfile || resolvedTarget.session.themeProfile
+          );
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {
+            [patchKey]: {
+              ...baseProfile,
+              [themeKey]: themeArgs[2].trim()
+            }
+          });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${patchKey}.${themeKey}.`;
+        }
+        if (themeSubcommand === "reset") {
+          if (themeArgs.length !== 1) {
+            return formatUsage("settings", "theme");
+          }
+          const slot = resolveThemeSlotToken(themeArgs[0]);
+          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {
+            [patchKey]: normalizeThemeProfile(defaultTerminalTheme)
+          });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${patchKey}.`;
+        }
+        return formatUsage("settings", "theme");
+      }
+
+      if (subcommand === "input-safety") {
+        const safetySubcommand = normalizeKeyword(rest[0]);
+        const safetyArgs = rest.slice(1);
+        if (!safetySubcommand || safetySubcommand === "show") {
+          if (safetyArgs.length > 0) {
+            return formatUsage("settings", "input-safety");
+          }
+          const inputSafetyProfile = normalizeSessionInputSafetyProfile(resolvedTarget.session.inputSafetyProfile);
+          return [
+            `[${formatSessionToken(resolvedTarget.session.id)}] ${formatSessionDisplayName(resolvedTarget.session)}`,
+            `inputSafetyProfile=${JSON.stringify(inputSafetyProfile, null, 2)}`
+          ].join("\n");
+        }
+        if (isSessionExited(resolvedTarget.session)) {
+          return getBlockedSessionActionMessage([resolvedTarget.session], "Settings update");
+        }
+        if (safetySubcommand === "set") {
+          if (safetyArgs.length !== 2) {
+            return formatUsage("settings", "input-safety");
+          }
+          const field = resolveInputSafetyField(safetyArgs[0]);
+          if (!field) {
+            return `Unknown input safety field: ${safetyArgs[0]}. Allowed fields: ${formatInputSafetyFieldList()}.`;
+          }
+          const currentProfile = normalizeSessionInputSafetyProfile(resolvedTarget.session.inputSafetyProfile);
+          const nextProfile = { ...currentProfile };
+          if (SESSION_INPUT_SAFETY_BOOLEAN_KEYS.includes(field)) {
+            const booleanValue = parseBooleanToken(safetyArgs[1]);
+            if (booleanValue === null) {
+              return `Invalid boolean value: ${safetyArgs[1]}`;
+            }
+            nextProfile[field] = booleanValue;
+          } else {
+            const numericValue = Number(safetyArgs[1]);
+            if (!Number.isFinite(numericValue) || numericValue < 0) {
+              return `Invalid numeric value: ${safetyArgs[1]}`;
+            }
+            nextProfile[field] = Math.trunc(numericValue);
+          }
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {
+            inputSafetyProfile: normalizeSessionInputSafetyProfile(nextProfile)
+          });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: inputSafetyProfile.${field}.`;
+        }
+        return formatUsage("settings", "input-safety");
+      }
+
+      if (subcommand === "mouse-forwarding") {
+        const mouseSubcommand = normalizeKeyword(rest[0]);
+        const mouseArgs = rest.slice(1);
+        if (!mouseSubcommand || mouseSubcommand === "show") {
+          if (mouseArgs.length > 0) {
+            return formatUsage("settings", "mouse-forwarding");
+          }
+          return [
+            `[${formatSessionToken(resolvedTarget.session.id)}] ${formatSessionDisplayName(resolvedTarget.session)}`,
+            `mouseForwardingMode=${JSON.stringify(normalizeSessionMouseForwardingMode(resolvedTarget.session.mouseForwardingMode))}`
+          ].join("\n");
+        }
+        if (isSessionExited(resolvedTarget.session)) {
+          return getBlockedSessionActionMessage([resolvedTarget.session], "Settings update");
+        }
+        if (mouseSubcommand === "set") {
+          if (mouseArgs.length !== 1) {
+            return formatUsage("settings", "mouse-forwarding");
+          }
+          const mode = normalizeSessionMouseForwardingMode(mouseArgs[0]);
+          if (![SESSION_MOUSE_FORWARDING_MODE_OFF, SESSION_MOUSE_FORWARDING_MODE_APPLICATION].includes(mode)) {
+            return "Invalid mouse forwarding mode. Allowed values: off, application.";
+          }
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, { mouseForwardingMode: mode });
+          return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: mouseForwardingMode.`;
+        }
+        return formatUsage("settings", "mouse-forwarding");
+      }
+
+      if (subcommand !== "apply") {
+        return formatUsage("settings");
       }
 
       const applyMatch = /^\/settings\s+apply\s+([\s\S]+)$/i.exec(interpreted.raw || "");
@@ -1548,11 +2179,13 @@ export function createCommandExecutor(options = {}) {
         "startCommand",
         "env",
         "tags",
+        "note",
         "themeProfile",
         "activeThemeProfile",
         "inactiveThemeProfile",
         "sendTerminator",
-        "inputSafetyProfile"
+        "inputSafetyProfile",
+        "mouseForwardingMode"
       ]);
       const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
       if (unknownKeys.length > 0) {
@@ -1572,6 +2205,9 @@ export function createCommandExecutor(options = {}) {
       if (Object.prototype.hasOwnProperty.call(payload, "tags")) {
         patch.tags = payload.tags;
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "note")) {
+        patch.note = payload.note;
+      }
       if (Object.prototype.hasOwnProperty.call(payload, "themeProfile")) {
         patch.themeProfile = payload.themeProfile;
       }
@@ -1584,10 +2220,13 @@ export function createCommandExecutor(options = {}) {
       if (Object.prototype.hasOwnProperty.call(payload, "inputSafetyProfile")) {
         patch.inputSafetyProfile = normalizeSessionInputSafetyProfile(payload.inputSafetyProfile);
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "mouseForwardingMode")) {
+        patch.mouseForwardingMode = normalizeSessionMouseForwardingMode(payload.mouseForwardingMode);
+      }
 
       let sendTerminatorMode = null;
       if (Object.prototype.hasOwnProperty.call(payload, "sendTerminator")) {
-        const requested = String(payload.sendTerminator || "").trim().toLowerCase();
+        const requested = normalizeKeyword(payload.sendTerminator);
         sendTerminatorMode = normalizeSendTerminatorMode(requested);
         if (requested && requested !== sendTerminatorMode) {
           return "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2, cr_delay.";
@@ -1600,18 +2239,16 @@ export function createCommandExecutor(options = {}) {
         return "No applicable settings keys in payload.";
       }
 
-      if (hasPatch) {
-        const updated = await api.updateSession(resolvedTarget.session.id, patch);
-        applyRuntimeEvent({ type: "session.updated", session: updated });
-      }
-      if (hasTerminator) {
-        setSessionSendTerminator(resolvedTarget.session.id, sendTerminatorMode);
-      }
+      const updated = await applySessionSettingsPatch(
+        resolvedTarget.session,
+        patch,
+        hasTerminator ? sendTerminatorMode : null
+      );
       const appliedKeys = [
         ...Object.keys(patch),
         ...(hasTerminator ? ["sendTerminator"] : [])
       ];
-      return `Applied settings to [${formatSessionToken(resolvedTarget.session.id)}] ${formatSessionDisplayName(resolvedTarget.session)}: ${appliedKeys.join(", ")}.`;
+      return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${appliedKeys.join(", ")}.`;
     }
 
     const allCustomCommands = listNormalizedCustomCommands();

@@ -117,7 +117,7 @@ test("command executor help and usage strings derive from declarative schema met
   const connectionUsage = await executor.execute({ command: "connection", args: ["wat"], raw: "/connection wat" });
   assert.equal(
     connectionUsage,
-    "Usage: /connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>"
+    "Usage: /connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft show | /connection draft new [name] | /connection draft active | /connection draft set <json> | /connection draft save [name] | /connection draft reset"
   );
 
   const layoutUsage = await executor.execute({ command: "layout", args: ["wat"], raw: "/layout wat" });
@@ -126,7 +126,7 @@ test("command executor help and usage strings derive from declarative schema met
   const workspaceUsage = await executor.execute({ command: "workspace", args: ["wat"], raw: "/workspace wat" });
   assert.equal(
     workspaceUsage,
-    "Usage: /workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
+    "Usage: /workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear"
   );
 
   const broadcastUsage = await executor.execute({ command: "broadcast", args: ["wat"], raw: "/broadcast wat" });
@@ -149,7 +149,10 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(renameUsage, "Usage: /rename <name>");
 
   const settingsUsage = await executor.execute({ command: "settings", args: [], raw: "/settings" });
-  assert.equal(settingsUsage, "Usage: /settings show | /settings apply <json>");
+  assert.equal(
+    settingsUsage,
+    "Usage: /settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
+  );
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
   assert.equal(customShowUsage, "Usage: /custom show [scope:global|scope:project|scope:session:<selector>] <name>");
@@ -492,6 +495,22 @@ test("command executor manages layout profiles through shared runtime hooks", as
 
 test("command executor manages connection profiles through shared runtime hooks", async () => {
   const calls = [];
+  let draftState = {
+    mode: "profile",
+    profileId: "ops",
+    name: "Ops Shell",
+    launch: {
+      kind: "local",
+      deckId: "ops",
+      shell: "bash",
+      startCwd: "/srv/ops",
+      startCommand: "",
+      env: {},
+      tags: ["ops"],
+      activeThemeProfile: { background: "#111111" },
+      inactiveThemeProfile: { background: "#222222" }
+    }
+  };
   const sessions = [
     {
       id: "s1",
@@ -583,9 +602,53 @@ test("command executor manages connection profiles through shared runtime hooks"
       calls.push(["save", session.id, name]);
       return `Saved connection profile [ops] ${name} from [1] Ops Shell.`;
     },
+    getConnectionProfileDraft: () => draftState,
+    setConnectionProfileDraft: (nextDraft) => {
+      draftState = { ...nextDraft };
+      calls.push(["draft-set", draftState.name]);
+      return draftState;
+    },
+    loadConnectionProfileDraftFromActive: (session) => {
+      calls.push(["draft-active", session.id]);
+      draftState = {
+        mode: "session",
+        profileId: "",
+        name: `${session.name} Profile`,
+        launch: {
+          kind: "local",
+          deckId: session.deckId,
+          shell: session.shell,
+          startCwd: session.startCwd,
+          startCommand: session.startCommand,
+          env: session.env,
+          tags: session.tags,
+          activeThemeProfile: session.activeThemeProfile,
+          inactiveThemeProfile: session.inactiveThemeProfile
+        }
+      };
+      return draftState;
+    },
+    saveConnectionProfileDraft: async () => {
+      calls.push(["draft-save", draftState.name]);
+      return `Saved connection profile [draft] ${draftState.name}.`;
+    },
+    resetConnectionProfileDraft: async () => {
+      calls.push(["draft-reset"]);
+      draftState = {
+        mode: "profile",
+        profileId: "ops",
+        name: "Ops Shell",
+        launch: profiles[0].launch
+      };
+      return "Reset the connection profile draft.";
+    },
     applyConnectionProfile: async (profileId) => {
       calls.push(["apply", profileId]);
       return `Started session [8] Ops Shell from connection profile [${profileId}] Ops Shell.`;
+    },
+    duplicateConnectionProfile: async (profileId, name) => {
+      calls.push(["duplicate", profileId, name]);
+      return `Duplicated connection profile [${profileId}] Ops Shell as [copy] ${name}.`;
     },
     renameConnectionProfile: async (profileId, name) => {
       calls.push(["rename", profileId, name]);
@@ -602,6 +665,10 @@ test("command executor manages connection profiles through shared runtime hooks"
     "[ops] Ops Shell -> kind=ssh deck=ops shell=ssh target=ops@ops.example:22"
   );
   assert.equal(
+    await executor.execute({ command: "connection", args: ["new", "Blank", "Shell"], raw: "/connection new Blank Shell" }),
+    "Saved connection profile [draft] Blank Shell."
+  );
+  assert.equal(
     await executor.execute({ command: "connection", args: ["save", "Ops", "Saved"], raw: "/connection save Ops Saved" }),
     "Saved connection profile [ops] Ops Saved from [1] Ops Shell."
   );
@@ -614,6 +681,10 @@ test("command executor manages connection profiles through shared runtime hooks"
     "Started session [8] Ops Shell from connection profile [ops] Ops Shell."
   );
   assert.equal(
+    await executor.execute({ command: "connection", args: ["duplicate", "ops", "Ops", "Copy"], raw: "/connection duplicate ops Ops Copy" }),
+    "Duplicated connection profile [ops] Ops Shell as [copy] Ops Copy."
+  );
+  assert.equal(
     await executor.execute({ command: "connection", args: ["rename", "ops", "Prod", "Shell"], raw: "/connection rename ops Prod Shell" }),
     "Renamed connection profile [ops] to Prod Shell."
   );
@@ -621,11 +692,47 @@ test("command executor manages connection profiles through shared runtime hooks"
     await executor.execute({ command: "connection", args: ["delete", "ops"], raw: "/connection delete ops" }),
     "Deleted connection profile [ops] Ops Shell."
   );
+  assert.match(
+    await executor.execute({ command: "connection", args: ["draft", "show"], raw: "/connection draft show" }),
+    /Connection profile draft/
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["draft", "active"], raw: "/connection draft active" }),
+    "Loaded the active session into a new connection profile draft."
+  );
+  assert.equal(
+    await executor.execute({
+      command: "connection",
+      args: [
+        "draft",
+        "set",
+        "{\"kind\":\"local\",\"deckId\":\"ops\",\"shell\":\"bash\",\"startCwd\":\"/tmp\",\"startCommand\":\"\",\"env\":{},\"tags\":[],\"activeThemeProfile\":{\"background\":\"#111111\"},\"inactiveThemeProfile\":{\"background\":\"#222222\"}}"
+      ],
+      raw: "/connection draft set {\"kind\":\"local\",\"deckId\":\"ops\",\"shell\":\"bash\",\"startCwd\":\"/tmp\",\"startCommand\":\"\",\"env\":{},\"tags\":[],\"activeThemeProfile\":{\"background\":\"#111111\"},\"inactiveThemeProfile\":{\"background\":\"#222222\"}}"
+    }),
+    "Updated the connection profile draft."
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["draft", "save", "Draft", "Shell"], raw: "/connection draft save Draft Shell" }),
+    "Saved connection profile [draft] Draft Shell."
+  );
+  assert.equal(
+    await executor.execute({ command: "connection", args: ["draft", "reset"], raw: "/connection draft reset" }),
+    "Reset the connection profile draft."
+  );
   assert.deepEqual(calls, [
+    ["draft-set", "Blank Shell"],
+    ["draft-save", "Blank Shell"],
     ["save", "s1", "Ops Saved"],
     ["apply", "ops"],
+    ["duplicate", "ops", "Ops Copy"],
     ["rename", "ops", "Prod Shell"],
-    ["delete", "ops"]
+    ["delete", "ops"],
+    ["draft-active", "s1"],
+    ["draft-set", "Ops Shell Profile"],
+    ["draft-set", "Draft Shell"],
+    ["draft-save", "Draft Shell"],
+    ["draft-reset"]
   ]);
 });
 
@@ -700,6 +807,10 @@ test("command executor manages workspace presets through shared runtime hooks", 
       calls.push(["save", name]);
       return `Saved workspace preset [ops] ${name}.`;
     },
+    duplicateWorkspacePreset: async (presetId, name) => {
+      calls.push(["duplicate", presetId, name]);
+      return `Duplicated workspace preset [${presetId}] Ops Workspace as [copy] ${name}.`;
+    },
     applyWorkspacePreset: async (presetId) => {
       calls.push(["apply", presetId]);
       return `Applied workspace preset [${presetId}] Ops Workspace.`;
@@ -745,9 +856,17 @@ test("command executor manages workspace presets through shared runtime hooks", 
     await executor.execute({ command: "workspace", args: ["save", "Ops", "Workspace"], raw: "/workspace save Ops Workspace" }),
     "Saved workspace preset [ops] Ops Workspace."
   );
+  assert.match(
+    await executor.execute({ command: "workspace", args: ["show", "ops"], raw: "/workspace show ops" }),
+    /activeDeckId="default"/
+  );
   assert.equal(
     await executor.execute({ command: "workspace", args: ["apply", "ops"], raw: "/workspace apply ops" }),
     "Applied workspace preset [ops] Ops Workspace."
+  );
+  assert.equal(
+    await executor.execute({ command: "workspace", args: ["duplicate", "ops", "Ops", "Copy"], raw: "/workspace duplicate ops Ops Copy" }),
+    "Duplicated workspace preset [ops] Ops Workspace as [copy] Ops Copy."
   );
   assert.equal(
     await executor.execute({ command: "workspace", args: ["rename", "ops", "New", "Name"], raw: "/workspace rename ops New Name" }),
@@ -784,6 +903,7 @@ test("command executor manages workspace presets through shared runtime hooks", 
   assert.deepEqual(calls, [
     ["save", "Ops Workspace"],
     ["apply", "ops"],
+    ["duplicate", "ops", "Ops Copy"],
     ["rename", "ops", "New Name"],
     ["delete", "ops"],
     ["group-save", "default", "Build"],
@@ -1699,7 +1819,7 @@ test("command executor applies explicit input safety profiles through settings p
   ]);
 });
 
-test("command executor applies settings to a direct-targeted session without selector args", async () => {
+test("command executor applies typed settings to a direct-targeted session without selector args", async () => {
   const calls = [];
   const sessions = [{ id: "s1", name: "one", deckId: "default" }];
   const executor = createCommandExecutor({
@@ -1740,7 +1860,6 @@ test("command executor applies settings to a direct-targeted session without sel
     parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
     applyTerminalSizeSettings: () => {},
     setSessionFilterText: () => {},
-    parseSettingsPayload: () => ({ ok: true, payload: { tags: ["ops"] } }),
     normalizeSendTerminatorMode: () => "auto",
     setSessionSendTerminator: () => {},
     getSessionSendTerminator: () => "auto",
@@ -1755,8 +1874,8 @@ test("command executor applies settings to a direct-targeted session without sel
 
   const feedback = await executor.execute({
     command: "settings",
-    args: ["apply", "{\"tags\":[\"ops\"]}"],
-    raw: "/settings apply {\"tags\":[\"ops\"]}",
+    args: ["startup", "tags", "ops"],
+    raw: "/settings startup tags ops",
     targetSelector: "7"
   });
 
@@ -1765,6 +1884,117 @@ test("command executor applies settings to a direct-targeted session without sel
     ["patch", "s1", ["ops"]],
     ["event", "session.updated", ["ops"]]
   ]);
+});
+
+test("command executor applies typed theme, mouse forwarding, and input safety settings", async () => {
+  const calls = [];
+  const sessions = [
+    {
+      id: "s1",
+      name: "one",
+      deckId: "default",
+      activeThemeProfile: { background: "#000000", foreground: "#ffffff" },
+      inactiveThemeProfile: { background: "#111111", foreground: "#dddddd" },
+      mouseForwardingMode: "off",
+      inputSafetyProfile: {}
+    }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload]);
+        sessions[0] = { ...sessions[0], ...payload };
+        return sessions[0];
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session]),
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions, error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: { background: "#000000", foreground: "#ffffff" },
+    terminalThemePresets: [
+      {
+        id: "night",
+        name: "Night",
+        profile: { background: "#222222", foreground: "#eeeeee" }
+      }
+    ],
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => ({
+      background: profile?.background || "#000000",
+      foreground: profile?.foreground || "#ffffff"
+    }),
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  assert.equal(
+    await executor.execute({ command: "settings", args: ["theme", "preset", "active", "night"], raw: "/settings theme preset active night" }),
+    "Applied settings to [7] one: activeThemeProfile."
+  );
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["mouse-forwarding", "set", "application"],
+      raw: "/settings mouse-forwarding set application"
+    }),
+    "Applied settings to [7] one: mouseForwardingMode."
+  );
+  assert.equal(
+    await executor.execute({ command: "settings", args: ["input-safety", "set", "syntax", "on"], raw: "/settings input-safety set syntax on" }),
+    "Applied settings to [7] one: inputSafetyProfile.requireValidShellSyntax."
+  );
+  assert.deepEqual(calls[0], [
+    "patch",
+    "s1",
+    {
+      activeThemeProfile: { background: "#222222", foreground: "#eeeeee" }
+    }
+  ]);
+  assert.deepEqual(calls[2], [
+    "patch",
+    "s1",
+    {
+      mouseForwardingMode: "application"
+    }
+  ]);
+  assert.equal(calls[4][0], "patch");
+  assert.equal(calls[4][1], "s1");
+  assert.equal(calls[4][2].inputSafetyProfile.requireValidShellSyntax, true);
 });
 
 test("command executor records correlated custom-command submissions per target session", async () => {

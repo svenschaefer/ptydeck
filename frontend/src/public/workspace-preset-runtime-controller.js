@@ -330,7 +330,7 @@ function formatWorkspacePresetSummary(preset) {
   ].join(" · ");
 }
 
-function formatWorkspacePresetDetail(preset) {
+export function formatWorkspacePresetDetail(preset) {
   const normalized = normalizeWorkspacePresetRecord(preset);
   if (!normalized) {
     return "No saved workspace preset selected.";

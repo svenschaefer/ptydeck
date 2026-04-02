@@ -15,15 +15,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: `v0.4.0-H55`.
-
-### Queued Wave `v0.4.0-H55` - Slash Command Surface Parity
-
-1. `CMD-001`
-2. `CMD-002` after `CMD-001`
-3. `CMD-003` after `CMD-001`
-4. `CMD-004` after `CMD-001`, `CMD-002`, and `CMD-003`
-5. `CMD-005` after `CMD-001`, `CMD-002`, `CMD-003`, and `CMD-004`
+- Queued next wave: none currently.
 
 ## Sequencing Rules
 

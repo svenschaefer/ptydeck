@@ -74,6 +74,8 @@ export function createAppBootstrapCompositionController(options = {}) {
   const delayedSubmitMs = Number.isFinite(options.delayedSubmitMs) ? options.delayedSubmitMs : 90;
   const systemSlashCommands = Array.isArray(options.systemSlashCommands) ? options.systemSlashCommands : [];
   const terminalThemePresets = Array.isArray(options.terminalThemePresets) ? options.terminalThemePresets : [];
+  const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys : [];
+  const defaultTerminalTheme = options.defaultTerminalTheme && typeof options.defaultTerminalTheme === "object" ? options.defaultTerminalTheme : {};
   const windowRef = options.windowRef || globalThis;
   const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const wsStateRef = options.wsStateRef || { current: null };
@@ -219,6 +221,9 @@ export function createAppBootstrapCompositionController(options = {}) {
       normalizeCustomCommandPayloadForShell,
       normalizeSessionTags: sessionUiFacadeController?.normalizeSessionTags,
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,
+      themeProfileKeys,
+      defaultTerminalTheme,
+      terminalThemePresets,
       getTerminalSettings: terminalSettings,
       requestRender: () => appCommandUiFacadeController?.render(),
       listLayoutProfiles: () => layoutProfileRuntimeController?.listProfiles?.() || [],
@@ -230,10 +235,16 @@ export function createAppBootstrapCompositionController(options = {}) {
       createLayoutProfileFromCurrent: (name) => layoutProfileRuntimeController?.createProfileFromCurrentLayout?.(name) || "",
       createConnectionProfileFromSession: (sessionOrId, name, createOptions) =>
         connectionProfileRuntimeController?.createProfileFromSession?.(sessionOrId, name, createOptions) || "",
+      getConnectionProfileDraft: () => connectionProfileRuntimeController?.getDraftState?.() || null,
+      setConnectionProfileDraft: (draft) => connectionProfileRuntimeController?.setDraftState?.(draft) || null,
+      loadConnectionProfileDraftFromActive: (sessionOrId) => connectionProfileRuntimeController?.loadDraftFromActiveSession?.(sessionOrId) || null,
+      saveConnectionProfileDraft: () => connectionProfileRuntimeController?.saveDraftById?.() || "",
+      resetConnectionProfileDraft: () => connectionProfileRuntimeController?.resetDraftFlow?.() || "",
       applyLayoutProfile: (profileId) => layoutProfileRuntimeController?.applyProfileById?.(profileId) || "",
       applyConnectionProfile: (profileId) => connectionProfileRuntimeController?.applyProfileById?.(profileId) || "",
       renameLayoutProfile: (profileId, name) => layoutProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
       renameConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.renameProfileById?.(profileId, name) || "",
+      duplicateConnectionProfile: (profileId, name) => connectionProfileRuntimeController?.duplicateProfileById?.(profileId, name) || "",
       deleteLayoutProfile: (profileId) => layoutProfileRuntimeController?.deleteProfileById?.(profileId) || "",
       deleteConnectionProfile: (profileId) => connectionProfileRuntimeController?.deleteProfileById?.(profileId) || "",
       listWorkspacePresets: () => workspacePresetRuntimeController?.listPresets?.() || [],
@@ -241,6 +252,7 @@ export function createAppBootstrapCompositionController(options = {}) {
         workspacePresetRuntimeController?.resolvePreset?.(selectorText) || { preset: null, error: "Unknown workspace preset." },
       createWorkspacePresetFromCurrent: (name) => workspacePresetRuntimeController?.createPresetFromCurrentWorkspace?.(name) || "",
       applyWorkspacePreset: (presetId) => workspacePresetRuntimeController?.applyPresetById?.(presetId) || "",
+      duplicateWorkspacePreset: (presetId, name) => workspacePresetRuntimeController?.duplicatePresetById?.(presetId, name) || "",
       renameWorkspacePreset: (presetId, name) => workspacePresetRuntimeController?.renamePresetById?.(presetId, name) || "",
       deleteWorkspacePreset: (presetId) => workspacePresetRuntimeController?.deletePresetById?.(presetId) || "",
       listWorkspaceGroupsForDeck: (deckId) => workspacePresetRuntimeController?.listGroupsForDeck?.(deckId) || [],

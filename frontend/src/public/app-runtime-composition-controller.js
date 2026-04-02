@@ -1220,6 +1220,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   delayedSubmitMs: DELAYED_SUBMIT_MS,
   systemSlashCommands: SYSTEM_SLASH_COMMANDS,
   terminalThemePresets: TERMINAL_THEME_PRESETS,
+  themeProfileKeys: THEME_PROFILE_KEYS,
+  defaultTerminalTheme: DEFAULT_TERMINAL_THEME,
   commandGuardSendOnceBtn,
   commandGuardCancelBtn,
   windowRef: window,

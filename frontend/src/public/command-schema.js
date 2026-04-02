@@ -306,14 +306,23 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage saved connection profiles",
     example: "/connection apply ops-shell",
-    summary: "/connection list | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection rename <profile> <name> | /connection delete <profile>",
+    summary:
+      "/connection list | /connection new <name> | /connection save <name> | /connection show <profile> | /connection apply <profile> | /connection duplicate <profile> <name> | /connection rename <profile> <name> | /connection delete <profile> | /connection draft ...",
     usage: [
       "/connection list",
+      "/connection new <name>",
       "/connection save <name>",
       "/connection show <profile>",
       "/connection apply <profile>",
+      "/connection duplicate <profile> <name>",
       "/connection rename <profile> <name>",
-      "/connection delete <profile>"
+      "/connection delete <profile>",
+      "/connection draft show",
+      "/connection draft new [name]",
+      "/connection draft active",
+      "/connection draft set <json>",
+      "/connection draft save [name]",
+      "/connection draft reset"
     ],
     subcommands: {
       list: {
@@ -324,6 +333,15 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/connection list",
         key: "slash:connection:list",
         usage: "/connection list"
+      },
+      new: {
+        insertText: "new",
+        label: "/connection new",
+        kind: "subcommand",
+        description: "create a blank saved connection profile",
+        example: "/connection new ops-shell",
+        key: "slash:connection:new",
+        usage: "/connection new <name>"
       },
       save: {
         insertText: "save",
@@ -352,6 +370,15 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         key: "slash:connection:apply",
         usage: "/connection apply <profile>"
       },
+      duplicate: {
+        insertText: "duplicate",
+        label: "/connection duplicate",
+        kind: "subcommand",
+        description: "duplicate a saved connection profile",
+        example: "/connection duplicate ops-shell ops-shell-copy",
+        key: "slash:connection:duplicate",
+        usage: "/connection duplicate <profile> <name>"
+      },
       rename: {
         insertText: "rename",
         label: "/connection rename",
@@ -369,6 +396,78 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/connection delete ops-shell",
         key: "slash:connection:delete",
         usage: "/connection delete <profile>"
+      },
+      draft: {
+        insertText: "draft",
+        label: "/connection draft",
+        kind: "subcommand",
+        description: "inspect or edit the connection profile draft used by the Workspace Library",
+        example: "/connection draft active",
+        key: "slash:connection:draft",
+        usage: [
+          "/connection draft show",
+          "/connection draft new [name]",
+          "/connection draft active",
+          "/connection draft set <json>",
+          "/connection draft save [name]",
+          "/connection draft reset"
+        ],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/connection draft show",
+            kind: "subcommand",
+            description: "show the current connection profile draft",
+            example: "/connection draft show",
+            key: "slash:connection:draft:show",
+            usage: "/connection draft show"
+          },
+          new: {
+            insertText: "new",
+            label: "/connection draft new",
+            kind: "subcommand",
+            description: "open a blank connection profile draft",
+            example: "/connection draft new ops-shell",
+            key: "slash:connection:draft:new",
+            usage: "/connection draft new [name]"
+          },
+          active: {
+            insertText: "active",
+            label: "/connection draft active",
+            kind: "subcommand",
+            description: "load the active or direct-targeted session into the connection draft",
+            example: "/connection draft active",
+            key: "slash:connection:draft:active",
+            usage: "/connection draft active"
+          },
+          set: {
+            insertText: "set",
+            label: "/connection draft set",
+            kind: "subcommand",
+            description: "replace the connection draft with a normalized launch JSON payload",
+            example: "/connection draft set {\"kind\":\"local\",\"deckId\":\"default\"}",
+            key: "slash:connection:draft:set",
+            usage: "/connection draft set <json>"
+          },
+          save: {
+            insertText: "save",
+            label: "/connection draft save",
+            kind: "subcommand",
+            description: "save the current connection draft as a new or updated profile",
+            example: "/connection draft save ops-shell",
+            key: "slash:connection:draft:save",
+            usage: "/connection draft save [name]"
+          },
+          reset: {
+            insertText: "reset",
+            label: "/connection draft reset",
+            kind: "subcommand",
+            description: "reset the connection draft back to the selected profile or a blank draft",
+            example: "/connection draft reset",
+            key: "slash:connection:draft:reset",
+            usage: "/connection draft reset"
+          }
+        }
       }
     }
   }),
@@ -453,11 +552,29 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     insertText: "settings",
     label: "/settings",
     kind: "command",
-    description: "inspect or apply session settings",
+    description: "inspect or manage session settings",
     example: "/settings show",
+    summary:
+      "/settings show | /settings startup ... | /settings note ... | /settings theme ... | /settings input-safety ... | /settings mouse-forwarding ...",
     usage: [
       "/settings show",
-      "/settings apply <json>"
+      "/settings startup show",
+      "/settings startup cwd <path>",
+      "/settings startup command <text...>",
+      "/settings startup env <json>",
+      "/settings startup tags <tag[,tag...]>",
+      "/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>",
+      "/settings note show",
+      "/settings note set <text...>",
+      "/settings note clear",
+      "/settings theme show [active|inactive]",
+      "/settings theme preset <active|inactive> <theme>",
+      "/settings theme set <active|inactive> <key> <#rrggbb>",
+      "/settings theme reset <active|inactive>",
+      "/settings input-safety show",
+      "/settings input-safety set <field> <value>",
+      "/settings mouse-forwarding show",
+      "/settings mouse-forwarding set <off|application>"
     ],
     subcommands: {
       show: {
@@ -469,14 +586,229 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         key: "slash:settings:show",
         usage: "/settings show"
       },
-      apply: {
-        insertText: "apply",
-        label: "/settings apply",
+      startup: {
+        insertText: "startup",
+        label: "/settings startup",
         kind: "subcommand",
-        description: "apply JSON settings patch",
-        example: "/settings apply {\"startCwd\":\"~\"}",
-        key: "slash:settings:apply",
-        usage: "/settings apply <json>"
+        description: "inspect or edit startup-related session settings",
+        example: "/settings startup cwd ~/src",
+        key: "slash:settings:startup",
+        usage: [
+          "/settings startup show",
+          "/settings startup cwd <path>",
+          "/settings startup cwd clear",
+          "/settings startup command <text...>",
+          "/settings startup command clear",
+          "/settings startup env <json>",
+          "/settings startup env clear",
+          "/settings startup tags <tag[,tag...]>",
+          "/settings startup tags clear",
+          "/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>"
+        ],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/settings startup show",
+            kind: "subcommand",
+            description: "show startup-related session settings",
+            example: "/settings startup show",
+            key: "slash:settings:startup:show",
+            usage: "/settings startup show"
+          },
+          cwd: {
+            insertText: "cwd",
+            label: "/settings startup cwd",
+            kind: "subcommand",
+            description: "set or clear the persisted startup cwd",
+            example: "/settings startup cwd ~/src",
+            key: "slash:settings:startup:cwd",
+            usage: ["/settings startup cwd <path>", "/settings startup cwd clear"]
+          },
+          command: {
+            insertText: "command",
+            label: "/settings startup command",
+            kind: "subcommand",
+            description: "set or clear the persisted startup command",
+            example: "/settings startup command npm run dev",
+            key: "slash:settings:startup:command",
+            usage: ["/settings startup command <text...>", "/settings startup command clear"]
+          },
+          env: {
+            insertText: "env",
+            label: "/settings startup env",
+            kind: "subcommand",
+            description: "set or clear the persisted startup environment map",
+            example: "/settings startup env {\"NODE_ENV\":\"development\"}",
+            key: "slash:settings:startup:env",
+            usage: ["/settings startup env <json>", "/settings startup env clear"]
+          },
+          tags: {
+            insertText: "tags",
+            label: "/settings startup tags",
+            kind: "subcommand",
+            description: "set or clear the persisted startup tags",
+            example: "/settings startup tags api,dev",
+            key: "slash:settings:startup:tags",
+            usage: ["/settings startup tags <tag[,tag...]>", "/settings startup tags clear"]
+          },
+          terminator: {
+            insertText: "terminator",
+            label: "/settings startup terminator",
+            kind: "subcommand",
+            description: "set the configured command send terminator",
+            example: "/settings startup terminator lf",
+            key: "slash:settings:startup:terminator",
+            usage: "/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>"
+          }
+        }
+      },
+      note: {
+        insertText: "note",
+        label: "/settings note",
+        kind: "subcommand",
+        description: "inspect or edit the persisted session note",
+        example: "/settings note set needs review",
+        key: "slash:settings:note",
+        usage: ["/settings note show", "/settings note set <text...>", "/settings note clear"],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/settings note show",
+            kind: "subcommand",
+            description: "show the persisted session note",
+            example: "/settings note show",
+            key: "slash:settings:note:show",
+            usage: "/settings note show"
+          },
+          set: {
+            insertText: "set",
+            label: "/settings note set",
+            kind: "subcommand",
+            description: "set the persisted session note",
+            example: "/settings note set needs review",
+            key: "slash:settings:note:set",
+            usage: "/settings note set <text...>"
+          },
+          clear: {
+            insertText: "clear",
+            label: "/settings note clear",
+            kind: "subcommand",
+            description: "clear the persisted session note",
+            example: "/settings note clear",
+            key: "slash:settings:note:clear",
+            usage: "/settings note clear"
+          }
+        }
+      },
+      theme: {
+        insertText: "theme",
+        label: "/settings theme",
+        kind: "subcommand",
+        description: "inspect or edit active and inactive terminal theme slots",
+        example: "/settings theme preset active solarized-dark",
+        key: "slash:settings:theme",
+        usage: [
+          "/settings theme show [active|inactive]",
+          "/settings theme preset <active|inactive> <theme>",
+          "/settings theme set <active|inactive> <key> <#rrggbb>",
+          "/settings theme reset <active|inactive>"
+        ],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/settings theme show",
+            kind: "subcommand",
+            description: "show the active and inactive theme slots",
+            example: "/settings theme show active",
+            key: "slash:settings:theme:show",
+            usage: "/settings theme show [active|inactive]"
+          },
+          preset: {
+            insertText: "preset",
+            label: "/settings theme preset",
+            kind: "subcommand",
+            description: "apply a known theme preset to a theme slot",
+            example: "/settings theme preset active solarized-dark",
+            key: "slash:settings:theme:preset",
+            usage: "/settings theme preset <active|inactive> <theme>"
+          },
+          set: {
+            insertText: "set",
+            label: "/settings theme set",
+            kind: "subcommand",
+            description: "set one theme key on a theme slot",
+            example: "/settings theme set active background #0a0d12",
+            key: "slash:settings:theme:set",
+            usage: "/settings theme set <active|inactive> <key> <#rrggbb>"
+          },
+          reset: {
+            insertText: "reset",
+            label: "/settings theme reset",
+            kind: "subcommand",
+            description: "reset a theme slot back to the default theme",
+            example: "/settings theme reset inactive",
+            key: "slash:settings:theme:reset",
+            usage: "/settings theme reset <active|inactive>"
+          }
+        }
+      },
+      "input-safety": {
+        insertText: "input-safety",
+        label: "/settings input-safety",
+        kind: "subcommand",
+        description: "inspect or edit explicit input safety options",
+        example: "/settings input-safety set syntax on",
+        key: "slash:settings:input-safety",
+        usage: ["/settings input-safety show", "/settings input-safety set <field> <value>"],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/settings input-safety show",
+            kind: "subcommand",
+            description: "show explicit input safety settings",
+            example: "/settings input-safety show",
+            key: "slash:settings:input-safety:show",
+            usage: "/settings input-safety show"
+          },
+          set: {
+            insertText: "set",
+            label: "/settings input-safety set",
+            kind: "subcommand",
+            description: "set one explicit input safety field",
+            example: "/settings input-safety set syntax on",
+            key: "slash:settings:input-safety:set",
+            usage: "/settings input-safety set <field> <value>"
+          }
+        }
+      },
+      "mouse-forwarding": {
+        insertText: "mouse-forwarding",
+        label: "/settings mouse-forwarding",
+        kind: "subcommand",
+        description: "inspect or edit the terminal mouse forwarding mode",
+        example: "/settings mouse-forwarding set application",
+        key: "slash:settings:mouse-forwarding",
+        usage: ["/settings mouse-forwarding show", "/settings mouse-forwarding set <off|application>"],
+        subcommands: {
+          show: {
+            insertText: "show",
+            label: "/settings mouse-forwarding show",
+            kind: "subcommand",
+            description: "show the terminal mouse forwarding mode",
+            example: "/settings mouse-forwarding show",
+            key: "slash:settings:mouse-forwarding:show",
+            usage: "/settings mouse-forwarding show"
+          },
+          set: {
+            insertText: "set",
+            label: "/settings mouse-forwarding set",
+            kind: "subcommand",
+            description: "set the terminal mouse forwarding mode",
+            example: "/settings mouse-forwarding set application",
+            key: "slash:settings:mouse-forwarding:set",
+            usage: "/settings mouse-forwarding set <off|application>"
+          }
+        }
       }
     }
   }),
@@ -550,11 +882,14 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     kind: "command",
     description: "manage persisted workspace presets",
     example: "/workspace apply ops",
-    summary: "/workspace list | /workspace save <name> | /workspace apply <preset> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...",
+    summary:
+      "/workspace list | /workspace save <name> | /workspace show <preset> | /workspace apply <preset> | /workspace duplicate <preset> <name> | /workspace rename <preset> <name> | /workspace delete <preset> | /workspace group ...",
     usage: [
       "/workspace list",
       "/workspace save <name>",
+      "/workspace show <preset>",
       "/workspace apply <preset>",
+      "/workspace duplicate <preset> <name>",
       "/workspace rename <preset> <name>",
       "/workspace delete <preset>",
       "/workspace group list",
@@ -583,6 +918,15 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         key: "slash:workspace:save",
         usage: "/workspace save <name>"
       },
+      show: {
+        insertText: "show",
+        label: "/workspace show",
+        kind: "subcommand",
+        description: "show workspace preset details",
+        example: "/workspace show ops",
+        key: "slash:workspace:show",
+        usage: "/workspace show <preset>"
+      },
       apply: {
         insertText: "apply",
         label: "/workspace apply",
@@ -591,6 +935,15 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         example: "/workspace apply ops",
         key: "slash:workspace:apply",
         usage: "/workspace apply <preset>"
+      },
+      duplicate: {
+        insertText: "duplicate",
+        label: "/workspace duplicate",
+        kind: "subcommand",
+        description: "duplicate a saved workspace preset",
+        example: "/workspace duplicate ops ops-copy",
+        key: "slash:workspace:duplicate",
+        usage: "/workspace duplicate <preset> <name>"
       },
       rename: {
         insertText: "rename",
@@ -874,14 +1227,18 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "layout.rename", command: "layout", subcommand: "rename" },
   { alias: "layout.delete", command: "layout", subcommand: "delete" },
   { alias: "connection.list", command: "connection", subcommand: "list" },
+  { alias: "connection.new", command: "connection", subcommand: "new" },
   { alias: "connection.save", command: "connection", subcommand: "save" },
   { alias: "connection.show", command: "connection", subcommand: "show" },
   { alias: "connection.apply", command: "connection", subcommand: "apply" },
+  { alias: "connection.duplicate", command: "connection", subcommand: "duplicate" },
   { alias: "connection.rename", command: "connection", subcommand: "rename" },
   { alias: "connection.delete", command: "connection", subcommand: "delete" },
   { alias: "workspace.list", command: "workspace", subcommand: "list" },
   { alias: "workspace.save", command: "workspace", subcommand: "save" },
+  { alias: "workspace.show", command: "workspace", subcommand: "show" },
   { alias: "workspace.apply", command: "workspace", subcommand: "apply" },
+  { alias: "workspace.duplicate", command: "workspace", subcommand: "duplicate" },
   { alias: "workspace.rename", command: "workspace", subcommand: "rename" },
   { alias: "workspace.delete", command: "workspace", subcommand: "delete" },
   { alias: "replay.view", command: "replay", subcommand: "view" },
@@ -890,7 +1247,11 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "transfer.upload", command: "transfer", subcommand: "upload" },
   { alias: "transfer.download", command: "transfer", subcommand: "download" },
   { alias: "settings.show", command: "settings", subcommand: "show" },
-  { alias: "settings.apply", command: "settings", subcommand: "apply" },
+  { alias: "settings.startup", command: "settings", subcommand: "startup" },
+  { alias: "settings.note", command: "settings", subcommand: "note" },
+  { alias: "settings.theme", command: "settings", subcommand: "theme" },
+  { alias: "settings.input-safety", command: "settings", subcommand: "input-safety" },
+  { alias: "settings.mouse-forwarding", command: "settings", subcommand: "mouse-forwarding" },
   { alias: "broadcast.status", command: "broadcast", subcommand: "status" },
   { alias: "broadcast.off", command: "broadcast", subcommand: "off" },
   { alias: "broadcast.group", command: "broadcast", subcommand: "group" },
