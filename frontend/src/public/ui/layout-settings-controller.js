@@ -82,7 +82,9 @@ export function createLayoutSettingsController(options = {}) {
     if (sidebarToggleIcon) {
       sidebarToggleIcon.textContent = "";
       if (sidebarToggleIcon.classList) {
+        sidebarToggleIcon.classList.add("icon-tabler");
         sidebarToggleIcon.classList.add("icon-tabler-caret-left-filled");
+        sidebarToggleIcon.classList.add("icon-tabler-sm");
       }
     }
     if (sidebarLauncherBtn) {

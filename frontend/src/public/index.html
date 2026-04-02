@@ -31,7 +31,7 @@
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
-            <span id="sidebar-toggle-icon" class="icon-tabler-caret-left-filled" aria-hidden="true"></span>
+            <span id="sidebar-toggle-icon" class="icon-tabler icon-tabler-caret-left-filled icon-tabler-sm" aria-hidden="true"></span>
           </button>
         </div>
         <div id="connection-state" class="pill">connecting</div>
@@ -89,7 +89,7 @@
           title="Show control pane"
           hidden
         >
-          <span aria-hidden="true">⌘</span>
+          <span class="icon-tabler icon-tabler-terminal-2" aria-hidden="true"></span>
         </button>
         <div id="workspace-shell" class="workspace-shell">
           <section id="control-pane" class="control-pane">
@@ -168,7 +168,7 @@
             aria-label="Expand sidebar"
             title="Expand sidebar"
           >
-            <span aria-hidden="true">☰</span>
+            <span class="icon-tabler icon-tabler-menu-2" aria-hidden="true"></span>
           </button>
           <main id="terminal-grid" class="terminal-grid"></main>
           <p id="empty-state" class="empty-state">No sessions yet. Create one to start.</p>
@@ -183,7 +183,9 @@
               <button id="replay-viewer-refresh" type="button">Refresh</button>
               <button id="replay-viewer-download" type="button">Download</button>
               <button id="replay-viewer-copy" type="button">Copy</button>
-              <button id="replay-viewer-close" type="button" aria-label="Close replay viewer">x</button>
+              <button id="replay-viewer-close" type="button" aria-label="Close replay viewer">
+                <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+              </button>
             </div>
           </div>
           <p id="replay-viewer-status" class="replay-viewer-status"></p>
@@ -207,7 +209,9 @@
               <p class="command-palette-title">Command Palette</p>
               <p id="command-palette-meta" class="command-palette-meta"></p>
             </div>
-            <button id="command-palette-close" type="button" aria-label="Close command palette">x</button>
+            <button id="command-palette-close" type="button" aria-label="Close command palette">
+              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+            </button>
           </div>
           <input
             id="command-palette-input"
@@ -224,7 +228,9 @@
               <p class="workspace-manager-title">Workspace Library</p>
               <p id="workspace-manager-meta" class="workspace-manager-meta"></p>
             </div>
-            <button id="workspace-manager-close" type="button" aria-label="Close workspace library">x</button>
+            <button id="workspace-manager-close" type="button" aria-label="Close workspace library">
+              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+            </button>
           </div>
           <div class="workspace-manager-tabs" role="tablist" aria-label="Workspace library sections">
             <button
@@ -326,7 +332,7 @@
             </div>
             <div class="session-toolbar-actions">
               <button class="session-settings" type="button" aria-label="Session settings">
-                <span class="session-settings-icon icon-tabler-settings" aria-hidden="true"></span>
+                <span class="session-settings-icon icon-tabler icon-tabler-settings" aria-hidden="true"></span>
               </button>
             </div>
           </div>
@@ -342,7 +348,9 @@
             <div class="session-settings-head-actions">
               <button class="session-rename" type="button">Rename</button>
               <button class="session-close" type="button">Delete</button>
-              <button class="session-settings-dismiss" type="button" aria-label="Close settings">x</button>
+              <button class="session-settings-dismiss" type="button" aria-label="Close settings">
+                <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+              </button>
             </div>
           </div>
           <p class="session-settings-hint">Configure startup behavior, session notes, terminal theme, and session actions.</p>

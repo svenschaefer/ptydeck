@@ -32,7 +32,7 @@ export function createDeckSidebarController(options = {}) {
       return null;
     }
     const iconEl = documentRef.createElement("span");
-    iconEl.className = "icon-tabler-settings";
+    iconEl.className = "icon-tabler icon-tabler-settings";
     iconEl.setAttribute?.("aria-hidden", "true");
     return iconEl;
   }
