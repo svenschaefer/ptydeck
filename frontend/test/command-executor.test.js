@@ -858,7 +858,7 @@ test("command executor manages workspace presets through shared runtime hooks", 
   );
   assert.match(
     await executor.execute({ command: "workspace", args: ["show", "ops"], raw: "/workspace show ops" }),
-    /activeDeckId="default"/
+    /Active deck: \[default\]/
   );
   assert.equal(
     await executor.execute({ command: "workspace", args: ["apply", "ops"], raw: "/workspace apply ops" }),

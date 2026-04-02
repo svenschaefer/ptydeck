@@ -191,7 +191,7 @@ test("workspace preset runtime controller manages preset lifecycle through backe
   assert.equal(controller.listPresets().length, 1);
   assert.equal(presetSelectEl.children.length, 1);
   assert.match(summaryEl.textContent, /Ops Workspace/);
-  assert.match(detailEl.textContent, /activeDeckId="ops"/);
+  assert.match(detailEl.textContent, /Active deck: \[ops\]/);
   assert.match(groupPersistenceEl.textContent, /persist into preset/i);
 
   controller.replaceWorkspaceState({
@@ -466,7 +466,7 @@ test("workspace preset helpers normalize records and resolve ambiguous group sel
   assert.equal(normalized.workspace.controlPanePosition, "bottom");
   assert.equal(normalized.workspace.controlPaneSize, 185);
   assert.deepEqual(normalized.workspace.deckGroups.ops.groups[0].sessionIds, ["s1", "s2"]);
-  assert.match(formatWorkspacePresetDetail(normalized), /activeDeckId="ops"/);
+  assert.match(formatWorkspacePresetDetail(normalized), /Active deck: \[ops\]/);
   assert.match(resolveWorkspaceGroupToken([
     { id: "build-a", name: "Build Alpha" },
     { id: "build-b", name: "Build Beta" }

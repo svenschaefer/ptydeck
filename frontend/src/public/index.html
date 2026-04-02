@@ -54,26 +54,28 @@
           </div>
         </section>
         <section class="settings-panel">
-          <h2>Settings</h2>
+          <h2>Terminal Size</h2>
+          <p class="sidebar-panel-note">Applies the current cols and rows to the active deck and resizes every terminal in that deck.</p>
           <div class="settings-grid">
             <label for="settings-cols">Cols</label>
             <input id="settings-cols" type="number" min="20" max="400" step="1" value="80" />
             <label for="settings-rows">Rows</label>
             <input id="settings-rows" type="number" min="5" max="120" step="1" value="20" />
           </div>
-          <button id="settings-apply" type="button">Apply</button>
+          <button id="settings-apply" type="button">Apply Size</button>
         </section>
         <section class="layout-profile-panel">
           <div class="layout-profile-head">
-            <h2>Layouts</h2>
+            <h2>Saved Layouts</h2>
             <p id="layout-profile-status" class="layout-profile-status">No saved layout profiles.</p>
           </div>
+          <p class="sidebar-panel-note">Save and reapply deck-local layout snapshots, including filter, sidebar, control pane, and split layout state.</p>
           <select id="layout-profile-select" class="layout-profile-select" aria-label="Saved layout profiles"></select>
           <div class="layout-profile-actions">
-            <button id="layout-profile-save" type="button">Save</button>
-            <button id="layout-profile-apply" type="button">Apply</button>
-            <button id="layout-profile-rename" type="button">Rename</button>
-            <button id="layout-profile-delete" type="button">Delete</button>
+            <button id="layout-profile-save" type="button">Save Layout</button>
+            <button id="layout-profile-apply" type="button">Apply Layout</button>
+            <button id="layout-profile-rename" type="button">Rename Layout</button>
+            <button id="layout-profile-delete" type="button">Delete Layout</button>
           </div>
         </section>
       </aside>
@@ -255,16 +257,21 @@
               <p class="workspace-manager-section-title">Connections</p>
               <p id="connection-profile-status" class="workspace-manager-status"></p>
             </div>
+            <p class="workspace-manager-inline-note">
+              Saved connection profiles start new local or SSH sessions. Use the guided form below for normal editing; the raw launch JSON remains available only as an advanced preview.
+            </p>
             <select id="connection-profile-select" class="workspace-manager-select" aria-label="Saved connection profiles"></select>
             <div class="workspace-manager-actions">
-              <button id="connection-profile-new" type="button">New Blank</button>
-              <button id="connection-profile-save" type="button">Load Active</button>
-              <button id="connection-profile-save-draft" type="button">Save Draft</button>
-              <button id="connection-profile-reset-draft" type="button">Reset</button>
-              <button id="connection-profile-apply" type="button">Launch</button>
-              <button id="connection-profile-duplicate" type="button">Duplicate</button>
-              <button id="connection-profile-rename" type="button">Rename</button>
-              <button id="connection-profile-delete" type="button">Delete</button>
+              <button id="connection-profile-new" type="button">New Local</button>
+              <button id="connection-profile-new-ssh" type="button">New SSH</button>
+              <button id="connection-profile-save" type="button">Use Active as Template</button>
+              <button id="connection-profile-save-draft" type="button">Save Profile</button>
+              <button id="connection-profile-save-and-launch" type="button">Save and Launch</button>
+              <button id="connection-profile-reset-draft" type="button">Reset Draft</button>
+              <button id="connection-profile-apply" type="button">Launch Saved</button>
+              <button id="connection-profile-duplicate" type="button">Duplicate Saved</button>
+              <button id="connection-profile-rename" type="button">Rename Saved</button>
+              <button id="connection-profile-delete" type="button">Delete Saved</button>
             </div>
             <p id="connection-profile-summary" class="workspace-manager-summary"></p>
             <div class="workspace-manager-editor">
@@ -275,12 +282,143 @@
                 type="text"
                 placeholder="Connection profile name"
               />
-              <label class="workspace-manager-field" for="connection-profile-draft-launch">Launch JSON</label>
+              <div class="workspace-manager-form-grid">
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-kind">Connection Type</label>
+                  <select id="connection-profile-kind" class="workspace-manager-input">
+                    <option value="local">Local</option>
+                    <option value="ssh">SSH</option>
+                  </select>
+                </div>
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-deck">Launch Deck</label>
+                  <select id="connection-profile-deck" class="workspace-manager-input"></select>
+                </div>
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-shell">Shell</label>
+                  <input id="connection-profile-shell" class="workspace-manager-input" type="text" placeholder="bash or ssh" />
+                </div>
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-start-cwd">Start Directory</label>
+                  <input id="connection-profile-start-cwd" class="workspace-manager-input" type="text" placeholder="/workspace or ~" />
+                </div>
+              </div>
+              <label class="workspace-manager-field" for="connection-profile-start-command">Start Command</label>
+              <textarea
+                id="connection-profile-start-command"
+                class="workspace-manager-textarea workspace-manager-textarea-compact"
+                rows="3"
+                spellcheck="false"
+                placeholder="Optional command to run after the terminal starts"
+              ></textarea>
+              <div class="workspace-manager-form-grid">
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-active-theme">Active Theme Slot</label>
+                  <select id="connection-profile-active-theme" class="workspace-manager-input"></select>
+                </div>
+                <div class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-inactive-theme">Inactive Theme Slot</label>
+                  <select id="connection-profile-inactive-theme" class="workspace-manager-input"></select>
+                </div>
+              </div>
+              <label class="workspace-manager-field" for="connection-profile-env">Environment Variables (KEY=VALUE per line)</label>
+              <textarea
+                id="connection-profile-env"
+                class="workspace-manager-textarea workspace-manager-textarea-compact"
+                rows="5"
+                spellcheck="false"
+                placeholder="NODE_ENV=production"
+              ></textarea>
+              <label class="workspace-manager-field" for="connection-profile-tags">Tags (comma, space, or newline separated)</label>
+              <input
+                id="connection-profile-tags"
+                class="workspace-manager-input"
+                type="text"
+                placeholder="ops prod ssh"
+              />
+              <section id="connection-profile-ssh-fields" class="workspace-manager-subsection" hidden>
+                <div class="workspace-manager-section-head">
+                  <p class="workspace-manager-section-title">SSH Connection</p>
+                  <p id="connection-profile-secret-hint" class="workspace-manager-status"></p>
+                </div>
+                <div class="workspace-manager-form-grid">
+                  <div class="workspace-manager-field-block">
+                    <label class="workspace-manager-field" for="connection-profile-remote-host">Host</label>
+                    <input id="connection-profile-remote-host" class="workspace-manager-input" type="text" placeholder="example.com" />
+                  </div>
+                  <div class="workspace-manager-field-block">
+                    <label class="workspace-manager-field" for="connection-profile-remote-port">Port</label>
+                    <input id="connection-profile-remote-port" class="workspace-manager-input" type="number" min="1" max="65535" step="1" value="22" />
+                  </div>
+                  <div class="workspace-manager-field-block">
+                    <label class="workspace-manager-field" for="connection-profile-remote-username">Username</label>
+                    <input id="connection-profile-remote-username" class="workspace-manager-input" type="text" placeholder="deploy" />
+                  </div>
+                  <div class="workspace-manager-field-block">
+                    <label class="workspace-manager-field" for="connection-profile-remote-auth-method">Auth Method</label>
+                    <select id="connection-profile-remote-auth-method" class="workspace-manager-input">
+                      <option value="privateKey">Private Key</option>
+                      <option value="password">Password</option>
+                      <option value="keyboardInteractive">Keyboard-Interactive</option>
+                    </select>
+                  </div>
+                </div>
+                <label class="workspace-manager-field" for="connection-profile-remote-private-key-path">Private Key Path</label>
+                <input
+                  id="connection-profile-remote-private-key-path"
+                  class="workspace-manager-input"
+                  type="text"
+                  placeholder="~/.ssh/id_ed25519"
+                />
+                <p id="connection-profile-auth-hint" class="workspace-manager-inline-note"></p>
+                <div class="workspace-manager-subsection workspace-manager-subsection-card">
+                  <div class="workspace-manager-section-head">
+                    <p class="workspace-manager-section-title">Host Key Trust</p>
+                    <p id="connection-profile-ssh-trust-status" class="workspace-manager-status"></p>
+                  </div>
+                  <p class="workspace-manager-inline-note">
+                    ptydeck stores trusted SSH host keys separately from the saved connection profile. Trusting a host key here updates the managed known-hosts store used by the backend SSH runtime.
+                  </p>
+                  <select
+                    id="connection-profile-ssh-trust-select"
+                    class="workspace-manager-select"
+                    aria-label="Trusted host keys for this SSH target"
+                  ></select>
+                  <div class="workspace-manager-form-grid">
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-key-type">Host Key Type</label>
+                      <input
+                        id="connection-profile-ssh-trust-key-type"
+                        class="workspace-manager-input"
+                        type="text"
+                        placeholder="ssh-ed25519"
+                      />
+                    </div>
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-public-key">Host Public Key</label>
+                      <textarea
+                        id="connection-profile-ssh-trust-public-key"
+                        class="workspace-manager-textarea workspace-manager-textarea-compact"
+                        rows="3"
+                        spellcheck="false"
+                        placeholder="AAAAC3NzaC1lZDI1NTE5AAAA..."
+                      ></textarea>
+                    </div>
+                  </div>
+                  <div class="workspace-manager-actions">
+                    <button id="connection-profile-ssh-trust-refresh" type="button">Refresh Trust</button>
+                    <button id="connection-profile-ssh-trust-save" type="button">Trust Host Key</button>
+                    <button id="connection-profile-ssh-trust-delete" type="button">Delete Trusted Key</button>
+                  </div>
+                </div>
+              </section>
+              <label class="workspace-manager-field" for="connection-profile-draft-launch">Advanced Launch JSON Preview</label>
               <textarea
                 id="connection-profile-draft-launch"
                 class="workspace-manager-textarea"
-                rows="16"
+                rows="12"
                 spellcheck="false"
+                readonly
                 placeholder='{"kind":"local","deckId":"default","shell":"bash","startCwd":"/"}'
               ></textarea>
               <p id="connection-profile-draft-status" class="workspace-manager-inline-note"></p>
@@ -291,13 +429,16 @@
               <p class="workspace-manager-section-title">Workspace Presets</p>
               <p id="workspace-preset-status" class="workspace-manager-status"></p>
             </div>
+            <p class="workspace-manager-inline-note">
+              Saving a workspace preset captures the active deck, selected layout profile, control-pane state, deck groups, and split-layout assignments. Applying a preset restores that full workspace view.
+            </p>
             <select id="workspace-preset-select" class="workspace-manager-select" aria-label="Saved workspace presets"></select>
             <div class="workspace-manager-actions">
-              <button id="workspace-preset-save" type="button">Save Current</button>
-              <button id="workspace-preset-apply" type="button">Apply</button>
-              <button id="workspace-preset-duplicate" type="button">Duplicate</button>
-              <button id="workspace-preset-rename" type="button">Rename</button>
-              <button id="workspace-preset-delete" type="button">Delete</button>
+              <button id="workspace-preset-save" type="button">Save Current Workspace</button>
+              <button id="workspace-preset-apply" type="button">Apply Preset</button>
+              <button id="workspace-preset-duplicate" type="button">Duplicate Preset</button>
+              <button id="workspace-preset-rename" type="button">Rename Preset</button>
+              <button id="workspace-preset-delete" type="button">Delete Preset</button>
             </div>
             <p id="workspace-preset-summary" class="workspace-manager-summary"></p>
             <pre id="workspace-preset-detail" class="workspace-manager-detail"></pre>
@@ -306,13 +447,16 @@
                 <p class="workspace-manager-section-title">Deck Groups</p>
                 <p id="workspace-group-summary" class="workspace-manager-status"></p>
               </div>
+              <p class="workspace-manager-inline-note">
+                Deck groups are deck-local session subsets. `Save Visible as Group` captures the current visible deck sessions, `Apply Group` switches the active subset, and `Clear Active Group` returns to all sessions in the current deck.
+              </p>
               <select id="workspace-group-select" class="workspace-manager-select" aria-label="Workspace groups for active deck"></select>
               <div class="workspace-manager-actions">
-                <button id="workspace-group-save" type="button">Save Visible</button>
-                <button id="workspace-group-apply" type="button">Apply</button>
-                <button id="workspace-group-rename" type="button">Rename</button>
-                <button id="workspace-group-delete" type="button">Delete</button>
-                <button id="workspace-group-clear" type="button">Clear</button>
+                <button id="workspace-group-save" type="button">Save Visible as Group</button>
+                <button id="workspace-group-apply" type="button">Apply Group</button>
+                <button id="workspace-group-rename" type="button">Rename Group</button>
+                <button id="workspace-group-delete" type="button">Delete Group</button>
+                <button id="workspace-group-clear" type="button">Clear Active Group</button>
               </div>
               <p id="workspace-group-persistence" class="workspace-manager-inline-note"></p>
             </div>
@@ -346,14 +490,14 @@
           <div class="session-settings-head">
             <p class="session-settings-title">Session Settings</p>
             <div class="session-settings-head-actions">
-              <button class="session-rename" type="button">Rename</button>
-              <button class="session-close" type="button">Delete</button>
+              <button class="session-rename" type="button">Rename Session</button>
+              <button class="session-close" type="button">Delete Session</button>
               <button class="session-settings-dismiss" type="button" aria-label="Close settings">
                 <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
               </button>
             </div>
           </div>
-          <p class="session-settings-hint">Configure startup behavior, session notes, terminal theme, and session actions.</p>
+          <p class="session-settings-hint">Edit the startup profile, note, and theme for this session. Cancel discards draft changes; Save Settings persists the current tabbed draft.</p>
           <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">
             <button class="session-settings-tab session-settings-tab-startup" type="button">Startup</button>
             <button class="session-settings-tab session-settings-tab-note" type="button">Note</button>
@@ -502,7 +646,7 @@
             </div>
             <div class="session-settings-footer-actions">
               <button class="session-settings-cancel" type="button">Cancel</button>
-              <button class="session-settings-apply" type="button">Apply Changes</button>
+              <button class="session-settings-apply" type="button">Save Settings</button>
             </div>
           </div>
         </dialog>

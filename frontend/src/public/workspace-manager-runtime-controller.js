@@ -94,8 +94,8 @@ export function createWorkspaceManagerRuntimeController(options = {}) {
     if (metaEl) {
       metaEl.textContent =
         activeTab === "connections"
-          ? "Manage saved connection profiles outside the sidebar."
-          : "Manage saved workspace presets and deck groups outside the sidebar.";
+          ? "Create, edit, save, and launch guided local or SSH connection profiles outside the sidebar."
+          : "Save/apply full workspace presets and manage deck-local groups outside the sidebar.";
     }
   }
 

@@ -272,6 +272,7 @@ export function formatConnectionProfileReport(profile) {
 }
 
 function buildBlankConnectionProfileLaunch(options = {}) {
+  const kind = normalizeLower(options.kind) === "ssh" ? "ssh" : "local";
   const deckId = normalizeText(options.deckId) || "default";
   const themeProfile =
     cloneThemeProfile(options.themeProfile) ||
@@ -297,16 +298,167 @@ function buildBlankConnectionProfileLaunch(options = {}) {
       brightWhite: "#f5f7fa"
     };
   return normalizeConnectionProfileLaunch({
-    kind: "local",
+    kind,
     deckId,
-    shell: "bash",
-    startCwd: "/",
+    shell: kind === "ssh" ? "ssh" : "bash",
+    startCwd: kind === "ssh" ? "~" : "/",
     startCommand: "",
     env: {},
     tags: [],
     activeThemeProfile: themeProfile || {},
-    inactiveThemeProfile: themeProfile || {}
+    inactiveThemeProfile: themeProfile || {},
+    ...(kind === "ssh"
+      ? {
+          remoteConnection: {
+            host: "",
+            port: 22
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: "~/.ssh/id_ed25519"
+          }
+        }
+      : {})
   });
+}
+
+function formatStringRecord(record) {
+  return Object.entries(cloneStringRecord(record))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+}
+
+function parseStringRecord(text) {
+  const result = {};
+  for (const rawLine of String(text || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+    const key = normalizeText(line.slice(0, separatorIndex));
+    const value = line.slice(separatorIndex + 1);
+    if (!key) {
+      continue;
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+function formatTags(tags) {
+  return normalizeTagList(tags).join(", ");
+}
+
+function parseTags(text) {
+  return normalizeTagList(String(text || "").split(/[\s,]+/));
+}
+
+function normalizeThemePresetCollection(themePresets) {
+  const next = [];
+  for (const preset of Array.isArray(themePresets) ? themePresets : []) {
+    const id = normalizeText(preset?.id);
+    const name = normalizeText(preset?.name);
+    const category = normalizeLower(preset?.category) === "light" ? "light" : "dark";
+    const profile = cloneThemeProfile(preset?.profile);
+    if (!id || !name || !profile) {
+      continue;
+    }
+    next.push({ id, name, category, profile });
+  }
+  return next;
+}
+
+function themeProfilesEqual(left, right) {
+  const normalizedLeft = cloneThemeProfile(left) || {};
+  const normalizedRight = cloneThemeProfile(right) || {};
+  const leftEntries = Object.entries(normalizedLeft).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  const rightEntries = Object.entries(normalizedRight).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  return JSON.stringify(leftEntries) === JSON.stringify(rightEntries);
+}
+
+function setSelectOptions(selectEl, options, selectedValue) {
+  if (!selectEl) {
+    return;
+  }
+  clearChildren(selectEl);
+  for (const optionConfig of Array.isArray(options) ? options : []) {
+    const option = optionConfig.documentRef?.createElement?.("option") || {
+      value: "",
+      textContent: "",
+      selected: false,
+      disabled: false
+    };
+    option.value = String(optionConfig.value || "");
+    option.textContent = String(optionConfig.label || option.value);
+    option.selected = option.value === String(selectedValue || "");
+    option.disabled = optionConfig.disabled === true;
+    selectEl.appendChild(option);
+  }
+  selectEl.value = String(selectedValue || "");
+}
+
+function normalizeSshTrustEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const id = normalizeText(entry.id);
+  const host = normalizeText(entry.host);
+  const port = Number.parseInt(String(entry.port ?? ""), 10);
+  const keyType = normalizeText(entry.keyType);
+  const publicKey = normalizeText(entry.publicKey);
+  const fingerprintSha256 = normalizeText(entry.fingerprintSha256);
+  if (!id || !host || !Number.isInteger(port) || port < 1 || port > 65535 || !keyType || !publicKey || !fingerprintSha256) {
+    return null;
+  }
+  return {
+    id,
+    host,
+    port,
+    keyType,
+    publicKey,
+    fingerprintSha256,
+    createdAt: Number.isInteger(entry.createdAt) ? entry.createdAt : 0,
+    updatedAt: Number.isInteger(entry.updatedAt) ? entry.updatedAt : 0
+  };
+}
+
+function normalizeSshTrustEntryCollection(entries) {
+  const next = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const normalized = normalizeSshTrustEntry(entry);
+    if (!normalized || seen.has(normalized.id)) {
+      continue;
+    }
+    seen.add(normalized.id);
+    next.push(normalized);
+  }
+  next.sort((left, right) => {
+    const hostCompare = left.host.localeCompare(right.host, "en-US", { sensitivity: "base" });
+    if (hostCompare !== 0) {
+      return hostCompare;
+    }
+    if (left.port !== right.port) {
+      return left.port - right.port;
+    }
+    const keyTypeCompare = left.keyType.localeCompare(right.keyType, "en-US", { sensitivity: "base" });
+    if (keyTypeCompare !== 0) {
+      return keyTypeCompare;
+    }
+    return left.id.localeCompare(right.id, "en-US", { sensitivity: "base" });
+  });
+  return next;
+}
+
+function formatSshTarget(host, port, username) {
+  const normalizedHost = normalizeText(host) || "?";
+  const normalizedPort = Number.isInteger(Number(port)) ? Number(port) : 22;
+  const normalizedUsername = normalizeText(username);
+  return `${normalizedUsername ? `${normalizedUsername}@` : ""}${normalizedHost}:${normalizedPort}`;
 }
 
 export function createConnectionProfileRuntimeController(options = {}) {
@@ -315,8 +467,10 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const api = options.api || {};
   const selectEl = options.selectEl || null;
   const newBtn = options.newBtn || null;
+  const newSshBtn = options.newSshBtn || null;
   const saveBtn = options.saveBtn || null;
   const saveDraftBtn = options.saveDraftBtn || null;
+  const saveAndLaunchBtn = options.saveAndLaunchBtn || null;
   const resetDraftBtn = options.resetDraftBtn || null;
   const applyBtn = options.applyBtn || null;
   const duplicateBtn = options.duplicateBtn || null;
@@ -325,8 +479,33 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const statusEl = options.statusEl || null;
   const summaryEl = options.summaryEl || null;
   const draftNameInputEl = options.draftNameInputEl || null;
+  const draftKindSelectEl = options.draftKindSelectEl || null;
+  const draftDeckSelectEl = options.draftDeckSelectEl || null;
+  const draftShellInputEl = options.draftShellInputEl || null;
+  const draftStartCwdInputEl = options.draftStartCwdInputEl || null;
+  const draftStartCommandTextareaEl = options.draftStartCommandTextareaEl || null;
+  const draftEnvTextareaEl = options.draftEnvTextareaEl || null;
+  const draftTagsInputEl = options.draftTagsInputEl || null;
+  const draftActiveThemeSelectEl = options.draftActiveThemeSelectEl || null;
+  const draftInactiveThemeSelectEl = options.draftInactiveThemeSelectEl || null;
+  const sshFieldsEl = options.sshFieldsEl || null;
+  const draftRemoteHostInputEl = options.draftRemoteHostInputEl || null;
+  const draftRemotePortInputEl = options.draftRemotePortInputEl || null;
+  const draftRemoteUsernameInputEl = options.draftRemoteUsernameInputEl || null;
+  const draftRemoteAuthMethodSelectEl = options.draftRemoteAuthMethodSelectEl || null;
+  const draftRemotePrivateKeyPathInputEl = options.draftRemotePrivateKeyPathInputEl || null;
+  const authHintEl = options.authHintEl || null;
+  const secretHintEl = options.secretHintEl || null;
+  const sshTrustStatusEl = options.sshTrustStatusEl || null;
+  const sshTrustSelectEl = options.sshTrustSelectEl || null;
+  const sshTrustKeyTypeInputEl = options.sshTrustKeyTypeInputEl || null;
+  const sshTrustPublicKeyTextareaEl = options.sshTrustPublicKeyTextareaEl || null;
+  const sshTrustRefreshBtn = options.sshTrustRefreshBtn || null;
+  const sshTrustSaveBtn = options.sshTrustSaveBtn || null;
+  const sshTrustDeleteBtn = options.sshTrustDeleteBtn || null;
   const draftLaunchTextareaEl = options.draftLaunchTextareaEl || null;
   const draftStatusEl = options.draftStatusEl || null;
+  const getDecks = typeof options.getDecks === "function" ? options.getDecks : () => [];
   const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
   const getSessionById =
     typeof options.getSessionById === "function"
@@ -346,12 +525,26 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const normalizeThemeProfile =
     typeof options.normalizeThemeProfile === "function" ? options.normalizeThemeProfile : (value) => (value && typeof value === "object" ? value : {});
   const defaultDeckId = normalizeText(options.defaultDeckId) || "default";
+  const themePresets = normalizeThemePresetCollection(options.themePresets);
   const defaultThemeProfile =
     cloneThemeProfile(options.defaultThemeProfile) || cloneThemeProfile(normalizeThemeProfile({})) || undefined;
+  const hasGuidedDraftControls = Boolean(
+    draftKindSelectEl ||
+      draftDeckSelectEl ||
+      draftShellInputEl ||
+      draftStartCwdInputEl ||
+      draftStartCommandTextareaEl ||
+      draftEnvTextareaEl ||
+      draftTagsInputEl
+  );
 
   let profiles = [];
   let selectedProfileId = "";
   let draftState = null;
+  let sshTrustEntries = [];
+  let selectedSshTrustEntryId = "";
+  let isRenderingDraft = false;
+  let loadingSshTrustEntries = false;
 
   function setStatus(message) {
     if (statusEl) {
@@ -377,17 +570,104 @@ export function createConnectionProfileRuntimeController(options = {}) {
     }
   }
 
+  function getDefaultShellForKind(kind) {
+    return normalizeLower(kind) === "ssh" ? "ssh" : "bash";
+  }
+
+  function getDefaultStartCwdForKind(kind) {
+    return normalizeLower(kind) === "ssh" ? "~" : "/";
+  }
+
+  function cloneDraftLaunch(source = {}) {
+    const fallbackKind = normalizeLower(source.kind) === "ssh" ? "ssh" : "local";
+    const sourceLaunch = source && typeof source === "object" && !Array.isArray(source) ? source : {};
+    const normalizedLaunch = normalizeConnectionProfileLaunch(sourceLaunch) || {};
+    const kind = normalizeLower(sourceLaunch.kind || normalizedLaunch.kind || fallbackKind) === "ssh" ? "ssh" : "local";
+    const deckId = normalizeText(sourceLaunch.deckId || normalizedLaunch.deckId) || defaultDeckId;
+    const activeThemeProfile =
+      cloneThemeProfile(sourceLaunch.activeThemeProfile) ||
+      cloneThemeProfile(sourceLaunch.themeProfile) ||
+      cloneThemeProfile(normalizedLaunch.activeThemeProfile) ||
+      cloneThemeProfile(normalizedLaunch.themeProfile) ||
+      cloneThemeProfile(defaultThemeProfile) ||
+      {};
+    const inactiveThemeProfile =
+      cloneThemeProfile(sourceLaunch.inactiveThemeProfile) ||
+      cloneThemeProfile(sourceLaunch.themeProfile) ||
+      cloneThemeProfile(normalizedLaunch.inactiveThemeProfile) ||
+      cloneThemeProfile(normalizedLaunch.themeProfile) ||
+      cloneThemeProfile(defaultThemeProfile) ||
+      {};
+    const base = {
+      kind,
+      deckId,
+      shell:
+        typeof sourceLaunch.shell === "string" ? sourceLaunch.shell : normalizedLaunch.shell || getDefaultShellForKind(kind),
+      startCwd:
+        typeof sourceLaunch.startCwd === "string"
+          ? sourceLaunch.startCwd
+          : normalizedLaunch.startCwd || getDefaultStartCwdForKind(kind),
+      startCommand:
+        typeof sourceLaunch.startCommand === "string"
+          ? sourceLaunch.startCommand
+          : typeof normalizedLaunch.startCommand === "string"
+            ? normalizedLaunch.startCommand
+            : "",
+      env: cloneStringRecord(sourceLaunch.env || normalizedLaunch.env),
+      tags: normalizeTagList(sourceLaunch.tags || normalizedLaunch.tags),
+      themeProfile:
+        cloneThemeProfile(sourceLaunch.themeProfile) ||
+        cloneThemeProfile(normalizedLaunch.themeProfile) ||
+        cloneThemeProfile(activeThemeProfile) ||
+        undefined,
+      activeThemeProfile,
+      inactiveThemeProfile
+    };
+    if (kind !== "ssh") {
+      return base;
+    }
+    const rawRemoteConnection =
+      sourceLaunch.remoteConnection && typeof sourceLaunch.remoteConnection === "object" && !Array.isArray(sourceLaunch.remoteConnection)
+        ? sourceLaunch.remoteConnection
+        : normalizedLaunch.remoteConnection || {};
+    const rawRemoteAuth =
+      sourceLaunch.remoteAuth && typeof sourceLaunch.remoteAuth === "object" && !Array.isArray(sourceLaunch.remoteAuth)
+        ? sourceLaunch.remoteAuth
+        : normalizedLaunch.remoteAuth || {};
+    const port = Number.parseInt(String(rawRemoteConnection.port ?? normalizedLaunch.remoteConnection?.port ?? 22), 10);
+    const method = normalizeText(rawRemoteAuth.method || normalizedLaunch.remoteAuth?.method) || "privateKey";
+    return {
+      ...base,
+      remoteConnection: {
+        host: normalizeText(rawRemoteConnection.host || normalizedLaunch.remoteConnection?.host),
+        port: Number.isInteger(port) && port >= 1 && port <= 65535 ? port : 22,
+        username: normalizeText(rawRemoteConnection.username || normalizedLaunch.remoteConnection?.username)
+      },
+      remoteAuth: {
+        method: ["password", "privateKey", "keyboardInteractive"].includes(method) ? method : "privateKey",
+        privateKeyPath:
+          typeof rawRemoteAuth.privateKeyPath === "string"
+            ? rawRemoteAuth.privateKeyPath
+            : typeof normalizedLaunch.remoteAuth?.privateKeyPath === "string"
+              ? normalizedLaunch.remoteAuth.privateKeyPath
+              : "~/.ssh/id_ed25519"
+      }
+    };
+  }
+
   function createDraftState(source = {}) {
+    const nextKind = normalizeLower(source.kind || source.launch?.kind) === "ssh" ? "ssh" : "local";
     const fallbackLaunch =
       buildBlankConnectionProfileLaunch({
-        deckId: normalizeText(source.deckId) || defaultDeckId,
-        defaultThemeProfile
+        deckId: normalizeText(source.deckId || source.launch?.deckId) || defaultDeckId,
+        defaultThemeProfile,
+        kind: nextKind
       }) || {};
     return {
       mode: normalizeText(source.mode) || "blank",
       profileId: normalizeText(source.profileId),
       name: normalizeText(source.name),
-      launch: normalizeConnectionProfileLaunch(source.launch) || fallbackLaunch
+      launch: cloneDraftLaunch(source.launch || fallbackLaunch)
     };
   }
 
@@ -402,26 +682,386 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (draftState.mode === "session") {
       return "Loaded the active session into a new unsaved draft.";
     }
-    return "Editing a new unsaved connection profile.";
+    const kindLabel = normalizeLower(draftState.launch?.kind) === "ssh" ? "SSH" : "local";
+    return `Editing a new unsaved ${kindLabel} connection profile.`;
+  }
+
+  function getDeckOptionsForDraft() {
+    const next = [];
+    const seen = new Set();
+    const currentDeckId = normalizeText(draftState?.launch?.deckId) || defaultDeckId;
+    const pushDeck = (deckId, name) => {
+      const normalizedDeckId = normalizeText(deckId);
+      if (!normalizedDeckId || seen.has(normalizedDeckId)) {
+        return;
+      }
+      seen.add(normalizedDeckId);
+      next.push({
+        value: normalizedDeckId,
+        label: name ? `[${normalizedDeckId}] ${name}` : normalizedDeckId,
+        documentRef
+      });
+    };
+    for (const deck of getDecks()) {
+      pushDeck(deck?.id, normalizeText(deck?.name));
+    }
+    pushDeck(defaultDeckId, defaultDeckId === "default" ? "Default" : "");
+    pushDeck(currentDeckId, "");
+    return next;
+  }
+
+  function getThemePresetSelectOptions(selectedValue) {
+    const options = themePresets.map((preset) => ({
+      value: preset.id,
+      label: `${preset.name} (${preset.category})`,
+      documentRef
+    }));
+    options.push({
+      value: "__custom__",
+      label: "Custom / keep current colors",
+      documentRef
+    });
+    if (!options.some((option) => option.value === selectedValue)) {
+      options.push({
+        value: selectedValue || "__custom__",
+        label: "Custom / keep current colors",
+        documentRef
+      });
+    }
+    return options;
+  }
+
+  function resolveThemePresetSelectionId(profile) {
+    for (const preset of themePresets) {
+      if (themeProfilesEqual(preset.profile, profile)) {
+        return preset.id;
+      }
+    }
+    return "__custom__";
+  }
+
+  function resolveThemeProfileFromSelection(selectionId, fallbackProfile) {
+    const normalizedSelectionId = normalizeText(selectionId);
+    if (!normalizedSelectionId || normalizedSelectionId === "__custom__") {
+      return cloneThemeProfile(fallbackProfile) || cloneThemeProfile(defaultThemeProfile) || {};
+    }
+    const preset = themePresets.find((entry) => entry.id === normalizedSelectionId);
+    return cloneThemeProfile(preset?.profile) || cloneThemeProfile(fallbackProfile) || cloneThemeProfile(defaultThemeProfile) || {};
+  }
+
+  function getDraftLaunchFromInputs() {
+    if (!hasGuidedDraftControls && typeof draftLaunchTextareaEl?.value === "string") {
+      try {
+        const parsed = JSON.parse(draftLaunchTextareaEl.value || "{}");
+        return cloneDraftLaunch(parsed);
+      } catch {
+        return cloneDraftLaunch(draftState?.launch);
+      }
+    }
+    const currentLaunch = cloneDraftLaunch(draftState?.launch);
+    const kind = normalizeLower(draftKindSelectEl?.value || currentLaunch.kind) === "ssh" ? "ssh" : "local";
+    const shellRaw = typeof draftShellInputEl?.value === "string" ? draftShellInputEl.value : currentLaunch.shell;
+    const startCwdRaw =
+      typeof draftStartCwdInputEl?.value === "string" ? draftStartCwdInputEl.value : currentLaunch.startCwd;
+    const startCommandRaw =
+      typeof draftStartCommandTextareaEl?.value === "string"
+        ? draftStartCommandTextareaEl.value
+        : currentLaunch.startCommand || "";
+    const draftLaunch = {
+      kind,
+      deckId: normalizeText(draftDeckSelectEl?.value || currentLaunch.deckId) || defaultDeckId,
+      shell: typeof shellRaw === "string" ? shellRaw : getDefaultShellForKind(kind),
+      startCwd: typeof startCwdRaw === "string" ? startCwdRaw : getDefaultStartCwdForKind(kind),
+      startCommand: typeof startCommandRaw === "string" ? startCommandRaw : "",
+      env: parseStringRecord(draftEnvTextareaEl?.value),
+      tags: parseTags(draftTagsInputEl?.value),
+      themeProfile: resolveThemeProfileFromSelection(
+        draftActiveThemeSelectEl?.value,
+        currentLaunch.themeProfile || currentLaunch.activeThemeProfile
+      ),
+      activeThemeProfile: resolveThemeProfileFromSelection(
+        draftActiveThemeSelectEl?.value,
+        currentLaunch.activeThemeProfile
+      ),
+      inactiveThemeProfile: resolveThemeProfileFromSelection(
+        draftInactiveThemeSelectEl?.value,
+        currentLaunch.inactiveThemeProfile
+      )
+    };
+    if (kind === "ssh") {
+      const portRaw = normalizeText(draftRemotePortInputEl?.value);
+      const parsedPort = Number.parseInt(portRaw || "22", 10);
+      const method = normalizeText(draftRemoteAuthMethodSelectEl?.value || currentLaunch.remoteAuth?.method) || "privateKey";
+      draftLaunch.remoteConnection = {
+        host: normalizeText(draftRemoteHostInputEl?.value || currentLaunch.remoteConnection?.host),
+        port: Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 22,
+        username: normalizeText(draftRemoteUsernameInputEl?.value || currentLaunch.remoteConnection?.username)
+      };
+      draftLaunch.remoteAuth = {
+        method: ["password", "privateKey", "keyboardInteractive"].includes(method) ? method : "privateKey",
+        privateKeyPath:
+          typeof draftRemotePrivateKeyPathInputEl?.value === "string"
+            ? draftRemotePrivateKeyPathInputEl.value
+            : currentLaunch.remoteAuth?.privateKeyPath || ""
+      };
+    }
+    return draftLaunch;
+  }
+
+  function buildPersistedDraftLaunch() {
+    const currentLaunch = getDraftLaunchFromInputs();
+    const kind = normalizeLower(currentLaunch.kind) === "ssh" ? "ssh" : "local";
+    const shell = normalizeText(currentLaunch.shell);
+    const startCwd = normalizeText(currentLaunch.startCwd);
+    if (!shell) {
+      throw new Error("Shell is required.");
+    }
+    if (!startCwd) {
+      throw new Error("Start directory is required.");
+    }
+    const payload = {
+      kind,
+      deckId: normalizeText(currentLaunch.deckId) || defaultDeckId,
+      shell,
+      startCwd,
+      startCommand: typeof currentLaunch.startCommand === "string" ? currentLaunch.startCommand : "",
+      env: cloneStringRecord(currentLaunch.env),
+      tags: normalizeTagList(currentLaunch.tags),
+      ...(cloneThemeProfile(currentLaunch.themeProfile) ? { themeProfile: cloneThemeProfile(currentLaunch.themeProfile) } : {}),
+      activeThemeProfile: cloneThemeProfile(currentLaunch.activeThemeProfile) || cloneThemeProfile(defaultThemeProfile) || {},
+      inactiveThemeProfile:
+        cloneThemeProfile(currentLaunch.inactiveThemeProfile) || cloneThemeProfile(defaultThemeProfile) || {}
+    };
+    if (kind === "ssh") {
+      const host = normalizeText(currentLaunch.remoteConnection?.host);
+      const port = Number.parseInt(String(currentLaunch.remoteConnection?.port ?? 22), 10);
+      const username = normalizeText(currentLaunch.remoteConnection?.username);
+      const method = normalizeText(currentLaunch.remoteAuth?.method) || "privateKey";
+      const privateKeyPath = normalizeText(currentLaunch.remoteAuth?.privateKeyPath);
+      if (!host) {
+        throw new Error("SSH host is required.");
+      }
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error("SSH port must be an integer between 1 and 65535.");
+      }
+      if (!["password", "privateKey", "keyboardInteractive"].includes(method)) {
+        throw new Error("SSH auth method must be password, privateKey, or keyboardInteractive.");
+      }
+      payload.remoteConnection = {
+        host,
+        port,
+        ...(username ? { username } : {})
+      };
+      payload.remoteAuth = {
+        method,
+        ...(method === "privateKey" && privateKeyPath ? { privateKeyPath } : {})
+      };
+    }
+    const normalized = normalizeConnectionProfileLaunch(payload);
+    if (!normalized) {
+      throw new Error("Connection profile draft is incomplete.");
+    }
+    return normalized;
+  }
+
+  function getSshAuthHint(launch) {
+    if (normalizeLower(launch?.kind) !== "ssh") {
+      return "";
+    }
+    const method = normalizeLower(launch?.remoteAuth?.method);
+    if (method === "password") {
+      return "Password auth stores only the method. The password is requested each time you launch the saved profile.";
+    }
+    if (method === "keyboardinteractive") {
+      return "Keyboard-interactive auth stores only the method. The challenge secret is requested each time you launch the saved profile.";
+    }
+    return "Private-key auth stores only the optional key path. No SSH secret is stored in the saved profile.";
+  }
+
+  function getSshSecretHint(launch) {
+    if (normalizeLower(launch?.kind) !== "ssh") {
+      return "";
+    }
+    return authMethodRequiresSecret(launch?.remoteAuth)
+      ? "Launching this SSH profile will prompt for a runtime secret."
+      : "Launching this SSH profile will use key-based auth without prompting for a runtime secret.";
+  }
+
+  function getCurrentSshTrustTarget() {
+    const draftLaunch = getDraftLaunchFromInputs();
+    if (normalizeLower(draftLaunch.kind) !== "ssh") {
+      return null;
+    }
+    const host = normalizeText(draftLaunch.remoteConnection?.host);
+    const port = Number.parseInt(String(draftLaunch.remoteConnection?.port ?? 22), 10);
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      return null;
+    }
+    return { host, port };
+  }
+
+  function getTrustEntriesForCurrentTarget() {
+    const target = getCurrentSshTrustTarget();
+    if (!target) {
+      return [];
+    }
+    return sshTrustEntries.filter((entry) => entry.host === target.host && entry.port === target.port);
+  }
+
+  function syncDraftStateFromInputs() {
+    if (!draftState || isRenderingDraft) {
+      return;
+    }
+    draftState = {
+      ...draftState,
+      name: normalizeText(draftNameInputEl?.value || draftState.name),
+      launch: getDraftLaunchFromInputs()
+    };
+    renderDraftComputedState();
+  }
+
+  function renderDraftComputedState() {
+    if (!draftState) {
+      return;
+    }
+    const selectedProfile = getSelectedProfile();
+    if (summaryEl) {
+      summaryEl.textContent = selectedProfile
+        ? formatConnectionProfileSummary(selectedProfile)
+        : "No saved connection profile selected. You can still save and launch the draft below.";
+    }
+    const currentLaunch = cloneDraftLaunch(draftState.launch);
+    const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
+    if (sshFieldsEl) {
+      sshFieldsEl.hidden = !isSsh;
+    }
+    if (authHintEl) {
+      authHintEl.textContent = getSshAuthHint(currentLaunch);
+    }
+    if (secretHintEl) {
+      secretHintEl.textContent = getSshSecretHint(currentLaunch);
+    }
+    if (draftLaunchTextareaEl) {
+      draftLaunchTextareaEl.readOnly = true;
+      draftLaunchTextareaEl.value = JSON.stringify(currentLaunch, null, 2);
+    }
+    setDraftStatus(getDraftModeMessage());
+
+    const matchingTrustEntries = getTrustEntriesForCurrentTarget();
+    const trustOptions = matchingTrustEntries.length
+      ? matchingTrustEntries.map((entry) => ({
+          value: entry.id,
+          label: `${entry.keyType} · ${entry.fingerprintSha256}`,
+          documentRef
+        }))
+      : [
+          {
+            value: "",
+            label: isSsh ? "No trusted keys for this SSH target" : "Switch to SSH to manage trust entries",
+            disabled: true,
+            documentRef
+          }
+        ];
+    const hasSelectedTrustEntry = matchingTrustEntries.some((entry) => entry.id === selectedSshTrustEntryId);
+    if (!hasSelectedTrustEntry) {
+      selectedSshTrustEntryId = matchingTrustEntries[0]?.id || "";
+    }
+    setSelectOptions(sshTrustSelectEl, trustOptions, selectedSshTrustEntryId || trustOptions[0]?.value || "");
+    if (sshTrustStatusEl) {
+      const target = getCurrentSshTrustTarget();
+      sshTrustStatusEl.textContent = target
+        ? `${matchingTrustEntries.length} trusted key(s) for ${formatSshTarget(target.host, target.port)}`
+        : isSsh
+          ? "Enter an SSH host to manage trusted host keys."
+          : "SSH trust entries are only used for SSH profiles.";
+    }
+    if (sshTrustRefreshBtn) {
+      sshTrustRefreshBtn.disabled = typeof api.listSshTrustEntries !== "function" || !isSsh || loadingSshTrustEntries;
+    }
+    if (sshTrustSaveBtn) {
+      sshTrustSaveBtn.disabled =
+        typeof api.createSshTrustEntry !== "function" ||
+        !isSsh ||
+        !normalizeText(draftRemoteHostInputEl?.value) ||
+        !normalizeText(sshTrustKeyTypeInputEl?.value) ||
+        !normalizeText(sshTrustPublicKeyTextareaEl?.value);
+    }
+    if (sshTrustDeleteBtn) {
+      sshTrustDeleteBtn.disabled = typeof api.deleteSshTrustEntry !== "function" || !selectedSshTrustEntryId;
+    }
   }
 
   function renderDraft() {
     if (!draftState) {
       return;
     }
+    const currentLaunch = cloneDraftLaunch(draftState.launch);
+    isRenderingDraft = true;
     if (draftNameInputEl) {
       draftNameInputEl.value = draftState.name;
     }
-    if (draftLaunchTextareaEl) {
-      draftLaunchTextareaEl.value = JSON.stringify(draftState.launch || {}, null, 2);
+    setSelectOptions(
+      draftKindSelectEl,
+      [
+        { value: "local", label: "Local", documentRef },
+        { value: "ssh", label: "SSH", documentRef }
+      ],
+      currentLaunch.kind
+    );
+    setSelectOptions(draftDeckSelectEl, getDeckOptionsForDraft(), currentLaunch.deckId);
+    if (draftShellInputEl) {
+      draftShellInputEl.value = currentLaunch.shell;
     }
-    if (summaryEl) {
-      const selectedProfile = getSelectedProfile();
-      summaryEl.textContent = selectedProfile
-        ? formatConnectionProfileSummary(selectedProfile)
-        : "No saved connection profile selected. The draft below can still be saved as a new profile.";
+    if (draftStartCwdInputEl) {
+      draftStartCwdInputEl.value = currentLaunch.startCwd;
     }
-    setDraftStatus(getDraftModeMessage());
+    if (draftStartCommandTextareaEl) {
+      draftStartCommandTextareaEl.value = currentLaunch.startCommand || "";
+    }
+    if (draftEnvTextareaEl) {
+      draftEnvTextareaEl.value = formatStringRecord(currentLaunch.env);
+    }
+    if (draftTagsInputEl) {
+      draftTagsInputEl.value = formatTags(currentLaunch.tags);
+    }
+    const activeThemeSelection = resolveThemePresetSelectionId(currentLaunch.activeThemeProfile);
+    const inactiveThemeSelection = resolveThemePresetSelectionId(currentLaunch.inactiveThemeProfile);
+    setSelectOptions(
+      draftActiveThemeSelectEl,
+      getThemePresetSelectOptions(activeThemeSelection),
+      activeThemeSelection
+    );
+    setSelectOptions(
+      draftInactiveThemeSelectEl,
+      getThemePresetSelectOptions(inactiveThemeSelection),
+      inactiveThemeSelection
+    );
+    if (draftRemoteHostInputEl) {
+      draftRemoteHostInputEl.value = currentLaunch.remoteConnection?.host || "";
+    }
+    if (draftRemotePortInputEl) {
+      draftRemotePortInputEl.value = String(currentLaunch.remoteConnection?.port || 22);
+    }
+    if (draftRemoteUsernameInputEl) {
+      draftRemoteUsernameInputEl.value = currentLaunch.remoteConnection?.username || "";
+    }
+    setSelectOptions(
+      draftRemoteAuthMethodSelectEl,
+      [
+        { value: "privateKey", label: "Private Key", documentRef },
+        { value: "password", label: "Password", documentRef },
+        { value: "keyboardInteractive", label: "Keyboard-Interactive", documentRef }
+      ],
+      currentLaunch.remoteAuth?.method || "privateKey"
+    );
+    if (draftRemotePrivateKeyPathInputEl) {
+      draftRemotePrivateKeyPathInputEl.value = currentLaunch.remoteAuth?.privateKeyPath || "";
+    }
+    isRenderingDraft = false;
+    renderDraftComputedState();
+    if (normalizeLower(currentLaunch.kind) === "ssh") {
+      refreshSshTrustEntries({ silent: true }).catch(() => {});
+    }
   }
 
   function setDraftState(nextDraft) {
@@ -443,11 +1083,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     const activeSession = getSessionById(getActiveSessionId());
     return setDraftState({
       mode: "blank",
-      name: "New Connection",
+      name: "New Local Connection",
       deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
       launch: buildBlankConnectionProfileLaunch({
         deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-        defaultThemeProfile
+        defaultThemeProfile,
+        kind: "local"
       })
     });
   }
@@ -472,21 +1113,31 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
   }
 
-  function parseDraftLaunch() {
-    const raw = typeof draftLaunchTextareaEl?.value === "string" ? draftLaunchTextareaEl.value : "";
-    let parsed;
+  async function refreshSshTrustEntries(options = {}) {
+    if (typeof api.listSshTrustEntries !== "function") {
+      sshTrustEntries = [];
+      renderDraftComputedState();
+      return [];
+    }
+    if (loadingSshTrustEntries) {
+      return sshTrustEntries.slice();
+    }
+    loadingSshTrustEntries = true;
+    renderDraftComputedState();
     try {
-      parsed = JSON.parse(raw || "{}");
+      const payload = await api.listSshTrustEntries();
+      sshTrustEntries = normalizeSshTrustEntryCollection(payload);
+      renderDraftComputedState();
+      return sshTrustEntries.slice();
     } catch (error) {
-      throw new Error(`Connection profile launch JSON is invalid: ${error instanceof Error ? error.message : String(error)}`);
+      if (options.silent !== true) {
+        throw error;
+      }
+      return sshTrustEntries.slice();
+    } finally {
+      loadingSshTrustEntries = false;
+      renderDraftComputedState();
     }
-    const launch = normalizeConnectionProfileLaunch(parsed);
-    if (!launch) {
-      throw new Error(
-        "Connection profile launch JSON is incomplete. Required fields: shell, startCwd, activeThemeProfile, inactiveThemeProfile."
-      );
-    }
-    return launch;
   }
 
   function syncSelection() {
@@ -695,7 +1346,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!name) {
       throw new Error("Connection profile name is required.");
     }
-    const launch = parseDraftLaunch();
+    const launch = buildPersistedDraftLaunch();
     const existingProfileId = normalizeText(draftState?.profileId);
     if (existingProfileId && getProfile(existingProfileId)) {
       const updated = await api.updateConnectionProfile(existingProfileId, { name, launch });
@@ -719,6 +1370,21 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return `Saved connection profile [${profile.id}] ${profile.name}.`;
   }
 
+  async function saveAndLaunchDraftFlow() {
+    const feedback = await saveDraftById();
+    const profile = getSelectedProfile();
+    if (!profile) {
+      setCommandFeedback(feedback);
+      setStatus(feedback);
+      return feedback;
+    }
+    const launchFeedback = await applyProfileById(profile.id);
+    const combinedFeedback = `${feedback}\n${launchFeedback}`;
+    setCommandFeedback(combinedFeedback);
+    setStatus(launchFeedback);
+    return combinedFeedback;
+  }
+
   async function loadProfiles() {
     if (typeof api.listConnectionProfiles !== "function") {
       replaceProfiles([]);
@@ -727,6 +1393,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     try {
       const payload = await api.listConnectionProfiles();
       replaceProfiles(payload || []);
+      await refreshSshTrustEntries({ silent: true });
       return profiles.slice();
     } catch (error) {
       setError(getErrorMessage(error, "Failed to load connection profiles."));
@@ -752,19 +1419,24 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return feedback;
   }
 
-  async function newDraftFlow() {
+  async function newDraftFlow(kind = "local") {
     const activeSession = getSessionById(getActiveSessionId());
+    const normalizedKind = normalizeLower(kind) === "ssh" ? "ssh" : "local";
     setDraftState({
       mode: "blank",
       profileId: "",
-      name: "New Connection",
+      name: normalizedKind === "ssh" ? "New SSH Connection" : "New Local Connection",
       deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
       launch: buildBlankConnectionProfileLaunch({
         deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-        defaultThemeProfile
+        defaultThemeProfile,
+        kind: normalizedKind
       })
     });
-    const feedback = "Opened a new connection profile draft.";
+    const feedback =
+      normalizedKind === "ssh"
+        ? "Opened a new guided SSH connection profile draft."
+        : "Opened a new guided local connection profile draft.";
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -780,6 +1452,50 @@ export function createConnectionProfileRuntimeController(options = {}) {
 
   async function saveDraftFlow() {
     const feedback = await saveDraftById();
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function saveTrustEntryFlow() {
+    const target = getCurrentSshTrustTarget();
+    if (!target) {
+      throw new Error("Enter an SSH host and port before trusting a host key.");
+    }
+    if (typeof api.createSshTrustEntry !== "function") {
+      throw new Error("SSH trust entry management is not available.");
+    }
+    const created = await api.createSshTrustEntry({
+      host: target.host,
+      port: target.port,
+      keyType: normalizeText(sshTrustKeyTypeInputEl?.value),
+      publicKey: normalizeText(sshTrustPublicKeyTextareaEl?.value)
+    });
+    const normalizedCreated = normalizeSshTrustEntry(created);
+    await refreshSshTrustEntries({ silent: true });
+    selectedSshTrustEntryId = normalizedCreated?.id || selectedSshTrustEntryId;
+    renderDraftComputedState();
+    const feedback = normalizedCreated
+      ? `Trusted SSH host key for ${formatSshTarget(target.host, target.port)} (${normalizedCreated.keyType} · ${normalizedCreated.fingerprintSha256}).`
+      : `Trusted SSH host key for ${formatSshTarget(target.host, target.port)}.`;
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function deleteTrustEntryFlow() {
+    if (!selectedSshTrustEntryId) {
+      throw new Error("Select a trusted SSH host key to delete.");
+    }
+    if (typeof api.deleteSshTrustEntry !== "function") {
+      throw new Error("SSH trust entry management is not available.");
+    }
+    const entry = sshTrustEntries.find((candidate) => candidate.id === selectedSshTrustEntryId) || null;
+    await api.deleteSshTrustEntry(selectedSshTrustEntryId);
+    await refreshSshTrustEntries({ silent: true });
+    const feedback = entry
+      ? `Deleted trusted SSH host key for ${formatSshTarget(entry.host, entry.port)} (${entry.keyType}).`
+      : "Deleted trusted SSH host key.";
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -856,14 +1572,27 @@ export function createConnectionProfileRuntimeController(options = {}) {
       syncSelection();
       resetDraftFromSelectedProfile();
     });
+    const bindDraftSync = (element, eventName = "input") => {
+      element?.addEventListener?.(eventName, () => {
+        syncDraftStateFromInputs();
+      });
+    };
     newBtn?.addEventListener?.("click", () => {
-      newDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to open a new connection profile draft.")));
+      newDraftFlow("local").catch((error) => setError(getErrorMessage(error, "Failed to open a new local connection profile draft.")));
+    });
+    newSshBtn?.addEventListener?.("click", () => {
+      newDraftFlow("ssh").catch((error) => setError(getErrorMessage(error, "Failed to open a new SSH connection profile draft.")));
     });
     saveBtn?.addEventListener?.("click", () => {
       loadActiveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to load the active session into a connection profile draft.")));
     });
     saveDraftBtn?.addEventListener?.("click", () => {
       saveDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to save the connection profile draft.")));
+    });
+    saveAndLaunchBtn?.addEventListener?.("click", () => {
+      saveAndLaunchDraftFlow().catch((error) =>
+        setError(getErrorMessage(error, "Failed to save and launch the connection profile draft."))
+      );
     });
     resetDraftBtn?.addEventListener?.("click", () => {
       resetDraftFlow().catch((error) => setError(getErrorMessage(error, "Failed to reset the connection profile draft.")));
@@ -880,6 +1609,36 @@ export function createConnectionProfileRuntimeController(options = {}) {
     deleteBtn?.addEventListener?.("click", () => {
       deleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete connection profile.")));
     });
+    sshTrustRefreshBtn?.addEventListener?.("click", () => {
+      refreshSshTrustEntries().catch((error) => setError(getErrorMessage(error, "Failed to load SSH trust entries.")));
+    });
+    sshTrustSaveBtn?.addEventListener?.("click", () => {
+      saveTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to trust SSH host key.")));
+    });
+    sshTrustDeleteBtn?.addEventListener?.("click", () => {
+      deleteTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete SSH trust entry.")));
+    });
+    sshTrustSelectEl?.addEventListener?.("change", () => {
+      selectedSshTrustEntryId = normalizeText(sshTrustSelectEl.value);
+      renderDraftComputedState();
+    });
+    bindDraftSync(draftNameInputEl);
+    bindDraftSync(draftKindSelectEl, "change");
+    bindDraftSync(draftDeckSelectEl, "change");
+    bindDraftSync(draftShellInputEl);
+    bindDraftSync(draftStartCwdInputEl);
+    bindDraftSync(draftStartCommandTextareaEl);
+    bindDraftSync(draftEnvTextareaEl);
+    bindDraftSync(draftTagsInputEl);
+    bindDraftSync(draftActiveThemeSelectEl, "change");
+    bindDraftSync(draftInactiveThemeSelectEl, "change");
+    bindDraftSync(draftRemoteHostInputEl);
+    bindDraftSync(draftRemotePortInputEl);
+    bindDraftSync(draftRemoteUsernameInputEl);
+    bindDraftSync(draftRemoteAuthMethodSelectEl, "change");
+    bindDraftSync(draftRemotePrivateKeyPathInputEl);
+    bindDraftSync(sshTrustKeyTypeInputEl);
+    bindDraftSync(sshTrustPublicKeyTextareaEl);
   }
 
   render();
@@ -908,11 +1667,15 @@ export function createConnectionProfileRuntimeController(options = {}) {
     newDraftFlow,
     loadActiveDraftFlow,
     saveDraftFlow,
+    saveAndLaunchDraftFlow,
     resetDraftFlow,
     applySelectedProfileFlow,
     duplicateSelectedProfileFlow,
     renameSelectedProfileFlow,
     deleteSelectedProfileFlow,
+    refreshSshTrustEntries,
+    saveTrustEntryFlow,
+    deleteTrustEntryFlow,
     bindUiEvents,
     render
   };

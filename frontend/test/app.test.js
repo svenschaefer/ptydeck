@@ -630,8 +630,10 @@ function createDocumentFixture() {
   workspaceManagerPanelWorkspace.hidden = true;
   const connectionProfileSelect = new FakeElement({ id: "connection-profile-select", tagName: "select" });
   const connectionProfileNew = new FakeElement({ id: "connection-profile-new", tagName: "button" });
+  const connectionProfileNewSsh = new FakeElement({ id: "connection-profile-new-ssh", tagName: "button" });
   const connectionProfileSave = new FakeElement({ id: "connection-profile-save", tagName: "button" });
   const connectionProfileSaveDraft = new FakeElement({ id: "connection-profile-save-draft", tagName: "button" });
+  const connectionProfileSaveAndLaunch = new FakeElement({ id: "connection-profile-save-and-launch", tagName: "button" });
   const connectionProfileResetDraft = new FakeElement({ id: "connection-profile-reset-draft", tagName: "button" });
   const connectionProfileApply = new FakeElement({ id: "connection-profile-apply", tagName: "button" });
   const connectionProfileDuplicate = new FakeElement({ id: "connection-profile-duplicate", tagName: "button" });
@@ -640,6 +642,33 @@ function createDocumentFixture() {
   const connectionProfileStatus = new FakeElement({ id: "connection-profile-status", tagName: "p" });
   const connectionProfileSummary = new FakeElement({ id: "connection-profile-summary", tagName: "p" });
   const connectionProfileDraftName = new FakeElement({ id: "connection-profile-draft-name", tagName: "input" });
+  const connectionProfileKind = new FakeElement({ id: "connection-profile-kind", tagName: "select" });
+  const connectionProfileDeck = new FakeElement({ id: "connection-profile-deck", tagName: "select" });
+  const connectionProfileShell = new FakeElement({ id: "connection-profile-shell", tagName: "input" });
+  const connectionProfileStartCwd = new FakeElement({ id: "connection-profile-start-cwd", tagName: "input" });
+  const connectionProfileStartCommand = new FakeElement({ id: "connection-profile-start-command", tagName: "textarea" });
+  const connectionProfileEnv = new FakeElement({ id: "connection-profile-env", tagName: "textarea" });
+  const connectionProfileTags = new FakeElement({ id: "connection-profile-tags", tagName: "input" });
+  const connectionProfileActiveTheme = new FakeElement({ id: "connection-profile-active-theme", tagName: "select" });
+  const connectionProfileInactiveTheme = new FakeElement({ id: "connection-profile-inactive-theme", tagName: "select" });
+  const connectionProfileSshFields = new FakeElement({ id: "connection-profile-ssh-fields", tagName: "section" });
+  const connectionProfileRemoteHost = new FakeElement({ id: "connection-profile-remote-host", tagName: "input" });
+  const connectionProfileRemotePort = new FakeElement({ id: "connection-profile-remote-port", tagName: "input" });
+  const connectionProfileRemoteUsername = new FakeElement({ id: "connection-profile-remote-username", tagName: "input" });
+  const connectionProfileRemoteAuthMethod = new FakeElement({ id: "connection-profile-remote-auth-method", tagName: "select" });
+  const connectionProfileRemotePrivateKeyPath = new FakeElement({
+    id: "connection-profile-remote-private-key-path",
+    tagName: "input"
+  });
+  const connectionProfileAuthHint = new FakeElement({ id: "connection-profile-auth-hint", tagName: "p" });
+  const connectionProfileSecretHint = new FakeElement({ id: "connection-profile-secret-hint", tagName: "p" });
+  const connectionProfileSshTrustStatus = new FakeElement({ id: "connection-profile-ssh-trust-status", tagName: "p" });
+  const connectionProfileSshTrustSelect = new FakeElement({ id: "connection-profile-ssh-trust-select", tagName: "select" });
+  const connectionProfileSshTrustKeyType = new FakeElement({ id: "connection-profile-ssh-trust-key-type", tagName: "input" });
+  const connectionProfileSshTrustPublicKey = new FakeElement({ id: "connection-profile-ssh-trust-public-key", tagName: "textarea" });
+  const connectionProfileSshTrustRefresh = new FakeElement({ id: "connection-profile-ssh-trust-refresh", tagName: "button" });
+  const connectionProfileSshTrustSave = new FakeElement({ id: "connection-profile-ssh-trust-save", tagName: "button" });
+  const connectionProfileSshTrustDelete = new FakeElement({ id: "connection-profile-ssh-trust-delete", tagName: "button" });
   const connectionProfileDraftLaunch = new FakeElement({ id: "connection-profile-draft-launch", tagName: "textarea" });
   const connectionProfileDraftStatus = new FakeElement({ id: "connection-profile-draft-status", tagName: "p" });
   const workspacePresetSelect = new FakeElement({ id: "workspace-preset-select", tagName: "select" });
@@ -753,8 +782,10 @@ function createDocumentFixture() {
     workspaceManagerPanelWorkspace,
     connectionProfileSelect,
     connectionProfileNew,
+    connectionProfileNewSsh,
     connectionProfileSave,
     connectionProfileSaveDraft,
+    connectionProfileSaveAndLaunch,
     connectionProfileResetDraft,
     connectionProfileApply,
     connectionProfileDuplicate,
@@ -763,6 +794,30 @@ function createDocumentFixture() {
     connectionProfileStatus,
     connectionProfileSummary,
     connectionProfileDraftName,
+    connectionProfileKind,
+    connectionProfileDeck,
+    connectionProfileShell,
+    connectionProfileStartCwd,
+    connectionProfileStartCommand,
+    connectionProfileEnv,
+    connectionProfileTags,
+    connectionProfileActiveTheme,
+    connectionProfileInactiveTheme,
+    connectionProfileSshFields,
+    connectionProfileRemoteHost,
+    connectionProfileRemotePort,
+    connectionProfileRemoteUsername,
+    connectionProfileRemoteAuthMethod,
+    connectionProfileRemotePrivateKeyPath,
+    connectionProfileAuthHint,
+    connectionProfileSecretHint,
+    connectionProfileSshTrustStatus,
+    connectionProfileSshTrustSelect,
+    connectionProfileSshTrustKeyType,
+    connectionProfileSshTrustPublicKey,
+    connectionProfileSshTrustRefresh,
+    connectionProfileSshTrustSave,
+    connectionProfileSshTrustDelete,
     connectionProfileDraftLaunch,
     connectionProfileDraftStatus,
     workspacePresetSelect,
@@ -852,16 +907,49 @@ function createDocumentFixture() {
       workspaceManagerPanelConnections,
       workspaceManagerPanelWorkspace,
       connectionProfileSelect,
+      connectionProfileNew,
+      connectionProfileNewSsh,
       connectionProfileSave,
+      connectionProfileSaveDraft,
+      connectionProfileSaveAndLaunch,
+      connectionProfileResetDraft,
       connectionProfileApply,
       connectionProfileDuplicate,
       connectionProfileRename,
       connectionProfileDelete,
       connectionProfileStatus,
       connectionProfileSummary,
+      connectionProfileDraftName,
+      connectionProfileKind,
+      connectionProfileDeck,
+      connectionProfileShell,
+      connectionProfileStartCwd,
+      connectionProfileStartCommand,
+      connectionProfileEnv,
+      connectionProfileTags,
+      connectionProfileActiveTheme,
+      connectionProfileInactiveTheme,
+      connectionProfileSshFields,
+      connectionProfileRemoteHost,
+      connectionProfileRemotePort,
+      connectionProfileRemoteUsername,
+      connectionProfileRemoteAuthMethod,
+      connectionProfileRemotePrivateKeyPath,
+      connectionProfileAuthHint,
+      connectionProfileSecretHint,
+      connectionProfileSshTrustStatus,
+      connectionProfileSshTrustSelect,
+      connectionProfileSshTrustKeyType,
+      connectionProfileSshTrustPublicKey,
+      connectionProfileSshTrustRefresh,
+      connectionProfileSshTrustSave,
+      connectionProfileSshTrustDelete,
+      connectionProfileDraftLaunch,
+      connectionProfileDraftStatus,
       workspacePresetSelect,
       workspacePresetSave,
       workspacePresetApply,
+      workspacePresetDuplicate,
       workspacePresetRename,
       workspacePresetDelete,
       workspaceGroupSelect,
@@ -872,7 +960,9 @@ function createDocumentFixture() {
       workspaceGroupClear,
       workspacePresetStatus,
       workspacePresetSummary,
-      workspaceGroupSummary
+      workspacePresetDetail,
+      workspaceGroupSummary,
+      workspaceGroupPersistence
     },
     document: {
       getElementById(id) {

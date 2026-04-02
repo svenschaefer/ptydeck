@@ -274,6 +274,15 @@ export function createApiClient(baseUrl, options = {}) {
     async deleteConnectionProfile(profileId) {
       await request(`/connection-profiles/${encodeURIComponent(profileId)}`, { method: "DELETE" }, { expectJson: false });
     },
+    async listSshTrustEntries() {
+      return request("/ssh-trust-entries");
+    },
+    async createSshTrustEntry(payload) {
+      return request("/ssh-trust-entries", withJson(payload || {}));
+    },
+    async deleteSshTrustEntry(entryId) {
+      await request(`/ssh-trust-entries/${encodeURIComponent(entryId)}`, { method: "DELETE" }, { expectJson: false });
+    },
     async createLayoutProfile(payload) {
       return request("/layout-profiles", withJson(payload || {}));
     },

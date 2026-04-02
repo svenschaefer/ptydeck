@@ -16,6 +16,7 @@ function createElement(tagName = "div") {
     disabled: false,
     selected: false,
     hidden: false,
+    readOnly: false,
     children: [],
     listeners: new Map(),
     appendChild(child) {
@@ -45,6 +46,51 @@ function createElement(tagName = "div") {
     click() {
       this.dispatch("click");
     }
+  };
+}
+
+function createConnectionProfileUiRefs() {
+  return {
+    selectEl: createElement("select"),
+    newBtn: createElement("button"),
+    newSshBtn: createElement("button"),
+    saveBtn: createElement("button"),
+    saveDraftBtn: createElement("button"),
+    saveAndLaunchBtn: createElement("button"),
+    resetDraftBtn: createElement("button"),
+    applyBtn: createElement("button"),
+    duplicateBtn: createElement("button"),
+    renameBtn: createElement("button"),
+    deleteBtn: createElement("button"),
+    statusEl: createElement("p"),
+    summaryEl: createElement("p"),
+    draftNameInputEl: createElement("input"),
+    draftKindSelectEl: createElement("select"),
+    draftDeckSelectEl: createElement("select"),
+    draftShellInputEl: createElement("input"),
+    draftStartCwdInputEl: createElement("input"),
+    draftStartCommandTextareaEl: createElement("textarea"),
+    draftEnvTextareaEl: createElement("textarea"),
+    draftTagsInputEl: createElement("input"),
+    draftActiveThemeSelectEl: createElement("select"),
+    draftInactiveThemeSelectEl: createElement("select"),
+    sshFieldsEl: createElement("section"),
+    draftRemoteHostInputEl: createElement("input"),
+    draftRemotePortInputEl: createElement("input"),
+    draftRemoteUsernameInputEl: createElement("input"),
+    draftRemoteAuthMethodSelectEl: createElement("select"),
+    draftRemotePrivateKeyPathInputEl: createElement("input"),
+    authHintEl: createElement("p"),
+    secretHintEl: createElement("p"),
+    sshTrustStatusEl: createElement("p"),
+    sshTrustSelectEl: createElement("select"),
+    sshTrustKeyTypeInputEl: createElement("input"),
+    sshTrustPublicKeyTextareaEl: createElement("textarea"),
+    sshTrustRefreshBtn: createElement("button"),
+    sshTrustSaveBtn: createElement("button"),
+    sshTrustDeleteBtn: createElement("button"),
+    draftLaunchTextareaEl: createElement("textarea"),
+    draftStatusEl: createElement("p")
   };
 }
 
@@ -175,17 +221,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
     }
   ];
   const calls = [];
-  const selectEl = createElement("select");
-  const statusEl = createElement("p");
-  const summaryEl = createElement("p");
-  const newBtn = createElement("button");
-  const saveBtn = createElement("button");
-  const saveDraftBtn = createElement("button");
-  const resetDraftBtn = createElement("button");
-  const duplicateBtn = createElement("button");
-  const draftNameInputEl = createElement("input");
-  const draftLaunchTextareaEl = createElement("textarea");
-  const draftStatusEl = createElement("p");
+  const ui = createConnectionProfileUiRefs();
   let activeSessionId = "s-local";
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
@@ -199,17 +235,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
       }
     },
     documentRef: createDocumentRef(),
-    selectEl,
-    newBtn,
-    saveBtn,
-    saveDraftBtn,
-    resetDraftBtn,
-    statusEl,
-    summaryEl,
-    duplicateBtn,
-    draftNameInputEl,
-    draftLaunchTextareaEl,
-    draftStatusEl,
+    ...ui,
     api: {
       async listConnectionProfiles() {
         calls.push(["list"]);
@@ -281,6 +307,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
         calls.push(["delete", profileId]);
       }
     },
+    getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
     getSessions: () => sessions,
     getSessionById: (sessionId) => sessions.find((session) => session.id === sessionId) || null,
     getActiveSessionId: () => activeSessionId,
@@ -305,9 +332,9 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   });
 
   await controller.loadProfiles();
-  assert.equal(selectEl.children.length, 1);
-  assert.equal(statusEl.textContent, "1 profile(s)");
-  assert.match(summaryEl.textContent, /Ops SSH/);
+  assert.equal(ui.selectEl.children.length, 1);
+  assert.equal(ui.statusEl.textContent, "1 profile(s)");
+  assert.match(ui.summaryEl.textContent, /Ops SSH/);
 
   const saveFeedback = await controller.createProfileFromSession("s-local", "Local Dev");
   assert.equal(saveFeedback, "Saved connection profile [local-dev] Local Dev from [1] s-local.");
@@ -329,9 +356,12 @@ test("connection profile runtime controller manages backend-backed lifecycle and
 
   const loadDraftFeedback = await controller.loadActiveDraftFlow();
   assert.equal(loadDraftFeedback, "Loaded the active session into a new connection profile draft.");
-  assert.equal(draftNameInputEl.value, "s-local Profile");
-  assert.match(draftStatusEl.textContent, /unsaved draft/i);
-  draftNameInputEl.value = "Drafted Local";
+  assert.equal(ui.draftNameInputEl.value, "s-local Profile");
+  assert.equal(ui.draftKindSelectEl.value, "local");
+  assert.equal(ui.draftShellInputEl.value, "bash");
+  assert.equal(ui.draftStartCwdInputEl.value, "/workspace");
+  assert.match(ui.draftStatusEl.textContent, /unsaved draft/i);
+  ui.draftNameInputEl.value = "Drafted Local";
 
   const saveDraftFeedback = await controller.saveDraftFlow();
   assert.equal(saveDraftFeedback, "Saved connection profile [local-dev] Drafted Local.");
@@ -351,7 +381,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
       inactiveThemeProfile: createThemeProfile("#030303")
     }
   });
-  assert.match(draftStatusEl.textContent, /Editing saved profile \[local-dev\]/i);
+  assert.match(ui.draftStatusEl.textContent, /Editing saved profile \[local-dev\]/i);
 
   const applyFeedback = await controller.applyProfileById("ops-ssh");
   assert.equal(applyFeedback, "Started session [8] Ops SSH from connection profile [ops-ssh] Ops SSH.");
@@ -379,24 +409,10 @@ test("connection profile runtime controller manages backend-backed lifecycle and
 
 test("connection profile runtime controller updates saved drafts instead of creating duplicates", async () => {
   const calls = [];
-  const draftNameInputEl = createElement("input");
-  const draftLaunchTextareaEl = createElement("textarea");
+  const ui = createConnectionProfileUiRefs();
   const controller = createConnectionProfileRuntimeController({
     documentRef: createDocumentRef(),
-    selectEl: createElement("select"),
-    statusEl: createElement("p"),
-    summaryEl: createElement("p"),
-    newBtn: createElement("button"),
-    saveBtn: createElement("button"),
-    saveDraftBtn: createElement("button"),
-    resetDraftBtn: createElement("button"),
-    applyBtn: createElement("button"),
-    duplicateBtn: createElement("button"),
-    renameBtn: createElement("button"),
-    deleteBtn: createElement("button"),
-    draftNameInputEl,
-    draftLaunchTextareaEl,
-    draftStatusEl: createElement("p"),
+    ...ui,
     api: {
       async updateConnectionProfile(profileId, payload) {
         calls.push(["update", profileId, payload]);
@@ -435,7 +451,7 @@ test("connection profile runtime controller updates saved drafts instead of crea
     name: "Ops Local",
     launch: controller.getProfile("ops-local").launch
   });
-  draftNameInputEl.value = "Ops Local Updated";
+  ui.draftNameInputEl.value = "Ops Local Updated";
 
   const feedback = await controller.saveDraftById();
   assert.equal(feedback, "Updated connection profile [ops-local] Ops Local Updated.");
@@ -447,6 +463,7 @@ test("connection profile runtime controller updates saved drafts instead of crea
 
 test("connection profile runtime controller reports apply cancellation when secret prompt is dismissed", async () => {
   const calls = [];
+  const ui = createConnectionProfileUiRefs();
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
       prompt() {
@@ -455,20 +472,7 @@ test("connection profile runtime controller reports apply cancellation when secr
       }
     },
     documentRef: createDocumentRef(),
-    selectEl: createElement("select"),
-    statusEl: createElement("p"),
-    summaryEl: createElement("p"),
-    newBtn: createElement("button"),
-    saveBtn: createElement("button"),
-    saveDraftBtn: createElement("button"),
-    resetDraftBtn: createElement("button"),
-    applyBtn: createElement("button"),
-    duplicateBtn: createElement("button"),
-    renameBtn: createElement("button"),
-    deleteBtn: createElement("button"),
-    draftNameInputEl: createElement("input"),
-    draftLaunchTextareaEl: createElement("textarea"),
-    draftStatusEl: createElement("p"),
+    ...ui,
     api: {
       async createSession(payload) {
         calls.push(["create-session", payload]);
@@ -500,4 +504,155 @@ test("connection profile runtime controller reports apply cancellation when secr
   const feedback = await controller.applyProfileById("ops-ssh");
   assert.equal(feedback, "Connection profile apply cancelled for [ops-ssh] Ops SSH.");
   assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
+});
+
+test("connection profile runtime controller supports guided SSH drafts, save-and-launch, and SSH trust entry management", async () => {
+  const calls = [];
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    windowRef: {
+      prompt(message) {
+        calls.push(["prompt", message]);
+        return "runtime-secret";
+      }
+    },
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async createConnectionProfile(payload) {
+        calls.push(["create", payload]);
+        return {
+          id: "ops-guided",
+          name: payload.name,
+          createdAt: 1,
+          updatedAt: 1,
+          launch: payload.launch
+        };
+      },
+      async createSession(payload) {
+        calls.push(["create-session", payload]);
+        return {
+          id: "s-ssh",
+          deckId: "ops",
+          name: "Guided SSH",
+          kind: "ssh"
+        };
+      },
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return [
+          {
+            id: "trust-1",
+            host: "ops.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      },
+      async createSshTrustEntry(payload) {
+        calls.push(["create-trust", payload]);
+        return {
+          id: "trust-2",
+          host: payload.host,
+          port: payload.port,
+          keyType: payload.keyType,
+          publicKey: payload.publicKey,
+          fingerprintSha256: "SHA256:created"
+        };
+      },
+      async deleteSshTrustEntry(entryId) {
+        calls.push(["delete-trust", entryId]);
+      }
+    },
+    getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
+    setActiveDeck: (deckId) => {
+      calls.push(["set-active-deck", deckId]);
+      return true;
+    },
+    setActiveSession: (sessionId) => {
+      calls.push(["set-active-session", sessionId]);
+    },
+    applyRuntimeEvent: (event) => {
+      calls.push(["runtime-event", event.type, event.session?.id || ""]);
+      return true;
+    },
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    requestRender: () => calls.push(["render"]),
+    themePresets: [
+      { id: "ptydeck-dark", name: "ptydeck-dark", category: "dark", profile: createThemeProfile("#151515") },
+      { id: "ptydeck-light", name: "ptydeck-light", category: "light", profile: createThemeProfile("#efefef") }
+    ],
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await controller.newDraftFlow("ssh");
+  assert.equal(ui.draftKindSelectEl.value, "ssh");
+  assert.equal(ui.sshFieldsEl.hidden, false);
+
+  ui.draftNameInputEl.value = "Guided SSH";
+  ui.draftDeckSelectEl.value = "ops";
+  ui.draftShellInputEl.value = "ssh";
+  ui.draftStartCwdInputEl.value = "~";
+  ui.draftStartCommandTextareaEl.value = "tmux a || tmux";
+  ui.draftEnvTextareaEl.value = "LANG=en_US.UTF-8";
+  ui.draftTagsInputEl.value = "ops, ssh";
+  ui.draftActiveThemeSelectEl.value = "ptydeck-dark";
+  ui.draftInactiveThemeSelectEl.value = "ptydeck-light";
+  ui.draftRemoteHostInputEl.value = "ops.example";
+  ui.draftRemotePortInputEl.value = "22";
+  ui.draftRemoteUsernameInputEl.value = "ops";
+  ui.draftRemoteAuthMethodSelectEl.value = "password";
+  ui.draftRemotePrivateKeyPathInputEl.value = "";
+  ui.sshTrustKeyTypeInputEl.value = "ssh-ed25519";
+  ui.sshTrustPublicKeyTextareaEl.value = "AAAAC3NzaC1lZDI1NTE5AAAAcreated";
+
+  const trustFeedback = await controller.saveTrustEntryFlow();
+  assert.match(trustFeedback, /Trusted SSH host key/);
+  assert.deepEqual(calls.find((entry) => entry[0] === "create-trust")?.[1], {
+    host: "ops.example",
+    port: 22,
+    keyType: "ssh-ed25519",
+    publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated"
+  });
+
+  const combinedFeedback = await controller.saveAndLaunchDraftFlow();
+  assert.match(combinedFeedback, /Saved connection profile \[ops-guided\] Guided SSH\./);
+  assert.match(combinedFeedback, /Started session \[s-ssh\] Guided SSH from connection profile \[ops-guided\] Guided SSH\./);
+  assert.deepEqual(calls.find((entry) => entry[0] === "create")?.[1], {
+    name: "Guided SSH",
+    launch: {
+      kind: "ssh",
+      deckId: "ops",
+      shell: "ssh",
+      startCwd: "~",
+      startCommand: "tmux a || tmux",
+      env: { LANG: "en_US.UTF-8" },
+      tags: ["ops", "ssh"],
+      themeProfile: createThemeProfile("#151515"),
+      activeThemeProfile: createThemeProfile("#151515"),
+      inactiveThemeProfile: createThemeProfile("#efefef"),
+      remoteConnection: {
+        host: "ops.example",
+        port: 22,
+        username: "ops"
+      },
+      remoteAuth: {
+        method: "password"
+      }
+    }
+  });
+  assert.deepEqual(calls.find((entry) => entry[0] === "create-session")?.[1], {
+    connectionProfileId: "ops-guided",
+    remoteSecret: "runtime-secret"
+  });
+  assert.match(ui.authHintEl.textContent, /Password auth/i);
+  assert.match(ui.secretHintEl.textContent, /runtime secret/i);
+
+  ui.sshTrustSelectEl.value = "trust-1";
+  ui.sshTrustSelectEl.dispatch("change");
+  const deleteTrustFeedback = await controller.deleteTrustEntryFlow();
+  assert.match(deleteTrustFeedback, /Deleted trusted SSH host key/);
+  assert.ok(calls.some((entry) => entry[0] === "delete-trust" && entry[1] === "trust-1"));
 });

@@ -335,15 +335,20 @@ export function formatWorkspacePresetDetail(preset) {
   if (!normalized) {
     return "No saved workspace preset selected.";
   }
+  const workspace = normalized.workspace || {};
+  const deckGroupDeckCount = Object.keys(workspace.deckGroups || {}).length;
+  const totalGroupCount = Object.values(workspace.deckGroups || {}).reduce(
+    (count, deckEntry) => count + (Array.isArray(deckEntry?.groups) ? deckEntry.groups.length : 0),
+    0
+  );
+  const splitLayoutDeckCount = Object.keys(workspace.deckSplitLayouts || {}).length;
   return [
     `[${normalized.id}] ${normalized.name}`,
-    `activeDeckId=${JSON.stringify(normalized.workspace.activeDeckId || "default")}`,
-    `layoutProfileId=${JSON.stringify(normalized.workspace.layoutProfileId || "")}`,
-    `controlPaneVisible=${JSON.stringify(normalized.workspace.controlPaneVisible !== false)}`,
-    `controlPanePosition=${JSON.stringify(normalized.workspace.controlPanePosition || "bottom")}`,
-    `controlPaneSize=${JSON.stringify(normalized.workspace.controlPaneSize || 185)}`,
-    `deckGroups=${JSON.stringify(normalized.workspace.deckGroups || {}, null, 2)}`,
-    `deckSplitLayouts=${JSON.stringify(normalized.workspace.deckSplitLayouts || {}, null, 2)}`
+    `Active deck: [${workspace.activeDeckId || "default"}]`,
+    `Linked layout profile: ${workspace.layoutProfileId ? `[${workspace.layoutProfileId}]` : "None"}`,
+    `Control pane: ${workspace.controlPaneVisible !== false ? "visible" : "hidden"} · ${workspace.controlPanePosition || "bottom"} · ${workspace.controlPaneSize || 185}px`,
+    `Deck groups: ${deckGroupDeckCount} deck(s) · ${totalGroupCount} saved group(s)`,
+    `Split layouts: ${splitLayoutDeckCount} deck(s) with saved pane assignments`
   ].join("\n");
 }
 

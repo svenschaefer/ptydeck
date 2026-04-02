@@ -186,6 +186,13 @@ body {
   color: var(--muted);
 }
 
+.sidebar-panel-note {
+  margin: 0;
+  color: #9db8d2;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .terminal-search-panel h2 {
   margin: 0;
   font-size: 13px;
@@ -1830,6 +1837,18 @@ button:hover {
   background: #111a26;
 }
 
+.workspace-manager-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.workspace-manager-field-block {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
 .workspace-manager-field {
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -1860,11 +1879,22 @@ button:hover {
   resize: vertical;
 }
 
+.workspace-manager-textarea-compact {
+  min-height: 0;
+}
+
 .workspace-manager-inline-note {
   margin: 0;
   color: #9db8d2;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.workspace-manager-subsection-card {
+  padding: 12px;
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: rgba(15, 21, 31, 0.75);
 }
 
 .workspace-manager-detail {
