@@ -61,7 +61,47 @@ function createInput(value = "") {
     checked: false,
     disabled: false,
     classList: new FakeClassList(),
-    style: {}
+    style: {},
+    attributes: new Map(),
+    setAttribute(name, nextValue) {
+      this.attributes.set(name, String(nextValue));
+    },
+    getAttribute(name) {
+      return this.attributes.has(name) ? this.attributes.get(name) : null;
+    },
+    toggleAttribute(name, force) {
+      if (force) {
+        this.attributes.set(name, "");
+      } else {
+        this.attributes.delete(name);
+      }
+    }
+  };
+}
+
+function createPanel({ hidden = false, scrollHeight = 0, offsetHeight = 0, clientHeight = 0 } = {}) {
+  return {
+    hidden,
+    scrollHeight,
+    offsetHeight,
+    clientHeight,
+    style: {},
+    classList: new FakeClassList(),
+    attributes: new Map(),
+    inert: false,
+    setAttribute(name, nextValue) {
+      this.attributes.set(name, String(nextValue));
+    },
+    getAttribute(name) {
+      return this.attributes.has(name) ? this.attributes.get(name) : null;
+    },
+    toggleAttribute(name, force) {
+      if (force) {
+        this.attributes.set(name, "");
+      } else {
+        this.attributes.delete(name);
+      }
+    }
   };
 }
 
@@ -224,9 +264,9 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     settingsTabStartupBtn: createInput(),
     settingsTabNoteBtn: createInput(),
     settingsTabThemeBtn: createInput(),
-    settingsPanelStartup: { hidden: false },
-    settingsPanelNote: { hidden: true },
-    settingsPanelTheme: { hidden: true },
+    settingsPanelStartup: createPanel(),
+    settingsPanelNote: createPanel({ hidden: true }),
+    settingsPanelTheme: createPanel({ hidden: true }),
     themeSlotSelect: createInput("active"),
     startCwdInput: createInput("/workspace"),
     startCommandInput: createInput("npm run dev"),
@@ -246,8 +286,14 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   assert.equal(controller.isSessionSettingsDirty(entry, session), false);
 
   controller.setActiveSettingsTab(entry, "note");
-  assert.equal(entry.settingsPanelStartup.hidden, true);
+  assert.equal(entry.settingsPanelStartup.hidden, false);
+  assert.equal(entry.settingsPanelStartup.classList.contains("session-settings-panel-inactive"), true);
+  assert.equal(entry.settingsPanelStartup.getAttribute("aria-hidden"), "true");
+  assert.equal(entry.settingsPanelStartup.inert, true);
   assert.equal(entry.settingsPanelNote.hidden, false);
+  assert.equal(entry.settingsPanelNote.classList.contains("session-settings-panel-active"), true);
+  assert.equal(entry.settingsPanelNote.getAttribute("aria-hidden"), "false");
+  assert.equal(entry.settingsPanelNote.inert, false);
   assert.equal(entry.settingsTabNoteBtn.classList.contains("active"), true);
 
   entry.themeSlotSelect.value = "inactive";
@@ -280,33 +326,32 @@ test("session-settings state controller stabilizes settings layout to the talles
     settingsTabStartupBtn: createInput(),
     settingsTabNoteBtn: createInput(),
     settingsTabThemeBtn: createInput(),
-    settingsPanelStartup: {
+    settingsPanelStartup: createPanel({
       hidden: false,
       scrollHeight: 180,
       offsetHeight: 180,
-      clientHeight: 180,
-      style: {}
-    },
-    settingsPanelNote: {
+      clientHeight: 180
+    }),
+    settingsPanelNote: createPanel({
       hidden: true,
       scrollHeight: 240,
       offsetHeight: 0,
-      clientHeight: 0,
-      style: {}
-    },
-    settingsPanelTheme: {
+      clientHeight: 0
+    }),
+    settingsPanelTheme: createPanel({
       hidden: true,
       scrollHeight: 312,
       offsetHeight: 0,
-      clientHeight: 0,
-      style: {}
-    }
+      clientHeight: 0
+    })
   };
 
   controller.setActiveSettingsTab(entry, "note");
 
-  assert.equal(entry.settingsPanelStartup.hidden, true);
+  assert.equal(entry.settingsPanelStartup.hidden, false);
+  assert.equal(entry.settingsPanelStartup.classList.contains("session-settings-panel-inactive"), true);
   assert.equal(entry.settingsPanelNote.hidden, false);
+  assert.equal(entry.settingsPanelNote.classList.contains("session-settings-panel-active"), true);
   assert.equal(entry.settingsLayout.style.minHeight, "312px");
 });
 

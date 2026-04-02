@@ -424,6 +424,21 @@ export function createSessionSettingsStateController(options = {}) {
     }
   }
 
+  function setSettingsPanelState(panel, active) {
+    if (!panel) {
+      return;
+    }
+    panel.hidden = false;
+    panel.classList?.toggle?.("session-settings-panel-active", active === true);
+    panel.classList?.toggle?.("session-settings-panel-inactive", active !== true);
+    panel.setAttribute?.("aria-hidden", active === true ? "false" : "true");
+    if ("inert" in panel) {
+      panel.inert = active !== true;
+    } else if (typeof panel.toggleAttribute === "function") {
+      panel.toggleAttribute("inert", active !== true);
+    }
+  }
+
   function readRenderedElementHeight(element) {
     if (!element) {
       return 0;
@@ -540,7 +555,7 @@ export function createSessionSettingsStateController(options = {}) {
         button.setAttribute?.("aria-selected", active ? "true" : "false");
       }
       if (panel) {
-        panel.hidden = !active;
+        setSettingsPanelState(panel, active);
       }
     }
     stabilizeSettingsLayout(entry);

@@ -1997,13 +1997,15 @@ button:hover {
 
 .session-settings-layout {
   margin-top: 10px;
-  display: block;
+  display: grid;
+  align-items: start;
   max-height: calc(100vh - 240px);
   overflow: auto;
   padding-right: 4px;
 }
 
 .session-settings-section {
+  grid-area: 1 / 1;
   border: 1px solid #243245;
   border-radius: 10px;
   background: #111a26;
@@ -2012,6 +2014,16 @@ button:hover {
 
 .session-settings-section[hidden] {
   display: none !important;
+}
+
+.session-settings-panel-active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.session-settings-panel-inactive {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .session-settings-section-title {

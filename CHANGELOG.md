@@ -14,6 +14,12 @@ Completed and validated release history belongs here.
 
 ## 2026-04-02
 
+- [x] Fixed the remaining session-settings dialog height jump across `Startup`, `Note`, and `Theme`: the tab panels now render in one shared grid layer with active/inactive state classes instead of relying only on hidden-panel height measurement, so the dialog stays pinned to the largest tab height instead of shrinking and growing on every tab switch.
+- [x] The settings-tab stability fix updated `frontend/src/public/ui/session-settings-state-controller.js` and `frontend/src/public/styles.css` so inactive settings panels stay out of interaction flow through `aria-hidden` plus `inert` while still contributing their natural height to the shared layout container.
+- [x] Regression coverage for the dialog-height fix now lives in `frontend/test/session-settings-state-controller.test.js` and `frontend/test/app.test.js`, covering active/inactive panel state transitions together with the real app-wired tab switching path.
+- [x] Validation for the session-settings height-stability fix passed with the full local quality gate: `npm run lint`, `npm run test`, and `npm run test:coverage:check`.
+- [x] Coverage after the session-settings height-stability fix: backend `91.52%` lines and frontend `93.48%` lines on the final validated tree.
+
 - [x] Fixed scrambled terminal rendering immediately after backend restart/bootstrap restore: authoritative runtime snapshots now trigger a local-only multi-pass terminal stabilization step so restored visible terminals are force-resized, scroll-synced, viewport-refreshed, and reflowed before the operator interacts with them.
 - [x] The snapshot stabilization wiring spans `frontend/src/public/runtime-event-controller.js`, `frontend/src/public/app-session-runtime-facade-controller.js`, `frontend/src/public/session-runtime-controller.js`, and `frontend/src/public/app-runtime-composition-controller.js`, so post-snapshot recovery is applied centrally after websocket snapshot replay instead of relying on later user-driven focus/resize side effects.
 - [x] `frontend/src/public/ui/session-terminal-resize-controller.js` now supports local-only forced resize passes (`skipRemote`) so the post-snapshot stabilization can fix frontend geometry without sending unintended backend PTY resize requests during reconnect or restart restore.
