@@ -76,7 +76,7 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   const gridEl = { classList: new ClassList() };
   const appShellEl = { classList: new ClassList() };
   const sidebarToggleBtn = createEl();
-  const sidebarToggleIcon = { textContent: "" };
+  const sidebarToggleIcon = createEl();
   const sidebarLauncherBtn = createEl();
   const settingsColsEl = createEl();
   const settingsRowsEl = createEl();
@@ -104,7 +104,8 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   assert.equal(gridEl.classList.contains("fixed-size"), true);
   assert.equal(sidebarToggleBtn.hidden, false);
   assert.equal(sidebarLauncherBtn.hidden, true);
-  assert.equal(sidebarToggleIcon.textContent, "⮜");
+  assert.equal(sidebarToggleIcon.textContent, "");
+  assert.equal(sidebarToggleIcon.classList.contains("icon-tabler-caret-left-filled"), true);
   assert.equal(style.get("--ptydeck-terminal-card-width"), "742px");
   assert.equal(style.get("--ptydeck-terminal-mount-height"), "402px");
 

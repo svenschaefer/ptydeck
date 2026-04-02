@@ -80,7 +80,10 @@ export function createLayoutSettingsController(options = {}) {
       sidebarToggleBtn.hidden = !sidebarVisible;
     }
     if (sidebarToggleIcon) {
-      sidebarToggleIcon.textContent = "⮜";
+      sidebarToggleIcon.textContent = "";
+      if (sidebarToggleIcon.classList) {
+        sidebarToggleIcon.classList.add("icon-tabler-caret-left-filled");
+      }
     }
     if (sidebarLauncherBtn) {
       sidebarLauncherBtn.setAttribute("aria-label", "Expand sidebar");
