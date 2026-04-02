@@ -15,7 +15,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: none currently.
+- Queued next wave: `v0.4.0-H56`.
+
+### Queued Wave `v0.4.0-H56` - Quality and Coverage Hardening
+
+1. `QLT-171`
+2. `QLT-172` after `QLT-171`
+3. `QLT-173` after `QLT-172`
+4. `QLT-174` after `QLT-172`
+5. `QLT-175` after `QLT-172`
+6. `QLT-176` after `QLT-171`, `QLT-172`, `QLT-173`, `QLT-174`, and `QLT-175`
 
 ## Sequencing Rules
 
