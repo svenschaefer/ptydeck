@@ -277,6 +277,9 @@ export function createApiClient(baseUrl, options = {}) {
     async listSshTrustEntries() {
       return request("/ssh-trust-entries");
     },
+    async probeSshHostKeys(payload) {
+      return request("/ssh-host-key-probe", withJson(payload || {}));
+    },
     async createSshTrustEntry(payload) {
       return request("/ssh-trust-entries", withJson(payload || {}));
     },

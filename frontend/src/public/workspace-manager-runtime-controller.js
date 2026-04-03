@@ -84,6 +84,7 @@ export function createWorkspaceManagerRuntimeController(options = {}) {
   const getActiveDeckId = typeof options.getActiveDeckId === "function" ? options.getActiveDeckId : () => "default";
 
   let activeTab = "connections";
+  let uiEventsBound = false;
 
   function setActiveTab(nextTab) {
     activeTab = nextTab === "workspace" ? "workspace" : "connections";
@@ -135,6 +136,10 @@ export function createWorkspaceManagerRuntimeController(options = {}) {
   }
 
   function bindUiEvents() {
+    if (uiEventsBound) {
+      return;
+    }
+    uiEventsBound = true;
     openBtn?.addEventListener?.("click", () => {
       open();
     });
@@ -160,6 +165,7 @@ export function createWorkspaceManagerRuntimeController(options = {}) {
     });
   }
 
+  bindUiEvents();
   setActiveTab(activeTab);
   render();
 

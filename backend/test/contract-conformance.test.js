@@ -83,6 +83,7 @@ function runtimeOperationKeys() {
     "GET /ssh-trust-entries",
     "POST /ssh-trust-entries",
     "DELETE /ssh-trust-entries/{entryId}",
+    "POST /ssh-host-key-probe",
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",

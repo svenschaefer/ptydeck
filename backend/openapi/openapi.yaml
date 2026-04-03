@@ -805,6 +805,51 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /ssh-host-key-probe:
+    post:
+      operationId: probeSshHostKeys
+      summary: Probe SSH host keys for a target before trusting one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SshHostKeyProbeRequest'
+      responses:
+        '200':
+          description: Probed SSH host keys for the requested target
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SshHostKeyProbeCandidate'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: SSH host-key probe failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: SSH host-key probe unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: SSH host-key probe timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions:
     get:
       operationId: listSessions
@@ -1980,6 +2025,38 @@ components:
         keyType:
           type: string
         publicKey:
+          type: string
+    SshHostKeyProbeRequest:
+      type: object
+      required:
+        - host
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+    SshHostKeyProbeCandidate:
+      type: object
+      required:
+        - host
+        - port
+        - keyType
+        - publicKey
+        - fingerprintSha256
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        keyType:
+          type: string
+        publicKey:
+          type: string
+        fingerprintSha256:
           type: string
     CustomCommand:
       type: object

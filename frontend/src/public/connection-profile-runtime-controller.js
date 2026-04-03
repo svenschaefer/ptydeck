@@ -454,6 +454,47 @@ function normalizeSshTrustEntryCollection(entries) {
   return next;
 }
 
+function normalizeSshHostKeyProbeCandidate(entry) {
+  const normalizedTrustEntry = normalizeSshTrustEntry({
+    ...entry,
+    id:
+      normalizeText(entry?.id) ||
+      `${normalizeText(entry?.host)}:${Number.parseInt(String(entry?.port ?? ""), 10)}:${normalizeText(entry?.keyType)}:${normalizeText(entry?.fingerprintSha256)}`
+  });
+  if (!normalizedTrustEntry) {
+    return null;
+  }
+  return {
+    id: normalizedTrustEntry.id,
+    host: normalizedTrustEntry.host,
+    port: normalizedTrustEntry.port,
+    keyType: normalizedTrustEntry.keyType,
+    publicKey: normalizedTrustEntry.publicKey,
+    fingerprintSha256: normalizedTrustEntry.fingerprintSha256
+  };
+}
+
+function normalizeSshHostKeyProbeCandidateCollection(entries) {
+  const next = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const normalized = normalizeSshHostKeyProbeCandidate(entry);
+    if (!normalized || seen.has(normalized.id)) {
+      continue;
+    }
+    seen.add(normalized.id);
+    next.push(normalized);
+  }
+  next.sort((left, right) => {
+    const keyTypeCompare = left.keyType.localeCompare(right.keyType, "en-US", { sensitivity: "base" });
+    if (keyTypeCompare !== 0) {
+      return keyTypeCompare;
+    }
+    return left.fingerprintSha256.localeCompare(right.fingerprintSha256, "en-US", { sensitivity: "base" });
+  });
+  return next;
+}
+
 function formatSshTarget(host, port, username) {
   const normalizedHost = normalizeText(host) || "?";
   const normalizedPort = Number.isInteger(Number(port)) ? Number(port) : 22;
@@ -497,13 +538,18 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const draftRemotePortInputEl = options.draftRemotePortInputEl || null;
   const draftRemoteUsernameInputEl = options.draftRemoteUsernameInputEl || null;
   const draftRemoteAuthMethodSelectEl = options.draftRemoteAuthMethodSelectEl || null;
+  const draftRemotePrivateKeyFieldEl = options.draftRemotePrivateKeyFieldEl || null;
   const draftRemotePrivateKeyPathInputEl = options.draftRemotePrivateKeyPathInputEl || null;
   const authHintEl = options.authHintEl || null;
   const secretHintEl = options.secretHintEl || null;
+  const runtimeSecretFieldEl = options.runtimeSecretFieldEl || null;
   const runtimeSecretInputEl = options.runtimeSecretInputEl || null;
   const sshTrustStatusEl = options.sshTrustStatusEl || null;
+  const sshTrustProbeBtn = options.sshTrustProbeBtn || null;
+  const sshProbeSelectEl = options.sshProbeSelectEl || null;
   const sshTrustSelectEl = options.sshTrustSelectEl || null;
   const sshTrustKeyTypeInputEl = options.sshTrustKeyTypeInputEl || null;
+  const sshTrustFingerprintInputEl = options.sshTrustFingerprintInputEl || null;
   const sshTrustPublicKeyTextareaEl = options.sshTrustPublicKeyTextareaEl || null;
   const sshTrustRefreshBtn = options.sshTrustRefreshBtn || null;
   const sshTrustSaveBtn = options.sshTrustSaveBtn || null;
@@ -548,9 +594,14 @@ export function createConnectionProfileRuntimeController(options = {}) {
   let draftState = null;
   let sshTrustEntries = [];
   let selectedSshTrustEntryId = "";
+  let sshHostKeyProbeCandidates = [];
+  let selectedSshProbeCandidateId = "";
+  let probingSshHostKeys = false;
+  let sshProbeTargetKey = "";
   let pendingDeleteProfileId = "";
   let isRenderingDraft = false;
   let loadingSshTrustEntries = false;
+  let uiEventsBound = false;
 
   function setStatus(message) {
     if (statusEl) {
@@ -914,6 +965,21 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return { host, port };
   }
 
+  function getSshTrustTargetKey(target) {
+    const host = normalizeText(target?.host);
+    const port = Number.parseInt(String(target?.port ?? 22), 10);
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      return "";
+    }
+    return `${host}:${port}`;
+  }
+
+  function clearSshProbeCandidates() {
+    sshHostKeyProbeCandidates = [];
+    selectedSshProbeCandidateId = "";
+    sshProbeTargetKey = "";
+  }
+
   function getTrustEntriesForCurrentTarget() {
     const target = getCurrentSshTrustTarget();
     if (!target) {
@@ -922,15 +988,28 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return sshTrustEntries.filter((entry) => entry.host === target.host && entry.port === target.port);
   }
 
+  function getSshProbeCandidatesForCurrentTarget() {
+    const target = getCurrentSshTrustTarget();
+    if (!target || getSshTrustTargetKey(target) !== sshProbeTargetKey) {
+      return [];
+    }
+    return sshHostKeyProbeCandidates.slice();
+  }
+
   function syncDraftStateFromInputs() {
     if (!draftState || isRenderingDraft) {
       return;
     }
+    const previousTargetKey = getSshTrustTargetKey(draftState.launch?.remoteConnection);
+    const nextLaunch = getDraftLaunchFromInputs();
     draftState = {
       ...draftState,
       name: normalizeText(draftNameInputEl?.value || draftState.name),
-      launch: getDraftLaunchFromInputs()
+      launch: nextLaunch
     };
+    if (getSshTrustTargetKey(nextLaunch?.remoteConnection) !== previousTargetKey) {
+      clearSshProbeCandidates();
+    }
     renderDraftComputedState();
   }
 
@@ -941,6 +1020,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     const selectedProfile = getSelectedProfile();
     const currentLaunch = cloneDraftLaunch(getDraftLaunchFromInputs());
     const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
+    const authMethod = normalizeLower(currentLaunch?.remoteAuth?.method) || "privatekey";
     const requiresSecret = authMethodRequiresSecret(currentLaunch?.remoteAuth);
     if (summaryEl) {
       summaryEl.textContent = selectedProfile
@@ -950,11 +1030,17 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (sshFieldsEl) {
       sshFieldsEl.hidden = !isSsh;
     }
+    if (draftRemotePrivateKeyFieldEl) {
+      draftRemotePrivateKeyFieldEl.hidden = !isSsh || authMethod !== "privatekey";
+    }
     if (authHintEl) {
       authHintEl.textContent = getSshAuthHint(currentLaunch);
     }
     if (secretHintEl) {
       secretHintEl.textContent = getSshSecretHint(currentLaunch);
+    }
+    if (runtimeSecretFieldEl) {
+      runtimeSecretFieldEl.hidden = !isSsh || !requiresSecret;
     }
     if (runtimeSecretInputEl) {
       runtimeSecretInputEl.hidden = !isSsh || !requiresSecret;
@@ -981,7 +1067,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
           : "";
     }
 
+    const target = getCurrentSshTrustTarget();
     const matchingTrustEntries = getTrustEntriesForCurrentTarget();
+    const probeCandidates = getSshProbeCandidatesForCurrentTarget();
     const trustOptions = matchingTrustEntries.length
       ? matchingTrustEntries.map((entry) => ({
           value: entry.id,
@@ -1000,25 +1088,60 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!hasSelectedTrustEntry) {
       selectedSshTrustEntryId = matchingTrustEntries[0]?.id || "";
     }
+    const probeOptions = probeCandidates.length
+      ? probeCandidates.map((entry) => ({
+          value: entry.id,
+          label: `${entry.keyType} · ${entry.fingerprintSha256}`,
+          documentRef
+        }))
+      : [
+          {
+            value: "",
+            label: isSsh ? "Fetch host keys to review one before trusting it" : "Switch to SSH to fetch host keys",
+            disabled: true,
+            documentRef
+          }
+        ];
+    const hasSelectedProbeCandidate = probeCandidates.some((entry) => entry.id === selectedSshProbeCandidateId);
+    if (!hasSelectedProbeCandidate) {
+      selectedSshProbeCandidateId = probeCandidates[0]?.id || "";
+    }
+    setSelectOptions(sshProbeSelectEl, probeOptions, selectedSshProbeCandidateId || probeOptions[0]?.value || "");
     setSelectOptions(sshTrustSelectEl, trustOptions, selectedSshTrustEntryId || trustOptions[0]?.value || "");
+    const selectedProbeCandidate = probeCandidates.find((entry) => entry.id === selectedSshProbeCandidateId) || null;
+    const selectedTrustEntry = matchingTrustEntries.find((entry) => entry.id === selectedSshTrustEntryId) || null;
+    const selectedPreview = selectedProbeCandidate || selectedTrustEntry;
+    if (sshTrustKeyTypeInputEl) {
+      sshTrustKeyTypeInputEl.value = selectedPreview?.keyType || "";
+      sshTrustKeyTypeInputEl.readOnly = true;
+    }
+    if (sshTrustFingerprintInputEl) {
+      sshTrustFingerprintInputEl.value = selectedPreview?.fingerprintSha256 || "";
+      sshTrustFingerprintInputEl.readOnly = true;
+    }
+    if (sshTrustPublicKeyTextareaEl) {
+      sshTrustPublicKeyTextareaEl.value = selectedPreview?.publicKey || "";
+      sshTrustPublicKeyTextareaEl.readOnly = true;
+    }
     if (sshTrustStatusEl) {
-      const target = getCurrentSshTrustTarget();
       sshTrustStatusEl.textContent = target
-        ? `${matchingTrustEntries.length} trusted key(s) for ${formatSshTarget(target.host, target.port)}`
+        ? probingSshHostKeys
+          ? `Fetching host keys for ${formatSshTarget(target.host, target.port)}...`
+          : probeCandidates.length
+            ? `Review ${probeCandidates.length} fetched host key(s) for ${formatSshTarget(target.host, target.port)} and trust the selected key if it matches your server.`
+            : `${matchingTrustEntries.length} trusted key(s) for ${formatSshTarget(target.host, target.port)}`
         : isSsh
           ? "Enter an SSH host to manage trusted host keys."
           : "SSH trust entries are only used for SSH profiles.";
+    }
+    if (sshTrustProbeBtn) {
+      sshTrustProbeBtn.disabled = typeof api.probeSshHostKeys !== "function" || !isSsh || !target || probingSshHostKeys;
     }
     if (sshTrustRefreshBtn) {
       sshTrustRefreshBtn.disabled = typeof api.listSshTrustEntries !== "function" || !isSsh || loadingSshTrustEntries;
     }
     if (sshTrustSaveBtn) {
-      sshTrustSaveBtn.disabled =
-        typeof api.createSshTrustEntry !== "function" ||
-        !isSsh ||
-        !normalizeText(draftRemoteHostInputEl?.value) ||
-        !normalizeText(sshTrustKeyTypeInputEl?.value) ||
-        !normalizeText(sshTrustPublicKeyTextareaEl?.value);
+      sshTrustSaveBtn.disabled = typeof api.createSshTrustEntry !== "function" || !isSsh || !selectedProbeCandidate;
     }
     if (sshTrustDeleteBtn) {
       sshTrustDeleteBtn.disabled = typeof api.deleteSshTrustEntry !== "function" || !selectedSshTrustEntryId;
@@ -1323,11 +1446,36 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return { ok: true, remoteSecret: String(secret), cancelled: false };
   }
 
+  async function ensureTrustedHostKeyBeforeLaunch(profile) {
+    if (normalizeLower(profile?.launch?.kind) !== "ssh") {
+      return "";
+    }
+    const host = normalizeText(profile?.launch?.remoteConnection?.host);
+    const port = Number.parseInt(String(profile?.launch?.remoteConnection?.port ?? 22), 10);
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error("Enter an SSH host and port before launching this saved profile.");
+    }
+    const matchingTrustEntries = sshTrustEntries.filter((entry) => entry.host === host && entry.port === port);
+    if (matchingTrustEntries.length > 0) {
+      return "";
+    }
+    if (normalizeText(selectedProfileId) !== profile.id) {
+      selectedProfileId = profile.id;
+      syncSelection();
+      resetDraftFromSelectedProfile();
+    }
+    await probeSshHostKeysFlow({ auto: true });
+    throw new Error(
+      `No trusted host key is stored for ${formatSshTarget(host, port)}. Review the fetched host key below, trust the one that matches your server, then launch again.`
+    );
+  }
+
   async function applyProfileById(profileId) {
     const profile = getProfile(profileId);
     if (!profile) {
       throw new Error(`Unknown connection profile: ${profileId}`);
     }
+    await ensureTrustedHostKeyBeforeLaunch(profile);
     const secretResult = await promptForLaunchSecret(profile);
     if (secretResult.cancelled) {
       return `Connection profile apply cancelled for [${profile.id}] ${profile.name}.`;
@@ -1509,6 +1657,37 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return feedback;
   }
 
+  async function probeSshHostKeysFlow(options = {}) {
+    const target = getCurrentSshTrustTarget();
+    if (!target) {
+      throw new Error("Enter an SSH host and port before fetching host keys.");
+    }
+    if (typeof api.probeSshHostKeys !== "function") {
+      throw new Error("SSH host-key probing is not available.");
+    }
+    probingSshHostKeys = true;
+    renderDraftComputedState();
+    try {
+      const payload = await api.probeSshHostKeys({
+        host: target.host,
+        port: target.port
+      });
+      sshHostKeyProbeCandidates = normalizeSshHostKeyProbeCandidateCollection(payload);
+      selectedSshProbeCandidateId = sshHostKeyProbeCandidates[0]?.id || "";
+      sshProbeTargetKey = getSshTrustTargetKey(target);
+      renderDraftComputedState();
+      const feedback = options.auto === true
+        ? `Fetched SSH host keys for ${formatSshTarget(target.host, target.port)}. Review the fingerprint and trust the selected key before launching.`
+        : `Fetched ${sshHostKeyProbeCandidates.length} SSH host key(s) for ${formatSshTarget(target.host, target.port)}.`;
+      setCommandFeedback(feedback);
+      setStatus(feedback);
+      return feedback;
+    } finally {
+      probingSshHostKeys = false;
+      renderDraftComputedState();
+    }
+  }
+
   async function saveTrustEntryFlow() {
     const target = getCurrentSshTrustTarget();
     if (!target) {
@@ -1517,15 +1696,23 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (typeof api.createSshTrustEntry !== "function") {
       throw new Error("SSH trust entry management is not available.");
     }
+    const selectedProbeCandidate =
+      sshHostKeyProbeCandidates.find((candidate) => candidate.id === selectedSshProbeCandidateId) || null;
+    if (!selectedProbeCandidate) {
+      throw new Error("Fetch SSH host keys and select the key you want to trust first.");
+    }
     const created = await api.createSshTrustEntry({
       host: target.host,
       port: target.port,
-      keyType: normalizeText(sshTrustKeyTypeInputEl?.value),
-      publicKey: normalizeText(sshTrustPublicKeyTextareaEl?.value)
+      keyType: selectedProbeCandidate.keyType,
+      publicKey: selectedProbeCandidate.publicKey
     });
     const normalizedCreated = normalizeSshTrustEntry(created);
     await refreshSshTrustEntries({ silent: true });
     selectedSshTrustEntryId = normalizedCreated?.id || selectedSshTrustEntryId;
+    if (normalizedCreated) {
+      selectedSshProbeCandidateId = `${normalizedCreated.host}:${normalizedCreated.port}:${normalizedCreated.keyType}:${normalizedCreated.fingerprintSha256}`;
+    }
     renderDraftComputedState();
     const feedback = normalizedCreated
       ? `Trusted SSH host key for ${formatSshTarget(target.host, target.port)} (${normalizedCreated.keyType} · ${normalizedCreated.fingerprintSha256}).`
@@ -1644,6 +1831,10 @@ export function createConnectionProfileRuntimeController(options = {}) {
   }
 
   function bindUiEvents() {
+    if (uiEventsBound) {
+      return;
+    }
+    uiEventsBound = true;
     selectEl?.addEventListener?.("change", () => {
       selectedProfileId = normalizeText(selectEl.value);
       syncSelection();
@@ -1695,6 +1886,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
     sshTrustRefreshBtn?.addEventListener?.("click", () => {
       refreshSshTrustEntries().catch((error) => setError(getErrorMessage(error, "Failed to load SSH trust entries.")));
     });
+    sshTrustProbeBtn?.addEventListener?.("click", () => {
+      probeSshHostKeysFlow().catch((error) => setError(getErrorMessage(error, "Failed to fetch SSH host keys.")));
+    });
     sshTrustSaveBtn?.addEventListener?.("click", () => {
       saveTrustEntryFlow().catch((error) => setError(getErrorMessage(error, "Failed to trust SSH host key.")));
     });
@@ -1703,6 +1897,10 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
     sshTrustSelectEl?.addEventListener?.("change", () => {
       selectedSshTrustEntryId = normalizeText(sshTrustSelectEl.value);
+      renderDraftComputedState();
+    });
+    sshProbeSelectEl?.addEventListener?.("change", () => {
+      selectedSshProbeCandidateId = normalizeText(sshProbeSelectEl.value);
       renderDraftComputedState();
     });
     bindDraftSync(draftNameInputEl);
@@ -1724,6 +1922,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     bindDraftSync(sshTrustPublicKeyTextareaEl);
   }
 
+  bindUiEvents();
   render();
 
   return {

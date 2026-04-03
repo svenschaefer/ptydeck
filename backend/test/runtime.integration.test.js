@@ -4438,6 +4438,53 @@ test("ready endpoint stays in starting_sessions until restored sessions go quiet
   await runtime.stop();
 });
 
+test("runtime exposes ssh-host-key-probe through the backend contract", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-ssh-probe-"));
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath: join(dir, "sessions.json"),
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    probeSshHostKeys: async ({ host, port }) => [
+      {
+        host,
+        port,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+        fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
+      }
+    ]
+  });
+
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/ssh-host-key-probe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        host: "example.internal",
+        port: 2222
+      })
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [
+      {
+        host: "example.internal",
+        port: 2222,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+        fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
+      }
+    ]);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime stop is idempotent", async () => {
   const { runtime } = await createStartedRuntime();
   await runtime.stop();

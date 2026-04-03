@@ -107,6 +107,23 @@ function isSshTrustEntry(value) {
   );
 }
 
+function isSshHostKeyProbeCandidate(value) {
+  return (
+    isObject(value) &&
+    typeof value.host === "string" &&
+    value.host.length > 0 &&
+    Number.isInteger(value.port) &&
+    value.port >= 1 &&
+    value.port <= 65535 &&
+    typeof value.keyType === "string" &&
+    value.keyType.length > 0 &&
+    typeof value.publicKey === "string" &&
+    value.publicKey.length > 0 &&
+    typeof value.fingerprintSha256 === "string" &&
+    value.fingerprintSha256.startsWith("SHA256:")
+  );
+}
+
 function isThemeProfile(value) {
   if (!isObject(value)) {
     return false;
@@ -938,6 +955,18 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname === "/api/v1/ssh-host-key-probe") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.host !== "string" || !body.host.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'host' must be a non-empty string.");
+    }
+    if (body.port !== undefined && !Number.isInteger(body.port)) {
+      throw new ApiError(400, "ValidationError", "Field 'port' must be an integer.");
+    }
+  }
+
   if (method === "DELETE" && pathname.match(/^\/api\/v1\/ssh-trust-entries\/[^/]+$/)) {
     if (!params.entryId || typeof params.entryId !== "string") {
       throw new ApiError(400, "ValidationError", "Missing entryId path parameter.");
@@ -1191,6 +1220,12 @@ export function validateResponse({ statusCode, body, expect }) {
   if (expect === "sshTrustEntryList") {
     if (!Array.isArray(body) || !body.every((item) => isSshTrustEntry(item))) {
       throw new ApiError(500, "ResponseValidationError", "Response does not match SshTrustEntry[] schema.");
+    }
+  }
+
+  if (expect === "sshHostKeyProbeCandidateList") {
+    if (!Array.isArray(body) || !body.every((item) => isSshHostKeyProbeCandidate(item))) {
+      throw new ApiError(500, "ResponseValidationError", "Response does not match SshHostKeyProbeCandidate[] schema.");
     }
   }
 }

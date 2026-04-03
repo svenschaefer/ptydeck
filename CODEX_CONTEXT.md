@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-03 (H55 slash-command parity delivered; H56 quality hardening delivered; H57 guided management/settings UX closeout delivered; post-H57 prompt-free Workspace Library management flows delivered; session-settings dismiss semantics unified; terminal-local paste now uses a native-helper paste path with a timed clipboard fallback for xterm instances that never emit the follow-up paste event; guarded terminal paste auto-reveals the confirmation UI and now also surfaces the guard summary immediately when strict per-session send-safety holds the paste for confirmation; xterm viewport scrollbar dragging is protected from render-layer pointer interception while the xterm screen itself keeps pointer/focus behavior; restored terminals now get explicit refresh plus fonts-ready reflow stabilization; visible terminals now also run a local mount-stabilization pass after hard reload so the first screen draw does not wait for later interaction; late snapshot-replay retries now trigger the same per-session stabilization pass for terminals that only receive replayed output after a delayed mount; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-03 (H55 slash-command parity delivered; H56 quality hardening delivered; H57 guided management/settings UX closeout delivered; H58 guided SSH trust and progressive-disclosure settings closeout delivered; Workspace Library panels now stay scrollable inside the dialog shell; `local` connection drafts hide SSH-only controls; guided SSH trust now uses backend SSH host-key probing plus fetch/review/trust flow instead of manual raw key entry; session and management dialogs now use `Advanced` disclosure for low-level fields; terminal-local paste now uses a native-helper paste path with a timed clipboard fallback for xterm instances that never emit the follow-up paste event; guarded terminal paste auto-reveals the confirmation UI and now also surfaces the guard summary immediately when strict per-session send-safety holds the paste for confirmation; xterm viewport scrollbar dragging is protected from render-layer pointer interception while the xterm screen itself keeps pointer/focus behavior; restored terminals now get explicit refresh plus fonts-ready reflow stabilization; visible terminals now also run a local mount-stabilization pass after hard reload so the first screen draw does not wait for later interaction; late snapshot-replay retries now trigger the same per-session stabilization pass for terminals that only receive replayed output after a delayed mount; `CHANGELOG.md` owns completed release history.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-03. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-03. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- The next queued release wave is `v0.4.0-H58` (`UX-023A` through `UX-023D`).
+- There is no queued release wave currently.
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -35,7 +35,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-03. 
 - Quick-ID swap ordering is backend-persisted and shared across reload, reconnect, and restart restore.
 - Send safety is configured through explicit per-session `inputSafetyProfile` option fields, not presets.
 - Session settings are tabbed; terminal-surface `Ctrl-C` ambiguity is resolved through a local copy-versus-cancel prompt.
-- Remote session baseline exists for `local` and `ssh`, including remote auth metadata, SSH host-key trust persistence, reconnect metadata, and saved connection profiles.
+- Remote session baseline exists for `local` and `ssh`, including remote auth metadata, SSH host-key trust persistence, backend SSH host-key probing, reconnect metadata, and saved connection profiles.
 - Read-only sharing exists for session/deck spectator access.
 - Session-scoped file transfer exists through the bounded backend contract and `/transfer` workflows.
 - Controlled mouse forwarding exists as per-session `mouseForwardingMode` (`off|application`), defaulting to `off`.
@@ -66,10 +66,11 @@ Documentation sync status: repository markdown files are aligned on 2026-04-03. 
   - primary `Workspace Library` CRUD flows for saved connection profiles, workspace presets, and deck groups no longer rely on browser `prompt()` / `confirm()` dialogs; they now use inline name inputs, inline runtime-secret entry, and inline two-step delete confirmation in the dialog itself;
   - `Save and Launch` for SSH connection-profile drafts must preserve the entered runtime secret across the intermediate save/rerender step before launching the saved profile;
   - session-settings close semantics are now intentionally unified: `Cancel`, dialog dismiss, and `Escape` all discard the draft and resync controls from persisted session state before closing.
-- The remaining end-user-friendly management/settings gaps are now explicitly queued in `v0.4.0-H58`:
-  - replace manual SSH trust-entry editing with a first-connect verify/trust flow;
-  - add `Basic` / `Advanced` progressive disclosure for session settings and management dialogs;
-  - replace the remaining preset/group storage-centric wording with clearer effect-centric summaries.
+- The delivered H58 closeout finished the remaining management/settings usability gaps:
+  - `frontend/src/public/index.html` and `frontend/src/public/styles.css` now keep the `Workspace Library` body and panels scrollable inside the dialog shell instead of letting the connections surface exceed the viewport without an internal scroll path;
+  - `frontend/src/public/connection-profile-runtime-controller.js` now hides SSH-only controls for `local` drafts, keeps auth-specific SSH fields conditional, and uses backend-backed host-key probing plus a fetch/review/trust workflow instead of asking operators to type raw `keyType` and public key values by hand;
+  - session settings and management surfaces now keep primary end-user actions visible by default while low-level launch, theme, input-safety, and expert transport controls live behind explicit `Advanced` disclosure sections;
+  - workspace preset and deck-group summaries now describe user effect rather than storage mechanics.
 - Help, usage, and autocomplete should continue to be treated as part of the command surface itself so the documented slash plane stays in parity with delivered behavior.
 - The H56 quality hardening closeout on 2026-04-02 delivered the identified near-term risk reductions:
   - backend session normalizers (`session-input-safety-profile.js`, `session-mouse-forwarding.js`) now have direct unit coverage for strict versus non-strict normalization and default fallback behavior;

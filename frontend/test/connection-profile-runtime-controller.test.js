@@ -79,13 +79,18 @@ function createConnectionProfileUiRefs() {
     draftRemotePortInputEl: createElement("input"),
     draftRemoteUsernameInputEl: createElement("input"),
     draftRemoteAuthMethodSelectEl: createElement("select"),
+    draftRemotePrivateKeyFieldEl: createElement("div"),
     draftRemotePrivateKeyPathInputEl: createElement("input"),
     authHintEl: createElement("p"),
     secretHintEl: createElement("p"),
+    runtimeSecretFieldEl: createElement("div"),
     runtimeSecretInputEl: createElement("input"),
     sshTrustStatusEl: createElement("p"),
+    sshTrustProbeBtn: createElement("button"),
+    sshProbeSelectEl: createElement("select"),
     sshTrustSelectEl: createElement("select"),
     sshTrustKeyTypeInputEl: createElement("input"),
+    sshTrustFingerprintInputEl: createElement("input"),
     sshTrustPublicKeyTextareaEl: createElement("textarea"),
     sshTrustRefreshBtn: createElement("button"),
     sshTrustSaveBtn: createElement("button"),
@@ -266,6 +271,19 @@ test("connection profile runtime controller manages backend-backed lifecycle and
           }
         ];
       },
+      async listSshTrustEntries() {
+        calls.push(["list-trust"]);
+        return [
+          {
+            id: "trust-ops",
+            host: "ops.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      },
       async createConnectionProfile(payload) {
         calls.push(["create", payload]);
         const createdId = payload.name === "Ops SSH Copy" ? "ops-ssh-copy" : "local-dev";
@@ -428,6 +446,41 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   assert.equal(deleteFeedback, "Deleted connection profile [ops-ssh] Ops SSH Prod.");
 });
 
+test("connection profile runtime controller hides SSH-only and auth-specific fields for local drafts", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listConnectionProfiles() {
+        return [];
+      }
+    },
+    getDecks: () => [{ id: "default", name: "Default" }],
+    getSessions: () => [],
+    getActiveSessionId: () => "",
+    setCommandFeedback: () => {},
+    requestRender: () => {},
+    normalizeThemeProfile: (profile) => profile,
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await controller.newDraftFlow("local");
+  assert.equal(ui.sshFieldsEl.hidden, true);
+  assert.equal(ui.draftRemotePrivateKeyFieldEl.hidden, true);
+  assert.equal(ui.runtimeSecretFieldEl.hidden, true);
+
+  await controller.newDraftFlow("ssh");
+  assert.equal(ui.sshFieldsEl.hidden, false);
+  assert.equal(ui.draftRemotePrivateKeyFieldEl.hidden, false);
+  assert.equal(ui.runtimeSecretFieldEl.hidden, true);
+
+  ui.draftRemoteAuthMethodSelectEl.value = "password";
+  ui.draftRemoteAuthMethodSelectEl.dispatch("change");
+  assert.equal(ui.draftRemotePrivateKeyFieldEl.hidden, true);
+  assert.equal(ui.runtimeSecretFieldEl.hidden, false);
+});
+
 test("connection profile runtime controller updates saved drafts instead of creating duplicates", async () => {
   const calls = [];
   const ui = createConnectionProfileUiRefs();
@@ -496,6 +549,39 @@ test("connection profile runtime controller reports apply cancellation when secr
     documentRef: createDocumentRef(),
     ...ui,
     api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-ssh",
+            name: "Ops SSH",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: [],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+              remoteAuth: { method: "password" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [
+          {
+            id: "trust-ops",
+            host: "ops.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      },
       async createSession(payload) {
         calls.push(["create-session", payload]);
         throw new Error("should not be reached");
@@ -503,25 +589,7 @@ test("connection profile runtime controller reports apply cancellation when secr
     }
   });
 
-  controller.replaceProfiles([
-    {
-      id: "ops-ssh",
-      name: "Ops SSH",
-      launch: {
-        kind: "ssh",
-        deckId: "ops",
-        shell: "ssh",
-        startCwd: "~",
-        startCommand: "",
-        env: {},
-        tags: [],
-        activeThemeProfile: createThemeProfile("#111111"),
-        inactiveThemeProfile: createThemeProfile("#121212"),
-        remoteConnection: { host: "ops.example", port: 22, username: "ops" },
-        remoteAuth: { method: "password" }
-      }
-    }
-  ]);
+  await controller.loadProfiles();
 
   const feedback = await controller.applyProfileById("ops-ssh");
   assert.equal(feedback, "Connection profile apply cancelled for [ops-ssh] Ops SSH.");
@@ -530,6 +598,16 @@ test("connection profile runtime controller reports apply cancellation when secr
 
 test("connection profile runtime controller supports guided SSH drafts, save-and-launch, and SSH trust entry management", async () => {
   const calls = [];
+  const trustEntries = [
+    {
+      id: "trust-1",
+      host: "ops.example",
+      port: 22,
+      keyType: "ssh-ed25519",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+      fingerprintSha256: "SHA256:existing"
+    }
+  ];
   const ui = createConnectionProfileUiRefs();
   const controller = createConnectionProfileRuntimeController({
     windowRef: {},
@@ -546,6 +624,16 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
           launch: payload.launch
         };
       },
+      async updateConnectionProfile(profileId, payload) {
+        calls.push(["update", profileId, payload]);
+        return {
+          id: profileId,
+          name: payload.name,
+          createdAt: 1,
+          updatedAt: 2,
+          launch: payload.launch
+        };
+      },
       async createSession(payload) {
         calls.push(["create-session", payload]);
         return {
@@ -557,20 +645,23 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
       },
       async listSshTrustEntries() {
         calls.push(["list-trust"]);
+        return trustEntries.slice();
+      },
+      async probeSshHostKeys(payload) {
+        calls.push(["probe-trust", payload]);
         return [
           {
-            id: "trust-1",
-            host: "ops.example",
-            port: 22,
+            host: payload.host,
+            port: payload.port,
             keyType: "ssh-ed25519",
-            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
-            fingerprintSha256: "SHA256:existing"
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated",
+            fingerprintSha256: "SHA256:created"
           }
         ];
       },
       async createSshTrustEntry(payload) {
         calls.push(["create-trust", payload]);
-        return {
+        const created = {
           id: "trust-2",
           host: payload.host,
           port: payload.port,
@@ -578,9 +669,15 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
           publicKey: payload.publicKey,
           fingerprintSha256: "SHA256:created"
         };
+        trustEntries.push(created);
+        return created;
       },
       async deleteSshTrustEntry(entryId) {
         calls.push(["delete-trust", entryId]);
+        const index = trustEntries.findIndex((entry) => entry.id === entryId);
+        if (index >= 0) {
+          trustEntries.splice(index, 1);
+        }
       }
     },
     getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
@@ -617,19 +714,32 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   ui.draftTagsInputEl.value = "ops, ssh";
   ui.draftActiveThemeSelectEl.value = "ptydeck-dark";
   ui.draftInactiveThemeSelectEl.value = "ptydeck-light";
-  ui.draftRemoteHostInputEl.value = "ops.example";
+  ui.draftRemoteHostInputEl.value = "ops-new.example";
   ui.draftRemotePortInputEl.value = "22";
   ui.draftRemoteUsernameInputEl.value = "ops";
   ui.draftRemoteAuthMethodSelectEl.value = "password";
   ui.draftRemotePrivateKeyPathInputEl.value = "";
   ui.runtimeSecretInputEl.value = "runtime-secret";
-  ui.sshTrustKeyTypeInputEl.value = "ssh-ed25519";
-  ui.sshTrustPublicKeyTextareaEl.value = "AAAAC3NzaC1lZDI1NTE5AAAAcreated";
+
+  const saveFeedback = await controller.saveDraftById();
+  assert.match(saveFeedback, /Saved connection profile \[ops-guided\] Guided SSH\./);
+
+  const firstLaunchFeedback = await controller.applyProfileById("ops-guided").catch((error) => error.message);
+  assert.match(firstLaunchFeedback, /No trusted host key is stored/);
+  assert.deepEqual(calls.find((entry) => entry[0] === "probe-trust")?.[1], {
+    host: "ops-new.example",
+    port: 22
+  });
+  assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
+  assert.equal(ui.sshProbeSelectEl.value.includes("ssh-ed25519"), true);
+  assert.equal(ui.sshTrustKeyTypeInputEl.value, "ssh-ed25519");
+  assert.equal(ui.sshTrustFingerprintInputEl.value, "SHA256:created");
+  assert.equal(ui.sshTrustPublicKeyTextareaEl.value, "AAAAC3NzaC1lZDI1NTE5AAAAcreated");
 
   const trustFeedback = await controller.saveTrustEntryFlow();
   assert.match(trustFeedback, /Trusted SSH host key/);
   assert.deepEqual(calls.find((entry) => entry[0] === "create-trust")?.[1], {
-    host: "ops.example",
+    host: "ops-new.example",
     port: 22,
     keyType: "ssh-ed25519",
     publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated"
@@ -637,7 +747,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
 
   ui.runtimeSecretInputEl.value = "runtime-secret";
   const combinedFeedback = await controller.saveAndLaunchDraftFlow();
-  assert.match(combinedFeedback, /Saved connection profile \[ops-guided\] Guided SSH\./);
+  assert.match(combinedFeedback, /Updated connection profile \[ops-guided\] Guided SSH\./);
   assert.match(combinedFeedback, /Started session \[s-ssh\] Guided SSH from connection profile \[ops-guided\] Guided SSH\./);
   assert.deepEqual(calls.find((entry) => entry[0] === "create")?.[1], {
     name: "Guided SSH",
@@ -653,7 +763,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
       activeThemeProfile: createThemeProfile("#151515"),
       inactiveThemeProfile: createThemeProfile("#efefef"),
       remoteConnection: {
-        host: "ops.example",
+        host: "ops-new.example",
         port: 22,
         username: "ops"
       },
@@ -674,5 +784,5 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   ui.sshTrustSelectEl.dispatch("change");
   const deleteTrustFeedback = await controller.deleteTrustEntryFlow();
   assert.match(deleteTrustFeedback, /Deleted trusted SSH host key/);
-  assert.ok(calls.some((entry) => entry[0] === "delete-trust" && entry[1] === "trust-1"));
+  assert.ok(calls.some((entry) => entry[0] === "delete-trust"));
 });

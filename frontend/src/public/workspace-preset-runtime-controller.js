@@ -322,11 +322,12 @@ function formatWorkspacePresetSummary(preset) {
   if (!normalized) {
     return "No saved workspace preset selected.";
   }
+  const groupDeckCount = Object.keys(normalized.workspace.deckGroups || {}).length;
   return [
     `[${normalized.id}] ${normalized.name}`,
-    `deck=${normalized.workspace.activeDeckId || "default"}`,
-    `layout=${normalized.workspace.layoutProfileId || "-"}`,
-    `grouped decks=${Object.keys(normalized.workspace.deckGroups || {}).length}`
+    `returns you to deck [${normalized.workspace.activeDeckId || "default"}]`,
+    normalized.workspace.layoutProfileId ? `uses layout [${normalized.workspace.layoutProfileId}]` : "keeps the current layout",
+    groupDeckCount > 0 ? `restores saved groups on ${groupDeckCount} deck(s)` : "does not change deck groups"
   ].join(" · ");
 }
 
@@ -344,11 +345,17 @@ export function formatWorkspacePresetDetail(preset) {
   const splitLayoutDeckCount = Object.keys(workspace.deckSplitLayouts || {}).length;
   return [
     `[${normalized.id}] ${normalized.name}`,
-    `Active deck: [${workspace.activeDeckId || "default"}]`,
-    `Linked layout profile: ${workspace.layoutProfileId ? `[${workspace.layoutProfileId}]` : "None"}`,
-    `Control pane: ${workspace.controlPaneVisible !== false ? "visible" : "hidden"} · ${workspace.controlPanePosition || "bottom"} · ${workspace.controlPaneSize || 185}px`,
-    `Deck groups: ${deckGroupDeckCount} deck(s) · ${totalGroupCount} saved group(s)`,
-    `Split layouts: ${splitLayoutDeckCount} deck(s) with saved pane assignments`
+    `When applied, this preset opens deck [${workspace.activeDeckId || "default"}].`,
+    workspace.layoutProfileId
+      ? `It switches to saved layout profile [${workspace.layoutProfileId}].`
+      : "It keeps whichever layout profile is already active.",
+    `The input pane becomes ${workspace.controlPaneVisible !== false ? "visible" : "hidden"} on ${workspace.controlPanePosition || "bottom"} at ${workspace.controlPaneSize || 185}px.`,
+    totalGroupCount > 0
+      ? `It restores ${totalGroupCount} saved deck group(s) across ${deckGroupDeckCount} deck(s).`
+      : "It does not restore any saved deck groups.",
+    splitLayoutDeckCount > 0
+      ? `It restores saved split panes on ${splitLayoutDeckCount} deck(s).`
+      : "It does not restore any split-pane layout."
   ].join("\n");
 }
 
@@ -415,6 +422,7 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   const selectedGroupIdByDeck = new Map();
   let pendingDeletePresetId = "";
   let pendingDeleteGroupKey = "";
+  let uiEventsBound = false;
 
   function getPresetNameInputValue() {
     return normalizeText(presetNameInputEl?.value);
@@ -759,8 +767,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     }
     if (groupPersistenceEl) {
       groupPersistenceEl.textContent = selectedPreset
-        ? `Deck-group edits on [${activeDeckId}] persist into preset [${selectedPreset.id}] ${selectedPreset.name}. Save Visible captures the current filtered deck view; Apply activates the selected group; Clear removes the active group.`
-        : `No workspace preset is selected. Deck-group edits on [${activeDeckId}] are local-only until you save or select a preset. Save Visible captures the current filtered deck view; Apply activates the selected group; Clear removes the active group.`;
+        ? `Changes you make here are saved into preset [${selectedPreset.id}] ${selectedPreset.name}. Save Visible remembers the sessions currently shown in deck [${activeDeckId}], Apply Group narrows the deck to that saved set, and Clear Active Group shows all sessions again.`
+        : `No workspace preset is selected. Changes you make here affect only the current browser view until you save a preset. Save Visible remembers the sessions currently shown in deck [${activeDeckId}], Apply Group narrows the deck to that saved set, and Clear Active Group shows all sessions again.`;
     }
     if (presetDeleteBtn) {
       presetDeleteBtn.textContent = pendingDeletePresetId && pendingDeletePresetId === selectedPreset?.id ? "Confirm Delete Preset" : "Delete Preset";
@@ -1417,6 +1425,10 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   }
 
   function bindUiEvents() {
+    if (uiEventsBound) {
+      return;
+    }
+    uiEventsBound = true;
     presetSelectEl?.addEventListener?.("change", () => {
       selectedPresetId = normalizeText(presetSelectEl.value);
       clearPendingPresetDelete();
@@ -1484,6 +1496,7 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     });
   }
 
+  bindUiEvents();
   render();
 
   return {

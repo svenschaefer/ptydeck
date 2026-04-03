@@ -287,6 +287,10 @@ test("api client calls SSH trust entry lifecycle endpoints", async () => {
 
   const api = createApiClient("http://localhost:18080/api/v1");
   await api.listSshTrustEntries();
+  await api.probeSshHostKeys({
+    host: "ops.example",
+    port: 22
+  });
   await api.createSshTrustEntry({
     host: "ops.example",
     port: 22,
@@ -295,13 +299,22 @@ test("api client calls SSH trust entry lifecycle endpoints", async () => {
   });
   await api.deleteSshTrustEntry("trust-1");
 
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/ssh-trust-entries");
   assert.equal((calls[0].options.method || "GET"), "GET");
-  assert.equal(calls[1].url, "http://localhost:18080/api/v1/ssh-trust-entries");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/ssh-host-key-probe");
   assert.equal(calls[1].options.method, "POST");
   assert.equal(
     calls[1].options.body,
+    JSON.stringify({
+      host: "ops.example",
+      port: 22
+    })
+  );
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/ssh-trust-entries");
+  assert.equal(calls[2].options.method, "POST");
+  assert.equal(
+    calls[2].options.body,
     JSON.stringify({
       host: "ops.example",
       port: 22,
@@ -309,8 +322,8 @@ test("api client calls SSH trust entry lifecycle endpoints", async () => {
       publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexample"
     })
   );
-  assert.equal(calls[2].url, "http://localhost:18080/api/v1/ssh-trust-entries/trust-1");
-  assert.equal(calls[2].options.method, "DELETE");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/ssh-trust-entries/trust-1");
+  assert.equal(calls[3].options.method, "DELETE");
 });
 
 test("api client calls workspace preset lifecycle endpoints", async () => {

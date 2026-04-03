@@ -1502,6 +1502,8 @@ button:hover {
 .session-settings-dialog {
   width: min(980px, calc(100vw - 48px));
   max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
@@ -1693,6 +1695,8 @@ button:hover {
 .workspace-manager-dialog {
   width: min(920px, calc(100vw - 48px));
   max-height: calc(100vh - 64px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 0;
@@ -1761,10 +1765,20 @@ button:hover {
   color: #eef5ff;
 }
 
+.workspace-manager-body {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 16px 16px;
+}
+
 .workspace-manager-panel {
   display: grid;
   gap: 12px;
-  padding: 16px;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: 16px 0 0;
 }
 
 .workspace-manager-panel[hidden] {
@@ -1775,6 +1789,11 @@ button:hover {
   display: grid;
   gap: 12px;
   padding-top: 4px;
+}
+
+.workspace-manager-subsection[hidden],
+.workspace-manager-field-block[hidden] {
+  display: none !important;
 }
 
 .workspace-manager-section-head {
@@ -1888,12 +1907,16 @@ button:hover {
 }
 
 .workspace-manager-textarea {
-  min-height: 240px;
+  min-height: 180px;
   resize: vertical;
 }
 
 .workspace-manager-textarea-compact {
   min-height: 0;
+}
+
+.workspace-manager-textarea-preview {
+  min-height: 140px;
 }
 
 .workspace-manager-inline-note {
@@ -1930,6 +1953,52 @@ button:hover {
   word-break: break-word;
   overflow: auto;
   max-height: 260px;
+}
+
+.workspace-manager-advanced,
+.session-settings-advanced {
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: rgba(15, 21, 31, 0.75);
+  overflow: hidden;
+}
+
+.workspace-manager-advanced > summary,
+.session-settings-advanced > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 11px 12px;
+  color: #9db8d2;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workspace-manager-advanced > summary::-webkit-details-marker,
+.session-settings-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workspace-manager-advanced > summary::before,
+.session-settings-advanced > summary::before {
+  content: "+";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--active);
+  font-weight: 700;
+}
+
+.workspace-manager-advanced[open] > summary::before,
+.session-settings-advanced[open] > summary::before {
+  content: "-";
+}
+
+.workspace-manager-advanced-body,
+.session-settings-advanced-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+  border-top: 1px solid #223041;
 }
 
 .replay-viewer-head {
@@ -2062,6 +2131,7 @@ button:hover {
   margin-top: 10px;
   display: grid;
   align-items: start;
+  min-height: 0;
   max-height: calc(100vh - 240px);
   overflow: auto;
   padding-right: 4px;

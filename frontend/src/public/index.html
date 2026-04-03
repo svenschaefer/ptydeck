@@ -252,13 +252,14 @@
               Workspace Presets
             </button>
           </div>
-          <section id="workspace-manager-panel-connections" class="workspace-manager-panel">
+          <div class="workspace-manager-body">
+            <section id="workspace-manager-panel-connections" class="workspace-manager-panel">
             <div class="workspace-manager-section-head">
               <p class="workspace-manager-section-title">Connections</p>
               <p id="connection-profile-status" class="workspace-manager-status"></p>
             </div>
             <p class="workspace-manager-inline-note">
-              Saved connection profiles start new local or SSH sessions. Use the guided form below for normal editing; the raw launch JSON remains available only as an advanced preview.
+              Saved connection profiles start new local or SSH sessions. The default form shows the fields most operators need first; advanced launch details stay collapsed until you ask for them.
             </p>
             <select id="connection-profile-select" class="workspace-manager-select" aria-label="Saved connection profiles"></select>
             <div class="workspace-manager-action-cluster">
@@ -310,10 +311,6 @@
                   <select id="connection-profile-deck" class="workspace-manager-input"></select>
                 </div>
                 <div class="workspace-manager-field-block">
-                  <label class="workspace-manager-field" for="connection-profile-shell">Shell</label>
-                  <input id="connection-profile-shell" class="workspace-manager-input" type="text" placeholder="bash or ssh" />
-                </div>
-                <div class="workspace-manager-field-block">
                   <label class="workspace-manager-field" for="connection-profile-start-cwd">Start Directory</label>
                   <input id="connection-profile-start-cwd" class="workspace-manager-input" type="text" placeholder="/workspace or ~" />
                 </div>
@@ -326,31 +323,6 @@
                 spellcheck="false"
                 placeholder="Optional command to run after the terminal starts"
               ></textarea>
-              <div class="workspace-manager-form-grid">
-                <div class="workspace-manager-field-block">
-                  <label class="workspace-manager-field" for="connection-profile-active-theme">Active Theme Slot</label>
-                  <select id="connection-profile-active-theme" class="workspace-manager-input"></select>
-                </div>
-                <div class="workspace-manager-field-block">
-                  <label class="workspace-manager-field" for="connection-profile-inactive-theme">Inactive Theme Slot</label>
-                  <select id="connection-profile-inactive-theme" class="workspace-manager-input"></select>
-                </div>
-              </div>
-              <label class="workspace-manager-field" for="connection-profile-env">Environment Variables (KEY=VALUE per line)</label>
-              <textarea
-                id="connection-profile-env"
-                class="workspace-manager-textarea workspace-manager-textarea-compact"
-                rows="5"
-                spellcheck="false"
-                placeholder="NODE_ENV=production"
-              ></textarea>
-              <label class="workspace-manager-field" for="connection-profile-tags">Tags (comma, space, or newline separated)</label>
-              <input
-                id="connection-profile-tags"
-                class="workspace-manager-input"
-                type="text"
-                placeholder="ops prod ssh"
-              />
               <section id="connection-profile-ssh-fields" class="workspace-manager-subsection" hidden>
                 <div class="workspace-manager-section-head">
                   <p class="workspace-manager-section-title">SSH Connection</p>
@@ -378,81 +350,139 @@
                     </select>
                   </div>
                 </div>
-                <label class="workspace-manager-field" for="connection-profile-remote-private-key-path">Private Key Path</label>
-                <input
-                  id="connection-profile-remote-private-key-path"
-                  class="workspace-manager-input"
-                  type="text"
-                  placeholder="~/.ssh/id_ed25519"
-                />
+                <div id="connection-profile-remote-private-key-field" class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-remote-private-key-path">Private Key Path</label>
+                  <input
+                    id="connection-profile-remote-private-key-path"
+                    class="workspace-manager-input"
+                    type="text"
+                    placeholder="~/.ssh/id_ed25519"
+                  />
+                </div>
                 <p id="connection-profile-auth-hint" class="workspace-manager-inline-note"></p>
-                <label class="workspace-manager-field" for="connection-profile-runtime-secret">Runtime Secret</label>
-                <input
-                  id="connection-profile-runtime-secret"
-                  class="workspace-manager-input"
-                  type="password"
-                  placeholder="Only required when the selected SSH auth method prompts at launch"
-                />
-                <div class="workspace-manager-subsection workspace-manager-subsection-card">
-                  <div class="workspace-manager-section-head">
-                    <p class="workspace-manager-section-title">Host Key Trust</p>
-                    <p id="connection-profile-ssh-trust-status" class="workspace-manager-status"></p>
-                  </div>
-                  <p class="workspace-manager-inline-note">
-                    ptydeck stores trusted SSH host keys separately from the saved connection profile. Trusting a host key here updates the managed known-hosts store used by the backend SSH runtime.
-                  </p>
-                  <select
-                    id="connection-profile-ssh-trust-select"
-                    class="workspace-manager-select"
-                    aria-label="Trusted host keys for this SSH target"
-                  ></select>
-                  <div class="workspace-manager-form-grid">
-                    <div class="workspace-manager-field-block">
-                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-key-type">Host Key Type</label>
-                      <input
-                        id="connection-profile-ssh-trust-key-type"
-                        class="workspace-manager-input"
-                        type="text"
-                        placeholder="ssh-ed25519"
-                      />
-                    </div>
-                    <div class="workspace-manager-field-block">
-                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-public-key">Host Public Key</label>
+                <div id="connection-profile-runtime-secret-field" class="workspace-manager-field-block">
+                  <label class="workspace-manager-field" for="connection-profile-runtime-secret">Runtime Secret</label>
+                  <input
+                    id="connection-profile-runtime-secret"
+                    class="workspace-manager-input"
+                    type="password"
+                    placeholder="Only required when the selected SSH auth method prompts at launch"
+                  />
+                </div>
+                <details class="workspace-manager-advanced workspace-manager-ssh-trust-advanced">
+                  <summary>Advanced host-key trust</summary>
+                  <div class="workspace-manager-advanced-body">
+                    <div class="workspace-manager-subsection workspace-manager-subsection-card">
+                      <div class="workspace-manager-section-head">
+                        <p class="workspace-manager-section-title">Trusted Host Keys</p>
+                        <p id="connection-profile-ssh-trust-status" class="workspace-manager-status"></p>
+                      </div>
+                      <p class="workspace-manager-inline-note">
+                        For a new SSH target, fetch the presented host keys, verify the fingerprint you expect, then trust the selected key before launching. Trusted host keys are stored separately from the saved connection profile.
+                      </p>
+                      <div class="workspace-manager-actions">
+                        <button id="connection-profile-ssh-trust-probe" type="button">Fetch Host Keys</button>
+                        <button id="connection-profile-ssh-trust-save" type="button">Trust Selected Key</button>
+                        <button id="connection-profile-ssh-trust-refresh" type="button">Refresh Trusted Keys</button>
+                        <button id="connection-profile-ssh-trust-delete" type="button">Delete Trusted Key</button>
+                      </div>
+                      <label class="workspace-manager-field" for="connection-profile-ssh-probe-select">Fetched Host Keys</label>
+                      <select
+                        id="connection-profile-ssh-probe-select"
+                        class="workspace-manager-select"
+                        aria-label="Fetched SSH host keys for this SSH target"
+                      ></select>
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-select">Trusted Host Keys</label>
+                      <select
+                        id="connection-profile-ssh-trust-select"
+                        class="workspace-manager-select"
+                        aria-label="Trusted host keys for this SSH target"
+                      ></select>
+                      <div class="workspace-manager-form-grid">
+                        <div class="workspace-manager-field-block">
+                          <label class="workspace-manager-field" for="connection-profile-ssh-trust-key-type">Selected Key Type</label>
+                          <input
+                            id="connection-profile-ssh-trust-key-type"
+                            class="workspace-manager-input"
+                            type="text"
+                            readonly
+                          />
+                        </div>
+                        <div class="workspace-manager-field-block">
+                          <label class="workspace-manager-field" for="connection-profile-ssh-trust-fingerprint">Selected Fingerprint</label>
+                          <input
+                            id="connection-profile-ssh-trust-fingerprint"
+                            class="workspace-manager-input"
+                            type="text"
+                            readonly
+                          />
+                        </div>
+                      </div>
+                      <label class="workspace-manager-field" for="connection-profile-ssh-trust-public-key">Selected Public Key</label>
                       <textarea
                         id="connection-profile-ssh-trust-public-key"
                         class="workspace-manager-textarea workspace-manager-textarea-compact"
                         rows="3"
                         spellcheck="false"
-                        placeholder="AAAAC3NzaC1lZDI1NTE5AAAA..."
+                        readonly
                       ></textarea>
                     </div>
                   </div>
-                  <div class="workspace-manager-actions">
-                    <button id="connection-profile-ssh-trust-refresh" type="button">Refresh Trust</button>
-                    <button id="connection-profile-ssh-trust-save" type="button">Trust Host Key</button>
-                    <button id="connection-profile-ssh-trust-delete" type="button">Delete Trusted Key</button>
-                  </div>
-                </div>
+                </details>
               </section>
-              <label class="workspace-manager-field" for="connection-profile-draft-launch">Advanced Launch JSON Preview</label>
-              <textarea
-                id="connection-profile-draft-launch"
-                class="workspace-manager-textarea"
-                rows="12"
-                spellcheck="false"
-                readonly
-                placeholder='{"kind":"local","deckId":"default","shell":"bash","startCwd":"/"}'
-              ></textarea>
+              <details class="workspace-manager-advanced">
+                <summary>Advanced launch options</summary>
+                <div class="workspace-manager-advanced-body">
+                  <div class="workspace-manager-form-grid">
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-shell">Shell</label>
+                      <input id="connection-profile-shell" class="workspace-manager-input" type="text" placeholder="bash or ssh" />
+                    </div>
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-active-theme">Active Theme Slot</label>
+                      <select id="connection-profile-active-theme" class="workspace-manager-input"></select>
+                    </div>
+                    <div class="workspace-manager-field-block">
+                      <label class="workspace-manager-field" for="connection-profile-inactive-theme">Inactive Theme Slot</label>
+                      <select id="connection-profile-inactive-theme" class="workspace-manager-input"></select>
+                    </div>
+                  </div>
+                  <label class="workspace-manager-field" for="connection-profile-env">Environment Variables (KEY=VALUE per line)</label>
+                  <textarea
+                    id="connection-profile-env"
+                    class="workspace-manager-textarea workspace-manager-textarea-compact"
+                    rows="5"
+                    spellcheck="false"
+                    placeholder="NODE_ENV=production"
+                  ></textarea>
+                  <label class="workspace-manager-field" for="connection-profile-tags">Tags (comma, space, or newline separated)</label>
+                  <input
+                    id="connection-profile-tags"
+                    class="workspace-manager-input"
+                    type="text"
+                    placeholder="ops prod ssh"
+                  />
+                  <label class="workspace-manager-field" for="connection-profile-draft-launch">Advanced Launch JSON Preview</label>
+                  <textarea
+                    id="connection-profile-draft-launch"
+                    class="workspace-manager-textarea workspace-manager-textarea-preview"
+                    rows="8"
+                    spellcheck="false"
+                    readonly
+                    placeholder='{"kind":"local","deckId":"default","shell":"bash","startCwd":"/"}'
+                  ></textarea>
+                </div>
+              </details>
               <p id="connection-profile-draft-status" class="workspace-manager-inline-note"></p>
             </div>
-          </section>
-          <section id="workspace-manager-panel-workspace" class="workspace-manager-panel" hidden>
+            </section>
+            <section id="workspace-manager-panel-workspace" class="workspace-manager-panel" hidden>
             <div class="workspace-manager-section-head">
               <p class="workspace-manager-section-title">Workspace Presets</p>
               <p id="workspace-preset-status" class="workspace-manager-status"></p>
             </div>
             <p class="workspace-manager-inline-note">
-              Saving a workspace preset captures the active deck, selected layout profile, control-pane state, deck groups, and split-layout assignments. Applying a preset restores that full workspace view.
+              Save Current Workspace to remember which deck, layout, pane arrangement, and deck groups you want to return to later. Apply Preset brings you back to that saved workspace view.
             </p>
             <select id="workspace-preset-select" class="workspace-manager-select" aria-label="Saved workspace presets"></select>
             <label class="workspace-manager-field" for="workspace-preset-name">Preset Name</label>
@@ -484,7 +514,7 @@
                 <p id="workspace-group-summary" class="workspace-manager-status"></p>
               </div>
               <p class="workspace-manager-inline-note">
-                Deck groups are deck-local session subsets. `Save Visible as Group` captures the current visible deck sessions, `Apply Group` switches the active subset, and `Clear Active Group` returns to all sessions in the current deck.
+                Save Visible as Group to remember the sessions currently shown in this deck. Apply Group narrows the deck to that saved set; Clear Active Group returns to all sessions in the current deck.
               </p>
               <select id="workspace-group-select" class="workspace-manager-select" aria-label="Workspace groups for active deck"></select>
               <label class="workspace-manager-field" for="workspace-group-name">Group Name</label>
@@ -510,7 +540,8 @@
               </div>
               <p id="workspace-group-persistence" class="workspace-manager-inline-note"></p>
             </div>
-          </section>
+            </section>
+          </div>
         </dialog>
       </section>
     </div>
@@ -547,7 +578,7 @@
               </button>
             </div>
           </div>
-          <p class="session-settings-hint">Edit the startup profile, note, and theme for this session. Cancel discards draft changes; Save Settings persists the current tabbed draft.</p>
+          <p class="session-settings-hint">Use Startup for how the session launches, Note for the saved note, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
           <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">
             <button class="session-settings-tab session-settings-tab-startup" type="button">Startup</button>
             <button class="session-settings-tab session-settings-tab-note" type="button">Note</button>
@@ -560,62 +591,67 @@
               <input class="session-start-cwd" type="text" value="" />
               <label class="session-startup-label">Start Command Line</label>
               <textarea class="session-start-command" rows="2"></textarea>
-              <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
-              <textarea class="session-start-env" rows="4"></textarea>
-              <label class="session-startup-label">Mouse Forwarding</label>
-              <select class="session-mouse-forwarding-mode">
-                <option value="off">Off</option>
-                <option value="application">Application-controlled</option>
-              </select>
-              <label class="session-startup-label">Tags (comma/space/newline separated)</label>
-              <input class="session-tags-input" type="text" value="" placeholder="backend ops prod" />
-              <label class="session-startup-label">Send Terminator</label>
-              <select class="session-send-terminator">
-                <option value="auto">Auto (CR / Enter)</option>
-                <option value="crlf">CRLF (\\r\\n)</option>
-                <option value="lf">LF (\\n)</option>
-                <option value="cr">CR (\\r)</option>
-                <option value="cr2">CR2 (\\r\\r)</option>
-                <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
-              </select>
-              <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
-              <div class="session-input-safety-grid">
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
-                  <span>Require valid shell syntax</span>
-                </label>
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
-                  <span>Confirm incomplete shell constructs</span>
-                </label>
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
-                  <span>Confirm natural-language input</span>
-                </label>
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
-                  <span>Confirm dangerous shell commands</span>
-                </label>
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
-                  <span>Confirm multiline or large paste input</span>
-                </label>
-                <label class="session-input-safety-check">
-                  <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
-                  <span>Confirm recent target switches</span>
-                </label>
-              </div>
-              <div class="session-input-safety-threshold-grid">
-                <label class="session-startup-label">Target Switch Grace (ms)</label>
-                <input class="session-input-safety-target-switch-grace-ms" type="number" min="0" step="1" value="4000" />
-                <label class="session-startup-label">Paste Length Threshold</label>
-                <input class="session-input-safety-paste-length-threshold" type="number" min="0" step="1" value="400" />
-                <label class="session-startup-label">Paste Line Threshold</label>
-                <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
-              </div>
-              <p class="session-settings-inline-hint">
-                Configure explicit parser-backed validation and confirmation checks per session.
-              </p>
+              <details class="session-settings-advanced">
+                <summary>Advanced startup and send safety</summary>
+                <div class="session-settings-advanced-body">
+                  <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
+                  <textarea class="session-start-env" rows="4"></textarea>
+                  <label class="session-startup-label">Mouse Forwarding</label>
+                  <select class="session-mouse-forwarding-mode">
+                    <option value="off">Off</option>
+                    <option value="application">Application-controlled</option>
+                  </select>
+                  <label class="session-startup-label">Tags (comma/space/newline separated)</label>
+                  <input class="session-tags-input" type="text" value="" placeholder="backend ops prod" />
+                  <label class="session-startup-label">Send Terminator</label>
+                  <select class="session-send-terminator">
+                    <option value="auto">Auto (CR / Enter)</option>
+                    <option value="crlf">CRLF (\\r\\n)</option>
+                    <option value="lf">LF (\\n)</option>
+                    <option value="cr">CR (\\r)</option>
+                    <option value="cr2">CR2 (\\r\\r)</option>
+                    <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
+                  </select>
+                  <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
+                  <div class="session-input-safety-grid">
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
+                      <span>Require valid shell syntax</span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
+                      <span>Confirm incomplete shell constructs</span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
+                      <span>Confirm natural-language input</span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
+                      <span>Confirm dangerous shell commands</span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
+                      <span>Confirm multiline or large paste input</span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
+                      <span>Confirm recent target switches</span>
+                    </label>
+                  </div>
+                  <div class="session-input-safety-threshold-grid">
+                    <label class="session-startup-label">Target Switch Grace (ms)</label>
+                    <input class="session-input-safety-target-switch-grace-ms" type="number" min="0" step="1" value="4000" />
+                    <label class="session-startup-label">Paste Length Threshold</label>
+                    <input class="session-input-safety-paste-length-threshold" type="number" min="0" step="1" value="400" />
+                    <label class="session-startup-label">Paste Line Threshold</label>
+                    <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
+                  </div>
+                  <p class="session-settings-inline-hint">
+                    Use these expert controls only when you need parser-backed confirmation rules or transport-specific send behavior for this session.
+                  </p>
+                </div>
+              </details>
             </section>
             <section class="session-settings-section session-settings-panel-note session-note-controls" hidden>
               <p class="session-settings-section-title">Note</p>
@@ -647,46 +683,51 @@
                   <option value="custom">Custom</option>
                 </select>
               </div>
-              <div class="session-theme-palette">
-                <label class="session-theme-label" for="">Background</label>
-                <input class="session-theme-bg session-theme-background" type="color" value="#0a0d12" />
-                <label class="session-theme-label" for="">Foreground</label>
-                <input class="session-theme-fg session-theme-foreground" type="color" value="#d8dee9" />
-                <label class="session-theme-label" for="">Cursor</label>
-                <input class="session-theme-cursor" type="color" value="#8ec07c" />
-                <label class="session-theme-label" for="">Black</label>
-                <input class="session-theme-black" type="color" value="#0a0d12" />
-                <label class="session-theme-label" for="">Red</label>
-                <input class="session-theme-red" type="color" value="#fb4934" />
-                <label class="session-theme-label" for="">Green</label>
-                <input class="session-theme-green" type="color" value="#8ec07c" />
-                <label class="session-theme-label" for="">Yellow</label>
-                <input class="session-theme-yellow" type="color" value="#fabd2f" />
-                <label class="session-theme-label" for="">Blue</label>
-                <input class="session-theme-blue" type="color" value="#83a598" />
-                <label class="session-theme-label" for="">Magenta</label>
-                <input class="session-theme-magenta" type="color" value="#b48ead" />
-                <label class="session-theme-label" for="">Cyan</label>
-                <input class="session-theme-cyan" type="color" value="#8fbcbb" />
-                <label class="session-theme-label" for="">White</label>
-                <input class="session-theme-white" type="color" value="#d8dee9" />
-                <label class="session-theme-label" for="">Bright Black</label>
-                <input class="session-theme-bright-black" type="color" value="#4b5563" />
-                <label class="session-theme-label" for="">Bright Red</label>
-                <input class="session-theme-bright-red" type="color" value="#ff6b5a" />
-                <label class="session-theme-label" for="">Bright Green</label>
-                <input class="session-theme-bright-green" type="color" value="#a5d68a" />
-                <label class="session-theme-label" for="">Bright Yellow</label>
-                <input class="session-theme-bright-yellow" type="color" value="#ffd36a" />
-                <label class="session-theme-label" for="">Bright Blue</label>
-                <input class="session-theme-bright-blue" type="color" value="#98b6cc" />
-                <label class="session-theme-label" for="">Bright Magenta</label>
-                <input class="session-theme-bright-magenta" type="color" value="#c8a7d8" />
-                <label class="session-theme-label" for="">Bright Cyan</label>
-                <input class="session-theme-bright-cyan" type="color" value="#a9d9d6" />
-                <label class="session-theme-label" for="">Bright White</label>
-                <input class="session-theme-bright-white" type="color" value="#f5f7fa" />
-              </div>
+              <details class="session-settings-advanced">
+                <summary>Advanced custom colors</summary>
+                <div class="session-settings-advanced-body">
+                  <div class="session-theme-palette">
+                    <label class="session-theme-label" for="">Background</label>
+                    <input class="session-theme-bg session-theme-background" type="color" value="#0a0d12" />
+                    <label class="session-theme-label" for="">Foreground</label>
+                    <input class="session-theme-fg session-theme-foreground" type="color" value="#d8dee9" />
+                    <label class="session-theme-label" for="">Cursor</label>
+                    <input class="session-theme-cursor" type="color" value="#8ec07c" />
+                    <label class="session-theme-label" for="">Black</label>
+                    <input class="session-theme-black" type="color" value="#0a0d12" />
+                    <label class="session-theme-label" for="">Red</label>
+                    <input class="session-theme-red" type="color" value="#fb4934" />
+                    <label class="session-theme-label" for="">Green</label>
+                    <input class="session-theme-green" type="color" value="#8ec07c" />
+                    <label class="session-theme-label" for="">Yellow</label>
+                    <input class="session-theme-yellow" type="color" value="#fabd2f" />
+                    <label class="session-theme-label" for="">Blue</label>
+                    <input class="session-theme-blue" type="color" value="#83a598" />
+                    <label class="session-theme-label" for="">Magenta</label>
+                    <input class="session-theme-magenta" type="color" value="#b48ead" />
+                    <label class="session-theme-label" for="">Cyan</label>
+                    <input class="session-theme-cyan" type="color" value="#8fbcbb" />
+                    <label class="session-theme-label" for="">White</label>
+                    <input class="session-theme-white" type="color" value="#d8dee9" />
+                    <label class="session-theme-label" for="">Bright Black</label>
+                    <input class="session-theme-bright-black" type="color" value="#4b5563" />
+                    <label class="session-theme-label" for="">Bright Red</label>
+                    <input class="session-theme-bright-red" type="color" value="#ff6b5a" />
+                    <label class="session-theme-label" for="">Bright Green</label>
+                    <input class="session-theme-bright-green" type="color" value="#a5d68a" />
+                    <label class="session-theme-label" for="">Bright Yellow</label>
+                    <input class="session-theme-bright-yellow" type="color" value="#ffd36a" />
+                    <label class="session-theme-label" for="">Bright Blue</label>
+                    <input class="session-theme-bright-blue" type="color" value="#98b6cc" />
+                    <label class="session-theme-label" for="">Bright Magenta</label>
+                    <input class="session-theme-bright-magenta" type="color" value="#c8a7d8" />
+                    <label class="session-theme-label" for="">Bright Cyan</label>
+                    <input class="session-theme-bright-cyan" type="color" value="#a9d9d6" />
+                    <label class="session-theme-label" for="">Bright White</label>
+                    <input class="session-theme-bright-white" type="color" value="#f5f7fa" />
+                  </div>
+                </div>
+              </details>
             </section>
           </div>
           <div class="session-settings-footer">

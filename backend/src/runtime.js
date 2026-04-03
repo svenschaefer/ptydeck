@@ -16,6 +16,14 @@ import {
 } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import { SessionManager } from "./session-manager.js";
+import {
+  computeSshTrustFingerprintSha256,
+  DEFAULT_SSH_HOST_KEY_PROBE_TIMEOUT_MS,
+  formatSshTarget,
+  normalizeSshHostKeyProbeCandidate,
+  normalizeSshHostKeyProbeRequest,
+  probeSshHostKeysWithKeyscan
+} from "./ssh-host-key-probe.js";
 import { validateRequest, validateResponse } from "./validation.js";
 
 const CUSTOM_COMMAND_RESERVED_NAMES = new Set([
@@ -390,6 +398,9 @@ function route(pathname, method) {
   }
   if (pathname === "/api/v1/ssh-trust-entries" && method === "POST") {
     return { kind: "createSshTrustEntry" };
+  }
+  if (pathname === "/api/v1/ssh-host-key-probe" && method === "POST") {
+    return { kind: "probeSshHostKeys" };
   }
 
   const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
@@ -1245,11 +1256,6 @@ function normalizeSshTrustEntryPublicKey(value, fieldPath, { strict = true } = {
   }
 
   return normalized.replace(/=+$/u, "");
-}
-
-function computeSshTrustFingerprintSha256(publicKey) {
-  const digest = crypto.createHash("sha256").update(Buffer.from(publicKey, "base64")).digest("base64").replace(/=+$/u, "");
-  return `SHA256:${digest}`;
 }
 
 function buildSshTrustEntryId({ host, port, keyType, publicKey }) {
@@ -2472,6 +2478,10 @@ export function createRuntime(config) {
     Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0 ? config.maxBodyBytes : 1024 * 1024;
   const debugLogs = config.debugLogs === true;
   const sshKnownHostsPath = join(dirname(config.dataPath), "ssh_known_hosts");
+  const sshHostKeyProbeTimeoutMs =
+    Number.isInteger(config.sshHostKeyProbeTimeoutMs) && config.sshHostKeyProbeTimeoutMs > 0
+      ? config.sshHostKeyProbeTimeoutMs
+      : DEFAULT_SSH_HOST_KEY_PROBE_TIMEOUT_MS;
   const sessionFileTransferMaxBytes =
     Number.isInteger(config.sessionFileTransferMaxBytes) && config.sessionFileTransferMaxBytes > 0
       ? config.sessionFileTransferMaxBytes
@@ -2516,6 +2526,10 @@ export function createRuntime(config) {
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
   const shareLinks = new Map();
+  const probeSshHostKeys =
+    typeof config.probeSshHostKeys === "function"
+      ? config.probeSshHostKeys
+      : (target) => probeSshHostKeysWithKeyscan(target, { timeoutMs: sshHostKeyProbeTimeoutMs });
   const sessionDeckAssignments = new Map();
   const sessionQuickIdAssignments = new Map();
   const sessionQuickIdRank = new Map(SESSION_QUICK_ID_POOL.map((token, index) => [token, index]));
@@ -3083,6 +3097,9 @@ export function createRuntime(config) {
       return "sessions:write";
     }
     if (kind === "listSshTrustEntries") {
+      return "sessions:read";
+    }
+    if (kind === "probeSshHostKeys") {
       return "sessions:read";
     }
     if (kind === "createSshTrustEntry" || kind === "deleteSshTrustEntry") {
@@ -4163,6 +4180,33 @@ export function createRuntime(config) {
 
   function listSshTrustEntries() {
     return Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry);
+  }
+
+  async function probeSshHostKeysOrThrow(input) {
+    const target = normalizeSshHostKeyProbeRequest(input, { strict: true });
+    const payload = await probeSshHostKeys(target);
+    const candidates = [];
+    const seen = new Set();
+    for (const entry of Array.isArray(payload) ? payload : []) {
+      const normalized = normalizeSshHostKeyProbeCandidate(entry, target, { strict: false });
+      if (!normalized) {
+        continue;
+      }
+      const dedupeKey = `${normalized.keyType}\n${normalized.publicKey}`;
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+      seen.add(dedupeKey);
+      candidates.push(normalized);
+    }
+    if (candidates.length === 0) {
+      throw new ApiError(
+        502,
+        "SshHostKeyProbeFailed",
+        `No SSH host keys were returned for ${formatSshTarget(target.host, target.port)}.`
+      );
+    }
+    return candidates;
   }
 
   function findSshTrustConflict(entry) {
@@ -5442,6 +5486,13 @@ function tryCreateRestoredSession({
         await persistNow(created ? "ssh-trust-entry.create" : "ssh-trust-entry.reuse");
         validateResponse({ statusCode: created ? 201 : 200, body: entry, expect: "sshTrustEntry" });
         writeJsonResponse( created ? 201 : 200, entry);
+        return;
+      }
+
+      if (match.kind === "probeSshHostKeys") {
+        const payload = await probeSshHostKeysOrThrow(body);
+        validateResponse({ statusCode: 200, body: payload, expect: "sshHostKeyProbeCandidateList" });
+        writeJsonResponse( 200, payload);
         return;
       }
 
