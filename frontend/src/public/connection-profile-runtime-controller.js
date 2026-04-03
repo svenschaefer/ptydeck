@@ -476,6 +476,10 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const duplicateBtn = options.duplicateBtn || null;
   const renameBtn = options.renameBtn || null;
   const deleteBtn = options.deleteBtn || null;
+  const deleteConfirmEl = options.deleteConfirmEl || null;
+  const deleteConfirmMessageEl = options.deleteConfirmMessageEl || null;
+  const deleteConfirmBtn = options.deleteConfirmBtn || null;
+  const deleteCancelBtn = options.deleteCancelBtn || null;
   const statusEl = options.statusEl || null;
   const summaryEl = options.summaryEl || null;
   const draftNameInputEl = options.draftNameInputEl || null;
@@ -496,6 +500,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   const draftRemotePrivateKeyPathInputEl = options.draftRemotePrivateKeyPathInputEl || null;
   const authHintEl = options.authHintEl || null;
   const secretHintEl = options.secretHintEl || null;
+  const runtimeSecretInputEl = options.runtimeSecretInputEl || null;
   const sshTrustStatusEl = options.sshTrustStatusEl || null;
   const sshTrustSelectEl = options.sshTrustSelectEl || null;
   const sshTrustKeyTypeInputEl = options.sshTrustKeyTypeInputEl || null;
@@ -543,6 +548,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   let draftState = null;
   let sshTrustEntries = [];
   let selectedSshTrustEntryId = "";
+  let pendingDeleteProfileId = "";
   let isRenderingDraft = false;
   let loadingSshTrustEntries = false;
 
@@ -568,6 +574,14 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (draftStatusEl) {
       draftStatusEl.textContent = normalizeText(message);
     }
+  }
+
+  function getDraftNameInputValue() {
+    return normalizeText(draftNameInputEl?.value || draftState?.name);
+  }
+
+  function clearPendingDeleteConfirmation() {
+    pendingDeleteProfileId = "";
   }
 
   function getDefaultShellForKind(kind) {
@@ -925,13 +939,14 @@ export function createConnectionProfileRuntimeController(options = {}) {
       return;
     }
     const selectedProfile = getSelectedProfile();
+    const currentLaunch = cloneDraftLaunch(getDraftLaunchFromInputs());
+    const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
+    const requiresSecret = authMethodRequiresSecret(currentLaunch?.remoteAuth);
     if (summaryEl) {
       summaryEl.textContent = selectedProfile
         ? formatConnectionProfileSummary(selectedProfile)
         : "No saved connection profile selected. You can still save and launch the draft below.";
     }
-    const currentLaunch = cloneDraftLaunch(draftState.launch);
-    const isSsh = normalizeLower(currentLaunch.kind) === "ssh";
     if (sshFieldsEl) {
       sshFieldsEl.hidden = !isSsh;
     }
@@ -941,11 +956,30 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (secretHintEl) {
       secretHintEl.textContent = getSshSecretHint(currentLaunch);
     }
+    if (runtimeSecretInputEl) {
+      runtimeSecretInputEl.hidden = !isSsh || !requiresSecret;
+      runtimeSecretInputEl.disabled = !isSsh || !requiresSecret;
+      if (!requiresSecret) {
+        runtimeSecretInputEl.value = "";
+      }
+    }
     if (draftLaunchTextareaEl) {
       draftLaunchTextareaEl.readOnly = true;
       draftLaunchTextareaEl.value = JSON.stringify(currentLaunch, null, 2);
     }
     setDraftStatus(getDraftModeMessage());
+    if (deleteBtn) {
+      deleteBtn.textContent = pendingDeleteProfileId && pendingDeleteProfileId === selectedProfile?.id ? "Confirm Delete Saved" : "Delete Saved";
+    }
+    if (deleteConfirmEl) {
+      deleteConfirmEl.hidden = !(selectedProfile && pendingDeleteProfileId === selectedProfile.id);
+    }
+    if (deleteConfirmMessageEl) {
+      deleteConfirmMessageEl.textContent =
+        selectedProfile && pendingDeleteProfileId === selectedProfile.id
+          ? `Delete saved connection profile [${selectedProfile.id}] ${selectedProfile.name}? This removes only the saved profile, not any already running sessions.`
+          : "";
+    }
 
     const matchingTrustEntries = getTrustEntriesForCurrentTarget();
     const trustOptions = matchingTrustEntries.length
@@ -1065,6 +1099,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
   }
 
   function setDraftState(nextDraft) {
+    clearPendingDeleteConfirmation();
     draftState = createDraftState(nextDraft);
     renderDraft();
     return draftState;
@@ -1143,6 +1178,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
   function syncSelection() {
     if (!selectedProfileId || !profiles.some((entry) => entry.id === selectedProfileId)) {
       selectedProfileId = profiles[0]?.id || "";
+    }
+    if (pendingDeleteProfileId && pendingDeleteProfileId !== selectedProfileId) {
+      clearPendingDeleteConfirmation();
     }
     if (selectEl) {
       selectEl.value = selectedProfileId;
@@ -1268,6 +1306,13 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!authMethodRequiresSecret(profile?.launch?.remoteAuth)) {
       return { ok: true, remoteSecret: undefined, cancelled: false };
     }
+    const inlineSecret = normalizeText(runtimeSecretInputEl?.value);
+    if (runtimeSecretInputEl) {
+      if (!inlineSecret) {
+        throw new Error("Enter the SSH runtime secret before launching this saved profile.");
+      }
+      return { ok: true, remoteSecret: inlineSecret, cancelled: false };
+    }
     const secret = windowRef?.prompt?.(`SSH secret for connection profile '${profile.name}'`, "");
     if (secret === null || secret === undefined) {
       return { ok: false, remoteSecret: undefined, cancelled: true };
@@ -1291,6 +1336,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
       connectionProfileId: profile.id,
       ...(secretResult.remoteSecret !== undefined ? { remoteSecret: secretResult.remoteSecret } : {})
     });
+    if (runtimeSecretInputEl) {
+      runtimeSecretInputEl.value = "";
+    }
     applyRuntimeEvent({ type: "session.created", session });
     if (normalizeText(session.deckId)) {
       setActiveDeck(session.deckId);
@@ -1371,7 +1419,11 @@ export function createConnectionProfileRuntimeController(options = {}) {
   }
 
   async function saveAndLaunchDraftFlow() {
+    const inlineRuntimeSecret = typeof runtimeSecretInputEl?.value === "string" ? runtimeSecretInputEl.value : "";
     const feedback = await saveDraftById();
+    if (runtimeSecretInputEl && inlineRuntimeSecret && !runtimeSecretInputEl.value) {
+      runtimeSecretInputEl.value = inlineRuntimeSecret;
+    }
     const profile = getSelectedProfile();
     if (!profile) {
       setCommandFeedback(feedback);
@@ -1515,6 +1567,8 @@ export function createConnectionProfileRuntimeController(options = {}) {
       return "";
     }
     const feedback = await applyProfileById(profile.id);
+    clearPendingDeleteConfirmation();
+    renderDraftComputedState();
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1525,11 +1579,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!profile) {
       return "";
     }
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Connection profile name", profile.name));
+    const input = normalizeText(name) || getDraftNameInputValue();
     if (!input) {
-      return "";
+      throw new Error("Enter the desired saved profile name in Profile Name before renaming.");
     }
     const feedback = await renameProfileById(profile.id, input);
+    clearPendingDeleteConfirmation();
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1540,13 +1595,26 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!profile) {
       return "";
     }
-    const defaultName = `${profile.name} Copy`;
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Connection profile name", defaultName));
-    if (!input) {
+    const requestedName = normalizeText(name) || getDraftNameInputValue();
+    const input =
+      requestedName && requestedName !== profile.name
+        ? requestedName
+        : `${profile.name} Copy`;
+    const feedback = await duplicateProfileById(profile.id, input);
+    clearPendingDeleteConfirmation();
+    setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function requestDeleteSelectedProfileFlow() {
+    const profile = getSelectedProfile();
+    if (!profile) {
       return "";
     }
-    const feedback = await duplicateProfileById(profile.id, input);
-    setCommandFeedback(feedback);
+    pendingDeleteProfileId = profile.id;
+    renderDraftComputedState();
+    const feedback = `Confirm deletion for saved connection profile [${profile.id}] ${profile.name}.`;
     setStatus(feedback);
     return feedback;
   }
@@ -1556,12 +1624,21 @@ export function createConnectionProfileRuntimeController(options = {}) {
     if (!profile) {
       return "";
     }
-    const confirmed = windowRef?.confirm?.(`Delete connection profile '${profile.name}'?`) !== false;
-    if (!confirmed) {
-      return "";
+    if (pendingDeleteProfileId !== profile.id) {
+      return requestDeleteSelectedProfileFlow();
     }
     const feedback = await deleteProfileById(profile.id);
+    clearPendingDeleteConfirmation();
+    renderDraftComputedState();
     setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function cancelDeleteSelectedProfileFlow() {
+    clearPendingDeleteConfirmation();
+    renderDraftComputedState();
+    const feedback = "Cancelled deletion of the saved connection profile.";
     setStatus(feedback);
     return feedback;
   }
@@ -1608,6 +1685,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
     deleteBtn?.addEventListener?.("click", () => {
       deleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete connection profile.")));
+    });
+    deleteConfirmBtn?.addEventListener?.("click", () => {
+      deleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete connection profile.")));
+    });
+    deleteCancelBtn?.addEventListener?.("click", () => {
+      cancelDeleteSelectedProfileFlow().catch((error) => setError(getErrorMessage(error, "Failed to cancel connection profile deletion.")));
     });
     sshTrustRefreshBtn?.addEventListener?.("click", () => {
       refreshSshTrustEntries().catch((error) => setError(getErrorMessage(error, "Failed to load SSH trust entries.")));
@@ -1672,7 +1755,9 @@ export function createConnectionProfileRuntimeController(options = {}) {
     applySelectedProfileFlow,
     duplicateSelectedProfileFlow,
     renameSelectedProfileFlow,
+    requestDeleteSelectedProfileFlow,
     deleteSelectedProfileFlow,
+    cancelDeleteSelectedProfileFlow,
     refreshSshTrustEntries,
     saveTrustEntryFlow,
     deleteTrustEntryFlow,

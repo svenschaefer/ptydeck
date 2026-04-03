@@ -1,8 +1,8 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-02 (H55 slash-command parity delivered; H56 quality hardening delivered; shared SVG icon path standardized; chunk-safe mouse-forwarding output filtering delivered; post-snapshot terminal stabilization delivered; session-settings dialog height stabilization delivered; H57 guided management/settings UX closeout delivered; `CHANGELOG.md` owns completed release history.)
+Last updated: 2026-04-03 (H55 slash-command parity delivered; H56 quality hardening delivered; H57 guided management/settings UX closeout delivered; post-H57 prompt-free Workspace Library management flows delivered; session-settings dismiss semantics unified; `CHANGELOG.md` owns completed release history.)
 
-Documentation sync status: repository markdown files are aligned on 2026-04-02. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
+Documentation sync status: repository markdown files are aligned on 2026-04-03. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
 ## Current Documentation Contract
 
@@ -24,7 +24,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
 ## Current Delivery State
 
 - There is no active release wave currently.
-- There is no queued release wave currently.
+- The next queued release wave is `v0.4.0-H58` (`UX-023A` through `UX-023D`).
 - Completed wave history is intentionally no longer duplicated across planning documents; it lives in `CHANGELOG.md`.
 
 ## Architecture Baselines To Preserve
@@ -53,6 +53,14 @@ Documentation sync status: repository markdown files are aligned on 2026-04-02. 
   - the `Connections` tab now exposes explicit `New Local` and `New SSH` flows, a structured normalized launch form, `Save Profile` and `Save and Launch` actions, and an advanced raw launch JSON preview that is no longer the primary editing path;
   - guided SSH profile creation now keeps host, port, username, auth-method choice, runtime-secret expectations, private-key path input, and SSH host-key trust management in one visible interaction model backed by the existing backend SSH trust-entry contract;
   - the `Workspace Presets` and deck-group areas now explain saved-state semantics more clearly, while the fixed terminal `Terminal Size` / `Saved Layouts` controls and deck/session settings wording now use more self-explanatory primary action labels and inline guidance.
+- The post-H57 UX hardening slice further tightened those management/settings flows:
+  - primary `Workspace Library` CRUD flows for saved connection profiles, workspace presets, and deck groups no longer rely on browser `prompt()` / `confirm()` dialogs; they now use inline name inputs, inline runtime-secret entry, and inline two-step delete confirmation in the dialog itself;
+  - `Save and Launch` for SSH connection-profile drafts must preserve the entered runtime secret across the intermediate save/rerender step before launching the saved profile;
+  - session-settings close semantics are now intentionally unified: `Cancel`, dialog dismiss, and `Escape` all discard the draft and resync controls from persisted session state before closing.
+- The remaining end-user-friendly management/settings gaps are now explicitly queued in `v0.4.0-H58`:
+  - replace manual SSH trust-entry editing with a first-connect verify/trust flow;
+  - add `Basic` / `Advanced` progressive disclosure for session settings and management dialogs;
+  - replace the remaining preset/group storage-centric wording with clearer effect-centric summaries.
 - Help, usage, and autocomplete should continue to be treated as part of the command surface itself so the documented slash plane stays in parity with delivered behavior.
 - The H56 quality hardening closeout on 2026-04-02 delivered the identified near-term risk reductions:
   - backend session normalizers (`session-input-safety-profile.js`, `session-mouse-forwarding.js`) now have direct unit coverage for strict versus non-strict normalization and default fallback behavior;

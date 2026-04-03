@@ -70,6 +70,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
     api: {},
     getSession: () => ({ id: "s1" }),
     getEntry: () => ({ id: "entry-1" }),
+    sessionThemeDrafts: new Map([["s1", { active: {}, inactive: {} }]]),
     onActivateSession: (sessionId) => calls.push(`focus:${sessionId}`),
     syncSessionStartupControls: () => calls.push("sync-startup"),
     syncSessionInputSafetyControls: () => calls.push("sync-input-safety"),
@@ -106,8 +107,16 @@ test("session-card-interactions controller wires focus and settings dialog contr
     "tab:startup",
     "stabilize",
     "stabilize",
+    "sync-startup",
+    "sync-input-safety",
+    "sync-theme",
+    "dirty:false",
     "close",
     "prevent",
+    "sync-startup",
+    "sync-input-safety",
+    "sync-theme",
+    "dirty:false",
     "close"
   ]);
 });

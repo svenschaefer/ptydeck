@@ -362,12 +362,22 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   const presetDuplicateBtn = options.presetDuplicateBtn || null;
   const presetRenameBtn = options.presetRenameBtn || null;
   const presetDeleteBtn = options.presetDeleteBtn || null;
+  const presetNameInputEl = options.presetNameInputEl || null;
+  const presetDeleteConfirmEl = options.presetDeleteConfirmEl || null;
+  const presetDeleteConfirmMessageEl = options.presetDeleteConfirmMessageEl || null;
+  const presetDeleteConfirmBtn = options.presetDeleteConfirmBtn || null;
+  const presetDeleteCancelBtn = options.presetDeleteCancelBtn || null;
   const groupSelectEl = options.groupSelectEl || null;
   const groupSaveBtn = options.groupSaveBtn || null;
   const groupApplyBtn = options.groupApplyBtn || null;
   const groupRenameBtn = options.groupRenameBtn || null;
   const groupDeleteBtn = options.groupDeleteBtn || null;
   const groupClearBtn = options.groupClearBtn || null;
+  const groupNameInputEl = options.groupNameInputEl || null;
+  const groupDeleteConfirmEl = options.groupDeleteConfirmEl || null;
+  const groupDeleteConfirmMessageEl = options.groupDeleteConfirmMessageEl || null;
+  const groupDeleteConfirmBtn = options.groupDeleteConfirmBtn || null;
+  const groupDeleteCancelBtn = options.groupDeleteCancelBtn || null;
   const statusEl = options.statusEl || null;
   const summaryEl = options.summaryEl || null;
   const detailEl = options.detailEl || null;
@@ -403,6 +413,24 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   let selectedPresetId = "";
   let workspaceState = cloneWorkspaceState();
   const selectedGroupIdByDeck = new Map();
+  let pendingDeletePresetId = "";
+  let pendingDeleteGroupKey = "";
+
+  function getPresetNameInputValue() {
+    return normalizeText(presetNameInputEl?.value);
+  }
+
+  function getGroupNameInputValue() {
+    return normalizeText(groupNameInputEl?.value);
+  }
+
+  function clearPendingPresetDelete() {
+    pendingDeletePresetId = "";
+  }
+
+  function clearPendingGroupDelete() {
+    pendingDeleteGroupKey = "";
+  }
 
   function getKnownDeckIds() {
     const known = new Set();
@@ -612,6 +640,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!selectedPresetId || !presets.some((entry) => entry.id === selectedPresetId)) {
       selectedPresetId = presets[0]?.id || "";
     }
+    if (pendingDeletePresetId && pendingDeletePresetId !== selectedPresetId) {
+      clearPendingPresetDelete();
+    }
     if (presetSelectEl) {
       presetSelectEl.value = selectedPresetId;
       presetSelectEl.disabled = presets.length === 0;
@@ -632,6 +663,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const activeDeckId = normalizeText(getActiveDeckId()) || "default";
     const groups = listGroupsForDeck(activeDeckId);
     const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
+    if (pendingDeleteGroupKey && pendingDeleteGroupKey !== `${activeDeckId}:${selectedGroupId}`) {
+      clearPendingGroupDelete();
+    }
     if (groupSelectEl) {
       groupSelectEl.value = selectedGroupId;
       groupSelectEl.disabled = groups.length === 0;
@@ -701,9 +735,17 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const groups = listGroupsForDeck(activeDeckId);
     const selectedPreset = getSelectedPreset();
     const activeGroupId = getActiveGroupIdForDeck(activeDeckId);
+    const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
+    const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
     const presetCountText = presets.length > 0 ? `${presets.length} preset(s)` : "No saved workspace presets.";
     const groupCountText = groups.length > 0 ? `${groups.length} group(s) on [${activeDeckId}]` : `No saved groups on [${activeDeckId}].`;
     setStatus(`${presetCountText} ${groupCountText}`.trim());
+    if (presetNameInputEl && !normalizeText(presetNameInputEl.value)) {
+      presetNameInputEl.value = selectedPreset?.name || "";
+    }
+    if (groupNameInputEl && !normalizeText(groupNameInputEl.value)) {
+      groupNameInputEl.value = selectedGroup?.name || "";
+    }
     if (summaryEl) {
       summaryEl.textContent = formatWorkspacePresetSummary(selectedPreset);
     }
@@ -719,6 +761,31 @@ export function createWorkspacePresetRuntimeController(options = {}) {
       groupPersistenceEl.textContent = selectedPreset
         ? `Deck-group edits on [${activeDeckId}] persist into preset [${selectedPreset.id}] ${selectedPreset.name}. Save Visible captures the current filtered deck view; Apply activates the selected group; Clear removes the active group.`
         : `No workspace preset is selected. Deck-group edits on [${activeDeckId}] are local-only until you save or select a preset. Save Visible captures the current filtered deck view; Apply activates the selected group; Clear removes the active group.`;
+    }
+    if (presetDeleteBtn) {
+      presetDeleteBtn.textContent = pendingDeletePresetId && pendingDeletePresetId === selectedPreset?.id ? "Confirm Delete Preset" : "Delete Preset";
+    }
+    if (presetDeleteConfirmEl) {
+      presetDeleteConfirmEl.hidden = !(selectedPreset && pendingDeletePresetId === selectedPreset.id);
+    }
+    if (presetDeleteConfirmMessageEl) {
+      presetDeleteConfirmMessageEl.textContent =
+        selectedPreset && pendingDeletePresetId === selectedPreset.id
+          ? `Delete workspace preset [${selectedPreset.id}] ${selectedPreset.name}? This removes only the saved preset.`
+          : "";
+    }
+    if (groupDeleteBtn) {
+      groupDeleteBtn.textContent =
+        pendingDeleteGroupKey && pendingDeleteGroupKey === `${activeDeckId}:${selectedGroupId}` ? "Confirm Delete Group" : "Delete Group";
+    }
+    if (groupDeleteConfirmEl) {
+      groupDeleteConfirmEl.hidden = !(selectedGroup && pendingDeleteGroupKey === `${activeDeckId}:${selectedGroupId}`);
+    }
+    if (groupDeleteConfirmMessageEl) {
+      groupDeleteConfirmMessageEl.textContent =
+        selectedGroup && pendingDeleteGroupKey === `${activeDeckId}:${selectedGroupId}`
+          ? `Delete workspace group [${selectedGroup.id}] ${selectedGroup.name} from deck [${activeDeckId}]?`
+          : "";
     }
   }
 
@@ -1060,11 +1127,15 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   }
 
   async function createPresetFlow(name) {
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Workspace preset name", "Current Workspace"));
+    const input = normalizeText(name) || getPresetNameInputValue();
     if (!input) {
-      return "";
+      throw new Error("Enter the preset name before saving the current workspace.");
     }
     const feedback = await createPresetFromCurrentWorkspace(input);
+    clearPendingPresetDelete();
+    if (presetNameInputEl) {
+      presetNameInputEl.value = input;
+    }
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1086,12 +1157,28 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!preset) {
       return "";
     }
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Workspace preset name", preset.name));
+    const input = normalizeText(name) || getPresetNameInputValue();
     if (!input) {
-      return "";
+      throw new Error("Enter the desired preset name before renaming.");
     }
     const feedback = await renamePresetById(preset.id, input);
+    clearPendingPresetDelete();
+    if (presetNameInputEl) {
+      presetNameInputEl.value = input;
+    }
     setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function requestDeleteSelectedPresetFlow() {
+    const preset = getSelectedPreset();
+    if (!preset) {
+      return "";
+    }
+    pendingDeletePresetId = preset.id;
+    render();
+    const feedback = `Confirm deletion for workspace preset [${preset.id}] ${preset.name}.`;
     setStatus(feedback);
     return feedback;
   }
@@ -1101,12 +1188,24 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!preset) {
       return "";
     }
-    const confirmed = windowRef?.confirm?.(`Delete workspace preset '${preset.name}'?`) !== false;
-    if (!confirmed) {
-      return "";
+    if (pendingDeletePresetId !== preset.id) {
+      return requestDeleteSelectedPresetFlow();
     }
     const feedback = await deletePresetById(preset.id);
+    clearPendingPresetDelete();
+    if (presetNameInputEl) {
+      presetNameInputEl.value = "";
+    }
+    render();
     setCommandFeedback(feedback);
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function cancelDeleteSelectedPresetFlow() {
+    clearPendingPresetDelete();
+    render();
+    const feedback = "Cancelled deletion of the workspace preset.";
     setStatus(feedback);
     return feedback;
   }
@@ -1116,11 +1215,16 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!preset) {
       return "";
     }
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Workspace preset name", `${preset.name} Copy`));
-    if (!input) {
-      return "";
-    }
+    const requestedName = normalizeText(name) || getPresetNameInputValue();
+    const input =
+      requestedName && requestedName !== preset.name
+        ? requestedName
+        : `${preset.name} Copy`;
     const feedback = await duplicatePresetById(preset.id, input);
+    clearPendingPresetDelete();
+    if (presetNameInputEl) {
+      presetNameInputEl.value = input;
+    }
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1137,6 +1241,10 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     } else {
       feedback = `${feedback} It is local-only until you save or select a workspace preset.`;
     }
+    clearPendingGroupDelete();
+    if (groupNameInputEl) {
+      groupNameInputEl.value = group.name;
+    }
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1144,9 +1252,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
 
   async function saveGroupFlow(name) {
     const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Workspace group name", "Current Deck"));
+    const input = normalizeText(name) || getGroupNameInputValue();
     if (!input) {
-      return "";
+      throw new Error("Enter the group name before saving the visible deck sessions.");
     }
     return saveGroupByName(input, activeDeckId);
   }
@@ -1199,6 +1307,10 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const feedback = preset
       ? `Renamed workspace group [${updatedGroup.id}] to ${updatedGroup.name} and persisted it into preset [${preset.id}] ${preset.name}.`
       : `Renamed workspace group [${updatedGroup.id}] to ${updatedGroup.name}. The change is local-only until you save or select a workspace preset.`;
+    clearPendingGroupDelete();
+    if (groupNameInputEl) {
+      groupNameInputEl.value = updatedGroup.name;
+    }
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1215,9 +1327,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!group) {
       return "";
     }
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Workspace group name", group.name));
+    const input = normalizeText(name) || getGroupNameInputValue();
     if (!input) {
-      return "";
+      throw new Error("Enter the desired group name before renaming.");
     }
     return renameGroupById(selectedGroupId, input, activeDeckId);
   }
@@ -1236,12 +1348,16 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const feedback = preset
       ? `Deleted workspace group [${deletedGroup.id}] ${deletedGroup.name} and persisted it into preset [${preset.id}] ${preset.name}.`
       : `Deleted workspace group [${deletedGroup.id}] ${deletedGroup.name}. The change is local-only until you save or select a workspace preset.`;
+    clearPendingGroupDelete();
+    if (groupNameInputEl) {
+      groupNameInputEl.value = "";
+    }
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
   }
 
-  async function deleteSelectedGroupFlow() {
+  async function requestDeleteSelectedGroupFlow() {
     const activeDeckId = normalizeText(getActiveDeckId()) || "default";
     const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
     if (!selectedGroupId) {
@@ -1252,11 +1368,31 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     if (!group) {
       return "";
     }
-    const confirmed = windowRef?.confirm?.(`Delete workspace group '${group.name}' from deck '${activeDeckId}'?`) !== false;
-    if (!confirmed) {
+    pendingDeleteGroupKey = `${activeDeckId}:${selectedGroupId}`;
+    render();
+    const feedback = `Confirm deletion for workspace group [${group.id}] ${group.name} on deck [${activeDeckId}].`;
+    setStatus(feedback);
+    return feedback;
+  }
+
+  async function deleteSelectedGroupFlow() {
+    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
+    const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
+    if (!selectedGroupId) {
       return "";
     }
+    if (pendingDeleteGroupKey !== `${activeDeckId}:${selectedGroupId}`) {
+      return requestDeleteSelectedGroupFlow();
+    }
     return deleteGroupById(selectedGroupId, activeDeckId);
+  }
+
+  async function cancelDeleteSelectedGroupFlow() {
+    clearPendingGroupDelete();
+    render();
+    const feedback = "Cancelled deletion of the workspace group.";
+    setStatus(feedback);
+    return feedback;
   }
 
   async function clearGroupForDeck(deckId = getActiveDeckId()) {
@@ -1269,6 +1405,7 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const feedback = preset
       ? `Cleared the active workspace group for deck [${activeDeckId}] and persisted it into preset [${preset.id}] ${preset.name}.`
       : `Cleared the active workspace group for deck [${activeDeckId}]. The change is local-only until you save or select a workspace preset.`;
+    clearPendingGroupDelete();
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;
@@ -1282,6 +1419,10 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   function bindUiEvents() {
     presetSelectEl?.addEventListener?.("change", () => {
       selectedPresetId = normalizeText(presetSelectEl.value);
+      clearPendingPresetDelete();
+      if (presetNameInputEl) {
+        presetNameInputEl.value = getSelectedPreset()?.name || "";
+      }
       render();
     });
     presetSaveBtn?.addEventListener?.("click", () => {
@@ -1299,8 +1440,23 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     presetDeleteBtn?.addEventListener?.("click", () => {
       deleteSelectedPresetFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete workspace preset.")));
     });
+    presetDeleteConfirmBtn?.addEventListener?.("click", () => {
+      deleteSelectedPresetFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete workspace preset.")));
+    });
+    presetDeleteCancelBtn?.addEventListener?.("click", () => {
+      cancelDeleteSelectedPresetFlow().catch((error) =>
+        setError(getErrorMessage(error, "Failed to cancel workspace preset deletion."))
+      );
+    });
     groupSelectEl?.addEventListener?.("change", () => {
       setSelectedGroupIdForDeck(getActiveDeckId(), normalizeText(groupSelectEl.value));
+      clearPendingGroupDelete();
+      const activeDeckId = normalizeText(getActiveDeckId()) || "default";
+      const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
+      const group = listGroupsForDeck(activeDeckId).find((entry) => entry.id === selectedGroupId) || null;
+      if (groupNameInputEl) {
+        groupNameInputEl.value = group?.name || "";
+      }
       render();
     });
     groupSaveBtn?.addEventListener?.("click", () => {
@@ -1314,6 +1470,14 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     });
     groupDeleteBtn?.addEventListener?.("click", () => {
       deleteSelectedGroupFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete workspace group.")));
+    });
+    groupDeleteConfirmBtn?.addEventListener?.("click", () => {
+      deleteSelectedGroupFlow().catch((error) => setError(getErrorMessage(error, "Failed to delete workspace group.")));
+    });
+    groupDeleteCancelBtn?.addEventListener?.("click", () => {
+      cancelDeleteSelectedGroupFlow().catch((error) =>
+        setError(getErrorMessage(error, "Failed to cancel workspace group deletion."))
+      );
     });
     groupClearBtn?.addEventListener?.("click", () => {
       clearSelectedGroupFlow().catch((error) => setError(getErrorMessage(error, "Failed to clear workspace group.")));
@@ -1355,7 +1519,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     applySelectedPresetFlow,
     duplicateSelectedPresetFlow,
     renameSelectedPresetFlow,
+    requestDeleteSelectedPresetFlow,
     deleteSelectedPresetFlow,
+    cancelDeleteSelectedPresetFlow,
     saveGroupByName,
     applyGroupById,
     renameGroupById,
@@ -1364,7 +1530,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     saveGroupFlow,
     applySelectedGroupFlow,
     renameSelectedGroupFlow,
+    requestDeleteSelectedGroupFlow,
     deleteSelectedGroupFlow,
+    cancelDeleteSelectedGroupFlow,
     clearSelectedGroupFlow,
     bindUiEvents,
     render

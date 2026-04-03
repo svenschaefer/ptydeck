@@ -2,6 +2,16 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-03
+
+- [x] Delivered an unplanned Workspace Library and session-settings UX hardening slice after the H57 guided-management closeout: the primary management flows no longer rely on browser `prompt()` / `confirm()` dialogs, saved-profile and preset/group deletion now use inline two-step confirmation, and session-settings dismissal semantics are now consistent across `Cancel`, dialog `X`, and `Escape`.
+- [x] The `Workspace Library` connections tab now keeps the core saved-profile path inline and stateful through updates in `frontend/src/public/index.html`, `frontend/src/public/styles.css`, `frontend/src/public/app-runtime-dom-refs.js`, `frontend/src/public/app-runtime-composition-controller.js`, and `frontend/src/public/connection-profile-runtime-controller.js`: runtime SSH secrets now use an inline field, saved-profile rename/duplicate now reuse the visible `Profile Name` input, saved-profile deletion now uses inline confirmation instead of a blocking browser dialog, and `Save and Launch` now preserves the entered runtime secret across the save/rerender pass before launching the saved SSH profile.
+- [x] The `Workspace Library` workspace-preset and deck-group flows now use the same inline management model in `frontend/src/public/index.html`, `frontend/src/public/app-runtime-dom-refs.js`, `frontend/src/public/app-runtime-composition-controller.js`, and `frontend/src/public/workspace-preset-runtime-controller.js`: preset/group naming now uses visible inputs, preset/group deletion now uses inline two-step confirmation, and the prompt-free CRUD/apply flows keep the dialog consistent with the post-sidebar-management direction delivered in H53-H57.
+- [x] Session-settings dismissal semantics are now explicit and consistent in `frontend/src/public/ui/session-card-interactions-controller.js`: `Cancel`, the dialog dismiss button, and `Escape` all discard unsaved draft changes, resync controls from the current persisted session state, clear transient startup feedback, restore the applied theme, and then close the dialog instead of leaving close semantics ambiguous across entry points.
+- [x] Added direct regression coverage for the prompt-free management flows and consistent settings dismissal in `frontend/test/connection-profile-runtime-controller.test.js`, `frontend/test/workspace-preset-runtime-controller.test.js`, `frontend/test/session-card-interactions-controller.test.js`, and `frontend/test/app.test.js`, including saved-profile inline delete confirmation, prompt-free preset/group CRUD, `Save and Launch` SSH secret retention, and `X` / `Escape` discard semantics.
+- [x] Validation for the 2026-04-03 UX hardening slice passed with focused frontend regressions plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), and the final process check confirmed no leftover validation/background processes.
+- [x] Coverage after the 2026-04-03 UX hardening slice: backend `91.52%` lines and frontend `93.65%` lines on the final validated tree.
+
 ## 2026-04-01
 
 - [x] `UX-021A`, `UX-021B`, `UX-021C`, and `UX-021D` are now completed as `v0.4.0-H54`: the `Workspace Library` follow-up is closed and the manager dialog now has direct editing and richer detail flows instead of only thin summary actions.

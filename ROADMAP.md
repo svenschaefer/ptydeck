@@ -15,7 +15,13 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: none currently.
+- Queued next wave: `v0.4.0-H58`.
+
+Queued wave detail:
+1. `UX-023A`
+2. `UX-023B` after `UX-023A`
+3. `UX-023C` after `UX-023B`
+4. `UX-023D` after `UX-023A`, `UX-023B`, and `UX-023C`
 
 ## Sequencing Rules
 

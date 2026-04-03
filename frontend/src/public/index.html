@@ -261,17 +261,32 @@
               Saved connection profiles start new local or SSH sessions. Use the guided form below for normal editing; the raw launch JSON remains available only as an advanced preview.
             </p>
             <select id="connection-profile-select" class="workspace-manager-select" aria-label="Saved connection profiles"></select>
-            <div class="workspace-manager-actions">
-              <button id="connection-profile-new" type="button">New Local</button>
-              <button id="connection-profile-new-ssh" type="button">New SSH</button>
-              <button id="connection-profile-save" type="button">Use Active as Template</button>
-              <button id="connection-profile-save-draft" type="button">Save Profile</button>
-              <button id="connection-profile-save-and-launch" type="button">Save and Launch</button>
-              <button id="connection-profile-reset-draft" type="button">Reset Draft</button>
-              <button id="connection-profile-apply" type="button">Launch Saved</button>
-              <button id="connection-profile-duplicate" type="button">Duplicate Saved</button>
-              <button id="connection-profile-rename" type="button">Rename Saved</button>
-              <button id="connection-profile-delete" type="button">Delete Saved</button>
+            <div class="workspace-manager-action-cluster">
+              <p class="workspace-manager-action-title">Draft</p>
+              <div class="workspace-manager-actions">
+                <button id="connection-profile-new" type="button">New Local</button>
+                <button id="connection-profile-new-ssh" type="button">New SSH</button>
+                <button id="connection-profile-save" type="button">Use Active as Template</button>
+                <button id="connection-profile-save-draft" type="button">Save Profile</button>
+                <button id="connection-profile-save-and-launch" type="button">Save and Launch</button>
+                <button id="connection-profile-reset-draft" type="button">Reset Draft</button>
+              </div>
+            </div>
+            <div class="workspace-manager-action-cluster">
+              <p class="workspace-manager-action-title">Saved Profiles</p>
+              <div class="workspace-manager-actions">
+                <button id="connection-profile-apply" type="button">Launch Saved</button>
+                <button id="connection-profile-duplicate" type="button">Duplicate Saved</button>
+                <button id="connection-profile-rename" type="button">Rename Saved</button>
+                <button id="connection-profile-delete" type="button">Delete Saved</button>
+              </div>
+              <div id="connection-profile-delete-confirm" class="workspace-manager-inline-confirm" hidden>
+                <p id="connection-profile-delete-confirm-message" class="workspace-manager-inline-note"></p>
+                <div class="workspace-manager-actions">
+                  <button id="connection-profile-delete-confirm-btn" type="button">Delete Saved Profile</button>
+                  <button id="connection-profile-delete-cancel-btn" type="button">Cancel</button>
+                </div>
+              </div>
             </div>
             <p id="connection-profile-summary" class="workspace-manager-summary"></p>
             <div class="workspace-manager-editor">
@@ -371,6 +386,13 @@
                   placeholder="~/.ssh/id_ed25519"
                 />
                 <p id="connection-profile-auth-hint" class="workspace-manager-inline-note"></p>
+                <label class="workspace-manager-field" for="connection-profile-runtime-secret">Runtime Secret</label>
+                <input
+                  id="connection-profile-runtime-secret"
+                  class="workspace-manager-input"
+                  type="password"
+                  placeholder="Only required when the selected SSH auth method prompts at launch"
+                />
                 <div class="workspace-manager-subsection workspace-manager-subsection-card">
                   <div class="workspace-manager-section-head">
                     <p class="workspace-manager-section-title">Host Key Trust</p>
@@ -433,12 +455,26 @@
               Saving a workspace preset captures the active deck, selected layout profile, control-pane state, deck groups, and split-layout assignments. Applying a preset restores that full workspace view.
             </p>
             <select id="workspace-preset-select" class="workspace-manager-select" aria-label="Saved workspace presets"></select>
+            <label class="workspace-manager-field" for="workspace-preset-name">Preset Name</label>
+            <input
+              id="workspace-preset-name"
+              class="workspace-manager-input"
+              type="text"
+              placeholder="Workspace preset name"
+            />
             <div class="workspace-manager-actions">
               <button id="workspace-preset-save" type="button">Save Current Workspace</button>
               <button id="workspace-preset-apply" type="button">Apply Preset</button>
               <button id="workspace-preset-duplicate" type="button">Duplicate Preset</button>
               <button id="workspace-preset-rename" type="button">Rename Preset</button>
               <button id="workspace-preset-delete" type="button">Delete Preset</button>
+            </div>
+            <div id="workspace-preset-delete-confirm" class="workspace-manager-inline-confirm" hidden>
+              <p id="workspace-preset-delete-confirm-message" class="workspace-manager-inline-note"></p>
+              <div class="workspace-manager-actions">
+                <button id="workspace-preset-delete-confirm-btn" type="button">Delete Preset</button>
+                <button id="workspace-preset-delete-cancel-btn" type="button">Cancel</button>
+              </div>
             </div>
             <p id="workspace-preset-summary" class="workspace-manager-summary"></p>
             <pre id="workspace-preset-detail" class="workspace-manager-detail"></pre>
@@ -451,12 +487,26 @@
                 Deck groups are deck-local session subsets. `Save Visible as Group` captures the current visible deck sessions, `Apply Group` switches the active subset, and `Clear Active Group` returns to all sessions in the current deck.
               </p>
               <select id="workspace-group-select" class="workspace-manager-select" aria-label="Workspace groups for active deck"></select>
+              <label class="workspace-manager-field" for="workspace-group-name">Group Name</label>
+              <input
+                id="workspace-group-name"
+                class="workspace-manager-input"
+                type="text"
+                placeholder="Workspace group name"
+              />
               <div class="workspace-manager-actions">
                 <button id="workspace-group-save" type="button">Save Visible as Group</button>
                 <button id="workspace-group-apply" type="button">Apply Group</button>
                 <button id="workspace-group-rename" type="button">Rename Group</button>
                 <button id="workspace-group-delete" type="button">Delete Group</button>
                 <button id="workspace-group-clear" type="button">Clear Active Group</button>
+              </div>
+              <div id="workspace-group-delete-confirm" class="workspace-manager-inline-confirm" hidden>
+                <p id="workspace-group-delete-confirm-message" class="workspace-manager-inline-note"></p>
+                <div class="workspace-manager-actions">
+                  <button id="workspace-group-delete-confirm-btn" type="button">Delete Group</button>
+                  <button id="workspace-group-delete-cancel-btn" type="button">Cancel</button>
+                </div>
               </div>
               <p id="workspace-group-persistence" class="workspace-manager-inline-note"></p>
             </div>

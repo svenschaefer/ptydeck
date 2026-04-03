@@ -94,6 +94,22 @@ export function createSessionCardInteractionsController(options = {}) {
       }
     }
 
+    function discardSettingsDraftAndClose() {
+      const freshSession = getSession();
+      const entry = getEntry() || refs;
+      sessionThemeDrafts?.delete?.(session.id);
+      if (freshSession) {
+        syncSessionStartupControls(entry, freshSession);
+        syncSessionNoteControls(entry, freshSession);
+        syncSessionInputSafetyControls(entry, freshSession);
+        syncSessionThemeControls(entry, session.id);
+      }
+      applyThemeForSession(session.id);
+      setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "");
+      setSettingsDirty(entry, false);
+      closeSettingsDialog(refs.settingsDialog);
+    }
+
     function buildSettingsFeedbackEntry() {
       return {
         settingsFeedback: refs.settingsFeedback,
@@ -112,13 +128,13 @@ export function createSessionCardInteractionsController(options = {}) {
         scheduleSettingsLayoutStabilization();
       }
     });
-    refs.settingsDismissBtn?.addEventListener("click", () => closeSettingsDialog(refs.settingsDialog));
+    refs.settingsDismissBtn?.addEventListener("click", () => discardSettingsDraftAndClose());
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {
       refs.settingsDialog.addEventListener("cancel", (event) => {
         if (event && typeof event.preventDefault === "function") {
           event.preventDefault();
         }
-        closeSettingsDialog(refs.settingsDialog);
+        discardSettingsDraftAndClose();
       });
     }
     refs.settingsTabStartupBtn?.addEventListener("click", () => {
@@ -362,30 +378,7 @@ export function createSessionCardInteractionsController(options = {}) {
     });
 
     refs.settingsCancelBtn?.addEventListener("click", () => {
-      const freshSession = getSession();
-      sessionThemeDrafts.delete(session.id);
-      if (freshSession) {
-        syncSessionStartupControls(
-          {
-            startCwdInput: refs.startCwdInput,
-            startCommandInput: refs.startCommandInput,
-            startEnvInput: refs.startEnvInput,
-            mouseForwardingModeSelect: refs.mouseForwardingModeSelect,
-            sessionNoteInput: refs.sessionNoteInput,
-            sessionTagsInput: refs.sessionTagsInput,
-            sessionSendTerminatorSelect: refs.sessionSendTerminatorSelect,
-            inputSafetyControls: refs.inputSafetyControls
-          },
-          freshSession
-        );
-        syncSessionNoteControls(refs, freshSession);
-        syncSessionInputSafetyControls(refs, freshSession);
-        syncSessionThemeControls(refs, session.id);
-      }
-      applyThemeForSession(session.id);
-      setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "");
-      setSettingsDirty(getEntry(), false);
-      closeSettingsDialog(refs.settingsDialog);
+      discardSettingsDraftAndClose();
     });
   }
 

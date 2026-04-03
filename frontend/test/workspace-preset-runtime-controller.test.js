@@ -498,3 +498,163 @@ test("workspace preset runtime controller guards local-only group save and silen
   assert.equal(await controller.deleteGroupById("", "ops"), "");
   assert.equal(feedback.length, 0);
 });
+
+test("workspace preset runtime controller supports prompt-free preset and group flows with inline confirmations", async () => {
+  const calls = [];
+  const presetSelectEl = new FakeElement("select");
+  const presetNameInputEl = new FakeElement("input");
+  const presetDeleteConfirmEl = new FakeElement("div");
+  presetDeleteConfirmEl.hidden = true;
+  const presetDeleteConfirmMessageEl = new FakeElement("p");
+  const groupSelectEl = new FakeElement("select");
+  const groupNameInputEl = new FakeElement("input");
+  const groupDeleteConfirmEl = new FakeElement("div");
+  groupDeleteConfirmEl.hidden = true;
+  const groupDeleteConfirmMessageEl = new FakeElement("p");
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    api: {
+      async createWorkspacePreset(payload) {
+        calls.push(["create", payload]);
+        return {
+          id: payload.name === "Ops Copy" ? "ops-copy" : "ops-new",
+          name: payload.name,
+          createdAt: 2,
+          updatedAt: 2,
+          workspace: payload.workspace
+        };
+      },
+      async updateWorkspacePreset(presetId, payload) {
+        calls.push(["update", presetId, payload]);
+        return {
+          id: presetId,
+          name: payload.name || "Ops Workspace",
+          createdAt: 1,
+          updatedAt: 3,
+          workspace: payload.workspace || {
+            activeDeckId: "ops",
+            layoutProfileId: "",
+            controlPaneVisible: true,
+            controlPanePosition: "bottom",
+            controlPaneSize: 185,
+            deckGroups: {},
+            deckSplitLayouts: {}
+          }
+        };
+      },
+      async deleteWorkspacePreset(presetId) {
+        calls.push(["delete", presetId]);
+      }
+    },
+    presetSelectEl,
+    presetNameInputEl,
+    presetSaveBtn: new FakeElement("button"),
+    presetApplyBtn: new FakeElement("button"),
+    presetDuplicateBtn: new FakeElement("button"),
+    presetRenameBtn: new FakeElement("button"),
+    presetDeleteBtn: new FakeElement("button"),
+    presetDeleteConfirmEl,
+    presetDeleteConfirmMessageEl,
+    presetDeleteConfirmBtn: new FakeElement("button"),
+    presetDeleteCancelBtn: new FakeElement("button"),
+    groupSelectEl,
+    groupNameInputEl,
+    groupSaveBtn: new FakeElement("button"),
+    groupApplyBtn: new FakeElement("button"),
+    groupRenameBtn: new FakeElement("button"),
+    groupDeleteBtn: new FakeElement("button"),
+    groupDeleteConfirmEl,
+    groupDeleteConfirmMessageEl,
+    groupDeleteConfirmBtn: new FakeElement("button"),
+    groupDeleteCancelBtn: new FakeElement("button"),
+    groupClearBtn: new FakeElement("button"),
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [{ id: "s1", deckId: "ops" }, { id: "s2", deckId: "ops" }],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    setCommandFeedback: (message) => calls.push(["feedback", message])
+  });
+
+  controller.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckGroups: {},
+    deckSplitLayouts: {}
+  });
+  controller.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: controller.getWorkspaceState()
+    }
+  ]);
+
+  presetNameInputEl.value = "Ops Copy";
+  const duplicateFeedback = await controller.duplicateSelectedPresetFlow();
+  assert.equal(
+    duplicateFeedback,
+    "Duplicated workspace preset [ops] Ops Workspace as [ops-copy] Ops Copy."
+  );
+
+  presetSelectEl.value = "ops";
+  controller.bindUiEvents();
+  presetSelectEl.dispatchEvent("change");
+  presetNameInputEl.value = "Ops Primary";
+  const renameFeedback = await controller.renameSelectedPresetFlow();
+  assert.equal(renameFeedback, "Renamed workspace preset [ops] to Ops Primary.");
+
+  const presetDeletePending = await controller.deleteSelectedPresetFlow();
+  assert.equal(presetDeletePending, "Confirm deletion for workspace preset [ops] Ops Primary.");
+  assert.equal(presetDeleteConfirmEl.hidden, false);
+  assert.match(presetDeleteConfirmMessageEl.textContent, /Ops Primary/);
+  assert.equal(calls.some((entry) => entry[0] === "delete"), false);
+
+  const presetDeleteCancelled = await controller.cancelDeleteSelectedPresetFlow();
+  assert.equal(presetDeleteCancelled, "Cancelled deletion of the workspace preset.");
+  assert.equal(presetDeleteConfirmEl.hidden, true);
+
+  await controller.deleteSelectedPresetFlow();
+  const presetDeleteFeedback = await controller.deleteSelectedPresetFlow();
+  assert.equal(presetDeleteFeedback, "Deleted workspace preset [ops] Ops Primary.");
+  controller.replacePresets([]);
+
+  groupNameInputEl.value = "Ops Team";
+  const groupSaveFeedback = await controller.saveGroupFlow();
+  assert.equal(
+    groupSaveFeedback,
+    "Saved workspace group [ops-team] Ops Team for deck [ops]. It is local-only until you save or select a workspace preset."
+  );
+
+  groupNameInputEl.value = "Ops Core";
+  const groupRenameFeedback = await controller.renameSelectedGroupFlow();
+  assert.equal(
+    groupRenameFeedback,
+    "Renamed workspace group [ops-team] to Ops Core. The change is local-only until you save or select a workspace preset."
+  );
+
+  const groupDeletePending = await controller.deleteSelectedGroupFlow();
+  assert.equal(groupDeletePending, "Confirm deletion for workspace group [ops-team] Ops Core on deck [ops].");
+  assert.equal(groupDeleteConfirmEl.hidden, false);
+  assert.match(groupDeleteConfirmMessageEl.textContent, /Ops Core/);
+
+  const groupDeleteCancelled = await controller.cancelDeleteSelectedGroupFlow();
+  assert.equal(groupDeleteCancelled, "Cancelled deletion of the workspace group.");
+  assert.equal(groupDeleteConfirmEl.hidden, true);
+
+  await controller.deleteSelectedGroupFlow();
+  const groupDeleteFeedback = await controller.deleteSelectedGroupFlow();
+  assert.equal(
+    groupDeleteFeedback,
+    "Deleted workspace group [ops-team] Ops Core. The change is local-only until you save or select a workspace preset."
+  );
+});

@@ -1815,6 +1815,19 @@ button:hover {
   gap: 8px;
 }
 
+.workspace-manager-action-cluster {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-manager-action-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #89aac8;
+}
+
 .workspace-manager-summary {
   margin: 0;
   padding: 10px 12px;
@@ -1888,6 +1901,15 @@ button:hover {
   color: #9db8d2;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.workspace-manager-inline-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: rgba(15, 21, 31, 0.75);
 }
 
 .workspace-manager-subsection-card {

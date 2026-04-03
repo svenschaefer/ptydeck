@@ -82,6 +82,7 @@ function createConnectionProfileUiRefs() {
     draftRemotePrivateKeyPathInputEl: createElement("input"),
     authHintEl: createElement("p"),
     secretHintEl: createElement("p"),
+    runtimeSecretInputEl: createElement("input"),
     sshTrustStatusEl: createElement("p"),
     sshTrustSelectEl: createElement("select"),
     sshTrustKeyTypeInputEl: createElement("input"),
@@ -89,6 +90,10 @@ function createConnectionProfileUiRefs() {
     sshTrustRefreshBtn: createElement("button"),
     sshTrustSaveBtn: createElement("button"),
     sshTrustDeleteBtn: createElement("button"),
+    deleteConfirmEl: createElement("div"),
+    deleteConfirmMessageEl: createElement("p"),
+    deleteConfirmBtn: createElement("button"),
+    deleteCancelBtn: createElement("button"),
     draftLaunchTextareaEl: createElement("textarea"),
     draftStatusEl: createElement("p")
   };
@@ -332,6 +337,7 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   });
 
   await controller.loadProfiles();
+  controller.bindUiEvents();
   assert.equal(ui.selectEl.children.length, 1);
   assert.equal(ui.statusEl.textContent, "1 profile(s)");
   assert.match(ui.summaryEl.textContent, /Ops SSH/);
@@ -383,12 +389,14 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   });
   assert.match(ui.draftStatusEl.textContent, /Editing saved profile \[local-dev\]/i);
 
+  ui.runtimeSecretInputEl.value = "secret-1";
   const applyFeedback = await controller.applyProfileById("ops-ssh");
   assert.equal(applyFeedback, "Started session [8] Ops SSH from connection profile [ops-ssh] Ops SSH.");
   assert.deepEqual(calls.find((entry) => entry[0] === "create-session")?.[1], {
     connectionProfileId: "ops-ssh",
     remoteSecret: "secret-1"
   });
+  assert.equal(ui.runtimeSecretInputEl.value, "");
   assert.ok(calls.some((entry) => entry[0] === "set-active-deck" && entry[1] === "ops"));
   assert.ok(calls.some((entry) => entry[0] === "set-active-session" && entry[1] === "s-created"));
   assert.ok(calls.some((entry) => entry[0] === "runtime-event" && entry[1] === "session.created" && entry[2] === "s-created"));
@@ -403,7 +411,20 @@ test("connection profile runtime controller manages backend-backed lifecycle and
   );
   assert.equal(controller.getSelectedProfileId(), "ops-ssh-copy");
 
-  const deleteFeedback = await controller.deleteProfileById("ops-ssh");
+  ui.selectEl.value = "ops-ssh";
+  ui.selectEl.dispatch("change");
+  const pendingDeleteFeedback = await controller.deleteSelectedProfileFlow();
+  assert.equal(pendingDeleteFeedback, "Confirm deletion for saved connection profile [ops-ssh] Ops SSH Prod.");
+  assert.equal(calls.some((entry) => entry[0] === "delete"), false);
+  assert.equal(ui.deleteConfirmEl.hidden, false);
+  assert.match(ui.deleteConfirmMessageEl.textContent, /Ops SSH Prod/);
+
+  const cancelDeleteFeedback = await controller.cancelDeleteSelectedProfileFlow();
+  assert.equal(cancelDeleteFeedback, "Cancelled deletion of the saved connection profile.");
+  assert.equal(ui.deleteConfirmEl.hidden, true);
+
+  await controller.deleteSelectedProfileFlow();
+  const deleteFeedback = await controller.deleteSelectedProfileFlow();
   assert.equal(deleteFeedback, "Deleted connection profile [ops-ssh] Ops SSH Prod.");
 });
 
@@ -464,6 +485,7 @@ test("connection profile runtime controller updates saved drafts instead of crea
 test("connection profile runtime controller reports apply cancellation when secret prompt is dismissed", async () => {
   const calls = [];
   const ui = createConnectionProfileUiRefs();
+  ui.runtimeSecretInputEl = null;
   const controller = createConnectionProfileRuntimeController({
     windowRef: {
       prompt() {
@@ -510,12 +532,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   const calls = [];
   const ui = createConnectionProfileUiRefs();
   const controller = createConnectionProfileRuntimeController({
-    windowRef: {
-      prompt(message) {
-        calls.push(["prompt", message]);
-        return "runtime-secret";
-      }
-    },
+    windowRef: {},
     documentRef: createDocumentRef(),
     ...ui,
     api: {
@@ -605,6 +622,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   ui.draftRemoteUsernameInputEl.value = "ops";
   ui.draftRemoteAuthMethodSelectEl.value = "password";
   ui.draftRemotePrivateKeyPathInputEl.value = "";
+  ui.runtimeSecretInputEl.value = "runtime-secret";
   ui.sshTrustKeyTypeInputEl.value = "ssh-ed25519";
   ui.sshTrustPublicKeyTextareaEl.value = "AAAAC3NzaC1lZDI1NTE5AAAAcreated";
 
@@ -617,6 +635,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated"
   });
 
+  ui.runtimeSecretInputEl.value = "runtime-secret";
   const combinedFeedback = await controller.saveAndLaunchDraftFlow();
   assert.match(combinedFeedback, /Saved connection profile \[ops-guided\] Guided SSH\./);
   assert.match(combinedFeedback, /Started session \[s-ssh\] Guided SSH from connection profile \[ops-guided\] Guided SSH\./);
@@ -647,6 +666,7 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
     connectionProfileId: "ops-guided",
     remoteSecret: "runtime-secret"
   });
+  assert.equal(calls.some((entry) => entry[0] === "prompt"), false);
   assert.match(ui.authHintEl.textContent, /Password auth/i);
   assert.match(ui.secretHintEl.textContent, /runtime secret/i);
 
