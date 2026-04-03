@@ -11,7 +11,7 @@ test("terminal viewport keeps a stable native scrollbar gutter", () => {
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(
     stylesCss,
-    /\.terminal-mount \.xterm-screen,\s*\.terminal-mount \.xterm-screen canvas \{\s*pointer-events: none;\s*\}/m
+    /\.terminal-mount \.xterm-screen canvas \{\s*pointer-events: none;\s*\}/m
   );
   assert.match(
     stylesCss,

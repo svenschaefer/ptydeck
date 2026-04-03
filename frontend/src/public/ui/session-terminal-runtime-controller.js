@@ -81,6 +81,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     let suppressNextClipboardPasteEvent = false;
     let pendingKeyboardPasteSource = "";
     let pendingKeyboardPasteTimer = null;
+    let pendingKeyboardPasteFallbackTimer = null;
     const handledClipboardEvents = new WeakSet();
 
     function isMouseForwardingEnabled() {
@@ -100,12 +101,37 @@ export function createSessionTerminalRuntimeController(options = {}) {
         clearTimeoutFn(pendingKeyboardPasteTimer);
         pendingKeyboardPasteTimer = null;
       }
+      if (pendingKeyboardPasteFallbackTimer !== null) {
+        clearTimeoutFn(pendingKeyboardPasteFallbackTimer);
+        pendingKeyboardPasteFallbackTimer = null;
+      }
       pendingKeyboardPasteSource = "";
     }
 
     function armPendingKeyboardPasteSource(source) {
       clearPendingKeyboardPasteSource();
       pendingKeyboardPasteSource = String(source || "").trim();
+      pendingKeyboardPasteFallbackTimer = setTimeoutFn(() => {
+        pendingKeyboardPasteFallbackTimer = null;
+        if (!pendingKeyboardPasteSource) {
+          return;
+        }
+        const fallbackSource = pendingKeyboardPasteSource;
+        suppressNextClipboardPasteOnce();
+        Promise.resolve(readClipboardText())
+          .then((text) => {
+            if (!text || pendingKeyboardPasteSource !== fallbackSource) {
+              return;
+            }
+            dispatchTerminalPaste(text, fallbackSource);
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (pendingKeyboardPasteSource === fallbackSource) {
+              clearPendingKeyboardPasteSource();
+            }
+          });
+      }, 120);
       pendingKeyboardPasteTimer = setTimeoutFn(() => {
         pendingKeyboardPasteTimer = null;
         pendingKeyboardPasteSource = "";
@@ -188,9 +214,15 @@ export function createSessionTerminalRuntimeController(options = {}) {
         return false;
       }
       terminal.focus?.();
+      terminal.textarea?.focus?.();
       onTerminalPaste(session.id, text);
       debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length, source });
       return true;
+    }
+
+    function focusTerminalSurface() {
+      terminal.focus?.();
+      terminal.textarea?.focus?.();
     }
 
     function requestClipboardPaste({ source, event, suppressFollowupPasteEvent = false }) {
@@ -285,6 +317,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button !== 1) {
         return;
       }
+      focusTerminalSurface();
       if (isMouseForwardingEnabled()) {
         suppressNextPaste = true;
         setTimeoutFn(() => {
@@ -359,14 +392,27 @@ export function createSessionTerminalRuntimeController(options = {}) {
       event.stopPropagation?.();
     };
 
+    const handleMouseDown = (event) => {
+      if (!event || event.button === 1) {
+        return;
+      }
+      focusTerminalSurface();
+    };
+
+    const handleContextMenu = () => {
+      focusTerminalSurface();
+    };
+
     const clipboardEventTargets = resolveClipboardEventTargets();
     for (const target of clipboardEventTargets) {
       target.addEventListener("keydown", handleKeydown, true);
       target.addEventListener("beforeinput", handleBeforeInput, true);
       target.addEventListener("paste", handlePaste, true);
     }
+    mount.addEventListener("mousedown", handleMouseDown, true);
     mount.addEventListener("mousedown", handleMiddleMouseDown);
     mount.addEventListener("auxclick", handleAuxClick);
+    mount.addEventListener("contextmenu", handleContextMenu, true);
     if (typeof terminal?.attachCustomKeyEventHandler === "function") {
       terminal.attachCustomKeyEventHandler((event) => {
         const pasteShortcutSource = getPasteShortcutSource(event);
@@ -388,8 +434,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
         target.removeEventListener("paste", handlePaste, true);
       }
       if (typeof mount.removeEventListener === "function") {
+        mount.removeEventListener("mousedown", handleMouseDown, true);
         mount.removeEventListener("mousedown", handleMiddleMouseDown);
         mount.removeEventListener("auxclick", handleAuxClick);
+        mount.removeEventListener("contextmenu", handleContextMenu, true);
       }
       if (typeof terminal?.attachCustomKeyEventHandler === "function") {
         terminal.attachCustomKeyEventHandler(() => true);
