@@ -11,6 +11,9 @@ class FakeTerminal {
     this.openedMount = null;
     this.selection = "";
     this.focusCalls = 0;
+    this.rows = 24;
+    this.refreshCalls = [];
+    this.scrollToBottomCalls = 0;
     this.textarea = null;
   }
   open(mount) {
@@ -33,6 +36,12 @@ class FakeTerminal {
   }
   focus() {
     this.focusCalls += 1;
+  }
+  refresh(start, end) {
+    this.refreshCalls.push([start, end]);
+  }
+  scrollToBottom() {
+    this.scrollToBottomCalls += 1;
   }
   emitData(data) {
     this.dataHandler?.(data);
@@ -200,6 +209,8 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     terminalFontSize: 16,
     terminalLineHeight: 1.2,
     terminalFontFamily: "mono",
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {},
     debugLog: (event, details) => calls.push(`debug:${event}:${details.sessionId}`)
   });
   const gridEl = {
@@ -260,7 +271,8 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     onTerminalData: (sessionId, data) => calls.push(`data:${sessionId}:${data}`),
     afterEntryRegistered: (registeredEntry, session) => calls.push(`registered:${session.id}:${registeredEntry.isVisible}`),
     onFirstTerminalMounted: () => calls.push("first-mounted"),
-    applyResizeForSession: (sessionId) => calls.push(`resize:${sessionId}`)
+    applyResizeForSession: (sessionId, options) =>
+      calls.push(`resize:${sessionId}:${options?.force === true}:${options?.skipRemote === true}`)
   });
 
   assert.equal(gridEl.appended.length, 1);
@@ -275,13 +287,16 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(entry.themeSlotSelect, refs.themeSlotSelect);
   assert.equal(entry.settingsCancelBtn, refs.settingsCancelBtn);
   assert.deepEqual(timers, [120, 400, 900]);
+  assert.deepEqual(entry.terminal.refreshCalls, [[0, 23]]);
+  assert.equal(entry.terminal.scrollToBottomCalls, 1);
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [
     "debug:terminal.created:s1",
     "mounted:s1",
     "registered:s1:true",
     "first-mounted",
-    "resize:s1",
+    "resize:s1:false:false",
+    "resize:s1:true:true",
     "data:s1:ls\n"
   ]);
   assert.equal(entry.terminal.options.fontSize, 16);

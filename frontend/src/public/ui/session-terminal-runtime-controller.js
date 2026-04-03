@@ -49,6 +49,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
       ? options.requestTerminalCtrlCAction
       : async () => "cancel";
   const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
+  const refreshTerminalViewport =
+    typeof options.refreshTerminalViewport === "function" ? options.refreshTerminalViewport : () => {};
+  const syncTerminalScrollArea =
+    typeof options.syncTerminalScrollArea === "function" ? options.syncTerminalScrollArea : () => {};
 
   function getTerminalSelection(terminal) {
     if (!terminal) {
@@ -461,6 +465,25 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const onFirstTerminalMounted = args.onFirstTerminalMounted || (() => {});
     const applyResizeForSession = args.applyResizeForSession || (() => {});
 
+    function stabilizeMountedTerminal(entry) {
+      if (!entry?.terminal) {
+        return false;
+      }
+      if (entry.isVisible === false) {
+        entry.pendingViewportSync = true;
+        return false;
+      }
+      applyResizeForSession(session.id, { force: true, skipRemote: true });
+      syncTerminalScrollArea(entry.terminal);
+      refreshTerminalViewport(entry.terminal);
+      if (entry.followOnShow !== false && typeof entry.terminal.scrollToBottom === "function") {
+        entry.terminal.scrollToBottom();
+      }
+      syncTerminalScrollArea(entry.terminal);
+      entry.pendingViewportSync = false;
+      return true;
+    }
+
     const terminal = new windowRef.Terminal({
       convertEol: true,
       fontSize: terminalFontSize,
@@ -541,9 +564,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
 
     onFirstTerminalMounted();
     applyResizeForSession(session.id);
-    setTimeoutFn(() => applyResizeForSession(session.id), 120);
-    setTimeoutFn(() => applyResizeForSession(session.id), 400);
-    setTimeoutFn(() => applyResizeForSession(session.id), 900);
+    stabilizeMountedTerminal(entry);
+    setTimeoutFn(() => stabilizeMountedTerminal(entry), 120);
+    setTimeoutFn(() => stabilizeMountedTerminal(entry), 400);
+    setTimeoutFn(() => stabilizeMountedTerminal(entry), 900);
 
     return entry;
   }
