@@ -84,6 +84,7 @@ test("session-runtime controller appends chunks and retries replay for late term
   const callbacks = [];
   const marks = [];
   const searchCalls = [];
+  const resizeCalls = [];
 
   const controller = createSessionRuntimeController({
     terminals,
@@ -93,6 +94,8 @@ test("session-runtime controller appends chunks and retries replay for late term
     markSessionActivity: (sessionId) => marks.push(sessionId),
     syncActiveTerminalSearch: (payload) => searchCalls.push(payload),
     getActiveSessionId: () => "s1",
+    applyResizeForSession: (sessionId, options) =>
+      resizeCalls.push([sessionId, options?.force === true, options?.skipRemote === true]),
     windowRef: {
       setTimeout(fn) {
         callbacks.push("retry");
@@ -160,6 +163,13 @@ test("session-runtime controller appends chunks and retries replay for late term
   controller.replaySnapshotOutputs([{ sessionId: "late", data: "chunk" }]);
   assert.ok(callbacks.includes("retry"));
   assert.deepEqual(terminals.get("late").terminal.writes, ["chunk"]);
+  assert.deepEqual(
+    resizeCalls.filter(([sessionId]) => sessionId === "late"),
+    [
+      ["late", true, true],
+      ["late", true, true]
+    ]
+  );
 });
 
 test("session-runtime controller strips mouse-tracking control sequences when forwarding is off", () => {

@@ -468,6 +468,9 @@ export function createCommandComposerRuntimeController(options = {}) {
         plan,
         guardResult
       };
+      if (guardResult.summary) {
+        setCommandFeedback(guardResult.summary);
+      }
       setCommandGuardState({
         active: true,
         summary: guardResult.summary,

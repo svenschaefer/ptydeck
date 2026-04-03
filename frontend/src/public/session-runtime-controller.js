@@ -148,6 +148,7 @@ export function createSessionRuntimeController(options = {}) {
     }
 
     let missing = 0;
+    const replayedSessionIds = new Set();
     for (const entry of outputs) {
       if (!entry || typeof entry.sessionId !== "string" || typeof entry.data !== "string" || entry.data.length === 0) {
         continue;
@@ -157,6 +158,18 @@ export function createSessionRuntimeController(options = {}) {
         continue;
       }
       appendTerminalChunk(entry.sessionId, entry.data, { markActivity: false });
+      replayedSessionIds.add(entry.sessionId);
+    }
+
+    if (replayedSessionIds.size > 0 && setTimeoutRef) {
+      const stabilizedIds = Array.from(replayedSessionIds);
+      const runPass = () => {
+        for (const sessionId of stabilizedIds) {
+          stabilizeTerminalAfterSnapshot(sessionId);
+        }
+      };
+      setTimeoutRef(runPass, 20);
+      setTimeoutRef(runPass, 140);
     }
 
     if (missing > 0 && attempt < 4 && setTimeoutRef) {
