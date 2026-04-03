@@ -21,6 +21,14 @@ function createFakeWindow() {
   };
 }
 
+function createDeferredPromise() {
+  let resolve = () => {};
+  const promise = new Promise((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 test("session-terminal-resize controller resizes terminal, updates mount geometry, and schedules remote resize", async () => {
   const windowRef = createFakeWindow();
   const apiCalls = [];
@@ -302,5 +310,56 @@ test("session-terminal-resize controller reapplies mount geometry when runtime m
   assert.equal(entry.mount.style.height, "270px");
   assert.equal(entry.mount.style.width, "680px");
   assert.equal(entry.element.style.width, "700px");
+  assert.deepEqual(resizeCalls, ["80x24"]);
+});
+
+test("session-terminal-resize controller schedules a forced reflow when document fonts become ready", async () => {
+  const windowRef = createFakeWindow();
+  const fontsReady = createDeferredPromise();
+  const resizeCalls = [];
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    documentRef: {
+      fonts: {
+        ready: fontsReady.promise
+      }
+    },
+    terminals: new Map([
+      [
+        "s1",
+        {
+          mount: { clientWidth: 640, clientHeight: 320, style: {} },
+          element: { style: {} },
+          terminal: {
+            resize(cols, rows) {
+              resizeCalls.push(`${cols}x${rows}`);
+            }
+          }
+        }
+      ]
+    ]),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    getSessionById: (sessionId) => ({ id: sessionId, deckId: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionTerminalGeometry: () => ({ cols: 80, rows: 24 }),
+    computeFixedMountHeightPx: () => 240,
+    computeFixedCardWidthPx: () => 820,
+    api: {
+      resizeSession() {
+        return Promise.resolve();
+      }
+    }
+  });
+
+  controller.scheduleDeferredResizePasses();
+  fontsReady.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const forcedResizeTimer = windowRef.scheduled.find((entry) => entry.delay === 120);
+  assert.ok(forcedResizeTimer);
+  forcedResizeTimer.fn();
+
   assert.deepEqual(resizeCalls, ["80x24"]);
 });

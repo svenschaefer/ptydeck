@@ -1023,6 +1023,7 @@ sessionCardRenderController = createSessionCardRenderController({
 
 sessionTerminalResizeController = createSessionTerminalResizeController({
   windowRef: window,
+  documentRef: document,
   terminals,
   resizeTimers,
   terminalSizes,

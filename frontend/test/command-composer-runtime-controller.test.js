@@ -587,6 +587,7 @@ test("command-composer runtime controller applies send safety to terminal pastes
       summary: "Confirmation required before sending to [7] ops.",
       reasons: [{ label: "Paste is guarded.", targets: ["[7] ops"] }]
     }),
+    showCommandGuardUi: () => calls.push(["show-guard-ui"]),
     setCommandGuardState: (nextState) => calls.push(["guard", nextState.summary, nextState.preview]),
     clearCommandGuardState: ({ render } = {}) => calls.push(["clear-guard", render === true]),
     formatSessionToken: () => "7",
@@ -598,6 +599,7 @@ test("command-composer runtime controller applies send safety to terminal pastes
   assert.equal(immediate, false);
   assert.deepEqual(calls, [
     ["clear-guard", false],
+    ["show-guard-ui"],
     ["guard", "Confirmation required before sending to [7] ops.", "rm -rf ./tmp"],
     ["render"]
   ]);

@@ -174,6 +174,9 @@ export function createSessionRuntimeController(options = {}) {
       return false;
     }
     applyResizeForSession(sessionId, { force: true, skipRemote: true });
+    if (typeof entry.terminal.refresh === "function" && Number.isInteger(entry.terminal.rows) && entry.terminal.rows > 0) {
+      entry.terminal.refresh(0, entry.terminal.rows - 1);
+    }
     syncTerminalScrollArea(entry.terminal);
     refreshTerminalViewport(entry.terminal);
     if (entry.followOnShow !== false && typeof entry.terminal.scrollToBottom === "function") {

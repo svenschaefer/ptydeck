@@ -1,5 +1,6 @@
 export function createSessionTerminalResizeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const documentRef = options.documentRef || (typeof document !== "undefined" ? document : null);
   const terminals = options.terminals;
   const resizeTimers = options.resizeTimers;
   const terminalSizes = options.terminalSizes;
@@ -18,6 +19,7 @@ export function createSessionTerminalResizeController(options = {}) {
 
   let globalResizeTimer = null;
   let deferredResizeTimer = null;
+  let fontsReadyHookScheduled = false;
 
   function clearTimer(timer) {
     if (!timer) {
@@ -163,6 +165,14 @@ export function createSessionTerminalResizeController(options = {}) {
   function scheduleDeferredResizePasses(options = {}) {
     const deckIdFilter = String(options.deckId || "").trim();
     const force = options.force === true;
+    if (!fontsReadyHookScheduled && documentRef?.fonts?.ready && typeof documentRef.fonts.ready.then === "function") {
+      fontsReadyHookScheduled = true;
+      Promise.resolve(documentRef.fonts.ready)
+        .then(() => {
+          scheduleGlobalResize({ force: true });
+        })
+        .catch(() => {});
+    }
     if (deferredResizeTimer) {
       clearTimer(deferredResizeTimer);
     }

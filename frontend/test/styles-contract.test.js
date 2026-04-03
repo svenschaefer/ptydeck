@@ -11,6 +11,10 @@ test("terminal viewport keeps a stable native scrollbar gutter", () => {
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(
     stylesCss,
-    /\.terminal-mount \.xterm-viewport \{\s*overflow-y: scroll !important;\s*scrollbar-gutter: stable;\s*\}/m
+    /\.terminal-mount \.xterm-screen,\s*\.terminal-mount \.xterm-screen canvas \{\s*pointer-events: none;\s*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.terminal-mount \.xterm-viewport \{[\s\S]*overflow-y: scroll !important;[\s\S]*scrollbar-gutter: stable;[\s\S]*pointer-events: auto;[\s\S]*\}/m
   );
 });

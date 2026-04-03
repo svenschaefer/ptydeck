@@ -12,6 +12,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
     typeof windowRef.setTimeout === "function"
       ? windowRef.setTimeout.bind(windowRef)
       : globalThis.setTimeout.bind(globalThis);
+  const clearTimeoutFn =
+    typeof windowRef.clearTimeout === "function"
+      ? windowRef.clearTimeout.bind(windowRef)
+      : globalThis.clearTimeout.bind(globalThis);
   const terminalFontSize = Number(options.terminalFontSize) || 16;
   const terminalLineHeight = Number(options.terminalLineHeight) || 1.2;
   const terminalFontFamily = String(options.terminalFontFamily || "monospace");
@@ -75,6 +79,8 @@ export function createSessionTerminalRuntimeController(options = {}) {
     let ctrlCIntentPending = false;
     let suppressNextPaste = false;
     let suppressNextClipboardPasteEvent = false;
+    let pendingKeyboardPasteSource = "";
+    let pendingKeyboardPasteTimer = null;
     const handledClipboardEvents = new WeakSet();
 
     function isMouseForwardingEnabled() {
@@ -87,6 +93,29 @@ export function createSessionTerminalRuntimeController(options = {}) {
       setTimeoutFn(() => {
         suppressNextClipboardPasteEvent = false;
       }, 0);
+    }
+
+    function clearPendingKeyboardPasteSource() {
+      if (pendingKeyboardPasteTimer !== null) {
+        clearTimeoutFn(pendingKeyboardPasteTimer);
+        pendingKeyboardPasteTimer = null;
+      }
+      pendingKeyboardPasteSource = "";
+    }
+
+    function armPendingKeyboardPasteSource(source) {
+      clearPendingKeyboardPasteSource();
+      pendingKeyboardPasteSource = String(source || "").trim();
+      pendingKeyboardPasteTimer = setTimeoutFn(() => {
+        pendingKeyboardPasteTimer = null;
+        pendingKeyboardPasteSource = "";
+      }, 750);
+    }
+
+    function consumePendingKeyboardPasteSource(fallbackSource) {
+      const source = pendingKeyboardPasteSource || fallbackSource;
+      clearPendingKeyboardPasteSource();
+      return source;
     }
 
     function shouldIgnoreDuplicateClipboardEvent(event) {
@@ -231,17 +260,6 @@ export function createSessionTerminalRuntimeController(options = {}) {
           });
         return;
       }
-      const pasteShortcutSource = getPasteShortcutSource(event);
-      if (pasteShortcutSource) {
-        if (shouldIgnoreDuplicateClipboardEvent(event)) {
-          return;
-        }
-        requestClipboardPaste({
-          source: pasteShortcutSource,
-          event
-        });
-        return;
-      }
       if (!event || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
         return;
       }
@@ -304,7 +322,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
         return;
       }
       requestClipboardPaste({
-        source: "beforeinput",
+        source: consumePendingKeyboardPasteSource("beforeinput"),
         event,
         suppressFollowupPasteEvent: true
       });
@@ -325,7 +343,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
         return;
       }
       requestClipboardPaste({
-        source: "clipboard",
+        source: consumePendingKeyboardPasteSource("clipboard"),
         event
       });
     };
@@ -355,13 +373,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
         if (!pasteShortcutSource) {
           return true;
         }
-        if (!handledClipboardEvents.has(event)) {
-          handledClipboardEvents.add(event);
-        }
-        requestClipboardPaste({
-          source: pasteShortcutSource,
-          event
-        });
+        armPendingKeyboardPasteSource(pasteShortcutSource);
         return false;
       });
     }
@@ -382,6 +394,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (typeof terminal?.attachCustomKeyEventHandler === "function") {
         terminal.attachCustomKeyEventHandler(() => true);
       }
+      clearPendingKeyboardPasteSource();
     };
   }
 

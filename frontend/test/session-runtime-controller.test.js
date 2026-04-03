@@ -10,11 +10,16 @@ function createTerminal() {
     writes: [],
     clearSelectionCalls: 0,
     scrollToBottomCalls: 0,
+    refreshCalls: [],
+    rows: 24,
     write(data, callback) {
       this.writes.push(data);
       if (typeof callback === "function") {
         callback();
       }
+    },
+    refresh(start, end) {
+      this.refreshCalls.push([start, end]);
     },
     scrollToBottom() {
       this.scrollToBottomCalls += 1;
@@ -251,6 +256,12 @@ test("session-runtime controller stabilizes mounted terminals after runtime snap
     ["s1", true, true],
     ["s1", true, true],
     ["s1", true, true]
+  ]);
+  assert.deepEqual(visibleTerminal.refreshCalls, [
+    [0, 23],
+    [0, 23],
+    [0, 23],
+    [0, 23]
   ]);
   assert.equal(visibleTerminal.scrollToBottomCalls, 4);
   assert.equal(terminals.get("s1").pendingViewportSync, false);

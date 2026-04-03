@@ -28,6 +28,7 @@ export function createCommandComposerRuntimeController(options = {}) {
   const setCommandPreview = options.setCommandPreview || (() => {});
   const setCommandGuardState = options.setCommandGuardState || (() => {});
   const clearCommandGuardState = options.clearCommandGuardState || (() => {});
+  const showCommandGuardUi = typeof options.showCommandGuardUi === "function" ? options.showCommandGuardUi : () => {};
   const clearCommandSuggestions = options.clearCommandSuggestions || (() => {});
   const render = options.render || (() => {});
   const debugLog = options.debugLog || (() => {});
@@ -388,6 +389,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
 
     if (guardResult.requiresConfirmation) {
+      showCommandGuardUi();
       pendingSend = {
         command,
         plan,
@@ -460,6 +462,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
 
     if (guardResult.requiresConfirmation) {
+      showCommandGuardUi();
       pendingSend = {
         command: "",
         plan,

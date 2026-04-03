@@ -156,6 +156,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     getCommandComposerRuntimeController()?.scheduleCommandPreview?.();
   }
 
+  function showCommandGuardUi() {
+    getControlPaneRuntimeController()?.show?.();
+  }
+
   return {
     listCustomCommands,
     getCustomCommand,
@@ -181,6 +185,7 @@ export function createAppCommandUiFacadeController(options = {}) {
     executeControlCommandDetailed,
     submitCommand,
     refreshCommandPreview,
-    scheduleCommandPreview
+    scheduleCommandPreview,
+    showCommandGuardUi
   };
 }

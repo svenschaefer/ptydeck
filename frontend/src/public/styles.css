@@ -2304,9 +2304,15 @@ button:hover {
   height: 100%;
 }
 
+.terminal-mount .xterm-screen,
+.terminal-mount .xterm-screen canvas {
+  pointer-events: none;
+}
+
 .terminal-mount .xterm-viewport {
   overflow-y: scroll !important;
   scrollbar-gutter: stable;
+  pointer-events: auto;
 }
 
 @media (max-width: 900px) {

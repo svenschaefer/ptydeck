@@ -357,6 +357,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       setCommandPreview: (message) => appCommandUiFacadeController?.setCommandPreview?.(message),
       setCommandGuardState: (nextState) => appCommandUiFacadeController?.setCommandGuardState?.(nextState),
       clearCommandGuardState: (runtimeOptions) => appCommandUiFacadeController?.clearCommandGuardState?.(runtimeOptions),
+      showCommandGuardUi: () => appCommandUiFacadeController?.showCommandGuardUi?.(),
       clearCommandSuggestions: () => appCommandUiFacadeController?.clearCommandSuggestions?.(),
       render: () => appCommandUiFacadeController?.render?.(),
       debugLog,
