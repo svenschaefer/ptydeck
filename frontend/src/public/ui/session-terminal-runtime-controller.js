@@ -75,6 +75,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     let ctrlCIntentPending = false;
     let suppressNextPaste = false;
     let suppressNextClipboardPasteEvent = false;
+    const handledClipboardEvents = new WeakSet();
 
     function isMouseForwardingEnabled() {
       const currentSession = getSessionById(session.id) || session;
@@ -86,6 +87,63 @@ export function createSessionTerminalRuntimeController(options = {}) {
       setTimeoutFn(() => {
         suppressNextClipboardPasteEvent = false;
       }, 0);
+    }
+
+    function shouldIgnoreDuplicateClipboardEvent(event) {
+      if (!event || typeof event !== "object") {
+        return false;
+      }
+      if (handledClipboardEvents.has(event)) {
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        return true;
+      }
+      handledClipboardEvents.add(event);
+      return false;
+    }
+
+    function getPasteShortcutSource(event) {
+      const key = String(event?.key || "");
+      const normalizedKey = key.toLowerCase();
+      const isShortcutPaste =
+        event &&
+        normalizedKey === "v" &&
+        ((event.ctrlKey === true && event.metaKey !== true) || (event.metaKey === true && event.ctrlKey !== true)) &&
+        event.altKey !== true;
+      if (isShortcutPaste) {
+        return "shortcut";
+      }
+      const isShiftInsertPaste =
+        event &&
+        key === "Insert" &&
+        event.shiftKey === true &&
+        event.ctrlKey !== true &&
+        event.metaKey !== true &&
+        event.altKey !== true;
+      if (isShiftInsertPaste) {
+        return "shift-insert";
+      }
+      return "";
+    }
+
+    function resolveClipboardEventTargets() {
+      const targets = [];
+      const seen = new Set();
+      const pushTarget = (target) => {
+        if (!target || typeof target.addEventListener !== "function" || seen.has(target)) {
+          return;
+        }
+        seen.add(target);
+        targets.push(target);
+      };
+      pushTarget(mount);
+      if (typeof mount.querySelector === "function") {
+        pushTarget(mount.querySelector(".xterm-helper-textarea"));
+      }
+      if (terminal && typeof terminal === "object" && terminal.textarea && typeof terminal.textarea.addEventListener === "function") {
+        pushTarget(terminal.textarea);
+      }
+      return targets;
     }
 
     function readClipboardPayloadFromEvent(event) {
@@ -173,23 +231,13 @@ export function createSessionTerminalRuntimeController(options = {}) {
           });
         return;
       }
-      const key = String(event?.key || "");
-      const normalizedKey = key.toLowerCase();
-      const isShortcutPaste =
-        event &&
-        normalizedKey === "v" &&
-        ((event.ctrlKey === true && event.metaKey !== true) || (event.metaKey === true && event.ctrlKey !== true)) &&
-        event.altKey !== true;
-      const isShiftInsertPaste =
-        event &&
-        key === "Insert" &&
-        event.shiftKey === true &&
-        event.ctrlKey !== true &&
-        event.metaKey !== true &&
-        event.altKey !== true;
-      if (isShortcutPaste || isShiftInsertPaste) {
+      const pasteShortcutSource = getPasteShortcutSource(event);
+      if (pasteShortcutSource) {
+        if (shouldIgnoreDuplicateClipboardEvent(event)) {
+          return;
+        }
         requestClipboardPaste({
-          source: isShiftInsertPaste ? "shift-insert" : "shortcut",
+          source: pasteShortcutSource,
           event
         });
         return;
@@ -242,6 +290,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.inputType !== "insertFromPaste") {
         return;
       }
+      if (shouldIgnoreDuplicateClipboardEvent(event)) {
+        return;
+      }
       if (suppressNextClipboardPasteEvent) {
         suppressNextClipboardPasteEvent = false;
         event.preventDefault?.();
@@ -260,6 +311,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     const handlePaste = (event) => {
+      if (shouldIgnoreDuplicateClipboardEvent(event)) {
+        return;
+      }
       if (suppressNextClipboardPasteEvent) {
         suppressNextClipboardPasteEvent = false;
         event?.preventDefault?.();
@@ -287,19 +341,46 @@ export function createSessionTerminalRuntimeController(options = {}) {
       event.stopPropagation?.();
     };
 
-    mount.addEventListener("keydown", handleKeydown, true);
-    mount.addEventListener("beforeinput", handleBeforeInput, true);
+    const clipboardEventTargets = resolveClipboardEventTargets();
+    for (const target of clipboardEventTargets) {
+      target.addEventListener("keydown", handleKeydown, true);
+      target.addEventListener("beforeinput", handleBeforeInput, true);
+      target.addEventListener("paste", handlePaste, true);
+    }
     mount.addEventListener("mousedown", handleMiddleMouseDown);
     mount.addEventListener("auxclick", handleAuxClick);
-    mount.addEventListener("paste", handlePaste, true);
+    if (typeof terminal?.attachCustomKeyEventHandler === "function") {
+      terminal.attachCustomKeyEventHandler((event) => {
+        const pasteShortcutSource = getPasteShortcutSource(event);
+        if (!pasteShortcutSource) {
+          return true;
+        }
+        if (!handledClipboardEvents.has(event)) {
+          handledClipboardEvents.add(event);
+        }
+        requestClipboardPaste({
+          source: pasteShortcutSource,
+          event
+        });
+        return false;
+      });
+    }
 
     return () => {
+      for (const target of clipboardEventTargets) {
+        if (typeof target.removeEventListener !== "function") {
+          continue;
+        }
+        target.removeEventListener("keydown", handleKeydown, true);
+        target.removeEventListener("beforeinput", handleBeforeInput, true);
+        target.removeEventListener("paste", handlePaste, true);
+      }
       if (typeof mount.removeEventListener === "function") {
-        mount.removeEventListener("keydown", handleKeydown, true);
-        mount.removeEventListener("beforeinput", handleBeforeInput, true);
         mount.removeEventListener("mousedown", handleMiddleMouseDown);
         mount.removeEventListener("auxclick", handleAuxClick);
-        mount.removeEventListener("paste", handlePaste, true);
+      }
+      if (typeof terminal?.attachCustomKeyEventHandler === "function") {
+        terminal.attachCustomKeyEventHandler(() => true);
       }
     };
   }

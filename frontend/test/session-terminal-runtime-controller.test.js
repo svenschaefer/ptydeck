@@ -7,15 +7,23 @@ class FakeTerminal {
   constructor(options) {
     this.options = options;
     this.dataHandler = null;
+    this.customKeyEventHandler = null;
     this.openedMount = null;
     this.selection = "";
     this.focusCalls = 0;
+    this.textarea = null;
   }
   open(mount) {
     this.openedMount = mount;
+    if (mount && typeof mount.querySelector === "function") {
+      this.textarea = mount.querySelector(".xterm-helper-textarea");
+    }
   }
   onData(handler) {
     this.dataHandler = handler;
+  }
+  attachCustomKeyEventHandler(handler) {
+    this.customKeyEventHandler = handler;
   }
   getSelection() {
     return this.selection;
@@ -42,6 +50,42 @@ class FakeResizeObserver {
 }
 
 class FakeMount {
+  constructor(id) {
+    this.id = id;
+    this.listeners = new Map();
+    this.helperTextarea = new FakeEventTarget(`${id}-textarea`);
+  }
+
+  addEventListener(type, handler) {
+    const handlers = this.listeners.get(type) || [];
+    handlers.push(handler);
+    this.listeners.set(type, handlers);
+  }
+
+  removeEventListener(type, handler) {
+    const handlers = this.listeners.get(type) || [];
+    this.listeners.set(
+      type,
+      handlers.filter((entry) => entry !== handler)
+    );
+  }
+
+  dispatchEvent(event) {
+    const handlers = this.listeners.get(event.type) || [];
+    for (const handler of handlers) {
+      handler(event);
+    }
+  }
+
+  querySelector(selector) {
+    if (selector === ".xterm-helper-textarea") {
+      return this.helperTextarea;
+    }
+    return null;
+  }
+}
+
+class FakeEventTarget {
   constructor(id) {
     this.id = id;
     this.listeners = new Map();
@@ -536,6 +580,66 @@ test("session-terminal-runtime controller pastes clipboard text on explicit Ctrl
 
   assert.equal(pasteEvent.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "git status\n"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller intercepts explicit paste shortcuts through xterm custom key handling", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "npm run test\n"
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const pasteEvent = createPasteShortcutEvent();
+  const handled = entry.terminal.customKeyEventHandler?.(pasteEvent);
+  await Promise.resolve();
+
+  assert.equal(handled, false);
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [["s1", "npm run test\n"]]);
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
