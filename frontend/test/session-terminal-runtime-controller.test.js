@@ -94,6 +94,18 @@ function createCtrlCEvent() {
   return event;
 }
 
+function createPasteShortcutEvent() {
+  const event = createKeyEvent("v");
+  event.ctrlKey = true;
+  return event;
+}
+
+function createShiftInsertEvent() {
+  const event = createKeyEvent("Insert");
+  event.shiftKey = true;
+  return event;
+}
+
 function createMouseEvent(type, button) {
   return {
     type,
@@ -466,6 +478,161 @@ test("session-terminal-runtime controller routes clipboard paste events through 
   assert.equal(pasteEvent.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "echo hi"]]);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller pastes clipboard text on explicit Ctrl-V shortcuts", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "git status\n"
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const pasteEvent = createPasteShortcutEvent();
+  refs.mount.dispatchEvent(pasteEvent);
+  await Promise.resolve();
+
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [["s1", "git status\n"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller treats Shift-Insert and beforeinput paste as one terminal paste", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "ignored\n"
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const shiftInsertEvent = createShiftInsertEvent();
+  refs.mount.dispatchEvent(shiftInsertEvent);
+  await Promise.resolve();
+
+  const beforeInputEvent = {
+    type: "beforeinput",
+    inputType: "insertFromPaste",
+    data: "echo beforeinput",
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  };
+  refs.mount.dispatchEvent(beforeInputEvent);
+
+  const trailingPasteEvent = {
+    type: "paste",
+    clipboardData: {
+      getData(format) {
+        return format === "text" ? "echo beforeinput" : "";
+      }
+    },
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  };
+  refs.mount.dispatchEvent(trailingPasteEvent);
+
+  assert.equal(shiftInsertEvent.defaultPrevented, true);
+  assert.equal(beforeInputEvent.defaultPrevented, true);
+  assert.equal(trailingPasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [
+    ["s1", "ignored\n"],
+    ["s1", "echo beforeinput"]
+  ]);
 });
 
 test("session-terminal-runtime controller prompts for Ctrl-C intent when terminal selection makes copy ambiguous", async () => {

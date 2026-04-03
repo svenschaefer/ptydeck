@@ -74,10 +74,62 @@ export function createSessionTerminalRuntimeController(options = {}) {
 
     let ctrlCIntentPending = false;
     let suppressNextPaste = false;
+    let suppressNextClipboardPasteEvent = false;
 
     function isMouseForwardingEnabled() {
       const currentSession = getSessionById(session.id) || session;
       return normalizeSessionMouseForwardingMode(currentSession?.mouseForwardingMode) === SESSION_MOUSE_FORWARDING_MODE_APPLICATION;
+    }
+
+    function suppressNextClipboardPasteOnce() {
+      suppressNextClipboardPasteEvent = true;
+      setTimeoutFn(() => {
+        suppressNextClipboardPasteEvent = false;
+      }, 0);
+    }
+
+    function readClipboardPayloadFromEvent(event) {
+      const dataTransferText = event?.clipboardData?.getData?.("text") || event?.dataTransfer?.getData?.("text") || "";
+      if (dataTransferText) {
+        return dataTransferText;
+      }
+      return typeof event?.data === "string" ? event.data : "";
+    }
+
+    function dispatchTerminalPaste(text, source) {
+      if (!text) {
+        return false;
+      }
+      terminal.focus?.();
+      onTerminalPaste(session.id, text);
+      debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length, source });
+      return true;
+    }
+
+    function requestClipboardPaste({ source, event, suppressFollowupPasteEvent = false }) {
+      const inlineText = readClipboardPayloadFromEvent(event);
+      if (inlineText) {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        if (suppressFollowupPasteEvent) {
+          suppressNextClipboardPasteOnce();
+        }
+        dispatchTerminalPaste(inlineText, source);
+        return;
+      }
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      Promise.resolve(readClipboardText())
+        .then((text) => {
+          if (!text) {
+            return;
+          }
+          if (suppressFollowupPasteEvent) {
+            suppressNextClipboardPasteOnce();
+          }
+          dispatchTerminalPaste(text, source);
+        })
+        .catch(() => {});
     }
 
     const handleKeydown = (event) => {
@@ -121,6 +173,27 @@ export function createSessionTerminalRuntimeController(options = {}) {
           });
         return;
       }
+      const key = String(event?.key || "");
+      const normalizedKey = key.toLowerCase();
+      const isShortcutPaste =
+        event &&
+        normalizedKey === "v" &&
+        ((event.ctrlKey === true && event.metaKey !== true) || (event.metaKey === true && event.ctrlKey !== true)) &&
+        event.altKey !== true;
+      const isShiftInsertPaste =
+        event &&
+        key === "Insert" &&
+        event.shiftKey === true &&
+        event.ctrlKey !== true &&
+        event.metaKey !== true &&
+        event.altKey !== true;
+      if (isShortcutPaste || isShiftInsertPaste) {
+        requestClipboardPaste({
+          source: isShiftInsertPaste ? "shift-insert" : "shortcut",
+          event
+        });
+        return;
+      }
       if (!event || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
         return;
       }
@@ -160,27 +233,47 @@ export function createSessionTerminalRuntimeController(options = {}) {
           if (!text) {
             return;
           }
-          terminal.focus?.();
-          onTerminalPaste(session.id, text);
-          debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length });
+          dispatchTerminalPaste(text, "middle-click");
         })
         .catch(() => {});
     };
 
-    const handlePaste = (event) => {
+    const handleBeforeInput = (event) => {
+      if (!event || event.inputType !== "insertFromPaste") {
+        return;
+      }
+      if (suppressNextClipboardPasteEvent) {
+        suppressNextClipboardPasteEvent = false;
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        return;
+      }
       if (suppressNextPaste && isMouseForwardingEnabled()) {
         suppressNextPaste = false;
         return;
       }
-      const text = event?.clipboardData?.getData?.("text") || "";
-      if (!text) {
+      requestClipboardPaste({
+        source: "beforeinput",
+        event,
+        suppressFollowupPasteEvent: true
+      });
+    };
+
+    const handlePaste = (event) => {
+      if (suppressNextClipboardPasteEvent) {
+        suppressNextClipboardPasteEvent = false;
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
         return;
       }
-      event.preventDefault?.();
-      event.stopPropagation?.();
-      terminal.focus?.();
-      onTerminalPaste(session.id, text);
-      debugLog("clipboard.paste.terminal", { sessionId: session.id, length: text.length, source: "clipboard" });
+      if (suppressNextPaste && isMouseForwardingEnabled()) {
+        suppressNextPaste = false;
+        return;
+      }
+      requestClipboardPaste({
+        source: "clipboard",
+        event
+      });
     };
 
     const handleAuxClick = (event) => {
@@ -195,6 +288,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     mount.addEventListener("keydown", handleKeydown, true);
+    mount.addEventListener("beforeinput", handleBeforeInput, true);
     mount.addEventListener("mousedown", handleMiddleMouseDown);
     mount.addEventListener("auxclick", handleAuxClick);
     mount.addEventListener("paste", handlePaste, true);
@@ -202,6 +296,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     return () => {
       if (typeof mount.removeEventListener === "function") {
         mount.removeEventListener("keydown", handleKeydown, true);
+        mount.removeEventListener("beforeinput", handleBeforeInput, true);
         mount.removeEventListener("mousedown", handleMiddleMouseDown);
         mount.removeEventListener("auxclick", handleAuxClick);
         mount.removeEventListener("paste", handlePaste, true);
