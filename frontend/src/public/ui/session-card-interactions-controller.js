@@ -61,6 +61,7 @@ export function createSessionCardInteractionsController(options = {}) {
     const setSessionSendTerminator = args.setSessionSendTerminator || (() => {});
     const setStartupSettingsFeedback = args.setStartupSettingsFeedback || (() => {});
     const requestRender = args.requestRender || (() => {});
+    const refreshMountedTerminal = args.refreshMountedTerminal || (() => false);
 
     if (!session || !refs.focusBtn) {
       return;
@@ -127,6 +128,10 @@ export function createSessionCardInteractionsController(options = {}) {
     }
 
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
+    refs.refreshBtn?.addEventListener("click", () => {
+      refreshMountedTerminal(session.id);
+      clearError();
+    });
     refs.settingsBtn?.addEventListener("click", () => {
       const wasOpen = refs.settingsDialog?.open === true;
       if (!wasOpen) {

@@ -56,6 +56,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
   });
   const refs = {
     focusBtn: createEventTarget(),
+    refreshBtn: createEventTarget(),
     settingsBtn: createEventTarget(),
     settingsDismissBtn: createEventTarget(),
     settingsDialog: createEventTarget(),
@@ -73,6 +74,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
     getEntry: () => ({ id: "entry-1" }),
     sessionThemeDrafts: new Map([["s1", { active: {}, inactive: {} }]]),
     onActivateSession: (sessionId) => calls.push(`focus:${sessionId}`),
+    refreshMountedTerminal: (sessionId) => calls.push(`refresh:${sessionId}`),
     syncSessionStartupControls: () => calls.push("sync-startup"),
     syncSessionInputSafetyControls: () => calls.push("sync-input-safety"),
     syncSessionThemeControls: () => calls.push("sync-theme"),
@@ -82,6 +84,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
   });
 
   await refs.focusBtn.emit("click");
+  await refs.refreshBtn.emit("click");
   await refs.settingsBtn.emit("click");
   await refs.settingsTabNoteBtn.emit("click");
   await refs.settingsTabThemeBtn.emit("click");
@@ -91,6 +94,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
 
   assert.deepEqual(calls, [
     "focus:s1",
+    "refresh:s1",
     "sync-startup",
     "sync-input-safety",
     "sync-theme",

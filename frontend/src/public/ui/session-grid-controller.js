@@ -232,6 +232,7 @@ export function createSessionGridController(options = {}) {
         session,
         refs: {
           focusBtn: refs.focusBtn,
+          refreshBtn: refs.refreshBtn,
           settingsBtn: refs.settingsBtn,
           renameBtn: refs.renameBtn,
           closeBtn: refs.closeBtn,
@@ -281,6 +282,7 @@ export function createSessionGridController(options = {}) {
         applyThemeForSession,
         getSessionThemeConfig,
         sessionThemeDrafts,
+        refreshMountedTerminal: (sessionId) => sessionTerminalRuntimeController?.refreshMountedTerminal?.(sessionId) === true,
         setSettingsDirty,
         setSessionSendTerminator,
         setStartupSettingsFeedback,
@@ -297,6 +299,7 @@ export function createSessionGridController(options = {}) {
           sessionMetaRowEl: refs.sessionMetaRowEl,
           sessionNoteEl: refs.sessionNoteEl,
           unrestoredHintEl: refs.unrestoredHintEl,
+          refreshBtn: refs.refreshBtn,
           settingsDialog: refs.settingsDialog,
           settingsTabStartupBtn: refs.settingsTabStartupBtn,
           settingsTabNoteBtn: refs.settingsTabNoteBtn,

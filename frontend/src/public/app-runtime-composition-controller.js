@@ -1078,6 +1078,7 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
 
 sessionTerminalRuntimeController = createSessionTerminalRuntimeController({
   windowRef: window,
+  terminals,
   terminalFontSize: TERMINAL_FONT_SIZE,
   terminalLineHeight: TERMINAL_LINE_HEIGHT,
   terminalFontFamily: TERMINAL_FONT_FAMILY,

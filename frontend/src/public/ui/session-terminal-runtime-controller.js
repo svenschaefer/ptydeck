@@ -54,6 +54,28 @@ export function createSessionTerminalRuntimeController(options = {}) {
     typeof options.refreshTerminalViewport === "function" ? options.refreshTerminalViewport : () => {};
   const syncTerminalScrollArea =
     typeof options.syncTerminalScrollArea === "function" ? options.syncTerminalScrollArea : () => {};
+  const terminals = options.terminals instanceof Map ? options.terminals : null;
+
+  function stabilizeMountedTerminalEntry(entry, sessionId, applyResizeForSession) {
+    if (!entry?.terminal) {
+      return false;
+    }
+    if (entry.isVisible === false) {
+      entry.pendingViewportSync = true;
+      return false;
+    }
+    if (typeof applyResizeForSession === "function" && sessionId) {
+      applyResizeForSession(sessionId, { force: true, skipRemote: true });
+    }
+    syncTerminalScrollArea(entry.terminal);
+    refreshTerminalViewport(entry.terminal);
+    if (entry.followOnShow !== false && typeof entry.terminal.scrollToBottom === "function") {
+      entry.terminal.scrollToBottom();
+    }
+    syncTerminalScrollArea(entry.terminal);
+    entry.pendingViewportSync = false;
+    return true;
+  }
 
   function getTerminalSelection(terminal) {
     if (!terminal) {
@@ -597,22 +619,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const applyResizeForSession = args.applyResizeForSession || (() => {});
 
     function stabilizeMountedTerminal(entry) {
-      if (!entry?.terminal) {
-        return false;
-      }
-      if (entry.isVisible === false) {
-        entry.pendingViewportSync = true;
-        return false;
-      }
-      applyResizeForSession(session.id, { force: true, skipRemote: true });
-      syncTerminalScrollArea(entry.terminal);
-      refreshTerminalViewport(entry.terminal);
-      if (entry.followOnShow !== false && typeof entry.terminal.scrollToBottom === "function") {
-        entry.terminal.scrollToBottom();
-      }
-      syncTerminalScrollArea(entry.terminal);
-      entry.pendingViewportSync = false;
-      return true;
+      return stabilizeMountedTerminalEntry(entry, session.id, applyResizeForSession);
     }
 
     const terminal = new windowRef.Terminal({
@@ -648,6 +655,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       sessionMetaRowEl: refs.sessionMetaRowEl,
       sessionNoteEl: refs.sessionNoteEl,
       unrestoredHintEl: refs.unrestoredHintEl,
+      refreshBtn: refs.refreshBtn,
       settingsDialog: refs.settingsDialog,
       settingsTabStartupBtn: refs.settingsTabStartupBtn,
       settingsTabNoteBtn: refs.settingsTabNoteBtn,
@@ -676,6 +684,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       themeFg: refs.themeFg,
       themeInputs: refs.themeInputs,
       mount: refs.mount,
+      applyResizeForSession,
       settingsDirty: false,
       isVisible: initialVisible,
       pendingViewportSync: !initialVisible,
@@ -704,6 +713,13 @@ export function createSessionTerminalRuntimeController(options = {}) {
   }
 
   return {
-    mountSessionTerminalCard
+    mountSessionTerminalCard,
+    refreshMountedTerminal(sessionId) {
+      if (!terminals || !sessionId) {
+        return false;
+      }
+      const entry = terminals.get(sessionId);
+      return stabilizeMountedTerminalEntry(entry, sessionId, entry?.applyResizeForSession);
+    }
   };
 }
