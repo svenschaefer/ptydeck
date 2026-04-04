@@ -1888,6 +1888,12 @@ dialog:not([open]) {
   color: #9db8d2;
 }
 
+.send-history-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .send-history-meta {
   margin: 8px 0 0;
   color: var(--muted);
@@ -1911,7 +1917,7 @@ dialog:not([open]) {
 }
 
 .send-history-browser {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
 }
 
 .send-history-search {
@@ -1922,6 +1928,19 @@ dialog:not([open]) {
   color: var(--text);
   padding: 9px 10px;
   font: inherit;
+}
+
+.send-history-storage-note {
+  margin: 0;
+  color: #d7b86e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.send-history-browser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .send-history-empty {
@@ -1968,6 +1987,10 @@ dialog:not([open]) {
   color: #eef5ff;
   font-size: 12px;
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   word-break: break-word;
 }
 

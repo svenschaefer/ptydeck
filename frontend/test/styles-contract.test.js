@@ -44,3 +44,11 @@ test("collapsed sidebar sections stay hidden even though the section body uses d
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(stylesCss, /\.sidebar-section-body\[hidden\] \{\s*display: none !important;\s*\}/m);
 });
+
+test("send-history preview rows stay compact even for long payloads", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.send-history-item-preview \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-box-orient: vertical;[\s\S]*-webkit-line-clamp: 2;[\s\S]*overflow: hidden;[\s\S]*\}/m
+  );
+});

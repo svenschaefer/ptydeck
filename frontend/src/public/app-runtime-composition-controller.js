@@ -279,8 +279,11 @@ const {
   sendHistoryOpenBtn,
   sendHistoryDialogEl,
   sendHistoryCloseBtn,
+  sendHistorySwitchSessionBtn,
   sendHistoryMetaEl,
   sendHistorySearchInputEl,
+  sendHistoryDeleteSelectedBtn,
+  sendHistoryClearSessionBtn,
   sendHistoryEmptyEl,
   sendHistoryListEl,
   sendHistoryDetailMetaEl,
@@ -907,8 +910,11 @@ sendHistoryRuntimeController = createSendHistoryRuntimeController({
   dialogEl: sendHistoryDialogEl,
   openBtn: sendHistoryOpenBtn,
   closeBtn: sendHistoryCloseBtn,
+  switchSessionBtn: sendHistorySwitchSessionBtn,
   metaEl: sendHistoryMetaEl,
   searchInputEl: sendHistorySearchInputEl,
+  deleteSelectedBtn: sendHistoryDeleteSelectedBtn,
+  clearSessionBtn: sendHistoryClearSessionBtn,
   emptyEl: sendHistoryEmptyEl,
   listEl: sendHistoryListEl,
   detailMetaEl: sendHistoryDetailMetaEl,
@@ -919,8 +925,14 @@ sendHistoryRuntimeController = createSendHistoryRuntimeController({
     const sessions = Array.isArray(state.sessions) ? state.sessions : [];
     return sessions.find((session) => session.id === state.activeSessionId) || null;
   },
+  getSessionById: (sessionId) => {
+    const state = store.getState() || {};
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    return sessions.find((session) => session.id === sessionId) || null;
+  },
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
   formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  getCommandValue: () => String(commandInput?.value || ""),
   setCommandValue: (value) => {
     commandInput.value = value;
   },
@@ -929,6 +941,7 @@ sendHistoryRuntimeController = createSendHistoryRuntimeController({
     const value = String(commandInput?.value || "");
     commandInput?.setSelectionRange?.(value.length, value.length);
   },
+  confirmAction: (options) => actionDialogController?.confirm(options),
   scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview?.(),
   scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions?.(),
   requestRender: () => appCommandUiFacadeController?.render?.()

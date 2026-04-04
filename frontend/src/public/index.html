@@ -585,9 +585,12 @@
               <p class="send-history-title">Send History</p>
               <p id="send-history-meta" class="send-history-meta"></p>
             </div>
-            <button id="send-history-close" type="button" aria-label="Close send history">
-              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
-            </button>
+            <div class="send-history-head-actions">
+              <button id="send-history-switch-session" type="button">Use Current Session</button>
+              <button id="send-history-close" type="button" aria-label="Close send history">
+                <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
           <div class="send-history-body">
             <div class="send-history-browser">
@@ -597,6 +600,13 @@
                 type="text"
                 placeholder="Search send history for the active session"
               />
+              <p class="send-history-storage-note">
+                Stored locally in this browser. Clear entries after sending secrets, tokens, or one-time credentials.
+              </p>
+              <div class="send-history-browser-actions">
+                <button id="send-history-delete-selected" type="button" disabled>Delete Selected</button>
+                <button id="send-history-clear-session" type="button" disabled>Clear Session</button>
+              </div>
               <p id="send-history-empty" class="send-history-empty" hidden>No send-history entries recorded yet.</p>
               <div id="send-history-list" class="send-history-list"></div>
             </div>

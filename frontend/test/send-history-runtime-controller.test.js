@@ -150,8 +150,11 @@ test("send-history runtime controller records, searches, persists, and restores 
   const dialogEl = new FakeElement({ id: "send-history-dialog", tagName: "dialog" });
   const openBtn = new FakeElement({ id: "send-history-open", tagName: "button" });
   const closeBtn = new FakeElement({ id: "send-history-close", tagName: "button" });
+  const switchSessionBtn = new FakeElement({ id: "send-history-switch-session", tagName: "button" });
   const metaEl = new FakeElement({ id: "send-history-meta", tagName: "p" });
   const searchInputEl = new FakeElement({ id: "send-history-search", tagName: "input" });
+  const deleteSelectedBtn = new FakeElement({ id: "send-history-delete-selected", tagName: "button" });
+  const clearSessionBtn = new FakeElement({ id: "send-history-clear-session", tagName: "button" });
   const emptyEl = new FakeElement({ id: "send-history-empty", tagName: "p" });
   const listEl = new FakeElement({ id: "send-history-list", tagName: "div" });
   const detailMetaEl = new FakeElement({ id: "send-history-detail-meta", tagName: "p" });
@@ -169,8 +172,11 @@ test("send-history runtime controller records, searches, persists, and restores 
     dialogEl,
     openBtn,
     closeBtn,
+    switchSessionBtn,
     metaEl,
     searchInputEl,
+    deleteSelectedBtn,
+    clearSessionBtn,
     emptyEl,
     listEl,
     detailMetaEl,
@@ -260,4 +266,107 @@ test("send-history runtime controller hydrates persisted state and prunes bounde
     s2Entries.map((entry) => entry.text),
     ["zzzzzz"]
   );
+});
+
+test("send-history runtime controller pins the opened session, guards draft replacement, and supports delete and clear flows", async () => {
+  const windowRef = createFakeWindow();
+  const documentRef = new FakeDocument();
+  const localStorageRef = new FakeStorage();
+  const dialogEl = new FakeElement({ id: "send-history-dialog", tagName: "dialog" });
+  const openBtn = new FakeElement({ id: "send-history-open", tagName: "button" });
+  const closeBtn = new FakeElement({ id: "send-history-close", tagName: "button" });
+  const switchSessionBtn = new FakeElement({ id: "send-history-switch-session", tagName: "button" });
+  const metaEl = new FakeElement({ id: "send-history-meta", tagName: "p" });
+  const searchInputEl = new FakeElement({ id: "send-history-search", tagName: "input" });
+  const deleteSelectedBtn = new FakeElement({ id: "send-history-delete-selected", tagName: "button" });
+  const clearSessionBtn = new FakeElement({ id: "send-history-clear-session", tagName: "button" });
+  const emptyEl = new FakeElement({ id: "send-history-empty", tagName: "p" });
+  const listEl = new FakeElement({ id: "send-history-list", tagName: "div" });
+  const detailMetaEl = new FakeElement({ id: "send-history-detail-meta", tagName: "p" });
+  const detailTextEl = new FakeElement({ id: "send-history-detail-text", tagName: "pre" });
+  const useBtn = new FakeElement({ id: "send-history-use", tagName: "button" });
+  const sessionsById = {
+    s1: { id: "s1", name: "ops" },
+    s2: { id: "s2", name: "deploy" }
+  };
+  let activeSession = sessionsById.s1;
+  let commandValue = "existing draft";
+  const confirmCalls = [];
+
+  const controller = createSendHistoryRuntimeController({
+    windowRef,
+    documentRef,
+    localStorageRef,
+    dialogEl,
+    openBtn,
+    closeBtn,
+    switchSessionBtn,
+    metaEl,
+    searchInputEl,
+    deleteSelectedBtn,
+    clearSessionBtn,
+    emptyEl,
+    listEl,
+    detailMetaEl,
+    detailTextEl,
+    useBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: (sessionId) => sessionsById[sessionId] || null,
+    formatSessionToken: (sessionId) => sessionId.toUpperCase(),
+    formatSessionDisplayName: (session) => session?.name || session?.id || "session",
+    getCommandValue: () => commandValue,
+    setCommandValue: (value) => {
+      commandValue = value;
+    },
+    confirmAction: async (options) => {
+      confirmCalls.push(options);
+      return options.title !== "Replace Draft";
+    },
+    focusCommandInput: () => {},
+    scheduleCommandPreview: () => {},
+    scheduleCommandSuggestions: () => {},
+    requestRender: () => {}
+  });
+
+  controller.recordSend("s1", "echo one", { submittedAt: 10 });
+  controller.recordSend("s2", "echo two", { submittedAt: 20 });
+  flushTimers(windowRef);
+
+  openBtn.click();
+  assert.equal(dialogEl.open, true);
+  assert.match(metaEl.textContent, /History for \[S1\] ops/);
+  assert.equal(controller.getState().pinnedSessionId, "s1");
+
+  activeSession = sessionsById.s2;
+  searchInputEl.value = "echo";
+  searchInputEl.dispatchEvent({ type: "input", target: searchInputEl });
+  flushTimers(windowRef);
+  controller.render();
+  assert.match(metaEl.textContent, /History for \[S1\] ops/);
+  assert.equal(searchInputEl.value, "echo");
+  assert.equal(switchSessionBtn.disabled, false);
+
+  controller.switchToActiveSession();
+  assert.match(metaEl.textContent, /History for \[S2\] deploy/);
+  assert.equal(searchInputEl.value, "");
+
+  const replaced = await controller.useSelectedEntry();
+  assert.equal(replaced, false);
+  assert.equal(commandValue, "existing draft");
+  assert.equal(confirmCalls[0].title, "Replace Draft");
+
+  commandValue = "";
+  const deleted = await controller.deleteSelectedEntry();
+  assert.equal(deleted, true);
+  flushTimers(windowRef);
+  assert.deepEqual(controller.listEntriesForSession("s2"), []);
+
+  controller.switchToActiveSession();
+  activeSession = sessionsById.s1;
+  controller.switchToActiveSession();
+  const cleared = await controller.clearSessionHistory();
+  assert.equal(cleared, true);
+  flushTimers(windowRef);
+  assert.deepEqual(controller.listEntriesForSession("s1"), []);
+  assert.equal(clearSessionBtn.disabled, true);
 });

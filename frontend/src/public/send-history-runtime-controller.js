@@ -225,13 +225,16 @@ export function createSendHistoryRuntimeController(options = {}) {
   const clearTimeoutFn =
     typeof windowRef?.clearTimeout === "function" ? windowRef.clearTimeout.bind(windowRef) : globalThis.clearTimeout.bind(globalThis);
   const getActiveSession = typeof options.getActiveSession === "function" ? options.getActiveSession : () => null;
+  const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
   const formatSessionToken =
     typeof options.formatSessionToken === "function" ? options.formatSessionToken : (sessionId) => String(sessionId || "?");
   const formatSessionDisplayName =
     typeof options.formatSessionDisplayName === "function"
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "session");
+  const getCommandValue = typeof options.getCommandValue === "function" ? options.getCommandValue : () => "";
   const setCommandValue = typeof options.setCommandValue === "function" ? options.setCommandValue : () => {};
+  const confirmAction = typeof options.confirmAction === "function" ? options.confirmAction : async () => true;
   const focusCommandInput = typeof options.focusCommandInput === "function" ? options.focusCommandInput : () => {};
   const scheduleCommandPreview =
     typeof options.scheduleCommandPreview === "function" ? options.scheduleCommandPreview : () => {};
@@ -241,8 +244,11 @@ export function createSendHistoryRuntimeController(options = {}) {
   const dialogEl = options.dialogEl || null;
   const openBtn = options.openBtn || null;
   const closeBtn = options.closeBtn || null;
+  const switchSessionBtn = options.switchSessionBtn || null;
   const metaEl = options.metaEl || null;
   const searchInputEl = options.searchInputEl || null;
+  const deleteSelectedBtn = options.deleteSelectedBtn || null;
+  const clearSessionBtn = options.clearSessionBtn || null;
   const emptyEl = options.emptyEl || null;
   const listEl = options.listEl || null;
   const detailMetaEl = options.detailMetaEl || null;
@@ -265,6 +271,7 @@ export function createSendHistoryRuntimeController(options = {}) {
   let searchRenderTimer = null;
   let persistTimer = null;
   let lastRenderedSessionId = "";
+  let pinnedSessionId = "";
   const searchCache = new Map();
 
   function getActiveSessionContext() {
@@ -274,6 +281,39 @@ export function createSendHistoryRuntimeController(options = {}) {
       session,
       sessionId
     };
+  }
+
+  function getSessionContextById(sessionId) {
+    const normalizedSessionId = normalizeText(sessionId);
+    if (!normalizedSessionId) {
+      return { session: null, sessionId: "" };
+    }
+    const activeContext = getActiveSessionContext();
+    if (activeContext.sessionId === normalizedSessionId) {
+      return activeContext;
+    }
+    const session = getSessionById(normalizedSessionId) || null;
+    return {
+      session,
+      sessionId: normalizedSessionId
+    };
+  }
+
+  function getBrowseSessionContext() {
+    if (dialogEl?.open && pinnedSessionId) {
+      return getSessionContextById(pinnedSessionId);
+    }
+    return getActiveSessionContext();
+  }
+
+  function resetBrowseState({ clearSearch = true } = {}) {
+    selectedEntryId = "";
+    if (clearSearch) {
+      searchQuery = "";
+      if (searchInputEl) {
+        searchInputEl.value = "";
+      }
+    }
   }
 
   function getSessionEntries(sessionId) {
@@ -421,23 +461,20 @@ export function createSendHistoryRuntimeController(options = {}) {
   }
 
   function render() {
-    const { session, sessionId } = getActiveSessionContext();
+    const activeContext = getActiveSessionContext();
+    const { session, sessionId } = getBrowseSessionContext();
     if (sessionId !== lastRenderedSessionId) {
       lastRenderedSessionId = sessionId;
-      searchQuery = "";
-      selectedEntryId = "";
-      if (searchInputEl) {
-        searchInputEl.value = "";
-      }
+      resetBrowseState();
     }
 
     if (openBtn) {
-      openBtn.disabled = !sessionId;
+      openBtn.disabled = !activeContext.sessionId;
       if (typeof openBtn.setAttribute === "function") {
         openBtn.setAttribute(
           "title",
-          sessionId
-            ? `Browse send history for [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`
+          activeContext.sessionId
+            ? `Browse send history for [${formatSessionToken(activeContext.session.id)}] ${formatSessionDisplayName(activeContext.session)}`
             : "No active session available for send history"
         );
       }
@@ -454,8 +491,21 @@ export function createSendHistoryRuntimeController(options = {}) {
 
     if (metaEl) {
       metaEl.textContent = sessionId
-        ? `History for [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} · ${allEntries.length} entr${allEntries.length === 1 ? "y" : "ies"}. Summary rows stay compact; select one to inspect the full payload.`
+        ? `History for [${formatSessionToken(sessionId)}] ${formatSessionDisplayName(session)} · ${allEntries.length} entr${allEntries.length === 1 ? "y" : "ies"}. Stored per session and pinned while this dialog stays open.${activeContext.sessionId && activeContext.sessionId !== sessionId ? " Use Current Session to switch context." : ""}`
         : "No active session selected. Send history is available per terminal session.";
+    }
+
+    if (switchSessionBtn) {
+      const canSwitch = Boolean(dialogEl?.open && activeContext.sessionId && activeContext.sessionId !== sessionId);
+      switchSessionBtn.disabled = !canSwitch;
+      if (typeof switchSessionBtn.setAttribute === "function") {
+        switchSessionBtn.setAttribute(
+          "title",
+          canSwitch
+            ? `Switch to [${formatSessionToken(activeContext.sessionId)}] ${formatSessionDisplayName(activeContext.session)}`
+            : "Already showing the current active session"
+        );
+      }
     }
 
     if (emptyEl) {
@@ -469,24 +519,52 @@ export function createSendHistoryRuntimeController(options = {}) {
       }
     }
 
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.disabled = !selectedEntry;
+    }
+    if (clearSessionBtn) {
+      clearSessionBtn.disabled = !sessionId || allEntries.length === 0;
+    }
+
     renderEntryList(filteredEntries);
     renderDetail(selectedEntry, session);
   }
 
   function open() {
+    const activeContext = getActiveSessionContext();
+    if (!activeContext.sessionId) {
+      return false;
+    }
+    pinnedSessionId = activeContext.sessionId;
+    lastRenderedSessionId = "";
     render();
     openDialog(dialogEl);
+    return true;
   }
 
   function close() {
     closeDialog(dialogEl);
+    pinnedSessionId = "";
+    lastRenderedSessionId = "";
   }
 
-  function useSelectedEntry() {
-    const { sessionId } = getActiveSessionContext();
+  async function useSelectedEntry() {
+    const currentCommandValue = String(getCommandValue() || "");
+    const { sessionId } = getBrowseSessionContext();
     const entry = getSelectedEntry(sessionId);
     if (!entry) {
       return false;
+    }
+    if (normalizeText(currentCommandValue) && currentCommandValue !== entry.text) {
+      const confirmed = await confirmAction({
+        title: "Replace Draft",
+        message: "Replace the current unsent command input with the selected send-history entry?",
+        confirmLabel: "Replace",
+        cancelLabel: "Keep Current"
+      });
+      if (!confirmed) {
+        return false;
+      }
     }
     setCommandValue(entry.text);
     scheduleCommandPreview();
@@ -494,6 +572,91 @@ export function createSendHistoryRuntimeController(options = {}) {
     focusCommandInput();
     close();
     requestRender();
+    return true;
+  }
+
+  function deleteEntryById(sessionId, entryId) {
+    const normalizedSessionId = normalizeText(sessionId);
+    const normalizedEntryId = normalizeText(entryId);
+    if (!normalizedSessionId || !normalizedEntryId) {
+      return false;
+    }
+    const entries = Array.isArray(historyBySession[normalizedSessionId]) ? historyBySession[normalizedSessionId] : [];
+    const nextEntries = entries.filter((entry) => entry?.id !== normalizedEntryId);
+    if (nextEntries.length === entries.length) {
+      return false;
+    }
+    if (nextEntries.length > 0) {
+      historyBySession = {
+        ...historyBySession,
+        [normalizedSessionId]: nextEntries
+      };
+    } else {
+      const nextState = { ...historyBySession };
+      delete nextState[normalizedSessionId];
+      historyBySession = nextState;
+    }
+    searchCache.clear();
+    schedulePersist();
+    return true;
+  }
+
+  async function deleteSelectedEntry() {
+    const { sessionId } = getBrowseSessionContext();
+    const entry = getSelectedEntry(sessionId);
+    if (!entry) {
+      return false;
+    }
+    const confirmed = await confirmAction({
+      title: "Delete Send History Entry",
+      message: "Delete the selected send-history entry from this browser?",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel"
+    });
+    if (!confirmed) {
+      return false;
+    }
+    const deleted = deleteEntryById(sessionId, entry.id);
+    if (deleted) {
+      selectedEntryId = "";
+      render();
+    }
+    return deleted;
+  }
+
+  async function clearSessionHistory() {
+    const { sessionId } = getBrowseSessionContext();
+    const entries = getSessionEntries(sessionId);
+    if (!sessionId || entries.length === 0) {
+      return false;
+    }
+    const confirmed = await confirmAction({
+      title: "Clear Session History",
+      message: "Delete all recorded send-history entries for this session from this browser?",
+      confirmLabel: "Clear History",
+      cancelLabel: "Cancel"
+    });
+    if (!confirmed) {
+      return false;
+    }
+    const nextState = { ...historyBySession };
+    delete nextState[sessionId];
+    historyBySession = nextState;
+    searchCache.clear();
+    resetBrowseState();
+    schedulePersist();
+    render();
+    return true;
+  }
+
+  function switchToActiveSession() {
+    const activeContext = getActiveSessionContext();
+    if (!dialogEl?.open || !activeContext.sessionId || activeContext.sessionId === pinnedSessionId) {
+      return false;
+    }
+    pinnedSessionId = activeContext.sessionId;
+    lastRenderedSessionId = "";
+    render();
     return true;
   }
 
@@ -553,12 +716,21 @@ export function createSendHistoryRuntimeController(options = {}) {
     closeBtn?.addEventListener?.("click", () => {
       close();
     });
+    switchSessionBtn?.addEventListener?.("click", () => {
+      switchToActiveSession();
+    });
     dialogEl?.addEventListener?.("cancel", (event) => {
       event?.preventDefault?.();
       close();
     });
     useBtn?.addEventListener?.("click", () => {
-      useSelectedEntry();
+      void useSelectedEntry();
+    });
+    deleteSelectedBtn?.addEventListener?.("click", () => {
+      void deleteSelectedEntry();
+    });
+    clearSessionBtn?.addEventListener?.("click", () => {
+      void clearSessionHistory();
     });
     searchInputEl?.addEventListener?.("input", (event) => {
       searchQuery = String(event?.target?.value || "");
@@ -576,6 +748,9 @@ export function createSendHistoryRuntimeController(options = {}) {
     render,
     recordSend,
     useSelectedEntry,
+    deleteSelectedEntry,
+    clearSessionHistory,
+    switchToActiveSession,
     listEntriesForSession(sessionId) {
       return getSessionEntries(sessionId).map((entry) => cloneHistoryEntry(entry));
     },
@@ -583,6 +758,7 @@ export function createSendHistoryRuntimeController(options = {}) {
       return {
         searchQuery,
         selectedEntryId,
+        pinnedSessionId,
         historyBySession: cloneHistoryState(historyBySession)
       };
     },
