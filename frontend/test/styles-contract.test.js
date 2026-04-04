@@ -39,3 +39,8 @@ test("workspace library keeps a scrollable body and hides SSH-only sections corr
     /\.workspace-manager-subsection\[hidden\],\s*\.workspace-manager-field-block\[hidden\] \{[\s\S]*display: none !important;[\s\S]*\}/m
   );
 });
+
+test("collapsed sidebar sections stay hidden even though the section body uses display grid", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(stylesCss, /\.sidebar-section-body\[hidden\] \{\s*display: none !important;\s*\}/m);
+});
