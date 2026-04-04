@@ -5,6 +5,7 @@ import {
 
 export function createSessionTerminalRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
+  const documentRef = windowRef.document || globalThis.document || null;
   const navigatorRef = options.navigatorRef || windowRef.navigator || globalThis.navigator || null;
   const ResizeObserverCtor =
     typeof windowRef.ResizeObserver === "function" ? windowRef.ResizeObserver : globalThis.ResizeObserver;
@@ -86,6 +87,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     let pendingKeyboardPasteSource = "";
     let pendingKeyboardPasteTimer = null;
     let pendingKeyboardPasteFallbackTimer = null;
+    let releaseViewportScrollbarDrag = null;
     const handledClipboardEvents = new WeakSet();
 
     function isMouseForwardingEnabled() {
@@ -227,6 +229,129 @@ export function createSessionTerminalRuntimeController(options = {}) {
     function focusTerminalSurface() {
       terminal.focus?.();
       terminal.textarea?.focus?.();
+    }
+
+    function getTerminalViewportElement() {
+      if (typeof mount.querySelector !== "function") {
+        return null;
+      }
+      return mount.querySelector(".xterm-viewport");
+    }
+
+    function getViewportScrollbarMetrics(viewport) {
+      const clientHeight = Number(viewport?.clientHeight) || 0;
+      const scrollHeight = Number(viewport?.scrollHeight) || 0;
+      const clientWidth = Number(viewport?.clientWidth) || 0;
+      const offsetWidth = Number(viewport?.offsetWidth) || 0;
+      const scrollbarWidth = Math.max(0, offsetWidth - clientWidth);
+      if (clientHeight <= 0 || scrollHeight <= clientHeight || scrollbarWidth <= 0) {
+        return null;
+      }
+      const maxScrollTop = scrollHeight - clientHeight;
+      const thumbHeight = Math.max(24, Math.round((clientHeight / scrollHeight) * clientHeight));
+      const maxThumbTop = Math.max(0, clientHeight - thumbHeight);
+      const currentScrollTop = Math.min(Math.max(Number(viewport?.scrollTop) || 0, 0), maxScrollTop);
+      const thumbTop = maxScrollTop > 0 && maxThumbTop > 0 ? (currentScrollTop / maxScrollTop) * maxThumbTop : 0;
+      return {
+        clientHeight,
+        scrollHeight,
+        scrollbarWidth,
+        thumbHeight,
+        maxThumbTop,
+        maxScrollTop,
+        thumbTop
+      };
+    }
+
+    function getEventClientPoint(event) {
+      const clientX = Number(event?.clientX);
+      const clientY = Number(event?.clientY);
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+        return null;
+      }
+      return { clientX, clientY };
+    }
+
+    function setViewportScrollFromThumbTop(viewport, metrics, thumbTop) {
+      if (!viewport || !metrics) {
+        return;
+      }
+      const clampedThumbTop = Math.min(Math.max(thumbTop, 0), metrics.maxThumbTop);
+      if (metrics.maxThumbTop <= 0 || metrics.maxScrollTop <= 0) {
+        viewport.scrollTop = 0;
+        return;
+      }
+      viewport.scrollTop = (clampedThumbTop / metrics.maxThumbTop) * metrics.maxScrollTop;
+    }
+
+    function tryStartViewportScrollbarDrag(event) {
+      if (!event || event.button !== 0) {
+        return false;
+      }
+      const viewport = getTerminalViewportElement();
+      const metrics = getViewportScrollbarMetrics(viewport);
+      if (!viewport || !metrics || typeof viewport.getBoundingClientRect !== "function") {
+        return false;
+      }
+      const point = getEventClientPoint(event);
+      if (!point) {
+        return false;
+      }
+      const rect = viewport.getBoundingClientRect();
+      const gutterLeft = rect.right - metrics.scrollbarWidth;
+      if (point.clientX < gutterLeft || point.clientX > rect.right || point.clientY < rect.top || point.clientY > rect.bottom) {
+        return false;
+      }
+
+      const globalEventTarget =
+        typeof windowRef.addEventListener === "function" && typeof windowRef.removeEventListener === "function"
+          ? windowRef
+          : typeof documentRef?.addEventListener === "function" && typeof documentRef?.removeEventListener === "function"
+            ? documentRef
+            : null;
+      if (!globalEventTarget) {
+        return false;
+      }
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      focusTerminalSurface();
+
+      const thumbTopPx = rect.top + metrics.thumbTop;
+      const thumbBottomPx = thumbTopPx + metrics.thumbHeight;
+      let dragOffset = point.clientY - thumbTopPx;
+      if (point.clientY < thumbTopPx || point.clientY > thumbBottomPx) {
+        dragOffset = metrics.thumbHeight / 2;
+        setViewportScrollFromThumbTop(viewport, metrics, point.clientY - rect.top - dragOffset);
+      }
+
+      const handleMouseMove = (moveEvent) => {
+        const movePoint = getEventClientPoint(moveEvent);
+        if (!movePoint) {
+          return;
+        }
+        moveEvent.preventDefault?.();
+        const nextMetrics = getViewportScrollbarMetrics(viewport);
+        if (!nextMetrics) {
+          return;
+        }
+        const nextRect = viewport.getBoundingClientRect();
+        setViewportScrollFromThumbTop(viewport, nextMetrics, movePoint.clientY - nextRect.top - dragOffset);
+      };
+
+      const releaseDrag = () => {
+        globalEventTarget.removeEventListener("mousemove", handleMouseMove, true);
+        globalEventTarget.removeEventListener("mouseup", releaseDrag, true);
+        releaseViewportScrollbarDrag = null;
+      };
+
+      if (typeof releaseViewportScrollbarDrag === "function") {
+        releaseViewportScrollbarDrag();
+      }
+      releaseViewportScrollbarDrag = releaseDrag;
+      globalEventTarget.addEventListener("mousemove", handleMouseMove, true);
+      globalEventTarget.addEventListener("mouseup", releaseDrag, true);
+      return true;
     }
 
     function requestClipboardPaste({ source, event, suppressFollowupPasteEvent = false }) {
@@ -400,6 +525,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button === 1) {
         return;
       }
+      if (tryStartViewportScrollbarDrag(event)) {
+        return;
+      }
       focusTerminalSurface();
     };
 
@@ -442,6 +570,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
         mount.removeEventListener("mousedown", handleMiddleMouseDown);
         mount.removeEventListener("auxclick", handleAuxClick);
         mount.removeEventListener("contextmenu", handleContextMenu, true);
+      }
+      if (typeof releaseViewportScrollbarDrag === "function") {
+        releaseViewportScrollbarDrag();
       }
       if (typeof terminal?.attachCustomKeyEventHandler === "function") {
         terminal.attachCustomKeyEventHandler(() => true);

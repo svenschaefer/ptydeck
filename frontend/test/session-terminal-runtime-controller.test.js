@@ -63,6 +63,7 @@ class FakeMount {
     this.id = id;
     this.listeners = new Map();
     this.helperTextarea = new FakeEventTarget(`${id}-textarea`);
+    this.viewport = new FakeViewport(`${id}-viewport`);
   }
 
   addEventListener(type, handler) {
@@ -89,6 +90,9 @@ class FakeMount {
   querySelector(selector) {
     if (selector === ".xterm-helper-textarea") {
       return this.helperTextarea;
+    }
+    if (selector === ".xterm-viewport") {
+      return this.viewport;
     }
     return null;
   }
@@ -119,6 +123,28 @@ class FakeEventTarget {
     for (const handler of handlers) {
       handler(event);
     }
+  }
+}
+
+class FakeViewport {
+  constructor(id) {
+    this.id = id;
+    this.scrollTop = 0;
+    this.scrollHeight = 2400;
+    this.clientHeight = 240;
+    this.offsetWidth = 640;
+    this.clientWidth = 624;
+  }
+
+  getBoundingClientRect() {
+    return {
+      top: 100,
+      bottom: 340,
+      left: 10,
+      right: 650,
+      width: 640,
+      height: 240
+    };
   }
 }
 
@@ -182,6 +208,8 @@ function createMouseEvent(type, button) {
   return {
     type,
     button,
+    clientX: 0,
+    clientY: 0,
     defaultPrevented: false,
     propagationStopped: false,
     preventDefault() {
@@ -191,6 +219,20 @@ function createMouseEvent(type, button) {
       this.propagationStopped = true;
     }
   };
+}
+
+class FakeWindowEventTarget extends FakeEventTarget {
+  constructor() {
+    super("window");
+    this.Terminal = FakeTerminal;
+    this.ResizeObserver = FakeResizeObserver;
+  }
+
+  setTimeout(fn) {
+    return fn;
+  }
+
+  clearTimeout() {}
 }
 
 test("session-terminal-runtime controller mounts terminal, registers entry, and schedules resize", () => {
@@ -556,6 +598,78 @@ test("session-terminal-runtime controller routes clipboard paste events through 
   assert.equal(pasteEvent.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "echo hi"]]);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller bridges scrollbar gutter drag to the xterm viewport", () => {
+  const windowRef = new FakeWindowEventTarget();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: () => {},
+    applyResizeForSession() {}
+  });
+
+  const downEvent = createMouseEvent("mousedown", 0);
+  downEvent.clientX = 645;
+  downEvent.clientY = 112;
+  refs.mount.dispatchEvent(downEvent);
+
+  assert.equal(downEvent.defaultPrevented, true);
+  assert.equal(refs.mount.viewport.scrollTop, 0);
+
+  const moveEvent = createMouseEvent("mousemove", 0);
+  moveEvent.clientX = 645;
+  moveEvent.clientY = 220;
+  windowRef.dispatchEvent(moveEvent);
+
+  assert.ok(refs.mount.viewport.scrollTop > 0);
+
+  const scrollAfterMove = refs.mount.viewport.scrollTop;
+  const upEvent = createMouseEvent("mouseup", 0);
+  upEvent.clientX = 645;
+  upEvent.clientY = 220;
+  windowRef.dispatchEvent(upEvent);
+
+  const moveAfterRelease = createMouseEvent("mousemove", 0);
+  moveAfterRelease.clientX = 645;
+  moveAfterRelease.clientY = 300;
+  windowRef.dispatchEvent(moveAfterRelease);
+
+  assert.equal(refs.mount.viewport.scrollTop, scrollAfterMove);
 });
 
 test("session-terminal-runtime controller pastes clipboard text on explicit Ctrl-V shortcuts via native paste events", async () => {
