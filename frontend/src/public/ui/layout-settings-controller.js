@@ -13,13 +13,60 @@ export function createLayoutSettingsController(options = {}) {
   const sidebarToggleBtn = options.sidebarToggleBtn || null;
   const sidebarToggleIcon = options.sidebarToggleIcon || null;
   const sidebarLauncherBtn = options.sidebarLauncherBtn || null;
+  const terminalSearchToggleBtn = options.terminalSearchToggleBtn || null;
+  const terminalSearchToggleIcon = options.terminalSearchToggleIcon || null;
+  const terminalSearchBodyEl = options.terminalSearchBodyEl || null;
   const settingsColsEl = options.settingsColsEl || null;
   const settingsRowsEl = options.settingsRowsEl || null;
+  const settingsPanelToggleBtn = options.settingsPanelToggleBtn || null;
+  const settingsPanelToggleIcon = options.settingsPanelToggleIcon || null;
+  const settingsPanelBodyEl = options.settingsPanelBodyEl || null;
+  const layoutProfileToggleBtn = options.layoutProfileToggleBtn || null;
+  const layoutProfileToggleIcon = options.layoutProfileToggleIcon || null;
+  const layoutProfileBodyEl = options.layoutProfileBodyEl || null;
   const terminalFontSize = Number(options.terminalFontSize) || 16;
   const terminalLineHeight = Number(options.terminalLineHeight) || 1.2;
   const terminalFontFamily = String(options.terminalFontFamily || "monospace");
   const cardHorizontalChromePx = Number(options.cardHorizontalChromePx) || 6;
   const mountVerticalChromePx = Number(options.mountVerticalChromePx) || 18;
+  const SIDEBAR_PANEL_IDS = ["find", "terminalSize", "savedLayouts"];
+  const TABLER_ICON_CLASSES = [
+    "icon-tabler-caret-left-filled",
+    "icon-tabler-caret-right-filled",
+    "icon-tabler-caret-down-filled"
+  ];
+
+  function normalizeSidebarPanels(sidebarPanels) {
+    const source = sidebarPanels && typeof sidebarPanels === "object" && !Array.isArray(sidebarPanels) ? sidebarPanels : {};
+    return {
+      find: source.find === true,
+      terminalSize: source.terminalSize === true,
+      savedLayouts: source.savedLayouts === true
+    };
+  }
+
+  function syncTablerIcon(iconEl, activeIconClass) {
+    if (!iconEl?.classList) {
+      return;
+    }
+    iconEl.textContent = "";
+    iconEl.classList.add("icon-tabler");
+    for (const iconClass of TABLER_ICON_CLASSES) {
+      iconEl.classList.toggle(iconClass, iconClass === activeIconClass);
+    }
+  }
+
+  function syncSidebarPanelSection({ toggleBtn, iconEl, bodyEl, collapsed, label }) {
+    if (toggleBtn) {
+      toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggleBtn.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${label}`);
+      toggleBtn.setAttribute("title", `${collapsed ? "Expand" : "Collapse"} ${label}`);
+    }
+    if (bodyEl) {
+      bodyEl.hidden = collapsed;
+    }
+    syncTablerIcon(iconEl, collapsed ? "icon-tabler-caret-right-filled" : "icon-tabler-caret-down-filled");
+  }
 
   function measureTerminalCellWidthPx() {
     if (!documentRef || typeof documentRef.createElement !== "function") {
@@ -79,33 +126,53 @@ export function createLayoutSettingsController(options = {}) {
       sidebarToggleBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
       sidebarToggleBtn.hidden = !sidebarVisible;
     }
-    if (sidebarToggleIcon) {
-      sidebarToggleIcon.textContent = "";
-      if (sidebarToggleIcon.classList) {
-        sidebarToggleIcon.classList.add("icon-tabler");
-        sidebarToggleIcon.classList.add("icon-tabler-caret-left-filled");
-      }
-    }
+    syncTablerIcon(sidebarToggleIcon, "icon-tabler-caret-left-filled");
     if (sidebarLauncherBtn) {
       sidebarLauncherBtn.setAttribute("aria-label", "Expand sidebar");
       sidebarLauncherBtn.setAttribute("title", "Expand sidebar");
       sidebarLauncherBtn.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
       sidebarLauncherBtn.hidden = sidebarVisible;
     }
+    const sidebarPanels = normalizeSidebarPanels(terminalSettings.sidebarPanels);
+    syncSidebarPanelSection({
+      toggleBtn: terminalSearchToggleBtn,
+      iconEl: terminalSearchToggleIcon,
+      bodyEl: terminalSearchBodyEl,
+      collapsed: sidebarPanels.find,
+      label: "Find"
+    });
+    syncSidebarPanelSection({
+      toggleBtn: settingsPanelToggleBtn,
+      iconEl: settingsPanelToggleIcon,
+      bodyEl: settingsPanelBodyEl,
+      collapsed: sidebarPanels.terminalSize,
+      label: "Terminal Size"
+    });
+    syncSidebarPanelSection({
+      toggleBtn: layoutProfileToggleBtn,
+      iconEl: layoutProfileToggleIcon,
+      bodyEl: layoutProfileBodyEl,
+      collapsed: sidebarPanels.savedLayouts,
+      label: "Saved Layouts"
+    });
     syncTerminalGeometryCss(terminalSettings);
   }
 
   function readSettingsFromUi(terminalSettings) {
+    const sidebarPanels = normalizeSidebarPanels(terminalSettings.sidebarPanels);
     return {
       cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
       rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
-      sidebarVisible: terminalSettings.sidebarVisible !== false
+      sidebarVisible: terminalSettings.sidebarVisible !== false,
+      sidebarPanels
     };
   }
 
   return {
     computeFixedCardWidthPx,
     computeFixedMountHeightPx,
+    normalizeSidebarPanels,
+    sidebarPanelIds: SIDEBAR_PANEL_IDS.slice(),
     syncTerminalGeometryCss,
     syncSettingsUi,
     readSettingsFromUi

@@ -278,7 +278,16 @@ test("app-layout-deck facade falls back safely when controllers are missing", as
   assert.equal(controller.measureTerminalCellWidthPx(), 10);
   assert.equal(controller.computeFixedMountHeightPx(20), 384);
   assert.equal(controller.computeFixedCardWidthPx(77), 770);
-  assert.deepEqual(controller.readSettingsFromUi(), { cols: 77, rows: 19, sidebarVisible: false });
+  assert.deepEqual(controller.readSettingsFromUi(), {
+    cols: 77,
+    rows: 19,
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  });
   assert.equal(await controller.applyTerminalSizeSettings(80, 24), undefined);
   assert.equal(await controller.onApplySettings(), undefined);
   assert.equal(controller.setSidebarVisible(true), undefined);

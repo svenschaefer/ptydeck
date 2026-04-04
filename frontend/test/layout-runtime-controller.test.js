@@ -51,7 +51,12 @@ test("layout runtime controller loads and persists terminal/session input settin
     "ptydeck.settings.v1": JSON.stringify({
       cols: 500,
       rows: 2,
-      sidebarVisible: false
+      sidebarVisible: false,
+      sidebarPanels: {
+        find: true,
+        terminalSize: false,
+        savedLayouts: true
+      }
     }),
     "ptydeck.session-input-settings.v1": JSON.stringify({
       "s-1": { sendTerminator: "lf" },
@@ -59,7 +64,16 @@ test("layout runtime controller loads and persists terminal/session input settin
     }),
     "ptydeck.session-filter.v1": " ops "
   });
-  let terminalSettings = { cols: 80, rows: 20, sidebarVisible: true };
+  let terminalSettings = {
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  };
   let sessionInputSettings = {};
 
   const controller = createLayoutRuntimeController({
@@ -78,7 +92,12 @@ test("layout runtime controller loads and persists terminal/session input settin
   assert.deepEqual(controller.loadTerminalSettings(), {
     cols: 400,
     rows: 5,
-    sidebarVisible: false
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
   });
   assert.equal(controller.loadStoredSessionFilterText(), "ops");
   assert.deepEqual(controller.loadSessionInputSettings(), {
@@ -91,7 +110,16 @@ test("layout runtime controller loads and persists terminal/session input settin
   assert.equal(controller.getSessionSendTerminator("s-2"), "crlf");
   assert.match(localStorageRef.getItem("ptydeck.session-input-settings.v1") || "", /"crlf"/);
 
-  terminalSettings = { cols: 58, rows: 40, sidebarVisible: true };
+  terminalSettings = {
+    cols: 58,
+    rows: 40,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  };
   controller.saveTerminalSettings();
   assert.deepEqual(JSON.parse(localStorageRef.getItem("ptydeck.settings.v1") || "{}"), terminalSettings);
 
@@ -102,7 +130,16 @@ test("layout runtime controller loads and persists terminal/session input settin
 test("layout runtime controller toggles sidebar state and syncs layout UI", () => {
   const syncCalls = [];
   const resizeCalls = [];
-  let terminalSettings = { cols: 80, rows: 20, sidebarVisible: true };
+  let terminalSettings = {
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  };
 
   const controller = createLayoutRuntimeController({
     localStorageRef: createStorage(),
@@ -121,16 +158,39 @@ test("layout runtime controller toggles sidebar state and syncs layout UI", () =
   assert.equal(controller.setSidebarVisible(false), true);
   assert.equal(terminalSettings.sidebarVisible, false);
   assert.equal(syncCalls.length, 1);
-  assert.deepEqual(syncCalls[0], { cols: 80, rows: 20, sidebarVisible: false });
+  assert.deepEqual(syncCalls[0], {
+    cols: 80,
+    rows: 20,
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  });
   assert.equal(resizeCalls.length, 1);
 
   assert.equal(controller.setSidebarVisible(false), false);
   assert.equal(resizeCalls.length, 1);
+
+  assert.equal(controller.setSidebarPanelCollapsed("find", true), true);
+  assert.deepEqual(terminalSettings.sidebarPanels, {
+    find: true,
+    terminalSize: false,
+    savedLayouts: false
+  });
+  assert.equal(syncCalls.length, 2);
+  assert.equal(resizeCalls.length, 1);
+
+  assert.equal(controller.setSidebarPanelCollapsed("find", true), false);
 });
 
 test("layout runtime controller binds UI events and applies deck terminal settings", async () => {
   const sidebarToggleBtn = createEventTarget();
   const sidebarLauncherBtn = createEventTarget();
+  const terminalSearchToggleBtn = createEventTarget();
+  const settingsPanelToggleBtn = createEventTarget();
+  const layoutProfileToggleBtn = createEventTarget();
   const settingsApplyBtn = createEventTarget();
   const settingsColsEl = createEventTarget("121");
   const settingsRowsEl = createEventTarget("33");
@@ -140,7 +200,16 @@ test("layout runtime controller binds UI events and applies deck terminal settin
   const feedback = [];
   const errors = [];
   const renderCalls = [];
-  let terminalSettings = { cols: 80, rows: 20, sidebarVisible: true };
+  let terminalSettings = {
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  };
   const activeDeck = { id: "ops", name: "Ops", settings: { terminal: { cols: 80, rows: 20 } } };
 
   const controller = createLayoutRuntimeController({
@@ -171,12 +240,16 @@ test("layout runtime controller binds UI events and applies deck terminal settin
     settingsRowsEl,
     sidebarToggleBtn,
     sidebarLauncherBtn,
+    terminalSearchToggleBtn,
+    settingsPanelToggleBtn,
+    layoutProfileToggleBtn,
     getLayoutSettingsController: () => ({
       readSettingsFromUi(currentSettings) {
         return {
           cols: Number(settingsColsEl.value || currentSettings.cols),
           rows: Number(settingsRowsEl.value || currentSettings.rows),
-          sidebarVisible: terminalSettings.sidebarVisible !== false
+          sidebarVisible: terminalSettings.sidebarVisible !== false,
+          sidebarPanels: terminalSettings.sidebarPanels
         };
       },
       syncSettingsUi() {}
@@ -188,6 +261,12 @@ test("layout runtime controller binds UI events and applies deck terminal settin
   assert.equal(terminalSettings.sidebarVisible, false);
   sidebarLauncherBtn.click();
   assert.equal(terminalSettings.sidebarVisible, true);
+  terminalSearchToggleBtn.click();
+  assert.equal(terminalSettings.sidebarPanels.find, true);
+  settingsPanelToggleBtn.click();
+  assert.equal(terminalSettings.sidebarPanels.terminalSize, true);
+  layoutProfileToggleBtn.click();
+  assert.equal(terminalSettings.sidebarPanels.savedLayouts, true);
 
   settingsApplyBtn.click();
   await Promise.resolve();

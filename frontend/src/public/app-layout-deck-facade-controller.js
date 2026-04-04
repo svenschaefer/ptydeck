@@ -136,11 +136,20 @@ export function createAppLayoutDeckFacadeController(options = {}) {
   }
 
   function readSettingsFromUi() {
+    const terminalSettings = getTerminalSettings?.() || {};
     return (
       getLayoutRuntimeController()?.readSettingsFromUi?.() || {
-        cols: getTerminalSettings()?.cols || defaultTerminalCols,
-        rows: getTerminalSettings()?.rows || defaultTerminalRows,
-        sidebarVisible: getTerminalSettings()?.sidebarVisible !== false
+        cols: terminalSettings.cols || defaultTerminalCols,
+        rows: terminalSettings.rows || defaultTerminalRows,
+        sidebarVisible: terminalSettings.sidebarVisible !== false,
+        sidebarPanels:
+          terminalSettings.sidebarPanels && typeof terminalSettings.sidebarPanels === "object"
+            ? terminalSettings.sidebarPanels
+            : {
+                find: false,
+                terminalSize: false,
+                savedLayouts: false
+              }
       }
     );
   }

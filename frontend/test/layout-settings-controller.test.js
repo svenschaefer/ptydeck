@@ -78,8 +78,17 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   const sidebarToggleBtn = createEl();
   const sidebarToggleIcon = createEl();
   const sidebarLauncherBtn = createEl();
+  const terminalSearchToggleBtn = createEl();
+  const terminalSearchToggleIcon = createEl();
+  const terminalSearchBodyEl = createEl();
   const settingsColsEl = createEl();
   const settingsRowsEl = createEl();
+  const settingsPanelToggleBtn = createEl();
+  const settingsPanelToggleIcon = createEl();
+  const settingsPanelBodyEl = createEl();
+  const layoutProfileToggleBtn = createEl();
+  const layoutProfileToggleIcon = createEl();
+  const layoutProfileBodyEl = createEl();
 
   const controller = createLayoutSettingsController({
     documentRef,
@@ -88,8 +97,17 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
     sidebarToggleBtn,
     sidebarToggleIcon,
     sidebarLauncherBtn,
+    terminalSearchToggleBtn,
+    terminalSearchToggleIcon,
+    terminalSearchBodyEl,
     settingsColsEl,
     settingsRowsEl,
+    settingsPanelToggleBtn,
+    settingsPanelToggleIcon,
+    settingsPanelBodyEl,
+    layoutProfileToggleBtn,
+    layoutProfileToggleIcon,
+    layoutProfileBodyEl,
     terminalFontSize: 16,
     terminalLineHeight: 1.2,
     terminalFontFamily: "monospace",
@@ -97,7 +115,16 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
     mountVerticalChromePx: 18
   });
 
-  controller.syncSettingsUi({ cols: 80, rows: 20, sidebarVisible: true });
+  controller.syncSettingsUi({
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: false,
+      terminalSize: true,
+      savedLayouts: false
+    }
+  });
 
   assert.equal(settingsColsEl.value, "80");
   assert.equal(settingsRowsEl.value, "20");
@@ -107,11 +134,37 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
   assert.equal(sidebarToggleIcon.textContent, "");
   assert.equal(sidebarToggleIcon.classList.contains("icon-tabler"), true);
   assert.equal(sidebarToggleIcon.classList.contains("icon-tabler-caret-left-filled"), true);
+  assert.equal(terminalSearchToggleBtn.getAttribute("aria-expanded"), "true");
+  assert.equal(terminalSearchBodyEl.hidden, false);
+  assert.equal(terminalSearchToggleIcon.classList.contains("icon-tabler-caret-down-filled"), true);
+  assert.equal(settingsPanelToggleBtn.getAttribute("aria-expanded"), "false");
+  assert.equal(settingsPanelBodyEl.hidden, true);
+  assert.equal(settingsPanelToggleIcon.classList.contains("icon-tabler-caret-right-filled"), true);
+  assert.equal(layoutProfileToggleBtn.getAttribute("aria-expanded"), "true");
+  assert.equal(layoutProfileBodyEl.hidden, false);
   assert.equal(style.get("--ptydeck-terminal-card-width"), "742px");
   assert.equal(style.get("--ptydeck-terminal-mount-height"), "402px");
 
   settingsColsEl.value = "58";
   settingsRowsEl.value = "40";
-  const parsed = controller.readSettingsFromUi({ cols: 80, rows: 20, sidebarVisible: true });
-  assert.deepEqual(parsed, { cols: 58, rows: 40, sidebarVisible: true });
+  const parsed = controller.readSettingsFromUi({
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  });
+  assert.deepEqual(parsed, {
+    cols: 58,
+    rows: 40,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  });
 });

@@ -9,7 +9,18 @@ export function createLayoutRuntimeController(options = {}) {
   const sendTerminatorModeSet = options.sendTerminatorModeSet || new Set(["auto"]);
   const cardHorizontalChromePx = Number(options.cardHorizontalChromePx) || 6;
   const getLayoutSettingsController = options.getLayoutSettingsController || (() => null);
-  const getTerminalSettings = options.getTerminalSettings || (() => ({ cols: defaultTerminalCols, rows: defaultTerminalRows, sidebarVisible: true }));
+  const getTerminalSettings =
+    options.getTerminalSettings ||
+    (() => ({
+      cols: defaultTerminalCols,
+      rows: defaultTerminalRows,
+      sidebarVisible: true,
+      sidebarPanels: {
+        find: false,
+        terminalSize: false,
+        savedLayouts: false
+      }
+    }));
   const setTerminalSettings = options.setTerminalSettings || (() => {});
   const getSessionInputSettings = options.getSessionInputSettings || (() => ({}));
   const setSessionInputSettings = options.setSessionInputSettings || (() => {});
@@ -27,6 +38,9 @@ export function createLayoutRuntimeController(options = {}) {
   const settingsRowsEl = options.settingsRowsEl || null;
   const sidebarToggleBtn = options.sidebarToggleBtn || null;
   const sidebarLauncherBtn = options.sidebarLauncherBtn || null;
+  const terminalSearchToggleBtn = options.terminalSearchToggleBtn || null;
+  const settingsPanelToggleBtn = options.settingsPanelToggleBtn || null;
+  const layoutProfileToggleBtn = options.layoutProfileToggleBtn || null;
 
   function clampInt(value, fallback, min, max) {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -34,6 +48,19 @@ export function createLayoutRuntimeController(options = {}) {
       return fallback;
     }
     return Math.min(max, Math.max(min, parsed));
+  }
+
+  function normalizeSidebarPanels(sidebarPanels) {
+    const controller = getLayoutSettingsController();
+    if (controller && typeof controller.normalizeSidebarPanels === "function") {
+      return controller.normalizeSidebarPanels(sidebarPanels);
+    }
+    const source = sidebarPanels && typeof sidebarPanels === "object" && !Array.isArray(sidebarPanels) ? sidebarPanels : {};
+    return {
+      find: source.find === true,
+      terminalSize: source.terminalSize === true,
+      savedLayouts: source.savedLayouts === true
+    };
   }
 
   function readStorageValue(key) {
@@ -88,12 +115,21 @@ export function createLayoutRuntimeController(options = {}) {
     return {
       cols: clampInt(stored?.cols, defaultTerminalCols, 20, 400),
       rows: clampInt(stored?.rows, defaultTerminalRows, 5, 120),
-      sidebarVisible: stored?.sidebarVisible !== false
+      sidebarVisible: stored?.sidebarVisible !== false,
+      sidebarPanels: normalizeSidebarPanels(stored?.sidebarPanels)
     };
   }
 
   function saveTerminalSettings() {
-    writeStorageValue(settingsStorageKey, JSON.stringify(getTerminalSettings()));
+    const terminalSettings = getTerminalSettings() || {};
+    writeStorageValue(
+      settingsStorageKey,
+      JSON.stringify({
+        ...terminalSettings,
+        sidebarVisible: terminalSettings.sidebarVisible !== false,
+        sidebarPanels: normalizeSidebarPanels(terminalSettings.sidebarPanels)
+      })
+    );
   }
 
   function normalizeSendTerminatorMode(value) {
@@ -199,7 +235,8 @@ export function createLayoutRuntimeController(options = {}) {
       return {
         cols: clampInt(settingsColsEl?.value, terminalSettings.cols, 20, 400),
         rows: clampInt(settingsRowsEl?.value, terminalSettings.rows, 5, 120),
-        sidebarVisible: terminalSettings.sidebarVisible !== false
+        sidebarVisible: terminalSettings.sidebarVisible !== false,
+        sidebarPanels: normalizeSidebarPanels(terminalSettings.sidebarPanels)
       };
     }
     return controller.readSettingsFromUi(terminalSettings);
@@ -261,6 +298,32 @@ export function createLayoutRuntimeController(options = {}) {
     return true;
   }
 
+  function setSidebarPanelCollapsed(panelId, collapsed) {
+    const normalizedPanelId = String(panelId || "").trim();
+    if (!normalizedPanelId) {
+      return false;
+    }
+    const terminalSettings = getTerminalSettings() || {};
+    const sidebarPanels = normalizeSidebarPanels(terminalSettings.sidebarPanels);
+    if (!(normalizedPanelId in sidebarPanels)) {
+      return false;
+    }
+    const nextCollapsed = collapsed === true;
+    if (sidebarPanels[normalizedPanelId] === nextCollapsed) {
+      return false;
+    }
+    setTerminalSettings({
+      ...terminalSettings,
+      sidebarPanels: {
+        ...sidebarPanels,
+        [normalizedPanelId]: nextCollapsed
+      }
+    });
+    saveTerminalSettings();
+    syncSettingsUi();
+    return true;
+  }
+
   function bindUiEvents() {
     if (sidebarToggleBtn && typeof sidebarToggleBtn.addEventListener === "function") {
       sidebarToggleBtn.addEventListener("click", () => setSidebarVisible(false));
@@ -271,6 +334,18 @@ export function createLayoutRuntimeController(options = {}) {
     if (settingsApplyBtn && typeof settingsApplyBtn.addEventListener === "function") {
       settingsApplyBtn.addEventListener("click", onApplySettings);
     }
+    const bindSidebarPanelToggle = (button, panelId) => {
+      if (!button || typeof button.addEventListener !== "function") {
+        return;
+      }
+      button.addEventListener("click", () => {
+        const currentPanels = normalizeSidebarPanels(getTerminalSettings()?.sidebarPanels);
+        setSidebarPanelCollapsed(panelId, currentPanels[panelId] !== true);
+      });
+    };
+    bindSidebarPanelToggle(terminalSearchToggleBtn, "find");
+    bindSidebarPanelToggle(settingsPanelToggleBtn, "terminalSize");
+    bindSidebarPanelToggle(layoutProfileToggleBtn, "savedLayouts");
     const bindEnter = (inputEl) => {
       if (!inputEl || typeof inputEl.addEventListener !== "function") {
         return;
@@ -306,6 +381,7 @@ export function createLayoutRuntimeController(options = {}) {
     applyTerminalSizeSettings,
     onApplySettings,
     setSidebarVisible,
+    setSidebarPanelCollapsed,
     bindUiEvents
   };
 }

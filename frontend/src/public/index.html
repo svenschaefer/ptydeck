@@ -44,8 +44,19 @@
           <div id="deck-tabs" class="deck-tabs"></div>
         </section>
         <section class="terminal-search-panel">
-          <h2>Find</h2>
-          <div class="terminal-search-row">
+          <h2 class="sidebar-section-heading">
+            <button
+              id="terminal-search-toggle"
+              class="sidebar-section-toggle"
+              type="button"
+              aria-controls="terminal-search-body"
+              aria-expanded="true"
+            >
+              <span class="sidebar-section-title">Find</span>
+              <span id="terminal-search-toggle-icon" class="icon-tabler icon-tabler-caret-down-filled" aria-hidden="true"></span>
+            </button>
+          </h2>
+          <div id="terminal-search-body" class="sidebar-section-body terminal-search-row">
             <input id="terminal-search-input" type="text" placeholder="Find in active terminal" />
             <button id="terminal-search-prev" type="button">Prev</button>
             <button id="terminal-search-next" type="button">Next</button>
@@ -54,28 +65,52 @@
           </div>
         </section>
         <section class="settings-panel">
-          <h2>Terminal Size</h2>
-          <p class="sidebar-panel-note">Applies the current cols and rows to the active deck and resizes every terminal in that deck.</p>
-          <div class="settings-grid">
-            <label for="settings-cols">Cols</label>
-            <input id="settings-cols" type="number" min="20" max="400" step="1" value="80" />
-            <label for="settings-rows">Rows</label>
-            <input id="settings-rows" type="number" min="5" max="120" step="1" value="20" />
+          <h2 class="sidebar-section-heading">
+            <button
+              id="settings-panel-toggle"
+              class="sidebar-section-toggle"
+              type="button"
+              aria-controls="settings-panel-body"
+              aria-expanded="true"
+            >
+              <span class="sidebar-section-title">Terminal Size</span>
+              <span id="settings-panel-toggle-icon" class="icon-tabler icon-tabler-caret-down-filled" aria-hidden="true"></span>
+            </button>
+          </h2>
+          <div id="settings-panel-body" class="sidebar-section-body">
+            <p class="sidebar-panel-note">Applies the current cols and rows to the active deck and resizes every terminal in that deck.</p>
+            <div class="settings-grid">
+              <label for="settings-cols">Cols</label>
+              <input id="settings-cols" type="number" min="20" max="400" step="1" value="80" />
+              <label for="settings-rows">Rows</label>
+              <input id="settings-rows" type="number" min="5" max="120" step="1" value="20" />
+            </div>
+            <button id="settings-apply" type="button">Apply Size</button>
           </div>
-          <button id="settings-apply" type="button">Apply Size</button>
         </section>
         <section class="layout-profile-panel">
-          <div class="layout-profile-head">
-            <h2>Saved Layouts</h2>
-            <p id="layout-profile-status" class="layout-profile-status">No saved layout profiles.</p>
-          </div>
-          <p class="sidebar-panel-note">Save and reapply deck-local layout snapshots, including filter, sidebar, control pane, and split layout state.</p>
-          <select id="layout-profile-select" class="layout-profile-select" aria-label="Saved layout profiles"></select>
-          <div class="layout-profile-actions">
-            <button id="layout-profile-save" type="button">Save Layout</button>
-            <button id="layout-profile-apply" type="button">Apply Layout</button>
-            <button id="layout-profile-rename" type="button">Rename Layout</button>
-            <button id="layout-profile-delete" type="button">Delete Layout</button>
+          <h2 class="sidebar-section-heading">
+            <button
+              id="layout-profile-toggle"
+              class="sidebar-section-toggle"
+              type="button"
+              aria-controls="layout-profile-body"
+              aria-expanded="true"
+            >
+              <span class="sidebar-section-title">Saved Layouts</span>
+              <span id="layout-profile-toggle-icon" class="icon-tabler icon-tabler-caret-down-filled" aria-hidden="true"></span>
+            </button>
+          </h2>
+          <div id="layout-profile-body" class="sidebar-section-body">
+            <p id="layout-profile-status" class="layout-profile-status" hidden>No saved layout profiles.</p>
+            <p class="sidebar-panel-note">Save and reapply deck-local layout snapshots, including filter, sidebar, control pane, and split layout state.</p>
+            <select id="layout-profile-select" class="layout-profile-select" aria-label="Saved layout profiles"></select>
+            <div class="layout-profile-actions">
+              <button id="layout-profile-save" type="button">Save</button>
+              <button id="layout-profile-apply" type="button">Apply</button>
+              <button id="layout-profile-rename" type="button">Rename</button>
+              <button id="layout-profile-delete" type="button">Delete</button>
+            </div>
           </div>
         </section>
       </aside>
