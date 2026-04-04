@@ -1499,6 +1499,10 @@ button:hover {
   color: #d8c1f0;
 }
 
+dialog:not([open]) {
+  display: none !important;
+}
+
 .session-settings-dialog {
   width: min(980px, calc(100vw - 48px));
   max-height: calc(100vh - 40px);

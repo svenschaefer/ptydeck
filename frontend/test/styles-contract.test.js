@@ -19,6 +19,11 @@ test("terminal viewport keeps a stable native scrollbar gutter", () => {
   );
 });
 
+test("non-open dialogs stay hidden even when dialog classes set layout display modes", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(stylesCss, /dialog:not\(\[open\]\) \{\s*display: none !important;\s*\}/m);
+});
+
 test("workspace library keeps a scrollable body and hides SSH-only sections correctly", () => {
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(

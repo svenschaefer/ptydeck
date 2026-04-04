@@ -2,6 +2,12 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-04
+
+- [x] Fixed a dialog visibility regression introduced by the recent settings/Workspace Library styling work: `frontend/src/public/styles.css` now restores the native dialog contract with an explicit `dialog:not([open]) { display: none !important; }` rule so layout-oriented dialog classes such as `.session-settings-dialog` and `.workspace-manager-dialog` cannot force closed dialogs to remain visible on the page.
+- [x] Added a direct style-contract regression in `frontend/test/styles-contract.test.js` to keep the non-open dialog visibility rule from drifting again while dialog shells continue to use custom grid/flex layout styling when opened.
+- [x] Validation for the 2026-04-04 dialog-visibility fix passed with a focused regression (`node --test frontend/test/styles-contract.test.js`) plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation processes after completion.
+
 ## 2026-04-03
 
 - [x] `UX-023A`, `UX-023B`, `UX-023C`, and `UX-023D` are now completed as `v0.4.0-H58`: the queued guided SSH trust and progressive-disclosure settings closeout is delivered, and there is no active or queued wave left in the near-term plan.
