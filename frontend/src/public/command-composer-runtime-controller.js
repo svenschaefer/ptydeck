@@ -66,6 +66,7 @@ export function createCommandComposerRuntimeController(options = {}) {
   const apiSendInput = options.apiSendInput || (() => Promise.resolve());
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator || (() => Promise.resolve());
   const recordCommandSubmission = options.recordCommandSubmission || (() => null);
+  const recordSendHistory = options.recordSendHistory || (() => null);
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode || ((mode) => mode);
   const delayedSubmitMs = Number(options.delayedSubmitMs) || 0;
   const setError = options.setError || (() => {});
@@ -225,6 +226,7 @@ export function createCommandComposerRuntimeController(options = {}) {
       return;
     }
 
+    const submittedAt = Date.now();
     for (const session of plan.targetSessions) {
       if (plan.activateTargetBeforeSend === true) {
         setActiveSession(session.id);
@@ -240,9 +242,11 @@ export function createCommandComposerRuntimeController(options = {}) {
         normalizeMode: normalizeSendTerminatorMode,
         delayedSubmitMs
       });
+      if (plan.source === "composer") {
+        recordSendHistory(session.id, plan.targetPayload, { submittedAt });
+      }
     }
 
-    const submittedAt = Date.now();
     for (const session of plan.targetSessions) {
       recordCommandSubmission(session.id, {
         source: plan.source === "paste" ? "paste" : "input",

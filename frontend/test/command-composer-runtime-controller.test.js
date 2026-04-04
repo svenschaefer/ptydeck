@@ -243,6 +243,7 @@ test("command-composer runtime controller sends command input via configured ter
     },
     normalizeSendTerminatorMode: (mode) => mode,
     delayedSubmitMs: 75,
+    recordSendHistory: (sessionId, payload) => calls.push(["history", sessionId, payload]),
     recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source, submission.text]),
     setCommandPreview: (message) => calls.push(["preview", message]),
     clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
@@ -258,6 +259,7 @@ test("command-composer runtime controller sends command input via configured ter
     ["debug", "command.send.start", "s1"],
     ["send", "s1", "ls -al", "CRLF", 75],
     ["api", "s1", "ls -al"],
+    ["history", "s1", "ls -al"],
     ["record", "s1", "input", "ls -al"],
     ["value", ""],
     ["preview", ""],
@@ -301,6 +303,7 @@ test("command-composer runtime controller records one submission per direct-rout
       calls.push(["send", sessionId, payload]);
     },
     normalizeSendTerminatorMode: (mode) => mode,
+    recordSendHistory: (sessionId, payload) => calls.push(["history", sessionId, payload]),
     recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.text]),
     formatSessionToken: (sessionId) => sessionId,
     formatSessionDisplayName: (session) => session.name,
@@ -316,7 +319,9 @@ test("command-composer runtime controller records one submission per direct-rout
 
   assert.deepEqual(calls, [
     ["send", "s1", "pwd"],
+    ["history", "s1", "pwd"],
     ["send", "s2", "pwd"],
+    ["history", "s2", "pwd"],
     ["record", "s1", "pwd"],
     ["record", "s2", "pwd"],
     ["value", ""],
@@ -629,6 +634,7 @@ test("command-composer runtime controller sends terminal pastes without clearing
     sendInputWithConfiguredTerminator: async (_sendFn, sessionId, payload) => {
       calls.push(["send", sessionId, payload]);
     },
+    recordSendHistory: (sessionId, payload) => calls.push(["history", sessionId, payload]),
     recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source, submission.text]),
     setCommandPreview: (message) => calls.push(["preview", message]),
     clearCommandSuggestions: () => calls.push(["clear-suggestions"]),

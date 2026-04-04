@@ -103,6 +103,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const connectionProfileRuntimeController = options.connectionProfileRuntimeController || null;
   const workspacePresetRuntimeController = options.workspacePresetRuntimeController || null;
   const workspaceManagerRuntimeController = options.workspaceManagerRuntimeController || null;
+  const sendHistoryRuntimeController = options.sendHistoryRuntimeController || null;
   const broadcastInputRuntimeController = options.broadcastInputRuntimeController || null;
   const terminalSearchController = options.terminalSearchController || null;
   const sessionTerminalResizeController = options.sessionTerminalResizeController || null;
@@ -384,6 +385,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       apiSendInput: api?.sendInput?.bind(api),
       sendInputWithConfiguredTerminator,
       recordCommandSubmission: (sessionId, submission) => store?.recordSessionCommandSubmission?.(sessionId, submission),
+      recordSendHistory: (sessionId, payload, runtimeOptions) =>
+        sendHistoryRuntimeController?.recordSend?.(sessionId, payload, runtimeOptions),
       normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
       delayedSubmitMs,
       setError: (message) => appCommandUiFacadeController?.setError?.(message),
@@ -439,6 +442,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       disposeTerminalSearch: () => terminalSearchController?.dispose?.(),
       disposeCommandComposerRuntime: () => commandComposerRuntimeController?.dispose?.(),
       disposeCommandComposerAutocomplete: () => commandComposerAutocompleteController?.dispose?.(),
+      disposeSendHistoryRuntime: () => sendHistoryRuntimeController?.dispose?.(),
       disposeWorkflowRuntime,
       disconnectTerminalObservers: () => {
         for (const observer of terminalObservers.values()) {

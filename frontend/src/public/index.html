@@ -139,6 +139,7 @@
                 </div>
                 <div class="command-meta-actions">
                   <button id="workspace-manager-open" type="button">Manage</button>
+                  <button id="send-history-open" type="button">History</button>
                   <p id="control-pane-status" class="control-pane-status"></p>
                   <label class="control-pane-position-wrap">
                     <span>Position</span>
@@ -576,6 +577,38 @@
               <p id="workspace-group-persistence" class="workspace-manager-inline-note"></p>
             </div>
             </section>
+          </div>
+        </dialog>
+        <dialog id="send-history-dialog" class="send-history-dialog">
+          <div class="send-history-head">
+            <div class="send-history-heading">
+              <p class="send-history-title">Send History</p>
+              <p id="send-history-meta" class="send-history-meta"></p>
+            </div>
+            <button id="send-history-close" type="button" aria-label="Close send history">
+              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="send-history-body">
+            <div class="send-history-browser">
+              <input
+                id="send-history-search"
+                class="send-history-search"
+                type="text"
+                placeholder="Search send history for the active session"
+              />
+              <p id="send-history-empty" class="send-history-empty" hidden>No send-history entries recorded yet.</p>
+              <div id="send-history-list" class="send-history-list"></div>
+            </div>
+            <div class="send-history-detail">
+              <p id="send-history-detail-meta" class="send-history-detail-meta">
+                Select a send-history entry to inspect the full payload.
+              </p>
+              <pre id="send-history-detail-text" class="send-history-detail-text"></pre>
+              <div class="send-history-detail-actions">
+                <button id="send-history-use" type="button" disabled>Use in Input</button>
+              </div>
+            </div>
           </div>
         </dialog>
         <dialog id="action-dialog" class="action-dialog">

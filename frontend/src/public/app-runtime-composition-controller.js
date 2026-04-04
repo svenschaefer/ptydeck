@@ -44,6 +44,7 @@ import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
 import { createReplayExportRuntimeController } from "./replay-export-runtime-controller.js";
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
+import { createSendHistoryRuntimeController } from "./send-history-runtime-controller.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
@@ -275,6 +276,16 @@ const {
   commandPaletteEmptyEl,
   commandPaletteCloseBtn,
   workspaceManagerOpenBtn,
+  sendHistoryOpenBtn,
+  sendHistoryDialogEl,
+  sendHistoryCloseBtn,
+  sendHistoryMetaEl,
+  sendHistorySearchInputEl,
+  sendHistoryEmptyEl,
+  sendHistoryListEl,
+  sendHistoryDetailMetaEl,
+  sendHistoryDetailTextEl,
+  sendHistoryUseBtn,
   workspaceManagerDialogEl,
   workspaceManagerCloseBtn,
   workspaceManagerMetaEl,
@@ -490,6 +501,7 @@ let controlPaneRuntimeController = null;
 let layoutProfileRuntimeController = null;
 let workspacePresetRuntimeController = null;
 let workspaceManagerRuntimeController = null;
+let sendHistoryRuntimeController = null;
 let broadcastInputRuntimeController = null;
 let splitLayoutRuntimeController = null;
 let slashWorkflowRuntimeController = null;
@@ -609,6 +621,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getControlPaneRuntimeController: () => controlPaneRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
+  getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
   getCommandExecutor: () => commandExecutor
 });
 
@@ -885,6 +898,40 @@ workspaceManagerRuntimeController = createWorkspaceManagerRuntimeController({
   getConnectionProfileRuntimeController: () => connectionProfileRuntimeController,
   getWorkspacePresetRuntimeController: () => workspacePresetRuntimeController,
   getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID
+});
+
+sendHistoryRuntimeController = createSendHistoryRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  localStorageRef: window?.localStorage || null,
+  dialogEl: sendHistoryDialogEl,
+  openBtn: sendHistoryOpenBtn,
+  closeBtn: sendHistoryCloseBtn,
+  metaEl: sendHistoryMetaEl,
+  searchInputEl: sendHistorySearchInputEl,
+  emptyEl: sendHistoryEmptyEl,
+  listEl: sendHistoryListEl,
+  detailMetaEl: sendHistoryDetailMetaEl,
+  detailTextEl: sendHistoryDetailTextEl,
+  useBtn: sendHistoryUseBtn,
+  getActiveSession: () => {
+    const state = store.getState() || {};
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    return sessions.find((session) => session.id === state.activeSessionId) || null;
+  },
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  setCommandValue: (value) => {
+    commandInput.value = value;
+  },
+  focusCommandInput: () => {
+    commandInput?.focus?.();
+    const value = String(commandInput?.value || "");
+    commandInput?.setSelectionRange?.(value.length, value.length);
+  },
+  scheduleCommandPreview: () => appCommandUiFacadeController?.scheduleCommandPreview?.(),
+  scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions?.(),
+  requestRender: () => appCommandUiFacadeController?.render?.()
 });
 
 broadcastInputRuntimeController = createBroadcastInputRuntimeController({
@@ -1408,6 +1455,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   connectionProfileRuntimeController,
   workspacePresetRuntimeController,
   workspaceManagerRuntimeController,
+  sendHistoryRuntimeController,
   broadcastInputRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,
