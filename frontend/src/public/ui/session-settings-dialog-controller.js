@@ -1,5 +1,14 @@
 export function createSessionSettingsDialogController(options = {}) {
   const windowRef = options.windowRef || (typeof window !== "undefined" ? window : null);
+  const confirmAction =
+    typeof options.confirmAction === "function"
+      ? options.confirmAction
+      : async ({ message = "" } = {}) => {
+          if (!windowRef || typeof windowRef.confirm !== "function") {
+            return true;
+          }
+          return windowRef.confirm(message);
+        };
 
   function open(dialog) {
     if (!dialog) {
@@ -44,13 +53,14 @@ export function createSessionSettingsDialogController(options = {}) {
     open(dialog);
   }
 
-  function confirmSessionDelete(session) {
+  async function confirmSessionDelete(session) {
     const sessionLabel = String(session?.name || session?.id || "").trim() || "this session";
     const message = `Delete session '${sessionLabel}' permanently?`;
-    if (!windowRef || typeof windowRef.confirm !== "function") {
-      return true;
-    }
-    return windowRef.confirm(message);
+    return confirmAction({
+      title: "Delete Session",
+      message,
+      confirmLabel: "Delete"
+    });
   }
 
   return {

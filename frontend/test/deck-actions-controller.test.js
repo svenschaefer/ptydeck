@@ -25,15 +25,9 @@ test("deck-actions controller handles create and rename flows", async () => {
   };
 
   const controller = createDeckActionsController({
-    windowRef: {
-      prompt() {
-        return prompts.shift() ?? null;
-      },
-      confirm() {
-        return true;
-      }
-    },
     api,
+    requestText: async () => prompts.shift() ?? null,
+    confirmAction: async () => true,
     getActiveDeck: () => ({ id: "deck-1", name: "Deck One" }),
     getDecks: () => [{ id: "default", name: "Default" }, { id: "deck-1", name: "Deck One" }],
     getTerminalSettings: () => ({ cols: 58, rows: 40 }),
@@ -81,15 +75,9 @@ test("deck-actions controller handles 409 force-delete flow", async () => {
   };
 
   const controller = createDeckActionsController({
-    windowRef: {
-      prompt() {
-        return null;
-      },
-      confirm() {
-        return confirms.shift() ?? false;
-      }
-    },
     api,
+    requestText: async () => null,
+    confirmAction: async () => confirms.shift() ?? false,
     getActiveDeck: () => ({ id: "deck-a", name: "Deck A" }),
     getDecks: () => [{ id: "default", name: "Default" }, { id: "deck-a", name: "Deck A" }],
     getTerminalSettings: () => ({ cols: 80, rows: 20 }),

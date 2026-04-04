@@ -38,14 +38,12 @@ test("session-settings dialog controller opens/closes/toggles fallback dialogs",
   assert.equal(dialog.classList.contains("open"), true);
 });
 
-test("session-settings dialog controller uses native modal methods and confirmation", () => {
+test("session-settings dialog controller uses native modal methods and confirmation", async () => {
   const confirmCalls = [];
   const controller = createSessionSettingsDialogController({
-    windowRef: {
-      confirm(message) {
-        confirmCalls.push(message);
-        return false;
-      }
+    confirmAction: async ({ message }) => {
+      confirmCalls.push(message);
+      return false;
     }
   });
 
@@ -71,7 +69,7 @@ test("session-settings dialog controller uses native modal methods and confirmat
   assert.equal(dialog.closeCalls, 1);
   assert.equal(dialog.open, false);
 
-  const confirmed = controller.confirmSessionDelete({ id: "s-1", name: "Alpha" });
+  const confirmed = await controller.confirmSessionDelete({ id: "s-1", name: "Alpha" });
   assert.equal(confirmed, false);
   assert.equal(confirmCalls.length, 1);
   assert.match(confirmCalls[0], /Delete session 'Alpha' permanently\?/);

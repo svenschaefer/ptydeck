@@ -134,3 +134,90 @@ test("file transfer runtime controller downloads payloads through blob download 
   assert.equal(objectUrls[0].type, "application/octet-stream")
   assert.equal(revokedUrls[0], "blob:transfer")
 })
+
+test("file transfer runtime controller can trigger downloads from a provided payload without an API client", async () => {
+  const documentRef = createDocumentRef()
+  const objectUrls = []
+  const controller = createFileTransferRuntimeController({
+    documentRef,
+    URLRef: {
+      createObjectURL(blob) {
+        objectUrls.push(blob)
+        return "blob:payload"
+      },
+      revokeObjectURL() {}
+    },
+    BlobCtor: class FakeBlob {
+      constructor(parts, options = {}) {
+        this.parts = parts
+        this.type = options.type
+      }
+    }
+  })
+
+  const outcome = await controller.downloadSessionFile(
+    { id: "s1", name: "ops" },
+    {
+      remotePath: "logs/output.txt",
+      payload: {
+        sessionId: "s1",
+        path: "logs/output.txt",
+        fileName: "output.txt",
+        contentType: "application/octet-stream",
+        encoding: "base64",
+        contentBase64: "dXBkYXRlZA==",
+        sizeBytes: 7
+      }
+    }
+  )
+
+  assert.equal(outcome.payload.fileName, "output.txt")
+  assert.equal(objectUrls.length, 1)
+})
+
+test("file transfer runtime controller rejects unsupported download and upload browser paths", async () => {
+  const downloadController = createFileTransferRuntimeController({
+    api: {
+      async downloadSessionFile() {
+        return {
+          sessionId: "s1",
+          path: "logs/output.txt",
+          fileName: "output.txt",
+          contentType: "application/octet-stream",
+          encoding: "base64",
+          contentBase64: "dXBkYXRlZA==",
+          sizeBytes: 7
+        }
+      }
+    },
+    documentRef: null,
+    URLRef: null,
+    BlobCtor: null
+  })
+
+  await assert.rejects(
+    () => downloadController.downloadSessionFile({ id: "s1" }, { remotePath: "logs/output.txt" }),
+    /download is unavailable/
+  )
+
+  const uploadController = createFileTransferRuntimeController({
+    api: {
+      async uploadSessionFile() {
+        throw new Error("should not reach upload api")
+      }
+    }
+  })
+
+  await assert.rejects(
+    () =>
+      uploadController.uploadSessionFile(
+        { id: "s1" },
+        {
+          file: {
+            name: "broken.txt"
+          }
+        }
+      ),
+    /upload is unavailable/
+  )
+})

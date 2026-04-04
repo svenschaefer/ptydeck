@@ -34,6 +34,15 @@ export function createSessionCardInteractionsController(options = {}) {
     const toggleSettingsDialog = args.toggleSettingsDialog || (() => {});
     const closeSettingsDialog = args.closeSettingsDialog || (() => {});
     const confirmSessionDelete = args.confirmSessionDelete || (() => true);
+    const requestSessionRename =
+      args.requestSessionRename ||
+      (async (currentSession) => {
+        if (typeof windowRef?.prompt !== "function") {
+          return null;
+        }
+        const value = windowRef.prompt("Session name", currentSession?.name || currentSession?.id || "");
+        return value === null || value === undefined ? null : String(value);
+      });
     const removeSession = args.removeSession || (() => {});
     const setCommandFeedback = args.setCommandFeedback || (() => {});
     const formatSessionToken = args.formatSessionToken || ((sessionId) => String(sessionId || ""));
@@ -156,7 +165,7 @@ export function createSessionCardInteractionsController(options = {}) {
         setError(getBlockedSessionActionMessage([currentSession], "Rename"));
         return;
       }
-      const nextName = windowRef?.prompt?.("Session name", currentSession.name || session.id.slice(0, 8));
+      const nextName = await requestSessionRename(currentSession);
       if (nextName === null || nextName === undefined) {
         return;
       }
@@ -176,7 +185,7 @@ export function createSessionCardInteractionsController(options = {}) {
 
     refs.closeBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;
-      if (!confirmSessionDelete(session)) {
+      if (!(await confirmSessionDelete(session))) {
         return;
       }
       if (isSessionExited(currentSession)) {

@@ -323,6 +323,162 @@ test("validateResponse accepts session file-transfer payloads", () => {
   });
 });
 
+test("validateRequest rejects invalid custom-command scope and missing session scope selector", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands",
+      params: {},
+      query: {
+        scope: "tenant"
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      query: {
+        scope: "session"
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "DELETE",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      query: {
+        scope: "global",
+        sessionId: "s-1"
+      }
+    });
+  });
+});
+
+test("validateRequest rejects unsupported connection-profile secrets and invalid SSH trust or probe payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/connection-profiles",
+      params: {},
+      body: {
+        name: "ops",
+        launch: {
+          kind: "ssh",
+          deckId: "default",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: THEME_PROFILE,
+          inactiveThemeProfile: THEME_PROFILE,
+          remoteSecret: "not-supported"
+        }
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/ssh-trust-entries",
+      params: {},
+      body: {
+        host: "example.internal",
+        port: "22",
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/ssh-host-key-probe",
+      params: {},
+      body: {
+        host: "example.internal",
+        port: "22"
+      }
+    });
+  });
+});
+
+test("validateResponse accepts SSH trust entries and SSH host-key probe candidate lists", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sshTrustEntryList",
+      body: [
+        {
+          id: "trust-aaaaaaaaaaaaaaaaaaaaaaaa",
+          host: "example.internal",
+          port: 22,
+          keyType: "ssh-ed25519",
+          publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+          fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E",
+          createdAt: 1,
+          updatedAt: 2
+        }
+      ]
+    });
+    validateResponse({
+      statusCode: 200,
+      expect: "sshHostKeyProbeCandidateList",
+      body: [
+        {
+          host: "example.internal",
+          port: 22,
+          keyType: "ssh-ed25519",
+          publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+          fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
+        }
+      ]
+    });
+  });
+});
+
+test("validateResponse rejects malformed SSH trust entries and malformed session file downloads", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sshTrustEntry",
+      body: {
+        id: "bad",
+        host: "example.internal",
+        port: 22,
+        keyType: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+        fingerprintSha256: "sha256-bad",
+        createdAt: 1,
+        updatedAt: 2
+      }
+    });
+  });
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionFileDownload",
+      body: {
+        sessionId: "a",
+        path: "logs/output.txt",
+        fileName: "output.txt",
+        contentType: "application/octet-stream",
+        encoding: "raw",
+        contentBase64: "dXBkYXRlZA==",
+        sizeBytes: 7
+      }
+    });
+  });
+});
+
 test("validateResponse rejects invalid session shape", () => {
   assert.throws(() => {
     validateResponse({

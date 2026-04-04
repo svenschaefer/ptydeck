@@ -45,6 +45,7 @@ export function createSessionGridController(options = {}) {
   const getSessionById = options.getSessionById || (() => null);
   const toggleSettingsDialog = options.toggleSettingsDialog || (() => {});
   const confirmSessionDelete = options.confirmSessionDelete || (() => true);
+  const requestSessionRename = options.requestSessionRename || (() => Promise.resolve(null));
   const removeSession = options.removeSession || (() => {});
   const setCommandFeedback = options.setCommandFeedback || (() => {});
   const formatSessionToken = options.formatSessionToken || ((sessionId) => String(sessionId || ""));
@@ -266,6 +267,7 @@ export function createSessionGridController(options = {}) {
         toggleSettingsDialog,
         closeSettingsDialog,
         confirmSessionDelete,
+        requestSessionRename,
         removeSession,
         setCommandFeedback,
         formatSessionToken,

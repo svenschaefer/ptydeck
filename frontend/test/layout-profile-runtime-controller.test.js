@@ -302,6 +302,62 @@ test("layout profile runtime controller loads, saves, renames, and deletes profi
   assert.equal(controller.listProfiles().length, 1);
 });
 
+test("layout profile runtime controller prompt flows use injected request and confirm actions", async () => {
+  const prompts = ["Current Layout", "Renamed Layout"];
+  const confirms = [true];
+  const apiCalls = [];
+  const controller = createLayoutProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl: createElement("select"),
+    statusEl: createElement("p"),
+    requestText: async () => prompts.shift() ?? null,
+    confirmAction: async () => confirms.shift() ?? false,
+    api: {
+      async createLayoutProfile(payload) {
+        apiCalls.push(["create", payload.name]);
+        return {
+          id: "layout-1",
+          name: payload.name,
+          createdAt: 1,
+          updatedAt: 1,
+          layout: payload.layout
+        };
+      },
+      async updateLayoutProfile(profileId, payload) {
+        apiCalls.push(["update", profileId, payload.name]);
+        return {
+          id: profileId,
+          name: payload.name,
+          createdAt: 1,
+          updatedAt: 2,
+          layout: {
+            activeDeckId: "default",
+            sidebarVisible: true,
+            sessionFilterText: "",
+            controlPaneVisible: true,
+            controlPanePosition: "bottom",
+            controlPaneSize: 185,
+            deckTerminalSettings: {}
+          }
+        };
+      },
+      async deleteLayoutProfile(profileId) {
+        apiCalls.push(["delete", profileId]);
+      }
+    }
+  });
+
+  await controller.createProfileFlow();
+  await controller.renameSelectedProfileFlow();
+  await controller.deleteSelectedProfileFlow();
+
+  assert.deepEqual(apiCalls, [
+    ["create", "Current Layout"],
+    ["update", "layout-1", "Renamed Layout"],
+    ["delete", "layout-1"]
+  ]);
+});
+
 test("layout profile runtime controller clears DOM-like select children before rerender", async () => {
   const selectEl = createDomLikeSelectElement();
   const statusEl = createElement("p");

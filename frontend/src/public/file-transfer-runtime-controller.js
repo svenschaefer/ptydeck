@@ -163,24 +163,27 @@ export function createFileTransferRuntimeController(options = {}) {
     })
     const objectUrl = URLRef.createObjectURL(blob)
     const anchor = documentRef.createElement("a")
-    anchor.href = objectUrl
-    anchor.download = normalizeText(downloadName) || normalizeText(payload?.fileName) || "session-file.bin"
-    if (anchor.style && typeof anchor.style === "object") {
-      anchor.style.display = "none"
-    }
     const parent = documentRef.body || documentRef.documentElement || null
-    if (parent && typeof parent.appendChild === "function") {
-      parent.appendChild(anchor)
+    try {
+      anchor.href = objectUrl
+      anchor.download = normalizeText(downloadName) || normalizeText(payload?.fileName) || "session-file.bin"
+      if (anchor.style && typeof anchor.style === "object") {
+        anchor.style.display = "none"
+      }
+      if (parent && typeof parent.appendChild === "function") {
+        parent.appendChild(anchor)
+      }
+      if (typeof anchor.click === "function") {
+        anchor.click()
+      }
+    } finally {
+      if (typeof anchor.remove === "function") {
+        anchor.remove()
+      } else if (parent && typeof parent.removeChild === "function") {
+        parent.removeChild(anchor)
+      }
+      URLRef.revokeObjectURL(objectUrl)
     }
-    if (typeof anchor.click === "function") {
-      anchor.click()
-    }
-    if (typeof anchor.remove === "function") {
-      anchor.remove()
-    } else if (parent && typeof parent.removeChild === "function") {
-      parent.removeChild(anchor)
-    }
-    URLRef.revokeObjectURL(objectUrl)
   }
 
   async function uploadSessionFile(session, { remotePath = "", file = null } = {}) {
@@ -223,7 +226,7 @@ export function createFileTransferRuntimeController(options = {}) {
     if (!session?.id) {
       throw new Error("File download requires a session.")
     }
-    if (!api || typeof api.downloadSessionFile !== "function") {
+    if (!payload && (!api || typeof api.downloadSessionFile !== "function")) {
       throw new Error("File download API is unavailable.")
     }
     const normalizedPath = normalizeText(remotePath)

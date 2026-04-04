@@ -8,20 +8,34 @@ export function createDeckActionsController(options = {}) {
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
   const defaultDeckId = String(options.defaultDeckId || "default");
-
-  function canPrompt() {
-    return windowRef && typeof windowRef.prompt === "function";
-  }
-
-  function canConfirm() {
-    return windowRef && typeof windowRef.confirm === "function";
-  }
+  const requestText =
+    typeof options.requestText === "function"
+      ? options.requestText
+      : async ({ message = "", defaultValue = "" } = {}) => {
+          if (!windowRef || typeof windowRef.prompt !== "function") {
+            return null;
+          }
+          const value = windowRef.prompt(message, defaultValue);
+          return value === null || value === undefined ? null : String(value);
+        };
+  const confirmAction =
+    typeof options.confirmAction === "function"
+      ? options.confirmAction
+      : async ({ message = "" } = {}) => {
+          if (!windowRef || typeof windowRef.confirm !== "function") {
+            return false;
+          }
+          return windowRef.confirm(message);
+        };
 
   async function createDeckFlow() {
-    if (!canPrompt()) {
-      return;
-    }
-    const input = windowRef.prompt("Deck name", "New Deck");
+    const input = await requestText({
+      title: "Create Deck",
+      message: "Enter the new deck name.",
+      inputLabel: "Deck Name",
+      defaultValue: "New Deck",
+      confirmLabel: "Create"
+    });
     if (input === null) {
       return;
     }
@@ -56,10 +70,13 @@ export function createDeckActionsController(options = {}) {
       setError("No active deck to rename.");
       return;
     }
-    if (!canPrompt()) {
-      return;
-    }
-    const input = windowRef.prompt("Deck name", activeDeck.name || activeDeck.id);
+    const input = await requestText({
+      title: "Rename Deck",
+      message: `Enter a new name for deck '${activeDeck.name || activeDeck.id}'.`,
+      inputLabel: "Deck Name",
+      defaultValue: activeDeck.name || activeDeck.id,
+      confirmLabel: "Rename"
+    });
     if (input === null) {
       return;
     }
@@ -85,10 +102,11 @@ export function createDeckActionsController(options = {}) {
       setError("No active deck to delete.");
       return;
     }
-    if (!canConfirm()) {
-      return;
-    }
-    const confirmed = windowRef.confirm(`Delete deck '${activeDeck.name}'?`);
+    const confirmed = await confirmAction({
+      title: "Delete Deck",
+      message: `Delete deck '${activeDeck.name}'?`,
+      confirmLabel: "Delete"
+    });
     if (!confirmed) {
       return;
     }
@@ -96,9 +114,11 @@ export function createDeckActionsController(options = {}) {
       await api.deleteDeck(activeDeck.id, { force: false });
     } catch (err) {
       if (err && err.status === 409) {
-        const forceConfirmed = windowRef.confirm(
-          `Deck '${activeDeck.name}' still contains sessions. Force delete and move sessions to default deck?`
-        );
+        const forceConfirmed = await confirmAction({
+          title: "Force Delete Deck",
+          message: `Deck '${activeDeck.name}' still contains sessions. Force delete and move sessions to the default deck?`,
+          confirmLabel: "Force Delete"
+        });
         if (!forceConfirmed) {
           return;
         }

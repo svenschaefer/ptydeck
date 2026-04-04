@@ -3787,12 +3787,26 @@ test("ssh sessions expose degraded then connected remote runtime metadata after 
   const createPty = () => {
     let exitHandler = null;
     let dataHandler = null;
+    let readyResolved = false;
+    let resolveReady = null;
+    const ready = new Promise((resolve) => {
+      resolveReady = resolve;
+    });
+    const markReady = () => {
+      if (readyResolved || !exitHandler || !dataHandler) {
+        return;
+      }
+      readyResolved = true;
+      resolveReady?.();
+    };
     const ptyInstance = {
       onExit(handler) {
         exitHandler = handler;
+        markReady();
       },
       onData(handler) {
         dataHandler = handler;
+        markReady();
       },
       write() {},
       resize() {},
@@ -3810,7 +3824,8 @@ test("ssh sessions expose degraded then connected remote runtime metadata after 
         if (exitHandler) {
           exitHandler(payload);
         }
-      }
+      },
+      ready
     };
     ptys.push(ptyInstance);
     return ptyInstance;
@@ -3852,6 +3867,7 @@ test("ssh sessions expose degraded then connected remote runtime metadata after 
     });
 
     await waitFor(() => ptys.length >= 2);
+    await ptys[1].ready;
     ptys[1].emitData("reconnected\n");
 
     await waitFor(async () => {
@@ -3877,9 +3893,18 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
   const ptys = [];
   const createPty = () => {
     let exitHandler = null;
+    let readyResolved = false;
+    let resolveReady = null;
+    const ready = new Promise((resolve) => {
+      resolveReady = resolve;
+    });
     const ptyInstance = {
       onExit(handler) {
         exitHandler = handler;
+        if (!readyResolved) {
+          readyResolved = true;
+          resolveReady?.();
+        }
       },
       onData() {},
       write() {},
@@ -3893,7 +3918,8 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
         if (exitHandler) {
           exitHandler(payload);
         }
-      }
+      },
+      ready
     };
     ptys.push(ptyInstance);
     return ptyInstance;
@@ -3903,7 +3929,7 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
     createPty,
     remoteReconnectMaxAttempts: 2,
     remoteReconnectDelayMs: 5,
-    remoteReconnectStableMs: 5
+    remoteReconnectStableMs: 1000
   });
 
   try {
@@ -3926,8 +3952,20 @@ test("ssh sessions become offline after bounded reconnect retries and reject dir
 
     ptys[0].emitExit();
     await waitFor(() => ptys.length >= 2, remoteRetryWaitMs);
+    await ptys[1].ready;
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      const body = await res.json();
+      return body.remoteRuntime?.connectivityState === "degraded" && body.remoteRuntime?.reconnectAttempts === 1;
+    }, remoteRetryWaitMs);
     ptys[1].emitExit();
     await waitFor(() => ptys.length >= 3, remoteRetryWaitMs);
+    await ptys[2].ready;
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      const body = await res.json();
+      return body.remoteRuntime?.connectivityState === "degraded" && body.remoteRuntime?.reconnectAttempts === 2;
+    }, remoteRetryWaitMs);
     ptys[2].emitExit();
 
     await waitFor(async () => {

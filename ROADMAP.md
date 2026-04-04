@@ -15,17 +15,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: `v0.4.0-H59`.
+- Queued next wave: none currently.
 
 ## Queued Execution Order
 
-- `v0.4.0-H59` `Quality and Coverage Follow-up`
-  - `QLT-177`
-  - `QLT-178` after `QLT-177`
-  - `QLT-179`
-  - `QLT-180` after `QLT-179`
-  - `QLT-181` after `QLT-179`
-  - `QLT-182` after `QLT-177`, `QLT-178`, `QLT-179`, `QLT-180`, and `QLT-181`
+- none currently
 
 ## Sequencing Rules
 

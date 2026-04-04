@@ -140,3 +140,57 @@ test("command send safety controller keeps common shell commands clear while cat
   assert.equal(multilineShellBlock.requiresConfirmation, false);
   assert.deepEqual(multilineShellBlock.reasons, []);
 });
+
+test("command send safety controller covers multiline, direct-route, and complex block branches", () => {
+  const profile = normalizeSessionInputSafetyProfile({
+    requireValidShellSyntax: true,
+    confirmOnIncompleteShellConstruct: true,
+    confirmOnNaturalLanguageInput: true,
+    confirmOnDangerousShellCommand: true,
+    confirmOnMultilineInput: true,
+    confirmOnRecentTargetSwitch: true,
+    pasteLengthConfirmThreshold: 20,
+    pasteLineConfirmThreshold: 2
+  });
+  const session = {
+    id: "s1",
+    name: "ops-shell",
+    inputSafetyProfile: profile
+  };
+
+  const multiline = evaluateSessionSendSafety({
+    session,
+    text: "echo one\necho two",
+    recentTargetSwitchAt: 9950,
+    nowMs: 10000
+  });
+  assert.deepEqual(
+    multiline.reasons.map((entry) => entry.code),
+    ["recent_target_switch", "oversized_input"]
+  );
+
+  const directRoute = evaluateSessionSendSafety({
+    session,
+    text: "echo one\necho two",
+    directRoute: true,
+    recentTargetSwitchAt: 9950,
+    nowMs: 10000
+  });
+  assert.deepEqual(
+    directRoute.reasons.map((entry) => entry.code),
+    ["oversized_input"]
+  );
+
+  assert.deepEqual(analyzeShellSyntax("case $x in\n  a) echo ok ;;\nesac"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("{ echo ok"), {
+    valid: false,
+    incomplete: true,
+    code: "incomplete_shell_construct",
+    label: "Input looks like an incomplete shell construct."
+  });
+});

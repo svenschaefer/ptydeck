@@ -578,6 +578,23 @@
             </section>
           </div>
         </dialog>
+        <dialog id="action-dialog" class="action-dialog">
+          <div class="action-dialog-head">
+            <p id="action-dialog-title" class="action-dialog-title">Confirm Action</p>
+            <button id="action-dialog-close" type="button" aria-label="Close action dialog">
+              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p id="action-dialog-message" class="action-dialog-message"></p>
+          <label id="action-dialog-input-wrap" class="action-dialog-input-wrap" hidden>
+            <span id="action-dialog-input-label" class="action-dialog-input-label">Value</span>
+            <input id="action-dialog-input" class="action-dialog-input" type="text" />
+          </label>
+          <div class="action-dialog-actions">
+            <button id="action-dialog-confirm" type="button">Confirm</button>
+            <button id="action-dialog-cancel" type="button">Cancel</button>
+          </div>
+        </dialog>
       </section>
     </div>
 

@@ -279,6 +279,25 @@ export function createLayoutProfileRuntimeController(options = {}) {
   const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
   const setError = typeof options.setError === "function" ? options.setError : () => {};
   const getErrorMessage = typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_, fallback) => fallback;
+  const requestText =
+    typeof options.requestText === "function"
+      ? options.requestText
+      : async ({ message = "", defaultValue = "" } = {}) => {
+          if (typeof windowRef?.prompt !== "function") {
+            return null;
+          }
+          const value = windowRef.prompt(message, defaultValue);
+          return value === null || value === undefined ? null : String(value);
+        };
+  const confirmAction =
+    typeof options.confirmAction === "function"
+      ? options.confirmAction
+      : async ({ message = "" } = {}) => {
+          if (typeof windowRef?.confirm !== "function") {
+            return false;
+          }
+          return windowRef.confirm(message);
+        };
   const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
   const getDeckSplitLayouts = typeof options.getDeckSplitLayouts === "function" ? options.getDeckSplitLayouts : null;
   const setDeckSplitLayouts = typeof options.setDeckSplitLayouts === "function" ? options.setDeckSplitLayouts : null;
@@ -538,7 +557,17 @@ export function createLayoutProfileRuntimeController(options = {}) {
   }
 
   async function createProfileFlow(name) {
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Layout profile name", "Current Layout"));
+    const input =
+      normalizeText(name) ||
+      normalizeText(
+        await requestText({
+          title: "Save Layout",
+          message: "Enter a name for the current saved layout.",
+          inputLabel: "Layout Name",
+          defaultValue: "Current Layout",
+          confirmLabel: "Save"
+        })
+      );
     if (!input) {
       return "";
     }
@@ -564,7 +593,17 @@ export function createLayoutProfileRuntimeController(options = {}) {
     if (!profile) {
       return "";
     }
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Layout profile name", profile.name));
+    const input =
+      normalizeText(name) ||
+      normalizeText(
+        await requestText({
+          title: "Rename Layout",
+          message: `Enter a new name for saved layout '${profile.name}'.`,
+          inputLabel: "Layout Name",
+          defaultValue: profile.name,
+          confirmLabel: "Rename"
+        })
+      );
     if (!input) {
       return "";
     }
@@ -579,7 +618,11 @@ export function createLayoutProfileRuntimeController(options = {}) {
     if (!profile) {
       return "";
     }
-    const confirmed = windowRef?.confirm?.(`Delete layout profile '${profile.name}'?`) !== false;
+    const confirmed = await confirmAction({
+      title: "Delete Layout",
+      message: `Delete saved layout '${profile.name}'?`,
+      confirmLabel: "Delete"
+    });
     if (!confirmed) {
       return "";
     }

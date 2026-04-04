@@ -37,6 +37,7 @@ import {
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
+import { createActionDialogController } from "./ui/action-dialog-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
 import { createFileTransferRuntimeController } from "./file-transfer-runtime-controller.js";
 import { createLayoutRuntimeController } from "./layout-runtime-controller.js";
@@ -281,6 +282,15 @@ const {
   workspaceManagerWorkspaceTabBtn,
   workspaceManagerConnectionsPanelEl,
   workspaceManagerWorkspacePanelEl,
+  actionDialogEl,
+  actionDialogTitleEl,
+  actionDialogMessageEl,
+  actionDialogInputWrapEl,
+  actionDialogInputLabelEl,
+  actionDialogInputEl,
+  actionDialogConfirmBtn,
+  actionDialogCancelBtn,
+  actionDialogCloseBtn,
   startupWarmupGateEl,
   startupWarmupMessageEl,
   startupWarmupDetailEl,
@@ -469,6 +479,7 @@ let sessionSettingsStateController = null;
 let sessionUiFacadeController = null;
 let sessionTerminalResizeController = null;
 let sessionTerminalRuntimeController = null;
+let actionDialogController = null;
 let terminalSearchController = null;
 let layoutSettingsController = null;
 let sessionSettingsDialogController = null;
@@ -718,6 +729,8 @@ layoutProfileRuntimeController = createLayoutProfileRuntimeController({
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
   setError: (message) => appCommandUiFacadeController?.setError?.(message),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  requestText: (options) => actionDialogController?.requestText(options),
+  confirmAction: (options) => actionDialogController?.confirm(options),
   requestRender: () => appCommandUiFacadeController?.render?.(),
   getDeckSplitLayouts: () => splitLayoutRuntimeController?.captureDeckSplitLayouts?.() || {},
   setDeckSplitLayouts: (nextLayouts) => splitLayoutRuntimeController?.replaceDeckSplitLayouts?.(nextLayouts)
@@ -1118,8 +1131,22 @@ layoutSettingsController = createLayoutSettingsController({
   mountVerticalChromePx: TERMINAL_MOUNT_VERTICAL_CHROME_PX
 });
 
+actionDialogController = createActionDialogController({
+  windowRef: window,
+  dialogEl: actionDialogEl,
+  titleEl: actionDialogTitleEl,
+  messageEl: actionDialogMessageEl,
+  inputWrapEl: actionDialogInputWrapEl,
+  inputLabelEl: actionDialogInputLabelEl,
+  inputEl: actionDialogInputEl,
+  confirmBtn: actionDialogConfirmBtn,
+  cancelBtn: actionDialogCancelBtn,
+  closeBtn: actionDialogCloseBtn
+});
+
 sessionSettingsDialogController = createSessionSettingsDialogController({
-  windowRef: window
+  windowRef: window,
+  confirmAction: (options) => actionDialogController?.confirm(options)
 });
 
 workspaceRenderController = createWorkspaceRenderController({
@@ -1193,6 +1220,8 @@ deckActionsController = createDeckActionsController({
   applyRuntimeEvent: (event, options) => appSessionRuntimeFacadeController?.applyRuntimeEvent(event, options) === true,
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   setError: (message) => appCommandUiFacadeController?.setError(message),
+  requestText: (options) => actionDialogController?.requestText(options),
+  confirmAction: (options) => actionDialogController?.confirm(options),
   defaultDeckId: DEFAULT_DECK_ID
 });
 
@@ -1314,6 +1343,16 @@ sessionGridController = createSessionGridController({
   getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById(sessionId),
   toggleSettingsDialog: (dialog) => appLayoutDeckFacadeController?.toggleSettingsDialog(dialog),
   confirmSessionDelete: (session) => appLayoutDeckFacadeController?.confirmSessionDelete(session),
+  requestSessionRename: (session) =>
+    actionDialogController?.requestText({
+      title: "Rename Session",
+      message: `Enter a new name for [${
+        appSessionRuntimeFacadeController?.formatSessionToken?.(session?.id) || "?"
+      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || session?.id || "session"}.`,
+      inputLabel: "Session Name",
+      defaultValue: session?.name || session?.id || "",
+      confirmLabel: "Rename"
+    }),
   removeSession: (sessionId) => appSessionRuntimeFacadeController?.removeSession(sessionId),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",

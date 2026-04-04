@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSshKeyscanOutput, probeSshHostKeysWithKeyscan } from "../src/ssh-host-key-probe.js";
+import {
+  formatSshTarget,
+  normalizeSshHostKeyProbeCandidate,
+  normalizeSshHostKeyProbeRequest,
+  parseSshKeyscanOutput,
+  probeSshHostKeysWithKeyscan
+} from "../src/ssh-host-key-probe.js";
 
 test("parseSshKeyscanOutput normalizes and deduplicates fetched host keys", () => {
   const payload = parseSshKeyscanOutput(
@@ -54,4 +60,114 @@ test("probeSshHostKeysWithKeyscan converts ssh-keyscan output into probe candida
       fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
     }
   ]);
+});
+
+test("SSH host-key probe normalizers trim inputs, default ports, and reject invalid payloads", () => {
+  assert.deepEqual(normalizeSshHostKeyProbeRequest({ host: "  example.internal  " }), {
+    host: "example.internal",
+    port: 22
+  });
+
+  assert.deepEqual(
+    normalizeSshHostKeyProbeCandidate(
+      {
+        keyType: " ssh-ed25519 ",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM=="
+      },
+      { host: "example.internal", port: 2222 }
+    ),
+    {
+      host: "example.internal",
+      port: 2222,
+      keyType: "ssh-ed25519",
+      publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+      fingerprintSha256: "SHA256:WBAy81afO2QAzgcFuxzxU+iGMFhHprahbFs9TMP7R9E"
+    }
+  );
+
+  assert.equal(normalizeSshHostKeyProbeRequest({ host: "bad host" }, { strict: false }), null);
+  assert.equal(
+    normalizeSshHostKeyProbeCandidate(
+      {
+        keyType: "ssh-ed25519",
+        publicKey: "***"
+      },
+      { host: "example.internal", port: 22 },
+      { strict: false }
+    ),
+    null
+  );
+
+  assert.throws(() => normalizeSshHostKeyProbeRequest({ host: "" }), /Field 'host'/);
+  assert.throws(
+    () =>
+      normalizeSshHostKeyProbeCandidate(
+        {
+          keyType: "ssh-ed25519",
+          publicKey: "***"
+        },
+        { host: "example.internal", port: 22 }
+      ),
+    /Field 'publicKey'/
+  );
+  assert.equal(formatSshTarget("example.internal", 22), "example.internal");
+  assert.equal(formatSshTarget("example.internal", 2222), "example.internal:2222");
+});
+
+test("probeSshHostKeysWithKeyscan maps unavailable, timeout, empty, and generic failures to API errors", async () => {
+  await assert.rejects(
+    () =>
+      probeSshHostKeysWithKeyscan(
+        { host: "example.internal", port: 22 },
+        {
+          execFileAsync: async () => {
+            const error = new Error("missing");
+            error.code = "ENOENT";
+            throw error;
+          }
+        }
+      ),
+    (error) => error?.statusCode === 503 && error?.error === "SshHostKeyProbeUnavailable"
+  );
+
+  await assert.rejects(
+    () =>
+      probeSshHostKeysWithKeyscan(
+        { host: "example.internal", port: 22 },
+        {
+          execFileAsync: async () => {
+            const error = new Error("timeout");
+            error.code = "ETIMEDOUT";
+            throw error;
+          }
+        }
+      ),
+    (error) => error?.statusCode === 504 && error?.error === "SshHostKeyProbeTimedOut"
+  );
+
+  await assert.rejects(
+    () =>
+      probeSshHostKeysWithKeyscan(
+        { host: "example.internal", port: 22 },
+        {
+          execFileAsync: async () => ({
+            stdout: "# no keys\n"
+          })
+        }
+      ),
+    (error) => error?.statusCode === 502 && error?.error === "SshHostKeyProbeFailed"
+  );
+
+  await assert.rejects(
+    () =>
+      probeSshHostKeysWithKeyscan(
+        { host: "example.internal", port: 22 },
+        {
+          execFileAsync: async () => {
+            throw new Error("ssh-keyscan failed");
+          }
+        }
+      ),
+    (error) => error?.statusCode === 502 && error?.error === "SshHostKeyProbeFailed"
+  );
 });

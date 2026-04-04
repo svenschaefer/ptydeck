@@ -118,10 +118,10 @@ export function createReplayViewerRuntimeController(options = {}) {
       refreshBtn.disabled = loading || !activeSession;
     }
     if (downloadBtn) {
-      downloadBtn.disabled = loading || !activeSession;
+      downloadBtn.disabled = loading || !activeSession || !activePayload;
     }
     if (copyBtn) {
-      copyBtn.disabled = loading || !activeSession;
+      copyBtn.disabled = loading || !activeSession || !activePayload;
     }
   }
 

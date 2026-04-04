@@ -255,13 +255,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
 
 test("session-card-interactions controller renames sessions through api update", async () => {
   const calls = [];
-  const controller = createSessionCardInteractionsController({
-    windowRef: {
-      prompt() {
-        return " renamed ";
-      }
-    }
-  });
+  const controller = createSessionCardInteractionsController();
   const refs = {
     focusBtn: createEventTarget(),
     renameBtn: createEventTarget()
@@ -277,6 +271,7 @@ test("session-card-interactions controller renames sessions through api update",
       }
     },
     getSession: () => ({ id: "s1", name: "old" }),
+    requestSessionRename: async () => " renamed ",
     applyRuntimeEvent: (event) => calls.push(`event:${event.type}:${event.session.name}`),
     clearError: () => calls.push("clear-error"),
     setError: (message) => calls.push(`error:${message}`)

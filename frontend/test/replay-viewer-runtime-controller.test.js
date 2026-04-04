@@ -138,3 +138,29 @@ test("replay viewer runtime controller refreshes and proxies copy and download a
   assert.equal(dialogEl.open, false);
   assert.equal(controller.getActiveSession(), null);
 });
+
+test("replay viewer runtime controller keeps export actions disabled when replay loading fails", async () => {
+  const dialogEl = createElement();
+  const statusEl = createElement();
+  const downloadBtn = createElement();
+  const copyBtn = createElement();
+  const controller = createReplayViewerRuntimeController({
+    dialogEl,
+    titleEl: createElement(),
+    metaEl: createElement(),
+    statusEl,
+    contentEl: createElement(),
+    refreshBtn: createElement(),
+    downloadBtn,
+    copyBtn,
+    closeBtn: createElement(),
+    loadSessionReplay: async () => {
+      throw new Error("backend failed");
+    }
+  });
+
+  await assert.rejects(() => controller.openSessionReplayViewer({ id: "s3", name: "gamma" }), /backend failed/);
+  assert.equal(downloadBtn.disabled, true);
+  assert.equal(copyBtn.disabled, true);
+  assert.match(statusEl.textContent, /backend failed/);
+});

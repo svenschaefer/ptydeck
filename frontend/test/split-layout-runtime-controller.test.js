@@ -265,3 +265,27 @@ test("split-layout runtime hides pane chrome for single-pane layouts", () => {
   assert.ok(headEl);
   assert.equal(headEl.hidden, true);
 });
+
+test("split-layout runtime normalizes invalid entries and ignores impossible mutations", () => {
+  const controller = createSplitLayoutRuntimeController();
+
+  controller.replaceDeckSplitLayouts({
+    ops: {
+      root: {
+        type: "row",
+        weights: [0, -1],
+        children: [{ type: "pane", paneId: "main" }, { type: "pane", paneId: "side" }]
+      },
+      paneSessions: {
+        main: ["s1", "s1", "s2"],
+        unknown: ["s3"]
+      }
+    }
+  });
+
+  assert.deepEqual(controller.getDeckSplitLayout("ops").root.weights, [0.5, 0.5]);
+  assert.deepEqual(controller.getDeckSplitLayout("ops").paneSessions.main, ["s1", "s2"]);
+  assert.equal(controller.setContainerWeightRatio("ops", [], 99, 0.8).root.type, "row");
+  assert.equal(controller.assignSessionToPane("ops", "missing", "s9").paneSessions.side.length, 0);
+  assert.equal(controller.removePane("ops", "missing").root.type, "row");
+});
