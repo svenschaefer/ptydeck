@@ -667,28 +667,53 @@
                   <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
                   <div class="session-input-safety-grid">
                     <label class="session-input-safety-check">
+                      <input class="session-input-safety-confirm-on-any-input" type="checkbox" />
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Always confirm before send</span>
+                        <span class="session-input-safety-check-detail">Catch-all guard. Every non-empty send requires confirmation.</span>
+                      </span>
+                    </label>
+                    <label class="session-input-safety-check">
                       <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
-                      <span>Require valid shell syntax</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Require structurally valid shell syntax</span>
+                        <span class="session-input-safety-check-detail">Rejects clearly broken shell input such as unbalanced quotes or unfinished blocks.</span>
+                      </span>
                     </label>
                     <label class="session-input-safety-check">
                       <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
-                      <span>Confirm incomplete shell constructs</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Confirm incomplete shell constructs</span>
+                        <span class="session-input-safety-check-detail">Prompts when shell syntax still looks unfinished even if it is not fully rejected.</span>
+                      </span>
                     </label>
                     <label class="session-input-safety-check">
                       <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
-                      <span>Confirm natural-language input</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Confirm likely natural-language text</span>
+                        <span class="session-input-safety-check-detail">Heuristic only. Catches prose-like input that does not look like a shell command.</span>
+                      </span>
                     </label>
                     <label class="session-input-safety-check">
                       <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
-                      <span>Confirm dangerous shell commands</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Confirm known dangerous shell patterns</span>
+                        <span class="session-input-safety-check-detail">Pattern-based matcher for destructive commands such as <code>rm -rf</code> or <code>git reset --hard</code>.</span>
+                      </span>
                     </label>
                     <label class="session-input-safety-check">
                       <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
-                      <span>Confirm multiline or large paste input</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Confirm multiline or large paste input</span>
+                        <span class="session-input-safety-check-detail">Uses the line and character thresholds configured below.</span>
+                      </span>
                     </label>
                     <label class="session-input-safety-check">
                       <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
-                      <span>Confirm recent target switches</span>
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Confirm recent target switches</span>
+                        <span class="session-input-safety-check-detail">Uses the grace window configured below. Outside that window, no prompt is shown.</span>
+                      </span>
                     </label>
                   </div>
                   <div class="session-input-safety-threshold-grid">
@@ -700,7 +725,7 @@
                     <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
                   </div>
                   <p class="session-settings-inline-hint">
-                    Use these expert controls only when you need parser-backed confirmation rules or transport-specific send behavior for this session.
+                    These checks are additive, not a global lock. A confirmation appears only when one of the enabled rules matches. Use <strong>Always confirm before send</strong> if you want every non-empty send to stop for confirmation first.
                   </p>
                 </div>
               </details>

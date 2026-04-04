@@ -279,6 +279,7 @@ test("session startup settings persist through patch and apply on restart", asyn
         note: "needs review\r\ncapture logs",
         mouseForwardingMode: "application",
         inputSafetyProfile: {
+          confirmOnAnyInput: false,
           requireValidShellSyntax: true,
           confirmOnIncompleteShellConstruct: true,
           confirmOnNaturalLanguageInput: false,
@@ -337,6 +338,7 @@ test("session startup settings persist through patch and apply on restart", asyn
         note: "capture restart logs\nbefore restart",
         mouseForwardingMode: "off",
         inputSafetyProfile: {
+          confirmOnAnyInput: false,
           requireValidShellSyntax: false,
           confirmOnIncompleteShellConstruct: true,
           confirmOnNaturalLanguageInput: true,
@@ -513,6 +515,7 @@ test("session input safety profile normalizes defaults and rejects invalid paylo
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         inputSafetyProfile: {
+          confirmOnAnyInput: false,
           requireValidShellSyntax: true,
           confirmOnIncompleteShellConstruct: true,
           confirmOnNaturalLanguageInput: true,

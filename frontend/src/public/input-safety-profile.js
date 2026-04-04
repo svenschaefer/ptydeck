@@ -1,4 +1,5 @@
 export const SESSION_INPUT_SAFETY_BOOLEAN_KEYS = Object.freeze([
+  "confirmOnAnyInput",
   "requireValidShellSyntax",
   "confirmOnIncompleteShellConstruct",
   "confirmOnNaturalLanguageInput",
@@ -14,6 +15,7 @@ export const SESSION_INPUT_SAFETY_INTEGER_DEFAULTS = Object.freeze({
 });
 
 export const DEFAULT_SESSION_INPUT_SAFETY_PROFILE = Object.freeze({
+  confirmOnAnyInput: false,
   requireValidShellSyntax: false,
   confirmOnIncompleteShellConstruct: false,
   confirmOnNaturalLanguageInput: false,

@@ -25,6 +25,7 @@ const THEME_PROFILE = {
 };
 
 const INPUT_SAFETY_PROFILE = {
+  confirmOnAnyInput: false,
   requireValidShellSyntax: true,
   confirmOnIncompleteShellConstruct: true,
   confirmOnNaturalLanguageInput: true,

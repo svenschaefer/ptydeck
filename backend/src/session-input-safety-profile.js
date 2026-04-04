@@ -1,6 +1,7 @@
 import { ApiError } from "./errors.js";
 
 export const SESSION_INPUT_SAFETY_PROFILE_BOOLEAN_KEYS = [
+  "confirmOnAnyInput",
   "requireValidShellSyntax",
   "confirmOnIncompleteShellConstruct",
   "confirmOnNaturalLanguageInput",
@@ -21,6 +22,7 @@ export const SESSION_INPUT_SAFETY_PROFILE_KEYS = [
 ];
 
 export const DEFAULT_SESSION_INPUT_SAFETY_PROFILE = Object.freeze({
+  confirmOnAnyInput: false,
   requireValidShellSyntax: false,
   confirmOnIncompleteShellConstruct: false,
   confirmOnNaturalLanguageInput: false,

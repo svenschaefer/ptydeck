@@ -115,6 +115,7 @@ function assertApiSessionShape(session) {
   assert.equal(typeof session?.shell, "string");
   assert.ok(session?.note === undefined || typeof session.note === "string");
   assert.ok(session?.inputSafetyProfile && typeof session.inputSafetyProfile === "object");
+  assert.equal(typeof session.inputSafetyProfile.confirmOnAnyInput, "boolean");
   assert.equal(typeof session.inputSafetyProfile.requireValidShellSyntax, "boolean");
   assert.equal(typeof session.inputSafetyProfile.targetSwitchGraceMs, "number");
   assert.ok(Array.isArray(session?.tags));

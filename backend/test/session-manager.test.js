@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { SessionManager } from "../src/session-manager.js";
 
 const INPUT_SAFETY_PROFILE = {
+  confirmOnAnyInput: false,
   requireValidShellSyntax: true,
   confirmOnIncompleteShellConstruct: true,
   confirmOnNaturalLanguageInput: true,
@@ -892,6 +893,7 @@ test("SessionManager stores, updates, and restarts session input safety profiles
   const created = manager.create({
     cwd: "/tmp",
     inputSafetyProfile: {
+      confirmOnAnyInput: false,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnNaturalLanguageInput: false,

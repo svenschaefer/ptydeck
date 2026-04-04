@@ -35,6 +35,7 @@ export function createSessionCardFactoryController(options = {}) {
     const sessionNoteInput = node.querySelector(".session-note-input");
     const sessionSendTerminatorSelect = node.querySelector(".session-send-terminator");
     const inputSafetyRequireValidShellSyntax = node.querySelector(".session-input-safety-require-valid-shell-syntax");
+    const inputSafetyConfirmOnAnyInput = node.querySelector(".session-input-safety-confirm-on-any-input");
     const inputSafetyConfirmIncompleteShellConstruct = node.querySelector(
       ".session-input-safety-confirm-incomplete-shell-construct"
     );
@@ -67,6 +68,7 @@ export function createSessionCardFactoryController(options = {}) {
       foreground: themeFg
     };
     const inputSafetyControls = {
+      confirmOnAnyInput: inputSafetyConfirmOnAnyInput,
       requireValidShellSyntax: inputSafetyRequireValidShellSyntax,
       confirmOnIncompleteShellConstruct: inputSafetyConfirmIncompleteShellConstruct,
       confirmOnNaturalLanguageInput: inputSafetyConfirmNaturalLanguageInput,

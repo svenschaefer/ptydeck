@@ -2219,6 +2219,7 @@ components:
     SessionInputSafetyProfile:
       type: object
       required:
+        - confirmOnAnyInput
         - requireValidShellSyntax
         - confirmOnIncompleteShellConstruct
         - confirmOnNaturalLanguageInput
@@ -2229,6 +2230,8 @@ components:
         - pasteLengthConfirmThreshold
         - pasteLineConfirmThreshold
       properties:
+        confirmOnAnyInput:
+          type: boolean
         requireValidShellSyntax:
           type: boolean
         confirmOnIncompleteShellConstruct:

@@ -14,6 +14,7 @@ test("normalizeSessionInputSafetyProfile returns defaults for empty input", () =
 test("normalizeSessionInputSafetyProfile normalizes a valid explicit profile", () => {
   assert.deepEqual(
     normalizeSessionInputSafetyProfile({
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnNaturalLanguageInput: false,
@@ -25,6 +26,7 @@ test("normalizeSessionInputSafetyProfile normalizes a valid explicit profile", (
       pasteLineConfirmThreshold: 7
     }),
     {
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnNaturalLanguageInput: false,

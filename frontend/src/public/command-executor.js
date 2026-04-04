@@ -368,6 +368,7 @@ export function createCommandExecutor(options = {}) {
 
   function formatInputSafetyFieldList() {
     return [
+      "confirmOnAnyInput",
       "requireValidShellSyntax",
       "confirmOnIncompleteShellConstruct",
       "confirmOnNaturalLanguageInput",
@@ -383,6 +384,10 @@ export function createCommandExecutor(options = {}) {
   function resolveInputSafetyField(value) {
     const normalized = normalizeKeyword(value);
     const aliases = new Map([
+      ["always", "confirmOnAnyInput"],
+      ["always-confirm", "confirmOnAnyInput"],
+      ["confirmonanyinput", "confirmOnAnyInput"],
+      ["alwaysconfirmbeforesend", "confirmOnAnyInput"],
       ["syntax", "requireValidShellSyntax"],
       ["requirevalidshellsyntax", "requireValidShellSyntax"],
       ["incomplete", "confirmOnIncompleteShellConstruct"],

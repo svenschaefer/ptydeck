@@ -24,6 +24,7 @@ function createEventTarget(value = "") {
 
 function createInputSafetyControls(overrides = {}) {
   return {
+    confirmOnAnyInput: { ...createEventTarget(), checked: false, ...overrides.confirmOnAnyInput },
     requireValidShellSyntax: { ...createEventTarget(), checked: false, ...overrides.requireValidShellSyntax },
     confirmOnIncompleteShellConstruct: {
       ...createEventTarget(),
@@ -215,6 +216,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
       sendTerminator: "auto"
     }),
     readSessionInputSafetyFromControls: () => ({
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true
     }),
     readSessionThemeProfilesForSave: () => ({
@@ -327,6 +329,7 @@ test("session-card-interactions controller applies valid settings and persists s
       sendTerminator: "crlf"
     }),
     readSessionInputSafetyFromControls: () => ({
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true
     }),
@@ -387,6 +390,7 @@ test("session-card-interactions controller applies valid settings and persists s
     "api:s1:/tmp:echo hi",
     "mouse:application",
     {
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true
     },

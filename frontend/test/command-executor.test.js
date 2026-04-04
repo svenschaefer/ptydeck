@@ -1721,6 +1721,7 @@ test("command executor applies explicit input safety profiles through settings p
   const calls = [];
   const sessions = [{ id: "s1", name: "one", deckId: "default" }];
   const requestedProfile = {
+    confirmOnAnyInput: true,
     requireValidShellSyntax: true,
     confirmOnIncompleteShellConstruct: true,
     confirmOnNaturalLanguageInput: true,
@@ -1790,6 +1791,7 @@ test("command executor applies explicit input safety profiles through settings p
       "patch",
       "s1",
       {
+        confirmOnAnyInput: true,
         requireValidShellSyntax: true,
         confirmOnIncompleteShellConstruct: true,
         confirmOnNaturalLanguageInput: true,
@@ -1805,6 +1807,7 @@ test("command executor applies explicit input safety profiles through settings p
       "event",
       "session.updated",
       {
+        confirmOnAnyInput: true,
         requireValidShellSyntax: true,
         confirmOnIncompleteShellConstruct: true,
         confirmOnNaturalLanguageInput: true,

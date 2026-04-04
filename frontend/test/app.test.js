@@ -2963,6 +2963,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(latestSettingsCall.payload.mouseForwardingMode, "application");
   assert.deepEqual(latestSettingsCall.payload.tags, ["ops", "prod"]);
   assert.deepEqual(latestSettingsCall.payload.inputSafetyProfile, {
+    confirmOnAnyInput: false,
     requireValidShellSyntax: false,
     confirmOnIncompleteShellConstruct: false,
     confirmOnNaturalLanguageInput: false,

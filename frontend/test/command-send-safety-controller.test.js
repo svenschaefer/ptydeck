@@ -49,6 +49,7 @@ test("command send safety controller detects shell syntax and natural language s
 
 test("command send safety controller evaluates per-session risks and grouped confirmation reasons", () => {
   const profile = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: false,
     requireValidShellSyntax: true,
     confirmOnIncompleteShellConstruct: true,
     confirmOnNaturalLanguageInput: true,
@@ -97,6 +98,7 @@ test("command send safety controller evaluates per-session risks and grouped con
 
 test("command send safety controller keeps common shell commands clear while catching terse natural language in strict mode", () => {
   const profile = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: false,
     requireValidShellSyntax: true,
     confirmOnIncompleteShellConstruct: true,
     confirmOnNaturalLanguageInput: true,
@@ -143,6 +145,7 @@ test("command send safety controller keeps common shell commands clear while cat
 
 test("command send safety controller covers multiline, direct-route, and complex block branches", () => {
   const profile = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: false,
     requireValidShellSyntax: true,
     confirmOnIncompleteShellConstruct: true,
     confirmOnNaturalLanguageInput: true,
@@ -193,4 +196,20 @@ test("command send safety controller covers multiline, direct-route, and complex
     code: "incomplete_shell_construct",
     label: "Input looks like an incomplete shell construct."
   });
+});
+
+test("command send safety controller supports an explicit always-confirm catch-all", () => {
+  const profile = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: true
+  });
+  const result = evaluateSessionSendSafety({
+    session: {
+      id: "s1",
+      name: "ops-shell",
+      inputSafetyProfile: profile
+    },
+    text: "echo safe-command"
+  });
+  assert.equal(result.requiresConfirmation, true);
+  assert.deepEqual(result.reasons.map((entry) => entry.code), ["always_confirm_before_send"]);
 });

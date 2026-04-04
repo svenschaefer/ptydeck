@@ -13,6 +13,7 @@ test("input safety profile normalizes defaults and explicit option values", () =
   assert.deepEqual(normalizeSessionInputSafetyProfile(null), DEFAULT_SESSION_INPUT_SAFETY_PROFILE);
 
   const normalized = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: true,
     requireValidShellSyntax: true,
     confirmOnDangerousShellCommand: true,
     targetSwitchGraceMs: "1234",
@@ -20,6 +21,7 @@ test("input safety profile normalizes defaults and explicit option values", () =
     pasteLineConfirmThreshold: "7"
   });
 
+  assert.equal(normalized.confirmOnAnyInput, true);
   assert.equal(normalized.requireValidShellSyntax, true);
   assert.equal(normalized.confirmOnDangerousShellCommand, true);
   assert.equal(normalized.targetSwitchGraceMs, 1234);
@@ -29,6 +31,7 @@ test("input safety profile normalizes defaults and explicit option values", () =
 
 test("input safety profile equality uses the explicit boolean and integer field sets", () => {
   const custom = normalizeSessionInputSafetyProfile({
+    confirmOnAnyInput: true,
     requireValidShellSyntax: true,
     confirmOnNaturalLanguageInput: true,
     pasteLengthConfirmThreshold: 111,
@@ -37,6 +40,7 @@ test("input safety profile equality uses the explicit boolean and integer field 
 
   assert.equal(
     areSessionInputSafetyProfilesEqual(custom, {
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnNaturalLanguageInput: true,
       pasteLengthConfirmThreshold: 111,
@@ -47,6 +51,7 @@ test("input safety profile equality uses the explicit boolean and integer field 
 
   assert.equal(
     areSessionInputSafetyProfilesEqual(custom, {
+      confirmOnAnyInput: false,
       requireValidShellSyntax: true,
       pasteLengthConfirmThreshold: 111,
       pasteLineConfirmThreshold: 2
@@ -55,6 +60,7 @@ test("input safety profile equality uses the explicit boolean and integer field 
   );
 
   assert.deepEqual(SESSION_INPUT_SAFETY_BOOLEAN_KEYS, [
+    "confirmOnAnyInput",
     "requireValidShellSyntax",
     "confirmOnIncompleteShellConstruct",
     "confirmOnNaturalLanguageInput",

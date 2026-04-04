@@ -526,6 +526,13 @@ function buildRecentTargetReason(profile) {
   };
 }
 
+function buildAlwaysConfirmReason() {
+  return {
+    code: "always_confirm_before_send",
+    label: "Session safety profile requires confirmation before every send."
+  };
+}
+
 function buildMultilineReason(profile, text) {
   const lines = trimLines(text);
   const lineCount = lines.length;
@@ -552,6 +559,10 @@ export function evaluateSessionSendSafety({
   const normalizedText = String(text || "");
   const trimmedText = normalizedText.trim();
   const syntaxAnalysis = analyzeShellSyntax(normalizedText);
+
+  if (profile.confirmOnAnyInput && trimmedText) {
+    reasons.push(buildAlwaysConfirmReason());
+  }
 
   if (profile.confirmOnRecentTargetSwitch && !directRoute) {
     const ageMs = Math.max(0, Number(nowMs) - Number(recentTargetSwitchAt || 0));

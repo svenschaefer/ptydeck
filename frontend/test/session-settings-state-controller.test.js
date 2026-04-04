@@ -107,6 +107,7 @@ function createPanel({ hidden = false, scrollHeight = 0, offsetHeight = 0, clien
 
 function createInputSafetyControls(overrides = {}) {
   return {
+    confirmOnAnyInput: { ...createInput(), checked: false, ...overrides.confirmOnAnyInput },
     requireValidShellSyntax: { ...createInput(), checked: false, ...overrides.requireValidShellSyntax },
     confirmOnIncompleteShellConstruct: {
       ...createInput(),
@@ -224,6 +225,7 @@ test("session-settings state controller detects startup/theme/terminator dirtine
     note: "first line\nsecond line",
     mouseForwardingMode: "off",
     inputSafetyProfile: {
+      confirmOnAnyInput: false,
       requireValidShellSyntax: false
     },
     activeThemeProfile: {
@@ -414,6 +416,7 @@ test("session-settings state controller syncs and reads explicit input safety co
   const session = {
     id: "s1",
     inputSafetyProfile: {
+      confirmOnAnyInput: true,
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnDangerousShellCommand: true,
@@ -422,6 +425,7 @@ test("session-settings state controller syncs and reads explicit input safety co
   };
 
   controller.syncSessionInputSafetyControls(entry, session);
+  assert.equal(entry.inputSafetyControls.confirmOnAnyInput.checked, true);
   assert.equal(entry.inputSafetyControls.requireValidShellSyntax.checked, true);
   assert.equal(entry.inputSafetyControls.confirmOnIncompleteShellConstruct.checked, true);
   assert.equal(entry.inputSafetyControls.confirmOnDangerousShellCommand.checked, true);
@@ -430,6 +434,7 @@ test("session-settings state controller syncs and reads explicit input safety co
   entry.inputSafetyControls.confirmOnNaturalLanguageInput.checked = true;
   entry.inputSafetyControls.pasteLengthConfirmThreshold.value = "123";
   const profile = controller.readSessionInputSafetyFromControls(entry, session);
+  assert.equal(profile.confirmOnAnyInput, true);
   assert.equal(profile.requireValidShellSyntax, true);
   assert.equal(profile.confirmOnDangerousShellCommand, true);
   assert.equal(profile.confirmOnNaturalLanguageInput, true);
