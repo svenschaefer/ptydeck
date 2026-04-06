@@ -2,6 +2,15 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-06
+
+- [x] Clarified the terminal/composer send-safety guard UX for multiline and large paste input: `frontend/src/public/command-composer-runtime-controller.js` now turns a held send into an explicit “nothing has been sent yet” state, mirrors that feedback into the normal command-feedback surface for both composer sends and terminal-local paste sends, and makes multiline holds visibly read as pending confirmation instead of broken paste/send behavior.
+- [x] The command-guard UI now uses a stronger confirmation affordance: `frontend/src/public/index.html` and `frontend/src/public/styles.css` now explain that guarded input is still pending review and relabel the primary action from `Send once` to `Send anyway`, making the pending multiline hold more self-explanatory for end users.
+- [x] When a send-safety guard opens, the primary guard action is now focused immediately through the existing runtime composition path in `frontend/src/public/app-bootstrap-composition-controller.js`, reducing the chance that multiline confirmation looks like a dead-end interaction.
+- [x] Added direct regression coverage for the clarified guard behavior in `frontend/test/command-composer-runtime-controller.test.js`, including guarded composer sends, guarded terminal-local paste, and explicit multiline guard summaries.
+- [x] Validation for the 2026-04-06 send-safety UX clarification passed with focused frontend regressions plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation or push processes after completion.
+- [x] Coverage after the 2026-04-06 send-safety UX clarification step: backend `91.92%` lines and frontend `93.69%` lines on the final validated tree.
+
 ## 2026-04-04
 
 - [x] `UX-025A`, `UX-025B`, `UX-025C`, and `UX-025D` are now completed as `v0.4.0-H61`: the queued send-history hardening wave is delivered, and there is no active or queued near-term wave left in `TODO.md` / `ROADMAP.md`.

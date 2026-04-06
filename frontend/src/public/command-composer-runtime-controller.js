@@ -15,6 +15,8 @@ export function createCommandComposerRuntimeController(options = {}) {
     typeof windowRef.clearTimeout === "function"
       ? windowRef.clearTimeout.bind(windowRef)
       : globalThis.clearTimeout.bind(globalThis);
+  const focusCommandGuardPrimaryAction =
+    typeof options.focusCommandGuardPrimaryAction === "function" ? options.focusCommandGuardPrimaryAction : () => {};
   const getCommandValue = options.getCommandValue || (() => "");
   const setCommandValue = options.setCommandValue || (() => {});
   const resetCommandAutocompleteState = options.resetCommandAutocompleteState || (() => {});
@@ -115,6 +117,53 @@ export function createCommandComposerRuntimeController(options = {}) {
         return `- ${entry.label}${targets}`;
       })
       .join("\n");
+  }
+
+  function buildCommandGuardSummary(plan, guardResult) {
+    const baseSummary =
+      typeof guardResult?.summary === "string" && guardResult.summary.trim()
+        ? guardResult.summary.trim()
+        : "Confirmation required before sending.";
+    const payload = String(plan?.targetPayload || "");
+    const rawLineCount = payload ? payload.split(/\r?\n/).length : 0;
+    const charCount = payload.length;
+    const reasonCodes = Array.isArray(guardResult?.reasons)
+      ? guardResult.reasons.map((reason) => String(reason?.code || "")).filter(Boolean)
+      : [];
+    const hasMultilineReason = reasonCodes.includes("multiline_input") || reasonCodes.includes("oversized_input");
+    const fragments = [baseSummary];
+    if (hasMultilineReason) {
+      const sizeParts = [];
+      if (rawLineCount > 1) {
+        sizeParts.push(`${rawLineCount} line${rawLineCount === 1 ? "" : "s"}`);
+      }
+      if (charCount > 0) {
+        sizeParts.push(`${charCount} char${charCount === 1 ? "" : "s"}`);
+      }
+      const sizeSuffix = sizeParts.length > 0 ? ` (${sizeParts.join(" · ")})` : "";
+      fragments.push(`Multiline input is waiting for confirmation${sizeSuffix}.`);
+    }
+    fragments.push("Nothing has been sent yet.");
+    return fragments.join(" ");
+  }
+
+  function revealPendingSendGuard(command, plan, guardResult) {
+    const guardSummary = buildCommandGuardSummary(plan, guardResult);
+    showCommandGuardUi();
+    pendingSend = {
+      command,
+      plan,
+      guardResult
+    };
+    setCommandFeedback(guardSummary);
+    setCommandGuardState({
+      active: true,
+      summary: guardSummary,
+      reasons: formatCommandGuardReasons(guardResult.reasons),
+      preview: plan.targetPayload
+    });
+    render();
+    focusCommandGuardPrimaryAction();
   }
 
   function resolveSendPlan(interpreted) {
@@ -393,19 +442,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
 
     if (guardResult.requiresConfirmation) {
-      showCommandGuardUi();
-      pendingSend = {
-        command,
-        plan,
-        guardResult
-      };
-      setCommandGuardState({
-        active: true,
-        summary: guardResult.summary,
-        reasons: formatCommandGuardReasons(guardResult.reasons),
-        preview: plan.targetPayload
-      });
-      render();
+      revealPendingSendGuard(command, plan, guardResult);
       return;
     }
 
@@ -466,22 +503,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     });
 
     if (guardResult.requiresConfirmation) {
-      showCommandGuardUi();
-      pendingSend = {
-        command: "",
-        plan,
-        guardResult
-      };
-      if (guardResult.summary) {
-        setCommandFeedback(guardResult.summary);
-      }
-      setCommandGuardState({
-        active: true,
-        summary: guardResult.summary,
-        reasons: formatCommandGuardReasons(guardResult.reasons),
-        preview: plan.targetPayload
-      });
-      render();
+      revealPendingSendGuard("", plan, guardResult);
       return false;
     }
 

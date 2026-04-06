@@ -991,6 +991,14 @@ body {
   color: #ffd36a;
   font-size: 12px;
   line-height: 1.4;
+  font-weight: 600;
+}
+
+.command-guard-hint {
+  margin: 0;
+  color: #f5f7fa;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .command-guard-reasons {

@@ -530,6 +530,7 @@ test("command-composer runtime controller guards risky sends until confirmed or 
       summary: "Confirmation required before sending to [7] ops.",
       reasons: [{ label: "Input looks like natural-language text.", targets: ["[7] ops"] }]
     }),
+    focusCommandGuardPrimaryAction: () => calls.push(["focus-guard-primary"]),
     setCommandGuardState: (nextState) => calls.push(["guard", nextState.summary, nextState.reasons, nextState.preview]),
     clearCommandGuardState: ({ render } = {}) => calls.push(["clear-guard", render === true]),
     setCommandFeedback: (message) => calls.push(["feedback", message]),
@@ -544,13 +545,15 @@ test("command-composer runtime controller guards risky sends until confirmed or 
   await controller.submitCommand();
   assert.deepEqual(calls, [
     ["clear-guard", false],
+    ["feedback", "Confirmation required before sending to [7] ops. Nothing has been sent yet."],
     [
       "guard",
-      "Confirmation required before sending to [7] ops.",
+      "Confirmation required before sending to [7] ops. Nothing has been sent yet.",
       "- Input looks like natural-language text. ([7] ops)",
       "please fix the tests"
     ],
-    ["render"]
+    ["render"],
+    ["focus-guard-primary"]
   ]);
 
   calls.length = 0;
@@ -606,14 +609,48 @@ test("command-composer runtime controller applies send safety to terminal pastes
   assert.deepEqual(calls, [
     ["clear-guard", false],
     ["show-guard-ui"],
-    ["feedback", "Confirmation required before sending to [7] ops."],
-    ["guard", "Confirmation required before sending to [7] ops.", "rm -rf ./tmp"],
+    ["feedback", "Confirmation required before sending to [7] ops. Nothing has been sent yet."],
+    ["guard", "Confirmation required before sending to [7] ops. Nothing has been sent yet.", "rm -rf ./tmp"],
     ["render"]
   ]);
 
   calls.length = 0;
   const confirmed = await controller.confirmPendingSend();
   assert.equal(confirmed, true);
+});
+
+test("command-composer runtime controller highlights multiline guards explicitly", async () => {
+  const calls = [];
+  let value = "echo one\necho two\necho three";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    setCommandValue: (next) => {
+      value = next;
+      calls.push(["value", next]);
+    },
+    interpretComposerInput: () => ({ kind: "input", data: value }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "ops" }],
+      activeSessionId: "s1"
+    }),
+    evaluateSendSafety: () => ({
+      requiresConfirmation: true,
+      summary: "Confirmation required before sending to [7] ops.",
+      reasons: [{ code: "multiline_input", label: "Input spans multiple lines.", targets: ["[7] ops"] }]
+    }),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    setCommandGuardState: (nextState) => calls.push(["guard", nextState.summary]),
+    clearCommandGuardState: () => {},
+    render: () => calls.push(["render"])
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["feedback", "Confirmation required before sending to [7] ops. Multiline input is waiting for confirmation (3 lines · 28 chars). Nothing has been sent yet."],
+    ["guard", "Confirmation required before sending to [7] ops. Multiline input is waiting for confirmation (3 lines · 28 chars). Nothing has been sent yet."],
+    ["render"]
+  ]);
 });
 
 test("command-composer runtime controller sends terminal pastes without clearing composer text", async () => {
