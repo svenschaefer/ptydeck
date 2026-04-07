@@ -33,10 +33,6 @@ This file is structured into:
 
 - [ ] Add plugin interface for project-specific automations.
 
-### Trusted-Local Multi-Device UX
-
-- [ ] Add device-aware layout and terminal-size profile handling for the trusted-local single-user multi-device flow so taking control on a laptop versus a desktop can restore an appropriate client-local layout/terminal-size baseline instead of forcing the operator to manually switch saved layouts after every controller handoff.
-
 ## Deferred Explicit Backlog
 
 ### Security and Multi-Tenancy
@@ -59,10 +55,6 @@ This file is structured into:
 
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
-
-### Trusted-Local Multi-Device UX
-
-- [ ] `MDT-017` Owner `FE`: Add trusted-local device-aware layout recall so each browser/device can persist and restore its own preferred client-local layout and terminal-size settings when taking or reclaiming control, while keeping shared session runtime state unchanged and avoiding accidental cross-device layout fights.
 
 ### Remote / External Theme Compatibility
 

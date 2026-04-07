@@ -16,10 +16,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active release wave: `v0.4.0-H65`.
 - Active scoped tasks:
   - `MDT-014`
-- Queued next wave: none currently.
+- Queued next wave: `v0.4.0-H66`.
 
 ## Queued Execution Order
-- none currently.
+
+1. `v0.4.0-H66` - Trusted-Local Fast Handoff and Device Layout Recall
+   - `MDT-017` after `MDT-014`
+   - `MDT-018` after `MDT-017`
+   - `MDT-019` after `MDT-017` and `MDT-018`
+   - `MDT-020` after `MDT-019`
+   - `MDT-021` after `MDT-017`, `MDT-018`, `MDT-019`, and `MDT-020`
 
 ## Sequencing Rules
 
