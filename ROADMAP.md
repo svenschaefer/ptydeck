@@ -15,10 +15,14 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: none currently.
+- Queued next wave: `v0.4.0-H65`.
 
 ## Queued Execution Order
-- none currently.
+
+1. `v0.4.0-H65` - Trusted-Local LAN Validation and Merge Readiness
+   - `MDT-014`
+   - `MDT-015` after `MDT-014`
+   - `MDT-016` after `MDT-014` and `MDT-015`
 
 ## Sequencing Rules
 
