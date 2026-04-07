@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 const DEFAULT_BACKUP_ID = "pre-h62-multi-device-control-foundation";
@@ -37,10 +37,64 @@ function parseManifest(raw) {
     if (parsed.sourceExisted !== true && parsed.sourceExisted !== false) {
       return null;
     }
+    if (!normalizeText(parsed.sourcePath)) {
+      return null;
+    }
+    if (parsed.payloadBackupPath !== undefined && typeof parsed.payloadBackupPath !== "string") {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
   }
+}
+
+async function readExistingManifest({
+  dataPath,
+  backupId,
+  readFileFn
+}) {
+  const manifestPath = buildManifestPath(dataPath);
+  const payloadBackupPath = buildPayloadBackupPath(dataPath);
+
+  let manifestRaw = null;
+  try {
+    manifestRaw = await readFileFn(manifestPath, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return {
+        manifestPath,
+        payloadBackupPath,
+        manifest: null
+      };
+    }
+    throw error;
+  }
+
+  const manifest = parseManifest(manifestRaw);
+  if (!manifest || manifest.backupId !== backupId) {
+    throw new Error(
+      `Startup blocked: an invalid or incompatible rollback backup manifest already exists at ${manifestPath}.`
+    );
+  }
+  if (manifest.sourceExisted === true) {
+    try {
+      await readFileFn(payloadBackupPath);
+    } catch (error) {
+      if (error && typeof error === "object" && error.code === "ENOENT") {
+        throw new Error(
+          `Startup blocked: rollback payload backup is missing at ${payloadBackupPath}.`
+        );
+      }
+      throw error;
+    }
+  }
+
+  return {
+    manifestPath,
+    payloadBackupPath,
+    manifest
+  };
 }
 
 export async function ensureStartupDataBackup(options = {}) {
@@ -54,40 +108,17 @@ export async function ensureStartupDataBackup(options = {}) {
   const readFileFn = typeof options.readFileFn === "function" ? options.readFileFn : readFile;
   const writeFileFn = typeof options.writeFileFn === "function" ? options.writeFileFn : writeFile;
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : Date.now;
+  const existingBackup = await readExistingManifest({
+    dataPath,
+    backupId,
+    readFileFn
+  });
 
-  const manifestPath = buildManifestPath(dataPath);
-  const payloadBackupPath = buildPayloadBackupPath(dataPath);
-
-  let manifestRaw = null;
-  try {
-    manifestRaw = await readFileFn(manifestPath, "utf8");
-  } catch (error) {
-    if (!error || typeof error !== "object" || error.code !== "ENOENT") {
-      throw error;
-    }
+  if (existingBackup.manifest) {
+    return { created: false, ...existingBackup };
   }
 
-  if (manifestRaw !== null) {
-    const manifest = parseManifest(manifestRaw);
-    if (!manifest || manifest.backupId !== backupId) {
-      throw new Error(
-        `Startup blocked: an invalid or incompatible rollback backup manifest already exists at ${manifestPath}.`
-      );
-    }
-    if (manifest.sourceExisted === true) {
-      try {
-        await readFileFn(payloadBackupPath);
-      } catch (error) {
-        if (error && typeof error === "object" && error.code === "ENOENT") {
-          throw new Error(
-            `Startup blocked: rollback payload backup is missing at ${payloadBackupPath}.`
-          );
-        }
-        throw error;
-      }
-    }
-    return { created: false, manifestPath, payloadBackupPath, manifest };
-  }
+  const { manifestPath, payloadBackupPath } = existingBackup;
 
   await mkdirFn(dirname(dataPath), { recursive: true });
 
@@ -128,6 +159,76 @@ export async function ensureStartupDataBackup(options = {}) {
   }
 
   return { created: true, manifestPath, payloadBackupPath, manifest: verifiedManifest };
+}
+
+export async function readStartupDataBackup(options = {}) {
+  const dataPath = normalizeText(options.dataPath);
+  if (!dataPath) {
+    throw new Error("Rollback restore requires a non-empty data path.");
+  }
+  const backupId = normalizeText(options.backupId) || DEFAULT_BACKUP_ID;
+  const readFileFn = typeof options.readFileFn === "function" ? options.readFileFn : readFile;
+  const existing = await readExistingManifest({
+    dataPath,
+    backupId,
+    readFileFn
+  });
+  if (!existing.manifest) {
+    throw new Error(
+      `Rollback restore blocked: no rollback backup manifest exists for ${dataPath}.`
+    );
+  }
+  return existing;
+}
+
+export async function restoreStartupDataBackup(options = {}) {
+  const dataPath = normalizeText(options.dataPath);
+  if (!dataPath) {
+    throw new Error("Rollback restore requires a non-empty data path.");
+  }
+  const mkdirFn = typeof options.mkdirFn === "function" ? options.mkdirFn : mkdir;
+  const readFileFn = typeof options.readFileFn === "function" ? options.readFileFn : readFile;
+  const writeFileFn = typeof options.writeFileFn === "function" ? options.writeFileFn : writeFile;
+  const rmFn = typeof options.rmFn === "function" ? options.rmFn : rm;
+  const { manifestPath, payloadBackupPath, manifest } = await readStartupDataBackup({
+    ...options,
+    dataPath,
+    readFileFn
+  });
+
+  if (manifest.sourceExisted === true) {
+    const payload = await readFileFn(payloadBackupPath);
+    await mkdirFn(dirname(dataPath), { recursive: true });
+    await writeFileFn(dataPath, payload);
+    const verified = await readFileFn(dataPath);
+    if (!Buffer.isBuffer(verified) || Buffer.compare(payload, verified) !== 0) {
+      throw new Error(`Rollback restore failed: restored data at ${dataPath} did not verify.`);
+    }
+    return {
+      restored: true,
+      removed: false,
+      manifestPath,
+      payloadBackupPath,
+      manifest
+    };
+  }
+
+  await rmFn(dataPath, { force: true });
+  try {
+    await readFileFn(dataPath);
+    throw new Error(`Rollback restore failed: expected ${dataPath} to be absent after restore.`);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+  return {
+    restored: true,
+    removed: true,
+    manifestPath,
+    payloadBackupPath,
+    manifest
+  };
 }
 
 export const STARTUP_BACKUP_ID = DEFAULT_BACKUP_ID;

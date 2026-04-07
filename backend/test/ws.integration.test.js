@@ -1122,6 +1122,121 @@ test("session control endpoints enforce controller-only writes and explicit take
   }
 });
 
+test("trusted-local device rename and stale-device forget endpoints update session control metadata", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
+    createPty: createEchoPtyFactory(),
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const operatorToken = await issueDevToken(baseUrl, { subject: "trusted-local-user" });
+    const operatorJsonHeaders = createAuthHeaders(operatorToken, { json: true });
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "trusted-local-shell" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    const firstTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ clientId: "device-1", label: "Desk Browser" })
+    });
+    assert.equal(firstTicketRes.status, 200);
+    const firstTicket = await firstTicketRes.json();
+
+    const firstEvents = [];
+    const firstWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${firstTicket.ticket}`]);
+    firstWs.on("message", (buffer) => {
+      firstEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "snapshot" &&
+          event.sessions.some((session) => session.id === createdSession.id)
+      )
+    );
+
+    const secondTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ clientId: "device-2", label: "Tablet" })
+    });
+    assert.equal(secondTicketRes.status, 200);
+    const secondTicket = await secondTicketRes.json();
+
+    const secondWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${secondTicket.ticket}`]);
+    secondWs.on("message", () => {});
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.length === 2
+      )
+    );
+
+    const renameRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/rename-client`, {
+      method: "POST",
+      headers: {
+        ...operatorJsonHeaders,
+        "x-ptydeck-client-id": "device-1"
+      },
+      body: JSON.stringify({ label: "Desk Left" })
+    });
+    assert.equal(renameRes.status, 200);
+    const renamedSession = await renameRes.json();
+    assert.equal(
+      renamedSession.controlState.attachedClients.find((entry) => entry.clientId === "device-1")?.label,
+      "Desk Left"
+    );
+
+    secondWs.close();
+    await waitFor(() => secondWs.readyState === WebSocket.CLOSED);
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.some(
+            (entry) => entry.clientId === "device-2" && entry.active === false
+          )
+      )
+    );
+
+    const forgetRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/forget-client`, {
+      method: "POST",
+      headers: {
+        ...operatorJsonHeaders,
+        "x-ptydeck-client-id": "device-1"
+      },
+      body: JSON.stringify({ clientId: "device-2" })
+    });
+    assert.equal(forgetRes.status, 200);
+    const forgottenSession = await forgetRes.json();
+    assert.equal(
+      forgottenSession.controlState.attachedClients.some((entry) => entry.clientId === "device-2"),
+      false
+    );
+
+    firstWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("WS spectator shares receive filtered snapshot and session events", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
     createPty: createEchoPtyFactory(),

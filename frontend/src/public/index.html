@@ -136,6 +136,7 @@
                   <p id="status-message" class="status-message"></p>
                   <p id="command-target" class="command-target"></p>
                   <p id="command-feedback" class="command-feedback"></p>
+                  <button id="command-feedback-action" class="command-feedback-action" type="button" hidden></button>
                 </div>
                 <div class="command-meta-actions">
                   <button id="workspace-manager-open" type="button">Manage</button>
@@ -691,6 +692,13 @@
               </div>
             </div>
             <p class="session-control-summary">Waiting for control attachment.</p>
+            <div class="session-control-device">
+              <label class="session-control-device-field">
+                <span class="session-control-device-label">This Device Name</span>
+                <input class="session-control-device-name" type="text" maxlength="64" placeholder="Desk Browser" />
+              </label>
+              <button class="session-control-device-save" type="button">Save Name</button>
+            </div>
             <div class="session-control-clients"></div>
           </section>
           <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">

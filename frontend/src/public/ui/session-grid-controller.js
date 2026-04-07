@@ -52,6 +52,8 @@ export function createSessionGridController(options = {}) {
   const toggleSettingsDialog = options.toggleSettingsDialog || (() => {});
   const confirmSessionDelete = options.confirmSessionDelete || (() => true);
   const requestSessionRename = options.requestSessionRename || (() => Promise.resolve(null));
+  const renameTrustedLocalDevice = options.renameTrustedLocalDevice || (() => Promise.resolve(null));
+  const confirmForgetSessionControlClient = options.confirmForgetSessionControlClient || (() => Promise.resolve(false));
   const removeSession = options.removeSession || (() => {});
   const setCommandFeedback = options.setCommandFeedback || (() => {});
   const formatSessionToken = options.formatSessionToken || ((sessionId) => String(sessionId || ""));
@@ -188,6 +190,17 @@ export function createSessionGridController(options = {}) {
       error: uiState.error,
       commandTargetText: getCommandTargetSummary(),
       commandFeedback: uiState.commandFeedback,
+      commandFeedbackActionVisible:
+        uiState.commandFeedbackActionVisible === true &&
+        Boolean(
+          orderedSessions.find(
+            (session) =>
+              session.id === uiState.commandFeedbackActionSessionId &&
+              !canWriteToSession(session)
+          )
+        ),
+      commandFeedbackActionLabel: uiState.commandFeedbackActionLabel,
+      commandFeedbackActionTitle: uiState.commandFeedbackActionTitle,
       commandInlineHint: uiState.commandInlineHint,
       commandInlineHintPrefixPx: uiState.commandInlineHintPrefixPx,
       commandPreview: uiState.commandPreview,
@@ -251,6 +264,8 @@ export function createSessionGridController(options = {}) {
           sessionControlTakeBtn: refs.sessionControlTakeBtn,
           sessionControlReleaseBtn: refs.sessionControlReleaseBtn,
           sessionControlSummaryEl: refs.sessionControlSummaryEl,
+          sessionControlDeviceNameInput: refs.sessionControlDeviceNameInput,
+          sessionControlDeviceSaveBtn: refs.sessionControlDeviceSaveBtn,
           sessionControlClientsEl: refs.sessionControlClientsEl,
           settingsTabStartupBtn: refs.settingsTabStartupBtn,
           settingsTabNoteBtn: refs.settingsTabNoteBtn,
@@ -284,6 +299,8 @@ export function createSessionGridController(options = {}) {
         confirmSessionDelete,
         requestSessionRename,
         removeSession,
+        renameTrustedLocalDevice,
+        confirmForgetSessionControlClient,
         setCommandFeedback,
         formatSessionToken,
         formatSessionDisplayName,
@@ -319,6 +336,8 @@ export function createSessionGridController(options = {}) {
           sessionControlTakeBtn: refs.sessionControlTakeBtn,
           sessionControlReleaseBtn: refs.sessionControlReleaseBtn,
           sessionControlSummaryEl: refs.sessionControlSummaryEl,
+          sessionControlDeviceNameInput: refs.sessionControlDeviceNameInput,
+          sessionControlDeviceSaveBtn: refs.sessionControlDeviceSaveBtn,
           sessionControlClientsEl: refs.sessionControlClientsEl,
           settingsTabStartupBtn: refs.settingsTabStartupBtn,
           settingsTabNoteBtn: refs.settingsTabNoteBtn,

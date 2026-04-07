@@ -34,6 +34,8 @@ export function createRuntimeEventController(options = {}) {
     typeof options.getReadOnlyModeMessage === "function"
       ? options.getReadOnlyModeMessage
       : () => "Read-only spectator mode. Write actions are disabled.";
+  const showBlockedWriteReclaimUi =
+    typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const setError = options.setError || (() => {});
   const sendInput = options.sendInput || (() => Promise.resolve());
 
@@ -71,7 +73,9 @@ export function createRuntimeEventController(options = {}) {
       return;
     }
     if (!canWriteToSession(latestSession)) {
-      setError(getSessionWriteBlockedMessage(latestSession));
+      const message = getSessionWriteBlockedMessage(latestSession);
+      setError(message);
+      showBlockedWriteReclaimUi(latestSession, { source: "terminal-input", message });
       return;
     }
     sendInput(sessionId, data).catch(() => setError("Failed to send terminal input."));

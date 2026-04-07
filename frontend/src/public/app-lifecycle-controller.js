@@ -4,6 +4,7 @@ export function createAppLifecycleController(options = {}) {
   const deckCreateBtn = options.deckCreateBtn || null;
   const startupWarmupSkipBtn = options.startupWarmupSkipBtn || null;
   const sendBtn = options.sendBtn || null;
+  const commandFeedbackActionBtn = options.commandFeedbackActionBtn || null;
   const commandGuardSendOnceBtn = options.commandGuardSendOnceBtn || null;
   const commandGuardCancelBtn = options.commandGuardCancelBtn || null;
   const workflowStopBtn = options.workflowStopBtn || null;
@@ -26,6 +27,8 @@ export function createAppLifecycleController(options = {}) {
       : () => "Read-only spectator mode. Write actions are disabled.";
   const createDeckFlow = typeof options.createDeckFlow === "function" ? options.createDeckFlow : () => Promise.resolve();
   const submitCommand = typeof options.submitCommand === "function" ? options.submitCommand : () => Promise.resolve();
+  const handleCommandFeedbackAction =
+    typeof options.handleCommandFeedbackAction === "function" ? options.handleCommandFeedbackAction : () => Promise.resolve(false);
   const confirmPendingCommandSend =
     typeof options.confirmPendingCommandSend === "function" ? options.confirmPendingCommandSend : () => Promise.resolve(false);
   const cancelPendingCommandSend =
@@ -130,6 +133,17 @@ export function createAppLifecycleController(options = {}) {
         }
         submitCommand().catch(() => {
           setError("Failed to send command.");
+        });
+      });
+    }
+    if (commandFeedbackActionBtn && typeof commandFeedbackActionBtn.addEventListener === "function") {
+      commandFeedbackActionBtn.addEventListener("click", () => {
+        if (isReadOnlyMode()) {
+          setError(getReadOnlyModeMessage());
+          return;
+        }
+        Promise.resolve(handleCommandFeedbackAction()).catch((error) => {
+          setError(getErrorMessage(error, "Failed to perform the session-control action."));
         });
       });
     }

@@ -67,6 +67,7 @@ export function createAppBootstrapCompositionController(options = {}) {
   const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const uiState = options.uiState || {};
   const commandInput = options.commandInput || { value: "" };
+  const commandFeedbackActionBtn = options.commandFeedbackActionBtn || null;
   const terminals = options.terminals || new Map();
   const terminalObservers = options.terminalObservers || new Map();
   const terminalSettings = typeof options.getTerminalSettings === "function" ? options.getTerminalSettings : () => null;
@@ -93,6 +94,8 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.getSessionWriteBlockedMessage === "function"
       ? options.getSessionWriteBlockedMessage
       : () => "This client cannot send input to the selected session.";
+  const showBlockedWriteReclaimUi =
+    typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
   const getWsTicketPayload = typeof options.getWsTicketPayload === "function" ? options.getWsTicketPayload : () => ({});
   const disposeStreamDebugTrace =
@@ -152,6 +155,8 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.killWorkflowSession === "function" ? options.killWorkflowSession : () => Promise.resolve("");
   const disposeWorkflowRuntime =
     typeof options.disposeWorkflowRuntime === "function" ? options.disposeWorkflowRuntime : () => {};
+  const handleCommandFeedbackAction =
+    typeof options.handleCommandFeedbackAction === "function" ? options.handleCommandFeedbackAction : () => Promise.resolve(false);
 
   let commandEngine = null;
   let commandTargetRuntimeController = null;
@@ -388,6 +393,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
       canWriteToSession,
       getSessionWriteBlockedMessage,
+      showBlockedWriteReclaimUi,
       isReadOnlyMode,
       getReadOnlyModeMessage,
       getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
@@ -410,6 +416,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       deckCreateBtn,
       startupWarmupSkipBtn,
       sendBtn,
+      commandFeedbackActionBtn,
       workflowStopBtn,
       workflowInterruptBtn,
       workflowKillBtn,
@@ -427,6 +434,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       getReadOnlyModeMessage,
       createDeckFlow: () => appLayoutDeckFacadeController?.createDeckFlow?.(),
       submitCommand: () => appCommandUiFacadeController?.submitCommand?.(),
+      handleCommandFeedbackAction,
       confirmPendingCommandSend: () => commandComposerRuntimeController?.confirmPendingSend?.(),
       cancelPendingCommandSend: () => commandComposerRuntimeController?.cancelPendingSend?.(),
       stopWorkflow: () => stopWorkflow(),

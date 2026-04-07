@@ -197,6 +197,28 @@ WebSocket requirements:
 2. Restart backend and frontend.
 3. Re-run smoke checks above.
 
+### 8.1 H62/H64 Trusted-Local Multi-Device Rollback
+
+When rolling back from `feature/h62-multi-device-control-foundation` to `main`, do not rely on the one-time startup backup alone. Restore both backend and browser-local state before switching branches.
+
+Backend runtime state:
+
+```bash
+npm run h62:rollback:restore
+```
+
+Browser-local state:
+
+1. Keep the feature-branch frontend available long enough to serve `/rollback-restore.html`.
+2. Open `http://127.0.0.1:18081/rollback-restore.html` in the same browser profile that ran the feature branch.
+3. Run `Restore Browser State`.
+
+Then complete the branch rollback:
+
+1. Checkout `main` (or the target stable commit/tag).
+2. Restart backend and frontend.
+3. Re-run the smoke checks above in the restored browser profile.
+
 ## 9. Production Logging Standard
 
 Use the following production logging contract for backend and frontend serving processes:

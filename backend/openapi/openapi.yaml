@@ -1184,6 +1184,171 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/control/take:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: takeSessionControl
+      summary: Take active control of a session for the current attached client.
+      responses:
+        '200':
+          description: Session control transferred to the requesting client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Control denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: No active attached client or another controller still owns the session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/control/release:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: releaseSessionControl
+      summary: Release active control of a session for the current controller.
+      responses:
+        '200':
+          description: Session control released
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Control denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: No active attached client or no current controller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/control/transfer:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: transferSessionControl
+      summary: Transfer active control to another attached client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientId]
+              properties:
+                clientId:
+                  type: string
+      responses:
+        '200':
+          description: Session control transferred to the target client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Control denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Target client is not actively attached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/control/rename-client:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: renameSessionControlClient
+      summary: Rename the current trusted-local attached client for reconnect and handoff flows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: Trusted-local client renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Control denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: No active attached client is available for rename
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/control/forget-client:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+    post:
+      operationId: forgetSessionControlClient
+      summary: Forget a stale offline trusted-local device attachment for the current session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientId]
+              properties:
+                clientId:
+                  type: string
+      responses:
+        '200':
+          description: Stale device forgotten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Control denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Target client is still active or not attached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/restart:
     parameters:
       - $ref: '#/components/parameters/sessionId'

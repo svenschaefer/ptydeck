@@ -271,6 +271,64 @@ test("command-composer runtime controller sends command input via configured ter
   ]);
 });
 
+test("command-composer runtime controller surfaces reclaim UI when send is blocked by another controller", async () => {
+  const calls = [];
+  let value = "ls -al";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    interpretComposerInput: () => ({ kind: "input", data: "ls -al" }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    showBlockedWriteReclaimUi: (session, options) => calls.push(["reclaim", session.id, options.source, options.message])
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["feedback", "This session is currently controlled by another client. Input and resize are disabled."],
+    [
+      "reclaim",
+      "s1",
+      "send",
+      "This session is currently controlled by another client. Input and resize are disabled."
+    ]
+  ]);
+});
+
+test("command-composer runtime controller surfaces reclaim UI when terminal paste is blocked by another controller", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    showBlockedWriteReclaimUi: (session, options) => calls.push(["reclaim", session.id, options.source, options.message])
+  });
+
+  const result = await controller.submitTerminalPaste("s1", "echo hi\n");
+
+  assert.equal(result, false);
+  assert.deepEqual(calls, [
+    ["feedback", "This session is currently controlled by another client. Input and resize are disabled."],
+    [
+      "reclaim",
+      "s1",
+      "paste",
+      "This session is currently controlled by another client. Input and resize are disabled."
+    ]
+  ]);
+});
+
 test("command-composer runtime controller blocks sends for non-controller sessions before transport", async () => {
   const calls = [];
   let value = "pwd";

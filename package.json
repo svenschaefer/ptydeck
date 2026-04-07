@@ -27,6 +27,7 @@
     "backup:create": "./scripts/backup-sessions.sh",
     "backup:restore": "./scripts/restore-sessions.sh",
     "backup:verify": "./scripts/verify-backup-restore.sh",
+    "h62:rollback:restore": "node scripts/restore-h62-rollbacks.mjs",
     "dr:drill": "./scripts/dr-restore-drill.sh",
     "retention:purge": "./scripts/purge-retention.sh",
     "release:evidence": "./scripts/generate-release-evidence.sh"

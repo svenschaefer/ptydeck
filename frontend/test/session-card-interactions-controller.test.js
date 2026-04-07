@@ -259,6 +259,94 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   assert.deepEqual(calls, ["feedback:Working Directory cannot be empty.:true"]);
 });
 
+test("session-card-interactions controller renames the current trusted-local device", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController();
+  const refs = {
+    focusBtn: createEventTarget(),
+    sessionControlDeviceNameInput: createEventTarget("Desk Browser"),
+    sessionControlDeviceSaveBtn: createEventTarget()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    getEntry: () => ({ id: "entry" }),
+    sessionThemeDrafts: new Map(),
+    renameTrustedLocalDevice: async (sessionId, label) => {
+      calls.push(["rename", sessionId, label]);
+      return { id: sessionId };
+    },
+    applyRuntimeEvent: (event) => calls.push(["runtime", event.type, event.session.id]),
+    clearError: () => calls.push(["clearError"]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    formatSessionToken: () => "1"
+  });
+
+  await refs.sessionControlDeviceSaveBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    ["rename", "s1", "Desk Browser"],
+    ["runtime", "session.updated", "s1"],
+    ["clearError"],
+    ["feedback", "Renamed this device to Desk Browser."]
+  ]);
+});
+
+test("session-card-interactions controller forgets a stale trusted-local device after confirmation", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController();
+  const refs = {
+    focusBtn: createEventTarget(),
+    sessionControlClientsEl: createEventTarget()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {
+      forgetSessionControlClient: async (sessionId, clientId) => {
+        calls.push(["forget", sessionId, clientId]);
+        return { id: sessionId };
+      }
+    },
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    getEntry: () => ({ id: "entry" }),
+    sessionThemeDrafts: new Map(),
+    confirmForgetSessionControlClient: async (_session, target) => {
+      calls.push(["confirm", target.clientId, target.label]);
+      return true;
+    },
+    applyRuntimeEvent: (event) => calls.push(["runtime", event.type, event.session.id]),
+    clearError: () => calls.push(["clearError"]),
+    setCommandFeedback: (message) => calls.push(["feedback", message])
+  });
+
+  await refs.sessionControlClientsEl.emit("click", {
+    target: {
+      closest() {
+        return {
+          dataset: {
+            sessionControlAction: "forget",
+            clientId: "client-stale",
+            clientLabel: "Tablet"
+          }
+        };
+      }
+    }
+  });
+
+  assert.deepEqual(calls, [
+    ["confirm", "client-stale", "Tablet"],
+    ["forget", "s1", "client-stale"],
+    ["runtime", "session.updated", "s1"],
+    ["clearError"],
+    ["feedback", "Forgot stale device Tablet."]
+  ]);
+});
+
 test("session-card-interactions controller wires take, release, and transfer session-control actions", async () => {
   const calls = [];
   const controller = createSessionCardInteractionsController();
@@ -292,12 +380,10 @@ test("session-card-interactions controller wires take, release, and transfer ses
   await refs.sessionControlReleaseBtn.emit("click");
   await refs.sessionControlClientsEl.emit("click", {
     target: {
-      closest(selector) {
-        if (selector !== "[data-session-control-action='transfer']") {
-          return null;
-        }
+      closest() {
         return {
           dataset: {
+            sessionControlAction: "transfer",
             clientId: "peer-client"
           }
         };

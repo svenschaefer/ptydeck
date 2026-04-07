@@ -70,3 +70,26 @@ test("trusted local client controller reuses an existing stored identity", async
     label: "Desk Browser"
   });
 });
+
+test("trusted local client controller can rename the persisted device identity", () => {
+  const storage = createStorage({
+    [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify({
+      format: "ptydeck.trusted-local-client.v1",
+      clientId: "trusted-existing-client",
+      label: "Desk Browser",
+      createdAt: 77
+    })
+  });
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: storage
+  });
+
+  const renamed = controller.renameClientIdentity("Office Tablet");
+
+  assert.equal(renamed.label, "Office Tablet");
+  assert.deepEqual(controller.getWsTicketPayload(), {
+    clientId: "trusted-existing-client",
+    label: "Office Tablet"
+  });
+  assert.match(storage.getItem(TRUSTED_LOCAL_CLIENT_STORAGE_KEY), /Office Tablet/);
+});

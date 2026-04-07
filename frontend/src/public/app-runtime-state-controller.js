@@ -48,7 +48,37 @@ export function createAppRuntimeStateController(options = {}) {
 
   function setCommandFeedback(message) {
     uiState.commandFeedback = typeof message === "string" ? message : String(message || "");
+    uiState.commandFeedbackActionVisible = false;
+    uiState.commandFeedbackActionLabel = "";
+    uiState.commandFeedbackActionTitle = "";
+    uiState.commandFeedbackActionSessionId = "";
     requestRender();
+  }
+
+  function setCommandFeedbackAction(nextState = {}) {
+    uiState.commandFeedbackActionVisible = nextState.visible === true;
+    uiState.commandFeedbackActionLabel =
+      typeof nextState.label === "string" ? nextState.label : "";
+    uiState.commandFeedbackActionTitle =
+      typeof nextState.title === "string" ? nextState.title : "";
+    uiState.commandFeedbackActionSessionId =
+      typeof nextState.sessionId === "string" ? nextState.sessionId : "";
+    requestRender();
+  }
+
+  function clearCommandFeedbackAction({ render = true } = {}) {
+    const hadState =
+      uiState.commandFeedbackActionVisible === true ||
+      Boolean(uiState.commandFeedbackActionLabel) ||
+      Boolean(uiState.commandFeedbackActionTitle) ||
+      Boolean(uiState.commandFeedbackActionSessionId);
+    uiState.commandFeedbackActionVisible = false;
+    uiState.commandFeedbackActionLabel = "";
+    uiState.commandFeedbackActionTitle = "";
+    uiState.commandFeedbackActionSessionId = "";
+    if (render && hadState) {
+      requestRender();
+    }
   }
 
   function setCommandPreview(message) {
@@ -236,6 +266,8 @@ export function createAppRuntimeStateController(options = {}) {
     clearError,
     setError,
     setCommandFeedback,
+    setCommandFeedbackAction,
+    clearCommandFeedbackAction,
     setCommandPreview,
     setCommandGuardState,
     setWorkflowRunState,

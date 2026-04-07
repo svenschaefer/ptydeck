@@ -52,3 +52,19 @@ test("send-history preview rows stay compact even for long payloads", () => {
     /\.send-history-item-preview \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-box-orient: vertical;[\s\S]*-webkit-line-clamp: 2;[\s\S]*overflow: hidden;[\s\S]*\}/m
   );
 });
+
+test("blocked-write reclaim and trusted-local device controls have explicit layout contracts", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.command-feedback-action \{[\s\S]*display: inline-flex;[\s\S]*border-radius: 999px;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-control-device \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-control-client-actions \{[\s\S]*display: flex;[\s\S]*flex-wrap: wrap;[\s\S]*\}/m
+  );
+});

@@ -114,8 +114,66 @@ export function createStartupBackupRuntimeController(options = {}) {
     return { created: true, backup: verified, storageKey };
   }
 
+  function getStartupBackup() {
+    return readExistingBackup();
+  }
+
+  function restoreStartupBackup() {
+    const storage = requireStorage();
+    if (typeof storage.removeItem !== "function") {
+      throw new Error(
+        "Browser rollback restore requires localStorage.removeItem so missing keys can be restored deterministically."
+      );
+    }
+    const backup = readExistingBackup();
+    if (!backup) {
+      throw new Error(
+        "Rollback restore blocked: no browser rollback backup exists for this H62 feature build."
+      );
+    }
+    const recordedSourceKeys =
+      Array.isArray(backup.sourceKeys) && backup.sourceKeys.length > 0 ? backup.sourceKeys : sourceKeys;
+    const normalizedKeys = Array.from(
+      new Set(recordedSourceKeys.map((key) => normalizeText(key)).filter(Boolean))
+    );
+    const restoredKeys = [];
+    const removedKeys = [];
+    for (const key of normalizedKeys) {
+      if (Object.prototype.hasOwnProperty.call(backup.entries, key)) {
+        storage.setItem(key, String(backup.entries[key]));
+        restoredKeys.push(key);
+        continue;
+      }
+      storage.removeItem(key);
+      removedKeys.push(key);
+    }
+    for (const key of restoredKeys) {
+      if (storage.getItem(key) !== String(backup.entries[key])) {
+        throw new Error(
+          `Rollback restore failed: browser key '${key}' did not verify after restore.`
+        );
+      }
+    }
+    for (const key of removedKeys) {
+      if (storage.getItem(key) !== null) {
+        throw new Error(
+          `Rollback restore failed: browser key '${key}' should have been removed but is still present.`
+        );
+      }
+    }
+    return {
+      restored: true,
+      storageKey,
+      backup,
+      restoredKeys,
+      removedKeys
+    };
+  }
+
   return {
     ensureStartupBackup,
+    getStartupBackup,
+    restoreStartupBackup,
     getBackupId: () => backupId,
     getStorageKey: () => storageKey,
     getSourceKeys: () => sourceKeys.slice()

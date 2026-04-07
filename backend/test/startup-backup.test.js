@@ -4,7 +4,11 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { ensureStartupDataBackup, STARTUP_BACKUP_ID } from "../src/startup-backup.js";
+import {
+  ensureStartupDataBackup,
+  restoreStartupDataBackup,
+  STARTUP_BACKUP_ID
+} from "../src/startup-backup.js";
 
 test("startup data backup creates manifest and payload copy when persistence file exists", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
@@ -99,4 +103,33 @@ test("startup data backup blocks startup when payload copy is missing for an exi
     ensureStartupDataBackup({ dataPath }),
     /rollback payload backup is missing/
   );
+});
+
+test("startup data backup restore rewrites the persisted runtime file from the verified payload copy", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
+  const dataPath = join(dir, "sessions.json");
+  await writeFile(dataPath, JSON.stringify({ sessions: [{ id: "original" }] }, null, 2), "utf8");
+  await ensureStartupDataBackup({ dataPath, nowFn: () => 3000 });
+  await writeFile(dataPath, JSON.stringify({ sessions: [{ id: "mutated" }] }, null, 2), "utf8");
+
+  const result = await restoreStartupDataBackup({ dataPath });
+
+  assert.equal(result.restored, true);
+  assert.equal(result.removed, false);
+  const restoredRaw = await readFile(dataPath, "utf8");
+  assert.match(restoredRaw, /"original"/);
+  assert.doesNotMatch(restoredRaw, /"mutated"/);
+});
+
+test("startup data backup restore removes the runtime file when the original source file did not exist", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
+  const dataPath = join(dir, "sessions.json");
+  await ensureStartupDataBackup({ dataPath, nowFn: () => 4000 });
+  await writeFile(dataPath, JSON.stringify({ sessions: [{ id: "created-later" }] }, null, 2), "utf8");
+
+  const result = await restoreStartupDataBackup({ dataPath });
+
+  assert.equal(result.restored, true);
+  assert.equal(result.removed, true);
+  await assert.rejects(readFile(dataPath, "utf8"), /ENOENT/);
 });

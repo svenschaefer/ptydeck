@@ -9,6 +9,8 @@ export function createSessionTerminalResizeController(options = {}) {
   const getSessionTerminalGeometry = options.getSessionTerminalGeometry || (() => ({ cols: 80, rows: 24 }));
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
   const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const showBlockedWriteReclaimUi =
+    typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const computeFixedMountHeightPx = options.computeFixedMountHeightPx || (() => 120);
   const computeFixedCardWidthPx = options.computeFixedCardWidthPx || (() => 260);
   const getTerminalCellHeightPx = options.getTerminalCellHeightPx || (() => 0);
@@ -110,7 +112,12 @@ export function createSessionTerminalResizeController(options = {}) {
     entry.terminal.resize(cols, rows);
     debugLog("terminal.resize.local", { sessionId, cols, rows });
 
-    if (options.skipRemote === true || !canWriteToSession(session)) {
+    if (options.skipRemote === true) {
+      return;
+    }
+
+    if (!canWriteToSession(session)) {
+      showBlockedWriteReclaimUi(session, { source: "resize" });
       return;
     }
 

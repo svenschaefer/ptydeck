@@ -117,6 +117,7 @@ export function collectAppRuntimeDomRefs(documentRef = globalThis.document) {
     statusMessageEl: getElementById("status-message"),
     commandTargetEl: getElementById("command-target"),
     commandFeedbackEl: getElementById("command-feedback"),
+    commandFeedbackActionBtn: getElementById("command-feedback-action"),
     commandInlineHintEl: getElementById("command-inline-hint"),
     commandPreviewEl: getElementById("command-preview"),
     commandSuggestionsEl: getElementById("command-suggestions"),

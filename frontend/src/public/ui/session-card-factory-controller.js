@@ -26,6 +26,8 @@ export function createSessionCardFactoryController(options = {}) {
     const sessionControlTakeBtn = node.querySelector(".session-control-take");
     const sessionControlReleaseBtn = node.querySelector(".session-control-release");
     const sessionControlSummaryEl = node.querySelector(".session-control-summary");
+    const sessionControlDeviceNameInput = node.querySelector(".session-control-device-name");
+    const sessionControlDeviceSaveBtn = node.querySelector(".session-control-device-save");
     const sessionControlClientsEl = node.querySelector(".session-control-clients");
     const settingsTabStartupBtn = node.querySelector(".session-settings-tab-startup");
     const settingsTabNoteBtn = node.querySelector(".session-settings-tab-note");
@@ -139,6 +141,8 @@ export function createSessionCardFactoryController(options = {}) {
       sessionControlTakeBtn,
       sessionControlReleaseBtn,
       sessionControlSummaryEl,
+      sessionControlDeviceNameInput,
+      sessionControlDeviceSaveBtn,
       sessionControlClientsEl,
       settingsTabStartupBtn,
       settingsTabNoteBtn,

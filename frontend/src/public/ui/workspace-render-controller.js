@@ -5,6 +5,7 @@ export function createWorkspaceRenderController(options = {}) {
   const statusMessageEl = options.statusMessageEl || null;
   const commandTargetEl = options.commandTargetEl || null;
   const commandFeedbackEl = options.commandFeedbackEl || null;
+  const commandFeedbackActionBtn = options.commandFeedbackActionBtn || null;
   const commandInlineHintEl = options.commandInlineHintEl || null;
   const commandPreviewEl = options.commandPreviewEl || null;
   const commandSuggestionsEl = options.commandSuggestionsEl || null;
@@ -112,6 +113,9 @@ export function createWorkspaceRenderController(options = {}) {
     error = "",
     commandTargetText = "",
     commandFeedback = "",
+    commandFeedbackActionVisible = false,
+    commandFeedbackActionLabel = "",
+    commandFeedbackActionTitle = "",
     commandInlineHint = "",
     commandInlineHintPrefixPx = 0,
     commandPreview = "",
@@ -166,6 +170,15 @@ export function createWorkspaceRenderController(options = {}) {
     }
     if (commandFeedbackEl) {
       commandFeedbackEl.textContent = commandFeedback || "";
+    }
+    if (commandFeedbackActionBtn) {
+      commandFeedbackActionBtn.hidden = commandFeedbackActionVisible !== true;
+      commandFeedbackActionBtn.textContent = commandFeedbackActionLabel || "";
+      if (commandFeedbackActionVisible === true && commandFeedbackActionTitle) {
+        commandFeedbackActionBtn.setAttribute("title", commandFeedbackActionTitle);
+      } else {
+        commandFeedbackActionBtn.removeAttribute("title");
+      }
     }
     if (commandTargetEl) {
       commandTargetEl.textContent = commandTargetText || "";

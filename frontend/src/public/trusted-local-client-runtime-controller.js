@@ -109,6 +109,10 @@ function createClientId(cryptoRef, nowFn) {
   return `trusted-${uuid}`;
 }
 
+function normalizeClientLabel(value) {
+  return normalizeText(value).slice(0, MAX_LABEL_LENGTH);
+}
+
 export function createTrustedLocalClientRuntimeController(options = {}) {
   const storageRef = options.storageRef || options.localStorageRef || options.windowRef?.localStorage || null;
   const navigatorRef = options.navigatorRef || options.windowRef?.navigator || globalThis.navigator || null;
@@ -162,6 +166,28 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
     return cachedRecord ? { ...cachedRecord } : readStoredRecord();
   }
 
+  function renameClientIdentity(label) {
+    const nextLabel = normalizeClientLabel(label);
+    if (!nextLabel) {
+      throw new Error("Device name cannot be empty.");
+    }
+    const current = cachedRecord || readStoredRecord();
+    if (!current) {
+      throw new Error("Trusted local device identity is not available yet.");
+    }
+    const storage = requireStorage();
+    const nextRecord = {
+      ...current,
+      label: nextLabel
+    };
+    storage.setItem(storageKey, JSON.stringify(nextRecord));
+    const verified = readStoredRecord();
+    if (!verified || verified.label !== nextLabel) {
+      throw new Error("Failed to persist the updated trusted local device name.");
+    }
+    return { ...verified };
+  }
+
   function getWsTicketPayload() {
     const record = getClientIdentity();
     if (!record) {
@@ -176,9 +202,12 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
   return {
     ensureClientIdentity,
     getClientIdentity,
+    renameClientIdentity,
     getWsTicketPayload,
-    getStorageKey: () => storageKey
+    getStorageKey: () => storageKey,
+    getLabelMaxLength: () => MAX_LABEL_LENGTH
   };
 }
 
 export const TRUSTED_LOCAL_CLIENT_STORAGE_KEY = DEFAULT_STORAGE_KEY;
+export const TRUSTED_LOCAL_CLIENT_LABEL_MAX_LENGTH = MAX_LABEL_LENGTH;

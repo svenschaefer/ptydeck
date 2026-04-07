@@ -389,6 +389,12 @@ export function createApiClient(baseUrl, options = {}) {
     async transferSessionControl(sessionId, clientId) {
       return request(`/sessions/${encodeURIComponent(sessionId)}/control/transfer`, withJson({ clientId }));
     },
+    async renameSessionControlClient(sessionId, label) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/control/rename-client`, withJson({ label }));
+    },
+    async forgetSessionControlClient(sessionId, clientId) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/control/forget-client`, withJson({ clientId }));
+    },
     /** @returns {Promise<Session>} */
     async restartSession(sessionId) {
       return request(`/sessions/${sessionId}/restart`, {

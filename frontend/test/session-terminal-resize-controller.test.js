@@ -167,6 +167,48 @@ test("session-terminal-resize controller clears pending resize timers for blocke
   assert.equal(terminalSizes.has("s1"), false);
 });
 
+test("session-terminal-resize controller offers reclaim UI instead of remote resize when this client is not writable", () => {
+  const windowRef = createFakeWindow();
+  const reclaimCalls = [];
+  const apiCalls = [];
+  const controller = createSessionTerminalResizeController({
+    windowRef,
+    terminals: new Map([
+      [
+        "s1",
+        {
+          mount: { clientWidth: 640, clientHeight: 320, style: {} },
+          element: { style: {} },
+          terminal: { resize() {} }
+        }
+      ]
+    ]),
+    resizeTimers: new Map(),
+    terminalSizes: new Map(),
+    getSessionById: (sessionId) => ({ id: sessionId, deckId: "d1" }),
+    resolveSessionDeckId: (session) => session.deckId,
+    getSessionTerminalGeometry: () => ({ cols: 80, rows: 24 }),
+    canWriteToSession: () => false,
+    showBlockedWriteReclaimUi: (session, options) => reclaimCalls.push([session.id, options.source]),
+    computeFixedMountHeightPx: (rows) => rows * 10,
+    computeFixedCardWidthPx: (cols) => cols * 5 + 20,
+    getTerminalCellHeightPx: () => 10,
+    terminalCardHorizontalChromePx: 20,
+    api: {
+      resizeSession(sessionId, cols, rows) {
+        apiCalls.push(`${sessionId}:${cols}x${rows}`);
+        return Promise.resolve();
+      }
+    }
+  });
+
+  controller.applyResizeForSession("s1");
+
+  assert.deepEqual(reclaimCalls, [["s1", "resize"]]);
+  assert.deepEqual(apiCalls, []);
+  assert.equal(windowRef.scheduled.length, 0);
+});
+
 test("session-terminal-resize controller scopes scheduled global resize passes by deck", () => {
   const windowRef = createFakeWindow();
   const resized = [];

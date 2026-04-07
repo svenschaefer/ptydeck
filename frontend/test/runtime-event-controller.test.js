@@ -97,12 +97,14 @@ test("runtime-event controller blocks direct terminal input in read-only spectat
 
 test("runtime-event controller blocks direct terminal input when this client does not control the session", async () => {
   const errors = [];
+  const reclaimCalls = [];
   const sendCalls = [];
   const controller = createRuntimeEventController({
     getSessionById: () => ({ id: "s-1", state: "running" }),
     canWriteToSession: () => false,
     getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
     setError: (message) => errors.push(message),
+    showBlockedWriteReclaimUi: (session, options) => reclaimCalls.push([session.id, options.source, options.message]),
     sendInput: (sessionId, data) => {
       sendCalls.push([sessionId, data]);
       return Promise.resolve();
@@ -114,6 +116,13 @@ test("runtime-event controller blocks direct terminal input when this client doe
 
   assert.deepEqual(errors, ["This session is currently controlled by another client. Input and resize are disabled."]);
   assert.deepEqual(sendCalls, []);
+  assert.deepEqual(reclaimCalls, [
+    [
+      "s-1",
+      "terminal-input",
+      "This session is currently controlled by another client. Input and resize are disabled."
+    ]
+  ]);
 });
 
 test("runtime-event controller applies representative runtime updates and deck fallback defaults", () => {

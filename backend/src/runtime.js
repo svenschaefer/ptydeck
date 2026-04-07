@@ -571,6 +571,16 @@ function route(pathname, method) {
     return { kind: "transferSessionControl", params: { sessionId: transferControlMatch[1] } };
   }
 
+  const renameControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/rename-client$/);
+  if (renameControlClientMatch && method === "POST") {
+    return { kind: "renameSessionControlClient", params: { sessionId: renameControlClientMatch[1] } };
+  }
+
+  const forgetControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/forget-client$/);
+  if (forgetControlClientMatch && method === "POST") {
+    return { kind: "forgetSessionControlClient", params: { sessionId: forgetControlClientMatch[1] } };
+  }
+
   const restartMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
   if (restartMatch && method === "POST") {
     return { kind: "restart", params: { sessionId: restartMatch[1] } };
@@ -642,6 +652,12 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/control\/transfer$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/control/transfer";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/control\/rename-client$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/control/rename-client";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/control\/forget-client$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/control/forget-client";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/restart";
@@ -3099,6 +3115,46 @@ export function createRuntime(config) {
     scheduleSessionControlAttachmentPrune();
   }
 
+  function updateSessionControlAttachmentLabel(auth, clientId, label) {
+    const attachmentKey = getSessionControlAttachmentKey({
+      auth,
+      clientId
+    });
+    if (!attachmentKey) {
+      return null;
+    }
+    const existing = sessionControlAttachments.get(attachmentKey) || null;
+    if (!existing?.client) {
+      return null;
+    }
+    const nextLabel = normalizeSessionControlClientLabel(label);
+    if (!nextLabel) {
+      throw new ApiError(400, "ValidationError", "Field 'label' must be a non-empty string.");
+    }
+    const nextClient = createSessionAttachedClient({
+      ...existing.client,
+      label: nextLabel,
+      principal: existing.auth || auth,
+      lastSeenAt: Number(Date.now())
+    });
+    sessionControlAttachments.set(attachmentKey, {
+      ...existing,
+      client: nextClient
+    });
+    return nextClient;
+  }
+
+  function forgetSessionControlAttachment(auth, clientId) {
+    const attachmentKey = getSessionControlAttachmentKey({
+      auth,
+      clientId
+    });
+    if (!attachmentKey) {
+      return false;
+    }
+    return sessionControlAttachments.delete(attachmentKey);
+  }
+
   function issueWsTicket(auth, input = {}) {
     pruneExpiredWsTickets();
     const requestedClientId = typeof input?.clientId === "string" ? input.clientId.trim() : "";
@@ -3320,6 +3376,8 @@ export function createRuntime(config) {
       kind === "takeSessionControl" ||
       kind === "releaseSessionControl" ||
       kind === "transferSessionControl" ||
+      kind === "renameSessionControlClient" ||
+      kind === "forgetSessionControlClient" ||
       kind === "restart" ||
       kind === "interrupt" ||
       kind === "terminate" ||
@@ -4887,6 +4945,14 @@ export function createRuntime(config) {
     return attachedClient;
   }
 
+  function requireOperatorSessionControlRequestClient(sessionId, auth = null, req = null) {
+    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    if (requestClient.accessMode === "spectator") {
+      throw new ApiError(403, "ControlDenied", "Read-only spectator clients cannot modify trusted-local device attachments.");
+    }
+    return requestClient;
+  }
+
   function getSessionControlViewOrThrow(sessionId, auth = null) {
     getApiSessionOrThrow(sessionId, auth);
     reconcileSessionControllerForSession(sessionId);
@@ -4993,6 +5059,45 @@ export function createRuntime(config) {
       setSessionControllerClient(currentState, targetClient.clientId, { allowAutoAssign: true }),
       traceSeed
     );
+  }
+
+  function renameSessionControlClientOrThrow(sessionId, label, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireOperatorSessionControlRequestClient(sessionId, auth, req);
+    const nextLabel = normalizeSessionControlClientLabel(label);
+    if (!nextLabel) {
+      throw new ApiError(400, "ValidationError", "Field 'label' must be a non-empty string.");
+    }
+    const renamedClient = updateSessionControlAttachmentLabel(auth, requestClient.clientId, nextLabel);
+    if (!renamedClient || renamedClient.active !== true) {
+      throw new ApiError(
+        409,
+        "ControllerClientRequired",
+        "This action requires an active attached session client. Reconnect the session UI and retry."
+      );
+    }
+    broadcastSessionControlRefreshForAuth(auth, traceSeed);
+    return getSessionControlViewOrThrow(sessionId, auth);
+  }
+
+  function forgetSessionControlClientOrThrow(sessionId, targetClientId, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireOperatorSessionControlRequestClient(sessionId, auth, req);
+    const normalizedTargetClientId = String(targetClientId || "").trim();
+    if (!normalizedTargetClientId) {
+      throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
+    }
+    if (normalizedTargetClientId === requestClient.clientId) {
+      throw new ApiError(409, "ControlAttachmentActive", "This device is still attached and cannot be forgotten.");
+    }
+    const targetClient = findAttachedClientForSession(sessionId, normalizedTargetClientId, auth);
+    if (!targetClient) {
+      throw new ApiError(409, "ControlTransferTargetNotAttached", "The target client is not attached to this session.");
+    }
+    if (targetClient.active === true || targetClient.activeConnectionCount > 0) {
+      throw new ApiError(409, "ControlAttachmentActive", "Only stale offline devices can be forgotten.");
+    }
+    forgetSessionControlAttachment(auth, normalizedTargetClientId);
+    broadcastSessionControlRefreshForAuth(auth, traceSeed);
+    return getSessionControlViewOrThrow(sessionId, auth);
   }
 
   function snapshotRuntimeState() {
@@ -6357,6 +6462,38 @@ function tryCreateRestoredSession({
         validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
         await persistNow("session.control.transfer");
         writeJsonResponse( 200, nextPayload);
+        return;
+      }
+
+      if (match.kind === "renameSessionControlClient") {
+        const payload = renameSessionControlClientOrThrow(match.params.sessionId, body.label, auth, req, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
+        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
+        const nextPayload = {
+          ...apiSession,
+          controlState: payload
+        };
+        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
+        await persistNow("session.control.rename_client");
+        writeJsonResponse(200, nextPayload);
+        return;
+      }
+
+      if (match.kind === "forgetSessionControlClient") {
+        const payload = forgetSessionControlClientOrThrow(match.params.sessionId, body.clientId, auth, req, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
+        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
+        const nextPayload = {
+          ...apiSession,
+          controlState: payload
+        };
+        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
+        await persistNow("session.control.forget_client");
+        writeJsonResponse(200, nextPayload);
         return;
       }
 

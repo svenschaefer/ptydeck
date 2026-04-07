@@ -627,6 +627,30 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname.endsWith("/control/rename-client")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.label !== "string" || !body.label.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'label' must be a non-empty string.");
+    }
+  }
+
+  if (method === "POST" && pathname.endsWith("/control/forget-client")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.clientId !== "string" || !body.clientId.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
+    }
+  }
+
   if (method === "POST" && pathname.endsWith("/restart")) {
     if (!params.sessionId) {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");

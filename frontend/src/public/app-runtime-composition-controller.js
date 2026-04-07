@@ -260,6 +260,7 @@ const {
   statusMessageEl,
   commandTargetEl,
   commandFeedbackEl,
+  commandFeedbackActionBtn,
   commandInlineHintEl,
   commandPreviewEl,
   commandSuggestionsEl,
@@ -547,6 +548,10 @@ const uiState = {
   readOnlyMode: false,
   accessSummary: "",
   commandFeedback: "",
+  commandFeedbackActionVisible: false,
+  commandFeedbackActionLabel: "",
+  commandFeedbackActionTitle: "",
+  commandFeedbackActionSessionId: "",
   commandInlineHint: "",
   commandInlineHintPrefixPx: 0,
   commandPreview: "",
@@ -789,6 +794,39 @@ function canTransferSessionControl(session, targetClientId) {
   return isLocalSessionController(session) || isLocalSessionOwner(session);
 }
 
+function canManageTrustedLocalDevice(session) {
+  if (isReadOnlyMode() || !session || !runtimeClientId) {
+    return false;
+  }
+  const localClient = getLocalSessionClient(session);
+  if (!localClient || localClient.active !== true) {
+    return false;
+  }
+  return normalizeControlText(localClient.accessMode) !== "spectator";
+}
+
+function canForgetSessionControlClient(session, targetClientId) {
+  if (!canManageTrustedLocalDevice(session)) {
+    return false;
+  }
+  const normalizedTargetClientId = normalizeControlText(targetClientId);
+  if (!normalizedTargetClientId || normalizedTargetClientId === runtimeClientId) {
+    return false;
+  }
+  const targetClient = getAttachedClientsForSession(session).find(
+    (entry) => normalizeControlText(entry?.clientId) === normalizedTargetClientId
+  );
+  if (!targetClient) {
+    return false;
+  }
+  return targetClient.active !== true && (targetClient.activeConnectionCount || 0) === 0;
+}
+
+function getTakeOrReclaimControlLabel(session) {
+  const reclaiming = getCurrentSessionController(session)?.active !== true && canTakeSessionControl(session);
+  return reclaiming ? "Reclaim Control" : "Take Control";
+}
+
 function setRuntimeClientId(clientId) {
   const nextClientId = normalizeControlText(clientId);
   if (runtimeClientId === nextClientId) {
@@ -798,6 +836,88 @@ function setRuntimeClientId(clientId) {
   api.setSessionControlClientId(runtimeClientId);
   appCommandUiFacadeController?.render?.();
   return runtimeClientId;
+}
+
+async function renameTrustedLocalDevice(sessionId, label) {
+  const normalizedSessionId = normalizeControlText(sessionId);
+  const session = normalizedSessionId
+    ? appSessionRuntimeFacadeController?.getSessionById?.(normalizedSessionId) || null
+    : null;
+  if (!canManageTrustedLocalDevice(session)) {
+    throw new Error(getSessionWriteBlockMessage(session) || "This device cannot rename its trusted-local attachment yet.");
+  }
+  const normalizedLabel = normalizeControlText(label);
+  if (!normalizedLabel) {
+    throw new Error("Device name cannot be empty.");
+  }
+  const updated = await api.renameSessionControlClient(normalizedSessionId, normalizedLabel);
+  const identity = trustedLocalClientRuntimeController.renameClientIdentity(normalizedLabel);
+  trustedLocalClientLabel = normalizeControlText(identity?.label);
+  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+  appCommandUiFacadeController?.render?.();
+  return updated;
+}
+
+async function forgetTrustedLocalDevice(sessionId, clientId) {
+  const normalizedSessionId = normalizeControlText(sessionId);
+  const session = normalizedSessionId
+    ? appSessionRuntimeFacadeController?.getSessionById?.(normalizedSessionId) || null
+    : null;
+  if (!canForgetSessionControlClient(session, clientId)) {
+    throw new Error("Only stale offline devices can be forgotten from this session.");
+  }
+  const updated = await api.forgetSessionControlClient(normalizedSessionId, clientId);
+  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+  return updated;
+}
+
+function showBlockedWriteReclaimUi(session, options = {}) {
+  if (!session) {
+    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+    return false;
+  }
+  const message = normalizeControlText(options.message) || getSessionWriteBlockMessage(session);
+  if (!canTakeSessionControl(session)) {
+    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+    if (message) {
+      appCommandUiFacadeController?.setCommandFeedback?.(message);
+    }
+    return false;
+  }
+  if (message) {
+    appCommandUiFacadeController?.setCommandFeedback?.(message);
+  }
+  appRuntimeStateController?.setCommandFeedbackAction?.({
+    visible: true,
+    label: getTakeOrReclaimControlLabel(session),
+    title: message,
+    sessionId: session.id
+  });
+  controlPaneRuntimeController?.show?.();
+  return true;
+}
+
+async function handleCommandFeedbackAction() {
+  const sessionId = normalizeControlText(uiState.commandFeedbackActionSessionId);
+  if (!sessionId) {
+    return false;
+  }
+  const session = appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null;
+  if (!canTakeSessionControl(session)) {
+    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+    throw new Error(getSessionWriteBlockMessage(session) || "This session cannot be controlled from this device.");
+  }
+  const reclaiming = getCurrentSessionController(session)?.active !== true;
+  const updated = await api.takeSessionControl(sessionId);
+  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+  appSessionRuntimeFacadeController?.applyRuntimeEvent?.({ type: "session.updated", session: updated });
+  appCommandUiFacadeController?.setCommandFeedback?.(
+    `${reclaiming ? "Reclaimed" : "Took"} control of [${
+      appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
+    }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
+  );
+  appRuntimeStateController?.clearError?.();
+  return true;
 }
 
 function clearNodeChildren(node) {
@@ -925,12 +1045,14 @@ function renderSessionControlClients(container, session) {
     const title = document.createElement("p");
     title.className = "session-control-client-name";
     const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
-    title.textContent = isLocalClient ? "This device" : getSessionControlClientLabel(client);
+    title.textContent = isLocalClient ? "This device" : "Other device";
     const detail = document.createElement("p");
     detail.className = "session-control-client-detail";
     const detailParts = [];
     if (isLocalClient) {
       detailParts.push(getLocalDeviceLabel(session));
+    } else {
+      detailParts.push(getSessionControlClientLabel(client));
     }
     if (normalizeControlText(client?.accessMode) === "spectator") {
       detailParts.push("read only");
@@ -947,6 +1069,8 @@ function renderSessionControlClients(container, session) {
     meta.appendChild(title);
     meta.appendChild(detail);
     row.appendChild(meta);
+    const actions = document.createElement("div");
+    actions.className = "session-control-client-actions";
     if (canTransferSessionControl(session, client?.clientId)) {
       const transferBtn = document.createElement("button");
       transferBtn.type = "button";
@@ -955,7 +1079,21 @@ function renderSessionControlClients(container, session) {
       transferBtn.dataset = transferBtn.dataset || {};
       transferBtn.dataset.sessionControlAction = "transfer";
       transferBtn.dataset.clientId = normalizeControlText(client?.clientId);
-      row.appendChild(transferBtn);
+      actions.appendChild(transferBtn);
+    }
+    if (canForgetSessionControlClient(session, client?.clientId)) {
+      const forgetBtn = document.createElement("button");
+      forgetBtn.type = "button";
+      forgetBtn.className = "session-control-forget";
+      forgetBtn.textContent = "Forget";
+      forgetBtn.dataset = forgetBtn.dataset || {};
+      forgetBtn.dataset.sessionControlAction = "forget";
+      forgetBtn.dataset.clientId = normalizeControlText(client?.clientId);
+      forgetBtn.dataset.clientLabel = getSessionControlClientLabel(client);
+      actions.appendChild(forgetBtn);
+    }
+    if (actions.childNodes.length > 0) {
+      row.appendChild(actions);
     }
     container.appendChild(row);
   }
@@ -985,7 +1123,7 @@ function renderSessionControl(entry, session) {
   if (entry.sessionControlTakeBtn) {
     const takeEnabled = canTakeSessionControl(session);
     const reclaiming = getCurrentSessionController(session)?.active !== true && takeEnabled;
-    entry.sessionControlTakeBtn.textContent = reclaiming ? "Reclaim Control" : "Take Control";
+    entry.sessionControlTakeBtn.textContent = getTakeOrReclaimControlLabel(session);
     entry.sessionControlTakeBtn.disabled = !takeEnabled;
     entry.sessionControlTakeBtn.setAttribute(
       "title",
@@ -1014,6 +1152,24 @@ function renderSessionControl(entry, session) {
     } else {
       entry.settingsApplyBtn.setAttribute("title", getSessionWriteBlockMessage(session));
     }
+  }
+  if (entry.sessionControlDeviceNameInput) {
+    const localDeviceName = getLocalDeviceLabel(session);
+    if (document?.activeElement !== entry.sessionControlDeviceNameInput) {
+      entry.sessionControlDeviceNameInput.value = localDeviceName;
+    }
+    entry.sessionControlDeviceNameInput.disabled = !canManageTrustedLocalDevice(session);
+    entry.sessionControlDeviceNameInput.setAttribute("title", localDeviceName);
+  }
+  if (entry.sessionControlDeviceSaveBtn) {
+    const canRenameDevice = canManageTrustedLocalDevice(session);
+    entry.sessionControlDeviceSaveBtn.disabled = !canRenameDevice;
+    entry.sessionControlDeviceSaveBtn.setAttribute(
+      "title",
+      canRenameDevice
+        ? "Rename this trusted-local device for future reconnect and handoff flows."
+        : getSessionWriteBlockMessage(session) || "This device must attach before it can be renamed."
+    );
   }
   renderSessionControlClients(entry.sessionControlClientsEl, session);
 }
@@ -1481,6 +1637,7 @@ runtimeEventController = createRuntimeEventController({
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
+  showBlockedWriteReclaimUi,
   isReadOnlyMode,
   getReadOnlyModeMessage,
   setError: (message) => appCommandUiFacadeController?.setError(message),
@@ -1582,6 +1739,7 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   getSessionTerminalGeometry: (sessionOrId) => appLayoutDeckFacadeController?.getSessionTerminalGeometry(sessionOrId),
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
   canWriteToSession,
+  showBlockedWriteReclaimUi,
   computeFixedMountHeightPx: (rows) => appLayoutDeckFacadeController?.computeFixedMountHeightPx(rows),
   computeFixedCardWidthPx: (cols) => appLayoutDeckFacadeController?.computeFixedCardWidthPx(cols),
   getTerminalCellHeightPx,
@@ -1673,6 +1831,7 @@ workspaceRenderController = createWorkspaceRenderController({
   statusMessageEl,
   commandTargetEl,
   commandFeedbackEl,
+  commandFeedbackActionBtn,
   commandInlineHintEl,
   commandPreviewEl,
   commandSuggestionsEl,
@@ -1873,6 +2032,15 @@ sessionGridController = createSessionGridController({
       defaultValue: session?.name || session?.id || "",
       confirmLabel: "Rename"
     }),
+  renameTrustedLocalDevice: (sessionId, label) => renameTrustedLocalDevice(sessionId, label),
+  confirmForgetSessionControlClient: (session, targetClient) =>
+    actionDialogController?.confirm({
+      title: "Forget Stale Device",
+      message: `Forget ${targetClient?.label || targetClient?.clientId || "this stale device"} from [${
+        appSessionRuntimeFacadeController?.formatSessionToken?.(session?.id) || "?"
+      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || session?.id || "session"}?`,
+      confirmLabel: "Forget"
+    }),
   removeSession: (sessionId) => appSessionRuntimeFacadeController?.removeSession(sessionId),
   setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback(message),
   formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken(sessionId) || "?",
@@ -1921,6 +2089,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   deckCreateBtn,
   startupWarmupSkipBtn,
   sendBtn,
+  commandFeedbackActionBtn,
   layoutRuntimeController,
   terminalSearchController,
   layoutProfileRuntimeController,
@@ -1947,8 +2116,10 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   getReadOnlyModeMessage,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
+  showBlockedWriteReclaimUi,
   getWsTicketPayload: () => trustedLocalClientRuntimeController.getWsTicketPayload(),
   setAccessState,
+  handleCommandFeedbackAction,
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),

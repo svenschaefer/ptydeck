@@ -44,6 +44,9 @@ export function createSessionCardInteractionsController(options = {}) {
         return value === null || value === undefined ? null : String(value);
       });
     const removeSession = args.removeSession || (() => {});
+    const renameTrustedLocalDevice = args.renameTrustedLocalDevice || (() => Promise.resolve(null));
+    const confirmForgetSessionControlClient =
+      args.confirmForgetSessionControlClient || (() => Promise.resolve(false));
     const setCommandFeedback = args.setCommandFeedback || (() => {});
     const formatSessionToken = args.formatSessionToken || ((sessionId) => String(sessionId || ""));
     const formatSessionDisplayName = args.formatSessionDisplayName || ((currentSession) => currentSession?.name || "");
@@ -173,16 +176,48 @@ export function createSessionCardInteractionsController(options = {}) {
       );
     });
     refs.sessionControlClientsEl?.addEventListener?.("click", async (event) => {
-      const transferBtn = event?.target?.closest?.("[data-session-control-action='transfer']");
-      const targetClientId = transferBtn?.dataset?.clientId || "";
-      if (!targetClientId) {
+      const actionBtn = event?.target?.closest?.("[data-session-control-action]");
+      const targetClientId = actionBtn?.dataset?.clientId || "";
+      const action = actionBtn?.dataset?.sessionControlAction || "";
+      if (!targetClientId || !action) {
         return;
       }
       const currentSession = getSession() || session;
+      if (action === "transfer") {
+        await applySessionControlUpdate(
+          () => api.transferSessionControl(session.id, targetClientId),
+          `Transferred control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+          "Failed to transfer session control."
+        );
+        return;
+      }
+      if (action === "forget") {
+        const targetLabel = actionBtn?.dataset?.clientLabel || targetClientId;
+        const confirmed = await confirmForgetSessionControlClient(currentSession, {
+          clientId: targetClientId,
+          label: targetLabel
+        });
+        if (!confirmed) {
+          return;
+        }
+        await applySessionControlUpdate(
+          () => api.forgetSessionControlClient(session.id, targetClientId),
+          `Forgot stale device ${targetLabel}.`,
+          "Failed to forget the stale device."
+        );
+      }
+    });
+    refs.sessionControlDeviceSaveBtn?.addEventListener("click", async () => {
+      const currentSession = getSession() || session;
+      const nextLabel = String(refs.sessionControlDeviceNameInput?.value || "").trim();
+      if (!nextLabel) {
+        setError("Device name cannot be empty.");
+        return;
+      }
       await applySessionControlUpdate(
-        () => api.transferSessionControl(session.id, targetClientId),
-        `Transferred control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
-        "Failed to transfer session control."
+        () => renameTrustedLocalDevice(currentSession.id, nextLabel),
+        `Renamed this device to ${nextLabel}.`,
+        "Failed to rename this device."
       );
     });
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {

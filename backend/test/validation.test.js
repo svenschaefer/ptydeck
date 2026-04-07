@@ -151,11 +151,39 @@ test("validateRequest accepts valid session control payloads and rejects invalid
       params: { sessionId: "abc" },
       body: { clientId: "ws-123" }
     });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/rename-client",
+      params: { sessionId: "abc" },
+      body: { label: "Desk Browser" }
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/forget-client",
+      params: { sessionId: "abc" },
+      body: { clientId: "ws-stale" }
+    });
   });
   assert.throws(() => {
     validateRequest({
       method: "POST",
       pathname: "/api/v1/sessions/abc/control/transfer",
+      params: { sessionId: "abc" },
+      body: { clientId: "" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/rename-client",
+      params: { sessionId: "abc" },
+      body: { label: "" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/forget-client",
       params: { sessionId: "abc" },
       body: { clientId: "" }
     });

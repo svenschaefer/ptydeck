@@ -67,6 +67,14 @@ export function createAppCommandUiFacadeController(options = {}) {
     getAppRuntimeStateController()?.setCommandFeedback?.(message);
   }
 
+  function setCommandFeedbackAction(nextState) {
+    getAppRuntimeStateController()?.setCommandFeedbackAction?.(nextState);
+  }
+
+  function clearCommandFeedbackAction(options) {
+    getAppRuntimeStateController()?.clearCommandFeedbackAction?.(options);
+  }
+
   function getErrorMessage(err, fallback) {
     return getAppRuntimeStateController()?.getErrorMessage?.(err, fallback) || fallback;
   }
@@ -171,6 +179,8 @@ export function createAppCommandUiFacadeController(options = {}) {
     replaceCustomCommands,
     setError,
     setCommandFeedback,
+    setCommandFeedbackAction,
+    clearCommandFeedbackAction,
     getErrorMessage,
     setCommandPreview,
     setCommandGuardState,

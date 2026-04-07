@@ -64,6 +64,8 @@ export function createCommandComposerRuntimeController(options = {}) {
     typeof options.getSessionWriteBlockedMessage === "function"
       ? options.getSessionWriteBlockedMessage
       : () => "This client cannot send input to the selected session.";
+  const showBlockedWriteReclaimUi =
+    typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "CR");
   const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
   const getReadOnlyModeMessage =
@@ -223,7 +225,10 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
     const nonWritableSessions = targetSessions.filter((session) => !canWriteToSession(session));
     if (nonWritableSessions.length > 0) {
-      return { error: getSessionWriteBlockedMessage(nonWritableSessions[0]) };
+      return {
+        error: getSessionWriteBlockedMessage(nonWritableSessions[0]),
+        blockedSession: nonWritableSessions[0]
+      };
     }
 
     return {
@@ -247,7 +252,7 @@ export function createCommandComposerRuntimeController(options = {}) {
       return { error: getBlockedSessionActionMessage([session], "Command send") };
     }
     if (!canWriteToSession(session)) {
-      return { error: getSessionWriteBlockedMessage(session) };
+      return { error: getSessionWriteBlockedMessage(session), blockedSession: session };
     }
     return {
       targetSessions: [session],
@@ -437,6 +442,12 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
     if (plan.error) {
       setCommandFeedback(plan.error);
+      if (plan.blockedSession) {
+        showBlockedWriteReclaimUi(plan.blockedSession, {
+          source: "send",
+          message: plan.error
+        });
+      }
       return;
     }
     if (isReadOnlyMode()) {
@@ -497,6 +508,12 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (!plan || plan.error) {
       if (plan?.error) {
         setCommandFeedback(plan.error);
+        if (plan.blockedSession) {
+          showBlockedWriteReclaimUi(plan.blockedSession, {
+            source: "paste",
+            message: plan.error
+          });
+        }
       }
       return false;
     }

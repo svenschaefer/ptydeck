@@ -944,6 +944,26 @@ body {
   text-overflow: ellipsis;
 }
 
+.command-feedback-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #35516d;
+  background: rgba(23, 49, 75, 0.6);
+  color: #eef5ff;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.command-feedback-action[hidden],
+.command-feedback-action:empty {
+  display: none !important;
+}
+
 .status-message:empty,
 .command-target:empty,
 .command-feedback:empty,
@@ -2497,6 +2517,42 @@ dialog:not([open]) {
   color: #d8dee9;
 }
 
+.session-control-device {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.session-control-device-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-control-device-label {
+  color: #89aac8;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.session-control-device-name {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #2a3c50;
+  background: #0f151f;
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.session-control-device-save {
+  white-space: nowrap;
+}
+
 .session-control-clients {
   display: grid;
   gap: 8px;
@@ -2504,7 +2560,7 @@ dialog:not([open]) {
 
 .session-control-client {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   border: 1px solid #223041;
@@ -2540,10 +2596,32 @@ dialog:not([open]) {
   line-height: 1.35;
 }
 
+.session-control-client-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .session-control-transfer {
   flex: 0 0 auto;
   padding: 6px 10px;
   font-size: 12px;
+}
+
+.session-control-forget {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-color: #6a4b4b;
+  background: #27181b;
+  color: #ffd7d7;
+}
+
+.session-control-forget:hover {
+  border-color: #8f5b5b;
+  background: #311d21;
 }
 
 .session-settings-tabs {
@@ -2823,6 +2901,19 @@ dialog:not([open]) {
   .session-settings-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .session-control-device {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .session-control-client {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .session-control-client-actions {
+    justify-content: flex-start;
   }
 
   .send-history-body {

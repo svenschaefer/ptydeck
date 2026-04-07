@@ -99,3 +99,39 @@ test("startup backup controller fails startup when an incompatible backup alread
     /invalid or incompatible browser rollback backup/
   );
 });
+
+test("startup backup controller restores browser-local state from the verified rollback snapshot", async () => {
+  const localStorageRef = createLocalStorage({
+    "ptydeck.settings.v1": '{"sidebarVisible":false}',
+    "ptydeck.active-deck.v1": "ops",
+    [STARTUP_BACKUP_STORAGE_KEY]: JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 222,
+      sourceKeys: STARTUP_BACKUP_SOURCE_KEYS,
+      entries: {
+        "ptydeck.settings.v1": '{"sidebarVisible":true}',
+        "ptydeck.session-filter.v1": "ssh"
+      }
+    })
+  });
+  const controller = createStartupBackupRuntimeController({ localStorageRef });
+
+  const result = controller.restoreStartupBackup();
+
+  assert.equal(result.restored, true);
+  assert.equal(localStorageRef.getItem("ptydeck.settings.v1"), '{"sidebarVisible":true}');
+  assert.equal(localStorageRef.getItem("ptydeck.session-filter.v1"), "ssh");
+  assert.equal(localStorageRef.getItem("ptydeck.active-deck.v1"), null);
+});
+
+test("startup backup controller blocks restore when no verified rollback snapshot exists", async () => {
+  const controller = createStartupBackupRuntimeController({
+    localStorageRef: createLocalStorage()
+  });
+
+  assert.throws(
+    () => controller.restoreStartupBackup(),
+    /no browser rollback backup exists/
+  );
+});

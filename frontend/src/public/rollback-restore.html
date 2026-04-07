@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck H62 Rollback Restore</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(77, 125, 163, 0.18), transparent 42%),
+          linear-gradient(180deg, #101722, #0a0f17 78%);
+        color: #edf4ff;
+      }
+
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 40px 20px 64px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .panel {
+        border: 1px solid #233247;
+        border-radius: 14px;
+        background: rgba(16, 23, 34, 0.92);
+        padding: 18px 20px;
+        box-shadow: 0 22px 52px rgba(0, 0, 0, 0.36);
+      }
+
+      h1,
+      h2,
+      p,
+      ul {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.15;
+      }
+
+      h2 {
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8fb8de;
+      }
+
+      p,
+      li {
+        color: #c6d3e1;
+        line-height: 1.55;
+      }
+
+      .status {
+        color: #eef5ff;
+        font-weight: 600;
+      }
+
+      ul {
+        padding-left: 18px;
+        display: grid;
+        gap: 6px;
+      }
+
+      button {
+        justify-self: start;
+        border: 1px solid #35516d;
+        border-radius: 999px;
+        background: #17314b;
+        color: #eef5ff;
+        padding: 10px 16px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>ptydeck H62 Rollback Restore</h1>
+        <p>
+          Use this page before switching from
+          <code>feature/h62-multi-device-control-foundation</code>
+          back to <code>main</code>. It restores the browser-local ptydeck keys from the pre-H62 snapshot that the
+          feature branch created on first startup.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Status</h2>
+        <p id="rollback-restore-status" class="status">Checking browser rollback backup...</p>
+        <p id="rollback-restore-detail"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Tracked Keys</h2>
+        <ul id="rollback-restore-source-keys"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Restore</h2>
+        <p>
+          This only restores browser-local state in this same browser profile. Restore the backend runtime file with
+          <code>npm run h62:rollback:restore</code> first or in parallel.
+        </p>
+        <button id="rollback-restore-run" type="button" disabled>Restore Browser State</button>
+      </section>
+    </main>
+
+    <script type="module" src="./startup-backup-restore-page.js"></script>
+  </body>
+</html>
