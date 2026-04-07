@@ -15,11 +15,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: none currently.
+- Queued next wave: `v0.4.0-H62`.
 
 ## Queued Execution Order
 
-- none currently
+1. `v0.4.0-H62` - Multi-Device Terminal Control Foundation
+   - `MDT-001`
+   - `MDT-002` after `MDT-001`
+   - `MDT-003` after `MDT-001` and `MDT-002`
+   - `MDT-004` after `MDT-002` and `MDT-003`
+   - `MDT-005` after `MDT-001`, `MDT-002`, `MDT-003`, and `MDT-004`
 
 ## Sequencing Rules
 
