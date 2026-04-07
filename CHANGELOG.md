@@ -2,6 +2,11 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-07
+
+- [x] Replaced the earlier outline-only draft in `docs/Multi-Device Terminal Control Requirements.md` with a decision-bearing requirement baseline for multi-device terminal control: the document now defines the Owner / Controller / Spectator role model, single-writer input arbitration, Controller-owned PTY resize authority, the required split between globally synchronized runtime state and client-local UI state, explicit observability requirements, and measurable non-functional expectations instead of leaving those system rules as open questions.
+- [x] Persisted that new multi-device control baseline in `CODEX_CONTEXT.md` so the Owner / Controller / Spectator model, exclusive control semantics, resize authority, and shared-versus-local-state split remain part of the repository's standing architecture/governance context.
+
 ## 2026-04-06
 
 - [x] Clarified the terminal/composer send-safety guard UX for multiline and large paste input: `frontend/src/public/command-composer-runtime-controller.js` now turns a held send into an explicit “nothing has been sent yet” state, mirrors that feedback into the normal command-feedback surface for both composer sends and terminal-local paste sends, and makes multiline holds visibly read as pending confirmation instead of broken paste/send behavior.
