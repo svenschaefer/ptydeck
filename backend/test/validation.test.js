@@ -163,6 +163,24 @@ test("validateRequest accepts valid session control payloads and rejects invalid
       params: { sessionId: "abc" },
       body: { clientId: "ws-stale" }
     });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "all" }
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "deck", deckId: "ops" }
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "session", sessionId: "abc" }
+    });
   });
   assert.throws(() => {
     validateRequest({
@@ -186,6 +204,22 @@ test("validateRequest accepts valid session control payloads and rejects invalid
       pathname: "/api/v1/sessions/abc/control/forget-client",
       params: { sessionId: "abc" },
       body: { clientId: "" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "deck" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "session" }
     });
   });
 });

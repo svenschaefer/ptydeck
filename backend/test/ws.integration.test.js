@@ -942,7 +942,7 @@ test("WS operator clients keep stable trusted-local control identity across reco
   }
 });
 
-test("session control endpoints enforce controller-only writes and explicit take release transfer flows", async () => {
+test("session control endpoints allow deterministic takeover without prior release and support scope claims", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
     createPty: createEchoPtyFactory(),
     authMode: "dev",
@@ -966,6 +966,13 @@ test("session control endpoints enforce controller-only writes and explicit take
     });
     assert.equal(createSessionRes.status, 201);
     const createdSession = await createSessionRes.json();
+    const secondSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: ownerJsonHeaders,
+      body: JSON.stringify({ name: "exclusive-shell-2" })
+    });
+    assert.equal(secondSessionRes.status, 201);
+    const secondSession = await secondSessionRes.json();
 
     const ownerTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
       method: "POST",
@@ -1016,6 +1023,14 @@ test("session control endpoints enforce controller-only writes and explicit take
           event.session.controlState.attachedClients.length === 2
       )
     );
+    await waitFor(() =>
+      ownerEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === secondSession.id &&
+          event.session.controlState.attachedClients.length === 2
+      )
+    );
 
     const peerSnapshot = peerEvents.find((event) => event.type === "snapshot");
     assert.equal(typeof peerSnapshot?.clientId, "string");
@@ -1041,37 +1056,6 @@ test("session control endpoints enforce controller-only writes and explicit take
     });
     assert.equal(deniedResizeRes.status, 403);
 
-    const deniedTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/take`, {
-      method: "POST",
-      headers: {
-        ...peerJsonHeaders,
-        "x-ptydeck-client-id": peerClientId
-      },
-      body: "{}"
-    });
-    assert.equal(deniedTakeRes.status, 403);
-
-    const releaseRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/release`, {
-      method: "POST",
-      headers: {
-        ...ownerJsonHeaders,
-        "x-ptydeck-client-id": ownerClientId
-      },
-      body: "{}"
-    });
-    assert.equal(releaseRes.status, 200);
-    const releasedSession = await releaseRes.json();
-    assert.equal(releasedSession.controlState.currentController, null);
-
-    await waitFor(() =>
-      peerEvents.some(
-        (event) =>
-          event.type === "session.updated" &&
-          event.session?.id === createdSession.id &&
-          event.session.controlState.currentController === null
-      )
-    );
-
     const peerTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/take`, {
       method: "POST",
       headers: {
@@ -1083,6 +1067,28 @@ test("session control endpoints enforce controller-only writes and explicit take
     assert.equal(peerTakeRes.status, 200);
     const peerControlledSession = await peerTakeRes.json();
     assert.equal(peerControlledSession.controlState.currentController.clientId, peerClientId);
+
+    const scopeTakeRes = await fetch(`${baseUrl}/session-control/take`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: JSON.stringify({ scope: "all" })
+    });
+    assert.equal(scopeTakeRes.status, 200);
+    const scopeTakePayload = await scopeTakeRes.json();
+    assert.equal(scopeTakePayload.scope, "all");
+    assert.equal(scopeTakePayload.controllerClientId, peerClientId);
+    assert.deepEqual(
+      scopeTakePayload.updatedSessions.map((session) => session.id).sort(),
+      [createdSession.id, secondSession.id].sort()
+    );
+    assert.ok(
+      scopeTakePayload.updatedSessions.every(
+        (session) => session.controlState.currentController?.clientId === peerClientId
+      )
+    );
 
     const ownerDeniedAfterTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
       method: "POST",
@@ -1112,6 +1118,14 @@ test("session control endpoints enforce controller-only writes and explicit take
           event.type === "session.updated" &&
           event.session?.id === createdSession.id &&
           event.session.controlState.currentController?.clientId === ownerClientId
+      )
+    );
+    await waitFor(() =>
+      ownerEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === secondSession.id &&
+          event.session.controlState.currentController?.clientId === peerClientId
       )
     );
 

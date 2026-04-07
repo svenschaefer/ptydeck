@@ -117,7 +117,13 @@ export function createSessionTerminalResizeController(options = {}) {
     }
 
     if (!canWriteToSession(session)) {
-      showBlockedWriteReclaimUi(session, { source: "resize" });
+      showBlockedWriteReclaimUi(session, {
+        source: "resize",
+        retryAction: {
+          kind: "resize",
+          sessionId
+        }
+      });
       return;
     }
 

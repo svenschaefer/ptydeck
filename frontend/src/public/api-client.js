@@ -379,6 +379,9 @@ export function createApiClient(baseUrl, options = {}) {
         body: "{}"
       });
     },
+    async takeSessionControlScope(payload = {}) {
+      return request("/session-control/take", withJson(payload || {}));
+    },
     async releaseSessionControl(sessionId) {
       return request(`/sessions/${encodeURIComponent(sessionId)}/control/release`, {
         method: "POST",

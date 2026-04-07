@@ -259,12 +259,21 @@ Second-client smoke procedure:
    - both clients see the same session output
    - the second client appears in the attached-device list
    - trusted-local labels distinguish `This device` from `Other device`
-8. Verify controller reclaim behavior between the two clients:
+8. Verify the subtle startup takeover flow on the second client:
+   - the UI offers the trusted-local startup takeover prompt when the second client is not already the effective controller
+   - declining the prompt keeps the second client attached without silently taking control
+   - accepting the prompt can take control without a prior release from the first client
+9. Verify controller reclaim and scope-aware takeover behavior between the two clients:
    - a blocked write on the non-controller client exposes `Take Control` or `Reclaim Control`
-   - taking or reclaiming control succeeds deterministically
+   - taking or reclaiming control succeeds deterministically without requiring multiple retries
+   - the compact `Control` flow can claim `All Sessions`, `This Deck`, and `This Session`
    - the controller indicator updates on both clients
    - subsequent write attempts on the controller client succeed
-9. Verify stale-device cleanup:
+10. Verify device-local layout recall on successful takeover:
+   - a known device reapplies its own local layout and terminal-size preferences after takeover
+   - an unseen device captures a first-use baseline instead of forcing another device's layout
+   - layout application stays local to the claiming device and does not disturb the other attached client
+11. Verify stale-device cleanup:
    - disconnect or close one attached client
    - wait for the branch's stale/offline handling to settle
    - confirm a stale device can be forgotten explicitly when the UI offers it
@@ -302,8 +311,12 @@ Multi-device control behavior:
 
 - [ ] Two attached clients can observe the same session output under the real hostnames.
 - [ ] Only one client can control input/PTY-authoritative resize at a time.
+- [ ] The second client shows the trusted-local startup takeover prompt when appropriate.
+- [ ] Startup takeover can claim control without a prior release from the current controller.
 - [ ] A blocked non-controller write offers `Take Control` or `Reclaim Control`.
+- [ ] Scope-aware takeover works for `All Sessions`, `This Deck`, and `This Session`.
 - [ ] Control reclaim updates attached clients deterministically.
+- [ ] Successful takeover reapplies or first-captures device-local layout and terminal-size preferences without cross-device layout fights.
 - [ ] Stale or offline attached devices can be forgotten without corrupting active control state.
 
 Rollback and restore:

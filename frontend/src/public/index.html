@@ -137,10 +137,18 @@
                   <p id="command-target" class="command-target"></p>
                   <p id="command-feedback" class="command-feedback"></p>
                   <button id="command-feedback-action" class="command-feedback-action" type="button" hidden></button>
+                  <div id="trusted-local-handoff-prompt" class="trusted-local-handoff-prompt" hidden>
+                    <p id="trusted-local-handoff-prompt-message" class="trusted-local-handoff-prompt-message"></p>
+                    <div class="trusted-local-handoff-prompt-actions">
+                      <button id="trusted-local-handoff-prompt-yes" type="button">Yes</button>
+                      <button id="trusted-local-handoff-prompt-no" type="button">No</button>
+                    </div>
+                  </div>
                 </div>
                 <div class="command-meta-actions">
                   <button id="workspace-manager-open" type="button">Manage</button>
                   <button id="send-history-open" type="button">History</button>
+                  <button id="trusted-local-control-open" type="button">Control</button>
                   <p id="control-pane-status" class="control-pane-status"></p>
                   <label class="control-pane-position-wrap">
                     <span>Position</span>
@@ -641,6 +649,25 @@
           <div class="action-dialog-actions">
             <button id="action-dialog-confirm" type="button">Confirm</button>
             <button id="action-dialog-cancel" type="button">Cancel</button>
+          </div>
+        </dialog>
+        <dialog id="trusted-local-control-dialog" class="trusted-local-control-dialog">
+          <div class="trusted-local-control-head">
+            <div class="trusted-local-control-heading">
+              <p class="trusted-local-control-title">Control On This Device</p>
+              <p id="trusted-local-control-meta" class="trusted-local-control-meta"></p>
+            </div>
+            <button id="trusted-local-control-close" type="button" aria-label="Close control dialog">
+              <span class="icon-tabler icon-tabler-x" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="trusted-local-control-note">
+            Taking control also restores this device's remembered local layout when one is available.
+          </p>
+          <div class="trusted-local-control-actions">
+            <button id="trusted-local-control-take-all" type="button">All Sessions</button>
+            <button id="trusted-local-control-take-deck" type="button">This Deck</button>
+            <button id="trusted-local-control-take-session" type="button">This Session</button>
           </div>
         </dialog>
       </section>

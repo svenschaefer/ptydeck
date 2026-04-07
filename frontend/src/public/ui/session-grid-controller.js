@@ -53,6 +53,7 @@ export function createSessionGridController(options = {}) {
   const confirmSessionDelete = options.confirmSessionDelete || (() => true);
   const requestSessionRename = options.requestSessionRename || (() => Promise.resolve(null));
   const renameTrustedLocalDevice = options.renameTrustedLocalDevice || (() => Promise.resolve(null));
+  const takeTrustedLocalControl = options.takeTrustedLocalControl || ((_scope, _options) => Promise.resolve(null));
   const confirmForgetSessionControlClient = options.confirmForgetSessionControlClient || (() => Promise.resolve(false));
   const removeSession = options.removeSession || (() => {});
   const setCommandFeedback = options.setCommandFeedback || (() => {});
@@ -300,6 +301,7 @@ export function createSessionGridController(options = {}) {
         requestSessionRename,
         removeSession,
         renameTrustedLocalDevice,
+        takeTrustedLocalControl,
         confirmForgetSessionControlClient,
         setCommandFeedback,
         formatSessionToken,

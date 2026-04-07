@@ -13,7 +13,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Session replay/export, file transfer, read-only sharing, and saved connection profiles
-- Multi-device terminal-control foundation with explicit Owner / Controller / Spectator roles, visible control metadata, and take/release/transfer control actions
+- Multi-device terminal-control foundation with visible control metadata, take/release/transfer control actions, trusted-local scope takeover (`all sessions`, `this deck`, `this session`), and automatic device-local layout recall on successful takeover
 - Dedicated `Workspace Library` manager for guided local/SSH connection profiles, first-connect SSH trust verification, workspace presets, and deck-group management outside the sidebar
 - Per-session safety controls, dual theme slots, multiline notes, and controlled mouse forwarding
 - REST + WebSocket backend with restart-safe persistence and deterministic contracts
@@ -35,7 +35,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Multi-session workspace rendering
 - Central command/composer flow plus slash-command plane
 - Decks, layout profiles, split-layout support, and a dedicated `Workspace Library` surface for guided connection setup with `Advanced` disclosure, SSH trust verification, workspace presets, and deck-group management
-- Session-level control badges/actions, trusted-local device identity/handoff states, and browser-side write blocking for non-controller clients on the multi-device feature branch
+- Session-level control badges/actions, trusted-local device identity/handoff states, subtle startup/anytime takeover prompts, blocked-write `Take Control and Retry` recovery, and browser-side write blocking for non-controller clients on the multi-device feature branch
 - Runtime/debug helpers for traceability and troubleshooting
 
 ## Quick Start

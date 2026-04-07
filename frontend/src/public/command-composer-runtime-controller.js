@@ -227,7 +227,13 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (nonWritableSessions.length > 0) {
       return {
         error: getSessionWriteBlockedMessage(nonWritableSessions[0]),
-        blockedSession: nonWritableSessions[0]
+        blockedSession: nonWritableSessions[0],
+        targetSessions,
+        targetPayload,
+        routeFeedback,
+        directRouteMatched: directRouting.matched === true,
+        source: "composer",
+        activateTargetBeforeSend: false
       };
     }
 
@@ -445,7 +451,17 @@ export function createCommandComposerRuntimeController(options = {}) {
       if (plan.blockedSession) {
         showBlockedWriteReclaimUi(plan.blockedSession, {
           source: "send",
-          message: plan.error
+          message: plan.error,
+          retryAction:
+            Array.isArray(plan.targetSessions) && plan.targetSessions.length === 1
+              ? {
+                  kind: "send",
+                  sessionId: plan.blockedSession.id,
+                  payload: plan.targetPayload,
+                  activateTargetBeforeSend: true,
+                  routeFeedback: plan.routeFeedback || ""
+                }
+              : null
         });
       }
       return;
@@ -511,7 +527,14 @@ export function createCommandComposerRuntimeController(options = {}) {
         if (plan.blockedSession) {
           showBlockedWriteReclaimUi(plan.blockedSession, {
             source: "paste",
-            message: plan.error
+            message: plan.error,
+            retryAction: {
+              kind: "paste",
+              sessionId: plan.blockedSession.id,
+              payload: plan.targetPayload,
+              activateTargetBeforeSend: true,
+              routeFeedback: plan.routeFeedback || ""
+            }
           });
         }
       }
@@ -552,6 +575,37 @@ export function createCommandComposerRuntimeController(options = {}) {
     clearPendingSend({ renderAfterClear: true });
     setCommandFeedback("Command send cancelled.");
     return true;
+  }
+
+  async function retryBlockedAction(action = {}) {
+    const sessionId = String(action.sessionId || "").trim();
+    const payload = String(action.payload || "");
+    const kind = String(action.kind || "").trim().toLowerCase();
+    if (!sessionId || !payload || !["send", "paste"].includes(kind)) {
+      return false;
+    }
+    const plan = resolveSingleSessionPlan(sessionId, payload, {
+      source: kind === "paste" ? "paste" : "composer",
+      activateTargetBeforeSend: action.activateTargetBeforeSend === true,
+      routeFeedback: String(action.routeFeedback || "")
+    });
+    if (!plan || plan.error) {
+      if (plan?.error) {
+        setCommandFeedback(plan.error);
+      }
+      return false;
+    }
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return false;
+    }
+    try {
+      await executeSendPlan(plan);
+      return true;
+    } catch {
+      setError(kind === "paste" ? "Failed to paste into terminal." : "Failed to send command.");
+      return false;
+    }
   }
 
   function resolveCustomPreview(custom, rawInput) {
@@ -648,6 +702,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     submitTerminalPaste,
     confirmPendingSend,
     cancelPendingSend,
+    retryBlockedAction,
     clearPendingSend,
     refreshCommandPreview,
     scheduleCommandPreview,

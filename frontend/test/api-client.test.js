@@ -94,25 +94,29 @@ test("api client attaches session-control client id and calls session control en
   const api = createApiClient("http://localhost:18080/api/v1");
   api.setSessionControlClientId("client-1");
   await api.takeSessionControl("s1");
+  await api.takeSessionControlScope({ scope: "all" });
   await api.releaseSessionControl("s1");
   await api.transferSessionControl("s1", "client-2");
   await api.renameSessionControlClient("s1", "Desk Browser");
   await api.forgetSessionControlClient("s1", "client-stale");
 
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 6);
   assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/s1/control/take");
-  assert.equal(calls[1].url, "http://localhost:18080/api/v1/sessions/s1/control/release");
-  assert.equal(calls[2].url, "http://localhost:18080/api/v1/sessions/s1/control/transfer");
-  assert.equal(calls[3].url, "http://localhost:18080/api/v1/sessions/s1/control/rename-client");
-  assert.equal(calls[4].url, "http://localhost:18080/api/v1/sessions/s1/control/forget-client");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/session-control/take");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/sessions/s1/control/release");
+  assert.equal(calls[3].url, "http://localhost:18080/api/v1/sessions/s1/control/transfer");
+  assert.equal(calls[4].url, "http://localhost:18080/api/v1/sessions/s1/control/rename-client");
+  assert.equal(calls[5].url, "http://localhost:18080/api/v1/sessions/s1/control/forget-client");
   assert.equal(calls[0].options.headers["x-ptydeck-client-id"], "client-1");
   assert.equal(calls[1].options.headers["x-ptydeck-client-id"], "client-1");
   assert.equal(calls[2].options.headers["x-ptydeck-client-id"], "client-1");
   assert.equal(calls[3].options.headers["x-ptydeck-client-id"], "client-1");
   assert.equal(calls[4].options.headers["x-ptydeck-client-id"], "client-1");
-  assert.equal(calls[2].options.body, JSON.stringify({ clientId: "client-2" }));
-  assert.equal(calls[3].options.body, JSON.stringify({ label: "Desk Browser" }));
-  assert.equal(calls[4].options.body, JSON.stringify({ clientId: "client-stale" }));
+  assert.equal(calls[5].options.headers["x-ptydeck-client-id"], "client-1");
+  assert.equal(calls[1].options.body, JSON.stringify({ scope: "all" }));
+  assert.equal(calls[3].options.body, JSON.stringify({ clientId: "client-2" }));
+  assert.equal(calls[4].options.body, JSON.stringify({ label: "Desk Browser" }));
+  assert.equal(calls[5].options.body, JSON.stringify({ clientId: "client-stale" }));
 });
 
 test("api client reports trace metadata from response headers", async () => {

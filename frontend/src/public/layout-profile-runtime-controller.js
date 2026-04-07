@@ -472,11 +472,40 @@ export function createLayoutProfileRuntimeController(options = {}) {
     if (!profile) {
       throw new Error(`Unknown layout profile: ${profileId}`);
     }
-    const targetActiveDeckId = profile.layout.activeDeckId;
+    await applyLayoutSnapshot(profile.layout, {
+      scope: "all",
+      targetDeckId: profile.layout.activeDeckId
+    });
+    selectedProfileId = profile.id;
+    render();
+    return `Applied layout profile [${profile.id}] ${profile.name}.`;
+  }
+
+  async function applyLayoutSnapshot(layout, options = {}) {
+    const normalizedLayout = normalizeLayoutProfileRecord({
+      id: "__device-layout__",
+      name: "Device Layout",
+      createdAt: 0,
+      updatedAt: 0,
+      layout
+    })?.layout;
+    if (!normalizedLayout) {
+      throw new Error("Invalid layout snapshot.");
+    }
+    const scope = normalizeLower(options.scope) || "all";
     const currentDecks = getDecks();
-    for (const deck of currentDecks) {
-      const deckId = normalizeText(deck?.id);
-      const nextGeometry = profile.layout.deckTerminalSettings[deckId];
+    const requestedTargetDeckId = normalizeText(options.targetDeckId);
+    const targetActiveDeckId =
+      requestedTargetDeckId ||
+      normalizedLayout.activeDeckId;
+    const deckIdsToApply =
+      scope === "all"
+        ? currentDecks
+            .map((deck) => normalizeText(deck?.id))
+            .filter(Boolean)
+        : [targetActiveDeckId].filter(Boolean);
+    for (const deckId of deckIdsToApply) {
+      const nextGeometry = normalizedLayout.deckTerminalSettings[deckId];
       if (!deckId || !nextGeometry) {
         continue;
       }
@@ -486,21 +515,30 @@ export function createLayoutProfileRuntimeController(options = {}) {
       }
       await updateDeckGeometry(deckId, nextGeometry, targetActiveDeckId);
     }
-    setSidebarVisible(profile.layout.sidebarVisible);
-    setSessionFilterText(profile.layout.sessionFilterText);
+    setSidebarVisible(normalizedLayout.sidebarVisible);
+    setSessionFilterText(normalizedLayout.sessionFilterText);
     if (typeof setControlPaneState === "function") {
-      setControlPaneState(normalizeControlPaneState(profile.layout));
+      setControlPaneState(normalizeControlPaneState(normalizedLayout));
     }
     if (typeof setDeckSplitLayouts === "function") {
-      setDeckSplitLayouts(profile.layout.deckSplitLayouts);
+      if (scope === "all") {
+        setDeckSplitLayouts(normalizedLayout.deckSplitLayouts);
+      } else if (targetActiveDeckId) {
+        const currentLayouts = cloneDeckSplitLayoutMap(typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {});
+        if (normalizedLayout.deckSplitLayouts[targetActiveDeckId]) {
+          currentLayouts[targetActiveDeckId] = cloneDeckSplitLayoutEntry(normalizedLayout.deckSplitLayouts[targetActiveDeckId]);
+        }
+        setDeckSplitLayouts(currentLayouts);
+      }
     }
     if (currentDecks.some((deck) => normalizeText(deck?.id) === targetActiveDeckId)) {
       setActiveDeck(targetActiveDeckId);
     }
     requestRender();
-    selectedProfileId = profile.id;
     render();
-    return `Applied layout profile [${profile.id}] ${profile.name}.`;
+    return targetActiveDeckId
+      ? `Applied layout snapshot for deck [${targetActiveDeckId}].`
+      : "Applied layout snapshot.";
   }
 
   async function createProfileFromCurrentLayout(name) {
@@ -666,6 +704,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
     removeProfile,
     resolveProfile,
     captureCurrentLayout,
+    applyLayoutSnapshot,
     createProfileFromCurrentLayout,
     applyProfileById,
     renameProfileById,

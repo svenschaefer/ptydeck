@@ -964,6 +964,36 @@ body {
   display: none !important;
 }
 
+.trusted-local-handoff-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #2c4054;
+  border-radius: 10px;
+  background: rgba(18, 27, 40, 0.92);
+}
+
+.trusted-local-handoff-prompt[hidden] {
+  display: none !important;
+}
+
+.trusted-local-handoff-prompt-message {
+  margin: 0;
+  color: #d7e4f2;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.trusted-local-handoff-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .status-message:empty,
 .command-target:empty,
 .command-feedback:empty,
@@ -1735,6 +1765,71 @@ dialog:not([open]) {
   justify-content: flex-end;
   gap: 10px;
   padding: 16px;
+}
+
+.trusted-local-control-dialog {
+  width: min(440px, calc(100vw - 48px));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(23, 33, 49, 0.98), rgba(12, 18, 28, 0.98)),
+    #0f151f;
+  color: var(--text);
+  overflow: hidden;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.42);
+}
+
+.trusted-local-control-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.trusted-local-control-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #223041;
+}
+
+.trusted-local-control-heading {
+  min-width: 0;
+}
+
+.trusted-local-control-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9db8d2;
+}
+
+.trusted-local-control-meta {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.trusted-local-control-note {
+  margin: 0;
+  padding: 14px 16px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.trusted-local-control-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.trusted-local-control-actions button {
+  min-width: 0;
 }
 
 .terminal-ctrl-c-head {

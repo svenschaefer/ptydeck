@@ -189,7 +189,7 @@ test("session-terminal-resize controller offers reclaim UI instead of remote res
     resolveSessionDeckId: (session) => session.deckId,
     getSessionTerminalGeometry: () => ({ cols: 80, rows: 24 }),
     canWriteToSession: () => false,
-    showBlockedWriteReclaimUi: (session, options) => reclaimCalls.push([session.id, options.source]),
+    showBlockedWriteReclaimUi: (session, options) => reclaimCalls.push([session.id, options.source, options.retryAction?.kind]),
     computeFixedMountHeightPx: (rows) => rows * 10,
     computeFixedCardWidthPx: (cols) => cols * 5 + 20,
     getTerminalCellHeightPx: () => 10,
@@ -204,7 +204,7 @@ test("session-terminal-resize controller offers reclaim UI instead of remote res
 
   controller.applyResizeForSession("s1");
 
-  assert.deepEqual(reclaimCalls, [["s1", "resize"]]);
+  assert.deepEqual(reclaimCalls, [["s1", "resize", "resize"]]);
   assert.deepEqual(apiCalls, []);
   assert.equal(windowRef.scheduled.length, 0);
 });

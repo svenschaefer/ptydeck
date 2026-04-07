@@ -561,6 +561,10 @@ function route(pathname, method) {
     return { kind: "takeSessionControl", params: { sessionId: takeControlMatch[1] } };
   }
 
+  if (pathname === "/api/v1/session-control/take" && method === "POST") {
+    return { kind: "takeSessionControlScope", params: {} };
+  }
+
   const releaseControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/release$/);
   if (releaseControlMatch && method === "POST") {
     return { kind: "releaseSessionControl", params: { sessionId: releaseControlMatch[1] } };
@@ -646,6 +650,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/control\/take$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/control/take";
+  }
+  if (pathname === "/api/v1/session-control/take") {
+    return "/api/v1/session-control/take";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/control\/release$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/control/release";
@@ -3374,6 +3381,7 @@ export function createRuntime(config) {
       kind === "input" ||
       kind === "resize" ||
       kind === "takeSessionControl" ||
+      kind === "takeSessionControlScope" ||
       kind === "releaseSessionControl" ||
       kind === "transferSessionControl" ||
       kind === "renameSessionControlClient" ||
@@ -4930,23 +4938,71 @@ export function createRuntime(config) {
   }
 
   function requireSessionControlRequestClient(sessionId, auth = null, req = null) {
-    const clientId = resolveSessionControlClientId(req, sessionId, auth);
-    if (!clientId) {
+    const requestClient = requireActiveSessionControlAttachment(auth, req);
+    if (!requestClient) {
       throw new ApiError(
         409,
         "ControllerClientRequired",
         "This action requires an active attached session client. Reconnect the session UI and retry."
       );
     }
-    const attachedClient = findAttachedClientForSession(sessionId, clientId, auth, { activeOnly: true });
+    const attachedClient = findAttachedClientForSession(sessionId, requestClient.clientId, auth, { activeOnly: true });
     if (!attachedClient) {
       throw new ApiError(409, "ControllerClientRequired", "This action requires an active attached session client. Reconnect the session UI and retry.");
     }
     return attachedClient;
   }
 
+  function findActiveSessionControlAttachment(auth = null, clientId = "") {
+    const attachmentKey = getSessionControlAttachmentKey({
+      auth,
+      clientId
+    });
+    if (!attachmentKey) {
+      return null;
+    }
+    const attachment = sessionControlAttachments.get(attachmentKey) || null;
+    if (!attachment?.client || attachment.client.active !== true) {
+      return null;
+    }
+    return attachment.client;
+  }
+
+  function requireActiveSessionControlAttachment(auth = null, req = null) {
+    const headerValue = req?.headers?.[SESSION_CONTROL_CLIENT_ID_HEADER];
+    const requestedClientId = Array.isArray(headerValue)
+      ? String(headerValue[0] || "").trim()
+      : typeof headerValue === "string"
+        ? headerValue.trim()
+        : "";
+    if (!requestedClientId) {
+      throw new ApiError(
+        409,
+        "ControllerClientRequired",
+        "This action requires an active attached session client. Reconnect the session UI and retry."
+      );
+    }
+    const attachedClient = findActiveSessionControlAttachment(auth, requestedClientId);
+    if (!attachedClient) {
+      throw new ApiError(
+        409,
+        "ControllerClientRequired",
+        "This action requires an active attached session client. Reconnect the session UI and retry."
+      );
+    }
+    return attachedClient;
+  }
+
   function requireOperatorSessionControlRequestClient(sessionId, auth = null, req = null) {
     const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    if (requestClient.accessMode === "spectator") {
+      throw new ApiError(403, "ControlDenied", "Read-only spectator clients cannot modify trusted-local device attachments.");
+    }
+    return requestClient;
+  }
+
+  function requireOperatorSessionControlAttachment(auth = null, req = null) {
+    const requestClient = requireActiveSessionControlAttachment(auth, req);
     if (requestClient.accessMode === "spectator") {
       throw new ApiError(403, "ControlDenied", "Read-only spectator clients cannot modify trusted-local device attachments.");
     }
@@ -4999,14 +5055,8 @@ export function createRuntime(config) {
   }
 
   function takeSessionControlOrThrow(sessionId, auth = null, req = null, traceSeed = null) {
-    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const requestClient = requireOperatorSessionControlRequestClient(sessionId, auth, req);
     const currentState = getSessionControlState(sessionId);
-    const controlView = getSessionControlViewOrThrow(sessionId, auth);
-    const isOwnerClient = sessionControlPrincipalsMatch(requestClient, currentState.owner);
-    const isCurrentController = controlView.currentController?.clientId === requestClient.clientId;
-    if (controlView.currentController && !isCurrentController && !isOwnerClient) {
-      throw new ApiError(403, "ControlDenied", "Only the owner can take control from the active controller.");
-    }
     return updateSessionControlStateAndBroadcast(
       sessionId,
       setSessionControllerClient(currentState, requestClient.clientId, { allowAutoAssign: true }),
@@ -5015,7 +5065,7 @@ export function createRuntime(config) {
   }
 
   function releaseSessionControlOrThrow(sessionId, auth = null, req = null, traceSeed = null) {
-    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const requestClient = requireOperatorSessionControlRequestClient(sessionId, auth, req);
     const currentState = getSessionControlState(sessionId);
     const controlView = getSessionControlViewOrThrow(sessionId, auth);
     const isOwnerClient = sessionControlPrincipalsMatch(requestClient, currentState.owner);
@@ -5031,7 +5081,7 @@ export function createRuntime(config) {
   }
 
   function transferSessionControlOrThrow(sessionId, targetClientId, auth = null, req = null, traceSeed = null) {
-    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const requestClient = requireOperatorSessionControlRequestClient(sessionId, auth, req);
     const normalizedTargetClientId = String(targetClientId || "").trim();
     if (!normalizedTargetClientId) {
       throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
@@ -5098,6 +5148,55 @@ export function createRuntime(config) {
     forgetSessionControlAttachment(auth, normalizedTargetClientId);
     broadcastSessionControlRefreshForAuth(auth, traceSeed);
     return getSessionControlViewOrThrow(sessionId, auth);
+  }
+
+  function listClaimableSessionIdsForScope(scope, options = {}, auth = null) {
+    const normalizedScope = typeof scope === "string" ? scope.trim().toLowerCase() : "";
+    if (normalizedScope === "all") {
+      return listSessionIdsForAuth(auth);
+    }
+    if (normalizedScope === "deck") {
+      const normalizedDeckId = typeof options.deckId === "string" ? options.deckId.trim() : "";
+      if (!normalizedDeckId) {
+        throw new ApiError(400, "ValidationError", "Field 'deckId' is required when scope is 'deck'.");
+      }
+      getDeckOrThrow(normalizedDeckId, auth);
+      return listSessionIdsForAuth(auth).filter((sessionId) => resolveSessionDeckId(sessionId) === normalizedDeckId);
+    }
+    if (normalizedScope === "session") {
+      const normalizedSessionId = typeof options.sessionId === "string" ? options.sessionId.trim() : "";
+      if (!normalizedSessionId) {
+        throw new ApiError(400, "ValidationError", "Field 'sessionId' is required when scope is 'session'.");
+      }
+      getApiSessionOrThrow(normalizedSessionId, auth);
+      return [normalizedSessionId];
+    }
+    throw new ApiError(400, "ValidationError", "Field 'scope' must be one of: all, deck, session.");
+  }
+
+  function takeSessionControlScopeOrThrow(scope, options = {}, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireOperatorSessionControlAttachment(auth, req);
+    const targetSessionIds = listClaimableSessionIdsForScope(scope, options, auth);
+    const updatedSessions = [];
+    for (const sessionId of targetSessionIds) {
+      const currentState = getSessionControlState(sessionId);
+      const updatedControlState = setSessionControllerClient(currentState, requestClient.clientId, { allowAutoAssign: true });
+      sessionControlStates.set(sessionId, normalizeSessionControlState(updatedControlState, {
+        fallbackOwner: currentState.owner
+      }));
+      broadcastSessionUpdated(sessionId, {
+        ...(traceSeed && typeof traceSeed === "object" ? traceSeed : {}),
+        sessionId
+      });
+      updatedSessions.push(getApiSessionOrThrow(sessionId, auth));
+    }
+    return {
+      scope: typeof scope === "string" ? scope.trim().toLowerCase() : "",
+      deckId: typeof options.deckId === "string" ? options.deckId.trim() : "",
+      sessionId: typeof options.sessionId === "string" ? options.sessionId.trim() : "",
+      controllerClientId: requestClient.clientId,
+      updatedSessions
+    };
   }
 
   function snapshotRuntimeState() {
@@ -6430,6 +6529,16 @@ function tryCreateRestoredSession({
         validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
         await persistNow("session.control.take");
         writeJsonResponse( 200, nextPayload);
+        return;
+      }
+
+      if (match.kind === "takeSessionControlScope") {
+        const payload = takeSessionControlScopeOrThrow(body.scope, body, auth, req, {
+          ...requestTraceContext,
+          scope: typeof body?.scope === "string" ? body.scope : ""
+        });
+        await persistNow("session.control.scope_take");
+        writeJsonResponse(200, payload);
         return;
       }
 

@@ -606,6 +606,22 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname === "/api/v1/session-control/take") {
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    const scope = typeof body.scope === "string" ? body.scope.trim() : "";
+    if (!["all", "deck", "session"].includes(scope)) {
+      throw new ApiError(400, "ValidationError", "Field 'scope' must be one of: all, deck, session.");
+    }
+    if (scope === "deck" && (typeof body.deckId !== "string" || !body.deckId.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'deckId' must be a non-empty string when scope is 'deck'.");
+    }
+    if (scope === "session" && (typeof body.sessionId !== "string" || !body.sessionId.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'sessionId' must be a non-empty string when scope is 'session'.");
+    }
+  }
+
   if (method === "POST" && pathname.endsWith("/control/release")) {
     if (!params.sessionId) {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");

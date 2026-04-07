@@ -45,6 +45,12 @@ export function createSessionCardInteractionsController(options = {}) {
       });
     const removeSession = args.removeSession || (() => {});
     const renameTrustedLocalDevice = args.renameTrustedLocalDevice || (() => Promise.resolve(null));
+    const takeTrustedLocalControl =
+      args.takeTrustedLocalControl ||
+      ((_scope, runtimeOptions = {}) =>
+        typeof api?.takeSessionControl === "function"
+          ? api.takeSessionControl(runtimeOptions.sessionId || session.id)
+          : Promise.resolve(null));
     const confirmForgetSessionControlClient =
       args.confirmForgetSessionControlClient || (() => Promise.resolve(false));
     const setCommandFeedback = args.setCommandFeedback || (() => {});
@@ -162,7 +168,7 @@ export function createSessionCardInteractionsController(options = {}) {
     refs.sessionControlTakeBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;
       await applySessionControlUpdate(
-        () => api.takeSessionControl(session.id),
+        () => takeTrustedLocalControl("session", { sessionId: session.id }),
         `Took control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
         "Failed to take session control."
       );

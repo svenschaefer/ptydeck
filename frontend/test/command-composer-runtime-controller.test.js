@@ -285,7 +285,8 @@ test("command-composer runtime controller surfaces reclaim UI when send is block
     canWriteToSession: () => false,
     getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
     setCommandFeedback: (message) => calls.push(["feedback", message]),
-    showBlockedWriteReclaimUi: (session, options) => calls.push(["reclaim", session.id, options.source, options.message])
+    showBlockedWriteReclaimUi: (session, options) =>
+      calls.push(["reclaim", session.id, options.source, options.message, options.retryAction?.kind || ""])
   });
 
   await controller.submitCommand();
@@ -296,7 +297,8 @@ test("command-composer runtime controller surfaces reclaim UI when send is block
       "reclaim",
       "s1",
       "send",
-      "This session is currently controlled by another client. Input and resize are disabled."
+      "This session is currently controlled by another client. Input and resize are disabled.",
+      "send"
     ]
   ]);
 });
@@ -312,7 +314,8 @@ test("command-composer runtime controller surfaces reclaim UI when terminal past
     canWriteToSession: () => false,
     getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
     setCommandFeedback: (message) => calls.push(["feedback", message]),
-    showBlockedWriteReclaimUi: (session, options) => calls.push(["reclaim", session.id, options.source, options.message])
+    showBlockedWriteReclaimUi: (session, options) =>
+      calls.push(["reclaim", session.id, options.source, options.message, options.retryAction?.kind || ""])
   });
 
   const result = await controller.submitTerminalPaste("s1", "echo hi\n");
@@ -324,8 +327,60 @@ test("command-composer runtime controller surfaces reclaim UI when terminal past
       "reclaim",
       "s1",
       "paste",
-      "This session is currently controlled by another client. Input and resize are disabled."
+      "This session is currently controlled by another client. Input and resize are disabled.",
+      "paste"
     ]
+  ]);
+});
+
+test("command-composer runtime controller retries a blocked send after control is reclaimed", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => true,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (sendFn, sessionId, payload, mode) => {
+      calls.push(["send", sessionId, payload, mode]);
+      await sendFn(sessionId, payload);
+    },
+    apiSendInput: async (sessionId, payload) => {
+      calls.push(["api", sessionId, payload]);
+    },
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordSendHistory: (sessionId, payload) => calls.push(["history", sessionId, payload]),
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source]),
+    setCommandValue: (value) => calls.push(["value", value]),
+    setCommandPreview: (value) => calls.push(["preview", value]),
+    clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
+    clearError: () => calls.push(["clearError"]),
+    render: () => calls.push(["render"]),
+    debugLog: (event, payload) => calls.push(["debug", event, payload.activeSessionId || ""])
+  });
+
+  const result = await controller.retryBlockedAction({
+    kind: "send",
+    sessionId: "s1",
+    payload: "uname -a",
+    activateTargetBeforeSend: true
+  });
+
+  assert.equal(result, true);
+  assert.deepEqual(calls, [
+    ["debug", "command.send.start", "s1"],
+    ["send", "s1", "uname -a", "CR"],
+    ["api", "s1", "uname -a"],
+    ["history", "s1", "uname -a"],
+    ["record", "s1", "input"],
+    ["value", ""],
+    ["preview", ""],
+    ["clearSuggestions"],
+    ["clearError"],
+    ["debug", "command.send.ok", "s1"],
+    ["render"]
   ]);
 });
 
