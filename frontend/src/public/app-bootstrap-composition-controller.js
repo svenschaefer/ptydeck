@@ -94,6 +94,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       ? options.getSessionWriteBlockedMessage
       : () => "This client cannot send input to the selected session.";
   const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
+  const getWsTicketPayload = typeof options.getWsTicketPayload === "function" ? options.getWsTicketPayload : () => ({});
   const disposeStreamDebugTrace =
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
   const createBtn = options.createBtn || null;
@@ -324,7 +325,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       observeSessionData,
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
-      createWsTicket: () => api?.createWsTicket?.(),
+      createWsTicket: () => api?.createWsTicket?.(getWsTicketPayload()),
       bootstrapDevAuthToken: (runtimeOptions) => appRuntimeStateController?.bootstrapDevAuthToken?.(runtimeOptions)
     });
 

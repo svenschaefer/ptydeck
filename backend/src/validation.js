@@ -669,6 +669,12 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body !== undefined && !isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
+    if (body?.clientId !== undefined && (typeof body.clientId !== "string" || !body.clientId.trim())) {
+      throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
+    }
+    if (body?.label !== undefined && typeof body.label !== "string") {
+      throw new ApiError(400, "ValidationError", "Field 'label' must be a string.");
+    }
   }
 
   if (method === "GET" && pathname === "/api/v1/shares") {
@@ -1050,7 +1056,12 @@ function isSessionAttachedClient(value) {
   return (
     isSessionControlPrincipal(value) &&
     typeof value.clientId === "string" &&
+    typeof value.label === "string" &&
     Number.isInteger(value.connectedAt) &&
+    Number.isInteger(value.lastSeenAt) &&
+    (value.lastDisconnectedAt === null || Number.isInteger(value.lastDisconnectedAt)) &&
+    Number.isInteger(value.activeConnectionCount) &&
+    typeof value.active === "boolean" &&
     (value.role === "owner" || value.role === "controller" || value.role === "spectator")
   );
 }

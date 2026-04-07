@@ -144,6 +144,8 @@ const SESSION_QUICK_ID_FALLBACK = "?";
 const TRACE_HEADER_ID = "x-ptydeck-trace-id";
 const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
 const SESSION_CONTROL_CLIENT_ID_HEADER = "x-ptydeck-client-id";
+const SESSION_CONTROL_CLIENT_LABEL_MAX_LENGTH = 64;
+const DEFAULT_SESSION_CONTROL_STALE_CLIENT_TTL_MS = 90_000;
 const TRACE_TOKEN_MAX_LENGTH = 128;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
@@ -2552,6 +2554,7 @@ export function createRuntime(config) {
   });
   const wsTickets = new Map();
   const sockets = new Set();
+  const sessionControlAttachments = new Map();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
   let persistedReplayOutputs = new Map();
@@ -2562,6 +2565,11 @@ export function createRuntime(config) {
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
   const shareLinks = new Map();
+  const sessionControlStaleClientTtlMs =
+    Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
+      ? config.sessionControlStaleClientTtlMs
+      : DEFAULT_SESSION_CONTROL_STALE_CLIENT_TTL_MS;
+  let sessionControlAttachmentPruneTimer = null;
   const probeSshHostKeys =
     typeof config.probeSshHostKeys === "function"
       ? config.probeSshHostKeys
@@ -2956,8 +2964,145 @@ export function createRuntime(config) {
     }
   }
 
-  function issueWsTicket(auth) {
+  function normalizeSessionControlClientLabel(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value.trim().slice(0, SESSION_CONTROL_CLIENT_LABEL_MAX_LENGTH);
+  }
+
+  function getSessionControlAttachmentKey(input = {}) {
+    const clientId = typeof input.clientId === "string" ? input.clientId.trim() : "";
+    if (!clientId) {
+      return "";
+    }
+    const principal = createSessionControlPrincipal(input.auth || input.principal || input);
+    return [
+      clientId,
+      principal.subject,
+      principal.tenantId,
+      principal.accessMode,
+      principal.permissionMode || ""
+    ].join("\u001f");
+  }
+
+  function pruneStaleSessionControlAttachments(now = Date.now()) {
+    let removed = false;
+    for (const [attachmentKey, entry] of sessionControlAttachments.entries()) {
+      const client = entry?.client;
+      if (!client || client.activeConnectionCount > 0) {
+        continue;
+      }
+      if (!client.lastDisconnectedAt) {
+        sessionControlAttachments.delete(attachmentKey);
+        removed = true;
+        continue;
+      }
+      if (now - client.lastDisconnectedAt >= sessionControlStaleClientTtlMs) {
+        sessionControlAttachments.delete(attachmentKey);
+        removed = true;
+      }
+    }
+    return removed;
+  }
+
+  function clearSessionControlAttachmentPruneTimer() {
+    if (sessionControlAttachmentPruneTimer === null) {
+      return;
+    }
+    clearTimeout(sessionControlAttachmentPruneTimer);
+    sessionControlAttachmentPruneTimer = null;
+  }
+
+  function getNextSessionControlAttachmentPruneDelay(now = Date.now()) {
+    let nextDelay = null;
+    for (const entry of sessionControlAttachments.values()) {
+      const client = entry?.client;
+      if (!client || client.activeConnectionCount > 0 || !client.lastDisconnectedAt) {
+        continue;
+      }
+      const expiresIn = Math.max(0, sessionControlStaleClientTtlMs - (now - client.lastDisconnectedAt));
+      nextDelay = nextDelay === null ? expiresIn : Math.min(nextDelay, expiresIn);
+    }
+    return nextDelay;
+  }
+
+  function scheduleSessionControlAttachmentPrune() {
+    clearSessionControlAttachmentPruneTimer();
+    if (isStopping || isStopped) {
+      return;
+    }
+    const delayMs = getNextSessionControlAttachmentPruneDelay();
+    if (delayMs === null) {
+      return;
+    }
+    sessionControlAttachmentPruneTimer = setTimeout(() => {
+      sessionControlAttachmentPruneTimer = null;
+      const removed = pruneStaleSessionControlAttachments();
+      if (removed) {
+        broadcastSessionControlRefreshForAuth(null, { source: "ws" });
+      }
+      scheduleSessionControlAttachmentPrune();
+    }, delayMs);
+  }
+
+  function registerSessionControlAttachment(input = {}) {
+    const attachmentKey = getSessionControlAttachmentKey(input);
+    if (!attachmentKey) {
+      return null;
+    }
+    const existing = sessionControlAttachments.get(attachmentKey) || null;
+    const nextClient = createSessionAttachedClient({
+      ...(existing?.client || {}),
+      clientId: input.clientId,
+      label: normalizeSessionControlClientLabel(input.label) || existing?.client?.label || "",
+      principal: input.auth,
+      connectedAt: existing?.client?.connectedAt || Number(Date.now()),
+      lastSeenAt: Number(Date.now()),
+      lastDisconnectedAt: null,
+      activeConnectionCount: (existing?.client?.activeConnectionCount || 0) + 1,
+      active: true
+    });
+    const auth =
+      input.auth && typeof input.auth === "object" && !Array.isArray(input.auth)
+        ? { ...input.auth }
+        : null;
+    sessionControlAttachments.set(attachmentKey, {
+      key: attachmentKey,
+      client: nextClient,
+      auth
+    });
+    scheduleSessionControlAttachmentPrune();
+    return nextClient;
+  }
+
+  function unregisterSessionControlAttachment(socket) {
+    const attachmentKey = typeof socket?.sessionControlAttachmentKey === "string" ? socket.sessionControlAttachmentKey : "";
+    if (!attachmentKey) {
+      return;
+    }
+    const existing = sessionControlAttachments.get(attachmentKey);
+    if (!existing?.client) {
+      return;
+    }
+    const nextCount = Math.max(0, (existing.client.activeConnectionCount || 0) - 1);
+    sessionControlAttachments.set(attachmentKey, {
+      ...existing,
+      client: createSessionAttachedClient({
+        ...existing.client,
+        lastSeenAt: Number(Date.now()),
+        lastDisconnectedAt: nextCount === 0 ? Number(Date.now()) : null,
+        activeConnectionCount: nextCount,
+        active: nextCount > 0
+      })
+    });
+    scheduleSessionControlAttachmentPrune();
+  }
+
+  function issueWsTicket(auth, input = {}) {
     pruneExpiredWsTickets();
+    const requestedClientId = typeof input?.clientId === "string" ? input.clientId.trim() : "";
+    const requestedLabel = normalizeSessionControlClientLabel(input?.label);
     const ticket = crypto.randomBytes(24).toString("base64url");
     wsTickets.set(ticket, {
       expiresAt: Date.now() + (authWsTicketTtlSeconds * 1000),
@@ -2970,7 +3115,9 @@ export function createRuntime(config) {
         shareLinkId: typeof auth.shareLinkId === "string" ? auth.shareLinkId : "",
         shareTargetType: typeof auth.shareTargetType === "string" ? auth.shareTargetType : "",
         shareTargetId: typeof auth.shareTargetId === "string" ? auth.shareTargetId : "",
-        shareTokenId: typeof auth.shareTokenId === "string" ? auth.shareTokenId : ""
+        shareTokenId: typeof auth.shareTokenId === "string" ? auth.shareTokenId : "",
+        sessionControlClientId: requestedClientId || "",
+        sessionControlClientLabel: requestedLabel || ""
       }
     });
     return {
@@ -4607,16 +4754,39 @@ export function createRuntime(config) {
       return [];
     }
     const attachedClients = [];
-    for (const socket of sockets) {
-      if (socket.readyState !== socket.OPEN || !socket.sessionControlClient) {
+    for (const entry of sessionControlAttachments.values()) {
+      if (!entry?.client) {
         continue;
       }
-      if (!isSessionVisibleToAuth(model, socket.auth || null)) {
+      if (!isSessionVisibleToAuth(model, entry.auth || null)) {
         continue;
       }
-      attachedClients.push(socket.sessionControlClient);
+      attachedClients.push(entry.client);
     }
     return attachedClients;
+  }
+
+  function findAttachedClientForSession(sessionId, clientId, auth = null, options = {}) {
+    const normalizedClientId = typeof clientId === "string" ? clientId.trim() : "";
+    if (!normalizedClientId) {
+      return null;
+    }
+    const requestPrincipal = createSessionControlPrincipal(auth);
+    const activeOnly = options.activeOnly === true;
+    return (
+      listAttachedClientsForSession(sessionId).find((entry) => {
+        if (entry.clientId !== normalizedClientId) {
+          return false;
+        }
+        if (!sessionControlPrincipalsMatch(entry, requestPrincipal)) {
+          return false;
+        }
+        if (activeOnly && entry.active !== true) {
+          return false;
+        }
+        return true;
+      }) || null
+    );
   }
 
   function buildApiSessionControlState(sessionId, sessionModel = null) {
@@ -4638,6 +4808,8 @@ export function createRuntime(config) {
     }
     const currentState = getSessionControlState(sessionId);
     const attachedClients = listAttachedClientsForSession(sessionId, sessionModel);
+    const activeAttachedClients = attachedClients.filter((entry) => entry.active === true);
+    const activeOperatorClients = activeAttachedClients.filter((entry) => entry.accessMode !== "spectator");
     let nextState = currentState;
     if (
       nextState.controllerClientId &&
@@ -4646,9 +4818,11 @@ export function createRuntime(config) {
       nextState = setSessionControllerClient(nextState, null);
     }
     if (!nextState.controllerClientId && nextState.allowAutoAssign !== false) {
-      const ownerClient = attachedClients.find((entry) => sessionControlPrincipalsMatch(entry, nextState.owner));
+      const ownerClient = activeOperatorClients.find((entry) => sessionControlPrincipalsMatch(entry, nextState.owner));
       if (ownerClient) {
         nextState = setSessionControllerClient(nextState, ownerClient.clientId, { allowAutoAssign: true });
+      } else if (activeOperatorClients.length > 0) {
+        nextState = setSessionControllerClient(nextState, activeOperatorClients[0].clientId, { allowAutoAssign: true });
       }
     }
     if (!nextState.controllerClientId && attachedClients.length === 0 && nextState.allowAutoAssign === false) {
@@ -4685,14 +4859,7 @@ export function createRuntime(config) {
     if (!requestedClientId) {
       return null;
     }
-    const requestPrincipal = createSessionControlPrincipal(auth);
-    return listAttachedClientsForSession(sessionId).some(
-      (entry) =>
-        entry.clientId === requestedClientId &&
-        sessionControlPrincipalsMatch(entry, requestPrincipal)
-    )
-      ? requestedClientId
-      : null;
+    return findAttachedClientForSession(sessionId, requestedClientId, auth, { activeOnly: true }) ? requestedClientId : null;
   }
 
   function recordSessionLastInput(sessionId, auth = null, req = null) {
@@ -4705,7 +4872,6 @@ export function createRuntime(config) {
   }
 
   function requireSessionControlRequestClient(sessionId, auth = null, req = null) {
-    const requestPrincipal = createSessionControlPrincipal(auth);
     const clientId = resolveSessionControlClientId(req, sessionId, auth);
     if (!clientId) {
       throw new ApiError(
@@ -4714,14 +4880,9 @@ export function createRuntime(config) {
         "This action requires an active attached session client. Reconnect the session UI and retry."
       );
     }
-    const attachedClient =
-      listAttachedClientsForSession(sessionId).find((entry) => entry.clientId === clientId) || null;
-    if (!attachedClient || !sessionControlPrincipalsMatch(attachedClient, requestPrincipal)) {
-      throw new ApiError(
-        409,
-        "ControllerClientRequired",
-        "This action requires an active attached session client. Reconnect the session UI and retry."
-      );
+    const attachedClient = findAttachedClientForSession(sessionId, clientId, auth, { activeOnly: true });
+    if (!attachedClient) {
+      throw new ApiError(409, "ControllerClientRequired", "This action requires an active attached session client. Reconnect the session UI and retry.");
     }
     return attachedClient;
   }
@@ -4817,9 +4978,15 @@ export function createRuntime(config) {
       throw new ApiError(403, "ControlDenied", "Only the owner or active controller can transfer session control.");
     }
     const targetClient =
-      listAttachedClientsForSession(sessionId).find((entry) => entry.clientId === normalizedTargetClientId) || null;
+      listAttachedClientsForSession(sessionId).find(
+        (entry) => entry.clientId === normalizedTargetClientId && entry.active === true
+      ) || null;
     if (!targetClient) {
-      throw new ApiError(409, "ControlTransferTargetNotAttached", "The target client is not attached to this session.");
+      throw new ApiError(
+        409,
+        "ControlTransferTargetNotAttached",
+        "The target client is not actively attached to this session."
+      );
     }
     return updateSessionControlStateAndBroadcast(
       sessionId,
@@ -5529,7 +5696,7 @@ function tryCreateRestoredSession({
 
       if (match.kind === "wsTicket") {
         const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
-        const payload = issueWsTicket(auth);
+        const payload = issueWsTicket(auth, body);
         validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
         writeJsonResponse(200, payload);
         return;
@@ -6380,10 +6547,20 @@ function tryCreateRestoredSession({
       };
       ws.clientIp = normalizedClientIp;
       ws.auth = wsAuth;
-      ws.sessionControlClient = createSessionAttachedClient({
-        clientId: ws.connectionId,
-        connectedAt: Date.now(),
-        principal: createSessionControlPrincipal(wsAuth)
+      const sessionControlClientId =
+        typeof wsAuth?.sessionControlClientId === "string" && wsAuth.sessionControlClientId.trim()
+          ? wsAuth.sessionControlClientId.trim()
+          : ws.connectionId;
+      const sessionControlClientLabel =
+        typeof wsAuth?.sessionControlClientLabel === "string" ? wsAuth.sessionControlClientLabel : "";
+      ws.sessionControlAttachmentKey = getSessionControlAttachmentKey({
+        clientId: sessionControlClientId,
+        auth: wsAuth
+      });
+      ws.sessionControlClient = registerSessionControlAttachment({
+        clientId: sessionControlClientId,
+        label: sessionControlClientLabel,
+        auth: wsAuth
       });
       ws.isAlive = true;
       logDebug("ws.upgrade.accepted", {
@@ -6399,6 +6576,7 @@ function tryCreateRestoredSession({
 
       ws.on("close", (code, reasonBuffer) => {
         sockets.delete(ws);
+        unregisterSessionControlAttachment(ws);
         metrics.wsConnectionsClosedTotal += 1;
         const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
         const wsClientState = wsClientConnections.get(clientIp);
@@ -6424,7 +6602,7 @@ function tryCreateRestoredSession({
       const snapshotPayload = filterPayloadForAuth(
         withTracePayload({
           type: "snapshot",
-          clientId: ws.connectionId,
+          clientId: ws.sessionControlClient?.clientId || sessionControlClientId,
           sessions: listApiSessions(ws.auth || null),
           outputs: snapshot.outputs,
           customCommands: listCustomCommands(),
@@ -6841,6 +7019,7 @@ function tryCreateRestoredSession({
       clearTimeout(persistTimer);
       persistTimer = null;
     }
+    clearSessionControlAttachmentPruneTimer();
 
     for (const ws of sockets) {
       ws.closeReasonHint = "server_shutdown";

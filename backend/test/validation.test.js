@@ -48,7 +48,12 @@ const CONTROL_STATE = {
   controllerChangedAt: 2,
   currentController: {
     clientId: "client-1",
+    label: "Desk Browser",
     connectedAt: 2,
+    lastSeenAt: 2,
+    lastDisconnectedAt: null,
+    activeConnectionCount: 1,
+    active: true,
     subject: "owner",
     tenantId: "tenant-a",
     accessMode: "operator",
@@ -66,7 +71,12 @@ const CONTROL_STATE = {
   attachedClients: [
     {
       clientId: "client-1",
+      label: "Desk Browser",
       connectedAt: 2,
+      lastSeenAt: 2,
+      lastDisconnectedAt: null,
+      activeConnectionCount: 1,
+      active: true,
       subject: "owner",
       tenantId: "tenant-a",
       accessMode: "operator",
@@ -695,7 +705,10 @@ test("validateRequest accepts valid ws ticket request payload", () => {
       method: "POST",
       pathname: "/api/v1/auth/ws-ticket",
       params: {},
-      body: {}
+      body: {
+        clientId: "trusted-device-1",
+        label: "Desk Browser"
+      }
     });
   });
 });

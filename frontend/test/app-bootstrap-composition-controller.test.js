@@ -31,8 +31,8 @@ function createBaseOptions(overrides = {}) {
   };
   const api = {
     sendInput() {},
-    createWsTicket() {
-      calls.push(["ticket"]);
+    createWsTicket(payload) {
+      calls.push(["ticket", payload]);
       return Promise.resolve({ ticket: "t1" });
     }
   };
@@ -368,5 +368,66 @@ test("app bootstrap composition controller hydrates UI bindings and starts runti
       ["lifecycle-init"],
       ["workspace-load"]
     ]
+  );
+});
+
+test("app bootstrap composition controller forwards trusted-local ws ticket payload", async () => {
+  const { calls, options } = createBaseOptions({
+    getWsTicketPayload: () => ({
+      clientId: "trusted-device-1",
+      label: "Desk Browser"
+    })
+  });
+  let wsFactoryOptions = null;
+
+  const controller = createAppBootstrapCompositionController({
+    ...options,
+    createCommandEngine: () => ({ parseAutocompleteContext: () => ({}) }),
+    createCommandTargetRuntimeController: () => ({
+      resolveTargetSelectors: () => [],
+      resolveFilterSelectors: () => [],
+      resolveDeckToken: () => "",
+      parseSizeCommandArgs: () => null,
+      parseCustomDefinition: () => null,
+      resolveSettingsTargets: () => [],
+      parseSettingsPayload: () => null,
+      resolveQuickSwitchTarget: () => null,
+      activateSessionTarget: () => {},
+      activateDeckTarget: () => {},
+      parseDirectTargetRoutingInput: () => null,
+      formatQuickSwitchPreview: () => ""
+    }),
+    createCommandExecutor: () => ({ execute: async () => true }),
+    createAuthBootstrapRuntimeController: () => ({
+      getWsAuthToken: () => "token",
+      dispose() {}
+    }),
+    createWsRuntimeController: (nextOptions) => {
+      wsFactoryOptions = nextOptions;
+      return { start: () => ({ close() {} }) };
+    },
+    createCommandComposerAutocompleteController: () => ({
+      bindUiEvents() {},
+      resetAutocompleteState() {},
+      recordSlashHistory() {},
+      resetSlashHistoryNavigationState() {},
+      dispose() {}
+    }),
+    createCommandComposerRuntimeController: () => ({ dispose() {} }),
+    createAppLifecycleController: () => ({
+      bindUiEvents() {},
+      bindWindowEvents() {},
+      initializeRuntime: async () => {}
+    })
+  });
+
+  controller.composeControllers();
+  await controller.bootstrapUiAndRuntime();
+  const payload = await wsFactoryOptions.createWsTicket();
+
+  assert.deepEqual(payload, { ticket: "t1" });
+  assert.deepEqual(
+    calls.filter((entry) => entry[0] === "ticket"),
+    [["ticket", { clientId: "trusted-device-1", label: "Desk Browser" }]]
   );
 });

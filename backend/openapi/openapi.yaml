@@ -41,6 +41,12 @@ paths:
     post:
       operationId: createWsTicket
       summary: Create a short-lived one-time WebSocket handshake ticket from an authenticated bearer session.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWsTicketRequest'
       responses:
         '200':
           description: WebSocket ticket created
@@ -1882,14 +1888,34 @@ components:
         - type: object
           required:
             - clientId
+            - label
             - connectedAt
+            - lastSeenAt
+            - lastDisconnectedAt
+            - activeConnectionCount
+            - active
             - role
           properties:
             clientId:
               type: string
+            label:
+              type: string
             connectedAt:
               type: integer
               format: int64
+            lastSeenAt:
+              type: integer
+              format: int64
+            lastDisconnectedAt:
+              oneOf:
+                - type: integer
+                  format: int64
+                - type: 'null'
+            activeConnectionCount:
+              type: integer
+              format: int64
+            active:
+              type: boolean
             role:
               type: string
               enum:
@@ -2455,6 +2481,13 @@ components:
           type: array
           items:
             type: string
+    CreateWsTicketRequest:
+      type: object
+      properties:
+        clientId:
+          type: string
+        label:
+          type: string
     AuthTokenResponse:
       type: object
       required:

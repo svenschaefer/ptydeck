@@ -15,15 +15,10 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release wave: none currently.
 - Active scoped tasks: none currently.
-- Queued next wave: `v0.4.0-H63`.
+- Queued next wave: none currently.
 
 ## Queued Execution Order
-
-1. `v0.4.0-H63` - Trusted-Local Multi-Device Identity and Handoff Hardening
-   - `MDT-006`
-   - `MDT-007` after `MDT-006`
-   - `MDT-008` after `MDT-006` and `MDT-007`
-   - `MDT-009` after `MDT-006`, `MDT-007`, and `MDT-008`
+- none currently
 
 ## Sequencing Rules
 

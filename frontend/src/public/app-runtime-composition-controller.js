@@ -24,6 +24,7 @@ import { createSplitLayoutRuntimeController } from "./split-layout-runtime-contr
 import { createStartupBackupRuntimeController as defaultCreateStartupBackupRuntimeController } from "./startup-backup-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createTraceDebugController } from "./trace-debug-controller.js";
+import { createTrustedLocalClientRuntimeController as defaultCreateTrustedLocalClientRuntimeController } from "./trusted-local-client-runtime-controller.js";
 import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
 import { createWorkspacePresetRuntimeController } from "./workspace-preset-runtime-controller.js";
 import {
@@ -66,7 +67,8 @@ export function createAppRuntimeCompositionController(options = {}) {
 const {
   windowRef = globalThis.window,
   documentRef = globalThis.document,
-  createStartupBackupRuntimeController: createStartupBackupRuntimeControllerOption
+  createStartupBackupRuntimeController: createStartupBackupRuntimeControllerOption,
+  createTrustedLocalClientRuntimeController: createTrustedLocalClientRuntimeControllerOption
 } = options;
 const window = windowRef;
 const document = documentRef;
@@ -74,6 +76,10 @@ const createStartupBackupRuntimeController =
   typeof createStartupBackupRuntimeControllerOption === "function"
     ? createStartupBackupRuntimeControllerOption
     : defaultCreateStartupBackupRuntimeController;
+const createTrustedLocalClientRuntimeController =
+  typeof createTrustedLocalClientRuntimeControllerOption === "function"
+    ? createTrustedLocalClientRuntimeControllerOption
+    : defaultCreateTrustedLocalClientRuntimeController;
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -104,6 +110,11 @@ const commandDiscoveryUsageStore = createCommandDiscoveryUsageStore({
 });
 const startupBackupRuntimeController = createStartupBackupRuntimeController({
   localStorageRef: window?.localStorage || null
+});
+const trustedLocalClientRuntimeController = createTrustedLocalClientRuntimeController({
+  localStorageRef: window?.localStorage || null,
+  navigatorRef: window?.navigator || globalThis.navigator || null,
+  cryptoRef: window?.crypto || globalThis.crypto || null
 });
 const replayExportRuntimeController = createReplayExportRuntimeController({
   api,
@@ -579,6 +590,7 @@ function getReadOnlyModeMessage() {
 }
 
 let runtimeClientId = "";
+let trustedLocalClientLabel = "";
 
 function normalizeControlText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -606,8 +618,9 @@ function getLocalSessionClient(session) {
   return getAttachedClientsForSession(session).find((entry) => normalizeControlText(entry?.clientId) === runtimeClientId) || null;
 }
 
-function getLocalSessionRole(session) {
-  return normalizeControlText(getLocalSessionClient(session)?.role);
+function getLocalDeviceLabel(session = null) {
+  const localClient = session ? getLocalSessionClient(session) : null;
+  return normalizeControlText(localClient?.label) || trustedLocalClientLabel || "this device";
 }
 
 function isLocalSessionController(session) {
@@ -659,8 +672,9 @@ function getSessionWriteBlockMessage(session) {
   if (canUseImplicitOwnerFallback(session)) {
     return "";
   }
-  if (!runtimeClientId) {
-    return "Waiting for session control attachment.";
+  const localDeviceLabel = getLocalDeviceLabel(session);
+  if (!runtimeClientId || !getLocalSessionClient(session)) {
+    return `Waiting for ${localDeviceLabel} to attach to session control.`;
   }
   const controller = getCurrentSessionController(session);
   if (!controller) {
@@ -669,13 +683,23 @@ function getSessionWriteBlockMessage(session) {
   if (normalizeControlText(controller.clientId) === runtimeClientId) {
     return "";
   }
+  if (controller.active !== true) {
+    if (isLocalSessionOwner(session)) {
+      return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. Take control to reclaim it or wait for reconnect.`;
+    }
+    return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. Input and resize are disabled on this device.`;
+  }
   if (isLocalSessionOwner(session)) {
-    return "Another attached client currently controls this session. Take control to override or wait for release.";
+    return `Device ${getSessionControlClientLabel(controller)} currently controls this session. Take control to override or wait for release.`;
   }
   return "This session is currently controlled by another client. Input and resize are disabled.";
 }
 
 function getSessionControlClientLabel(client) {
+  const label = normalizeControlText(client?.label);
+  if (label) {
+    return label;
+  }
   const subject = normalizeControlText(client?.subject) || "unknown";
   const tenantId = normalizeControlText(client?.tenantId);
   return tenantId ? `${subject}@${tenantId}` : subject;
@@ -684,33 +708,43 @@ function getSessionControlClientLabel(client) {
 function getSessionControlSummary(session) {
   const controller = getCurrentSessionController(session);
   const localClient = getLocalSessionClient(session);
+  const localDeviceLabel = getLocalDeviceLabel(session);
   if (!session) {
     return "Control unavailable.";
   }
-  if (!runtimeClientId) {
+  if (!runtimeClientId || !localClient) {
     if (canUseImplicitOwnerFallback(session)) {
       return "Local operator write access is active until a session control client attaches.";
     }
-    return "Waiting for control attachment.";
+    return `Waiting for ${localDeviceLabel} to attach.`;
   }
   if (!controller) {
-    if (localClient) {
-      return "No active controller. You can take control.";
-    }
-    return "No active controller.";
+    return `No active controller. ${localDeviceLabel} can take control.`;
   }
   if (normalizeControlText(controller.clientId) === runtimeClientId) {
-    return "Controller: you";
+    const tabCount = Number.isInteger(localClient.activeConnectionCount) ? localClient.activeConnectionCount : 0;
+    return tabCount > 1
+      ? `${localDeviceLabel} controls this session. ${tabCount} tabs are attached for this device.`
+      : `${localDeviceLabel} controls this session.`;
   }
-  const localRole = getLocalSessionRole(session);
-  if (localRole === "owner" || isLocalSessionOwner(session)) {
-    return `Controller: ${getSessionControlClientLabel(controller)}. You can override.`;
+  if (controller.active !== true) {
+    if (isLocalSessionOwner(session)) {
+      return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. ${localDeviceLabel} can reclaim it.`;
+    }
+    return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}.`;
   }
-  return `Controller: ${getSessionControlClientLabel(controller)}. Observe-only on this client.`;
+  if (isLocalSessionOwner(session)) {
+    return `Device ${getSessionControlClientLabel(controller)} controls this session. ${localDeviceLabel} can take control.`;
+  }
+  return `Device ${getSessionControlClientLabel(controller)} controls this session. Observe-only on this device.`;
 }
 
 function canTakeSessionControl(session) {
   if (isReadOnlyMode() || !session || !runtimeClientId) {
+    return false;
+  }
+  const localClient = getLocalSessionClient(session);
+  if (!localClient || localClient.active !== true) {
     return false;
   }
   if (isLocalSessionController(session)) {
@@ -727,6 +761,10 @@ function canReleaseSessionControl(session) {
   if (isReadOnlyMode() || !session || !runtimeClientId) {
     return false;
   }
+  const localClient = getLocalSessionClient(session);
+  if (!localClient || localClient.active !== true) {
+    return false;
+  }
   return isLocalSessionController(session) || isLocalSessionOwner(session);
 }
 
@@ -736,6 +774,12 @@ function canTransferSessionControl(session, targetClientId) {
   }
   const normalizedTargetClientId = normalizeControlText(targetClientId);
   if (!normalizedTargetClientId) {
+    return false;
+  }
+  const targetClient = getAttachedClientsForSession(session).find(
+    (entry) => normalizeControlText(entry?.clientId) === normalizedTargetClientId
+  );
+  if (!targetClient || targetClient.active !== true) {
     return false;
   }
   const controllerClientId = normalizeControlText(getCurrentSessionController(session)?.clientId);
@@ -799,11 +843,12 @@ function getSessionControlBadgeState(session) {
       title: "Local operator write access is active until a session control client attaches."
     };
   }
-  if (!runtimeClientId) {
+  const localClient = getLocalSessionClient(session);
+  if (!runtimeClientId || !localClient) {
     return {
       label: "ATTACHING",
       tone: "pending",
-      title: "Waiting for this browser client to attach to session control metadata."
+      title: `Waiting for ${getLocalDeviceLabel(session)} to attach to session control metadata.`
     };
   }
   if (isLocalSessionController(session)) {
@@ -813,19 +858,32 @@ function getSessionControlBadgeState(session) {
       title: "This browser client currently controls terminal input and resize for this session."
     };
   }
-  if (isLocalSessionOwner(session)) {
+  if (normalizeControlText(localClient?.accessMode) === "spectator") {
     return {
-      label: "OWNER",
-      tone: "owner",
-      title: "This browser client owns the session and can take or transfer control."
+      label: "READ ONLY",
+      tone: "spectator",
+      title: "This browser client is attached in read-only spectator mode."
     };
   }
-  const localRole = getLocalSessionRole(session);
-  if (localRole === "spectator") {
+  if (!getCurrentSessionController(session)) {
     return {
-      label: "SPECTATOR",
-      tone: "spectator",
-      title: "This browser client is attached without active control for this session."
+      label: "ATTACHED",
+      tone: "owner",
+      title: `${getLocalDeviceLabel(session)} is attached and can take control.`
+    };
+  }
+  if (getCurrentSessionController(session)?.active !== true && isLocalSessionOwner(session)) {
+    return {
+      label: "RECLAIM",
+      tone: "owner",
+      title: "Another device is reconnecting. This browser client can reclaim control."
+    };
+  }
+  if (isLocalSessionOwner(session)) {
+    return {
+      label: "ATTACHED",
+      tone: "owner",
+      title: `${getLocalDeviceLabel(session)} is attached and can take or transfer control.`
     };
   }
   return {
@@ -850,8 +908,10 @@ function renderSessionControlClients(container, session) {
       container,
       clients
         .map((client) => {
-          const name = normalizeControlText(client?.clientId) === runtimeClientId ? "you" : getSessionControlClientLabel(client);
-          return `${name} · ${(normalizeControlText(client?.role) || "spectator").toUpperCase()}`;
+          const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
+          const name = isLocalClient ? "this device" : getSessionControlClientLabel(client);
+          const status = client?.active === true ? "connected" : "offline window";
+          return `${name} · ${status}`;
         })
         .join("\n")
     );
@@ -865,12 +925,23 @@ function renderSessionControlClients(container, session) {
     const title = document.createElement("p");
     title.className = "session-control-client-name";
     const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
-    title.textContent = isLocalClient ? "You" : getSessionControlClientLabel(client);
+    title.textContent = isLocalClient ? "This device" : getSessionControlClientLabel(client);
     const detail = document.createElement("p");
     detail.className = "session-control-client-detail";
-    const detailParts = [(normalizeControlText(client?.role) || "spectator").toUpperCase()];
+    const detailParts = [];
+    if (isLocalClient) {
+      detailParts.push(getLocalDeviceLabel(session));
+    }
+    if (normalizeControlText(client?.accessMode) === "spectator") {
+      detailParts.push("read only");
+    }
     if (normalizeControlText(getCurrentSessionController(session)?.clientId) === normalizeControlText(client?.clientId)) {
-      detailParts.push("ACTIVE");
+      detailParts.push(client?.active === true ? "controlling" : "reconnect pending");
+    } else {
+      detailParts.push(client?.active === true ? "connected" : "offline window");
+    }
+    if (Number.isInteger(client?.activeConnectionCount) && client.activeConnectionCount > 1) {
+      detailParts.push(`${client.activeConnectionCount} tabs`);
     }
     detail.textContent = detailParts.join(" · ");
     meta.appendChild(title);
@@ -913,10 +984,16 @@ function renderSessionControl(entry, session) {
   }
   if (entry.sessionControlTakeBtn) {
     const takeEnabled = canTakeSessionControl(session);
+    const reclaiming = getCurrentSessionController(session)?.active !== true && takeEnabled;
+    entry.sessionControlTakeBtn.textContent = reclaiming ? "Reclaim Control" : "Take Control";
     entry.sessionControlTakeBtn.disabled = !takeEnabled;
     entry.sessionControlTakeBtn.setAttribute(
       "title",
-      takeEnabled ? "Take active control for this session." : getSessionWriteBlockMessage(session)
+      takeEnabled
+        ? reclaiming
+          ? "Reclaim active control for this session after another device disconnected."
+          : "Take active control for this session."
+        : getSessionWriteBlockMessage(session)
     );
   }
   if (entry.sessionControlReleaseBtn) {
@@ -924,7 +1001,9 @@ function renderSessionControl(entry, session) {
     entry.sessionControlReleaseBtn.disabled = !releaseEnabled;
     entry.sessionControlReleaseBtn.setAttribute(
       "title",
-      releaseEnabled ? "Release active control for this session." : "Only the owner or active controller can release control."
+      releaseEnabled
+        ? "Release active control for this session."
+        : "Only the active controller or another attached operator device can release control."
     );
   }
   if (entry.settingsApplyBtn) {
@@ -1868,6 +1947,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   getReadOnlyModeMessage,
   canWriteToSession,
   getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
+  getWsTicketPayload: () => trustedLocalClientRuntimeController.getWsTicketPayload(),
   setAccessState,
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
@@ -1973,6 +2053,9 @@ function setInitializationError(message) {
 async function initialize() {
   try {
     await startupBackupRuntimeController.ensureStartupBackup();
+    const trustedLocalClient = await trustedLocalClientRuntimeController.ensureClientIdentity();
+    trustedLocalClientLabel = normalizeControlText(trustedLocalClient?.label);
+    setRuntimeClientId(trustedLocalClient?.clientId || "");
     return await appBootstrapCompositionController.bootstrapUiAndRuntime();
   } catch (error) {
     if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {

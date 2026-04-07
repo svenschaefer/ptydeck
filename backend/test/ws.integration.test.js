@@ -750,7 +750,7 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
   }
 });
 
-test("WS operator clients expose per-session control metadata and deterministic controller reassignment", async () => {
+test("WS operator clients keep stable trusted-local control identity across reconnect and stale expiry", async () => {
   const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
     createPty: createEchoPtyFactory(),
     authMode: "dev",
@@ -759,12 +759,15 @@ test("WS operator clients expose per-session control metadata and deterministic 
     authDevSecret: "test-secret",
     authIssuer: "test-issuer",
     authAudience: "test-audience",
-    authDevTokenTtlSeconds: 900
+    authDevTokenTtlSeconds: 900,
+    sessionControlStaleClientTtlMs: 120
   });
 
   try {
     const operatorToken = await issueDevToken(baseUrl);
     const operatorJsonHeaders = createAuthHeaders(operatorToken, { json: true });
+    const firstStableClientId = "trusted-device-1";
+    const secondStableClientId = "trusted-device-2";
     const createSessionRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: operatorJsonHeaders,
@@ -776,7 +779,7 @@ test("WS operator clients expose per-session control metadata and deterministic 
     const firstTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
       method: "POST",
       headers: operatorJsonHeaders,
-      body: JSON.stringify({})
+      body: JSON.stringify({ clientId: firstStableClientId, label: "Desk Browser" })
     });
     assert.equal(firstTicketRes.status, 200);
     const firstTicket = await firstTicketRes.json();
@@ -797,17 +800,21 @@ test("WS operator clients expose per-session control metadata and deterministic 
 
     const firstSnapshot = firstEvents.find((event) => event.type === "snapshot");
     assert.equal(typeof firstSnapshot.clientId, "string");
+    assert.equal(firstSnapshot.clientId, firstStableClientId);
     const firstSnapshotSession = firstSnapshot.sessions.find((session) => session.id === createdSession.id);
     assert.equal(firstSnapshotSession.controlState.owner.subject, "dev-user");
     assert.equal(firstSnapshotSession.controlState.attachedClients.length, 1);
     assert.equal(firstSnapshotSession.controlState.currentController.role, "controller");
     const firstControllerClientId = firstSnapshotSession.controlState.currentController.clientId;
     assert.equal(firstSnapshot.clientId, firstControllerClientId);
+    assert.equal(firstSnapshotSession.controlState.currentController.label, "Desk Browser");
+    assert.equal(firstSnapshotSession.controlState.currentController.active, true);
+    assert.equal(firstSnapshotSession.controlState.currentController.activeConnectionCount, 1);
 
     const secondTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
       method: "POST",
       headers: operatorJsonHeaders,
-      body: JSON.stringify({})
+      body: JSON.stringify({ clientId: secondStableClientId, label: "Laptop Browser" })
     });
     assert.equal(secondTicketRes.status, 200);
     const secondTicket = await secondTicketRes.json();
@@ -834,6 +841,10 @@ test("WS operator clients expose per-session control metadata and deterministic 
     assert.deepEqual(
       secondAttachUpdate.session.controlState.attachedClients.map((entry) => entry.role).sort(),
       ["controller", "owner"]
+    );
+    assert.deepEqual(
+      secondAttachUpdate.session.controlState.attachedClients.map((entry) => entry.clientId).sort(),
+      [firstStableClientId, secondStableClientId]
     );
 
     const inputRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
@@ -862,9 +873,58 @@ test("WS operator clients expose per-session control metadata and deterministic 
         (event) =>
           event.type === "session.updated" &&
           event.session?.id === createdSession.id &&
-          event.session.controlState.attachedClients.length === 1 &&
           event.session.controlState.currentController &&
-          event.session.controlState.currentController.clientId !== firstControllerClientId
+          event.session.controlState.currentController.clientId === firstControllerClientId &&
+          event.session.controlState.currentController.active === false
+      )
+    );
+
+    const reservedUpdate = secondEvents
+      .filter((event) => event.type === "session.updated" && event.session?.id === createdSession.id)
+      .at(-1);
+    assert.equal(reservedUpdate.session.controlState.attachedClients.length, 2);
+    assert.equal(reservedUpdate.session.controlState.currentController.role, "controller");
+    assert.equal(reservedUpdate.session.controlState.currentController.label, "Desk Browser");
+    assert.equal(reservedUpdate.session.controlState.currentController.activeConnectionCount, 0);
+    assert.equal(reservedUpdate.session.controlState.lastInput.clientId, firstControllerClientId);
+
+    const reclaimTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ clientId: firstStableClientId, label: "Desk Browser" })
+    });
+    assert.equal(reclaimTicketRes.status, 200);
+    const reclaimTicket = await reclaimTicketRes.json();
+
+    const reclaimEvents = [];
+    const reclaimWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${reclaimTicket.ticket}`]);
+    reclaimWs.on("message", (buffer) => {
+      reclaimEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      reclaimEvents.some(
+        (event) =>
+          event.type === "snapshot" &&
+          event.clientId === firstStableClientId &&
+          event.sessions.some(
+            (session) =>
+              session.id === createdSession.id &&
+              session.controlState.currentController?.clientId === firstStableClientId &&
+              session.controlState.currentController?.active === true
+          )
+      )
+    );
+
+    reclaimWs.close();
+
+    await waitFor(() =>
+      secondEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.length === 1 &&
+          event.session.controlState.currentController?.clientId === secondStableClientId
       )
     );
 
@@ -873,6 +933,7 @@ test("WS operator clients expose per-session control metadata and deterministic 
       .at(-1);
     assert.equal(reassignedUpdate.session.controlState.attachedClients.length, 1);
     assert.equal(reassignedUpdate.session.controlState.currentController.role, "controller");
+    assert.equal(reassignedUpdate.session.controlState.currentController.clientId, secondStableClientId);
     assert.equal(reassignedUpdate.session.controlState.lastInput.clientId, firstControllerClientId);
 
     secondWs.close();

@@ -14,6 +14,10 @@ function normalizeTimestamp(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
+function normalizeCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
 export function createLocalOperatorPrincipal() {
   return {
     subject: DEFAULT_CONTROL_SUBJECT,
@@ -99,9 +103,18 @@ export function createSessionAttachedClient(input = {}) {
   if (!clientId) {
     throw new Error("Session attached client requires a non-empty clientId.");
   }
+  const connectedAt = normalizeTimestamp(input.connectedAt) || Number(Date.now());
+  const lastSeenAt = normalizeTimestamp(input.lastSeenAt) || connectedAt;
+  const activeConnectionCount = normalizeCount(input.activeConnectionCount);
+  const active = typeof input.active === "boolean" ? input.active : activeConnectionCount > 0;
   return {
     clientId,
-    connectedAt: normalizeTimestamp(input.connectedAt) || Number(Date.now()),
+    label: normalizeText(input.label),
+    connectedAt,
+    lastSeenAt,
+    lastDisconnectedAt: normalizeTimestamp(input.lastDisconnectedAt),
+    activeConnectionCount,
+    active,
     subject: principal.subject,
     tenantId: principal.tenantId,
     accessMode: principal.accessMode,
@@ -110,6 +123,9 @@ export function createSessionAttachedClient(input = {}) {
 }
 
 function compareAttachedClients(left, right) {
+  if (Boolean(left.active) !== Boolean(right.active)) {
+    return left.active ? -1 : 1;
+  }
   if (left.connectedAt !== right.connectedAt) {
     return left.connectedAt - right.connectedAt;
   }
