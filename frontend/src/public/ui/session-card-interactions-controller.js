@@ -127,6 +127,19 @@ export function createSessionCardInteractionsController(options = {}) {
       };
     }
 
+    async function applySessionControlUpdate(task, feedbackMessage, fallbackError) {
+      try {
+        const updated = await task();
+        applyRuntimeEvent({ type: "session.updated", session: updated });
+        clearError();
+        if (feedbackMessage) {
+          setCommandFeedback(feedbackMessage);
+        }
+      } catch (error) {
+        setError(getErrorMessage(error, fallbackError));
+      }
+    }
+
     refs.focusBtn.addEventListener("click", () => onActivateSession(session.id));
     refs.refreshBtn?.addEventListener("click", () => {
       refreshMountedTerminal(session.id);
@@ -143,6 +156,35 @@ export function createSessionCardInteractionsController(options = {}) {
       }
     });
     refs.settingsDismissBtn?.addEventListener("click", () => discardSettingsDraftAndClose());
+    refs.sessionControlTakeBtn?.addEventListener("click", async () => {
+      const currentSession = getSession() || session;
+      await applySessionControlUpdate(
+        () => api.takeSessionControl(session.id),
+        `Took control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+        "Failed to take session control."
+      );
+    });
+    refs.sessionControlReleaseBtn?.addEventListener("click", async () => {
+      const currentSession = getSession() || session;
+      await applySessionControlUpdate(
+        () => api.releaseSessionControl(session.id),
+        `Released control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+        "Failed to release session control."
+      );
+    });
+    refs.sessionControlClientsEl?.addEventListener?.("click", async (event) => {
+      const transferBtn = event?.target?.closest?.("[data-session-control-action='transfer']");
+      const targetClientId = transferBtn?.dataset?.clientId || "";
+      if (!targetClientId) {
+        return;
+      }
+      const currentSession = getSession() || session;
+      await applySessionControlUpdate(
+        () => api.transferSessionControl(session.id, targetClientId),
+        `Transferred control of [${formatSessionToken(currentSession.id)}] ${formatSessionDisplayName(currentSession)}.`,
+        "Failed to transfer session control."
+      );
+    });
     if (refs.settingsDialog && typeof refs.settingsDialog.addEventListener === "function") {
       refs.settingsDialog.addEventListener("cancel", (event) => {
         if (event && typeof event.preventDefault === "function") {

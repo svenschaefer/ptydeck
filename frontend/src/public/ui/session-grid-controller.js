@@ -38,6 +38,12 @@ export function createSessionGridController(options = {}) {
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
+  const renderSessionControl = options.renderSessionControl || (() => {});
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the selected session.";
   const applyResizeForSession = options.applyResizeForSession || (() => {});
   const scheduleGlobalResize = options.scheduleGlobalResize || (() => {});
   const scheduleDeferredResizePasses = options.scheduleDeferredResizePasses || (() => {});
@@ -119,6 +125,7 @@ export function createSessionGridController(options = {}) {
     const activeDeck = getActiveDeck();
     const activeDeckId = activeDeck ? activeDeck.id : "";
     const orderedSessions = sortSessionsByQuickId(state.sessions);
+    const activeSession = orderedSessions.find((session) => session.id === state.activeSessionId) || null;
     const activeDeckSessions = activeDeckId
       ? orderedSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
       : orderedSessions.slice();
@@ -171,6 +178,8 @@ export function createSessionGridController(options = {}) {
       connectionState: state.connectionState,
       accessSummary: uiState.accessSummary,
       readOnlySpectator: uiState.readOnlyMode === true,
+      writeDisabled: !activeSession || !canWriteToSession(activeSession),
+      writeDisabledMessage: getSessionWriteBlockedMessage(activeSession),
       loading: uiState.loading,
       startupGateActive: uiState.startupGateActive,
       startupGateMessage: uiState.startupGateMessage,
@@ -238,6 +247,11 @@ export function createSessionGridController(options = {}) {
           closeBtn: refs.closeBtn,
           settingsDialog: refs.settingsDialog,
           settingsDismissBtn: refs.settingsDismissBtn,
+          controlBadgeEl: refs.controlBadgeEl,
+          sessionControlTakeBtn: refs.sessionControlTakeBtn,
+          sessionControlReleaseBtn: refs.sessionControlReleaseBtn,
+          sessionControlSummaryEl: refs.sessionControlSummaryEl,
+          sessionControlClientsEl: refs.sessionControlClientsEl,
           settingsTabStartupBtn: refs.settingsTabStartupBtn,
           settingsTabNoteBtn: refs.settingsTabNoteBtn,
           settingsTabThemeBtn: refs.settingsTabThemeBtn,
@@ -296,11 +310,16 @@ export function createSessionGridController(options = {}) {
           focusBtn: refs.focusBtn,
           quickIdEl: refs.quickIdEl,
           stateBadgeEl: refs.stateBadgeEl,
+          controlBadgeEl: refs.controlBadgeEl,
           sessionMetaRowEl: refs.sessionMetaRowEl,
           sessionNoteEl: refs.sessionNoteEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           refreshBtn: refs.refreshBtn,
           settingsDialog: refs.settingsDialog,
+          sessionControlTakeBtn: refs.sessionControlTakeBtn,
+          sessionControlReleaseBtn: refs.sessionControlReleaseBtn,
+          sessionControlSummaryEl: refs.sessionControlSummaryEl,
+          sessionControlClientsEl: refs.sessionControlClientsEl,
           settingsTabStartupBtn: refs.settingsTabStartupBtn,
           settingsTabNoteBtn: refs.settingsTabNoteBtn,
           settingsTabThemeBtn: refs.settingsTabThemeBtn,
@@ -344,6 +363,7 @@ export function createSessionGridController(options = {}) {
           syncSessionStartupControls(entry, currentSession);
           syncSessionInputSafetyControls(entry, currentSession);
           syncSessionThemeControls(entry, currentSession.id);
+          renderSessionControl(entry, currentSession);
           setSettingsDirty(entry, false);
         },
         onFirstTerminalMounted: () => {

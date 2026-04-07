@@ -59,6 +59,11 @@ export function createCommandComposerRuntimeController(options = {}) {
     typeof options.getLastActiveSessionSwitchAt === "function" ? options.getLastActiveSessionSwitchAt : () => 0;
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const isSessionActionBlocked = options.isSessionActionBlocked || (() => false);
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the selected session.";
   const getSessionSendTerminator = options.getSessionSendTerminator || (() => "CR");
   const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
   const getReadOnlyModeMessage =
@@ -216,6 +221,10 @@ export function createCommandComposerRuntimeController(options = {}) {
     if (blockedSessions.length > 0) {
       return { error: getBlockedSessionActionMessage(blockedSessions, "Command send") };
     }
+    const nonWritableSessions = targetSessions.filter((session) => !canWriteToSession(session));
+    if (nonWritableSessions.length > 0) {
+      return { error: getSessionWriteBlockedMessage(nonWritableSessions[0]) };
+    }
 
     return {
       targetSessions,
@@ -236,6 +245,9 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
     if (isSessionActionBlocked(session)) {
       return { error: getBlockedSessionActionMessage([session], "Command send") };
+    }
+    if (!canWriteToSession(session)) {
+      return { error: getSessionWriteBlockedMessage(session) };
     }
     return {
       targetSessions: [session],

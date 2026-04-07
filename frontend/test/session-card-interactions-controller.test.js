@@ -259,6 +259,65 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   assert.deepEqual(calls, ["feedback:Working Directory cannot be empty.:true"]);
 });
 
+test("session-card-interactions controller wires take, release, and transfer session-control actions", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController();
+  const refs = {
+    focusBtn: createEventTarget(),
+    sessionControlTakeBtn: createEventTarget(),
+    sessionControlReleaseBtn: createEventTarget(),
+    sessionControlClientsEl: createEventTarget()
+  };
+  const session = { id: "s1", name: "alpha" };
+
+  controller.bindSessionCardInteractions({
+    session,
+    refs,
+    api: {
+      takeSessionControl: async () => ({ id: "s1", controlState: { currentController: { clientId: "self" } } }),
+      releaseSessionControl: async () => ({ id: "s1", controlState: { currentController: null } }),
+      transferSessionControl: async (_sessionId, clientId) => ({ id: "s1", controlState: { currentController: { clientId } } })
+    },
+    getSession: () => session,
+    getEntry: () => ({ id: "entry" }),
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.controlState.currentController?.clientId || "none"]),
+    clearError: () => calls.push(["clearError"]),
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    formatSessionToken: () => "A",
+    formatSessionDisplayName: () => "alpha",
+    setError: (message) => calls.push(["error", message])
+  });
+
+  await refs.sessionControlTakeBtn.emit("click");
+  await refs.sessionControlReleaseBtn.emit("click");
+  await refs.sessionControlClientsEl.emit("click", {
+    target: {
+      closest(selector) {
+        if (selector !== "[data-session-control-action='transfer']") {
+          return null;
+        }
+        return {
+          dataset: {
+            clientId: "peer-client"
+          }
+        };
+      }
+    }
+  });
+
+  assert.deepEqual(calls, [
+    ["event", "session.updated", "self"],
+    ["clearError"],
+    ["feedback", "Took control of [A] alpha."],
+    ["event", "session.updated", "none"],
+    ["clearError"],
+    ["feedback", "Released control of [A] alpha."],
+    ["event", "session.updated", "peer-client"],
+    ["clearError"],
+    ["feedback", "Transferred control of [A] alpha."]
+  ]);
+});
+
 test("session-card-interactions controller renames sessions through api update", async () => {
   const calls = [];
   const controller = createSessionCardInteractionsController();

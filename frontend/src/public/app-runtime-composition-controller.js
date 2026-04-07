@@ -577,6 +577,367 @@ function getReadOnlyModeMessage() {
   }
   return "Read-only spectator mode. Write actions are disabled.";
 }
+
+let runtimeClientId = "";
+
+function normalizeControlText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getSessionControlState(session) {
+  return session?.controlState && typeof session.controlState === "object" ? session.controlState : null;
+}
+
+function getCurrentSessionController(session) {
+  const controlState = getSessionControlState(session);
+  const controller = controlState?.currentController;
+  return controller && typeof controller === "object" ? controller : null;
+}
+
+function getAttachedClientsForSession(session) {
+  const controlState = getSessionControlState(session);
+  return Array.isArray(controlState?.attachedClients) ? controlState.attachedClients : [];
+}
+
+function getLocalSessionClient(session) {
+  if (!runtimeClientId) {
+    return null;
+  }
+  return getAttachedClientsForSession(session).find((entry) => normalizeControlText(entry?.clientId) === runtimeClientId) || null;
+}
+
+function getLocalSessionRole(session) {
+  return normalizeControlText(getLocalSessionClient(session)?.role);
+}
+
+function isLocalSessionController(session) {
+  return normalizeControlText(getCurrentSessionController(session)?.clientId) === runtimeClientId && Boolean(runtimeClientId);
+}
+
+function isLocalSessionOwner(session) {
+  const localClient = getLocalSessionClient(session);
+  const owner = getSessionControlState(session)?.owner;
+  if (!localClient || !owner) {
+    return false;
+  }
+  return (
+    normalizeControlText(localClient.subject) === normalizeControlText(owner.subject) &&
+    normalizeControlText(localClient.tenantId) === normalizeControlText(owner.tenantId) &&
+    normalizeControlText(localClient.accessMode) === normalizeControlText(owner.accessMode) &&
+    normalizeControlText(localClient.permissionMode) === normalizeControlText(owner.permissionMode)
+  );
+}
+
+function canUseImplicitOwnerFallback(session) {
+  if (isReadOnlyMode() || !session) {
+    return false;
+  }
+  if (!getSessionControlState(session)) {
+    return true;
+  }
+  if (getCurrentSessionController(session)) {
+    return false;
+  }
+  const attachedClients = getAttachedClientsForSession(session);
+  return attachedClients.length === 0 || attachedClients.every((entry) => normalizeControlText(entry?.accessMode) === "spectator");
+}
+
+function canWriteToSession(session) {
+  if (isReadOnlyMode() || !session) {
+    return false;
+  }
+  return isLocalSessionController(session) || canUseImplicitOwnerFallback(session);
+}
+
+function getSessionWriteBlockMessage(session) {
+  if (isReadOnlyMode()) {
+    return getReadOnlyModeMessage();
+  }
+  if (!session) {
+    return "No active session selected.";
+  }
+  if (canUseImplicitOwnerFallback(session)) {
+    return "";
+  }
+  if (!runtimeClientId) {
+    return "Waiting for session control attachment.";
+  }
+  const controller = getCurrentSessionController(session);
+  if (!controller) {
+    return "No client currently holds control for this session. Take control before sending input or resizing.";
+  }
+  if (normalizeControlText(controller.clientId) === runtimeClientId) {
+    return "";
+  }
+  if (isLocalSessionOwner(session)) {
+    return "Another attached client currently controls this session. Take control to override or wait for release.";
+  }
+  return "This session is currently controlled by another client. Input and resize are disabled.";
+}
+
+function getSessionControlClientLabel(client) {
+  const subject = normalizeControlText(client?.subject) || "unknown";
+  const tenantId = normalizeControlText(client?.tenantId);
+  return tenantId ? `${subject}@${tenantId}` : subject;
+}
+
+function getSessionControlSummary(session) {
+  const controller = getCurrentSessionController(session);
+  const localClient = getLocalSessionClient(session);
+  if (!session) {
+    return "Control unavailable.";
+  }
+  if (!runtimeClientId) {
+    if (canUseImplicitOwnerFallback(session)) {
+      return "Local operator write access is active until a session control client attaches.";
+    }
+    return "Waiting for control attachment.";
+  }
+  if (!controller) {
+    if (localClient) {
+      return "No active controller. You can take control.";
+    }
+    return "No active controller.";
+  }
+  if (normalizeControlText(controller.clientId) === runtimeClientId) {
+    return "Controller: you";
+  }
+  const localRole = getLocalSessionRole(session);
+  if (localRole === "owner" || isLocalSessionOwner(session)) {
+    return `Controller: ${getSessionControlClientLabel(controller)}. You can override.`;
+  }
+  return `Controller: ${getSessionControlClientLabel(controller)}. Observe-only on this client.`;
+}
+
+function canTakeSessionControl(session) {
+  if (isReadOnlyMode() || !session || !runtimeClientId) {
+    return false;
+  }
+  if (isLocalSessionController(session)) {
+    return false;
+  }
+  const controller = getCurrentSessionController(session);
+  if (!controller) {
+    return true;
+  }
+  return isLocalSessionOwner(session);
+}
+
+function canReleaseSessionControl(session) {
+  if (isReadOnlyMode() || !session || !runtimeClientId) {
+    return false;
+  }
+  return isLocalSessionController(session) || isLocalSessionOwner(session);
+}
+
+function canTransferSessionControl(session, targetClientId) {
+  if (isReadOnlyMode() || !session || !runtimeClientId) {
+    return false;
+  }
+  const normalizedTargetClientId = normalizeControlText(targetClientId);
+  if (!normalizedTargetClientId) {
+    return false;
+  }
+  const controllerClientId = normalizeControlText(getCurrentSessionController(session)?.clientId);
+  if (normalizedTargetClientId === controllerClientId) {
+    return false;
+  }
+  return isLocalSessionController(session) || isLocalSessionOwner(session);
+}
+
+function setRuntimeClientId(clientId) {
+  const nextClientId = normalizeControlText(clientId);
+  if (runtimeClientId === nextClientId) {
+    return runtimeClientId;
+  }
+  runtimeClientId = nextClientId;
+  api.setSessionControlClientId(runtimeClientId);
+  appCommandUiFacadeController?.render?.();
+  return runtimeClientId;
+}
+
+function clearNodeChildren(node) {
+  if (!node) {
+    return;
+  }
+  if (typeof node.replaceChildren === "function") {
+    node.replaceChildren();
+    return;
+  }
+  while (node.firstChild) {
+    node.removeChild(node.firstChild);
+  }
+}
+
+function appendNodeText(node, text) {
+  if (!node) {
+    return;
+  }
+  node.textContent = typeof text === "string" ? text : String(text || "");
+}
+
+function getSessionLastInputSummary(session) {
+  const lastInput = getSessionControlState(session)?.lastInput;
+  if (!lastInput) {
+    return "No input has been recorded for this session yet.";
+  }
+  const actorLabel =
+    normalizeControlText(lastInput.clientId) && normalizeControlText(lastInput.clientId) === runtimeClientId
+      ? "you"
+      : getSessionControlClientLabel(lastInput);
+  return `Last input: ${actorLabel}.`;
+}
+
+function getSessionControlBadgeState(session) {
+  if (!session) {
+    return { label: "", tone: "", title: "" };
+  }
+  if (canUseImplicitOwnerFallback(session)) {
+    return {
+      label: "LOCAL",
+      tone: "owner",
+      title: "Local operator write access is active until a session control client attaches."
+    };
+  }
+  if (!runtimeClientId) {
+    return {
+      label: "ATTACHING",
+      tone: "pending",
+      title: "Waiting for this browser client to attach to session control metadata."
+    };
+  }
+  if (isLocalSessionController(session)) {
+    return {
+      label: "CONTROLLER",
+      tone: "controller",
+      title: "This browser client currently controls terminal input and resize for this session."
+    };
+  }
+  if (isLocalSessionOwner(session)) {
+    return {
+      label: "OWNER",
+      tone: "owner",
+      title: "This browser client owns the session and can take or transfer control."
+    };
+  }
+  const localRole = getLocalSessionRole(session);
+  if (localRole === "spectator") {
+    return {
+      label: "SPECTATOR",
+      tone: "spectator",
+      title: "This browser client is attached without active control for this session."
+    };
+  }
+  return {
+    label: "REMOTE",
+    tone: "remote",
+    title: "Another attached client currently controls this session."
+  };
+}
+
+function renderSessionControlClients(container, session) {
+  if (!container) {
+    return;
+  }
+  clearNodeChildren(container);
+  const clients = getAttachedClientsForSession(session);
+  if (!clients.length) {
+    appendNodeText(container, "No attached clients.");
+    return;
+  }
+  if (!document || typeof document.createElement !== "function") {
+    appendNodeText(
+      container,
+      clients
+        .map((client) => {
+          const name = normalizeControlText(client?.clientId) === runtimeClientId ? "you" : getSessionControlClientLabel(client);
+          return `${name} · ${(normalizeControlText(client?.role) || "spectator").toUpperCase()}`;
+        })
+        .join("\n")
+    );
+    return;
+  }
+  for (const client of clients) {
+    const row = document.createElement("div");
+    row.className = "session-control-client";
+    const meta = document.createElement("div");
+    meta.className = "session-control-client-meta";
+    const title = document.createElement("p");
+    title.className = "session-control-client-name";
+    const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
+    title.textContent = isLocalClient ? "You" : getSessionControlClientLabel(client);
+    const detail = document.createElement("p");
+    detail.className = "session-control-client-detail";
+    const detailParts = [(normalizeControlText(client?.role) || "spectator").toUpperCase()];
+    if (normalizeControlText(getCurrentSessionController(session)?.clientId) === normalizeControlText(client?.clientId)) {
+      detailParts.push("ACTIVE");
+    }
+    detail.textContent = detailParts.join(" · ");
+    meta.appendChild(title);
+    meta.appendChild(detail);
+    row.appendChild(meta);
+    if (canTransferSessionControl(session, client?.clientId)) {
+      const transferBtn = document.createElement("button");
+      transferBtn.type = "button";
+      transferBtn.className = "session-control-transfer";
+      transferBtn.textContent = "Transfer";
+      transferBtn.dataset = transferBtn.dataset || {};
+      transferBtn.dataset.sessionControlAction = "transfer";
+      transferBtn.dataset.clientId = normalizeControlText(client?.clientId);
+      row.appendChild(transferBtn);
+    }
+    container.appendChild(row);
+  }
+}
+
+function renderSessionControl(entry, session) {
+  if (!entry || !session) {
+    return;
+  }
+  const badgeState = getSessionControlBadgeState(session);
+  if (entry.controlBadgeEl) {
+    entry.controlBadgeEl.hidden = !badgeState.label;
+    entry.controlBadgeEl.textContent = badgeState.label;
+    entry.controlBadgeEl.className = "session-control-badge";
+    if (badgeState.tone) {
+      entry.controlBadgeEl.classList.add(`session-control-badge-${badgeState.tone}`);
+    }
+    if (badgeState.title) {
+      entry.controlBadgeEl.setAttribute("title", badgeState.title);
+    } else {
+      entry.controlBadgeEl.removeAttribute("title");
+    }
+  }
+  if (entry.sessionControlSummaryEl) {
+    entry.sessionControlSummaryEl.textContent = `${getSessionControlSummary(session)} ${getSessionLastInputSummary(session)}`.trim();
+  }
+  if (entry.sessionControlTakeBtn) {
+    const takeEnabled = canTakeSessionControl(session);
+    entry.sessionControlTakeBtn.disabled = !takeEnabled;
+    entry.sessionControlTakeBtn.setAttribute(
+      "title",
+      takeEnabled ? "Take active control for this session." : getSessionWriteBlockMessage(session)
+    );
+  }
+  if (entry.sessionControlReleaseBtn) {
+    const releaseEnabled = canReleaseSessionControl(session);
+    entry.sessionControlReleaseBtn.disabled = !releaseEnabled;
+    entry.sessionControlReleaseBtn.setAttribute(
+      "title",
+      releaseEnabled ? "Release active control for this session." : "Only the owner or active controller can release control."
+    );
+  }
+  if (entry.settingsApplyBtn) {
+    const writable = canWriteToSession(session);
+    entry.settingsApplyBtn.disabled = !writable;
+    if (writable) {
+      entry.settingsApplyBtn.removeAttribute("title");
+    } else {
+      entry.settingsApplyBtn.setAttribute("title", getSessionWriteBlockMessage(session));
+    }
+  }
+  renderSessionControlClients(entry.sessionControlClientsEl, session);
+}
 const terminalSearchState = {
   query: "",
   sessionId: "",
@@ -1025,6 +1386,7 @@ runtimeEventController = createRuntimeEventController({
   scheduleCommandSuggestions: () => appCommandUiFacadeController?.scheduleCommandSuggestions(),
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
+  setRuntimeClientId,
   upsertSession: (nextSession) => appSessionRuntimeFacadeController?.upsertSession(nextSession),
   markSessionExited: (sessionId, exitDetails) => appSessionRuntimeFacadeController?.markSessionExited(sessionId, exitDetails),
   markSessionClosed: (sessionId) => appSessionRuntimeFacadeController?.markSessionClosed(sessionId),
@@ -1038,6 +1400,8 @@ runtimeEventController = createRuntimeEventController({
   getUnrestoredSessionMessage: sessionUiFacadeController.getUnrestoredSessionMessage,
   isSessionExited: sessionUiFacadeController.isSessionExited,
   getExitedSessionMessage: sessionUiFacadeController.getExitedSessionMessage,
+  canWriteToSession,
+  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   isReadOnlyMode,
   getReadOnlyModeMessage,
   setError: (message) => appCommandUiFacadeController?.setError(message),
@@ -1123,6 +1487,7 @@ sessionCardRenderController = createSessionCardRenderController({
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
   applyThemeForSession: sessionUiFacadeController.applyThemeForSession,
+  renderSessionControl,
   isReadOnlyMode,
   getReadOnlyModeMessage
 });
@@ -1137,6 +1502,7 @@ sessionTerminalResizeController = createSessionTerminalResizeController({
   resolveSessionDeckId: (session) => appSessionRuntimeFacadeController?.resolveSessionDeckId(session),
   getSessionTerminalGeometry: (sessionOrId) => appLayoutDeckFacadeController?.getSessionTerminalGeometry(sessionOrId),
   isSessionActionBlocked: sessionUiFacadeController.isSessionActionBlocked,
+  canWriteToSession,
   computeFixedMountHeightPx: (rows) => appLayoutDeckFacadeController?.computeFixedMountHeightPx(rows),
   computeFixedCardWidthPx: (cols) => appLayoutDeckFacadeController?.computeFixedCardWidthPx(cols),
   getTerminalCellHeightPx,
@@ -1408,6 +1774,9 @@ sessionGridController = createSessionGridController({
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
   syncSessionThemeControls: sessionUiFacadeController.syncSessionThemeControls,
   setSettingsDirty: sessionUiFacadeController.setSettingsDirty,
+  renderSessionControl,
+  canWriteToSession,
+  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   applyResizeForSession: (sessionId, options) => appLayoutDeckFacadeController?.applyResizeForSession(sessionId, options),
   scheduleGlobalResize: (options) => appLayoutDeckFacadeController?.scheduleGlobalResize(options),
   scheduleDeferredResizePasses: (options) => appLayoutDeckFacadeController?.scheduleDeferredResizePasses(options),
@@ -1497,6 +1866,8 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   isReadOnlyMode,
   getReadOnlyModeMessage,
+  canWriteToSession,
+  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
   setAccessState,
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),

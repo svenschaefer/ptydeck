@@ -70,8 +70,13 @@ function createEchoPtyFactory() {
   };
 }
 
-async function issueDevToken(baseUrl, scopes) {
-  const body = Array.isArray(scopes) ? { scopes } : {};
+async function issueDevToken(baseUrl, input = undefined) {
+  const body =
+    Array.isArray(input)
+      ? { scopes: input }
+      : input && typeof input === "object"
+        ? input
+        : {};
   const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -119,6 +124,16 @@ function assertApiSessionShape(session) {
   assert.equal(typeof session.inputSafetyProfile.requireValidShellSyntax, "boolean");
   assert.equal(typeof session.inputSafetyProfile.targetSwitchGraceMs, "number");
   assert.ok(Array.isArray(session?.tags));
+  assert.ok(session?.controlState && typeof session.controlState === "object");
+  assert.equal(typeof session.controlState.owner?.subject, "string");
+  assert.equal(typeof session.controlState.owner?.tenantId, "string");
+  assert.equal(typeof session.controlState.owner?.accessMode, "string");
+  assert.equal(typeof session.controlState.owner?.permissionMode, "string");
+  assert.ok(session.controlState.controllerClientId === null || typeof session.controlState.controllerClientId === "string");
+  assert.ok(session.controlState.controllerChangedAt === null || typeof session.controlState.controllerChangedAt === "number");
+  assert.ok(session.controlState.currentController === null || typeof session.controlState.currentController.clientId === "string");
+  assert.ok(session.controlState.lastInput === null || typeof session.controlState.lastInput.at === "number");
+  assert.ok(Array.isArray(session.controlState.attachedClients));
   assert.ok(session?.activityState === "active" || session?.activityState === "inactive");
   assert.equal(typeof session?.activityUpdatedAt, "number");
   assert.equal(typeof session?.createdAt, "number");
@@ -175,6 +190,8 @@ test("WS emits session events and reconnect receives snapshot", async () => {
       events.push(JSON.parse(buffer.toString()));
     });
     await waitFor(() => events.some((event) => event.type === "snapshot"));
+    const snapshot = events.find((event) => event.type === "snapshot");
+    assert.equal(typeof snapshot?.clientId, "string");
 
     const createRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
@@ -199,11 +216,15 @@ test("WS emits session events and reconnect receives snapshot", async () => {
     assert.equal(typeof startedEvent.startedAt, "number");
     assert.equal(typeof startedEvent.updatedAt, "number");
 
-    await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-ptydeck-client-id": snapshot.clientId
+      },
       body: JSON.stringify({ data: "echo WS_OK\n" })
     });
+    assert.equal(inputRes.status, 204);
 
     await waitFor(() =>
       events.some(
@@ -301,6 +322,7 @@ test("WS snapshot and session events preserve trace and correlation continuity",
 
     await waitFor(() => events.some((event) => event.type === "snapshot"));
     const snapshot = events.find((event) => event.type === "snapshot");
+    assert.equal(typeof snapshot?.clientId, "string");
     assert.equal(typeof snapshot.trace?.traceId, "string");
     assert.equal(typeof snapshot.trace?.correlationId, "string");
     assert.equal(snapshot.trace?.source, "ws");
@@ -331,7 +353,8 @@ test("WS snapshot and session events preserve trace and correlation continuity",
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-ptydeck-correlation-id": "corr-session-input"
+        "x-ptydeck-correlation-id": "corr-session-input",
+        "x-ptydeck-client-id": snapshot.clientId
       },
       body: JSON.stringify({ data: "echo TRACE_OK\n" })
     });
@@ -722,6 +745,317 @@ test("WS auth rejects missing token and accepts valid dev token", async () => {
     assert.match(metricsText, /ptydeck_ws_errors_by_reason_total\{reason="upgrade_auth_rejected"\} [1-9]\d*/);
 
     authedWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("WS operator clients expose per-session control metadata and deterministic controller reassignment", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
+    createPty: createEchoPtyFactory(),
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const operatorToken = await issueDevToken(baseUrl);
+    const operatorJsonHeaders = createAuthHeaders(operatorToken, { json: true });
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({ name: "controlled-shell" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    const firstTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({})
+    });
+    assert.equal(firstTicketRes.status, 200);
+    const firstTicket = await firstTicketRes.json();
+
+    const firstEvents = [];
+    const firstWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${firstTicket.ticket}`]);
+    firstWs.on("message", (buffer) => {
+      firstEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "snapshot" &&
+          event.sessions.some((session) => session.id === createdSession.id && session.controlState.currentController)
+      )
+    );
+
+    const firstSnapshot = firstEvents.find((event) => event.type === "snapshot");
+    assert.equal(typeof firstSnapshot.clientId, "string");
+    const firstSnapshotSession = firstSnapshot.sessions.find((session) => session.id === createdSession.id);
+    assert.equal(firstSnapshotSession.controlState.owner.subject, "dev-user");
+    assert.equal(firstSnapshotSession.controlState.attachedClients.length, 1);
+    assert.equal(firstSnapshotSession.controlState.currentController.role, "controller");
+    const firstControllerClientId = firstSnapshotSession.controlState.currentController.clientId;
+    assert.equal(firstSnapshot.clientId, firstControllerClientId);
+
+    const secondTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: operatorJsonHeaders,
+      body: JSON.stringify({})
+    });
+    assert.equal(secondTicketRes.status, 200);
+    const secondTicket = await secondTicketRes.json();
+
+    const secondEvents = [];
+    const secondWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${secondTicket.ticket}`]);
+    secondWs.on("message", (buffer) => {
+      secondEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.length === 2
+      )
+    );
+
+    const secondAttachUpdate = firstEvents
+      .filter((event) => event.type === "session.updated" && event.session?.id === createdSession.id)
+      .at(-1);
+    assert.equal(secondAttachUpdate.session.controlState.currentController.clientId, firstControllerClientId);
+    assert.deepEqual(
+      secondAttachUpdate.session.controlState.attachedClients.map((entry) => entry.role).sort(),
+      ["controller", "owner"]
+    );
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
+      method: "POST",
+      headers: {
+        ...createAuthHeaders(operatorToken, { json: true }),
+        "x-ptydeck-client-id": firstControllerClientId
+      },
+      body: JSON.stringify({ data: "CONTROLLED\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    await waitFor(() =>
+      firstEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.lastInput?.clientId === firstControllerClientId
+      )
+    );
+
+    firstWs.close();
+
+    await waitFor(() =>
+      secondEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.length === 1 &&
+          event.session.controlState.currentController &&
+          event.session.controlState.currentController.clientId !== firstControllerClientId
+      )
+    );
+
+    const reassignedUpdate = secondEvents
+      .filter((event) => event.type === "session.updated" && event.session?.id === createdSession.id)
+      .at(-1);
+    assert.equal(reassignedUpdate.session.controlState.attachedClients.length, 1);
+    assert.equal(reassignedUpdate.session.controlState.currentController.role, "controller");
+    assert.equal(reassignedUpdate.session.controlState.lastInput.clientId, firstControllerClientId);
+
+    secondWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("session control endpoints enforce controller-only writes and explicit take release transfer flows", async () => {
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
+    createPty: createEchoPtyFactory(),
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const ownerToken = await issueDevToken(baseUrl, { subject: "owner-user" });
+    const peerToken = await issueDevToken(baseUrl, { subject: "peer-user" });
+    const ownerJsonHeaders = createAuthHeaders(ownerToken, { json: true });
+    const peerJsonHeaders = createAuthHeaders(peerToken, { json: true });
+    const createSessionRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: ownerJsonHeaders,
+      body: JSON.stringify({ name: "exclusive-shell" })
+    });
+    assert.equal(createSessionRes.status, 201);
+    const createdSession = await createSessionRes.json();
+
+    const ownerTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: ownerJsonHeaders,
+      body: JSON.stringify({})
+    });
+    assert.equal(ownerTicketRes.status, 200);
+    const ownerTicket = await ownerTicketRes.json();
+
+    const ownerEvents = [];
+    const ownerWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${ownerTicket.ticket}`]);
+    ownerWs.on("message", (buffer) => {
+      ownerEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      ownerEvents.some(
+        (event) =>
+          event.type === "snapshot" &&
+          event.sessions.some((session) => session.id === createdSession.id && session.controlState.currentController)
+      )
+    );
+
+    const ownerSnapshot = ownerEvents.find((event) => event.type === "snapshot");
+    const ownerSession = ownerSnapshot.sessions.find((session) => session.id === createdSession.id);
+    const ownerClientId = ownerSnapshot.clientId;
+    assert.equal(ownerSession.controlState.currentController.clientId, ownerClientId);
+
+    const peerTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: peerJsonHeaders,
+      body: JSON.stringify({})
+    });
+    assert.equal(peerTicketRes.status, 200);
+    const peerTicket = await peerTicketRes.json();
+
+    const peerEvents = [];
+    const peerWs = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${peerTicket.ticket}`]);
+    peerWs.on("message", (buffer) => {
+      peerEvents.push(JSON.parse(buffer.toString()));
+    });
+
+    await waitFor(() =>
+      ownerEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.attachedClients.length === 2
+      )
+    );
+
+    const peerSnapshot = peerEvents.find((event) => event.type === "snapshot");
+    assert.equal(typeof peerSnapshot?.clientId, "string");
+    const peerClientId = peerSnapshot.clientId;
+
+    const deniedInputRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: JSON.stringify({ data: "PEER_INPUT\n" })
+    });
+    assert.equal(deniedInputRes.status, 403);
+
+    const deniedResizeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/resize`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: JSON.stringify({ cols: 100, rows: 30 })
+    });
+    assert.equal(deniedResizeRes.status, 403);
+
+    const deniedTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/take`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: "{}"
+    });
+    assert.equal(deniedTakeRes.status, 403);
+
+    const releaseRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/release`, {
+      method: "POST",
+      headers: {
+        ...ownerJsonHeaders,
+        "x-ptydeck-client-id": ownerClientId
+      },
+      body: "{}"
+    });
+    assert.equal(releaseRes.status, 200);
+    const releasedSession = await releaseRes.json();
+    assert.equal(releasedSession.controlState.currentController, null);
+
+    await waitFor(() =>
+      peerEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.currentController === null
+      )
+    );
+
+    const peerTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/take`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: "{}"
+    });
+    assert.equal(peerTakeRes.status, 200);
+    const peerControlledSession = await peerTakeRes.json();
+    assert.equal(peerControlledSession.controlState.currentController.clientId, peerClientId);
+
+    const ownerDeniedAfterTakeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
+      method: "POST",
+      headers: {
+        ...ownerJsonHeaders,
+        "x-ptydeck-client-id": ownerClientId
+      },
+      body: JSON.stringify({ data: "OWNER_INPUT\n" })
+    });
+    assert.equal(ownerDeniedAfterTakeRes.status, 403);
+
+    const transferRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/control/transfer`, {
+      method: "POST",
+      headers: {
+        ...peerJsonHeaders,
+        "x-ptydeck-client-id": peerClientId
+      },
+      body: JSON.stringify({ clientId: ownerClientId })
+    });
+    assert.equal(transferRes.status, 200);
+    const transferredSession = await transferRes.json();
+    assert.equal(transferredSession.controlState.currentController.clientId, ownerClientId);
+
+    await waitFor(() =>
+      ownerEvents.some(
+        (event) =>
+          event.type === "session.updated" &&
+          event.session?.id === createdSession.id &&
+          event.session.controlState.currentController?.clientId === ownerClientId
+      )
+    );
+
+    ownerWs.close();
+    peerWs.close();
   } finally {
     await runtime.stop();
   }

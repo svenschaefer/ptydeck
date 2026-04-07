@@ -1768,6 +1768,7 @@ components:
         - shell
         - inputSafetyProfile
         - tags
+        - controlState
         - createdAt
         - updatedAt
         - activityUpdatedAt
@@ -1824,6 +1825,8 @@ components:
           type: array
           items:
             type: string
+        controlState:
+          $ref: '#/components/schemas/SessionControlState'
         themeProfile:
           $ref: '#/components/schemas/SessionThemeProfile'
         activeThemeProfile:
@@ -1857,6 +1860,100 @@ components:
           type: integer
           format: int64
           nullable: true
+    SessionControlPrincipal:
+      type: object
+      required:
+        - subject
+        - tenantId
+        - accessMode
+        - permissionMode
+      properties:
+        subject:
+          type: string
+        tenantId:
+          type: string
+        accessMode:
+          type: string
+        permissionMode:
+          type: string
+    SessionAttachedClient:
+      allOf:
+        - $ref: '#/components/schemas/SessionControlPrincipal'
+        - type: object
+          required:
+            - clientId
+            - connectedAt
+            - role
+          properties:
+            clientId:
+              type: string
+            connectedAt:
+              type: integer
+              format: int64
+            role:
+              type: string
+              enum:
+                - owner
+                - controller
+                - spectator
+    SessionControlLastInput:
+      type: object
+      required:
+        - at
+        - clientId
+        - subject
+        - tenantId
+        - accessMode
+        - permissionMode
+      properties:
+        at:
+          type: integer
+          format: int64
+        clientId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        subject:
+          type: string
+        tenantId:
+          type: string
+        accessMode:
+          type: string
+        permissionMode:
+          type: string
+    SessionControlState:
+      type: object
+      required:
+        - owner
+        - controllerClientId
+        - controllerChangedAt
+        - currentController
+        - lastInput
+        - attachedClients
+      properties:
+        owner:
+          $ref: '#/components/schemas/SessionControlPrincipal'
+        controllerClientId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        controllerChangedAt:
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+        currentController:
+          oneOf:
+            - $ref: '#/components/schemas/SessionAttachedClient'
+            - type: 'null'
+        lastInput:
+          oneOf:
+            - $ref: '#/components/schemas/SessionControlLastInput'
+            - type: 'null'
+        attachedClients:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionAttachedClient'
     SessionQuickIdSwap:
       type: object
       required:

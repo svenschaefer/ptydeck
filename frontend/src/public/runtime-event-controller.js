@@ -10,6 +10,7 @@ export function createRuntimeEventController(options = {}) {
   const scheduleCommandSuggestions = options.scheduleCommandSuggestions || (() => {});
   const clearError = options.clearError || (() => {});
   const markRuntimeBootstrapReady = options.markRuntimeBootstrapReady || (() => {});
+  const setRuntimeClientId = typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {};
   const upsertSession = options.upsertSession || (() => {});
   const markSessionExited = options.markSessionExited || (() => {});
   const markSessionClosed = options.markSessionClosed || (() => {});
@@ -23,6 +24,11 @@ export function createRuntimeEventController(options = {}) {
   const getUnrestoredSessionMessage = options.getUnrestoredSessionMessage || (() => "");
   const isSessionExited = options.isSessionExited || (() => false);
   const getExitedSessionMessage = options.getExitedSessionMessage || (() => "");
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the current session.";
   const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
   const getReadOnlyModeMessage =
     typeof options.getReadOnlyModeMessage === "function"
@@ -32,6 +38,7 @@ export function createRuntimeEventController(options = {}) {
   const sendInput = options.sendInput || (() => Promise.resolve());
 
   function applyRuntimeSnapshot(event) {
+    setRuntimeClientId(event?.clientId || "");
     const sessionIds = Array.isArray(event.sessions)
       ? event.sessions.map((session) => String(session?.id || "").trim()).filter(Boolean)
       : [];
@@ -61,6 +68,10 @@ export function createRuntimeEventController(options = {}) {
     }
     if (isSessionExited(latestSession)) {
       setError(getExitedSessionMessage(latestSession));
+      return;
+    }
+    if (!canWriteToSession(latestSession)) {
+      setError(getSessionWriteBlockedMessage(latestSession));
       return;
     }
     sendInput(sessionId, data).catch(() => setError("Failed to send terminal input."));

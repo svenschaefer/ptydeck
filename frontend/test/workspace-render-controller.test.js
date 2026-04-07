@@ -146,3 +146,25 @@ test("workspace render controller only shows workflow panel for active or comple
   });
   assert.equal(workflowPanelEl.hidden, false);
 });
+
+test("workspace render controller disables send controls when the active session is not writable", () => {
+  const commandInput = createElement();
+  const sendBtn = createElement();
+  const controller = createWorkspaceRenderController({
+    commandInput,
+    sendBtn
+  });
+
+  controller.renderStatus({
+    connectionState: "connected",
+    readOnlySpectator: false,
+    writeDisabled: true,
+    writeDisabledMessage: "This session is currently controlled by another client. Input and resize are disabled."
+  });
+
+  assert.equal(sendBtn.disabled, true);
+  assert.equal(sendBtn.getAttribute("title"), "This session is currently controlled by another client. Input and resize are disabled.");
+  assert.equal(commandInput.disabled, true);
+  assert.equal(commandInput.getAttribute("aria-disabled"), "true");
+  assert.equal(commandInput.getAttribute("title"), "This session is currently controlled by another client. Input and resize are disabled.");
+});

@@ -597,6 +597,36 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "POST" && pathname.endsWith("/control/take")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
+
+  if (method === "POST" && pathname.endsWith("/control/release")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (body !== undefined && !isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+  }
+
+  if (method === "POST" && pathname.endsWith("/control/transfer")) {
+    if (!params.sessionId) {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (!isObject(body)) {
+      throw new ApiError(400, "ValidationError", "Body must be an object.");
+    }
+    if (typeof body.clientId !== "string" || !body.clientId.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
+    }
+  }
+
   if (method === "POST" && pathname.endsWith("/restart")) {
     if (!params.sessionId) {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
@@ -997,11 +1027,56 @@ function isSession(value) {
     isInputSafetyProfile(value.inputSafetyProfile) &&
     Array.isArray(value.tags) &&
     value.tags.every((entry) => typeof entry === "string") &&
+    isSessionControlState(value.controlState) &&
     isThemeProfile(value.activeThemeProfile) &&
     isThemeProfile(value.inactiveThemeProfile) &&
     (value.themeProfile === undefined || isThemeProfile(value.themeProfile)) &&
     Number.isInteger(value.createdAt) &&
     Number.isInteger(value.updatedAt)
+  );
+}
+
+function isSessionControlPrincipal(value) {
+  return (
+    isObject(value) &&
+    typeof value.subject === "string" &&
+    typeof value.tenantId === "string" &&
+    typeof value.accessMode === "string" &&
+    typeof value.permissionMode === "string"
+  );
+}
+
+function isSessionAttachedClient(value) {
+  return (
+    isSessionControlPrincipal(value) &&
+    typeof value.clientId === "string" &&
+    Number.isInteger(value.connectedAt) &&
+    (value.role === "owner" || value.role === "controller" || value.role === "spectator")
+  );
+}
+
+function isSessionControlLastInput(value) {
+  return (
+    isObject(value) &&
+    Number.isInteger(value.at) &&
+    (value.clientId === null || typeof value.clientId === "string") &&
+    typeof value.subject === "string" &&
+    typeof value.tenantId === "string" &&
+    typeof value.accessMode === "string" &&
+    typeof value.permissionMode === "string"
+  );
+}
+
+function isSessionControlState(value) {
+  return (
+    isObject(value) &&
+    isSessionControlPrincipal(value.owner) &&
+    (value.controllerClientId === null || typeof value.controllerClientId === "string") &&
+    (value.controllerChangedAt === null || Number.isInteger(value.controllerChangedAt)) &&
+    (value.currentController === null || isSessionAttachedClient(value.currentController)) &&
+    (value.lastInput === null || isSessionControlLastInput(value.lastInput)) &&
+    Array.isArray(value.attachedClients) &&
+    value.attachedClients.every((entry) => isSessionAttachedClient(entry))
   );
 }
 

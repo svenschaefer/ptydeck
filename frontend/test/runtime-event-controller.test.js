@@ -6,6 +6,7 @@ import { createRuntimeEventController } from "../src/public/runtime-event-contro
 test("runtime-event controller applies snapshot payloads and clears runtime errors", () => {
   const calls = [];
   const controller = createRuntimeEventController({
+    setRuntimeClientId: (clientId) => calls.push(["clientId", clientId]),
     getPreferredActiveDeckId: () => "deck-a",
     setDecks: (decks, options) => calls.push(["decks", decks, options.preferredActiveDeckId]),
     replaceCustomCommandState: (commands) => calls.push(["commands", commands.length]),
@@ -28,6 +29,7 @@ test("runtime-event controller applies snapshot payloads and clears runtime erro
 
   assert.equal(applied, true);
   assert.deepEqual(calls, [
+    ["clientId", ""],
     ["decks", [{ id: "deck-a" }], "deck-a"],
     ["commands", 1],
     ["sessions", 2],
@@ -90,6 +92,27 @@ test("runtime-event controller blocks direct terminal input in read-only spectat
   await Promise.resolve();
 
   assert.deepEqual(errors, ["Spectator · Read-only session s-1. Write actions are disabled."]);
+  assert.deepEqual(sendCalls, []);
+});
+
+test("runtime-event controller blocks direct terminal input when this client does not control the session", async () => {
+  const errors = [];
+  const sendCalls = [];
+  const controller = createRuntimeEventController({
+    getSessionById: () => ({ id: "s-1", state: "running" }),
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
+    setError: (message) => errors.push(message),
+    sendInput: (sessionId, data) => {
+      sendCalls.push([sessionId, data]);
+      return Promise.resolve();
+    }
+  });
+
+  controller.handleSessionTerminalInput("s-1", "pwd");
+  await Promise.resolve();
+
+  assert.deepEqual(errors, ["This session is currently controlled by another client. Input and resize are disabled."]);
   assert.deepEqual(sendCalls, []);
 });
 

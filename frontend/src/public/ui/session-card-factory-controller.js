@@ -13,6 +13,7 @@ export function createSessionCardFactoryController(options = {}) {
     const quickIdEl = node.querySelector(".session-quick-id");
     const focusBtn = node.querySelector(".session-focus");
     const stateBadgeEl = node.querySelector(".session-state-badge");
+    const controlBadgeEl = node.querySelector(".session-control-badge");
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
@@ -22,6 +23,10 @@ export function createSessionCardFactoryController(options = {}) {
     const closeBtn = node.querySelector(".session-close");
     const settingsDialog = node.querySelector(".session-settings-dialog");
     const settingsDismissBtn = node.querySelector(".session-settings-dismiss");
+    const sessionControlTakeBtn = node.querySelector(".session-control-take");
+    const sessionControlReleaseBtn = node.querySelector(".session-control-release");
+    const sessionControlSummaryEl = node.querySelector(".session-control-summary");
+    const sessionControlClientsEl = node.querySelector(".session-control-clients");
     const settingsTabStartupBtn = node.querySelector(".session-settings-tab-startup");
     const settingsTabNoteBtn = node.querySelector(".session-settings-tab-note");
     const settingsTabThemeBtn = node.querySelector(".session-settings-tab-theme");
@@ -121,6 +126,7 @@ export function createSessionCardFactoryController(options = {}) {
       quickIdEl,
       focusBtn,
       stateBadgeEl,
+      controlBadgeEl,
       sessionMetaRowEl,
       sessionNoteEl,
       unrestoredHintEl,
@@ -130,6 +136,10 @@ export function createSessionCardFactoryController(options = {}) {
       closeBtn,
       settingsDialog,
       settingsDismissBtn,
+      sessionControlTakeBtn,
+      sessionControlReleaseBtn,
+      sessionControlSummaryEl,
+      sessionControlClientsEl,
       settingsTabStartupBtn,
       settingsTabNoteBtn,
       settingsTabThemeBtn,

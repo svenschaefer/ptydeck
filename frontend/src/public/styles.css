@@ -1439,6 +1439,39 @@ button:hover {
   letter-spacing: 0.03em;
 }
 
+.session-control-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #35526d;
+  color: #9fd3ff;
+  background: #182534;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.session-control-badge-controller {
+  border-color: #3f6a3d;
+  color: #9be39b;
+  background: #18261a;
+}
+
+.session-control-badge-owner {
+  border-color: #5d4d2a;
+  color: #ffd36a;
+  background: #2b2418;
+}
+
+.session-control-badge-spectator,
+.session-control-badge-remote,
+.session-control-badge-pending {
+  border-color: #35526d;
+  color: #9fd3ff;
+  background: #182534;
+}
+
 .session-note-text {
   margin: 0;
   flex: 1 1 auto;
@@ -2423,6 +2456,94 @@ dialog:not([open]) {
   margin: 10px 0 0;
   font-size: 12px;
   color: #9db8d2;
+}
+
+.session-control-panel {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #243245;
+  border-radius: 10px;
+  background: #111a26;
+  padding: 10px;
+}
+
+.session-control-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.session-control-panel-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #89aac8;
+}
+
+.session-control-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-control-summary {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #d8dee9;
+}
+
+.session-control-clients {
+  display: grid;
+  gap: 8px;
+}
+
+.session-control-client {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #223041;
+  border-radius: 8px;
+  background: #0f151f;
+  padding: 8px 10px;
+}
+
+.session-control-client-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.session-control-client-name,
+.session-control-client-detail {
+  margin: 0;
+  min-width: 0;
+}
+
+.session-control-client-name {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-control-client-detail {
+  color: #92a4bb;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.session-control-transfer {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .session-settings-tabs {

@@ -102,6 +102,8 @@ export function createWorkspaceRenderController(options = {}) {
     connectionState = "",
     accessSummary = "",
     readOnlySpectator = false,
+    writeDisabled = false,
+    writeDisabledMessage = "",
     loading = false,
     startupGateActive = false,
     startupGateMessage = "",
@@ -223,14 +225,21 @@ export function createWorkspaceRenderController(options = {}) {
     if (deckCreateBtn) {
       deckCreateBtn.disabled = readOnlySpectator === true;
     }
+    const writeLocked = readOnlySpectator === true || writeDisabled === true;
+    const writeLockMessage = String(writeDisabledMessage || accessSummary || "Write actions are disabled.").trim();
     if (sendBtn) {
-      sendBtn.disabled = readOnlySpectator === true;
+      sendBtn.disabled = writeLocked;
+      if (writeLocked) {
+        sendBtn.setAttribute("title", writeLockMessage);
+      } else {
+        sendBtn.removeAttribute("title");
+      }
     }
     if (commandInput) {
-      commandInput.disabled = readOnlySpectator === true;
-      if (readOnlySpectator === true) {
+      commandInput.disabled = writeLocked;
+      if (writeLocked) {
         commandInput.setAttribute("aria-disabled", "true");
-        commandInput.setAttribute("title", accessSummary || "Read-only spectator mode.");
+        commandInput.setAttribute("title", writeLockMessage);
       } else {
         commandInput.removeAttribute("aria-disabled");
         commandInput.removeAttribute("title");

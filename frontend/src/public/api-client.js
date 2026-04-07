@@ -12,6 +12,7 @@ class ApiClientError extends Error {
 
 const TRACE_HEADER_ID = "x-ptydeck-trace-id";
 const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
+const SESSION_CONTROL_CLIENT_ID_HEADER = "x-ptydeck-client-id";
 
 function withJson(body) {
   return {
@@ -87,6 +88,7 @@ export function createApiClient(baseUrl, options = {}) {
   const onUnauthorized = typeof options.onUnauthorized === "function" ? options.onUnauthorized : null;
   const onTrace = typeof options.onTrace === "function" ? options.onTrace : null;
   let authToken = typeof options.authToken === "string" ? options.authToken.trim() : "";
+  let sessionControlClientId = typeof options.sessionControlClientId === "string" ? options.sessionControlClientId.trim() : "";
   let unauthorizedRefreshPromise = null;
   const readyUrl = new URL("/ready", baseUrl).toString();
 
@@ -126,6 +128,9 @@ export function createApiClient(baseUrl, options = {}) {
       };
       if (authToken && !headers.authorization) {
         headers.authorization = `Bearer ${authToken}`;
+      }
+      if (sessionControlClientId && !headers[SESSION_CONTROL_CLIENT_ID_HEADER]) {
+        headers[SESSION_CONTROL_CLIENT_ID_HEADER] = sessionControlClientId;
       }
       const res = await fetch(`${baseUrl}${path}`, {
         ...fetchOptions,
@@ -181,6 +186,9 @@ export function createApiClient(baseUrl, options = {}) {
       if (authToken && !headers.authorization) {
         headers.authorization = `Bearer ${authToken}`;
       }
+      if (sessionControlClientId && !headers[SESSION_CONTROL_CLIENT_ID_HEADER]) {
+        headers[SESSION_CONTROL_CLIENT_ID_HEADER] = sessionControlClientId;
+      }
       const res = await fetch(normalizedUrl, {
         ...fetchOptions,
         headers
@@ -223,6 +231,9 @@ export function createApiClient(baseUrl, options = {}) {
   return {
     setAuthToken(token) {
       authToken = typeof token === "string" ? token.trim() : "";
+    },
+    setSessionControlClientId(clientId) {
+      sessionControlClientId = typeof clientId === "string" ? clientId.trim() : "";
     },
     /** @returns {Promise<Session[]>} */
     async listSessions() {
@@ -360,6 +371,23 @@ export function createApiClient(baseUrl, options = {}) {
     },
     async resizeSession(sessionId, cols, rows) {
       await request(`/sessions/${sessionId}/resize`, withJson({ cols, rows }), { expectJson: false });
+    },
+    async takeSessionControl(sessionId) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/control/take`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
+    async releaseSessionControl(sessionId) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/control/release`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}"
+      });
+    },
+    async transferSessionControl(sessionId, clientId) {
+      return request(`/sessions/${encodeURIComponent(sessionId)}/control/transfer`, withJson({ clientId }));
     },
     /** @returns {Promise<Session>} */
     async restartSession(sessionId) {

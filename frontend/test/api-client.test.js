@@ -72,6 +72,41 @@ test("api client calls ready endpoint outside api v1 base path", async () => {
   assert.equal(payload.phase, "starting_sessions");
 });
 
+test("api client attaches session-control client id and calls session control endpoints", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      headers: createHeaders(),
+      json: async () => ({
+        id: "s1",
+        controlState: {
+          controllerClientId: "client-1",
+          currentController: { clientId: "client-1" },
+          attachedClients: []
+        }
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  api.setSessionControlClientId("client-1");
+  await api.takeSessionControl("s1");
+  await api.releaseSessionControl("s1");
+  await api.transferSessionControl("s1", "client-2");
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/s1/control/take");
+  assert.equal(calls[1].url, "http://localhost:18080/api/v1/sessions/s1/control/release");
+  assert.equal(calls[2].url, "http://localhost:18080/api/v1/sessions/s1/control/transfer");
+  assert.equal(calls[0].options.headers["x-ptydeck-client-id"], "client-1");
+  assert.equal(calls[1].options.headers["x-ptydeck-client-id"], "client-1");
+  assert.equal(calls[2].options.headers["x-ptydeck-client-id"], "client-1");
+  assert.equal(calls[2].options.body, JSON.stringify({ clientId: "client-2" }));
+});
+
 test("api client reports trace metadata from response headers", async () => {
   const traceEvents = [];
   global.fetch = async () => ({

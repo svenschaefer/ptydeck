@@ -88,6 +88,11 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.getReadOnlyModeMessage === "function"
       ? options.getReadOnlyModeMessage
       : () => "Read-only spectator mode. Write actions are disabled.";
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the selected session.";
   const setAccessState = typeof options.setAccessState === "function" ? options.setAccessState : () => {};
   const disposeStreamDebugTrace =
     typeof options.disposeStreamDebugTrace === "function" ? options.disposeStreamDebugTrace : () => {};
@@ -380,6 +385,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       getLastActiveSessionSwitchAt: () => commandTargetRuntimeController?.getLastActiveSessionSwitchAt?.() || 0,
       getBlockedSessionActionMessage: sessionUiFacadeController?.getBlockedSessionActionMessage,
       isSessionActionBlocked: sessionUiFacadeController?.isSessionActionBlocked,
+      canWriteToSession,
+      getSessionWriteBlockedMessage,
       isReadOnlyMode,
       getReadOnlyModeMessage,
       getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",

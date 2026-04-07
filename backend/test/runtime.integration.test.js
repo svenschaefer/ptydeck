@@ -155,6 +155,9 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const created = await createRes.json();
     assert.equal(typeof created.id, "string");
     assert.equal(created.state, "running");
+    assert.equal(created.controlState.owner.subject, "local-operator");
+    assert.equal(created.controlState.currentController, null);
+    assert.deepEqual(created.controlState.attachedClients, []);
 
     const listRes = await fetch(`${baseUrl}/sessions`);
     assert.equal(listRes.status, 200);
@@ -184,6 +187,12 @@ test("REST lifecycle endpoints work end-to-end", async () => {
       body: JSON.stringify({ data: "echo REST_OK\n" })
     });
     assert.equal(inputRes.status, 204);
+
+    const afterInputRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(afterInputRes.status, 200);
+    const afterInput = await afterInputRes.json();
+    assert.equal(afterInput.controlState.lastInput.subject, "local-operator");
+    assert.equal(afterInput.controlState.lastInput.clientId, null);
 
     const resizeRes = await fetch(`${baseUrl}/sessions/${created.id}/resize`, {
       method: "POST",
@@ -2097,6 +2106,7 @@ test("OPTIONS advertises PATCH/PUT and authorization header for CORS preflight",
     assert.ok(allowMethods.includes("PUT"));
     const allowHeaders = res.headers.get("access-control-allow-headers") || "";
     assert.ok(allowHeaders.includes("authorization"));
+    assert.ok(allowHeaders.includes("x-ptydeck-client-id"));
   } finally {
     await runtime.stop();
   }

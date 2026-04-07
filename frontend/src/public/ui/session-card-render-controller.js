@@ -16,6 +16,7 @@ export function createSessionCardRenderController(options = {}) {
   const syncSessionThemeControls = options.syncSessionThemeControls || (() => {});
   const setSettingsDirty = options.setSettingsDirty || (() => {});
   const applyThemeForSession = options.applyThemeForSession || (() => {});
+  const renderSessionControl = options.renderSessionControl || (() => {});
   const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
   const getReadOnlyModeMessage =
     typeof options.getReadOnlyModeMessage === "function"
@@ -80,6 +81,7 @@ export function createSessionCardRenderController(options = {}) {
 
     renderSessionTagList(entry, session);
     renderSessionNote(entry, session);
+    renderSessionControl(entry, session);
 
     for (const control of [entry.settingsBtn, entry.renameBtn, entry.closeBtn, entry.settingsApplyBtn]) {
       if (!control) {

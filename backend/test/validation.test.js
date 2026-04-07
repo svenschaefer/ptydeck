@@ -37,6 +37,45 @@ const INPUT_SAFETY_PROFILE = {
   pasteLineConfirmThreshold: 5
 };
 
+const CONTROL_STATE = {
+  owner: {
+    subject: "owner",
+    tenantId: "tenant-a",
+    accessMode: "operator",
+    permissionMode: ""
+  },
+  controllerClientId: "client-1",
+  controllerChangedAt: 2,
+  currentController: {
+    clientId: "client-1",
+    connectedAt: 2,
+    subject: "owner",
+    tenantId: "tenant-a",
+    accessMode: "operator",
+    permissionMode: "",
+    role: "controller"
+  },
+  lastInput: {
+    at: 3,
+    clientId: "client-1",
+    subject: "owner",
+    tenantId: "tenant-a",
+    accessMode: "operator",
+    permissionMode: ""
+  },
+  attachedClients: [
+    {
+      clientId: "client-1",
+      connectedAt: 2,
+      subject: "owner",
+      tenantId: "tenant-a",
+      accessMode: "operator",
+      permissionMode: "",
+      role: "controller"
+    }
+  ]
+};
+
 test("validateRequest accepts valid input body", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -82,6 +121,37 @@ test("validateRequest accepts valid PTY control requests without a body", () => 
   });
 });
 
+test("validateRequest accepts valid session control payloads and rejects invalid transfer payloads", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/take",
+      params: { sessionId: "abc" },
+      body: undefined
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/release",
+      params: { sessionId: "abc" },
+      body: {}
+    });
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/transfer",
+      params: { sessionId: "abc" },
+      body: { clientId: "ws-123" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/transfer",
+      params: { sessionId: "abc" },
+      body: { clientId: "" }
+    });
+  });
+});
+
 test("validateResponse checks session list schema", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -103,6 +173,7 @@ test("validateResponse checks session list schema", () => {
           startCommand: "",
           env: {},
           tags: [],
+          controlState: CONTROL_STATE,
           themeProfile: THEME_PROFILE,
           activeThemeProfile: THEME_PROFILE,
           inactiveThemeProfile: THEME_PROFILE,
@@ -156,6 +227,7 @@ test("validateResponse accepts ssh session remote runtime metadata", () => {
         startCommand: "",
         env: {},
         tags: [],
+        controlState: CONTROL_STATE,
         themeProfile: THEME_PROFILE,
         activeThemeProfile: THEME_PROFILE,
         inactiveThemeProfile: THEME_PROFILE,
@@ -264,6 +336,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           startCommand: "",
           env: {},
           tags: [],
+          controlState: CONTROL_STATE,
           themeProfile: THEME_PROFILE,
           activeThemeProfile: THEME_PROFILE,
           inactiveThemeProfile: THEME_PROFILE,
@@ -284,6 +357,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           startCommand: "",
           env: {},
           tags: [],
+          controlState: CONTROL_STATE,
           themeProfile: THEME_PROFILE,
           activeThemeProfile: THEME_PROFILE,
           inactiveThemeProfile: THEME_PROFILE,

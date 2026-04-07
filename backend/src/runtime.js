@@ -11,6 +11,16 @@ import { JsonPersistence } from "./persistence.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import {
+  buildSessionControlStateView,
+  createLocalOperatorPrincipal,
+  createSessionAttachedClient,
+  createSessionControlPrincipal,
+  normalizeSessionControlState,
+  setSessionControllerClient,
+  sessionControlPrincipalsMatch,
+  updateSessionControlLastInput
+} from "./session-control-state.js";
+import {
   DEFAULT_SESSION_INPUT_SAFETY_PROFILE,
   normalizeSessionInputSafetyProfile
 } from "./session-input-safety-profile.js";
@@ -133,6 +143,7 @@ const SESSION_QUICK_ID_POOL = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const SESSION_QUICK_ID_FALLBACK = "?";
 const TRACE_HEADER_ID = "x-ptydeck-trace-id";
 const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
+const SESSION_CONTROL_CLIENT_ID_HEADER = "x-ptydeck-client-id";
 const TRACE_TOKEN_MAX_LENGTH = 128;
 const DEFAULT_SESSION_THEME_PROFILE = {
   background: "#0a0d12",
@@ -543,6 +554,21 @@ function route(pathname, method) {
     return { kind: "resize", params: { sessionId: resizeMatch[1] } };
   }
 
+  const takeControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/take$/);
+  if (takeControlMatch && method === "POST") {
+    return { kind: "takeSessionControl", params: { sessionId: takeControlMatch[1] } };
+  }
+
+  const releaseControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/release$/);
+  if (releaseControlMatch && method === "POST") {
+    return { kind: "releaseSessionControl", params: { sessionId: releaseControlMatch[1] } };
+  }
+
+  const transferControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/transfer$/);
+  if (transferControlMatch && method === "POST") {
+    return { kind: "transferSessionControl", params: { sessionId: transferControlMatch[1] } };
+  }
+
   const restartMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
   if (restartMatch && method === "POST") {
     return { kind: "restart", params: { sessionId: restartMatch[1] } };
@@ -605,6 +631,15 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/resize$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/resize";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/control\/take$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/control/take";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/control\/release$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/control/release";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/control\/transfer$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/control/transfer";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/restart";
@@ -2521,6 +2556,7 @@ export function createRuntime(config) {
   const unrestoredSessions = new Map();
   let persistedReplayOutputs = new Map();
   const decks = new Map();
+  const sessionControlStates = new Map();
   const connectionProfiles = new Map();
   const layoutProfiles = new Map();
   const workspacePresets = new Map();
@@ -2676,7 +2712,7 @@ export function createRuntime(config) {
       ...buildSecurityHeaders(),
       "content-type": "application/json",
       "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-      "access-control-allow-headers": `content-type,authorization,${TRACE_HEADER_CORRELATION_ID}`,
+      "access-control-allow-headers": `content-type,authorization,${TRACE_HEADER_CORRELATION_ID},${SESSION_CONTROL_CLIENT_ID_HEADER}`,
       "access-control-expose-headers": `${TRACE_HEADER_ID},${TRACE_HEADER_CORRELATION_ID}`,
       ...buildTraceHeaders(traceContext)
     };
@@ -3134,6 +3170,9 @@ export function createRuntime(config) {
       kind === "uploadSessionFile" ||
       kind === "input" ||
       kind === "resize" ||
+      kind === "takeSessionControl" ||
+      kind === "releaseSessionControl" ||
+      kind === "transferSessionControl" ||
       kind === "restart" ||
       kind === "interrupt" ||
       kind === "terminate" ||
@@ -4504,6 +4543,291 @@ export function createRuntime(config) {
     return Boolean(targetSession) && targetSession.deckId === deckId;
   }
 
+  function createDefaultSessionOwner(auth = null) {
+    return createSessionControlPrincipal(auth);
+  }
+
+  function setSessionControlState(sessionId, value, fallbackOwner = null) {
+    const normalized = normalizeSessionControlState(value, {
+      fallbackOwner: fallbackOwner || createDefaultSessionOwner()
+    });
+    sessionControlStates.set(sessionId, normalized);
+    return normalized;
+  }
+
+  function getSessionControlState(sessionId, fallbackOwner = null) {
+    const existing = sessionControlStates.get(sessionId);
+    if (existing) {
+      return existing;
+    }
+    return setSessionControlState(sessionId, {}, fallbackOwner);
+  }
+
+  function deleteSessionControlState(sessionId) {
+    sessionControlStates.delete(sessionId);
+  }
+
+  function resolveSessionControlModel(sessionId) {
+    try {
+      return withDeckId(manager.get(sessionId).meta);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const unrestored = unrestoredSessions.get(sessionId);
+    return unrestored ? withDeckId(unrestored) : null;
+  }
+
+  function listSessionIdsForAuth(auth = null) {
+    const ids = [];
+    const seen = new Set();
+    for (const session of manager.list()) {
+      const apiSession = withDeckId(session);
+      if (isSessionVisibleToAuth(apiSession, auth)) {
+        ids.push(apiSession.id);
+      }
+      seen.add(apiSession.id);
+    }
+    for (const [sessionId, session] of unrestoredSessions.entries()) {
+      if (seen.has(sessionId)) {
+        continue;
+      }
+      const apiSession = withDeckId(session);
+      if (isSessionVisibleToAuth(apiSession, auth)) {
+        ids.push(apiSession.id);
+      }
+    }
+    return ids;
+  }
+
+  function listAttachedClientsForSession(sessionId, sessionModel = null) {
+    const model = sessionModel || resolveSessionControlModel(sessionId);
+    if (!model) {
+      return [];
+    }
+    const attachedClients = [];
+    for (const socket of sockets) {
+      if (socket.readyState !== socket.OPEN || !socket.sessionControlClient) {
+        continue;
+      }
+      if (!isSessionVisibleToAuth(model, socket.auth || null)) {
+        continue;
+      }
+      attachedClients.push(socket.sessionControlClient);
+    }
+    return attachedClients;
+  }
+
+  function buildApiSessionControlState(sessionId, sessionModel = null) {
+    const controlState = getSessionControlState(sessionId);
+    return buildSessionControlStateView(controlState, listAttachedClientsForSession(sessionId, sessionModel));
+  }
+
+  function withPersistedSessionControlState(session, fallbackOwner = null) {
+    return {
+      ...session,
+      controlState: { ...getSessionControlState(session.id, fallbackOwner) }
+    };
+  }
+
+  function reconcileSessionControllerForSession(sessionId) {
+    const sessionModel = resolveSessionControlModel(sessionId);
+    if (!sessionModel) {
+      return false;
+    }
+    const currentState = getSessionControlState(sessionId);
+    const attachedClients = listAttachedClientsForSession(sessionId, sessionModel);
+    let nextState = currentState;
+    if (
+      nextState.controllerClientId &&
+      !attachedClients.some((entry) => entry.clientId === nextState.controllerClientId)
+    ) {
+      nextState = setSessionControllerClient(nextState, null);
+    }
+    if (!nextState.controllerClientId && nextState.allowAutoAssign !== false) {
+      const ownerClient = attachedClients.find((entry) => sessionControlPrincipalsMatch(entry, nextState.owner));
+      if (ownerClient) {
+        nextState = setSessionControllerClient(nextState, ownerClient.clientId, { allowAutoAssign: true });
+      }
+    }
+    if (!nextState.controllerClientId && attachedClients.length === 0 && nextState.allowAutoAssign === false) {
+      nextState = setSessionControllerClient(nextState, null, { allowAutoAssign: true });
+    }
+    if (
+      nextState.controllerClientId === currentState.controllerClientId &&
+      nextState.controllerChangedAt === currentState.controllerChangedAt &&
+      nextState.allowAutoAssign === currentState.allowAutoAssign
+    ) {
+      return false;
+    }
+    sessionControlStates.set(sessionId, nextState);
+    return true;
+  }
+
+  function broadcastSessionControlRefreshForAuth(auth = null, traceSeed = null) {
+    for (const sessionId of listSessionIdsForAuth(auth)) {
+      reconcileSessionControllerForSession(sessionId);
+      broadcastSessionUpdated(sessionId, {
+        ...(traceSeed && typeof traceSeed === "object" ? traceSeed : {}),
+        sessionId
+      });
+    }
+  }
+
+  function resolveSessionControlClientId(req, sessionId, auth = null) {
+    const headerValue = req?.headers?.[SESSION_CONTROL_CLIENT_ID_HEADER];
+    const requestedClientId = Array.isArray(headerValue)
+      ? String(headerValue[0] || "").trim()
+      : typeof headerValue === "string"
+        ? headerValue.trim()
+        : "";
+    if (!requestedClientId) {
+      return null;
+    }
+    const requestPrincipal = createSessionControlPrincipal(auth);
+    return listAttachedClientsForSession(sessionId).some(
+      (entry) =>
+        entry.clientId === requestedClientId &&
+        sessionControlPrincipalsMatch(entry, requestPrincipal)
+    )
+      ? requestedClientId
+      : null;
+  }
+
+  function recordSessionLastInput(sessionId, auth = null, req = null) {
+    const nextState = updateSessionControlLastInput(getSessionControlState(sessionId), {
+      principal: createSessionControlPrincipal(auth),
+      clientId: resolveSessionControlClientId(req, sessionId, auth)
+    });
+    sessionControlStates.set(sessionId, nextState);
+    return nextState;
+  }
+
+  function requireSessionControlRequestClient(sessionId, auth = null, req = null) {
+    const requestPrincipal = createSessionControlPrincipal(auth);
+    const clientId = resolveSessionControlClientId(req, sessionId, auth);
+    if (!clientId) {
+      throw new ApiError(
+        409,
+        "ControllerClientRequired",
+        "This action requires an active attached session client. Reconnect the session UI and retry."
+      );
+    }
+    const attachedClient =
+      listAttachedClientsForSession(sessionId).find((entry) => entry.clientId === clientId) || null;
+    if (!attachedClient || !sessionControlPrincipalsMatch(attachedClient, requestPrincipal)) {
+      throw new ApiError(
+        409,
+        "ControllerClientRequired",
+        "This action requires an active attached session client. Reconnect the session UI and retry."
+      );
+    }
+    return attachedClient;
+  }
+
+  function getSessionControlViewOrThrow(sessionId, auth = null) {
+    getApiSessionOrThrow(sessionId, auth);
+    reconcileSessionControllerForSession(sessionId);
+    return buildApiSessionControlState(sessionId);
+  }
+
+  function ensureSessionControllerAccess(sessionId, auth = null, req = null, actionLabel = "write to this session") {
+    const controlView = getSessionControlViewOrThrow(sessionId, auth);
+    const attachedClients = Array.isArray(controlView.attachedClients) ? controlView.attachedClients : [];
+    const canUseImplicitOwnerFallback =
+      !controlView.currentController &&
+      attachedClients.every((entry) => entry?.accessMode === "spectator");
+    if (canUseImplicitOwnerFallback) {
+      if (!sessionControlPrincipalsMatch(createSessionControlPrincipal(auth), controlView.owner)) {
+        throw new ApiError(403, "ControlDenied", `Only the active controller may ${actionLabel}.`);
+      }
+      return {
+        requestClient: null,
+        controlView
+      };
+    }
+    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    if (!controlView.currentController) {
+      throw new ApiError(409, "NoActiveController", "No client currently holds session control.");
+    }
+    if (controlView.currentController.clientId !== requestClient.clientId) {
+      throw new ApiError(403, "ControlDenied", `Only the active controller may ${actionLabel}.`);
+    }
+    return {
+      requestClient,
+      controlView
+    };
+  }
+
+  function updateSessionControlStateAndBroadcast(sessionId, nextState, traceSeed = null) {
+    sessionControlStates.set(sessionId, normalizeSessionControlState(nextState, {
+      fallbackOwner: getSessionControlState(sessionId).owner
+    }));
+    broadcastSessionUpdated(sessionId, {
+      ...(traceSeed && typeof traceSeed === "object" ? traceSeed : {}),
+      sessionId
+    });
+    return buildApiSessionControlState(sessionId);
+  }
+
+  function takeSessionControlOrThrow(sessionId, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const currentState = getSessionControlState(sessionId);
+    const controlView = getSessionControlViewOrThrow(sessionId, auth);
+    const isOwnerClient = sessionControlPrincipalsMatch(requestClient, currentState.owner);
+    const isCurrentController = controlView.currentController?.clientId === requestClient.clientId;
+    if (controlView.currentController && !isCurrentController && !isOwnerClient) {
+      throw new ApiError(403, "ControlDenied", "Only the owner can take control from the active controller.");
+    }
+    return updateSessionControlStateAndBroadcast(
+      sessionId,
+      setSessionControllerClient(currentState, requestClient.clientId, { allowAutoAssign: true }),
+      traceSeed
+    );
+  }
+
+  function releaseSessionControlOrThrow(sessionId, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const currentState = getSessionControlState(sessionId);
+    const controlView = getSessionControlViewOrThrow(sessionId, auth);
+    const isOwnerClient = sessionControlPrincipalsMatch(requestClient, currentState.owner);
+    const isCurrentController = controlView.currentController?.clientId === requestClient.clientId;
+    if (!isOwnerClient && !isCurrentController) {
+      throw new ApiError(403, "ControlDenied", "Only the owner or active controller can release session control.");
+    }
+    return updateSessionControlStateAndBroadcast(
+      sessionId,
+      setSessionControllerClient(currentState, null, { allowAutoAssign: false }),
+      traceSeed
+    );
+  }
+
+  function transferSessionControlOrThrow(sessionId, targetClientId, auth = null, req = null, traceSeed = null) {
+    const requestClient = requireSessionControlRequestClient(sessionId, auth, req);
+    const normalizedTargetClientId = String(targetClientId || "").trim();
+    if (!normalizedTargetClientId) {
+      throw new ApiError(400, "ValidationError", "Field 'clientId' must be a non-empty string.");
+    }
+    const currentState = getSessionControlState(sessionId);
+    const controlView = getSessionControlViewOrThrow(sessionId, auth);
+    const isOwnerClient = sessionControlPrincipalsMatch(requestClient, currentState.owner);
+    const isCurrentController = controlView.currentController?.clientId === requestClient.clientId;
+    if (!isOwnerClient && !isCurrentController) {
+      throw new ApiError(403, "ControlDenied", "Only the owner or active controller can transfer session control.");
+    }
+    const targetClient =
+      listAttachedClientsForSession(sessionId).find((entry) => entry.clientId === normalizedTargetClientId) || null;
+    if (!targetClient) {
+      throw new ApiError(409, "ControlTransferTargetNotAttached", "The target client is not attached to this session.");
+    }
+    return updateSessionControlStateAndBroadcast(
+      sessionId,
+      setSessionControllerClient(currentState, targetClient.clientId, { allowAutoAssign: true }),
+      traceSeed
+    );
+  }
+
   function snapshotRuntimeState() {
     const snapshot = manager.getSnapshot({
       outputMaxChars: sessionReplayPersistMaxChars,
@@ -4512,11 +4836,11 @@ export function createRuntime(config) {
     });
     const sessionMap = new Map();
     for (const session of snapshot.sessions) {
-      sessionMap.set(session.id, withDeckId(session));
+      sessionMap.set(session.id, withPersistedSessionControlState(withDeckId(session)));
     }
     for (const [sessionId, session] of unrestoredSessions.entries()) {
       if (!sessionMap.has(sessionId)) {
-        sessionMap.set(sessionId, withDeckId(session));
+        sessionMap.set(sessionId, withPersistedSessionControlState(withDeckId(session)));
       }
     }
     ensureDefaultDeck();
@@ -4537,9 +4861,11 @@ export function createRuntime(config) {
 
   function toApiSession(session, explicitState) {
     const sessionState = typeof explicitState === "string" && explicitState.trim() ? explicitState.trim() : String(session?.state || "").trim();
+    const sessionModel = withDeckId(session);
     return {
-      ...withDeckId(session),
-      state: sessionState || "running"
+      ...sessionModel,
+      state: sessionState || "running",
+      controlState: buildApiSessionControlState(session.id, sessionModel)
     };
   }
 
@@ -5552,6 +5878,7 @@ function tryCreateRestoredSession({
         const tags = normalizeSessionTags(mergedBody?.tags, { strict: true });
         const sessionId = crypto.randomUUID();
         const quickIdToken = assignSessionQuickIdToken(sessionId);
+        setSessionControlState(sessionId, {}, createDefaultSessionOwner(auth));
         let payload = null;
         try {
           payload = manager.create({
@@ -5578,6 +5905,7 @@ function tryCreateRestoredSession({
           });
         } catch (error) {
           deleteSessionQuickIdToken(sessionId);
+          deleteSessionControlState(sessionId);
           throw error;
         }
         sessionDeckAssignments.set(
@@ -5587,9 +5915,15 @@ function tryCreateRestoredSession({
             hasKnownDeck: (deckId) => decks.has(deckId)
           })
         );
+        reconcileSessionControllerForSession(payload.id);
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
+        broadcastSessionUpdated(payload.id, {
+          ...requestTraceContext,
+          sessionId: payload.id,
+          deckId: apiPayload.deckId
+        });
         writeJsonResponse( 201, apiPayload);
         return;
       }
@@ -5624,6 +5958,7 @@ function tryCreateRestoredSession({
         });
         sessionDeckAssignments.delete(match.params.sessionId);
         deleteSessionQuickIdToken(match.params.sessionId);
+        deleteSessionControlState(match.params.sessionId);
         unrestoredSessions.delete(match.params.sessionId);
         for (const deletedCommand of removeCustomCommandsForSession(match.params.sessionId)) {
           broadcast({
@@ -5773,11 +6108,18 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "input") {
+        getApiSessionOrThrow(match.params.sessionId, auth);
+        ensureSessionControllerAccess(match.params.sessionId, auth, req, "send terminal input");
         manager.sendInput(match.params.sessionId, body.data, {
           trace: {
             ...requestTraceContext,
             sessionId: match.params.sessionId
           }
+        });
+        recordSessionLastInput(match.params.sessionId, auth, req);
+        broadcastSessionUpdated(match.params.sessionId, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
         });
         writeJsonResponse( 204);
         return;
@@ -5791,6 +6133,8 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "resize") {
+        getApiSessionOrThrow(match.params.sessionId, auth);
+        ensureSessionControllerAccess(match.params.sessionId, auth, req, "resize this terminal");
         manager.resize(match.params.sessionId, body.cols, body.rows, {
           trace: {
             ...requestTraceContext,
@@ -5798,6 +6142,54 @@ function tryCreateRestoredSession({
           }
         });
         writeJsonResponse( 204);
+        return;
+      }
+
+      if (match.kind === "takeSessionControl") {
+        const payload = takeSessionControlOrThrow(match.params.sessionId, auth, req, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
+        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
+        const nextPayload = {
+          ...apiSession,
+          controlState: payload
+        };
+        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
+        await persistNow("session.control.take");
+        writeJsonResponse( 200, nextPayload);
+        return;
+      }
+
+      if (match.kind === "releaseSessionControl") {
+        const payload = releaseSessionControlOrThrow(match.params.sessionId, auth, req, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
+        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
+        const nextPayload = {
+          ...apiSession,
+          controlState: payload
+        };
+        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
+        await persistNow("session.control.release");
+        writeJsonResponse( 200, nextPayload);
+        return;
+      }
+
+      if (match.kind === "transferSessionControl") {
+        const payload = transferSessionControlOrThrow(match.params.sessionId, body.clientId, auth, req, {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
+        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
+        const nextPayload = {
+          ...apiSession,
+          controlState: payload
+        };
+        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
+        await persistNow("session.control.transfer");
+        writeJsonResponse( 200, nextPayload);
         return;
       }
 
@@ -5988,6 +6380,11 @@ function tryCreateRestoredSession({
       };
       ws.clientIp = normalizedClientIp;
       ws.auth = wsAuth;
+      ws.sessionControlClient = createSessionAttachedClient({
+        clientId: ws.connectionId,
+        connectedAt: Date.now(),
+        principal: createSessionControlPrincipal(wsAuth)
+      });
       ws.isAlive = true;
       logDebug("ws.upgrade.accepted", {
         socketCount: sockets.size,
@@ -6014,15 +6411,20 @@ function tryCreateRestoredSession({
           wsClientConnections.set(clientIp, wsClientState);
         }
         logDebug("ws.client.closed", { socketCount: sockets.size }, ws.traceContext || upgradeTraceContext);
+        broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext || upgradeTraceContext);
       });
       ws.on("error", () => {
         recordWsError("socket_error");
       });
 
+      for (const sessionId of listSessionIdsForAuth(ws.auth || null)) {
+        reconcileSessionControllerForSession(sessionId);
+      }
       const snapshot = manager.getSnapshot();
       const snapshotPayload = filterPayloadForAuth(
         withTracePayload({
           type: "snapshot",
+          clientId: ws.connectionId,
           sessions: listApiSessions(ws.auth || null),
           outputs: snapshot.outputs,
           customCommands: listCustomCommands(),
@@ -6036,6 +6438,7 @@ function tryCreateRestoredSession({
         outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
         customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
       }, snapshotPayload.trace || ws.traceContext);
+      broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
     });
   });
 
@@ -6210,6 +6613,7 @@ function tryCreateRestoredSession({
             ? session.deckId
             : DEFAULT_DECK_ID;
         sessionDeckAssignments.set(session.id, persistedDeckId);
+        setSessionControlState(session.id, session.controlState, createLocalOperatorPrincipal());
         const kind = normalizeSessionKind(session.kind, { strict: false });
         const startupConfig = normalizeSessionStartupConfig(
           {
@@ -6350,6 +6754,9 @@ function tryCreateRestoredSession({
         console.error("failed to restore session", session.id, err);
       }
     }
+    for (const sessionId of listSessionIdsForAuth(null)) {
+      reconcileSessionControllerForSession(sessionId);
+    }
     const restoreCandidates = [];
     for (const customCommand of persistedState.customCommands) {
       const candidate = buildCustomCommandEntry(customCommand?.name, customCommand, {
@@ -6441,6 +6848,9 @@ function tryCreateRestoredSession({
     }
     sockets.clear();
     wsServer.close();
+    for (const sessionId of listSessionIdsForAuth(null)) {
+      reconcileSessionControllerForSession(sessionId);
+    }
 
     const persistedSnapshot = snapshotRuntimeState();
     logDebug("runtime.stop.start", {

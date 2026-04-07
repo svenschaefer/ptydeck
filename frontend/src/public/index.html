@@ -653,6 +653,7 @@
               <span class="session-quick-id"></span>
               <button class="session-focus" type="button"></button>
               <span class="session-state-badge" hidden></span>
+              <span class="session-control-badge" hidden></span>
             </div>
             <div class="session-toolbar-actions">
               <button class="session-refresh" type="button" aria-label="Refresh terminal screen">
@@ -681,6 +682,17 @@
             </div>
           </div>
           <p class="session-settings-hint">Use Startup for how the session launches, Note for the saved note, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
+          <section class="session-control-panel">
+            <div class="session-control-panel-head">
+              <p class="session-control-panel-title">Control</p>
+              <div class="session-control-panel-actions">
+                <button class="session-control-take" type="button">Take Control</button>
+                <button class="session-control-release" type="button">Release Control</button>
+              </div>
+            </div>
+            <p class="session-control-summary">Waiting for control attachment.</p>
+            <div class="session-control-clients"></div>
+          </section>
           <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">
             <button class="session-settings-tab session-settings-tab-startup" type="button">Startup</button>
             <button class="session-settings-tab session-settings-tab-note" type="button">Note</button>

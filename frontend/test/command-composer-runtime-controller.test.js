@@ -271,6 +271,31 @@ test("command-composer runtime controller sends command input via configured ter
   ]);
 });
 
+test("command-composer runtime controller blocks sends for non-controller sessions before transport", async () => {
+  const calls = [];
+  let value = "pwd";
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => value,
+    interpretComposerInput: () => ({ kind: "input", data: "pwd" }),
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    canWriteToSession: () => false,
+    getSessionWriteBlockedMessage: () => "This session is currently controlled by another client. Input and resize are disabled.",
+    setCommandFeedback: (message) => calls.push(["feedback", message]),
+    apiSendInput: async () => {
+      calls.push(["api"]);
+    }
+  });
+
+  await controller.submitCommand();
+
+  assert.deepEqual(calls, [
+    ["feedback", "This session is currently controlled by another client. Input and resize are disabled."]
+  ]);
+});
+
 test("command-composer runtime controller records one submission per direct-route target", async () => {
   const calls = [];
   let value = "@ops pwd";
