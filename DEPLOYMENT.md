@@ -219,6 +219,107 @@ Then complete the branch rollback:
 2. Restart backend and frontend.
 3. Re-run the smoke checks above in the restored browser profile.
 
+### 8.2 H65 Trusted-Local Second-Client LAN Smoke
+
+Use this checklist to validate `feature/h62-multi-device-control-foundation` from at least one second LAN client under the real hostnames.
+
+Preconditions:
+
+1. The active branch is `feature/h62-multi-device-control-foundation`.
+2. The backend and frontend are running on the primary host.
+3. LAN DNS resolves both hostnames to the primary host:
+   - `ptydeck.local.secos.rocks`
+   - `api.ptydeck.local.secos.rocks`
+4. The second LAN client uses a normal browser profile with `localStorage` enabled.
+5. The second LAN client is not the same browser instance/profile as the primary host browser already attached to the session.
+
+Expected baseline responses before UI interaction:
+
+1. `https://ptydeck.local.secos.rocks/` returns `200`.
+2. `https://api.ptydeck.local.secos.rocks/api/v1/sessions` returns `401 Missing bearer token` before auth bootstrap.
+3. `https://api.ptydeck.local.secos.rocks/ws` with WebSocket upgrade headers returns `401 Missing WebSocket ticket` before ticket creation.
+
+Second-client smoke procedure:
+
+1. Open `https://ptydeck.local.secos.rocks/` on the second LAN client.
+2. Confirm the frontend boots without a startup-gate failure screen.
+3. Confirm the browser creates or reuses the H62 rollback backup in local storage:
+   - storage key: `ptydeck.backup.pre-h62.v1`
+4. Confirm the browser creates or reuses the trusted-local client identity in local storage:
+   - storage key: `ptydeck.trusted-local-client.v1`
+5. Confirm the frontend reaches a usable runtime state under the real hostnames:
+   - the session list loads
+   - no persistent REST auth failure remains visible
+   - the runtime transitions into connected state
+6. Confirm WebSocket boot succeeds under the real hostnames:
+   - the browser obtains a WS ticket
+   - the ticket payload includes the trusted-local `clientId` and `label`
+   - the WS connection reaches the normal connected state
+7. With one primary client already attached to a session, attach the second LAN client to the same session and verify:
+   - both clients see the same session output
+   - the second client appears in the attached-device list
+   - trusted-local labels distinguish `This device` from `Other device`
+8. Verify controller reclaim behavior between the two clients:
+   - a blocked write on the non-controller client exposes `Take Control` or `Reclaim Control`
+   - taking or reclaiming control succeeds deterministically
+   - the controller indicator updates on both clients
+   - subsequent write attempts on the controller client succeed
+9. Verify stale-device cleanup:
+   - disconnect or close one attached client
+   - wait for the branch's stale/offline handling to settle
+   - confirm a stale device can be forgotten explicitly when the UI offers it
+
+Fail the LAN smoke if any of the following occur:
+
+- The second client cannot boot because the startup backup or trusted-local identity cannot be created or verified.
+- REST auth or WS ticket bootstrap succeeds only on loopback/dev URLs but fails on the real hostnames.
+- The attached-device list diverges between clients.
+- Blocked writes remain passive and do not offer reclaim.
+- Control state becomes ambiguous or both clients can write concurrently.
+
+Record the result with:
+
+- second-client device/browser used
+- date/time
+- hostnames tested
+- pass/fail per step
+- any remaining follow-up defects
+
+### 8.3 H65 Merge-Readiness Acceptance Checklist
+
+`feature/h62-multi-device-control-foundation` is merge-ready only when all items below are explicitly marked pass.
+
+Trusted-local LAN validation:
+
+- [ ] A second LAN client booted successfully under `https://ptydeck.local.secos.rocks/`.
+- [ ] The second LAN client created or verified `ptydeck.backup.pre-h62.v1`.
+- [ ] The second LAN client created or verified `ptydeck.trusted-local-client.v1`.
+- [ ] REST auth bootstrap worked under `https://api.ptydeck.local.secos.rocks`.
+- [ ] WebSocket ticket bootstrap worked under `https://api.ptydeck.local.secos.rocks/ws`.
+- [ ] The WS ticket flow carried the trusted-local `clientId` and `label`.
+
+Multi-device control behavior:
+
+- [ ] Two attached clients can observe the same session output under the real hostnames.
+- [ ] Only one client can control input/PTY-authoritative resize at a time.
+- [ ] A blocked non-controller write offers `Take Control` or `Reclaim Control`.
+- [ ] Control reclaim updates attached clients deterministically.
+- [ ] Stale or offline attached devices can be forgotten without corrupting active control state.
+
+Rollback and restore:
+
+- [ ] Backend rollback restore succeeds with `npm run h62:rollback:restore`.
+- [ ] Browser rollback restore succeeds through `/rollback-restore.html` in the same browser profile.
+- [ ] After restoring and switching back to `main`, the restored browser profile boots without branch-specific state breakage.
+
+Documentation and branch hygiene:
+
+- [ ] `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, and `CODEX_CONTEXT.md` reflect the final branch state.
+- [ ] The feature branch worktree is clean after validation.
+- [ ] No leftover validation or smoke-test processes remain.
+
+If any checklist item is not pass, do not merge the branch. Keep the branch open, record the failing item, and queue the concrete remediation task before attempting merge again.
+
 ## 9. Production Logging Standard
 
 Use the following production logging contract for backend and frontend serving processes:
