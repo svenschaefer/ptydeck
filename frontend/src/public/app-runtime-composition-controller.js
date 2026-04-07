@@ -21,6 +21,7 @@ import { createSessionRuntimeController } from "./session-runtime-controller.js"
 import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
+import { createStartupBackupRuntimeController as defaultCreateStartupBackupRuntimeController } from "./startup-backup-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createTraceDebugController } from "./trace-debug-controller.js";
 import { createWorkspaceManagerRuntimeController } from "./workspace-manager-runtime-controller.js";
@@ -61,12 +62,18 @@ import { createWorkspaceRenderController } from "./ui/workspace-render-controlle
 
 export { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
 
-export function createAppRuntimeCompositionController({
+export function createAppRuntimeCompositionController(options = {}) {
+const {
   windowRef = globalThis.window,
-  documentRef = globalThis.document
-} = {}) {
+  documentRef = globalThis.document,
+  createStartupBackupRuntimeController: createStartupBackupRuntimeControllerOption
+} = options;
 const window = windowRef;
 const document = documentRef;
+const createStartupBackupRuntimeController =
+  typeof createStartupBackupRuntimeControllerOption === "function"
+    ? createStartupBackupRuntimeControllerOption
+    : defaultCreateStartupBackupRuntimeController;
 
 const config = resolveRuntimeConfig(window);
 const debugLogs = config.debugLogs === true;
@@ -94,6 +101,9 @@ const clipboardRuntimeController = createClipboardRuntimeController({
 });
 const commandDiscoveryUsageStore = createCommandDiscoveryUsageStore({
   storageRef: window?.localStorage || null
+});
+const startupBackupRuntimeController = createStartupBackupRuntimeController({
+  localStorageRef: window?.localStorage || null
 });
 const replayExportRuntimeController = createReplayExportRuntimeController({
   api,
@@ -124,6 +134,7 @@ const traceDebugController = debugLogs
     })
   : { record() {}, dispose() {} };
 const store = createStore();
+let initializationErrorMessage = "";
 
 const {
   appShellEl,
@@ -1575,11 +1586,29 @@ commandPaletteRuntimeController = createCommandPaletteRuntimeController({
 });
 
 function setInitializationError(message) {
-  appCommandUiFacadeController?.setError(message);
+  const normalizedMessage =
+    typeof message === "string" && message.trim() ? message.trim() : "Failed to initialize application runtime.";
+  if (
+    initializationErrorMessage &&
+    normalizedMessage === "Failed to initialize application runtime." &&
+    initializationErrorMessage !== normalizedMessage
+  ) {
+    return;
+  }
+  initializationErrorMessage = normalizedMessage;
+  appCommandUiFacadeController?.setError(normalizedMessage);
 }
 
 async function initialize() {
-  return appBootstrapCompositionController.bootstrapUiAndRuntime();
+  try {
+    await startupBackupRuntimeController.ensureStartupBackup();
+    return await appBootstrapCompositionController.bootstrapUiAndRuntime();
+  } catch (error) {
+    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
+      setInitializationError(error.message);
+    }
+    throw error;
+  }
 }
 
 return {

@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { createRuntime } from "./runtime.js";
+import { ensureStartupDataBackup } from "./startup-backup.js";
 
 function loadLocalEnvFiles() {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,7 @@ function loadLocalEnvFiles() {
 loadLocalEnvFiles();
 
 const config = loadConfig();
+await ensureStartupDataBackup({ dataPath: config.dataPath });
 const runtime = createRuntime(config);
 
 function shutdown() {
