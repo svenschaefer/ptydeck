@@ -18,14 +18,13 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `v0.4.0-H67`
 - Active scoped tasks:
   - `MDT-014`
-  - `QLT-190`
   - `QLT-191`
   - `QLT-192`
   - `QLT-193`
 - Queued next wave: none currently.
 
 ## Queued Execution Order
-- `QLT-194` after `QLT-190`, `QLT-191`, `QLT-192`, and `QLT-193`
+- `QLT-194` after `QLT-191`, `QLT-192`, and `QLT-193`
 
 ## Sequencing Rules
 

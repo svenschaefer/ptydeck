@@ -216,6 +216,36 @@ test("SessionManager marks ssh sessions offline after bounded reconnect failures
   );
 });
 
+test("SessionManager delete clears pending ssh reconnect timers so degraded sessions do not respawn", async () => {
+  const queued = createQueuedFakePtyFactory();
+  const manager = new SessionManager({
+    createPty: () => queued.createPty(),
+    remoteReconnectDelayMs: 10,
+    remoteReconnectStableMs: 5
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+
+  queued.ptys[0].kill();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+  assert.equal(manager.get(created.id).meta.remoteRuntime.connectivityState, "degraded");
+
+  manager.delete(created.id);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.equal(manager.list().length, 0);
+  assert.equal(queued.ptys.length, 1);
+});
+
 test("SessionManager emits activity completion after quiet period and persists inactive metadata in-session", async () => {
   const fakePty = createFakePty();
   let currentTime = 1710000000000;

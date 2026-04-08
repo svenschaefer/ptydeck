@@ -61,3 +61,28 @@ test("resolveRequestContext accepts forwarded headers from trusted proxy", () =>
   assert.equal(context.protocol, "https");
   assert.equal(context.host, "api.example.com");
 });
+
+test("parseTrustedProxy normalizes ipv4-mapped list entries and resolveRequestContext sanitizes invalid forwarded values", () => {
+  assert.deepEqual(parseTrustedProxy("::ffff:127.0.0.1, ::1"), {
+    mode: "list",
+    ips: ["127.0.0.1", "::1"]
+  });
+
+  const context = resolveRequestContext(
+    {
+      headers: {
+        host: "backend.local",
+        "x-forwarded-for": "not-an-ip",
+        "x-forwarded-proto": "ws",
+        "x-forwarded-host": "api example.com"
+      },
+      socket: { remoteAddress: "::ffff:127.0.0.1", encrypted: true }
+    },
+    parseTrustedProxy("loopback")
+  );
+
+  assert.equal(context.trustedProxy, true);
+  assert.equal(context.clientIp, "127.0.0.1");
+  assert.equal(context.protocol, "https");
+  assert.equal(context.host, "backend.local");
+});

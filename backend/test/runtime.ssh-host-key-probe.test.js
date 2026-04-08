@@ -114,6 +114,32 @@ test("SSH host-key probe normalizers trim inputs, default ports, and reject inva
   assert.equal(formatSshTarget("example.internal", 2222), "example.internal:2222");
 });
 
+test("parseSshKeyscanOutput ignores malformed lines and probe candidate normalization can fail softly", () => {
+  const payload = parseSshKeyscanOutput(
+    [
+      "example.internal garbage",
+      "example.internal ssh-ed25519 not-base64***",
+      "example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+    ].join("\n"),
+    { host: "example.internal" }
+  );
+
+  assert.equal(payload.length, 1);
+  assert.equal(payload[0].port, 22);
+  assert.equal(
+    normalizeSshHostKeyProbeCandidate(
+      {
+        host: "bad host",
+        keyType: "bad key type",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM"
+      },
+      { host: "example.internal", port: 22 },
+      { strict: false }
+    ),
+    null
+  );
+});
+
 test("probeSshHostKeysWithKeyscan maps unavailable, timeout, empty, and generic failures to API errors", async () => {
   await assert.rejects(
     () =>
@@ -169,5 +195,20 @@ test("probeSshHostKeysWithKeyscan maps unavailable, timeout, empty, and generic 
         }
       ),
     (error) => error?.statusCode === 502 && error?.error === "SshHostKeyProbeFailed"
+  );
+
+  await assert.rejects(
+    () =>
+      probeSshHostKeysWithKeyscan(
+        { host: "example.internal", port: 22 },
+        {
+          execFileAsync: async () => {
+            const error = new Error("killed");
+            error.killed = true;
+            throw error;
+          }
+        }
+      ),
+    (error) => error?.statusCode === 504 && error?.error === "SshHostKeyProbeTimedOut"
   );
 });
