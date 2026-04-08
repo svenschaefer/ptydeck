@@ -980,6 +980,12 @@ export function createConnectionProfileRuntimeController(options = {}) {
     sshProbeTargetKey = "";
   }
 
+  function clearSshTrustState() {
+    sshTrustEntries = [];
+    selectedSshTrustEntryId = "";
+    clearSshProbeCandidates();
+  }
+
   function getTrustEntriesForCurrentTarget() {
     const target = getCurrentSshTrustTarget();
     if (!target) {
@@ -1587,16 +1593,19 @@ export function createConnectionProfileRuntimeController(options = {}) {
 
   async function loadProfiles() {
     if (typeof api.listConnectionProfiles !== "function") {
+      clearSshTrustState();
       replaceProfiles([]);
       return [];
     }
     try {
       const payload = await api.listConnectionProfiles();
       replaceProfiles(payload || []);
+      clearSshTrustState();
       await refreshSshTrustEntries({ silent: true });
       return profiles.slice();
     } catch (error) {
       setError(getErrorMessage(error, "Failed to load connection profiles."));
+      clearSshTrustState();
       replaceProfiles([]);
       return [];
     }

@@ -598,9 +598,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
   }
 
   function replaceWorkspaceState(nextWorkspace) {
-    workspaceState = cloneWorkspaceState(nextWorkspace);
+    workspaceState = normalizeWorkspaceStateAgainstCurrentState(nextWorkspace);
     if (typeof setDeckSplitLayouts === "function") {
-      setDeckSplitLayouts(workspaceState.deckSplitLayouts);
+      setDeckSplitLayouts(cloneDeckSplitLayoutMap(workspaceState.deckSplitLayouts));
     }
     render();
     requestRender();

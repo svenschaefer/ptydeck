@@ -596,6 +596,119 @@ test("connection profile runtime controller reports apply cancellation when secr
   assert.equal(calls.some((entry) => entry[0] === "create-session"), false);
 });
 
+test("connection profile runtime controller sanitizes malformed reload payloads and clears stale trust state after trust refresh failure", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const errors = [];
+  const api = {
+    async listConnectionProfiles() {
+      return [
+        null,
+        {
+          id: "ops-ssh",
+          name: "Ops SSH",
+          launch: {
+            kind: "ssh",
+            deckId: "ops",
+            shell: "ssh",
+            startCwd: "~",
+            startCommand: "",
+            env: {},
+            tags: [],
+            activeThemeProfile: createThemeProfile("#111111"),
+            inactiveThemeProfile: createThemeProfile("#121212"),
+            remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+            remoteAuth: { method: "privateKey", privateKeyPath: "/home/ops/.ssh/id_ed25519" }
+          }
+        },
+        {
+          id: "ops-ssh",
+          name: "Duplicate Should Be Dropped",
+          launch: {
+            kind: "ssh",
+            deckId: "ops",
+            shell: "ssh",
+            startCwd: "~",
+            startCommand: "",
+            env: {},
+            tags: [],
+            activeThemeProfile: createThemeProfile("#313131"),
+            inactiveThemeProfile: createThemeProfile("#323232"),
+            remoteConnection: { host: "dupe.example", port: 22, username: "ops" },
+            remoteAuth: { method: "privateKey", privateKeyPath: "/home/ops/.ssh/id_ed25519" }
+          }
+        }
+      ];
+    },
+    async listSshTrustEntries() {
+      return [
+        {
+          id: "trust-ops",
+          host: "ops.example",
+          port: 22,
+          keyType: "ssh-ed25519",
+          publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+          fingerprintSha256: "SHA256:existing"
+        }
+      ];
+    }
+  };
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api,
+    getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
+    getSessions: () => [],
+    getActiveSessionId: () => "",
+    setError: (message) => errors.push(message),
+    getErrorMessage: (_, fallback) => fallback,
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  const loadedProfiles = await controller.loadProfiles();
+  assert.equal(loadedProfiles.length, 1);
+  assert.equal(loadedProfiles[0].id, "ops-ssh");
+
+  await controller.newDraftFlow("ssh");
+  ui.draftRemoteHostInputEl.value = "ops.example";
+  ui.draftRemoteHostInputEl.dispatch("input");
+  assert.match(ui.sshTrustSelectEl.children[0].textContent, /SHA256:existing/);
+
+  api.listConnectionProfiles = async () => {
+    return [
+      {
+        id: "ops-ssh",
+        name: "Ops SSH",
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "",
+          env: {},
+          tags: [],
+          activeThemeProfile: createThemeProfile("#111111"),
+          inactiveThemeProfile: createThemeProfile("#121212"),
+          remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+          remoteAuth: { method: "privateKey", privateKeyPath: "/home/ops/.ssh/id_ed25519" }
+        }
+      }
+    ];
+  };
+  api.listSshTrustEntries = async () => {
+    throw new Error("trust reload failed");
+  };
+
+  const reloadedProfiles = await controller.loadProfiles();
+  assert.equal(reloadedProfiles.length, 1);
+  assert.equal(controller.listProfiles().length, 1);
+  assert.equal(errors.length, 0);
+
+  await controller.newDraftFlow("ssh");
+  ui.draftRemoteHostInputEl.value = "ops.example";
+  ui.draftRemoteHostInputEl.dispatch("input");
+  assert.equal(ui.sshTrustSelectEl.children[0].textContent, "No trusted keys for this SSH target");
+});
+
 test("connection profile runtime controller supports guided SSH drafts, save-and-launch, and SSH trust entry management", async () => {
   const calls = [];
   const trustEntries = [

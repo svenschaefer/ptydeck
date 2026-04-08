@@ -357,6 +357,82 @@ test("workspace preset runtime controller normalizes stale references and resolv
   );
 });
 
+test("workspace preset runtime controller normalizes replacement state before pushing split layouts into runtime hooks", () => {
+  const appliedLayouts = [];
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    presetSelectEl: new FakeElement("select"),
+    groupSelectEl: new FakeElement("select"),
+    statusEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [
+      { id: "s1", deckId: "ops" },
+      { id: "s2", deckId: "ops" }
+    ],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    getSelectedLayoutProfileId: () => "",
+    listLayoutProfiles: () => [{ id: "focus" }],
+    setDeckSplitLayouts: (layouts) => appliedLayouts.push(layouts)
+  });
+
+  controller.replaceWorkspaceState({
+    activeDeckId: "ghost",
+    layoutProfileId: "missing",
+    controlPaneVisible: true,
+    controlPanePosition: "left",
+    controlPaneSize: 80,
+    deckGroups: {},
+    deckSplitLayouts: {
+      ghost: {
+        root: {
+          type: "pane",
+          paneId: "main"
+        },
+        paneSessions: {
+          main: ["missing"]
+        }
+      },
+      ops: {
+        root: {
+          type: "row",
+          weights: [0.7, 0.3],
+          children: [
+            { type: "pane", paneId: "left" },
+            { type: "pane", paneId: "right" }
+          ]
+        },
+        paneSessions: {
+          left: ["s1", "missing", "s2"],
+          right: ["s2"]
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(appliedLayouts, [
+    {
+      ops: {
+        root: {
+          type: "row",
+          weights: [0.7, 0.3],
+          children: [
+            { type: "pane", paneId: "left" },
+            { type: "pane", paneId: "right" }
+          ]
+        },
+        paneSessions: {
+          left: ["s1", "s2"],
+          right: []
+        }
+      }
+    }
+  ]);
+  assert.deepEqual(controller.getWorkspaceState().deckSplitLayouts, appliedLayouts[0]);
+});
+
 test("workspace preset runtime controller exposes explicit deck-group lifecycle with persisted-vs-local feedback", async () => {
   const feedback = [];
   const controller = createWorkspacePresetRuntimeController({
