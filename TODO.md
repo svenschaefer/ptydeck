@@ -24,6 +24,14 @@ Completed work belongs in `CHANGELOG.md`.
    Add an optional conservative `Paste Auto Continue` mode for terminal-local paste only, using bounded heuristics such as known placeholder patterns, partial-echo detection, and quiet-window stall detection, with strict retry limits and visible feedback so the feature can help Codex-like chunked paste flows without turning ordinary sends into unsafe blind auto-input.
 5. `UX-026D` Owner `QA`
    Add regression coverage and closeout validation for the paste observation and continue workflow, including full-echo paste, partial/stalled paste, known placeholder acknowledgements, manual continue, bounded auto-continue retries, and no false-positive continuation on normal single-pass paste behavior.
+6. `UX-027A` Owner `BE`
+   Add a replay-excerpt extraction foundation that can produce normalized visible-text slices from a single source session using explicit selectors `l:N`, `c:N`, and `sp:N`, where `sp:N` is only available when shell-block boundaries are known robustly enough to return complete prompt-plus-command-plus-output blocks instead of relying on ad-hoc visible-prompt regex guesses.
+7. `UX-027B` Owner `FE`
+   Add slash-command support for replay-based cross-session clipboard relay with `/replay preview <sourceSelector> <sliceSelector>`, `/replay copy <sourceSelector> <sliceSelector>`, and `/replay paste <sourceSelector> <targetSelector> <sliceSelector>`, plus a compact `/ccp <sourceSelector> <targetSelector> <sliceSelector>` alias for the paste form so the feature stays consistent with the existing slash-command plane instead of introducing a separate UI surface.
+8. `UX-027C` Owner `FE`
+   Route `/replay paste` and `/ccp` through the existing target-session paste/send path so target send terminators, send-safety rules, multi-device controller gating, reclaim-and-retry behavior, and future paste-observation handling remain identical to ordinary terminal-local paste, while command feedback reports exact selector resolution, truncation, unavailable `sp:N` support, and actual copied or pasted size.
+9. `UX-027D` Owner `QA`
+   Add regression coverage and closeout validation for replay-based clipboard relay, including `l:N`, `c:N`, and `sp:N` selector parsing, explicit failure when `sp:N` is unavailable, preview/copy/paste command behavior, `/ccp` alias parity, target-session guard/reclaim interaction, and no ANSI/control-sequence leakage into copied or pasted visible-text excerpts.
 
 ## Active Ownership Role
 
