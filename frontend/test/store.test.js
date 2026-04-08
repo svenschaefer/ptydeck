@@ -55,6 +55,60 @@ test("store manages deck state, active deck switching, and fallback removal", ()
   );
 });
 
+test("store normalizes reload-style runtime preference hydration and ignores duplicate resets", () => {
+  const store = createStore();
+  let publishes = 0;
+  store.subscribe(() => {
+    publishes += 1;
+  });
+
+  store.hydrateRuntimePreferences({
+    activeDeckId: " ops ",
+    sessionFilterText: "  tag:ops  "
+  });
+
+  let state = store.getState();
+  assert.equal(state.activeDeckId, "ops");
+  assert.equal(state.sessionFilterText, "tag:ops");
+
+  publishes = 0;
+  store.hydrateRuntimePreferences({
+    activeDeckId: "ops",
+    sessionFilterText: "tag:ops"
+  });
+  assert.equal(publishes, 0);
+
+  store.hydrateRuntimePreferences({
+    activeDeckId: "   ",
+    sessionFilterText: "   "
+  });
+  state = store.getState();
+  assert.equal(state.activeDeckId, "");
+  assert.equal(state.sessionFilterText, "");
+});
+
+test("store falls back cleanly when reload hydrates a stale active deck id", () => {
+  const store = createStore();
+
+  store.hydrateRuntimePreferences({
+    activeDeckId: "retired",
+    sessionFilterText: "ops"
+  });
+  store.setDecks([
+    { id: "default", name: "Default" },
+    { id: "ops", name: "Ops" }
+  ]);
+  store.setSessions([
+    { id: "a", deckId: "default" },
+    { id: "b", deckId: "ops" }
+  ]);
+
+  const state = store.getState();
+  assert.equal(state.activeDeckId, "default");
+  assert.equal(state.activeSessionId, "a");
+  assert.equal(state.sessionFilterText, "ops");
+});
+
 test("store manages normalized custom commands and protects internal snapshots", () => {
   const store = createStore();
 

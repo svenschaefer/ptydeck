@@ -148,7 +148,7 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
   }
 
   async function ensureClientIdentity() {
-    const existing = cachedRecord || readStoredRecord();
+    const existing = readStoredRecord();
     if (existing) {
       return { ...existing };
     }
@@ -163,7 +163,8 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
   }
 
   function getClientIdentity() {
-    return cachedRecord ? { ...cachedRecord } : readStoredRecord();
+    const current = readStoredRecord();
+    return current ? { ...current } : null;
   }
 
   function renameClientIdentity(label) {
@@ -171,7 +172,7 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
     if (!nextLabel) {
       throw new Error("Device name cannot be empty.");
     }
-    const current = cachedRecord || readStoredRecord();
+    const current = readStoredRecord();
     if (!current) {
       throw new Error("Trusted local device identity is not available yet.");
     }

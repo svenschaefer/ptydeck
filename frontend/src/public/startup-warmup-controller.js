@@ -119,6 +119,9 @@ export function createStartupWarmupController(options = {}) {
 
   async function waitForServerWarmup() {
     if (typeof api.getReadyStatus !== "function") {
+      clearStartupGateState();
+      setConnectionState("connecting");
+      debugLog("startup.warmup.unavailable");
       return "ready";
     }
     if (waitPromise) {

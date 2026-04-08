@@ -93,3 +93,79 @@ test("trusted local client controller can rename the persisted device identity",
   });
   assert.match(storage.getItem(TRUSTED_LOCAL_CLIENT_STORAGE_KEY), /Office Tablet/);
 });
+
+test("trusted local client controller recreates malformed stored identity payloads", async () => {
+  const storage = createStorage({
+    [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify({
+      format: "ptydeck.trusted-local-client.v1",
+      clientId: "trusted-bad",
+      label: "   ",
+      createdAt: "oops"
+    })
+  });
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: storage,
+    navigatorRef: {
+      userAgent: "Mozilla/5.0 Firefox/124.0",
+      platform: "Win32"
+    },
+    cryptoRef: {
+      randomUUID() {
+        return "feedface-1234-1234-1234-abcdefabcdef";
+      }
+    },
+    nowFn: () => 4321
+  });
+
+  const identity = await controller.ensureClientIdentity();
+
+  assert.equal(identity.clientId, "trusted-feedface-1234-1234-1234-abcdefabcdef");
+  assert.equal(identity.createdAt, 4321);
+  assert.deepEqual(controller.getWsTicketPayload(), {
+    clientId: identity.clientId,
+    label: identity.label
+  });
+});
+
+test("trusted local client controller rereads browser storage so stale labels from other tabs do not stick", async () => {
+  const storage = createStorage({
+    [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify({
+      format: "ptydeck.trusted-local-client.v1",
+      clientId: "trusted-existing-client",
+      label: "Desk Browser",
+      createdAt: 77
+    })
+  });
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: storage
+  });
+
+  assert.equal((await controller.ensureClientIdentity()).label, "Desk Browser");
+
+  storage.setItem(
+    TRUSTED_LOCAL_CLIENT_STORAGE_KEY,
+    JSON.stringify({
+      format: "ptydeck.trusted-local-client.v1",
+      clientId: "trusted-existing-client",
+      label: "Notebook Browser",
+      createdAt: 77
+    })
+  );
+
+  assert.equal(controller.getClientIdentity()?.label, "Notebook Browser");
+  assert.deepEqual(controller.getWsTicketPayload(), {
+    clientId: "trusted-existing-client",
+    label: "Notebook Browser"
+  });
+});
+
+test("trusted local client controller fails clearly when localStorage is unavailable", async () => {
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: null
+  });
+
+  await assert.rejects(
+    () => controller.ensureClientIdentity(),
+    /requires browser localStorage/
+  );
+});
