@@ -17,7 +17,15 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `v0.4.0-H65`
 - Active scoped tasks:
   - `MDT-014`
-- Queued next wave: none currently.
+- Queued next wave:
+  - `v0.4.0-H69`
+
+Queued wave order and dependencies:
+
+1. `UX-026A` after `MDT-014`
+2. `UX-026B` after `UX-026A`
+3. `UX-026C` after `UX-026A` and `UX-026B`
+4. `UX-026D` after `UX-026A`, `UX-026B`, and `UX-026C`
 
 ## Sequencing Rules
 

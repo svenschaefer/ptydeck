@@ -16,6 +16,14 @@ Completed work belongs in `CHANGELOG.md`.
 
 1. `MDT-014` Owner `QA`
    Validate `feature/h62-multi-device-control-foundation` from at least one second LAN client under the real hostnames (`https://ptydeck.local.secos.rocks` and `https://api.ptydeck.local.secos.rocks`), including frontend boot, browser-local startup-backup creation and verification, trusted-local device identity persistence, REST bearer auth, WebSocket ticket flow, subtle startup takeover prompting, scope-aware trusted-local control claim (`all sessions`, `current deck`, `current session`), automatic device-local layout recall on successful takeover, and deterministic controller reclaim between two attached clients without prior release.
+2. `UX-026A` Owner `FE`
+   Add a session-local paste observation pipeline for terminal-local paste attempts so ptydeck can correlate an outbound paste payload with the subsequent raw session output stream, distinguish between full echo, partial echo, and known placeholder-style acknowledgements, and surface enough structured state to reason about stalled large pastes without relying on DOM-only terminal rendering.
+3. `UX-026B` Owner `FE`
+   Add a compact operator-facing paste follow-up UX that can show whether a large terminal-local paste looks complete, partially acknowledged, placeholder-acknowledged, or stalled, and expose an explicit `Continue Paste` action that uses the session's configured send terminator instead of requiring manual `Enter` or `Ctrl-J` retries.
+4. `UX-026C` Owner `FE`
+   Add an optional conservative `Paste Auto Continue` mode for terminal-local paste only, using bounded heuristics such as known placeholder patterns, partial-echo detection, and quiet-window stall detection, with strict retry limits and visible feedback so the feature can help Codex-like chunked paste flows without turning ordinary sends into unsafe blind auto-input.
+5. `UX-026D` Owner `QA`
+   Add regression coverage and closeout validation for the paste observation and continue workflow, including full-echo paste, partial/stalled paste, known placeholder acknowledgements, manual continue, bounded auto-continue retries, and no false-positive continuation on normal single-pass paste behavior.
 
 ## Active Ownership Role
 
