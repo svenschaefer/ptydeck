@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-08
+
+- [x] `QLT-189` is now completed as the first active slice of `v0.4.0-H67` on `feature/h62-multi-device-control-foundation`; the external second-client LAN validation task `MDT-014` remains open in parallel under `v0.4.0-H65`.
+- [x] Backend quality hardening for `backend/src/startup-backup.js` now rejects incompatible rollback manifests more strictly by validating the persisted source path and deterministic payload-backup path before startup or restore reuse continues, which closes a real rollback-safety seam rather than only adding tests around it.
+- [x] Direct backend regression coverage now closes the targeted `QLT-189` hotspots in `backend/test/validation.test.js`, `backend/test/startup-backup.test.js`, and `backend/test/persistence.test.js`, covering new invalid request branches, startup-backup manifest verification and restore-failure paths, encrypted persistence failure modes, and temp-file cleanup behavior on rename failure.
+- [x] Validation for the `QLT-189` slice passed with the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation or push processes after completion; coverage on the final validated tree is backend `92.40%` lines and frontend `92.12%` lines.
+
 ## 2026-04-07
 
 - [x] `MDT-017`, `MDT-018`, `MDT-019`, `MDT-020`, and `MDT-021` are now completed as `v0.4.0-H66` on `feature/h62-multi-device-control-foundation`: trusted-local fast handoff and device-local layout recall are delivered, while `MDT-014` remains the only open external validation task in the active `v0.4.0-H65` wave.

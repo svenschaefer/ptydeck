@@ -775,6 +775,33 @@ test("validateRequest accepts valid ws ticket request payload", () => {
   });
 });
 
+test("validateRequest rejects invalid auth and share request branches", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/auth/dev-token",
+      params: {},
+      body: { scopes: "operator" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/auth/ws-ticket",
+      params: {},
+      body: { clientId: "   " }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: {}
+    });
+  });
+});
+
 test("validateRequest accepts share lifecycle payloads", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -1233,6 +1260,46 @@ test("validateRequest rejects invalid connection profile payloads", () => {
       body: {}
     });
   });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/connection-profiles",
+      params: {},
+      body: {
+        name: "Ops SSH",
+        launch: {
+          kind: "ssh",
+          env: {
+            LANG: 1
+          }
+        }
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/connection-profiles/ops-ssh",
+      params: { profileId: "ops-ssh" },
+      body: {
+        launch: {
+          activeThemeProfile: "bad"
+        }
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/connection-profiles/ops-ssh",
+      params: { profileId: "ops-ssh" },
+      body: {
+        launch: {
+          remoteConnection: "bad"
+        }
+      }
+    });
+  });
 });
 
 test("validateResponse accepts connection profile payloads", () => {
@@ -1620,6 +1687,30 @@ test("validateResponse accepts deck payloads", () => {
           updatedAt: 2
         }
       ]
+    });
+  });
+});
+
+test("validateRequest rejects unsupported query combinations for custom command lookups", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands",
+      params: {},
+      query: {
+        sessionId: "session-a"
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      query: {
+        scope: "global",
+        sessionId: "session-a"
+      }
     });
   });
 });

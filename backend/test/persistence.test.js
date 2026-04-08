@@ -110,6 +110,79 @@ test("JsonPersistence supports key rotation via active key switch", async () => 
   assert.ok(rotatedRaw.includes("\"keyId\": \"b\""));
 });
 
+test("JsonPersistence rejects encrypted payloads when no encryption provider is configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 1).toString("base64");
+  const provider = createDataEncryptionProvider(`a:${keyA}`, "a");
+
+  await new JsonPersistence(file, { encryptionProvider: provider }).save([
+    { id: "enc-1", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }
+  ]);
+
+  await assert.rejects(
+    new JsonPersistence(file).loadState(),
+    /encrypted, but no encryption provider is configured/
+  );
+});
+
+test("JsonPersistence rejects encrypted payloads when the key is unavailable or the ciphertext is corrupted", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 1).toString("base64");
+  const keyB = Buffer.alloc(32, 2).toString("base64");
+  const persistence = new JsonPersistence(file, {
+    encryptionProvider: createDataEncryptionProvider(`a:${keyA}`, "a")
+  });
+
+  await persistence.save([{ id: "enc-1", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }]);
+
+  await assert.rejects(
+    new JsonPersistence(file, {
+      encryptionProvider: createDataEncryptionProvider(`b:${keyB}`, "b")
+    }).loadState(),
+    /Encryption key 'a' is not available/
+  );
+
+  const envelope = JSON.parse(await persistence.readFileFn(file, "utf8"));
+  envelope.ciphertext = "AAAA";
+  await writeFile(file, JSON.stringify(envelope, null, 2), "utf8");
+
+  await assert.rejects(
+    new JsonPersistence(file, {
+      encryptionProvider: createDataEncryptionProvider(`a:${keyA}`, "a")
+    }).loadState(),
+    /Failed to decrypt persistence payload/
+  );
+});
+
+test("JsonPersistence save cleans up temp files when rename fails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  await writeFile(
+    file,
+    JSON.stringify([{ id: "stable", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }], null, 2),
+    "utf8"
+  );
+
+  const persistence = new JsonPersistence(file, {
+    renameFn: async () => {
+      throw new Error("simulated rename failure");
+    }
+  });
+
+  await assert.rejects(
+    persistence.save([{ id: "next", cwd: "/srv", shell: "sh", createdAt: 2, updatedAt: 2 }]),
+    /simulated rename failure/
+  );
+
+  const stableRaw = await persistence.load();
+  assert.deepEqual(stableRaw, [{ id: "stable", cwd: "/tmp", shell: "bash", createdAt: 1, updatedAt: 1 }]);
+
+  const entries = await readdir(dir);
+  assert.equal(entries.some((name) => name.includes(".tmp-")), false);
+});
+
 test("JsonPersistence loads and saves runtime state with custom commands", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
   const file = join(dir, "sessions.json");

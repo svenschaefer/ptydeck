@@ -43,6 +43,12 @@ function parseManifest(raw) {
     if (parsed.payloadBackupPath !== undefined && typeof parsed.payloadBackupPath !== "string") {
       return null;
     }
+    if (parsed.sourceExisted === true && !normalizeText(parsed.payloadBackupPath)) {
+      return null;
+    }
+    if (parsed.sourceExisted === false && normalizeText(parsed.payloadBackupPath)) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -73,6 +79,16 @@ async function readExistingManifest({
 
   const manifest = parseManifest(manifestRaw);
   if (!manifest || manifest.backupId !== backupId) {
+    throw new Error(
+      `Startup blocked: an invalid or incompatible rollback backup manifest already exists at ${manifestPath}.`
+    );
+  }
+  if (manifest.sourcePath !== dataPath) {
+    throw new Error(
+      `Startup blocked: an invalid or incompatible rollback backup manifest already exists at ${manifestPath}.`
+    );
+  }
+  if (manifest.sourceExisted === true && manifest.payloadBackupPath !== payloadBackupPath) {
     throw new Error(
       `Startup blocked: an invalid or incompatible rollback backup manifest already exists at ${manifestPath}.`
     );
