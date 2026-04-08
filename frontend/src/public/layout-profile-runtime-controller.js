@@ -527,6 +527,8 @@ export function createLayoutProfileRuntimeController(options = {}) {
         const currentLayouts = cloneDeckSplitLayoutMap(typeof getDeckSplitLayouts === "function" ? getDeckSplitLayouts() : {});
         if (normalizedLayout.deckSplitLayouts[targetActiveDeckId]) {
           currentLayouts[targetActiveDeckId] = cloneDeckSplitLayoutEntry(normalizedLayout.deckSplitLayouts[targetActiveDeckId]);
+        } else {
+          delete currentLayouts[targetActiveDeckId];
         }
         setDeckSplitLayouts(currentLayouts);
       }

@@ -289,3 +289,46 @@ test("split-layout runtime normalizes invalid entries and ignores impossible mut
   assert.equal(controller.assignSessionToPane("ops", "missing", "s9").paneSessions.side.length, 0);
   assert.equal(controller.removePane("ops", "missing").root.type, "row");
 });
+
+test("split-layout runtime clamps resize ratios and collapses nested removals back into stable pane assignments", () => {
+  const controller = createSplitLayoutRuntimeController();
+
+  controller.replaceDeckSplitLayouts({
+    ops: {
+      root: {
+        type: "row",
+        weights: [1, 3],
+        children: [
+          { type: "pane", paneId: "main" },
+          {
+            type: "column",
+            weights: [1, 1],
+            children: [
+              { type: "pane", paneId: "side-top" },
+              { type: "pane", paneId: "side-bottom" }
+            ]
+          }
+        ]
+      },
+      paneSessions: {
+        main: ["s1"],
+        "side-top": ["s2"],
+        "side-bottom": ["s3"]
+      }
+    }
+  });
+
+  controller.setContainerWeightRatio("ops", [], 0, 5);
+  let entry = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(entry.root.weights, [0.9, 0.1]);
+
+  controller.removePane("ops", "side-bottom");
+  entry = controller.getDeckSplitLayout("ops");
+  assert.equal(entry.root.type, "row");
+  assert.deepEqual(entry.root.children, [
+    { type: "pane", paneId: "main" },
+    { type: "pane", paneId: "side-top" }
+  ]);
+  assert.deepEqual(entry.paneSessions.main, ["s1", "s3"]);
+  assert.deepEqual(entry.paneSessions["side-top"], ["s2"]);
+});

@@ -421,6 +421,85 @@ test("session-terminal-runtime controller exposes manual refresh through the mou
   assert.equal(entry.terminal.scrollToBottomCalls, 2);
 });
 
+test("session-terminal-runtime controller defers manual refresh while the terminal is hidden", () => {
+  const calls = [];
+  const terminals = new Map();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    terminals,
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => calls.push("sync")
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    sessionMetaRowEl: {},
+    sessionNoteEl: {},
+    unrestoredHintEl: {},
+    refreshBtn: {},
+    settingsDialog: {},
+    settingsTabStartupBtn: {},
+    settingsTabNoteBtn: {},
+    settingsTabThemeBtn: {},
+    settingsPanelStartup: {},
+    settingsPanelNote: {},
+    settingsPanelTheme: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    mouseForwardingModeSelect: {},
+    sessionNoteInput: {},
+    sessionSendTerminatorSelect: {},
+    inputSafetyControls: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    settingsFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsCancelBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSlotSelect: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: false,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers: new Map(),
+    applyResizeForSession: (sessionId, options) =>
+      calls.push(`resize:${sessionId}:${options?.force === true}:${options?.skipRemote === true}`)
+  });
+
+  entry.terminal.refreshCalls.length = 0;
+  entry.terminal.scrollToBottomCalls = 0;
+  calls.length = 0;
+
+  const refreshed = controller.refreshMountedTerminal("s1");
+
+  assert.equal(refreshed, false);
+  assert.equal(entry.pendingViewportSync, true);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(entry.terminal.refreshCalls, []);
+  assert.equal(entry.terminal.scrollToBottomCalls, 0);
+});
+
 test("session-terminal-runtime controller copies the terminal selection on plain Enter", async () => {
   const clipboardWrites = [];
   const controller = createSessionTerminalRuntimeController({

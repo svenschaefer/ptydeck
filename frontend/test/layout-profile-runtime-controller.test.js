@@ -483,3 +483,88 @@ test("layout profile runtime controller applies persisted layout state through s
   assert.deepEqual(activeDeckChanges, ["ops"]);
   assert.deepEqual(renderCalls, ["render"]);
 });
+
+test("layout profile runtime controller clears stale deck split layouts during deck-scoped reapply when the snapshot has none", async () => {
+  const updates = [];
+  let currentLayouts = {
+    default: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["s-default"] }
+    },
+    ops: {
+      root: {
+        type: "row",
+        weights: [0.5, 0.5],
+        children: [
+          { type: "pane", paneId: "left" },
+          { type: "pane", paneId: "right" }
+        ]
+      },
+      paneSessions: {
+        left: ["s-ops-1"],
+        right: ["s-ops-2"]
+      }
+    }
+  };
+  const controller = createLayoutProfileRuntimeController({
+    api: {
+      async updateDeck(deckId, payload) {
+        updates.push([deckId, payload]);
+        return {
+          id: deckId,
+          name: deckId.toUpperCase(),
+          settings: payload.settings
+        };
+      }
+    },
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getDeckById: (deckId) => ({ id: deckId, settings: {} }),
+    getActiveDeckId: () => "default",
+    getSessionFilterText: () => "",
+    getSidebarVisible: () => true,
+    getDeckTerminalGeometry: (deckId) => (deckId === "ops" ? { cols: 120, rows: 32 } : { cols: 96, rows: 24 }),
+    getDeckSplitLayouts: () => currentLayouts,
+    setDeckSplitLayouts: (layouts) => {
+      currentLayouts = layouts;
+    },
+    setSidebarVisible() {},
+    setSessionFilterText() {},
+    setControlPaneState() {},
+    setActiveDeck() {},
+    applyRuntimeEvent() {},
+    requestRender() {}
+  });
+
+  const feedback = await controller.applyLayoutSnapshot(
+    {
+      activeDeckId: "ops",
+      sidebarVisible: true,
+      sessionFilterText: "",
+      controlPaneVisible: true,
+      controlPanePosition: "bottom",
+      controlPaneSize: 240,
+      deckTerminalSettings: {
+        ops: { cols: 132, rows: 40 }
+      },
+      deckSplitLayouts: {}
+    },
+    {
+      scope: "deck",
+      targetDeckId: "ops"
+    }
+  );
+
+  assert.equal(feedback, "Applied layout snapshot for deck [ops].");
+  assert.deepEqual(updates, [
+    [
+      "ops",
+      {
+        settings: {
+          terminal: { cols: 132, rows: 40 }
+        }
+      }
+    ]
+  ]);
+  assert.ok(currentLayouts.default);
+  assert.equal(currentLayouts.ops, undefined);
+});
