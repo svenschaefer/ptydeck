@@ -13,6 +13,10 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function stableSerialize(value) {
+  return JSON.stringify(value);
+}
+
 function safeParseBackup(raw) {
   if (typeof raw !== "string" || !raw.trim()) {
     return null;
@@ -106,7 +110,8 @@ export function createStartupBackupRuntimeController(options = {}) {
     const snapshot = buildSnapshot();
     storage.setItem(storageKey, JSON.stringify(snapshot));
     const verified = readExistingBackup();
-    if (!verified) {
+    const expected = safeParseBackup(JSON.stringify(snapshot));
+    if (!verified || !expected || stableSerialize(verified) !== stableSerialize(expected)) {
       throw new Error(
         "Startup blocked: failed to verify the browser rollback backup for this H62 feature build."
       );

@@ -4,8 +4,15 @@ import { createWsClient } from "../src/public/ws-client.js";
 
 class MockWebSocket {
   static instances = [];
+  static throwOnCreate = null;
 
   constructor(url, protocols) {
+    if (typeof MockWebSocket.throwOnCreate === "function") {
+      const error = MockWebSocket.throwOnCreate(url, protocols);
+      if (error) {
+        throw error;
+      }
+    }
     this.url = url;
     this.protocols = protocols;
     this.listeners = new Map();
@@ -42,6 +49,7 @@ function withMockedGlobals(t) {
   let randomIndex = 0;
 
   MockWebSocket.instances = [];
+  MockWebSocket.throwOnCreate = null;
   global.WebSocket = MockWebSocket;
   global.setTimeout = (fn, ms) => {
     const handle = { fn, ms, cleared: false };
@@ -189,4 +197,120 @@ test("ws client resolves handshake protocols without mutating URL", async (t) =>
   assert.equal(MockWebSocket.instances[0].url, "ws://localhost:18080/ws");
   assert.deepEqual(MockWebSocket.instances[0].protocols, ["ptydeck.v1", "ptydeck.auth.ticket-123"]);
   client.close();
+});
+
+test("ws client falls back to reconnect when the protocols provider rejects", async (t) => {
+  const { timers } = withMockedGlobals(t);
+  const states = [];
+  let attempts = 0;
+  createWsClient("ws://localhost:18080/ws", {
+    onState: (state) => states.push(state),
+    onMessage: () => {}
+  }, {
+    protocolsProvider: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("ticket unavailable");
+      }
+      return ["ptydeck.v1"];
+    }
+  });
+
+  await Promise.resolve();
+  assert.deepEqual(states, ["connecting", "error", "reconnecting"]);
+  assert.equal(timers.length, 1);
+  timers[0].fn();
+  await Promise.resolve();
+  assert.equal(MockWebSocket.instances.length, 1);
+});
+
+test("ws client ignores stale protocol resolution after the client was closed", async (t) => {
+  withMockedGlobals(t);
+  let resolveProtocols;
+  const client = createWsClient("ws://localhost:18080/ws", {
+    onState: () => {},
+    onMessage: () => {}
+  }, {
+    protocolsProvider: () => new Promise((resolve) => {
+      resolveProtocols = resolve;
+    })
+  });
+
+  client.close();
+  resolveProtocols(["ptydeck.v1"]);
+  await Promise.resolve();
+
+  assert.equal(MockWebSocket.instances.length, 0);
+});
+
+test("ws client retries when the WebSocket constructor throws and avoids duplicate reconnect timers", (t) => {
+  const { timers } = withMockedGlobals(t);
+  const states = [];
+  MockWebSocket.throwOnCreate = () => new Error("constructor failed");
+
+  createWsClient("ws://localhost:18080/ws", {
+    onState: (state) => states.push(state),
+    onMessage: () => {}
+  });
+
+  assert.deepEqual(states, ["connecting", "error", "reconnecting"]);
+  assert.equal(timers.length, 1);
+
+  const first = MockWebSocket.instances[0];
+  assert.equal(first, undefined);
+
+  // Multiple reconnect triggers before the timer fires must not stack timers.
+  MockWebSocket.throwOnCreate = null;
+  timers[0].fn();
+  const socket = MockWebSocket.instances[0];
+  socket.emit("close");
+  socket.emit("close");
+
+  assert.equal(timers.length, 2);
+  assert.deepEqual(states, ["connecting", "error", "reconnecting", "connecting", "reconnecting"]);
+});
+
+test("ws client logs debug lifecycle events and ignores malformed messages", (t) => {
+  withMockedGlobals(t);
+  const events = [];
+  const messages = [];
+  const client = createWsClient("ws://localhost:18080/ws", {
+    onState: () => {},
+    onMessage: (message) => messages.push(message)
+  }, {
+    debug: true,
+    log: (type, payload) => events.push([type, payload])
+  });
+
+  const socket = MockWebSocket.instances[0];
+  socket.emit("open");
+  socket.emit("message", { data: JSON.stringify({ type: "snapshot" }) });
+  socket.emit("message", { data: "not-json" });
+  socket.emit("error");
+  client.close();
+
+  assert.equal(messages.length, 1);
+  assert.deepEqual(events.map(([type]) => type), [
+    "ws.connecting",
+    "ws.open",
+    "ws.message",
+    "ws.message.parse_error",
+    "ws.error",
+    "ws.closed.manual",
+    "ws.close.requested"
+  ]);
+});
+
+test("ws client omits protocols when the provider resolves to a non-array value", async (t) => {
+  withMockedGlobals(t);
+  createWsClient("ws://localhost:18080/ws", {
+    onState: () => {},
+    onMessage: () => {}
+  }, {
+    protocolsProvider: async () => ({ ticket: "not-an-array" })
+  });
+
+  await Promise.resolve();
+  assert.equal(MockWebSocket.instances.length, 1);
+  assert.equal(MockWebSocket.instances[0].protocols, undefined);
 });

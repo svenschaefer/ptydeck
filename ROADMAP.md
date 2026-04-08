@@ -15,16 +15,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active release waves:
   - `v0.4.0-H65`
-  - `v0.4.0-H67`
 - Active scoped tasks:
   - `MDT-014`
-  - `QLT-191`
-  - `QLT-192`
-  - `QLT-193`
 - Queued next wave: none currently.
 
 ## Queued Execution Order
-- `QLT-194` after `QLT-191`, `QLT-192`, and `QLT-193`
+- none currently.
 
 ## Sequencing Rules
 

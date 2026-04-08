@@ -13,6 +13,10 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function stableSerialize(value) {
+  return JSON.stringify(value);
+}
+
 function safeParseRecord(raw) {
   if (typeof raw !== "string" || !raw.trim()) {
     return null;
@@ -51,6 +55,14 @@ export function createTrustedLocalLayoutRuntimeController(options = {}) {
   const applyLayoutSnapshot =
     typeof options.applyLayoutSnapshot === "function" ? options.applyLayoutSnapshot : async () => "";
 
+  function captureLayoutSnapshot() {
+    const snapshot = captureCurrentLayout();
+    if (!isObject(snapshot)) {
+      throw new Error("Trusted-local device layout capture requires a serializable layout snapshot.");
+    }
+    return cloneValue(snapshot);
+  }
+
   function requireStorage() {
     if (!storageRef || typeof storageRef.getItem !== "function" || typeof storageRef.setItem !== "function") {
       throw new Error("Trusted-local device layout recall requires browser localStorage.");
@@ -67,7 +79,8 @@ export function createTrustedLocalLayoutRuntimeController(options = {}) {
     const storage = requireStorage();
     storage.setItem(storageKey, JSON.stringify(record));
     const verified = safeParseRecord(storage.getItem(storageKey));
-    if (!verified) {
+    const expected = safeParseRecord(JSON.stringify(record));
+    if (!verified || !expected || stableSerialize(verified) !== stableSerialize(expected)) {
       throw new Error("Failed to verify trusted-local device layout storage after writing it to localStorage.");
     }
     return verified;
@@ -91,7 +104,7 @@ export function createTrustedLocalLayoutRuntimeController(options = {}) {
     const record = readRecord();
     record.clients[normalizedClientId] = {
       updatedAt: Number(nowFn()),
-      layout: cloneValue(captureCurrentLayout())
+      layout: captureLayoutSnapshot()
     };
     writeRecord(record);
     return getLayoutForClient(normalizedClientId);

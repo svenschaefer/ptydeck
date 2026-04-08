@@ -96,3 +96,113 @@ test("deck-actions controller handles 409 force-delete flow", async () => {
   assert.equal(events[0].event.type, "deck.deleted");
   assert.equal(events[0].event.fallbackDeckId, "default");
 });
+
+test("deck-actions controller covers fallback prompt and confirm adapters plus validation branches", async () => {
+  const promptCalls = [];
+  const confirmCalls = [];
+  const errors = [];
+  const apiCalls = [];
+  const controller = createDeckActionsController({
+    api: {
+      async createDeck(payload) {
+        apiCalls.push(["create", payload.name]);
+        return { id: "deck-2", name: payload.name };
+      },
+      async updateDeck() {
+        throw new Error("not used");
+      },
+      async deleteDeck() {
+        throw new Error("not used");
+      }
+    },
+    windowRef: {
+      prompt(message, defaultValue) {
+        promptCalls.push([message, defaultValue]);
+        return promptCalls.length === 1 ? "  " : "Notebook";
+      },
+      confirm(message) {
+        confirmCalls.push(message);
+        return false;
+      }
+    },
+    getActiveDeck: () => ({ id: "deck-1", name: "Deck One" }),
+    getDecks: () => [{ id: "deck-1", name: "Deck One" }],
+    getTerminalSettings: () => ({ cols: 90, rows: 24 }),
+    applyRuntimeEvent: () => {},
+    setCommandFeedback: () => {},
+    setError: (message) => errors.push(message)
+  });
+
+  await controller.createDeckFlow();
+  await controller.createDeckFlow();
+  await controller.deleteDeckFlow();
+
+  assert.equal(apiCalls.length, 1);
+  assert.deepEqual(apiCalls[0], ["create", "Notebook"]);
+  assert.equal(confirmCalls.length, 1);
+  assert.deepEqual(errors, ["Deck name cannot be empty."]);
+});
+
+test("deck-actions controller reports missing active decks, blank rename input, and force-delete aborts", async () => {
+  const errors = [];
+  const deleteCalls = [];
+  const controllerWithoutDeck = createDeckActionsController({
+    api: {},
+    requestText: async () => "ignored",
+    confirmAction: async () => true,
+    getActiveDeck: () => null,
+    setError: (message) => errors.push(message)
+  });
+
+  await controllerWithoutDeck.renameDeckFlow();
+  await controllerWithoutDeck.deleteDeckFlow();
+
+  const controllerWithDeck = createDeckActionsController({
+    api: {
+      async updateDeck() {
+        throw new Error("not used");
+      },
+      async deleteDeck(deckId, payload) {
+        deleteCalls.push([deckId, payload.force]);
+        const error = new Error("conflict");
+        error.status = 409;
+        throw error;
+      }
+    },
+    requestText: async () => "   ",
+    confirmAction: async () => (deleteCalls.length === 0),
+    getActiveDeck: () => ({ id: "deck-a", name: "Deck A" }),
+    getDecks: () => [{ id: "deck-a", name: "Deck A" }],
+    setError: (message) => errors.push(message)
+  });
+
+  await controllerWithDeck.renameDeckFlow();
+  await controllerWithDeck.deleteDeckFlow();
+
+  assert.deepEqual(errors, [
+    "No active deck to rename.",
+    "No active deck to delete.",
+    "Deck name cannot be empty."
+  ]);
+  assert.deepEqual(deleteCalls, [["deck-a", false]]);
+});
+
+test("deck-actions controller rethrows non-conflict delete errors", async () => {
+  const controller = createDeckActionsController({
+    api: {
+      async deleteDeck() {
+        const error = new Error("boom");
+        error.status = 500;
+        throw error;
+      }
+    },
+    confirmAction: async () => true,
+    getActiveDeck: () => ({ id: "deck-a", name: "Deck A" }),
+    getDecks: () => [{ id: "deck-a", name: "Deck A" }]
+  });
+
+  await assert.rejects(
+    controller.deleteDeckFlow(),
+    /boom/
+  );
+});

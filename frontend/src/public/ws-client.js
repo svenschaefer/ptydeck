@@ -20,6 +20,9 @@ export function createWsClient(url, handlers, options = {}) {
   }
 
   function scheduleReconnect() {
+    if (closed || reconnectTimer) {
+      return;
+    }
     const delayMs = nextReconnectDelayMs();
     if (debug) {
       log("ws.closed.reconnect", { url, delayMs, reconnectAttempts });
@@ -59,7 +62,19 @@ export function createWsClient(url, handlers, options = {}) {
       return;
     }
 
-    socket = new WebSocket(url, protocols);
+    try {
+      socket = new WebSocket(url, protocols);
+    } catch (error) {
+      if (closed || generation !== connectGeneration) {
+        return;
+      }
+      if (debug) {
+        log("ws.connect.error", { message: error instanceof Error ? error.message : String(error) });
+      }
+      handlers.onState("error");
+      scheduleReconnect();
+      return;
+    }
 
     socket.addEventListener("open", () => {
       reconnectAttempts = 0;
@@ -110,9 +125,11 @@ export function createWsClient(url, handlers, options = {}) {
       connectGeneration += 1;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
       if (socket) {
         socket.close();
+        socket = null;
       }
       if (debug) {
         log("ws.close.requested", { url });

@@ -202,7 +202,7 @@ export function createFileTransferRuntimeController(options = {}) {
       }
     }
     const bytes = await readFileBytes(selectedFile)
-    const effectivePath = normalizeText(remotePath) || normalizeText(selectedFile.name)
+    const effectivePath = normalizeText(remotePath).trim() || normalizeText(selectedFile.name).trim()
     if (!effectivePath) {
       throw new Error("Upload path is required.")
     }
@@ -229,7 +229,7 @@ export function createFileTransferRuntimeController(options = {}) {
     if (!payload && (!api || typeof api.downloadSessionFile !== "function")) {
       throw new Error("File download API is unavailable.")
     }
-    const normalizedPath = normalizeText(remotePath)
+    const normalizedPath = normalizeText(remotePath).trim()
     if (!normalizedPath) {
       throw new Error("Download path is required.")
     }

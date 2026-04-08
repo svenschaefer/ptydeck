@@ -110,6 +110,9 @@ export function createTrustedLocalHandoffRuntimeController(options = {}) {
 
   async function applyUpdatedSessions(updatedSessions = []) {
     for (const session of updatedSessions) {
+      if (!session || typeof session !== "object" || !normalizeText(session.id)) {
+        continue;
+      }
       applyRuntimeEvent({ type: "session.updated", session });
     }
   }
@@ -141,6 +144,15 @@ export function createTrustedLocalHandoffRuntimeController(options = {}) {
     const normalizedDeckId = normalizeText(options.deckId);
     const normalizedSessionId = normalizeText(options.sessionId);
     try {
+      if (normalizedScope !== "all" && normalizedScope !== "deck" && normalizedScope !== "session") {
+        throw new Error("Trusted-local control handoff requires a known claim scope.");
+      }
+      if (normalizedScope === "deck" && !normalizedDeckId) {
+        throw new Error("Trusted-local deck takeover requires an active deck.");
+      }
+      if (normalizedScope === "session" && !normalizedSessionId) {
+        throw new Error("Trusted-local session takeover requires an active session.");
+      }
       let updatedSessions = [];
       if (normalizedScope === "session") {
         const updatedSession = await takeSessionControl(normalizedSessionId);

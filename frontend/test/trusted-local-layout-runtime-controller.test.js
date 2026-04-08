@@ -11,6 +11,9 @@ function createStorage() {
     },
     setItem(key, value) {
       data.set(key, String(value));
+    },
+    removeItem(key) {
+      data.delete(key);
     }
   };
 }
@@ -80,3 +83,91 @@ test("trusted-local layout runtime controller reapplies a stored device layout s
   assert.equal(applied[0][1].scope, "deck");
   assert.equal(applied[0][1].targetDeckId, "ops");
 });
+
+test("trusted-local layout runtime controller rejects invalid client ids and non-object layout snapshots", async () => {
+  const controller = createTrustedLocalLayoutRuntimeController({
+    localStorageRef: createStorage(),
+    captureCurrentLayout: () => null
+  });
+
+  assert.throws(
+    () => controller.saveCurrentLayoutForClient(" "),
+    /requires a stable client id/i
+  );
+  await assert.rejects(
+    controller.applyLayoutForClient(" ", {}),
+    /requires a stable client id/i
+  );
+  assert.throws(
+    () => controller.saveCurrentLayoutForClient("trusted-3"),
+    /requires a serializable layout snapshot/i
+  );
+});
+
+test("trusted-local layout runtime controller ignores malformed storage and verifies writes exactly", () => {
+  const storage = createStorage();
+  storage.setItem(controllerStorageKey(), JSON.stringify({
+    format: "ptydeck.trusted-local-layouts.v1",
+    clients: {
+      "bad-client": {
+        updatedAt: "wrong",
+        layout: {}
+      }
+    }
+  }));
+
+  const controller = createTrustedLocalLayoutRuntimeController({
+    localStorageRef: storage,
+    captureCurrentLayout: () => ({
+      activeDeckId: "default",
+      sidebarVisible: true
+    })
+  });
+
+  assert.equal(controller.getLayoutForClient("bad-client"), null);
+  const result = controller.saveCurrentLayoutForClient("trusted-4");
+  assert.equal(result.layout.activeDeckId, "default");
+});
+
+test("trusted-local layout runtime controller fails when a storage write cannot be verified", () => {
+  const storageKey = controllerStorageKey();
+  const existingRecord = JSON.stringify({
+    format: "ptydeck.trusted-local-layouts.v1",
+    clients: {
+      "trusted-old": {
+        updatedAt: 1,
+        layout: {
+          activeDeckId: "old"
+        }
+      }
+    }
+  });
+  let currentValue = existingRecord;
+  const storage = {
+    getItem(key) {
+      return key === storageKey ? currentValue : null;
+    },
+    setItem(key, _value) {
+      if (key === storageKey) {
+        // Simulate a silent write failure that leaves the previous valid record in place.
+        currentValue = existingRecord;
+      }
+    }
+  };
+  const controller = createTrustedLocalLayoutRuntimeController({
+    localStorageRef: storage,
+    captureCurrentLayout: () => ({
+      activeDeckId: "default",
+      sidebarVisible: true
+    })
+  });
+
+  assert.throws(
+    () => controller.saveCurrentLayoutForClient("trusted-5"),
+    /Failed to verify trusted-local device layout storage/i
+  );
+});
+
+function controllerStorageKey() {
+  return "ptydeck.trusted-local-layouts.v1";
+}

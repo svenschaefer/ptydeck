@@ -404,6 +404,84 @@ test("session-card-interactions controller wires take, release, and transfer ses
   ]);
 });
 
+test("session-card-interactions controller handles session-control errors, blank device labels, and canceled stale-device forgets", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController();
+  const refs = {
+    focusBtn: createEventTarget(),
+    sessionControlTakeBtn: createEventTarget(),
+    sessionControlReleaseBtn: createEventTarget(),
+    sessionControlClientsEl: createEventTarget(),
+    sessionControlDeviceNameInput: createEventTarget("   "),
+    sessionControlDeviceSaveBtn: createEventTarget()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {
+      releaseSessionControl: async () => {
+        throw new Error("release failed");
+      },
+      transferSessionControl: async () => {
+        throw new Error("transfer failed");
+      }
+    },
+    takeTrustedLocalControl: async () => {
+      throw new Error("take failed");
+    },
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    getEntry: () => ({ id: "entry" }),
+    sessionThemeDrafts: new Map(),
+    confirmForgetSessionControlClient: async () => false,
+    setError: (message) => calls.push(["error", message]),
+    applyRuntimeEvent: () => calls.push(["event"])
+  });
+
+  await refs.sessionControlTakeBtn.emit("click");
+  await refs.sessionControlReleaseBtn.emit("click");
+  await refs.sessionControlClientsEl.emit("click", {
+    target: {
+      closest() {
+        return null;
+      }
+    }
+  });
+  await refs.sessionControlClientsEl.emit("click", {
+    target: {
+      closest() {
+        return {
+          dataset: {
+            sessionControlAction: "forget",
+            clientId: "client-stale",
+            clientLabel: "Tablet"
+          }
+        };
+      }
+    }
+  });
+  await refs.sessionControlClientsEl.emit("click", {
+    target: {
+      closest() {
+        return {
+          dataset: {
+            sessionControlAction: "transfer",
+            clientId: "peer"
+          }
+        };
+      }
+    }
+  });
+  await refs.sessionControlDeviceSaveBtn.emit("click");
+
+  assert.deepEqual(calls, [
+    ["error", "take failed"],
+    ["error", "release failed"],
+    ["error", "transfer failed"],
+    ["error", "Device name cannot be empty."]
+  ]);
+});
+
 test("session-card-interactions controller renames sessions through api update", async () => {
   const calls = [];
   const controller = createSessionCardInteractionsController();
@@ -431,6 +509,67 @@ test("session-card-interactions controller renames sessions through api update",
   await refs.renameBtn.emit("click");
 
   assert.deepEqual(calls, ["api:s1:renamed", "event:session.updated:renamed", "clear-error"]);
+});
+
+test("session-card-interactions controller blocks exited rename, rejects blank rename, and reports rename failures", async () => {
+  const blockedCalls = [];
+  const blockedController = createSessionCardInteractionsController({
+    isSessionExited: () => true,
+    getBlockedSessionActionMessage: () => "Rename is blocked."
+  });
+  const blockedRefs = {
+    focusBtn: createEventTarget(),
+    renameBtn: createEventTarget()
+  };
+
+  blockedController.bindSessionCardInteractions({
+    session: { id: "s1", name: "old" },
+    refs: blockedRefs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "old" }),
+    setError: (message) => blockedCalls.push(message)
+  });
+  await blockedRefs.renameBtn.emit("click");
+
+  const blankCalls = [];
+  const blankController = createSessionCardInteractionsController();
+  const blankRefs = {
+    focusBtn: createEventTarget(),
+    renameBtn: createEventTarget()
+  };
+  blankController.bindSessionCardInteractions({
+    session: { id: "s1", name: "old" },
+    refs: blankRefs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "old" }),
+    requestSessionRename: async () => "   ",
+    setError: (message) => blankCalls.push(message)
+  });
+  await blankRefs.renameBtn.emit("click");
+
+  const failureCalls = [];
+  const failureController = createSessionCardInteractionsController();
+  const failureRefs = {
+    focusBtn: createEventTarget(),
+    renameBtn: createEventTarget()
+  };
+  failureController.bindSessionCardInteractions({
+    session: { id: "s1", name: "old" },
+    refs: failureRefs,
+    api: {
+      async updateSession() {
+        throw new Error("boom");
+      }
+    },
+    getSession: () => ({ id: "s1", name: "old" }),
+    requestSessionRename: async () => "new",
+    setError: (message) => failureCalls.push(message)
+  });
+  await failureRefs.renameBtn.emit("click");
+
+  assert.deepEqual(blockedCalls, ["Rename is blocked."]);
+  assert.deepEqual(blankCalls, ["Session name cannot be empty."]);
+  assert.deepEqual(failureCalls, ["Failed to rename session."]);
 });
 
 test("session-card-interactions controller deletes exited sessions locally", async () => {
@@ -461,6 +600,48 @@ test("session-card-interactions controller deletes exited sessions locally", asy
   await refs.closeBtn.emit("click");
 
   assert.deepEqual(calls, ["remove:s1", "close-dialog", "clear-error", "feedback:Removed exited session [A] alpha."]);
+});
+
+test("session-card-interactions controller handles delete cancel and delete failure paths", async () => {
+  const cancelCalls = [];
+  const cancelController = createSessionCardInteractionsController();
+  const cancelRefs = {
+    focusBtn: createEventTarget(),
+    closeBtn: createEventTarget(),
+    settingsDialog: {}
+  };
+  cancelController.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs: cancelRefs,
+    api: {},
+    confirmSessionDelete: async () => false,
+    setError: (message) => cancelCalls.push(message)
+  });
+  await cancelRefs.closeBtn.emit("click");
+
+  const failureCalls = [];
+  const failureController = createSessionCardInteractionsController();
+  const failureRefs = {
+    focusBtn: createEventTarget(),
+    closeBtn: createEventTarget(),
+    settingsDialog: {}
+  };
+  failureController.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs: failureRefs,
+    api: {
+      async deleteSession() {
+        throw new Error("boom");
+      }
+    },
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    confirmSessionDelete: async () => true,
+    setError: (message) => failureCalls.push(message)
+  });
+  await failureRefs.closeBtn.emit("click");
+
+  assert.deepEqual(cancelCalls, []);
+  assert.deepEqual(failureCalls, ["Failed to delete session."]);
 });
 
 test("session-card-interactions controller applies valid settings and persists session update", async () => {
@@ -547,6 +728,206 @@ test("session-card-interactions controller applies valid settings and persists s
     "terminator:s1:crlf",
     "feedback:Settings saved.:false",
     "dirty:false"
+  ]);
+});
+
+test("session-card-interactions controller covers settings-apply validation and failure branches", async () => {
+  const blockedCalls = [];
+  const blockedController = createSessionCardInteractionsController({
+    isSessionExited: () => true,
+    getBlockedSessionActionMessage: () => "Settings apply is blocked."
+  });
+  const blockedRefs = {
+    focusBtn: createEventTarget(),
+    settingsApplyBtn: createEventTarget(),
+    startFeedback: {}
+  };
+  blockedController.bindSessionCardInteractions({
+    session: { id: "s1" },
+    refs: blockedRefs,
+    api: {},
+    getSession: () => ({ id: "s1" }),
+    setError: (message) => blockedCalls.push(`error:${message}`),
+    setStartupSettingsFeedback: (_entry, message, isError) => blockedCalls.push(`feedback:${message}:${isError === true}`)
+  });
+  await blockedRefs.settingsApplyBtn.emit("click");
+
+  const envCalls = [];
+  const envController = createSessionCardInteractionsController({
+    themeProfileKeys: ["background"],
+    readSessionStartupFromControls: () => ({
+      startCwd: "/tmp",
+      envResult: { ok: false, error: "Bad env" },
+      tagResult: { ok: true, tags: [] },
+      startCommand: "",
+      mouseForwardingMode: "off",
+      sendTerminator: "auto"
+    }),
+    readSessionThemeProfilesForSave: () => ({
+      activeThemeProfile: { background: "#000000" },
+      inactiveThemeProfile: { background: "#111111" }
+    }),
+    readSessionInputSafetyFromControls: () => ({}),
+    isValidHexColor: () => true
+  });
+  const envRefs = {
+    focusBtn: createEventTarget(),
+    settingsApplyBtn: createEventTarget(),
+    inputSafetyControls: createInputSafetyControls(),
+    themeSelect: createEventTarget("custom"),
+    themeSlotSelect: createEventTarget("active"),
+    themeCategory: createEventTarget("all"),
+    themeSearch: createEventTarget(""),
+    startCwdInput: createEventTarget("/tmp"),
+    startCommandInput: createEventTarget(""),
+    startEnvInput: createEventTarget("A=1"),
+    mouseForwardingModeSelect: createEventTarget("off"),
+    sessionTagsInput: createEventTarget(""),
+    sessionSendTerminatorSelect: createEventTarget("auto"),
+    startFeedback: {}
+  };
+  envController.bindSessionCardInteractions({
+    session: { id: "s1" },
+    refs: envRefs,
+    api: {},
+    getSession: () => ({ id: "s1" }),
+    setStartupSettingsFeedback: (_entry, message, isError) => envCalls.push(`feedback:${message}:${isError === true}`)
+  });
+  await envRefs.settingsApplyBtn.emit("click");
+
+  const failureCalls = [];
+  const failureController = createSessionCardInteractionsController({
+    themeProfileKeys: ["background"],
+    readSessionStartupFromControls: () => ({
+      startCwd: "/tmp",
+      envResult: { ok: true, env: {} },
+      tagResult: { ok: true, tags: [] },
+      startCommand: "",
+      mouseForwardingMode: "off",
+      sendTerminator: "auto"
+    }),
+    readSessionThemeProfilesForSave: () => ({
+      activeThemeProfile: { background: "#000000" },
+      inactiveThemeProfile: { background: "#111111" }
+    }),
+    readSessionInputSafetyFromControls: () => ({}),
+    isValidHexColor: () => true,
+    updateSessionThemeDraftFromControls: () => failureCalls.push("draft")
+  });
+  const failureRefs = {
+    focusBtn: createEventTarget(),
+    settingsApplyBtn: createEventTarget(),
+    inputSafetyControls: createInputSafetyControls(),
+    themeSelect: createEventTarget("custom"),
+    themeSlotSelect: createEventTarget("active"),
+    themeCategory: createEventTarget("all"),
+    themeSearch: createEventTarget(""),
+    startCwdInput: createEventTarget("/tmp"),
+    startCommandInput: createEventTarget(""),
+    startEnvInput: createEventTarget("A=1"),
+    mouseForwardingModeSelect: createEventTarget("off"),
+    sessionTagsInput: createEventTarget(""),
+    sessionSendTerminatorSelect: createEventTarget("auto"),
+    startFeedback: {}
+  };
+  failureController.bindSessionCardInteractions({
+    session: { id: "s1" },
+    refs: failureRefs,
+    api: {
+      async updateSession() {
+        throw new Error("boom");
+      }
+    },
+    getSession: () => ({ id: "s1" }),
+    sessionThemeDrafts: new Map(),
+    applyThemeForSession: () => failureCalls.push("theme"),
+    syncSessionThemeControls: () => failureCalls.push("sync"),
+    clearError: () => failureCalls.push("clear"),
+    setError: (message) => failureCalls.push(`error:${message}`),
+    setStartupSettingsFeedback: (_entry, message, isError) => failureCalls.push(`feedback:${message}:${isError === true}`)
+  });
+  await failureRefs.settingsApplyBtn.emit("click");
+
+  assert.deepEqual(blockedCalls, [
+    "error:Settings apply is blocked.",
+    "feedback:Settings apply is blocked.:true"
+  ]);
+  assert.deepEqual(envCalls, ["feedback:Bad env:true"]);
+  assert.deepEqual(failureCalls, [
+    "draft",
+    "theme",
+    "sync",
+    "clear",
+    "error:Failed to save settings.",
+    "feedback:Failed to save settings.:true"
+  ]);
+});
+
+test("session-card-interactions controller updates theme-slot, category, search, and custom theme input branches", async () => {
+  const calls = [];
+  const controller = createSessionCardInteractionsController({
+    themeProfileKeys: ["background"],
+    normalizeThemeSlot: (value) => value || "active",
+    normalizeThemeFilterCategory: (value) => value,
+    readThemeProfileFromControls: () => ({ background: "#123456" }),
+    updateSessionThemeDraftFromControls: (_refs, sessionId, overrides) => {
+      calls.push(["draft", sessionId, overrides]);
+    },
+    isSessionSettingsDirty: () => true
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    themeSlotSelect: createEventTarget("inactive"),
+    themeCategory: createEventTarget("Ops"),
+    themeSearch: createEventTarget("ssh"),
+    themeInputs: {
+      background: createEventTarget("#123456")
+    },
+    themeBg: createEventTarget("#123456"),
+    themeFg: createEventTarget("#ffffff"),
+    startCwdInput: createEventTarget("/tmp"),
+    startCommandInput: createEventTarget(""),
+    startEnvInput: createEventTarget(""),
+    mouseForwardingModeSelect: createEventTarget("off"),
+    sessionNoteInput: createEventTarget(""),
+    sessionSendTerminatorSelect: createEventTarget("auto"),
+    sessionTagsInput: createEventTarget(""),
+    inputSafetyControls: createInputSafetyControls()
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1" },
+    refs,
+    api: {},
+    getSession: () => ({ id: "s1" }),
+    getEntry: () => ({ id: "entry" }),
+    sessionThemeDrafts: new Map(),
+    syncSessionThemeControls: () => calls.push(["sync"]),
+    applyThemeForSession: (_sessionId, payload) => calls.push(["theme", payload.themeSlot]),
+    setSettingsDirty: (_entry, dirty) => calls.push(["dirty", dirty]),
+    clearError: () => calls.push(["clear"])
+  });
+
+  await refs.themeSlotSelect.emit("change");
+  await refs.themeCategory.emit("change");
+  await refs.themeSearch.emit("input");
+  await refs.themeInputs.background.emit("input");
+
+  assert.deepEqual(calls, [
+    ["draft", "s1", { selectedSlot: "inactive" }],
+    ["sync"],
+    ["theme", "inactive"],
+    ["dirty", true],
+    ["clear"],
+    ["draft", "s1", { selectedSlot: "inactive", slot: "inactive", category: "ops", search: "ssh" }],
+    ["sync"],
+    ["dirty", true],
+    ["draft", "s1", { selectedSlot: "inactive", slot: "inactive", category: "ops", search: "ssh" }],
+    ["sync"],
+    ["dirty", true],
+    ["draft", "s1", { selectedSlot: "inactive", slot: "inactive", preset: "custom", profile: { background: "#123456" } }],
+    ["theme", "inactive"],
+    ["dirty", true]
   ]);
 });
 
