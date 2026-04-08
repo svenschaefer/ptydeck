@@ -1,10 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { mkdtemp, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createDataEncryptionProvider } from "../src/key-provider.js";
 import { JsonPersistence } from "../src/persistence.js";
+
+function buildEncryptedEnvelopeForTest(payloadJson, encryptionProvider) {
+  const active = encryptionProvider.getActiveKey();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", active.key, iv);
+  const ciphertext = Buffer.concat([cipher.update(payloadJson, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return {
+    format: "ptydeck.encrypted.v1",
+    algorithm: "aes-256-gcm",
+    keyId: active.id,
+    iv: iv.toString("base64"),
+    tag: authTag.toString("base64"),
+    ciphertext: ciphertext.toString("base64")
+  };
+}
 
 test("JsonPersistence returns empty list when file does not exist", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
@@ -396,4 +413,65 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     sshTrustEntries: [],
     shareLinks: []
   });
+});
+
+test("JsonPersistence loadState supports encrypted legacy array payload format", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 7).toString("base64");
+  const provider = createDataEncryptionProvider(`a:${keyA}`, "a");
+  const persistence = new JsonPersistence(file, { encryptionProvider: provider });
+  const legacySessions = [{ id: "legacy-enc", cwd: "/tmp", shell: "sh", createdAt: 1, updatedAt: 1 }];
+
+  await writeFile(
+    file,
+    JSON.stringify(buildEncryptedEnvelopeForTest(JSON.stringify(legacySessions), provider), null, 2),
+    "utf8"
+  );
+
+  const loadedState = await persistence.loadState();
+  assert.deepEqual(loadedState, {
+    sessions: legacySessions,
+    sessionOutputs: [],
+    customCommands: [],
+    decks: [],
+    connectionProfiles: [],
+    layoutProfiles: [],
+    workspacePresets: [],
+    sshTrustEntries: [],
+    shareLinks: []
+  });
+});
+
+test("JsonPersistence rejects invalid encrypted envelopes and unsupported decrypted state shapes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-persistence-"));
+  const file = join(dir, "sessions.json");
+  const keyA = Buffer.alloc(32, 9).toString("base64");
+  const provider = createDataEncryptionProvider(`a:${keyA}`, "a");
+  const persistence = new JsonPersistence(file, { encryptionProvider: provider });
+
+  await writeFile(
+    file,
+    JSON.stringify(
+      {
+        format: "ptydeck.encrypted.v1",
+        algorithm: "aes-128-gcm",
+        keyId: "a",
+        iv: "AAAA",
+        tag: "BBBB",
+        ciphertext: "CCCC"
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  await assert.rejects(persistence.loadState(), /invalid encrypted envelope/);
+
+  await writeFile(
+    file,
+    JSON.stringify(buildEncryptedEnvelopeForTest(JSON.stringify({ invalid: true }), provider), null, 2),
+    "utf8"
+  );
+  await assert.rejects(persistence.loadState(), /did not decode to a supported state format/);
 });

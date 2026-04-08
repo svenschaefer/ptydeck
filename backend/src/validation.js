@@ -796,8 +796,8 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (!params.sessionId || typeof params.sessionId !== "string") {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
     }
-    if (!isObject(body) || typeof body.path !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'path' must be a string.");
+    if (!isObject(body) || typeof body.path !== "string" || !body.path.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'path' must be a non-empty string.");
     }
   }
 
@@ -805,8 +805,8 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (!params.sessionId || typeof params.sessionId !== "string") {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
     }
-    if (!isObject(body) || typeof body.path !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'path' must be a string.");
+    if (!isObject(body) || typeof body.path !== "string" || !body.path.trim()) {
+      throw new ApiError(400, "ValidationError", "Field 'path' must be a non-empty string.");
     }
     if (
       typeof body.contentBase64 !== "string" ||

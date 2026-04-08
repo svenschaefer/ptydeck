@@ -86,6 +86,31 @@ const CONTROL_STATE = {
   ]
 };
 
+function createLocalSession(overrides = {}) {
+  return {
+    id: "a",
+    deckId: "default",
+    quickIdToken: "1",
+    state: "running",
+    kind: "local",
+    cwd: "/tmp",
+    shell: "bash",
+    mouseForwardingMode: "off",
+    inputSafetyProfile: INPUT_SAFETY_PROFILE,
+    startCwd: "/tmp",
+    startCommand: "",
+    env: {},
+    tags: [],
+    controlState: CONTROL_STATE,
+    themeProfile: THEME_PROFILE,
+    activeThemeProfile: THEME_PROFILE,
+    inactiveThemeProfile: THEME_PROFILE,
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides
+  };
+}
+
 test("validateRequest accepts valid input body", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -794,9 +819,73 @@ test("validateRequest rejects invalid auth and share request branches", () => {
   });
   assert.throws(() => {
     validateRequest({
+      method: "POST",
+      pathname: "/api/v1/auth/ws-ticket",
+      params: {},
+      body: { label: 42 }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
       method: "GET",
       pathname: "/api/v1/shares",
       params: {},
+      body: {}
+    });
+  });
+});
+
+test("validateRequest rejects invalid trusted-local control and management patch edge cases", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/abc/control/take",
+      params: { sessionId: "abc" },
+      body: "invalid"
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "invalid" }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/upload",
+      params: { sessionId: "a" },
+      body: {
+        path: "   ",
+        contentBase64: "aGVsbG8="
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/download",
+      params: { sessionId: "a" },
+      body: {
+        path: ""
+      }
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/layout-profiles/focus",
+      params: { profileId: "focus" },
+      body: {}
+    });
+  });
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/workspace-presets/focus",
+      params: { presetId: "focus" },
       body: {}
     });
   });
@@ -875,6 +964,38 @@ test("validateResponse accepts auth token response", () => {
         tokenType: "Bearer",
         expiresIn: 900,
         scope: "sessions:read"
+      }
+    });
+  });
+});
+
+test("validateResponse rejects malformed trusted-local session control and ws ticket payloads", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "session",
+      body: createLocalSession({
+        controlState: {
+          ...CONTROL_STATE,
+          attachedClients: [
+            {
+              ...CONTROL_STATE.attachedClients[0],
+              role: "writer"
+            }
+          ]
+        }
+      })
+    });
+  });
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "wsTicket",
+      body: {
+        ticket: "ticket-1",
+        tokenType: "bearer",
+        expiresIn: "60"
       }
     });
   });

@@ -2,6 +2,44 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+function createEmptyState(sessions = []) {
+  return {
+    sessions,
+    sessionOutputs: [],
+    customCommands: [],
+    decks: [],
+    connectionProfiles: [],
+    layoutProfiles: [],
+    workspacePresets: [],
+    sshTrustEntries: [],
+    shareLinks: []
+  };
+}
+
+function normalizePersistedState(value) {
+  if (Array.isArray(value)) {
+    return createEmptyState(value);
+  }
+  if (value && Array.isArray(value.sessions) && Array.isArray(value.customCommands)) {
+    return {
+      sessions: value.sessions,
+      sessionOutputs: Array.isArray(value.sessionOutputs) ? value.sessionOutputs : [],
+      customCommands: value.customCommands,
+      decks: Array.isArray(value.decks) ? value.decks : [],
+      connectionProfiles: Array.isArray(value.connectionProfiles) ? value.connectionProfiles : [],
+      layoutProfiles: Array.isArray(value.layoutProfiles) ? value.layoutProfiles : [],
+      workspacePresets: Array.isArray(value.workspacePresets) ? value.workspacePresets : [],
+      sshTrustEntries: Array.isArray(value.sshTrustEntries) ? value.sshTrustEntries : [],
+      shareLinks: Array.isArray(value.shareLinks) ? value.shareLinks : []
+    };
+  }
+  return null;
+}
+
+function isEncryptedEnvelopeCandidate(value) {
+  return value && value.format === "ptydeck.encrypted.v1";
+}
+
 function buildEncryptedEnvelope(payloadJson, encryptionProvider) {
   const active = encryptionProvider.getActiveKey();
   const iv = randomBytes(12);
@@ -70,108 +108,32 @@ export class JsonPersistence {
     try {
       const raw = await this.readFileFn(this.filePath, "utf8");
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return {
-          sessions: parsed,
-          sessionOutputs: [],
-          customCommands: [],
-          decks: [],
-          connectionProfiles: [],
-          layoutProfiles: [],
-          workspacePresets: [],
-          sshTrustEntries: [],
-          shareLinks: []
-        };
+      const normalized = normalizePersistedState(parsed);
+      if (normalized) {
+        return normalized;
       }
-      if (parsed && Array.isArray(parsed.sessions) && Array.isArray(parsed.customCommands)) {
-        return {
-          sessions: parsed.sessions,
-          sessionOutputs: Array.isArray(parsed.sessionOutputs) ? parsed.sessionOutputs : [],
-          customCommands: parsed.customCommands,
-          decks: Array.isArray(parsed.decks) ? parsed.decks : [],
-          connectionProfiles: Array.isArray(parsed.connectionProfiles) ? parsed.connectionProfiles : [],
-          layoutProfiles: Array.isArray(parsed.layoutProfiles) ? parsed.layoutProfiles : [],
-          workspacePresets: Array.isArray(parsed.workspacePresets) ? parsed.workspacePresets : [],
-          sshTrustEntries: Array.isArray(parsed.sshTrustEntries) ? parsed.sshTrustEntries : [],
-          shareLinks: Array.isArray(parsed.shareLinks) ? parsed.shareLinks : []
-        };
-      }
-      if (
-        parsed &&
-        parsed.format === "ptydeck.encrypted.v1" &&
-        typeof parsed.keyId === "string" &&
-        typeof parsed.iv === "string" &&
-        typeof parsed.tag === "string" &&
-        typeof parsed.ciphertext === "string"
-      ) {
+      if (isEncryptedEnvelopeCandidate(parsed)) {
+        if (
+          parsed.algorithm !== "aes-256-gcm" ||
+          typeof parsed.keyId !== "string" ||
+          typeof parsed.iv !== "string" ||
+          typeof parsed.tag !== "string" ||
+          typeof parsed.ciphertext !== "string"
+        ) {
+          throw new Error("Persistence payload contains an invalid encrypted envelope.");
+        }
         const plainJson = decryptEnvelope(parsed, this.encryptionProvider);
         const decryptedParsed = JSON.parse(plainJson);
-        if (Array.isArray(decryptedParsed)) {
-          return {
-            sessions: decryptedParsed,
-            sessionOutputs: [],
-            customCommands: [],
-            decks: [],
-            connectionProfiles: [],
-            layoutProfiles: [],
-            workspacePresets: [],
-            sshTrustEntries: [],
-            shareLinks: []
-          };
+        const normalizedDecrypted = normalizePersistedState(decryptedParsed);
+        if (normalizedDecrypted) {
+          return normalizedDecrypted;
         }
-        if (
-          decryptedParsed &&
-          Array.isArray(decryptedParsed.sessions) &&
-          Array.isArray(decryptedParsed.customCommands)
-        ) {
-          return {
-            sessions: decryptedParsed.sessions,
-            sessionOutputs: Array.isArray(decryptedParsed.sessionOutputs) ? decryptedParsed.sessionOutputs : [],
-            customCommands: decryptedParsed.customCommands,
-            decks: Array.isArray(decryptedParsed.decks) ? decryptedParsed.decks : [],
-            connectionProfiles: Array.isArray(decryptedParsed.connectionProfiles) ? decryptedParsed.connectionProfiles : [],
-            layoutProfiles: Array.isArray(decryptedParsed.layoutProfiles) ? decryptedParsed.layoutProfiles : [],
-            workspacePresets: Array.isArray(decryptedParsed.workspacePresets) ? decryptedParsed.workspacePresets : [],
-            sshTrustEntries: Array.isArray(decryptedParsed.sshTrustEntries) ? decryptedParsed.sshTrustEntries : [],
-            shareLinks: Array.isArray(decryptedParsed.shareLinks) ? decryptedParsed.shareLinks : []
-          };
-        }
-        return {
-          sessions: [],
-          sessionOutputs: [],
-          customCommands: [],
-          decks: [],
-          connectionProfiles: [],
-          layoutProfiles: [],
-          workspacePresets: [],
-          sshTrustEntries: [],
-          shareLinks: []
-        };
+        throw new Error("Encrypted persistence payload did not decode to a supported state format.");
       }
-      return {
-        sessions: [],
-        sessionOutputs: [],
-        customCommands: [],
-        decks: [],
-        connectionProfiles: [],
-        layoutProfiles: [],
-        workspacePresets: [],
-        sshTrustEntries: [],
-        shareLinks: []
-      };
+      return createEmptyState();
     } catch (err) {
       if (err && typeof err === "object" && err.code === "ENOENT") {
-        return {
-          sessions: [],
-          sessionOutputs: [],
-          customCommands: [],
-          decks: [],
-          connectionProfiles: [],
-          layoutProfiles: [],
-          workspacePresets: [],
-          sshTrustEntries: [],
-          shareLinks: []
-        };
+        return createEmptyState();
       }
       throw err;
     }
