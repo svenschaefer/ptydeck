@@ -1,9 +1,10 @@
 # Docs Review Index
 
-This directory now contains two document classes:
+This directory now contains three document classes:
 
 - imported architecture-review and strategy notes
 - repository-native ADR process material under `docs/adr/`
+- repository-native operational acceptance notes for branch-specific validation/sign-off
 
 The imported review notes are useful inputs, but they are not the authoritative source of implementation status.
 
@@ -112,6 +113,15 @@ Authoritative repository documents remain:
     - `ALT-006`
   - Current interpretation:
     - keep current stack unless scalability, security isolation, or team-size pressure creates a concrete need
+
+### 8. Operational Acceptance
+
+- `MDT-014 Trusted-Local LAN Acceptance.md`
+  - Role: executable acceptance/sign-off sheet for the real second-LAN-client validation on `feature/h62-multi-device-control-foundation`
+  - Status: active while `MDT-014` remains open in `TODO.md`
+  - Canonical companions:
+    - `DEPLOYMENT.md` section `8.2`
+    - `DEPLOYMENT.md` section `8.3`
 
 ## Consolidation Outcome
 

@@ -223,6 +223,8 @@ Then complete the branch rollback:
 
 Use this checklist to validate `feature/h62-multi-device-control-foundation` from at least one second LAN client under the real hostnames.
 
+For a sign-off-oriented execution sheet, use [docs/MDT-014 Trusted-Local LAN Acceptance.md](docs/MDT-014%20Trusted-Local%20LAN%20Acceptance.md) together with this runbook section.
+
 Preconditions:
 
 1. The active branch is `feature/h62-multi-device-control-foundation`.
