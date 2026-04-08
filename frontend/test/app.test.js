@@ -1608,7 +1608,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   await tick();
   assert.equal(
     fixture.elements.commandFeedback.textContent,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast share replay transfer settings custom help run"
+    "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size swap switch transfer workspace"
   );
 
   fixture.elements.commandInput.value = "/custom docu echo verify";

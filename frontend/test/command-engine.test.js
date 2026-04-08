@@ -188,6 +188,22 @@ test("command engine resolves declarative provider autocomplete for command argu
   );
 });
 
+test("command engine autocompletes help topics and subcommands through declarative providers", () => {
+  const engine = createEngineFixture({
+    systemSlashCommands: ["deck", "help", "switch", "run"]
+  });
+
+  const topicContext = engine.parseAutocompleteContext("/help d");
+  assert.equal(topicContext.replacePrefix, "/help ");
+  assert.equal(topicContext.matches[0].insertText, "deck");
+  assert.ok(topicContext.matches.some((candidate) => candidate.insertText === "deck.switch"));
+
+  const subcommandContext = engine.parseAutocompleteContext("/help deck s");
+  assert.equal(subcommandContext.replacePrefix, "/help deck ");
+  assert.equal(subcommandContext.matches[0].insertText, "switch");
+  assert.ok(subcommandContext.matches.some((candidate) => candidate.insertText === "switch"));
+});
+
 test("command engine returns structured quick-switch autocomplete candidates", () => {
   const engine = createEngineFixture();
 

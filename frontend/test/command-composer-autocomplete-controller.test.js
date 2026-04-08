@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createCommandComposerAutocompleteController } from "../src/public/command-composer-autocomplete-controller.js";
+import { createCommandEngine, createCustomCommandRegistry } from "../src/public/command-engine.js";
 
 class FakeInput {
   constructor() {
@@ -328,4 +329,34 @@ test("command-composer autocomplete controller pastes system clipboard text on m
   assert.equal(middleDown.defaultPrevented, true);
   assert.equal(commandInput.value, "/help --verbose");
   assert.equal(commandInput.focusCalls, 1);
+});
+
+test("command-composer autocomplete controller completes help topics and subcommands progressively", async () => {
+  const commandInput = new FakeInput();
+  const registry = createCustomCommandRegistry();
+  const engine = createCommandEngine({
+    systemSlashCommands: ["deck", "help", "switch", "run"],
+    listCustomCommands: () => registry.list(),
+    getSessions: () => [],
+    getDecks: () => [],
+    getThemes: () => []
+  });
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    parseAutocompleteContext: (rawInput) => engine.parseAutocompleteContext(rawInput)
+  });
+
+  commandInput.value = "/h";
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/help");
+
+  commandInput.value = "/help d";
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/help deck");
+
+  commandInput.value = "/help deck s";
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/help deck switch");
 });

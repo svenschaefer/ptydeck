@@ -1189,6 +1189,10 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/help",
       "/help <topic>",
       "/help <topic> <subcommand>"
+    ],
+    args: [
+      { provider: "help-topic", optional: true },
+      { provider: "help-subcommand", optional: true }
     ]
   }),
   run: freezeCommandDefinition({
@@ -1492,7 +1496,8 @@ export function createCommandHelpText(systemSlashCommands = [], options = {}) {
   const commandNames = registry
     .listCanonical()
     .map((command) => normalizeText(command?.insertText))
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
   const parts = [];
   if (includeDirectRouting) {
     parts.push("@");

@@ -85,7 +85,11 @@ export function createCommandEngine(options = {}) {
     getSessionToken,
     getSessionDisplayName,
     getSessionDeckId,
-    getUsageScore: getDiscoveryUsageScore
+    getUsageScore: getDiscoveryUsageScore,
+    providers: {
+      "help-topic": () => buildHelpTopicCandidates(),
+      "help-subcommand": (_, context) => buildHelpSubcommandCandidates(context)
+    }
   });
 
   function parseSlashInputForAutocomplete(rawInput) {
@@ -183,6 +187,73 @@ export function createCommandEngine(options = {}) {
     return normalizeCompletionCandidates(candidates, { replacePrefix: "/" });
   }
 
+  function buildHelpTopicCandidates() {
+    const candidates = [
+      {
+        key: "help-topic:@",
+        insertText: "@",
+        label: "@",
+        kind: "help-topic",
+        description: "direct-route help topic",
+        example: "/help @"
+      },
+      {
+        key: "help-topic:>",
+        insertText: ">",
+        label: ">",
+        kind: "help-topic",
+        description: "quick-switch help topic",
+        example: "/help >"
+      }
+    ];
+
+    for (const command of slashCommandRegistry.listCanonical()) {
+      candidates.push({
+        key: `help-topic:${String(command?.insertText || "").toLowerCase()}`,
+        insertText: command?.insertText,
+        label: command?.label,
+        kind: "help-topic",
+        description: command?.description,
+        example: command?.example
+      });
+    }
+
+    for (const alias of slashCommandRegistry.list().filter((entry) => entry?.isAlias === true)) {
+      candidates.push({
+        key: `help-topic:${String(alias?.insertText || "").toLowerCase()}`,
+        insertText: alias?.insertText,
+        label: alias?.label,
+        kind: "help-alias",
+        description: alias?.aliasOf ? `alias for ${alias.aliasOf}` : alias?.description,
+        example: alias?.example
+      });
+    }
+
+    return normalizeCompletionCandidates(candidates, { replacePrefix: "/help " });
+  }
+
+  function buildHelpSubcommandCandidates(context = {}) {
+    const topic = String(Array.isArray(context.argTokens) ? context.argTokens[0] || "" : "").trim().toLowerCase();
+    if (!topic || topic === "@" || topic === ">") {
+      return [];
+    }
+    const spec = getSlashCommandSpec(topic);
+    if (!spec || spec.isAlias || !spec.subcommands) {
+      return [];
+    }
+    return normalizeCompletionCandidates(
+      Object.values(spec.subcommands).map((entry) => ({
+        key: `help-subcommand:${topic}:${String(entry?.insertText || "").toLowerCase()}`,
+        insertText: entry?.insertText,
+        label: entry?.label,
+        kind: "subcommand",
+        description: entry?.description,
+        example: entry?.example
+      })),
+      { replacePrefix: `/help ${topic} ` }
+    );
+  }
+
   function resolveProviderAutocompleteContext(rawInput, argSpecs, argTokens, context = {}) {
     if (!Array.isArray(argSpecs) || argSpecs.length === 0) {
       return null;
@@ -196,7 +267,10 @@ export function createCommandEngine(options = {}) {
     }
     return {
       replacePrefix: deriveReplacePrefix(rawInput, currentToken),
-      matches: suggestionProviders.provide(argSpec.provider, currentToken, context)
+      matches: suggestionProviders.provide(argSpec.provider, currentToken, {
+        ...context,
+        argTokens: Array.isArray(argTokens) ? argTokens.slice() : []
+      })
     };
   }
 

@@ -116,7 +116,7 @@ test("command schema formats command help text from declarative command summarie
   assert.match(helpText, /^Commands: /);
   assert.equal(
     helpText,
-    "Commands: @ > / new deck swap note connection layout workspace broadcast share replay transfer custom help run"
+    "Commands: @ > / broadcast connection custom deck help layout new note replay run share swap transfer workspace"
   );
 });
 

@@ -77,7 +77,7 @@ test("command executor help and usage strings derive from declarative schema met
   const helpText = await executor.execute({ command: "help", args: [], raw: "/help" });
   assert.equal(
     helpText,
-    "Commands: @ > / new deck move size filter close switch swap next prev list rename restart note connection layout workspace broadcast share replay transfer settings custom help run"
+    "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size swap switch transfer workspace"
   );
 
   const topicHelp = await executor.execute({ command: "help", args: ["deck"], raw: "/help deck" });
