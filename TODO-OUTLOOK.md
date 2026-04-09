@@ -12,7 +12,7 @@ This file is structured into:
 
 ### Product and UX
 
-- [ ] Add a messaging-adapter framework as the next larger post-`H74` mainline epic, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
+- [ ] Add a messaging-adapter framework as the next larger post-`H75` mainline epic, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
 
 ### Security and Multi-Tenancy
 
