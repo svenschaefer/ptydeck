@@ -24,6 +24,14 @@ Completed work belongs in `CHANGELOG.md`.
    Route `/replay paste` and `/ccp` through the existing target-session paste/send path so target send terminators, send-safety rules, multi-device controller gating, reclaim-and-retry behavior, and future paste-observation handling remain identical to ordinary terminal-local paste, while command feedback reports exact selector resolution, truncation, unavailable `sp:N` support, and actual copied or pasted size.
 5. `UX-027D` Owner `QA`
    Add regression coverage and closeout validation for replay-based clipboard relay, including `l:N`, `c:N`, and `sp:N` selector parsing, explicit failure when `sp:N` is unavailable, preview/copy/paste command behavior, `/ccp` alias parity, target-session guard/reclaim interaction, and no ANSI/control-sequence leakage into copied or pasted visible-text excerpts.
+6. `QLT-200` Owner `BE`
+   Raise direct branch coverage and failure-path hardening for `backend/src/validation.js` and `backend/src/session-manager.js`, especially the remaining response-schema branches, session create/update/restart normalization paths, SSH and replay lifecycle edges, timer cleanup behavior, and contract failures that still depend mostly on broad integration coverage instead of direct unit-level assertions.
+7. `QLT-201` Owner `FE`
+   Raise direct orchestration coverage and targeted hardening for `frontend/src/public/app-runtime-composition-controller.js`, especially the runtime glue around websocket/session-data wiring, command-feedback actions, reclaim-and-retry control flow, paste-observation integration, share/access transitions, and fallback/no-op branches that currently sit mostly behind broad `app.test.js` coverage.
+8. `QLT-202` Owner `FE`
+   Raise direct command-surface coverage and hardening for `frontend/src/public/command-engine.js`, `frontend/src/public/command-executor.js`, `frontend/src/public/command-completion.js`, `frontend/src/public/command-send-safety-controller.js`, and `frontend/src/public/slash-workflow-source-adapter.js`, covering declarative-provider failure handling, alias/direct-target ambiguity, typed help/usage edge cases, grouped send-risk branches, replay/paste/share command interactions, and workflow-source error paths that still rely too heavily on app-level tests.
+9. `QLT-203` Owner `QA`
+   Add regression coverage and closeout validation for `v0.4.0-H71`, including deterministic focused suites for the backend contract/session-manager hotspots and the frontend runtime/command-surface hotspots, followed by a full local gate rerun and coverage check on the final tree.
 
 ## Active Ownership Role
 

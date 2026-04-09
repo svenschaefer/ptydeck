@@ -19,6 +19,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `MDT-014`
 - Queued next waves:
   - `v0.4.0-H70`
+  - `v0.4.0-H71`
 
 Queued wave order and dependencies:
 
@@ -26,6 +27,10 @@ Queued wave order and dependencies:
 2. `UX-027B` after `UX-027A`
 3. `UX-027C` after `UX-027A` and `UX-027B`
 4. `UX-027D` after `UX-027A`, `UX-027B`, and `UX-027C`
+5. `QLT-200` after `UX-027D`
+6. `QLT-201` after `QLT-200`
+7. `QLT-202` after `QLT-200` and `QLT-201`
+8. `QLT-203` after `QLT-200`, `QLT-201`, and `QLT-202`
 
 ## Sequencing Rules
 
