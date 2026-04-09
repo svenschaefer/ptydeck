@@ -12,7 +12,7 @@ This file is structured into:
 
 ### Product and UX
 
-- none currently
+- [ ] Add a messaging-adapter framework as the first major post-`feature/h62-multi-device-control-foundation` mainline epic, explicitly after `MDT-014` branch closeout rather than as another branch-local follow-up.
 
 ### Security and Multi-Tenancy
 
@@ -32,6 +32,7 @@ This file is structured into:
 ### Extensibility
 
 - [ ] Add plugin interface for project-specific automations.
+- [ ] Add a platform-independent messaging-adapter framework with outbound-first reference delivery before richer inbound remote-action phases.
 
 ## Deferred Explicit Backlog
 
@@ -55,6 +56,14 @@ This file is structured into:
 
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
+
+### Messaging Adapters
+
+- [ ] `MSG-001` Owner `BE`: Add a provider-independent messaging-event foundation that normalizes session lifecycle, replay-visible output signals, controller/share state changes, and attention-required conditions into a stable adapter-facing event model without coupling the core runtime to any single messaging product.
+- [ ] `MSG-002` Owner `BE`: Add deterministic signal-extraction and trigger-profile support for the first messaging-adapter wave, including explicit shell, coding-agent, build/test, deploy, and transfer-oriented rule bundles plus message-eligibility policy so adapters consume normalized events instead of parsing raw PTY output ad hoc.
+- [ ] `MSG-003` Owner `PLAT`: Add an outbound-only Telegram reference adapter that maps one ptydeck session to one conversation target, supports new-message/update/alert lifecycle behavior, and stays subordinate to existing ptydeck REST/WebSocket/share/control contracts rather than introducing provider-specific runtime authority.
+- [ ] `MSG-004` Owner `BE`: Add a bounded inbound adapter-action contract that can map explicit remote actions such as `status`, `stop`, `retry`, replay excerpt requests, and bounded slash-command execution onto existing ptydeck control/share/send-safety decisions without introducing a second terminal-authority model.
+- [ ] `MSG-005` Owner `QA`: Add closeout validation for the first messaging-adapter wave, including provider-independent event/trigger/message-policy coverage plus end-to-end verification of the Telegram outbound reference adapter and the bounded inbound action contract.
 
 ### Remote / External Theme Compatibility
 

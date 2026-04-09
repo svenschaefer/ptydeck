@@ -4,6 +4,7 @@ Completed and validated release history belongs here.
 
 ## 2026-04-09
 
+- [x] The post-`feature/h62-multi-device-control-foundation` messaging-adapter direction is now recorded explicitly as future backlog instead of an active branch continuation: `TODO-OUTLOOK.md` now carries the deferred `MSG-001` through `MSG-005` foundation tasks, and `CODEX_CONTEXT.md` now states that this becomes the next larger product epic only after `MDT-014` closes the branch rather than as another in-branch wave.
 - [x] `docs/ptydeck_messaging_adapter_framework_final_concept.md` is now aligned with the actual ptydeck product boundary instead of a generic chat-integration sketch: the concept is explicitly session-first but deck-aware, adapters are required to stay subordinate to existing ptydeck REST/WebSocket/share/control contracts, inbound remote actions are framed as bounded extensions of the current slash/control model rather than a second terminal authority, and the stale platform-specific citation artifacts and vendor-detail assumptions were removed so the document now reads as a durable ptydeck requirements concept.
 
 ## 2026-04-08
