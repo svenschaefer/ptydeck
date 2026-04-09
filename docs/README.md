@@ -123,6 +123,16 @@ Authoritative repository documents remain:
     - `DEPLOYMENT.md` section `8.2`
     - `DEPLOYMENT.md` section `8.3`
 
+### 9. Messaging Adapter Concept
+
+- `ptydeck_messaging_adapter_framework_final_concept.md`
+  - Role: non-technical product concept for a future messaging-adapter framework
+  - Status: reference concept only; not an active implementation-status document
+  - Current interpretation:
+    - adapters must remain subordinate to existing ptydeck session, share, and control contracts
+    - the primary mapping model is session-first, with deck-level rollups only as later extensions
+    - inbound chat actions should be bounded extensions of the ptydeck control/slash model rather than a parallel terminal authority
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:

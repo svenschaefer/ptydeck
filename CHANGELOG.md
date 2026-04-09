@@ -2,6 +2,10 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-09
+
+- [x] `docs/ptydeck_messaging_adapter_framework_final_concept.md` is now aligned with the actual ptydeck product boundary instead of a generic chat-integration sketch: the concept is explicitly session-first but deck-aware, adapters are required to stay subordinate to existing ptydeck REST/WebSocket/share/control contracts, inbound remote actions are framed as bounded extensions of the current slash/control model rather than a second terminal authority, and the stale platform-specific citation artifacts and vendor-detail assumptions were removed so the document now reads as a durable ptydeck requirements concept.
+
 ## 2026-04-08
 
 - [x] The top-level `/help` overview is now deterministic and alphabetically sorted by canonical slash command name instead of reflecting incidental registration order, and `/help` now participates in the declarative autocomplete contract so progressive completion flows such as `/h <TAB> d <TAB>` resolve cleanly to `/help deck` and `/help deck s <TAB>` resolves to `/help deck switch`.
