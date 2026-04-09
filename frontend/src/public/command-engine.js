@@ -87,6 +87,7 @@ export function createCommandEngine(options = {}) {
     getSessionDeckId,
     getUsageScore: getDiscoveryUsageScore,
     providers: {
+      "replay-slice-selector": (prefix) => buildReplaySliceCandidates(prefix),
       "help-topic": () => buildHelpTopicCandidates(),
       "help-subcommand": (_, context) => buildHelpSubcommandCandidates(context)
     }
@@ -230,6 +231,61 @@ export function createCommandEngine(options = {}) {
     }
 
     return normalizeCompletionCandidates(candidates, { replacePrefix: "/help " });
+  }
+
+  function buildReplaySliceCandidates(prefix = "") {
+    const normalizedPrefix = String(prefix || "").trim().toLowerCase();
+    const candidates = [
+      {
+        key: "replay-slice:sp1",
+        insertText: "sp:1",
+        label: "sp:1",
+        kind: "replay-slice",
+        description: "latest complete shell block when shell block tracking is available",
+        example: "/replay preview 4 sp:1"
+      },
+      {
+        key: "replay-slice:sp2",
+        insertText: "sp:2",
+        label: "sp:2",
+        kind: "replay-slice",
+        description: "latest two complete shell blocks when shell block tracking is available",
+        example: "/replay paste 4 3 sp:2"
+      },
+      {
+        key: "replay-slice:l20",
+        insertText: "l:20",
+        label: "l:20",
+        kind: "replay-slice",
+        description: "latest 20 visible replay lines",
+        example: "/replay copy 4 l:20"
+      },
+      {
+        key: "replay-slice:l80",
+        insertText: "l:80",
+        label: "l:80",
+        kind: "replay-slice",
+        description: "latest 80 visible replay lines",
+        example: "/replay preview 4 l:80"
+      },
+      {
+        key: "replay-slice:c500",
+        insertText: "c:500",
+        label: "c:500",
+        kind: "replay-slice",
+        description: "latest 500 visible replay chars",
+        example: "/replay copy 4 c:500"
+      },
+      {
+        key: "replay-slice:c4000",
+        insertText: "c:4000",
+        label: "c:4000",
+        kind: "replay-slice",
+        description: "latest 4000 visible replay chars",
+        example: "/ccp 4 3 c:4000"
+      }
+    ];
+    return filterCompletionCandidates(candidates, normalizedPrefix);
   }
 
   function buildHelpSubcommandCandidates(context = {}) {

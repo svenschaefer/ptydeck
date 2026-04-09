@@ -281,10 +281,16 @@ export function createAppBootstrapCompositionController(options = {}) {
       openSessionReplayViewer,
       exportSessionReplayDownload,
       exportSessionReplayCopy,
+      loadSessionReplayExcerpt: (session, selector) => options.loadSessionReplayExcerpt?.(session, selector),
+      copySessionReplayExcerpt: (session, selector, runtimeOptions) =>
+        options.copySessionReplayExcerpt?.(session, selector, runtimeOptions),
+      previewSessionReplayExcerpt: (session, payload) => options.previewSessionReplayExcerpt?.(session, payload) || "",
       listShares,
       createShareLink,
       revokeShareLink,
       writeClipboardText,
+      submitTerminalPaste: (sessionId, text, runtimeOptions) =>
+        commandComposerRuntimeController?.submitProgrammaticPaste?.(sessionId, text, runtimeOptions),
       uploadSessionFile,
       downloadSessionFile
     });

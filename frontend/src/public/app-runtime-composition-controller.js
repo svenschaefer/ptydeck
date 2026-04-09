@@ -2252,6 +2252,11 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   openSessionReplayViewer: (session) => replayViewerRuntimeController?.openSessionReplayViewer?.(session),
   exportSessionReplayDownload: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "download" }),
   exportSessionReplayCopy: (session) => replayExportRuntimeController.exportSessionReplay(session, { mode: "copy" }),
+  loadSessionReplayExcerpt: (session, selector) => replayExportRuntimeController.loadSessionReplayExcerpt(session, selector),
+  copySessionReplayExcerpt: (session, selector, runtimeOptions) =>
+    replayExportRuntimeController.copySessionReplayExcerpt(session, selector, runtimeOptions),
+  previewSessionReplayExcerpt: (session, payload) =>
+    replayExportRuntimeController.previewSessionReplayExcerpt(session, payload),
   listShares: () => api.listShares(),
   createShareLink: (payload) => api.createShareLink(payload),
   revokeShareLink: (shareId) => api.revokeShareLink(shareId),

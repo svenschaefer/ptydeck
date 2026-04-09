@@ -135,3 +135,65 @@ test("replay export runtime controller rejects copy when clipboard support is un
     /Replay export copy is unavailable in this browser\./
   );
 });
+
+test("replay export runtime controller loads and copies normalized replay excerpts", async () => {
+  const excerptCalls = [];
+  const clipboardWrites = [];
+  const controller = createReplayExportRuntimeController({
+    api: {
+      async getSessionReplayExcerpt(sessionId, selector) {
+        excerptCalls.push([sessionId, selector]);
+        return {
+          selector,
+          selectorKind: "lines",
+          resolvedCount: 20,
+          availableCount: 20,
+          selectorSatisfied: true,
+          chars: 120,
+          lines: 20,
+          data: "line one\nline two\n"
+        };
+      }
+    },
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    },
+    formatSessionToken: () => "9",
+    formatSessionDisplayName: () => "three"
+  });
+
+  const payload = await controller.loadSessionReplayExcerpt({ id: "s3", name: "three" }, "l:20");
+  const outcome = await controller.copySessionReplayExcerpt({ id: "s3", name: "three" }, "l:20", { payload });
+
+  assert.deepEqual(excerptCalls, [["s3", "l:20"]]);
+  assert.deepEqual(clipboardWrites, ["line one\nline two\n"]);
+  assert.equal(outcome.feedback, "Copied replay excerpt from [9] three (l:20 -> 20/20 units, 120 chars, 20 lines).");
+});
+
+test("replay export runtime controller formats replay excerpt previews", () => {
+  const controller = createReplayExportRuntimeController({
+    formatSessionToken: () => "4",
+    formatSessionDisplayName: () => "alpha"
+  });
+
+  const feedback = controller.previewSessionReplayExcerpt(
+    { id: "s4", name: "alpha" },
+    {
+      selector: "sp:2",
+      selectorKind: "shell_blocks",
+      resolvedCount: 1,
+      availableCount: 2,
+      selectorSatisfied: false,
+      shellBlocksSupported: true,
+      chars: 44,
+      lines: 6,
+      data: "prompt\noutput\n"
+    }
+  );
+
+  assert.equal(
+    feedback,
+    "Preview from [4] alpha (sp:2 -> 1/2 units, 44 chars, 6 lines, partial).\n\nprompt\noutput\n"
+  );
+});

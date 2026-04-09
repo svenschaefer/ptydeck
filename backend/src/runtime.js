@@ -126,8 +126,11 @@ const SPLIT_LAYOUT_PANE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 const DEFAULT_SPLIT_LAYOUT_PANE_ID = "main";
 const HTTP_DURATION_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const SESSION_REPLAY_EXPORT_SCOPE = "retained_replay_tail";
+const SESSION_REPLAY_EXCERPT_SCOPE = "visible_replay_excerpt";
 const SESSION_REPLAY_EXPORT_FORMAT = "text";
+const SESSION_REPLAY_EXCERPT_FORMAT = "text";
 const SESSION_REPLAY_EXPORT_CONTENT_TYPE = "text/plain; charset=utf-8";
+const SESSION_REPLAY_EXCERPT_CONTENT_TYPE = "text/plain; charset=utf-8";
 const DEFAULT_SESSION_FILE_TRANSFER_MAX_BYTES = 256 * 1024;
 const SESSION_FILE_TRANSFER_PATH_MAX_LENGTH = 512;
 const SESSION_FILE_TRANSFER_CONTENT_TYPE = "application/octet-stream";
@@ -541,6 +544,11 @@ function route(pathname, method) {
     return { kind: "getSessionReplayExport", params: { sessionId: replayExportMatch[1] } };
   }
 
+  const replayExcerptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-excerpt$/);
+  if (replayExcerptMatch && method === "GET") {
+    return { kind: "getSessionReplayExcerpt", params: { sessionId: replayExcerptMatch[1] } };
+  }
+
   const fileTransferUploadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/upload$/);
   if (fileTransferUploadMatch && method === "POST") {
     return { kind: "uploadSessionFile", params: { sessionId: fileTransferUploadMatch[1] } };
@@ -638,6 +646,9 @@ function normalizeMetricsPath(pathname) {
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/replay-export$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/replay-export";
+  }
+  if (/^\/api\/v1\/sessions\/[^/]+\/replay-excerpt$/.test(pathname)) {
+    return "/api/v1/sessions/{sessionId}/replay-excerpt";
   }
   if (/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/upload$/.test(pathname)) {
     return "/api/v1/sessions/{sessionId}/file-transfer/upload";
@@ -3360,7 +3371,7 @@ export function createRuntime(config) {
     if (kind === "listSessions" || kind === "getSession") {
       return "sessions:read";
     }
-    if (kind === "getSessionReplayExport") {
+    if (kind === "getSessionReplayExport" || kind === "getSessionReplayExcerpt") {
       return "sessions:read";
     }
     if (kind === "downloadSessionFile") {
@@ -5330,6 +5341,31 @@ export function createRuntime(config) {
     };
   }
 
+  function buildSessionReplayExcerptOrThrow(sessionId, selector) {
+    const apiSession = getApiSessionOrThrow(sessionId);
+    const excerpt = manager.getReplayExcerpt(sessionId, selector);
+    return {
+      sessionId: apiSession.id,
+      sessionState: apiSession.state,
+      scope: SESSION_REPLAY_EXCERPT_SCOPE,
+      format: SESSION_REPLAY_EXCERPT_FORMAT,
+      contentType: SESSION_REPLAY_EXCERPT_CONTENT_TYPE,
+      selector: excerpt.selector,
+      selectorKind: excerpt.selectorKind,
+      requestedCount: excerpt.requestedCount,
+      resolvedCount: excerpt.resolvedCount,
+      availableCount: excerpt.availableCount,
+      selectorSatisfied: excerpt.selectorSatisfied === true,
+      shellBlocksSupported: excerpt.shellBlocksSupported === true,
+      data: excerpt.data,
+      chars: excerpt.chars,
+      lines: excerpt.lines,
+      sourceRetainedChars: excerpt.sourceRetainedChars,
+      sourceRetentionLimitChars: excerpt.sourceRetentionLimitChars,
+      sourceTruncated: excerpt.sourceTruncated === true
+    };
+  }
+
   function resolveSessionTransferRootOrThrow(session) {
     const rawRoot =
       typeof session?.meta?.cwd === "string" && session.meta.cwd.trim()
@@ -6309,6 +6345,13 @@ function tryCreateRestoredSession({
       if (match.kind === "getSessionReplayExport") {
         const payload = buildSessionReplayExportOrThrow(match.params.sessionId);
         validateResponse({ statusCode: 200, body: payload, expect: "sessionReplayExport" });
+        writeJsonResponse( 200, payload);
+        return;
+      }
+
+      if (match.kind === "getSessionReplayExcerpt") {
+        const payload = buildSessionReplayExcerptOrThrow(match.params.sessionId, parsedUrl.searchParams.get("slice"));
+        validateResponse({ statusCode: 200, body: payload, expect: "sessionReplayExcerpt" });
         writeJsonResponse( 200, payload);
         return;
       }

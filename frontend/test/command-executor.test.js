@@ -136,7 +136,10 @@ test("command executor help and usage strings derive from declarative schema met
   assert.equal(shareUsage, "Usage: /share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
 
   const replayUsage = await executor.execute({ command: "replay", args: [], raw: "/replay" });
-  assert.equal(replayUsage, "Usage: /replay view | /replay export | /replay copy");
+  assert.equal(
+    replayUsage,
+    "Usage: /replay view | /replay export | /replay copy | /replay copy <sourceSelector> <sliceSelector> | /replay preview <sourceSelector> <sliceSelector> | /replay paste <sourceSelector> <targetSelector> <sliceSelector>"
+  );
 
   const transferUsage = await executor.execute({ command: "transfer", args: [], raw: "/transfer" });
   assert.equal(transferUsage, "Usage: /transfer upload [path] | /transfer download <path>");
@@ -1715,6 +1718,358 @@ test("command executor copies retained replay tails for an explicitly selected s
 
   assert.equal(feedback, "Copied replay tail for [8] two (0 chars retained).");
   assert.deepEqual(calls, [["copy", "s2"]]);
+});
+
+test("command executor previews normalized replay excerpts for an explicitly selected session", async () => {
+  const excerptCalls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async (session, selector) => {
+      excerptCalls.push([session.id, selector]);
+      return {
+        selector,
+        selectorKind: "lines",
+        resolvedCount: 20,
+        availableCount: 20,
+        selectorSatisfied: true,
+        chars: 120,
+        lines: 20,
+        data: "line one\nline two\n"
+      };
+    },
+    previewSessionReplayExcerpt: (session, payload) =>
+      `Preview from [8] ${session.name} (${payload.selector} -> ${payload.resolvedCount}/${payload.availableCount} units, ${payload.chars} chars, ${payload.lines} lines).\n\n${payload.data}`
+  });
+
+  const feedback = await executor.execute({
+    command: "replay",
+    args: ["preview", "8", "l:20"],
+    raw: "/replay preview 8 l:20"
+  });
+
+  assert.equal(
+    feedback,
+    "Preview from [8] two (l:20 -> 20/20 units, 120 chars, 20 lines).\n\nline one\nline two\n"
+  );
+  assert.deepEqual(excerptCalls, [["s2", "l:20"]]);
+});
+
+test("command executor copies normalized replay excerpts for an explicitly selected session", async () => {
+  const excerptCalls = [];
+  const copyCalls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async (session, selector) => {
+      excerptCalls.push([session.id, selector]);
+      return {
+        selector,
+        selectorKind: "chars",
+        resolvedCount: 500,
+        availableCount: 500,
+        selectorSatisfied: true,
+        chars: 500,
+        lines: 10,
+        data: "excerpt"
+      };
+    },
+    copySessionReplayExcerpt: async (session, selector, options) => {
+      copyCalls.push([session.id, selector, options.payload.data]);
+      return {
+        feedback: "Copied replay excerpt from [8] two (c:500 -> 500/500 units, 500 chars, 10 lines)."
+      };
+    }
+  });
+
+  const feedback = await executor.execute({
+    command: "replay",
+    args: ["copy", "8", "c:500"],
+    raw: "/replay copy 8 c:500"
+  });
+
+  assert.equal(feedback, "Copied replay excerpt from [8] two (c:500 -> 500/500 units, 500 chars, 10 lines).");
+  assert.deepEqual(excerptCalls, [["s2", "c:500"]]);
+  assert.deepEqual(copyCalls, [["s2", "c:500", "excerpt"]]);
+});
+
+test("command executor pastes replay excerpts through the terminal paste path", async () => {
+  const excerptCalls = [];
+  const pasteCalls = [];
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "7") {
+        return { sessions: [sessions[0]], error: "" };
+      }
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async (session, selector) => {
+      excerptCalls.push([session.id, selector]);
+      return {
+        selector,
+        selectorKind: "shell_blocks",
+        resolvedCount: 2,
+        availableCount: 2,
+        selectorSatisfied: true,
+        chars: 44,
+        lines: 6,
+        data: "prompt\noutput\n"
+      };
+    },
+    submitTerminalPaste: async (sessionId, text, runtimeOptions) => {
+      pasteCalls.push([sessionId, text, runtimeOptions]);
+      return { ok: true, status: "sent", feedback: "" };
+    }
+  });
+
+  const feedback = await executor.execute({
+    command: "replay",
+    args: ["paste", "8", "7", "sp:2"],
+    raw: "/replay paste 8 7 sp:2"
+  });
+
+  assert.equal(
+    feedback,
+    "Pasted replay excerpt sp:2 -> 2/2 units, 44 chars, 6 lines from [8] two to [7] one."
+  );
+  assert.deepEqual(excerptCalls, [["s2", "sp:2"]]);
+  assert.deepEqual(pasteCalls, [["s1", "prompt\noutput\n", { source: "replay-paste", activateTargetBeforeSend: true }]]);
+});
+
+test("command executor routes the ccp alias through replay paste and preserves blocked feedback", async () => {
+  const sessions = [
+    { id: "s1", name: "one", deckId: "default" },
+    { id: "s2", name: "two", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 2,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s2" ? "8" : "7"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => {
+      if (selector === "7") {
+        return { sessions: [sessions[0]], error: "" };
+      }
+      if (selector === "8") {
+        return { sessions: [sessions[1]], error: "" };
+      }
+      return { sessions: [], error: `Unknown session identifier: ${selector}` };
+    },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async () => ({
+      selector: "l:20",
+      selectorKind: "lines",
+      resolvedCount: 20,
+      availableCount: 20,
+      selectorSatisfied: true,
+      chars: 120,
+      lines: 20,
+      data: "line one\nline two\n"
+    }),
+    submitTerminalPaste: async () => ({
+      ok: false,
+      status: "blocked",
+      feedback: "This session is currently controlled by another client."
+    })
+  });
+
+  const feedback = await executor.execute({
+    command: "ccp",
+    args: ["8", "7", "l:20"],
+    raw: "/ccp 8 7 l:20"
+  });
+
+  assert.equal(feedback, "This session is currently controlled by another client.");
 });
 
 test("command executor applies explicit input safety profiles through settings payloads", async () => {

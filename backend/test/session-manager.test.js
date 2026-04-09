@@ -440,6 +440,61 @@ test("SessionManager replay export reports truncation when replay retention is d
   assert.equal(replayExport.truncated, true);
 });
 
+test("SessionManager builds replay excerpts for visible line and char selectors", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "sh" });
+
+  fakePty.write("one\r\ntwo\r\nthree\r\n");
+
+  const lineExcerpt = manager.getReplayExcerpt(created.id, "l:2");
+  assert.equal(lineExcerpt.data, "two\nthree");
+  assert.equal(lineExcerpt.availableCount, 3);
+  assert.equal(lineExcerpt.resolvedCount, 2);
+  assert.equal(lineExcerpt.selectorSatisfied, true);
+
+  const charExcerpt = manager.getReplayExcerpt(created.id, "c:5");
+  assert.equal(charExcerpt.data, "hree\n");
+  assert.equal(charExcerpt.availableCount, "one\ntwo\nthree\n".length);
+  assert.equal(charExcerpt.resolvedCount, 5);
+  assert.equal(charExcerpt.shellBlocksSupported, false);
+});
+
+test("SessionManager tracks bash shell blocks for sp:N replay excerpts", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+
+  fakePty.write("__CWD__/tmp__\r\nwsl$ ");
+  fakePty.write("echo hi\r\nhi\r\n__CWD__/tmp__\r\nwsl$ ");
+  fakePty.write("pwd\r\n/tmp\r\n__CWD__/tmp__\r\nwsl$ ");
+
+  const excerpt = manager.getReplayExcerpt(created.id, "sp:2");
+  assert.equal(excerpt.shellBlocksSupported, true);
+  assert.equal(excerpt.availableCount, 2);
+  assert.equal(excerpt.resolvedCount, 2);
+  assert.equal(excerpt.data, "wsl$ echo hi\nhi\nwsl$ pwd\n/tmp\n");
+});
+
+test("SessionManager rejects sp:N replay excerpts when shell blocks are unavailable", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "sh" });
+
+  fakePty.write("plain shell\r\n");
+
+  assert.throws(
+    () => manager.getReplayExcerpt(created.id, "sp:1"),
+    /Selector 'sp:1' is unavailable/
+  );
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()

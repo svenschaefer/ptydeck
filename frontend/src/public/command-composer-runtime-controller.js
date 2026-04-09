@@ -516,16 +516,16 @@ export function createCommandComposerRuntimeController(options = {}) {
     }
   }
 
-  async function submitTerminalPaste(sessionId, text) {
+  async function submitSessionPaste(sessionId, text, runtimeOptions = {}) {
     const payload = String(text || "");
     if (!payload) {
-      return false;
+      return { ok: false, status: "empty", feedback: "" };
     }
 
     clearPendingSend({ renderAfterClear: false });
     const plan = resolveSingleSessionPlan(sessionId, payload, {
-      source: "paste",
-      activateTargetBeforeSend: true
+      source: typeof runtimeOptions.source === "string" && runtimeOptions.source ? runtimeOptions.source : "paste",
+      activateTargetBeforeSend: runtimeOptions.activateTargetBeforeSend === true
     });
     if (!plan || plan.error) {
       if (plan?.error) {
@@ -538,17 +538,17 @@ export function createCommandComposerRuntimeController(options = {}) {
               kind: "paste",
               sessionId: plan.blockedSession.id,
               payload: plan.targetPayload,
-              activateTargetBeforeSend: true,
+              activateTargetBeforeSend: runtimeOptions.activateTargetBeforeSend === true,
               routeFeedback: plan.routeFeedback || ""
             }
           });
         }
       }
-      return false;
+      return { ok: false, status: plan?.blockedSession ? "blocked" : "error", feedback: plan?.error || "" };
     }
     if (isReadOnlyMode()) {
       setError(getReadOnlyModeMessage());
-      return false;
+      return { ok: false, status: "read-only", feedback: getReadOnlyModeMessage() };
     }
 
     const guardResult = evaluateSendSafety({
@@ -562,16 +562,24 @@ export function createCommandComposerRuntimeController(options = {}) {
 
     if (guardResult.requiresConfirmation) {
       revealPendingSendGuard("", plan, guardResult);
-      return false;
+      return { ok: false, status: "guarded", feedback: guardResult.summary || "Paste confirmation is required." };
     }
 
     try {
       await executeSendPlan(plan);
-      return true;
+      return { ok: true, status: "sent", feedback: "" };
     } catch {
       setError("Failed to paste into terminal.");
-      return false;
+      return { ok: false, status: "error", feedback: "Failed to paste into terminal." };
     }
+  }
+
+  async function submitTerminalPaste(sessionId, text) {
+    const result = await submitSessionPaste(sessionId, text, {
+      source: "paste",
+      activateTargetBeforeSend: true
+    });
+    return result.ok === true;
   }
 
   function cancelPendingSend() {
@@ -756,6 +764,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     cancelPendingSend,
     retryBlockedAction,
     continueObservedPaste,
+    submitProgrammaticPaste: submitSessionPaste,
     clearPendingSend,
     refreshCommandPreview,
     scheduleCommandPreview,

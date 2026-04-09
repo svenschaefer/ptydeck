@@ -646,6 +646,43 @@ test("api client calls session replay export endpoint", async () => {
   assert.equal(payload.fileName, "abc.txt");
 });
 
+test("api client calls session replay excerpt endpoint", async () => {
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      headers: createHeaders(),
+      json: async () => ({
+        sessionId: "abc",
+        scope: "visible_replay_excerpt",
+        format: "text",
+        contentType: "text/plain; charset=utf-8",
+        selector: "sp:2",
+        selectorKind: "shell_blocks",
+        requestedCount: 2,
+        resolvedCount: 2,
+        availableCount: 3,
+        selectorSatisfied: true,
+        shellBlocksSupported: true,
+        chars: 12,
+        lines: 2,
+        data: "pwd\nls\n"
+      })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1");
+  const payload = await api.getSessionReplayExcerpt("abc", "sp:2");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://localhost:18080/api/v1/sessions/abc/replay-excerpt?slice=sp%3A2");
+  assert.equal(calls[0].options.method || "GET", "GET");
+  assert.equal(payload.selector, "sp:2");
+  assert.equal(payload.data, "pwd\nls\n");
+});
+
 test("api client calls session file transfer endpoints", async () => {
   const calls = [];
   global.fetch = async (url, options = {}) => {

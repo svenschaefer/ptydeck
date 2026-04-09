@@ -79,12 +79,22 @@ export function createCommandExecutor(options = {}) {
     typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
   const exportSessionReplayCopy =
     typeof options.exportSessionReplayCopy === "function" ? options.exportSessionReplayCopy : async () => null;
+  const loadSessionReplayExcerpt =
+    typeof options.loadSessionReplayExcerpt === "function" ? options.loadSessionReplayExcerpt : async () => null;
+  const copySessionReplayExcerpt =
+    typeof options.copySessionReplayExcerpt === "function" ? options.copySessionReplayExcerpt : async () => null;
+  const previewSessionReplayExcerpt =
+    typeof options.previewSessionReplayExcerpt === "function" ? options.previewSessionReplayExcerpt : () => "";
   const uploadSessionFile =
     typeof options.uploadSessionFile === "function" ? options.uploadSessionFile : async () => null;
   const downloadSessionFile =
     typeof options.downloadSessionFile === "function" ? options.downloadSessionFile : async () => null;
   const openSessionReplayViewer =
     typeof options.openSessionReplayViewer === "function" ? options.openSessionReplayViewer : async () => null;
+  const submitTerminalPaste =
+    typeof options.submitTerminalPaste === "function"
+      ? options.submitTerminalPaste
+      : async () => ({ ok: false, status: "unavailable", feedback: "Replay paste path is unavailable." });
   const listLayoutProfiles = typeof options.listLayoutProfiles === "function" ? options.listLayoutProfiles : () => [];
   const listConnectionProfiles = typeof options.listConnectionProfiles === "function" ? options.listConnectionProfiles : () => [];
   const resolveLayoutProfile = typeof options.resolveLayoutProfile === "function" ? options.resolveLayoutProfile : () => ({ profile: null, error: "Unknown layout profile." });
@@ -533,6 +543,20 @@ export function createCommandExecutor(options = {}) {
       return directTarget;
     }
     return resolveSingleSessionForCommand("", sessions, activeSessionId, missingActiveMessage, selectorLabel);
+  }
+
+  function buildReplayExcerptSummary(payload) {
+    const selector = String(payload?.selector || "excerpt").trim() || "excerpt";
+    const resolvedCount = Number.isInteger(payload?.resolvedCount) ? payload.resolvedCount : 0;
+    const availableCount = Number.isInteger(payload?.availableCount) ? payload.availableCount : resolvedCount;
+    const chars = Number.isInteger(payload?.chars) ? payload.chars : String(payload?.data || "").length;
+    const lines = Number.isInteger(payload?.lines) ? payload.lines : String(payload?.data || "").split("\n").filter(Boolean).length;
+    const partialSuffix = payload?.selectorSatisfied === true ? "" : ", partial";
+    return `${selector} -> ${resolvedCount}/${availableCount} units, ${chars} chars, ${lines} lines${partialSuffix}`;
+  }
+
+  function buildReplayExcerptEmptyFeedback(session, selector) {
+    return `No replay excerpt matched ${selector} on [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
   }
 
   function resolveCustomCommandTargets(selectorText, sessions, activeSessionId, missingActiveMessage) {
@@ -1186,28 +1210,96 @@ export function createCommandExecutor(options = {}) {
 
     if (command === "replay") {
       const subcommand = String(args[0] || "").trim().toLowerCase();
-      if ((subcommand !== "view" && subcommand !== "export" && subcommand !== "copy") || args.length !== 1) {
-        return formatUsage("replay");
-      }
-      const resolvedTarget = resolveActiveOrDirectTargetSession(
-        interpreted,
-        sessions,
-        activeSessionId,
-        "No active session for /replay.",
-        "Replay selector"
-      );
-      if (resolvedTarget.error) {
-        return resolvedTarget.error;
-      }
-      if (subcommand === "view") {
-        const outcome = await openSessionReplayViewer(resolvedTarget.session);
+      if (subcommand === "view" || subcommand === "export" || (subcommand === "copy" && args.length === 1)) {
+        const resolvedTarget = resolveActiveOrDirectTargetSession(
+          interpreted,
+          sessions,
+          activeSessionId,
+          "No active session for /replay.",
+          "Replay selector"
+        );
+        if (resolvedTarget.error) {
+          return resolvedTarget.error;
+        }
+        if (subcommand === "view") {
+          const outcome = await openSessionReplayViewer(resolvedTarget.session);
+          return outcome?.feedback || "";
+        }
+        const outcome =
+          subcommand === "copy"
+            ? await exportSessionReplayCopy(resolvedTarget.session)
+            : await exportSessionReplayDownload(resolvedTarget.session);
         return outcome?.feedback || "";
       }
-      const outcome =
-        subcommand === "copy"
-          ? await exportSessionReplayCopy(resolvedTarget.session)
-          : await exportSessionReplayDownload(resolvedTarget.session);
-      return outcome?.feedback || "";
+
+      if (subcommand === "preview" || subcommand === "copy" || subcommand === "paste") {
+        if (subcommand === "preview" && args.length !== 3) {
+          return formatUsage("replay", "preview");
+        }
+        if (subcommand === "copy" && args.length !== 3) {
+          return formatUsage("replay", "copy");
+        }
+        if (subcommand === "paste" && args.length !== 4) {
+          return formatUsage("replay", "paste");
+        }
+
+        const sourceResolution = resolveSingleSessionForCommand(
+          args[1],
+          sessions,
+          activeSessionId,
+          "Replay source selector must resolve to exactly one session.",
+          "Replay source selector"
+        );
+        if (sourceResolution.error) {
+          return sourceResolution.error;
+        }
+        const sliceSelector = String(args[subcommand === "paste" ? 3 : 2] || "").trim();
+        if (!sliceSelector) {
+          return formatUsage("replay", subcommand);
+        }
+        const excerptPayload = await loadSessionReplayExcerpt(sourceResolution.session, sliceSelector);
+        if (!excerptPayload || typeof excerptPayload !== "object") {
+          return "Failed to load replay excerpt.";
+        }
+        if (!excerptPayload.data) {
+          return buildReplayExcerptEmptyFeedback(sourceResolution.session, sliceSelector);
+        }
+        if (subcommand === "preview") {
+          return (
+            previewSessionReplayExcerpt(sourceResolution.session, excerptPayload) ||
+            `Preview from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} (${buildReplayExcerptSummary(excerptPayload)}).\n\n${excerptPayload.data}`
+          );
+        }
+        if (subcommand === "copy") {
+          const outcome = await copySessionReplayExcerpt(sourceResolution.session, sliceSelector, {
+            payload: excerptPayload
+          });
+          return (
+            outcome?.feedback ||
+            `Copied replay excerpt from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} (${buildReplayExcerptSummary(excerptPayload)}).`
+          );
+        }
+        const targetResolution = resolveSingleSessionForCommand(
+          args[2],
+          sessions,
+          activeSessionId,
+          "Replay target selector must resolve to exactly one session.",
+          "Replay target selector"
+        );
+        if (targetResolution.error) {
+          return targetResolution.error;
+        }
+        const pasteResult = await submitTerminalPaste(targetResolution.session.id, excerptPayload.data, {
+          source: "replay-paste",
+          activateTargetBeforeSend: true
+        });
+        if (pasteResult?.status === "sent") {
+          return `Pasted replay excerpt ${buildReplayExcerptSummary(excerptPayload)} from [${formatSessionToken(sourceResolution.session.id)}] ${formatSessionDisplayName(sourceResolution.session)} to [${formatSessionToken(targetResolution.session.id)}] ${formatSessionDisplayName(targetResolution.session)}.`;
+        }
+        return pasteResult?.feedback || "Failed to paste replay excerpt.";
+      }
+
+      return formatUsage("replay");
     }
 
     if (command === "transfer") {

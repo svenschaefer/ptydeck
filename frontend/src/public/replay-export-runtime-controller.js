@@ -26,6 +26,28 @@ function buildReplayFeedback({ session, payload, mode, formatSessionToken, forma
   return `${actionText} for [${token}] ${name} (${buildReplayRetentionSummary(payload)}).`;
 }
 
+function buildReplayExcerptSummary(payload) {
+  const selector = normalizeText(payload?.selector) || "excerpt";
+  const resolvedCount = normalizePositiveInteger(payload?.resolvedCount, 0);
+  const availableCount = normalizePositiveInteger(payload?.availableCount, resolvedCount);
+  const chars = normalizePositiveInteger(payload?.chars, normalizeText(payload?.data).length);
+  const lines = normalizePositiveInteger(payload?.lines, normalizeText(payload?.data).split("\n").filter(Boolean).length);
+  const selectorSatisfied = payload?.selectorSatisfied === true;
+  const shellBlocksSupported = payload?.shellBlocksSupported === true;
+  const supportSuffix =
+    normalizeText(payload?.selectorKind) === "shell_blocks" && !shellBlocksSupported ? ", unavailable" : selectorSatisfied ? "" : ", partial";
+  return `${selector} -> ${resolvedCount}/${availableCount} units, ${chars} chars, ${lines} lines${supportSuffix}`;
+}
+
+function buildReplayExcerptFeedback({ session, payload, mode, formatSessionToken, formatSessionDisplayName }) {
+  const token = formatSessionToken(session?.id);
+  const name = formatSessionDisplayName(session);
+  if (mode === "copy") {
+    return `Copied replay excerpt from [${token}] ${name} (${buildReplayExcerptSummary(payload)}).`;
+  }
+  return `Preview from [${token}] ${name} (${buildReplayExcerptSummary(payload)}).\n\n${normalizeText(payload?.data)}`;
+}
+
 export function createReplayExportRuntimeController(options = {}) {
   const api = options.api || null;
   const documentRef = options.documentRef || globalThis.document || null;
@@ -87,11 +109,29 @@ export function createReplayExportRuntimeController(options = {}) {
     return api.getSessionReplayExport(sessionId);
   }
 
+  async function fetchReplayExcerpt(sessionId, selector) {
+    if (!api || typeof api.getSessionReplayExcerpt !== "function") {
+      throw new Error("Replay excerpt API is unavailable.");
+    }
+    return api.getSessionReplayExcerpt(sessionId, selector);
+  }
+
   async function loadSessionReplay(session) {
     if (!session?.id) {
       throw new Error("Replay export requires a session.");
     }
     return fetchReplayExport(session.id);
+  }
+
+  async function loadSessionReplayExcerpt(session, selector) {
+    if (!session?.id) {
+      throw new Error("Replay excerpt requires a session.");
+    }
+    const normalizedSelector = normalizeText(selector);
+    if (!normalizedSelector) {
+      throw new Error("Replay excerpt selector is required.");
+    }
+    return fetchReplayExcerpt(session.id, normalizedSelector);
   }
 
   async function exportSessionReplay(session, { mode = "download", payload = null } = {}) {
@@ -113,9 +153,38 @@ export function createReplayExportRuntimeController(options = {}) {
     };
   }
 
+  async function copySessionReplayExcerpt(session, selector, { payload = null } = {}) {
+    const nextPayload = payload || (await loadSessionReplayExcerpt(session, selector));
+    await copyReplayText(nextPayload);
+    return {
+      payload: nextPayload,
+      feedback: buildReplayExcerptFeedback({
+        session,
+        payload: nextPayload,
+        mode: "copy",
+        formatSessionToken,
+        formatSessionDisplayName
+      })
+    };
+  }
+
+  function previewSessionReplayExcerpt(session, payload) {
+    return buildReplayExcerptFeedback({
+      session,
+      payload,
+      mode: "preview",
+      formatSessionToken,
+      formatSessionDisplayName
+    });
+  }
+
   return {
     buildReplayRetentionSummary,
+    buildReplayExcerptSummary,
+    copySessionReplayExcerpt,
     exportSessionReplay,
-    loadSessionReplay
+    loadSessionReplay,
+    loadSessionReplayExcerpt,
+    previewSessionReplayExcerpt
   };
 }

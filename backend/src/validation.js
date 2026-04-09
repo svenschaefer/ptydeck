@@ -792,6 +792,15 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
   }
 
+  if (method === "GET" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/replay-excerpt$/)) {
+    if (!params.sessionId || typeof params.sessionId !== "string") {
+      throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
+    }
+    if (typeof query?.slice !== "string" || !/^(sp|l|c):[1-9]\d*$/i.test(query.slice.trim())) {
+      throw new ApiError(400, "ValidationError", "Query parameter 'slice' must match 'l:N', 'c:N', or 'sp:N'.");
+    }
+  }
+
   if (method === "POST" && pathname.match(/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/download$/)) {
     if (!params.sessionId || typeof params.sessionId !== "string") {
       throw new ApiError(400, "ValidationError", "Missing sessionId path parameter.");
@@ -1212,6 +1221,42 @@ function isSessionReplayExport(value) {
   );
 }
 
+function isSessionReplayExcerpt(value) {
+  return (
+    isObject(value) &&
+    typeof value.sessionId === "string" &&
+    (
+      value.sessionState === "starting" ||
+      value.sessionState === "running" ||
+      value.sessionState === "exited" ||
+      value.sessionState === "unrestored"
+    ) &&
+    value.scope === "visible_replay_excerpt" &&
+    value.format === "text" &&
+    typeof value.contentType === "string" &&
+    typeof value.selector === "string" &&
+    (value.selectorKind === "lines" || value.selectorKind === "chars" || value.selectorKind === "shell_blocks") &&
+    Number.isInteger(value.requestedCount) &&
+    value.requestedCount > 0 &&
+    Number.isInteger(value.resolvedCount) &&
+    value.resolvedCount >= 0 &&
+    Number.isInteger(value.availableCount) &&
+    value.availableCount >= 0 &&
+    typeof value.selectorSatisfied === "boolean" &&
+    typeof value.shellBlocksSupported === "boolean" &&
+    typeof value.data === "string" &&
+    Number.isInteger(value.chars) &&
+    value.chars >= 0 &&
+    Number.isInteger(value.lines) &&
+    value.lines >= 0 &&
+    Number.isInteger(value.sourceRetainedChars) &&
+    value.sourceRetainedChars >= 0 &&
+    Number.isInteger(value.sourceRetentionLimitChars) &&
+    value.sourceRetentionLimitChars >= 0 &&
+    typeof value.sourceTruncated === "boolean"
+  );
+}
+
 function isSessionFileUpload(value) {
   return (
     isObject(value) &&
@@ -1275,6 +1320,10 @@ export function validateResponse({ statusCode, body, expect }) {
 
   if (expect === "sessionReplayExport" && !isSessionReplayExport(body)) {
     throw new ApiError(500, "ResponseValidationError", "Response does not match SessionReplayExport schema.");
+  }
+
+  if (expect === "sessionReplayExcerpt" && !isSessionReplayExcerpt(body)) {
+    throw new ApiError(500, "ResponseValidationError", "Response does not match SessionReplayExcerpt schema.");
   }
 
   if (expect === "sessionFileUpload" && !isSessionFileUpload(body)) {

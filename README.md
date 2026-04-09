@@ -12,7 +12,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Local and SSH-backed sessions through one shared session model
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
-- Session replay/export, file transfer, read-only sharing, and saved connection profiles
+- Session replay/export, replay-excerpt clipboard relay via `/replay ...` and `/ccp`, file transfer, read-only sharing, and saved connection profiles
 - Multi-device terminal-control foundation with visible control metadata, take/release/transfer control actions, trusted-local scope takeover (`all sessions`, `this deck`, `this session`), and automatic device-local layout recall on successful takeover
 - Dedicated `Workspace Library` manager for guided local/SSH connection profiles, first-connect SSH trust verification, workspace presets, and deck-group management outside the sidebar
 - Per-session safety controls, dual theme slots, multiline notes, and controlled mouse forwarding
@@ -143,6 +143,14 @@ Transfer a file from a session:
 
 ```text
 /transfer download /tmp/app.log
+```
+
+Preview or relay normalized replay excerpts between sessions:
+
+```text
+/replay preview 4 l:80
+/replay copy 4 c:500
+/ccp 4 3 sp:2
 ```
 
 ## Repository Layout

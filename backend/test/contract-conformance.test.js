@@ -87,6 +87,7 @@ function runtimeOperationKeys() {
     "GET /sessions",
     "POST /sessions",
     "GET /sessions/{sessionId}",
+    "GET /sessions/{sessionId}/replay-excerpt",
     "GET /sessions/{sessionId}/replay-export",
     "POST /sessions/{sessionId}/file-transfer/download",
     "POST /sessions/{sessionId}/file-transfer/upload",
@@ -191,6 +192,14 @@ test("runtime routes and statuses conform to openapi contract", async () => {
       headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
     });
     assert.ok(operations.get("GET /sessions/{sessionId}/replay-export").has(replayExportRes.status));
+
+    const replayExcerptRes = await contractFetch(
+      `${baseUrl}/sessions/${createdSession.id}/replay-excerpt?slice=l%3A1`,
+      {
+        headers: { authorization: `Bearer ${tokenPayload.accessToken}` }
+      }
+    );
+    assert.ok(operations.get("GET /sessions/{sessionId}/replay-excerpt").has(replayExcerptRes.status));
 
     const fileUploadRes = await contractFetch(`${baseUrl}/sessions/${createdSession.id}/file-transfer/upload`, {
       method: "POST",

@@ -999,6 +999,46 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '426':
           $ref: '#/components/responses/TlsRequired'
+  /sessions/{sessionId}/replay-excerpt:
+    parameters:
+      - $ref: '#/components/parameters/sessionId'
+      - in: query
+        name: slice
+        required: true
+        schema:
+          type: string
+          pattern: '^(sp|l|c):[1-9][0-9]*$'
+        description: Replay excerpt selector, such as `l:80`, `c:4000`, or `sp:2`.
+    get:
+      operationId: getSessionReplayExcerpt
+      summary: Extract a normalized visible-text replay excerpt for a session.
+      responses:
+        '200':
+          description: Replay excerpt payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionReplayExcerpt'
+        '400':
+          description: Invalid replay excerpt selector
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Requested replay excerpt mode is unavailable for the session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '426':
+          $ref: '#/components/responses/TlsRequired'
   /sessions/{sessionId}/file-transfer/download:
     parameters:
       - $ref: '#/components/parameters/sessionId'
@@ -2199,6 +2239,85 @@ components:
           type: integer
           minimum: 0
         truncated:
+          type: boolean
+    SessionReplayExcerpt:
+      type: object
+      required:
+        - sessionId
+        - sessionState
+        - scope
+        - format
+        - contentType
+        - selector
+        - selectorKind
+        - requestedCount
+        - resolvedCount
+        - availableCount
+        - selectorSatisfied
+        - shellBlocksSupported
+        - data
+        - chars
+        - lines
+        - sourceRetainedChars
+        - sourceRetentionLimitChars
+        - sourceTruncated
+      properties:
+        sessionId:
+          type: string
+        sessionState:
+          type: string
+          enum:
+            - starting
+            - running
+            - exited
+            - unrestored
+        scope:
+          type: string
+          enum:
+            - visible_replay_excerpt
+        format:
+          type: string
+          enum:
+            - text
+        contentType:
+          type: string
+        selector:
+          type: string
+          pattern: '^(sp|l|c):[1-9][0-9]*$'
+        selectorKind:
+          type: string
+          enum:
+            - lines
+            - chars
+            - shell_blocks
+        requestedCount:
+          type: integer
+          minimum: 1
+        resolvedCount:
+          type: integer
+          minimum: 0
+        availableCount:
+          type: integer
+          minimum: 0
+        selectorSatisfied:
+          type: boolean
+        shellBlocksSupported:
+          type: boolean
+        data:
+          type: string
+        chars:
+          type: integer
+          minimum: 0
+        lines:
+          type: integer
+          minimum: 0
+        sourceRetainedChars:
+          type: integer
+          minimum: 0
+        sourceRetentionLimitChars:
+          type: integer
+          minimum: 0
+        sourceTruncated:
           type: boolean
     SessionFileDownloadRequest:
       type: object

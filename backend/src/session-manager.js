@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
+import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import { createShellAdapter } from "./shell-adapter.js";
@@ -220,6 +221,33 @@ function normalizeQuickIdToken(value) {
   }
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function normalizePromptBoundaries(promptBoundaries, chunkLength) {
+  const maxLength = Number.isInteger(chunkLength) && chunkLength >= 0 ? chunkLength : 0;
+  return (Array.isArray(promptBoundaries) ? promptBoundaries : [])
+    .map((entry) => (Number.isInteger(entry) && entry >= 0 && entry <= maxLength ? entry : null))
+    .filter((entry) => entry !== null)
+    .sort((left, right) => left - right);
+}
+
+function normalizeReplayShellBlocks(shellBlocks, maxLength) {
+  const effectiveMaxLength = Number.isInteger(maxLength) && maxLength >= 0 ? maxLength : 0;
+  return (Array.isArray(shellBlocks) ? shellBlocks : [])
+    .map((entry) => {
+      const start = Number.isInteger(entry?.start) ? entry.start : -1;
+      const end = Number.isInteger(entry?.end) ? entry.end : -1;
+      if (start < 0 || end <= start || end > effectiveMaxLength) {
+        return null;
+      }
+      return { start, end };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.start - right.start);
+}
+
+function getTextLength(value) {
+  return typeof value === "string" ? value.length : 0;
 }
 
 function normalizeSessionKind(kind) {
@@ -810,27 +838,32 @@ export class SessionManager {
     session.ptyProcess = ptyProcess;
     session.shellAdapter = shellAdapter;
     session.cwdTrackingBuffer = "";
+    session.replayShellBlockTrackingSupported = shellAdapter?.capability?.shellBlockTrackingSupported === true;
     ptyProcess.onData((data) => {
-      const cleaned = session.shellAdapter.consumeOutput(session, data);
+      const streamResult = session.shellAdapter.consumeOutput(session, data);
+      const cleaned = typeof streamResult?.cleaned === "string" ? streamResult.cleaned : "";
+      const promptBoundaries = Array.isArray(streamResult?.promptBoundaries) ? streamResult.promptBoundaries : [];
+      if (!cleaned && promptBoundaries.length > 0) {
+        this.appendReplayOutput(session, "", promptBoundaries);
+        return;
+      }
       if (cleaned) {
         const timestamp = this.nowFn();
         if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== REMOTE_CONNECTIVITY_CONNECTED) {
-        this.markRemoteSessionConnected(session, timestamp);
-      }
-      session.lastActivityAt = timestamp;
-      const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-        sessionId: session.id,
-        source: "pty"
-      });
-      this.updateSessionTraceSeed(session, trace, { source: "pty" });
-      if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
-        this.emitSessionActivityStarted(session, timestamp);
-      } else {
-        session.meta.updatedAt = timestamp;
-      }
-        const replayOutput = this.buildReplayRetentionResult(`${session.outputBuffer}${cleaned}`);
-        session.outputBuffer = replayOutput.value;
-        session.outputTruncated = session.outputTruncated === true || replayOutput.truncated === true;
+          this.markRemoteSessionConnected(session, timestamp);
+        }
+        session.lastActivityAt = timestamp;
+        const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+          sessionId: session.id,
+          source: "pty"
+        });
+        this.updateSessionTraceSeed(session, trace, { source: "pty" });
+        if (session.meta.activityState !== SESSION_ACTIVITY_STATE_ACTIVE) {
+          this.emitSessionActivityStarted(session, timestamp);
+        } else {
+          session.meta.updatedAt = timestamp;
+        }
+        this.appendReplayOutput(session, cleaned, promptBoundaries);
         this.scheduleSessionActivityCompletion(session);
         this.events.emit("session.data", {
           sessionId: session.id,
@@ -1016,6 +1049,60 @@ export class SessionManager {
     return { value, truncated: false };
   }
 
+  buildReplayRetentionState(value, shellBlocks = [], currentShellBlockStart = null, maxChars = this.sessionReplayMemoryMaxChars) {
+    const replayOutput = this.buildReplayRetentionResult(value, maxChars);
+    if (!replayOutput.value) {
+      return {
+        value: "",
+        truncated: replayOutput.truncated,
+        shellBlocks: [],
+        currentShellBlockStart: null
+      };
+    }
+    const trimDelta = getTextLength(value) - replayOutput.value.length;
+    const nextShellBlocks = normalizeReplayShellBlocks(shellBlocks, getTextLength(value))
+      .map((entry) => ({
+        start: entry.start - trimDelta,
+        end: entry.end - trimDelta
+      }))
+      .filter((entry) => entry.start >= 0 && entry.end > entry.start && entry.end <= replayOutput.value.length);
+    const nextCurrentShellBlockStart =
+      Number.isInteger(currentShellBlockStart) && currentShellBlockStart - trimDelta >= 0
+        ? currentShellBlockStart - trimDelta
+        : null;
+    return {
+      value: replayOutput.value,
+      truncated: replayOutput.truncated,
+      shellBlocks: nextShellBlocks,
+      currentShellBlockStart: nextCurrentShellBlockStart
+    };
+  }
+
+  appendReplayOutput(session, cleaned, promptBoundaries = []) {
+    const chunk = typeof cleaned === "string" ? cleaned : "";
+    const normalizedPromptBoundaries = normalizePromptBoundaries(promptBoundaries, chunk.length);
+    const combinedOutput = `${session.outputBuffer || ""}${chunk}`;
+    const absolutePromptBoundaries = normalizedPromptBoundaries.map((entry) => getTextLength(session.outputBuffer) + entry);
+    const nextShellBlocks = normalizeReplayShellBlocks(session.replayShellBlocks, getTextLength(session.outputBuffer));
+    let currentShellBlockStart = Number.isInteger(session.currentShellBlockStart) ? session.currentShellBlockStart : null;
+    for (const boundary of absolutePromptBoundaries) {
+      if (Number.isInteger(currentShellBlockStart) && boundary > currentShellBlockStart) {
+        nextShellBlocks.push({ start: currentShellBlockStart, end: boundary });
+      }
+      currentShellBlockStart = boundary;
+    }
+    const replayState = this.buildReplayRetentionState(
+      combinedOutput,
+      nextShellBlocks,
+      currentShellBlockStart,
+      this.sessionReplayMemoryMaxChars
+    );
+    session.outputBuffer = replayState.value;
+    session.outputTruncated = session.outputTruncated === true || replayState.truncated === true;
+    session.replayShellBlocks = replayState.shellBlocks;
+    session.currentShellBlockStart = replayState.currentShellBlockStart;
+  }
+
   trimReplayOutput(value, maxChars = this.sessionReplayMemoryMaxChars) {
     return this.buildReplayRetentionResult(value, maxChars).value;
   }
@@ -1050,6 +1137,36 @@ export class SessionManager {
       retainedChars: session.outputBuffer.length,
       retentionLimitChars: this.sessionReplayMemoryMaxChars,
       truncated: session.outputTruncated === true
+    };
+  }
+
+  getReplayExcerpt(sessionId, selectorText) {
+    const session = this.get(sessionId);
+    const selector = parseReplaySliceSelector(selectorText);
+    if (!selector) {
+      throw new ApiError(400, "ValidationError", "Field 'slice' must match 'l:N', 'c:N', or 'sp:N'.");
+    }
+    const excerpt = buildReplayExcerpt({
+      selector: selector.selector,
+      text: session.outputBuffer,
+      shellBlocks: session.replayShellBlocks,
+      shellBlocksSupported: session.replayShellBlockTrackingSupported === true
+    });
+    if (!excerpt) {
+      throw new ApiError(500, "ReplayExcerptUnavailable", "Replay excerpt could not be generated.");
+    }
+    if (excerpt.unavailableReason === "shell_blocks_unavailable") {
+      throw new ApiError(
+        409,
+        "ReplayExcerptUnsupported",
+        `Selector '${selector.selector}' is unavailable for session '${sessionId}'. Use 'l:N' or 'c:N'.`
+      );
+    }
+    return {
+      ...excerpt,
+      sourceRetainedChars: session.outputBuffer.length,
+      sourceRetentionLimitChars: this.sessionReplayMemoryMaxChars,
+      sourceTruncated: session.outputTruncated === true
     };
   }
 
@@ -1183,6 +1300,9 @@ export class SessionManager {
       cwdTrackingBuffer: "",
       outputBuffer: initialReplayOutput.value,
       outputTruncated: replayOutputTruncated === true || initialReplayOutput.truncated,
+      replayShellBlocks: [],
+      currentShellBlockStart: null,
+      replayShellBlockTrackingSupported: false,
       activityTimer: null,
       remoteReconnectTimer: null,
       remoteReconnectStabilizeTimer: null,

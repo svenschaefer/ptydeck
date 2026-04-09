@@ -204,6 +204,20 @@ test("command engine autocompletes help topics and subcommands through declarati
   assert.ok(subcommandContext.matches.some((candidate) => candidate.insertText === "switch"));
 });
 
+test("command engine autocompletes replay slice selectors and ccp alias entries", () => {
+  const engine = createEngineFixture({
+    systemSlashCommands: ["replay", "help", "run"]
+  });
+
+  const sliceContext = engine.parseAutocompleteContext("/replay preview 1 s");
+  assert.equal(sliceContext.replacePrefix, "/replay preview 1 ");
+  assert.equal(sliceContext.matches[0].insertText, "sp:1");
+  assert.ok(sliceContext.matches.some((candidate) => candidate.insertText === "sp:2"));
+
+  const aliasContext = engine.parseAutocompleteContext("/cc");
+  assert.equal(aliasContext.matches[0].insertText, "ccp");
+});
+
 test("command engine returns structured quick-switch autocomplete candidates", () => {
   const engine = createEngineFixture();
 

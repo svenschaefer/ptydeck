@@ -2929,6 +2929,47 @@ test("session replay export endpoint preserves truncation metadata across restar
   }
 });
 
+test("session replay excerpt endpoint returns normalized visible-text excerpts and rejects unsupported shell-block selectors", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: createFallbackAwarePtyFactory()
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "one\r\ntwo\r\nthree\r\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    const excerptRes = await fetch(`${baseUrl}/sessions/${created.id}/replay-excerpt?slice=l:2`);
+    assert.equal(excerptRes.status, 200);
+    const excerpt = await excerptRes.json();
+    assert.equal(excerpt.sessionId, created.id);
+    assert.equal(excerpt.scope, "visible_replay_excerpt");
+    assert.equal(excerpt.selector, "l:2");
+    assert.equal(excerpt.selectorKind, "lines");
+    assert.equal(excerpt.data, "two\nthree");
+    assert.equal(excerpt.lines, 2);
+    assert.equal(excerpt.shellBlocksSupported, false);
+
+    const unsupportedRes = await fetch(`${baseUrl}/sessions/${created.id}/replay-excerpt?slice=sp:1`);
+    assert.equal(unsupportedRes.status, 409);
+    const unsupported = await unsupportedRes.json();
+    assert.equal(unsupported.error, "ReplayExcerptUnsupported");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session replay export endpoint serves retained persisted tails for unrestored sessions", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

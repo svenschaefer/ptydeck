@@ -9,6 +9,7 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     family: "bash",
     shellNames: Object.freeze(["bash"]),
     cwdTrackingSupported: true,
+    shellBlockTrackingSupported: true,
     cwdTrackingMode: "prompt_command_marker",
     fallbackBehavior: "n/a"
   }),
@@ -16,6 +17,7 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     family: "zsh",
     shellNames: Object.freeze(["zsh"]),
     cwdTrackingSupported: false,
+    shellBlockTrackingSupported: false,
     cwdTrackingMode: "unsupported",
     fallbackBehavior: "retain_last_known_cwd"
   }),
@@ -23,6 +25,7 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     family: "fish",
     shellNames: Object.freeze(["fish"]),
     cwdTrackingSupported: false,
+    shellBlockTrackingSupported: false,
     cwdTrackingMode: "unsupported",
     fallbackBehavior: "retain_last_known_cwd"
   }),
@@ -30,6 +33,7 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     family: "posix_sh",
     shellNames: Object.freeze(["sh", "dash", "ash", "busybox"]),
     cwdTrackingSupported: false,
+    shellBlockTrackingSupported: false,
     cwdTrackingMode: "unsupported",
     fallbackBehavior: "retain_last_known_cwd"
   }),
@@ -37,6 +41,7 @@ const SHELL_CWD_TRACKING_CAPABILITY_MATRIX = Object.freeze({
     family: "unknown",
     shellNames: Object.freeze([]),
     cwdTrackingSupported: false,
+    shellBlockTrackingSupported: false,
     cwdTrackingMode: "unsupported",
     fallbackBehavior: "retain_last_known_cwd"
   })
@@ -51,6 +56,7 @@ function cloneCapability(capability) {
     family: capability.family,
     shellNames: capability.shellNames.slice(),
     cwdTrackingSupported: capability.cwdTrackingSupported,
+    shellBlockTrackingSupported: capability.shellBlockTrackingSupported,
     cwdTrackingMode: capability.cwdTrackingMode,
     fallbackBehavior: capability.fallbackBehavior
   };
@@ -95,15 +101,31 @@ function consumeCwdMarkers(session, chunk) {
   const markerRegex = /__CWD__(.*?)__/g;
   let match = markerRegex.exec(dataForScan);
   let lastCwdCandidate = "";
+  let lastIndex = 0;
+  const cleanedParts = [];
+  const promptBoundaries = [];
   while (match) {
+    cleanedParts.push(dataForScan.slice(lastIndex, match.index));
     lastCwdCandidate = String(match[1] || "").trim();
+    let cursor = match.index + match[0].length;
+    if (dataForScan.startsWith("\r\n", cursor)) {
+      cursor += 2;
+    } else if (dataForScan[cursor] === "\n" || dataForScan[cursor] === "\r") {
+      cursor += 1;
+    }
+    promptBoundaries.push(cleanedParts.join("").length);
+    lastIndex = cursor;
     match = markerRegex.exec(dataForScan);
   }
+  cleanedParts.push(dataForScan.slice(lastIndex));
   if (lastCwdCandidate) {
     session.meta.cwd = lastCwdCandidate;
   }
 
-  return dataForScan.replace(/__CWD__(.*?)__\r?\n?/g, "");
+  return {
+    cleaned: cleanedParts.join(""),
+    promptBoundaries
+  };
 }
 
 function createUnsupportedShellAdapter(capability) {
@@ -113,7 +135,10 @@ function createUnsupportedShellAdapter(capability) {
       return { ...env };
     },
     consumeOutput(_session, chunk) {
-      return String(chunk || "");
+      return {
+        cleaned: String(chunk || ""),
+        promptBoundaries: []
+      };
     }
   };
 }

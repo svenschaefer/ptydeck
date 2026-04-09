@@ -24,6 +24,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   const settings = schema.find((entry) => entry.insertText === "settings");
   const deckSwitchAlias = schema.find((entry) => entry.insertText === "deck.switch");
   const sessionSwapAlias = schema.find((entry) => entry.insertText === "session.swap");
+  const ccpAlias = schema.find((entry) => entry.insertText === "ccp");
   const run = schema.find((entry) => entry.insertText === "run");
 
   assert.ok(deck);
@@ -39,6 +40,7 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.ok(settings);
   assert.ok(deckSwitchAlias);
   assert.ok(sessionSwapAlias);
+  assert.ok(ccpAlias);
   assert.ok(run);
   assert.equal(deck.summary, "/deck list|new|rename|switch|delete");
   assert.equal(
@@ -79,6 +81,21 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.deepEqual(run.usage, ["/run + newline-separated slash commands", "/cmd1 + newline + /cmd2"]);
   assert.equal(replay.subcommands.view.args, undefined);
   assert.equal(replay.subcommands.export.args, undefined);
+  assert.deepEqual(replay.subcommands.copy.args, [
+    { provider: "session-selector", optional: false },
+    { provider: "replay-slice-selector", optional: false }
+  ]);
+  assert.deepEqual(replay.subcommands.preview.args, [
+    { provider: "session-selector", optional: false },
+    { provider: "replay-slice-selector", optional: false }
+  ]);
+  assert.deepEqual(replay.subcommands.paste.args, [
+    { provider: "session-selector", optional: false },
+    { provider: "session-selector", optional: false },
+    { provider: "replay-slice-selector", optional: false }
+  ]);
+  assert.equal(ccpAlias.aliasOf, "/replay paste");
+  assert.deepEqual(ccpAlias.argsPrefix, ["paste"]);
   assert.equal(settings.subcommands.show.args, undefined);
   assert.deepEqual(settings.subcommands.startup.subcommands.cwd.usage, [
     "/settings startup cwd <path>",
@@ -102,13 +119,17 @@ test("command schema exposes declarative command metadata and distinct help/usag
   assert.equal(getSlashCommandUsage("workspace", "group"), "/workspace group list | /workspace group save <name> | /workspace group apply <group> | /workspace group rename <group> <name> | /workspace group delete <group> | /workspace group clear");
   assert.equal(getSlashCommandUsage("broadcast"), "/broadcast status | /broadcast off | /broadcast group [group]");
   assert.equal(getSlashCommandUsage("share"), "/share list | /share session | /share deck [deckSelector] | /share revoke <shareId>");
-  assert.equal(getSlashCommandUsage("replay"), "/replay view | /replay export | /replay copy");
+  assert.equal(
+    getSlashCommandUsage("replay"),
+    "/replay view | /replay export | /replay copy | /replay copy <sourceSelector> <sliceSelector> | /replay preview <sourceSelector> <sliceSelector> | /replay paste <sourceSelector> <targetSelector> <sliceSelector>"
+  );
   assert.equal(getSlashCommandUsage("transfer"), "/transfer upload [path] | /transfer download <path>");
   assert.equal(
     getSlashCommandUsage("settings"),
     "/settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
   );
   assert.equal(getSlashCommandUsage("deck.switch"), "/deck.switch <deckSelector>");
+  assert.equal(getSlashCommandUsage("ccp", "", ["replay"]), "/ccp <sourceSelector> <targetSelector> <sliceSelector>");
 });
 
 test("command schema formats command help text from declarative command summaries", () => {

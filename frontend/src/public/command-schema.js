@@ -476,13 +476,16 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
     insertText: "replay",
     label: "/replay",
     kind: "command",
-    description: "view, export, or copy the retained replay tail for a session",
-    example: "/replay view",
-    summary: "/replay view | /replay export | /replay copy",
+    description: "view retained replay tails or preview/copy/paste normalized replay excerpts",
+    example: "/replay preview 4 l:80",
+    summary: "/replay view | /replay export | /replay copy | /replay preview | /replay paste",
     usage: [
       "/replay view",
       "/replay export",
-      "/replay copy"
+      "/replay copy",
+      "/replay copy <sourceSelector> <sliceSelector>",
+      "/replay preview <sourceSelector> <sliceSelector>",
+      "/replay paste <sourceSelector> <targetSelector> <sliceSelector>"
     ],
     subcommands: {
       view: {
@@ -507,10 +510,34 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
         insertText: "copy",
         label: "/replay copy",
         kind: "subcommand",
-        description: "copy the retained replay tail to the clipboard",
-        example: "/replay copy",
+        description: "copy the retained replay tail or a normalized replay excerpt to the clipboard",
+        example: "/replay copy 4 l:80",
         key: "slash:replay:copy",
-        usage: "/replay copy"
+        usage: [
+          "/replay copy",
+          "/replay copy <sourceSelector> <sliceSelector>"
+        ],
+        args: [{ provider: "session-selector" }, { provider: "replay-slice-selector" }]
+      },
+      preview: {
+        insertText: "preview",
+        label: "/replay preview",
+        kind: "subcommand",
+        description: "preview a normalized replay excerpt from one source session",
+        example: "/replay preview 4 sp:2",
+        key: "slash:replay:preview",
+        usage: "/replay preview <sourceSelector> <sliceSelector>",
+        args: [{ provider: "session-selector" }, { provider: "replay-slice-selector" }]
+      },
+      paste: {
+        insertText: "paste",
+        label: "/replay paste",
+        kind: "subcommand",
+        description: "paste a normalized replay excerpt from one session into another session",
+        example: "/replay paste 4 3 sp:2",
+        key: "slash:replay:paste",
+        usage: "/replay paste <sourceSelector> <targetSelector> <sliceSelector>",
+        args: [{ provider: "session-selector" }, { provider: "session-selector" }, { provider: "replay-slice-selector" }]
       }
     }
   }),
@@ -1248,6 +1275,9 @@ const DEFAULT_SLASH_COMMAND_ALIAS_SOURCES = Object.freeze([
   { alias: "replay.view", command: "replay", subcommand: "view" },
   { alias: "replay.export", command: "replay", subcommand: "export" },
   { alias: "replay.copy", command: "replay", subcommand: "copy" },
+  { alias: "replay.preview", command: "replay", subcommand: "preview" },
+  { alias: "replay.paste", command: "replay", subcommand: "paste" },
+  { alias: "ccp", command: "replay", subcommand: "paste" },
   { alias: "transfer.upload", command: "transfer", subcommand: "upload" },
   { alias: "transfer.download", command: "transfer", subcommand: "download" },
   { alias: "settings.show", command: "settings", subcommand: "show" },
@@ -1364,7 +1394,7 @@ export function createSlashCommandRegistry(systemSlashCommands = []) {
       continue;
     }
     const targetKey = `${entry.canonicalCommand}:${entry.canonicalSubcommand || ""}`;
-    const list = aliasesByTarget.get(targetKey) || [];
+    const list = [...(aliasesByTarget.get(targetKey) || [])];
     list.push(entry);
     aliasesByTarget.set(targetKey, Object.freeze(list));
   }

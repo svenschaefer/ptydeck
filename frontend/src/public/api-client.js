@@ -349,6 +349,11 @@ export function createApiClient(baseUrl, options = {}) {
     async getSessionReplayExport(sessionId) {
       return request(`/sessions/${sessionId}/replay-export`);
     },
+    async getSessionReplayExcerpt(sessionId, slice) {
+      const params = new URLSearchParams();
+      params.set("slice", String(slice || "").trim());
+      return request(`/sessions/${sessionId}/replay-excerpt?${params.toString()}`);
+    },
     async downloadSessionFile(sessionId, path) {
       return request(`/sessions/${sessionId}/file-transfer/download`, withJson({ path }));
     },
