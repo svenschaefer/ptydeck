@@ -333,6 +333,57 @@ test("command-composer runtime controller surfaces reclaim UI when terminal past
   ]);
 });
 
+test("command-composer runtime controller records terminal paste observations after transport succeeds", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getState: () => ({
+      sessions: [
+        {
+          id: "s1",
+          name: "one",
+          inputSafetyProfile: {
+            autoContinueStalledPaste: true
+          }
+        }
+      ],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => true,
+    getSessionSendTerminator: () => "CR",
+    sendInputWithConfiguredTerminator: async (sendFn, sessionId, payload, mode) => {
+      calls.push(["send", sessionId, payload, mode]);
+      await sendFn(sessionId, payload);
+    },
+    apiSendInput: async (sessionId, payload) => calls.push(["api", sessionId, payload]),
+    normalizeSendTerminatorMode: (mode) => mode,
+    onTerminalPasteSubmitted: (session, payload, runtimeOptions) =>
+      calls.push(["observe", session.id, payload, runtimeOptions.submittedAt > 0]),
+    recordCommandSubmission: (sessionId, submission) => calls.push(["record", sessionId, submission.source, submission.text]),
+    setCommandPreview: (value) => calls.push(["preview", value]),
+    clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
+    clearError: () => calls.push(["clearError"]),
+    render: () => calls.push(["render"]),
+    debugLog: (event, payload) => calls.push(["debug", event, payload.activeSessionId || ""])
+  });
+
+  const result = await controller.submitTerminalPaste("s1", "echo hi\n");
+
+  assert.equal(result, true);
+  assert.deepEqual(calls, [
+    ["debug", "command.send.start", "s1"],
+    ["send", "s1", "echo hi\n", "CR"],
+    ["api", "s1", "echo hi\n"],
+    ["observe", "s1", "echo hi\n", true],
+    ["record", "s1", "paste", "echo hi\n"],
+    ["preview", ""],
+    ["clearSuggestions"],
+    ["clearError"],
+    ["debug", "command.send.ok", "s1"],
+    ["render"]
+  ]);
+});
+
 test("command-composer runtime controller retries a blocked send after control is reclaimed", async () => {
   const calls = [];
   const controller = createCommandComposerRuntimeController({
@@ -376,6 +427,47 @@ test("command-composer runtime controller retries a blocked send after control i
     ["history", "s1", "uname -a"],
     ["record", "s1", "input"],
     ["value", ""],
+    ["preview", ""],
+    ["clearSuggestions"],
+    ["clearError"],
+    ["debug", "command.send.ok", "s1"],
+    ["render"]
+  ]);
+});
+
+test("command-composer runtime controller sends only the configured terminator when continuing an observed paste", async () => {
+  const calls = [];
+  const controller = createCommandComposerRuntimeController({
+    getState: () => ({
+      sessions: [{ id: "s1", name: "one" }],
+      activeSessionId: "s1"
+    }),
+    isSessionActionBlocked: () => false,
+    canWriteToSession: () => true,
+    getSessionSendTerminator: () => "CRLF",
+    sendInputWithConfiguredTerminator: async (sendFn, sessionId, payload, mode) => {
+      calls.push(["send", sessionId, payload, mode]);
+      await sendFn(sessionId, payload);
+    },
+    apiSendInput: async (sessionId, payload) => calls.push(["api", sessionId, payload]),
+    normalizeSendTerminatorMode: (mode) => mode,
+    recordCommandSubmission: () => calls.push(["record"]),
+    recordSendHistory: () => calls.push(["history"]),
+    setCommandValue: (value) => calls.push(["value", value]),
+    setCommandPreview: (value) => calls.push(["preview", value]),
+    clearCommandSuggestions: () => calls.push(["clearSuggestions"]),
+    clearError: () => calls.push(["clearError"]),
+    render: () => calls.push(["render"]),
+    debugLog: (event, payload) => calls.push(["debug", event, payload.activeSessionId || ""])
+  });
+
+  const result = await controller.continueObservedPaste("s1", { activateTargetBeforeSend: true });
+
+  assert.equal(result, true);
+  assert.deepEqual(calls, [
+    ["debug", "command.send.start", "s1"],
+    ["send", "s1", "", "CRLF"],
+    ["api", "s1", ""],
     ["preview", ""],
     ["clearSuggestions"],
     ["clearError"],

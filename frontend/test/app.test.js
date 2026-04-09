@@ -429,6 +429,11 @@ function createTerminalCardTemplateNode() {
     tagName: "input"
   });
   inputSafetyConfirmMultiline.checked = false;
+  const inputSafetyAutoContinueStalledPaste = new FakeElement({
+    className: "session-input-safety-auto-continue-stalled-paste",
+    tagName: "input"
+  });
+  inputSafetyAutoContinueStalledPaste.checked = false;
   const inputSafetyConfirmRecentTarget = new FakeElement({
     className: "session-input-safety-confirm-recent-target-switch",
     tagName: "input"
@@ -515,6 +520,7 @@ function createTerminalCardTemplateNode() {
   inputSafetyGrid.appendChild(inputSafetyConfirmNaturalLanguage);
   inputSafetyGrid.appendChild(inputSafetyConfirmDangerous);
   inputSafetyGrid.appendChild(inputSafetyConfirmMultiline);
+  inputSafetyGrid.appendChild(inputSafetyAutoContinueStalledPaste);
   inputSafetyGrid.appendChild(inputSafetyConfirmRecentTarget);
   inputSafetyThresholdGrid.appendChild(inputSafetyTargetSwitchGrace);
   inputSafetyThresholdGrid.appendChild(inputSafetyPasteLength);
@@ -2969,6 +2975,7 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     confirmOnNaturalLanguageInput: false,
     confirmOnDangerousShellCommand: false,
     confirmOnMultilineInput: false,
+    autoContinueStalledPaste: false,
     confirmOnRecentTargetSwitch: false,
     targetSwitchGraceMs: 4000,
     pasteLengthConfirmThreshold: 400,

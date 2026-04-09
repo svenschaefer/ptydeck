@@ -67,6 +67,8 @@ export function createAppLifecycleController(options = {}) {
     typeof options.disposeCommandComposerAutocomplete === "function" ? options.disposeCommandComposerAutocomplete : () => {};
   const disposeSendHistoryRuntime =
     typeof options.disposeSendHistoryRuntime === "function" ? options.disposeSendHistoryRuntime : () => {};
+  const disposePasteObservationRuntime =
+    typeof options.disposePasteObservationRuntime === "function" ? options.disposePasteObservationRuntime : () => {};
   const disposeWorkflowRuntime =
     typeof options.disposeWorkflowRuntime === "function" ? options.disposeWorkflowRuntime : () => {};
   const disconnectTerminalObservers =
@@ -219,6 +221,7 @@ export function createAppLifecycleController(options = {}) {
     disposeCommandComposerRuntime();
     disposeCommandComposerAutocomplete();
     disposeSendHistoryRuntime();
+    disposePasteObservationRuntime();
     disposeWorkflowRuntime();
     disconnectTerminalObservers();
     disposeTerminals();

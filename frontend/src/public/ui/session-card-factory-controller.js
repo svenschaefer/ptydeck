@@ -52,6 +52,7 @@ export function createSessionCardFactoryController(options = {}) {
       ".session-input-safety-confirm-dangerous-shell-command"
     );
     const inputSafetyConfirmMultilineInput = node.querySelector(".session-input-safety-confirm-multiline-input");
+    const inputSafetyAutoContinueStalledPaste = node.querySelector(".session-input-safety-auto-continue-stalled-paste");
     const inputSafetyConfirmRecentTargetSwitch = node.querySelector(".session-input-safety-confirm-recent-target-switch");
     const inputSafetyTargetSwitchGraceMs = node.querySelector(".session-input-safety-target-switch-grace-ms");
     const inputSafetyPasteLengthConfirmThreshold = node.querySelector(".session-input-safety-paste-length-threshold");
@@ -82,6 +83,7 @@ export function createSessionCardFactoryController(options = {}) {
       confirmOnNaturalLanguageInput: inputSafetyConfirmNaturalLanguageInput,
       confirmOnDangerousShellCommand: inputSafetyConfirmDangerousShellCommand,
       confirmOnMultilineInput: inputSafetyConfirmMultilineInput,
+      autoContinueStalledPaste: inputSafetyAutoContinueStalledPaste,
       confirmOnRecentTargetSwitch: inputSafetyConfirmRecentTargetSwitch,
       targetSwitchGraceMs: inputSafetyTargetSwitchGraceMs,
       pasteLengthConfirmThreshold: inputSafetyPasteLengthConfirmThreshold,

@@ -34,6 +34,10 @@ export function createAppCommandUiFacadeController(options = {}) {
     typeof options.getTrustedLocalHandoffRuntimeController === "function"
       ? options.getTrustedLocalHandoffRuntimeController
       : () => null;
+  const getPasteObservationRuntimeController =
+    typeof options.getPasteObservationRuntimeController === "function"
+      ? options.getPasteObservationRuntimeController
+      : () => null;
   const getConnectionProfileRuntimeController =
     typeof options.getConnectionProfileRuntimeController === "function"
       ? options.getConnectionProfileRuntimeController
@@ -150,6 +154,7 @@ export function createAppCommandUiFacadeController(options = {}) {
     getWorkspaceManagerRuntimeController()?.render?.();
     getSendHistoryRuntimeController()?.render?.();
     getTrustedLocalHandoffRuntimeController()?.render?.();
+    getPasteObservationRuntimeController()?.render?.();
   }
 
   async function executeControlCommand(interpreted) {

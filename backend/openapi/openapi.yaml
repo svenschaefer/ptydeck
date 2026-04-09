@@ -2513,6 +2513,7 @@ components:
         - confirmOnNaturalLanguageInput
         - confirmOnDangerousShellCommand
         - confirmOnMultilineInput
+        - autoContinueStalledPaste
         - confirmOnRecentTargetSwitch
         - targetSwitchGraceMs
         - pasteLengthConfirmThreshold
@@ -2529,6 +2530,8 @@ components:
         confirmOnDangerousShellCommand:
           type: boolean
         confirmOnMultilineInput:
+          type: boolean
+        autoContinueStalledPaste:
           type: boolean
         confirmOnRecentTargetSwitch:
           type: boolean

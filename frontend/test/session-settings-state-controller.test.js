@@ -117,6 +117,7 @@ function createInputSafetyControls(overrides = {}) {
     confirmOnNaturalLanguageInput: { ...createInput(), checked: false, ...overrides.confirmOnNaturalLanguageInput },
     confirmOnDangerousShellCommand: { ...createInput(), checked: false, ...overrides.confirmOnDangerousShellCommand },
     confirmOnMultilineInput: { ...createInput(), checked: false, ...overrides.confirmOnMultilineInput },
+    autoContinueStalledPaste: { ...createInput(), checked: false, ...overrides.autoContinueStalledPaste },
     confirmOnRecentTargetSwitch: { ...createInput(), checked: false, ...overrides.confirmOnRecentTargetSwitch },
     targetSwitchGraceMs: createInput("4000"),
     pasteLengthConfirmThreshold: createInput("400"),
@@ -420,6 +421,7 @@ test("session-settings state controller syncs and reads explicit input safety co
       requireValidShellSyntax: true,
       confirmOnIncompleteShellConstruct: true,
       confirmOnDangerousShellCommand: true,
+      autoContinueStalledPaste: true,
       targetSwitchGraceMs: 2222
     }
   };
@@ -429,6 +431,7 @@ test("session-settings state controller syncs and reads explicit input safety co
   assert.equal(entry.inputSafetyControls.requireValidShellSyntax.checked, true);
   assert.equal(entry.inputSafetyControls.confirmOnIncompleteShellConstruct.checked, true);
   assert.equal(entry.inputSafetyControls.confirmOnDangerousShellCommand.checked, true);
+  assert.equal(entry.inputSafetyControls.autoContinueStalledPaste.checked, true);
   assert.equal(entry.inputSafetyControls.targetSwitchGraceMs.value, "2222");
 
   entry.inputSafetyControls.confirmOnNaturalLanguageInput.checked = true;
@@ -437,6 +440,7 @@ test("session-settings state controller syncs and reads explicit input safety co
   assert.equal(profile.confirmOnAnyInput, true);
   assert.equal(profile.requireValidShellSyntax, true);
   assert.equal(profile.confirmOnDangerousShellCommand, true);
+  assert.equal(profile.autoContinueStalledPaste, true);
   assert.equal(profile.confirmOnNaturalLanguageInput, true);
   assert.equal(profile.pasteLengthConfirmThreshold, 123);
 });

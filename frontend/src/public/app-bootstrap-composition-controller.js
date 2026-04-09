@@ -402,6 +402,11 @@ export function createAppBootstrapCompositionController(options = {}) {
       recordCommandSubmission: (sessionId, submission) => store?.recordSessionCommandSubmission?.(sessionId, submission),
       recordSendHistory: (sessionId, payload, runtimeOptions) =>
         sendHistoryRuntimeController?.recordSend?.(sessionId, payload, runtimeOptions),
+      onTerminalPasteSubmitted: (session, payload, runtimeOptions) =>
+        options.pasteObservationRuntimeController?.recordTerminalPaste?.(session?.id, payload, {
+          autoContinueEnabled: session?.inputSafetyProfile?.autoContinueStalledPaste === true,
+          ...runtimeOptions
+        }),
       normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
       delayedSubmitMs,
       setError: (message) => appCommandUiFacadeController?.setError?.(message),
@@ -460,6 +465,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       disposeCommandComposerRuntime: () => commandComposerRuntimeController?.dispose?.(),
       disposeCommandComposerAutocomplete: () => commandComposerAutocompleteController?.dispose?.(),
       disposeSendHistoryRuntime: () => sendHistoryRuntimeController?.dispose?.(),
+      disposePasteObservationRuntime: () => options.pasteObservationRuntimeController?.dispose?.(),
       disposeWorkflowRuntime,
       disconnectTerminalObservers: () => {
         for (const observer of terminalObservers.values()) {

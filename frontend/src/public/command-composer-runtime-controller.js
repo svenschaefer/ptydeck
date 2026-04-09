@@ -76,6 +76,8 @@ export function createCommandComposerRuntimeController(options = {}) {
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator || (() => Promise.resolve());
   const recordCommandSubmission = options.recordCommandSubmission || (() => null);
   const recordSendHistory = options.recordSendHistory || (() => null);
+  const onTerminalPasteSubmitted =
+    typeof options.onTerminalPasteSubmitted === "function" ? options.onTerminalPasteSubmitted : () => null;
   const normalizeSendTerminatorMode = options.normalizeSendTerminatorMode || ((mode) => mode);
   const delayedSubmitMs = Number(options.delayedSubmitMs) || 0;
   const setError = options.setError || (() => {});
@@ -316,19 +318,23 @@ export function createCommandComposerRuntimeController(options = {}) {
       });
       if (plan.source === "composer") {
         recordSendHistory(session.id, plan.targetPayload, { submittedAt });
+      } else if (plan.source === "paste") {
+        onTerminalPasteSubmitted(session, plan.targetPayload, { submittedAt });
       }
     }
 
-    for (const session of plan.targetSessions) {
-      recordCommandSubmission(session.id, {
-        source: plan.source === "paste" ? "paste" : "input",
-        text: plan.targetPayload,
-        submittedAt
-      });
+    if (plan.source !== "paste-continue") {
+      for (const session of plan.targetSessions) {
+        recordCommandSubmission(session.id, {
+          source: plan.source === "paste" ? "paste" : "input",
+          text: plan.targetPayload,
+          submittedAt
+        });
+      }
     }
 
     clearPendingSend({ renderAfterClear: false });
-    if (plan.source !== "paste") {
+    if (plan.source === "composer") {
       setCommandValue("");
     }
     setCommandPreview("");
@@ -581,11 +587,14 @@ export function createCommandComposerRuntimeController(options = {}) {
     const sessionId = String(action.sessionId || "").trim();
     const payload = String(action.payload || "");
     const kind = String(action.kind || "").trim().toLowerCase();
-    if (!sessionId || !payload || !["send", "paste"].includes(kind)) {
+    if (!sessionId || !["send", "paste", "paste-continue"].includes(kind)) {
+      return false;
+    }
+    if ((kind === "send" || kind === "paste") && !payload) {
       return false;
     }
     const plan = resolveSingleSessionPlan(sessionId, payload, {
-      source: kind === "paste" ? "paste" : "composer",
+      source: kind === "paste" ? "paste" : kind === "paste-continue" ? "paste-continue" : "composer",
       activateTargetBeforeSend: action.activateTargetBeforeSend === true,
       routeFeedback: String(action.routeFeedback || "")
     });
@@ -603,7 +612,50 @@ export function createCommandComposerRuntimeController(options = {}) {
       await executeSendPlan(plan);
       return true;
     } catch {
-      setError(kind === "paste" ? "Failed to paste into terminal." : "Failed to send command.");
+      setError(
+        kind === "paste"
+          ? "Failed to paste into terminal."
+          : kind === "paste-continue"
+            ? "Failed to continue terminal paste."
+            : "Failed to send command."
+      );
+      return false;
+    }
+  }
+
+  async function continueObservedPaste(sessionId, runtimeOptions = {}) {
+    const plan = resolveSingleSessionPlan(sessionId, "", {
+      source: "paste-continue",
+      activateTargetBeforeSend: runtimeOptions.activateTargetBeforeSend === true
+    });
+    if (!plan || plan.error) {
+      if (plan?.error) {
+        setCommandFeedback(plan.error);
+        if (plan.blockedSession) {
+          showBlockedWriteReclaimUi(plan.blockedSession, {
+            source: "paste-continue",
+            message: plan.error,
+            retryAction: {
+              kind: "paste-continue",
+              sessionId: plan.blockedSession.id,
+              payload: "",
+              activateTargetBeforeSend: true,
+              routeFeedback: ""
+            }
+          });
+        }
+      }
+      return false;
+    }
+    if (isReadOnlyMode()) {
+      setError(getReadOnlyModeMessage());
+      return false;
+    }
+    try {
+      await executeSendPlan(plan);
+      return true;
+    } catch {
+      setError("Failed to continue terminal paste.");
       return false;
     }
   }
@@ -703,6 +755,7 @@ export function createCommandComposerRuntimeController(options = {}) {
     confirmPendingSend,
     cancelPendingSend,
     retryBlockedAction,
+    continueObservedPaste,
     clearPendingSend,
     refreshCommandPreview,
     scheduleCommandPreview,

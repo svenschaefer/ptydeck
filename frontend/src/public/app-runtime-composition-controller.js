@@ -24,6 +24,7 @@ import { createSplitLayoutRuntimeController } from "./split-layout-runtime-contr
 import { createStartupBackupRuntimeController as defaultCreateStartupBackupRuntimeController } from "./startup-backup-runtime-controller.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createTraceDebugController } from "./trace-debug-controller.js";
+import { createPasteObservationRuntimeController } from "./paste-observation-runtime-controller.js";
 import { createTrustedLocalClientRuntimeController as defaultCreateTrustedLocalClientRuntimeController } from "./trusted-local-client-runtime-controller.js";
 import { createTrustedLocalHandoffRuntimeController } from "./trusted-local-handoff-runtime-controller.js";
 import { createTrustedLocalLayoutRuntimeController } from "./trusted-local-layout-runtime-controller.js";
@@ -277,6 +278,10 @@ const {
   commandGuardPreviewEl,
   commandGuardSendOnceBtn,
   commandGuardCancelBtn,
+  pasteObservationEl,
+  pasteObservationSummaryEl,
+  pasteObservationDetailEl,
+  pasteObservationContinueBtn,
   workflowRuntimePanelEl,
   workflowStatusEl,
   workflowTargetEl,
@@ -536,6 +541,7 @@ let sessionSettingsDialogController = null;
 let workspaceRenderController = null;
 let trustedLocalLayoutRuntimeController = null;
 let trustedLocalHandoffRuntimeController = null;
+let pasteObservationRuntimeController = null;
 let replayViewerRuntimeController = null;
 let commandPaletteRuntimeController = null;
 let controlPaneRuntimeController = null;
@@ -946,7 +952,7 @@ async function handleCommandFeedbackAction() {
   appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
   if (retryAction?.kind === "resize") {
     sessionTerminalResizeController?.applyResizeForSession?.(sessionId, { force: true });
-  } else if (retryAction?.kind === "send" || retryAction?.kind === "paste") {
+  } else if (retryAction?.kind === "send" || retryAction?.kind === "paste" || retryAction?.kind === "paste-continue") {
     await commandComposerRuntimeController?.retryBlockedAction?.(retryAction);
   } else {
     appCommandUiFacadeController?.setCommandFeedback?.(
@@ -1272,6 +1278,7 @@ appCommandUiFacadeController = createAppCommandUiFacadeController({
   getWorkspaceManagerRuntimeController: () => workspaceManagerRuntimeController,
   getSendHistoryRuntimeController: () => sendHistoryRuntimeController,
   getTrustedLocalHandoffRuntimeController: () => trustedLocalHandoffRuntimeController,
+  getPasteObservationRuntimeController: () => pasteObservationRuntimeController,
   getCommandExecutor: () => commandExecutor
 });
 
@@ -1641,6 +1648,25 @@ trustedLocalHandoffRuntimeController = createTrustedLocalHandoffRuntimeControlle
   requestRender: () => appCommandUiFacadeController?.render?.()
 });
 trustedLocalHandoffRuntimeController.bindUiEvents?.();
+
+pasteObservationRuntimeController = createPasteObservationRuntimeController({
+  windowRef: window,
+  panelEl: pasteObservationEl,
+  summaryEl: pasteObservationSummaryEl,
+  detailEl: pasteObservationDetailEl,
+  continueBtn: pasteObservationContinueBtn,
+  getActiveSession: () => {
+    const state = store.getState() || {};
+    const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+    return sessions.find((session) => session.id === state.activeSessionId) || null;
+  },
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  requestContinuePaste: (sessionId, runtimeOptions) =>
+    commandComposerRuntimeController?.continueObservedPaste?.(sessionId, runtimeOptions),
+  showCommandUi: () => controlPaneRuntimeController?.show?.()
+});
 
 broadcastInputRuntimeController = createBroadcastInputRuntimeController({
   getActiveDeckId: () => store.getState().activeDeckId || DEFAULT_DECK_ID,
@@ -2180,11 +2206,13 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   windowRef: window,
   documentRef: document,
   wsStateRef,
-  observeSessionData: (sessionId, data) =>
+  observeSessionData: (sessionId, data) => {
     streamDebugTraceController.record(sessionId, "ws.session.data", {
       chunk: data,
       hasTerminal: terminals.has(sessionId)
-    }),
+    });
+    pasteObservationRuntimeController?.observeSessionOutput?.(sessionId, data);
+  },
   createBtn,
   deckCreateBtn,
   startupWarmupSkipBtn,
@@ -2197,6 +2225,7 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   workspacePresetRuntimeController,
   workspaceManagerRuntimeController,
   sendHistoryRuntimeController,
+  pasteObservationRuntimeController,
   broadcastInputRuntimeController,
   sessionTerminalResizeController,
   appCommandUiFacadeController,

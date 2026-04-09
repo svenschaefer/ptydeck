@@ -189,6 +189,13 @@
                       <button id="command-guard-cancel" type="button">Cancel</button>
                     </div>
                   </section>
+                  <section id="paste-observation" class="paste-observation" hidden>
+                    <p id="paste-observation-summary" class="paste-observation-summary"></p>
+                    <p id="paste-observation-detail" class="paste-observation-detail"></p>
+                    <div class="paste-observation-actions">
+                      <button id="paste-observation-continue" type="button" hidden>Continue Paste</button>
+                    </div>
+                  </section>
                   <section id="workflow-runtime-panel" class="workflow-runtime-panel" hidden>
                     <div class="workflow-runtime-head">
                       <p class="workflow-runtime-title">Workflow</p>
@@ -803,6 +810,13 @@
                       <span class="session-input-safety-check-copy">
                         <span class="session-input-safety-check-title">Confirm multiline or large paste input</span>
                         <span class="session-input-safety-check-detail">Uses the line and character thresholds configured below.</span>
+                      </span>
+                    </label>
+                    <label class="session-input-safety-check">
+                      <input class="session-input-safety-auto-continue-stalled-paste" type="checkbox" />
+                      <span class="session-input-safety-check-copy">
+                        <span class="session-input-safety-check-title">Auto continue stalled terminal paste</span>
+                        <span class="session-input-safety-check-detail">Terminal-local paste only. Sends the configured terminator automatically after bounded partial-ack stall detection.</span>
                       </span>
                     </label>
                     <label class="session-input-safety-check">

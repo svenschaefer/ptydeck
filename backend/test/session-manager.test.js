@@ -10,6 +10,7 @@ const INPUT_SAFETY_PROFILE = {
   confirmOnNaturalLanguageInput: true,
   confirmOnDangerousShellCommand: false,
   confirmOnMultilineInput: true,
+  autoContinueStalledPaste: false,
   confirmOnRecentTargetSwitch: true,
   targetSwitchGraceMs: 2500,
   pasteLengthConfirmThreshold: 320,

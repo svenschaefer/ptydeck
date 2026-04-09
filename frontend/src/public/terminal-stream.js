@@ -96,8 +96,15 @@ const ANSI_ESCAPE_PATTERN =
   /(?:\u001b\][\s\S]*?(?:\u0007|\u001b\\)|\u001b[P^_X][\s\S]*?\u001b\\|[\u0090\u0098\u009e\u009f][\s\S]*?\u009c|\u009d[\s\S]*?(?:\u0007|\u009c)|\u001b\[[0-?]*[ -/]*[@-~]|\u009b[0-?]*[ -/]*[@-~]|\u001b[()#%][ -~]|\u001b[78=>]|\u001b[@-Z\\-_])/g;
 const NON_VISIBLE_PATTERN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}]/gu;
 
-function stripAnsiCodes(value) {
+export function stripAnsiCodes(value) {
   return String(value || "").replace(ANSI_ESCAPE_PATTERN, "");
+}
+
+export function normalizeVisibleTerminalText(value) {
+  return stripAnsiCodes(String(value || ""))
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "");
 }
 
 export function hasMeaningfulStreamActivity(chunk) {

@@ -7,6 +7,7 @@ export const SESSION_INPUT_SAFETY_PROFILE_BOOLEAN_KEYS = [
   "confirmOnNaturalLanguageInput",
   "confirmOnDangerousShellCommand",
   "confirmOnMultilineInput",
+  "autoContinueStalledPaste",
   "confirmOnRecentTargetSwitch"
 ];
 
@@ -28,6 +29,7 @@ export const DEFAULT_SESSION_INPUT_SAFETY_PROFILE = Object.freeze({
   confirmOnNaturalLanguageInput: false,
   confirmOnDangerousShellCommand: false,
   confirmOnMultilineInput: false,
+  autoContinueStalledPaste: false,
   confirmOnRecentTargetSwitch: false,
   targetSwitchGraceMs: SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS.targetSwitchGraceMs.defaultValue,
   pasteLengthConfirmThreshold: SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS.pasteLengthConfirmThreshold.defaultValue,
