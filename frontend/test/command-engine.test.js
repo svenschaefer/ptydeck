@@ -6,30 +6,34 @@ import { createCommandEngine, createCustomCommandRegistry } from "../src/public/
 function createEngineFixture(options = {}) {
   const registry = createCustomCommandRegistry();
   registry.upsert({ name: "Docu", content: "sync docs" });
-  const sessions = [
-    {
-      id: "sess-1-abcdef",
-      name: "alpha",
-      deckId: "default",
-      tags: ["ops"],
-      cwd: "~/alpha",
-      startCwd: "~/alpha",
-      env: { APP_ENV: "dev" }
-    },
-    {
-      id: "sess-2-fedcba",
-      name: "beta",
-      deckId: "ops",
-      tags: ["ops", "db"],
-      cwd: "~/ops",
-      startCwd: "~/ops",
-      env: { APP_ENV: "prod", DB_HOST: "db" }
-    }
-  ];
-  const decks = [
-    { id: "default", name: "Default" },
-    { id: "ops", name: "Ops" }
-  ];
+  const sessions = Array.isArray(options.sessions)
+    ? options.sessions
+    : [
+        {
+          id: "sess-1-abcdef",
+          name: "alpha",
+          deckId: "default",
+          tags: ["ops"],
+          cwd: "~/alpha",
+          startCwd: "~/alpha",
+          env: { APP_ENV: "dev" }
+        },
+        {
+          id: "sess-2-fedcba",
+          name: "beta",
+          deckId: "ops",
+          tags: ["ops", "db"],
+          cwd: "~/ops",
+          startCwd: "~/ops",
+          env: { APP_ENV: "prod", DB_HOST: "db" }
+        }
+      ];
+  const decks = Array.isArray(options.decks)
+    ? options.decks
+    : [
+        { id: "default", name: "Default" },
+        { id: "ops", name: "Ops" }
+      ];
   const themes = [
     { id: "ptydeck-default", name: "Ptydeck Default", category: "dark" },
     { id: "solarized-light", name: "Solarized Light", category: "light" }
@@ -232,4 +236,81 @@ test("command engine returns structured quick-switch autocomplete candidates", (
     crossDeckContext.matches.map((candidate) => candidate.insertText),
     ["2", "beta", "sess-2-fedcba"]
   );
+});
+
+test("command engine parses settings payloads, size arguments, and direct-route targets defensively", () => {
+  const engine = createEngineFixture();
+
+  assert.deepEqual(engine.parseSettingsPayload("{"), {
+    ok: false,
+    error: "Invalid JSON payload for /settings apply."
+  });
+  assert.deepEqual(engine.parseSettingsPayload("[]"), {
+    ok: false,
+    error: "Settings payload must be a JSON object."
+  });
+  assert.deepEqual(engine.parseSettingsPayload("{\"theme\":\"dark\"}"), {
+    ok: true,
+    payload: { theme: "dark" }
+  });
+
+  assert.deepEqual(engine.parseSizeCommandArgs(["c120", "r40"], 80, 20), {
+    ok: true,
+    cols: 120,
+    rows: 40
+  });
+  assert.deepEqual(engine.parseSizeCommandArgs(["c999"], 80, 20), {
+    ok: false,
+    error: "Columns must be between 20 and 400."
+  });
+
+  assert.deepEqual(engine.parseDirectTargetRoutingInput("@ops::beta /note needs review"), {
+    matched: true,
+    targetToken: "ops::beta",
+    payload: "/note needs review"
+  });
+  assert.deepEqual(engine.parseDirectTargetRoutingInput("@ops"), {
+    matched: false,
+    targetToken: "",
+    payload: ""
+  });
+});
+
+test("command engine reports ambiguous quick-switch and malformed filter deck selectors explicitly", () => {
+  const engine = createEngineFixture({
+    sessions: [
+      {
+        id: "sess-1-abcdef",
+        name: "ops",
+        deckId: "default",
+        tags: ["ops"],
+        cwd: "~/alpha",
+        startCwd: "~/alpha",
+        env: { APP_ENV: "dev" }
+      }
+    ],
+    decks: [
+      { id: "default", name: "Default" },
+      { id: "ops", name: "Ops" }
+    ]
+  });
+
+  assert.equal(
+    engine.resolveQuickSwitchTarget("ops").error,
+    "Ambiguous quick-switch target: 'ops' matches both a session and a deck. Use 'deck:ops' for the deck target."
+  );
+  assert.deepEqual(engine.resolveFilterSelectors("deck:", engine.resolveTargetSelectors("*", [
+    {
+      id: "sess-1-abcdef",
+      name: "ops",
+      deckId: "default",
+      tags: ["ops"],
+      cwd: "~/alpha",
+      startCwd: "~/alpha",
+      env: { APP_ENV: "dev" }
+    }
+  ]).sessions), {
+    sessions: [],
+    error: "Deck selector must be 'deck:<deckSelector>'."
+  });
 });

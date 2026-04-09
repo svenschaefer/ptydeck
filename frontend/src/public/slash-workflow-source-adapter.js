@@ -2,6 +2,15 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+const KNOWN_WORKFLOW_SOURCES = new Set([
+  "status",
+  "summary",
+  "exit-code",
+  "session-state",
+  "line",
+  "visible-line"
+]);
+
 function createSourceError(code, message, details = {}) {
   const error = new Error(message);
   error.name = "SlashWorkflowSourceAdapterError";
@@ -138,6 +147,13 @@ export function createSlashWorkflowSourceAdapter(options = {}) {
   }
 
   function assertSourceAvailable(sessionId, source) {
+    const normalizedSource = normalizeText(source).toLowerCase();
+    if (!KNOWN_WORKFLOW_SOURCES.has(normalizedSource)) {
+      throw createSourceError("workflow.source_unavailable", `Workflow source '${normalizedSource}' is not available.`, {
+        source: normalizedSource,
+        sessionId
+      });
+    }
     if (!sessionId) {
       throw createSourceError(
         "workflow.target_required",
@@ -148,19 +164,19 @@ export function createSlashWorkflowSourceAdapter(options = {}) {
     const session = getSessionById(snapshot, sessionId);
     if (!session) {
       throw createSourceError("workflow.source_unavailable", `Workflow source '${source}' has no live session target.`, {
-        source,
+        source: normalizedSource,
         sessionId
       });
     }
-    if (!isTerminalBoundSource(source)) {
+    if (!isTerminalBoundSource(normalizedSource)) {
       return;
     }
     if (!getTerminalEntry(sessionId)?.terminal) {
       throw createSourceError(
         "workflow.source_unavailable",
-        `Workflow source '${source}' requires a mounted terminal buffer for [${sessionId}].`,
+        `Workflow source '${normalizedSource}' requires a mounted terminal buffer for [${sessionId}].`,
         {
-          source,
+          source: normalizedSource,
           sessionId
         }
       );

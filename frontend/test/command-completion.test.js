@@ -23,6 +23,18 @@ test("completion candidates normalize and format with metadata", () => {
   assert.match(formatCompletionSuggestionLine(candidate, "/", true), /> \/switch  \[command\]/);
 });
 
+test("completion normalization rejects empty candidates and preserves string defaults", () => {
+  assert.equal(normalizeCompletionCandidate(""), null);
+  assert.equal(normalizeCompletionCandidate(null), null);
+
+  const candidate = normalizeCompletionCandidate("switch", {
+    kind: "command",
+    replacePrefix: "/"
+  });
+  assert.equal(candidate.kind, "command");
+  assert.equal(candidate.previewText, "/switch");
+});
+
 test("completion candidate equality is structural", () => {
   const left = [{ insertText: "show", label: "/custom show", kind: "subcommand" }];
   const right = [{ insertText: "show", label: "/custom show", kind: "subcommand" }];
@@ -82,6 +94,7 @@ test("suggestion provider registry yields bounded contextual candidates and isol
   assert.ok(registry.provide("theme-selector", "solar").length > 0);
   assert.ok(registry.provide("session-selector", "").length <= 48);
   assert.deepEqual(registry.provide("failing", ""), []);
+  assert.deepEqual(registry.provide("unknown-provider", ""), []);
 });
 
 test("suggestion provider registry exposes scoped custom-command references deterministically", () => {
@@ -109,4 +122,33 @@ test("suggestion provider registry exposes scoped custom-command references dete
 
   const unique = registry.provide("custom-command-reference", "sy");
   assert.equal(unique[0]?.insertText, "sync");
+});
+
+test("suggestion provider registry includes wildcard, explicit deck selectors, and whitespace names when requested", () => {
+  const sessions = [
+    { id: "s1", name: "db shell", deckId: "default", tags: ["ops"] },
+    { id: "s2", name: "ops", deckId: "ops", tags: ["build"] }
+  ];
+  const decks = [
+    { id: "default", name: "Default" },
+    { id: "ops", name: "Ops" }
+  ];
+  const registry = createSuggestionProviderRegistry({
+    getSessions: () => sessions,
+    getDecks: () => decks,
+    getSessionToken: (id) => (id === "s1" ? "1" : "2"),
+    getSessionDisplayName: (session) => session.name
+  });
+
+  const multiTarget = registry.provide("multi-target-selector", "", {
+    includeExplicitPrefix: true
+  });
+  assert.equal(multiTarget[0]?.insertText, "*");
+  assert.ok(multiTarget.some((candidate) => candidate.insertText === "deck:ops"));
+  assert.ok(!registry.provide("session-selector", "").some((candidate) => candidate.insertText === "db shell"));
+  assert.ok(
+    registry
+      .provide("quick-switch-target", "db", { includeNamesWithWhitespace: true })
+      .some((candidate) => candidate.insertText === "db shell")
+  );
 });

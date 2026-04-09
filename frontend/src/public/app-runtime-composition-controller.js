@@ -71,7 +71,8 @@ const {
   windowRef = globalThis.window,
   documentRef = globalThis.document,
   createStartupBackupRuntimeController: createStartupBackupRuntimeControllerOption,
-  createTrustedLocalClientRuntimeController: createTrustedLocalClientRuntimeControllerOption
+  createTrustedLocalClientRuntimeController: createTrustedLocalClientRuntimeControllerOption,
+  testHooks = null
 } = options;
 const window = windowRef;
 const document = documentRef;
@@ -940,30 +941,99 @@ async function handleCommandFeedbackAction() {
     return false;
   }
   const session = appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null;
+  const retryAction = commandFeedbackActionMeta?.retryAction || null;
+  const completeAction = async (feedbackMessage = "") => {
+    commandFeedbackActionMeta = null;
+    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
+    if (retryAction?.kind === "resize") {
+      sessionTerminalResizeController?.applyResizeForSession?.(sessionId, { force: true });
+    } else if (retryAction?.kind === "send" || retryAction?.kind === "paste" || retryAction?.kind === "paste-continue") {
+      await commandComposerRuntimeController?.retryBlockedAction?.(retryAction);
+    } else if (feedbackMessage) {
+      appCommandUiFacadeController?.setCommandFeedback?.(feedbackMessage);
+    }
+    appRuntimeStateController?.clearError?.();
+    return true;
+  };
+  if (canWriteToSession(session)) {
+    return completeAction(
+      `This device already controls [${
+        appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
+      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
+    );
+  }
   if (!canTakeSessionControl(session)) {
     commandFeedbackActionMeta = null;
     appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
     throw new Error(getSessionWriteBlockMessage(session) || "This session cannot be controlled from this device.");
   }
   const reclaiming = getCurrentSessionController(session)?.active !== true;
-  const retryAction = commandFeedbackActionMeta?.retryAction || null;
   await trustedLocalHandoffRuntimeController?.takeControlScope?.("session", { sessionId });
-  commandFeedbackActionMeta = null;
-  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-  if (retryAction?.kind === "resize") {
-    sessionTerminalResizeController?.applyResizeForSession?.(sessionId, { force: true });
-  } else if (retryAction?.kind === "send" || retryAction?.kind === "paste" || retryAction?.kind === "paste-continue") {
-    await commandComposerRuntimeController?.retryBlockedAction?.(retryAction);
-  } else {
-    appCommandUiFacadeController?.setCommandFeedback?.(
-      `${reclaiming ? "Reclaimed" : "Took"} control of [${
-        appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
-      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
-    );
-  }
-  appRuntimeStateController?.clearError?.();
-  return true;
+  return completeAction(
+    retryAction
+      ? ""
+      : `${reclaiming ? "Reclaimed" : "Took"} control of [${
+          appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
+        }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
+  );
 }
+
+function installTestHooks() {
+  if (!testHooks || typeof testHooks !== "object") {
+    return;
+  }
+  Object.assign(testHooks, {
+    uiState,
+    setAccessState,
+    setRuntimeClientId,
+    setTrustedLocalClientLabel(label) {
+      trustedLocalClientLabel = normalizeControlText(label);
+    },
+    getInitializationErrorMessage: () => initializationErrorMessage,
+    getSessionWriteBlockMessage,
+    getTakeOrReclaimControlLabel,
+    showBlockedWriteReclaimUi,
+    handleCommandFeedbackAction,
+    getCommandFeedbackActionMeta: () => commandFeedbackActionMeta,
+    setCommandFeedbackActionSessionId(sessionId) {
+      uiState.commandFeedbackActionSessionId = normalizeControlText(sessionId);
+    },
+    setCommandFeedbackActionMeta(meta) {
+      commandFeedbackActionMeta =
+        meta && typeof meta === "object" && !Array.isArray(meta)
+          ? { ...meta }
+          : null;
+    },
+    setCollaborators(overrides = {}) {
+      if (!overrides || typeof overrides !== "object") {
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "appSessionRuntimeFacadeController")) {
+        appSessionRuntimeFacadeController = overrides.appSessionRuntimeFacadeController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "appRuntimeStateController")) {
+        appRuntimeStateController = overrides.appRuntimeStateController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "appCommandUiFacadeController")) {
+        appCommandUiFacadeController = overrides.appCommandUiFacadeController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "trustedLocalHandoffRuntimeController")) {
+        trustedLocalHandoffRuntimeController = overrides.trustedLocalHandoffRuntimeController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "commandComposerRuntimeController")) {
+        commandComposerRuntimeController = overrides.commandComposerRuntimeController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "sessionTerminalResizeController")) {
+        sessionTerminalResizeController = overrides.sessionTerminalResizeController;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "controlPaneRuntimeController")) {
+        controlPaneRuntimeController = overrides.controlPaneRuntimeController;
+      }
+    }
+  });
+}
+
+installTestHooks();
 
 function clearNodeChildren(node) {
   if (!node) {

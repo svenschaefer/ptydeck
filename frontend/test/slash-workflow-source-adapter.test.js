@@ -108,3 +108,37 @@ test("workflow source adapter reports missing terminal-backed sources explicitly
     (error) => error?.code === "workflow.source_unavailable"
   );
 });
+
+test("workflow source adapter fails fast for unknown sources and missing session targets", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running", lifecycleState: "running", statusText: "ready" }]);
+  const adapter = createSlashWorkflowSourceAdapter({
+    store,
+    getTerminalEntry: () => ({
+      terminal: createTerminal(["ready"])
+    })
+  });
+
+  assert.throws(
+    () => adapter.resolveSubscription("s1", "mystery-source"),
+    (error) =>
+      error?.code === "workflow.source_unavailable" &&
+      error?.source === "mystery-source" &&
+      error?.sessionId === "s1"
+  );
+  assert.throws(
+    () => adapter.resolveSubscription("", "status"),
+    (error) => error?.code === "workflow.target_required"
+  );
+});
+
+test("workflow source adapter ignores non-function listeners and returns a safe unsubscribe", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running", lifecycleState: "running", statusText: "ready" }]);
+  const adapter = createSlashWorkflowSourceAdapter({ store });
+
+  const unsubscribe = adapter.resolveSubscription("s1", "status")(null);
+
+  assert.equal(typeof unsubscribe, "function");
+  assert.doesNotThrow(() => unsubscribe());
+});

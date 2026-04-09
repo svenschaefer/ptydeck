@@ -308,6 +308,61 @@ test("command executor manages share links through shared runtime hooks", async 
   );
 });
 
+test("command executor reports empty share lists explicitly", async () => {
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [{ id: "s-1", deckId: "default", name: "one" }],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s-1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["share", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: (session) => String(session?.deckId || "default"),
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => String(session?.name || ""),
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    listShares: async () => []
+  });
+
+  assert.equal(
+    await executor.execute({ command: "share", args: ["list"], raw: "/share list" }),
+    "No share links available."
+  );
+});
+
 test("command executor resolves namespaced aliases through the canonical command path", async () => {
   const deckCalls = [];
   const executor = createCommandExecutor({
@@ -2072,6 +2127,78 @@ test("command executor routes the ccp alias through replay paste and preserves b
   assert.equal(feedback, "This session is currently controlled by another client.");
 });
 
+test("command executor reports unavailable replay paste paths directly", async () => {
+  const sessions = [
+    { id: "s1", name: "source", deckId: "default" },
+    { id: "s2", name: "target", deckId: "default" }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {},
+    systemSlashCommands: ["replay", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => sessions.length,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => (id === "s1" ? "7" : "8"),
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) => ({
+      sessions: sessions.filter((session) => selector === "7" ? session.id === "s1" : session.id === "s2"),
+      error: ""
+    }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {},
+    loadSessionReplayExcerpt: async () => ({
+      data: "build output",
+      selector: "l:20",
+      selectorKind: "lines",
+      resolvedCount: 20,
+      availableCount: 20,
+      selectorSatisfied: true,
+      chars: 12,
+      lines: 1,
+      meta: { truncated: false }
+    })
+  });
+
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["paste", "7", "8", "l:20"], raw: "/replay paste 7 8 l:20" }),
+    "Replay paste path is unavailable."
+  );
+});
+
 test("command executor applies explicit input safety profiles through settings payloads", async () => {
   const calls = [];
   const sessions = [{ id: "s1", name: "one", deckId: "default" }];
@@ -2355,6 +2482,77 @@ test("command executor applies typed theme, mouse forwarding, and input safety s
   assert.equal(calls[4][0], "patch");
   assert.equal(calls[4][1], "s1");
   assert.equal(calls[4][2].inputSafetyProfile.requireValidShellSyntax, true);
+});
+
+test("command executor rejects invalid typed input safety values", async () => {
+  const sessions = [{ id: "s1", name: "one", deckId: "default", inputSafetyProfile: {} }];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession() {
+        throw new Error("Invalid input safety values should not patch sessions.");
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions, error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions, error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["input-safety", "set", "syntax", "maybe"],
+      raw: "/settings input-safety set syntax maybe"
+    }),
+    "Invalid boolean value: maybe"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["input-safety", "set", "paste-lines", "-1"],
+      raw: "/settings input-safety set paste-lines -1"
+    }),
+    "Invalid numeric value: -1"
+  );
 });
 
 test("command executor records correlated custom-command submissions per target session", async () => {
