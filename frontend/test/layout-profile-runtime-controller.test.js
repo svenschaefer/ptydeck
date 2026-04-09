@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   createLayoutProfileRuntimeController,
+  normalizeLayoutProfileRecord,
   resolveLayoutProfileToken
 } from "../src/public/layout-profile-runtime-controller.js";
 
@@ -171,6 +172,77 @@ test("resolveLayoutProfileToken rejects ambiguous profile prefixes deterministic
   const resolved = resolveLayoutProfileToken(profiles, "ops");
   assert.equal(resolved.profile, null);
   assert.match(resolved.error, /Ambiguous layout profile 'ops'/);
+});
+
+test("normalizeLayoutProfileRecord filters malformed terminal settings and split-layout branches", () => {
+  const normalized = normalizeLayoutProfileRecord({
+    id: " ops ",
+    name: " Ops Layout ",
+    createdAt: "bad",
+    updatedAt: 7,
+    layout: {
+      activeDeckId: " dev ",
+      controlPanePosition: "left",
+      controlPaneSize: "500",
+      deckTerminalSettings: {
+        dev: { cols: 120, rows: 40 },
+        broken: { cols: "wide", rows: 20 },
+        "": { cols: 80, rows: 24 }
+      },
+      deckSplitLayouts: {
+        dev: {
+          root: {
+            type: "column",
+            children: [
+              { type: "pane", paneId: " Main " },
+              { type: "pane", paneId: "" },
+              {
+                type: "row",
+                children: [{ type: "pane", paneId: "side" }]
+              }
+            ],
+            weights: [3, -1, 0]
+          },
+          paneSessions: {
+            main: ["s-1", "s-1", "s-2"],
+            side: ["s-3"],
+            ghost: ["s-4"]
+          }
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(normalized, {
+    id: "ops",
+    name: "Ops Layout",
+    createdAt: 0,
+    updatedAt: 7,
+    layout: {
+      activeDeckId: "dev",
+      sidebarVisible: true,
+      sessionFilterText: "",
+      controlPaneVisible: true,
+      controlPanePosition: "left",
+      controlPaneSize: 500,
+      deckTerminalSettings: {
+        dev: { cols: 120, rows: 40 }
+      },
+      deckSplitLayouts: {
+        dev: {
+          root: {
+            type: "column",
+            children: [{ type: "pane", paneId: "main" }, { type: "pane", paneId: "side" }],
+            weights: [0.5, 0.5]
+          },
+          paneSessions: {
+            main: ["s-1", "s-2"],
+            side: ["s-3"]
+          }
+        }
+      }
+    }
+  });
 });
 
 test("layout profile runtime controller loads, saves, renames, and deletes profiles", async () => {

@@ -830,6 +830,67 @@ test("session-terminal-runtime controller falls back to reading clipboard text w
   assert.equal(entry.terminal.focusCalls, 1);
 });
 
+test("session-terminal-runtime controller swallows clipboard-read failures for empty paste payloads", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => {
+      throw new Error("Clipboard unavailable.");
+    }
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const pasteEvent = createClipboardPasteEvent("");
+  refs.mount.helperTextarea.dispatchEvent(pasteEvent);
+  await Promise.resolve();
+
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, []);
+  assert.equal(entry.terminal.focusCalls, 0);
+});
+
 test("session-terminal-runtime controller bridges scrollbar gutter drag to the xterm viewport", () => {
   const windowRef = new FakeWindowEventTarget();
   const controller = createSessionTerminalRuntimeController({

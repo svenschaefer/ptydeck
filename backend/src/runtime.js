@@ -520,53 +520,53 @@ function route(pathname, method) {
 
   const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
   if (getSessionMatch && method === "GET") {
-    return { kind: "getSession", params: { sessionId: getSessionMatch[1] } };
+    return { kind: "getSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
   }
   if (getSessionMatch && method === "PATCH") {
-    return { kind: "updateSession", params: { sessionId: getSessionMatch[1] } };
+    return { kind: "updateSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
   }
   if (getSessionMatch && method === "DELETE") {
-    return { kind: "deleteSession", params: { sessionId: getSessionMatch[1] } };
+    return { kind: "deleteSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
   }
 
   const inputMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/input$/);
   if (inputMatch && method === "POST") {
-    return { kind: "input", params: { sessionId: inputMatch[1] } };
+    return { kind: "input", params: { sessionId: decodePathParam(inputMatch[1], "sessionId") } };
   }
 
   const swapQuickIdMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/swap-quick-id$/);
   if (swapQuickIdMatch && method === "POST") {
-    return { kind: "swapSessionQuickId", params: { sessionId: swapQuickIdMatch[1] } };
+    return { kind: "swapSessionQuickId", params: { sessionId: decodePathParam(swapQuickIdMatch[1], "sessionId") } };
   }
 
   const replayExportMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);
   if (replayExportMatch && method === "GET") {
-    return { kind: "getSessionReplayExport", params: { sessionId: replayExportMatch[1] } };
+    return { kind: "getSessionReplayExport", params: { sessionId: decodePathParam(replayExportMatch[1], "sessionId") } };
   }
 
   const replayExcerptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-excerpt$/);
   if (replayExcerptMatch && method === "GET") {
-    return { kind: "getSessionReplayExcerpt", params: { sessionId: replayExcerptMatch[1] } };
+    return { kind: "getSessionReplayExcerpt", params: { sessionId: decodePathParam(replayExcerptMatch[1], "sessionId") } };
   }
 
   const fileTransferUploadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/upload$/);
   if (fileTransferUploadMatch && method === "POST") {
-    return { kind: "uploadSessionFile", params: { sessionId: fileTransferUploadMatch[1] } };
+    return { kind: "uploadSessionFile", params: { sessionId: decodePathParam(fileTransferUploadMatch[1], "sessionId") } };
   }
 
   const fileTransferDownloadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/download$/);
   if (fileTransferDownloadMatch && method === "POST") {
-    return { kind: "downloadSessionFile", params: { sessionId: fileTransferDownloadMatch[1] } };
+    return { kind: "downloadSessionFile", params: { sessionId: decodePathParam(fileTransferDownloadMatch[1], "sessionId") } };
   }
 
   const resizeMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
   if (resizeMatch && method === "POST") {
-    return { kind: "resize", params: { sessionId: resizeMatch[1] } };
+    return { kind: "resize", params: { sessionId: decodePathParam(resizeMatch[1], "sessionId") } };
   }
 
   const takeControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/take$/);
   if (takeControlMatch && method === "POST") {
-    return { kind: "takeSessionControl", params: { sessionId: takeControlMatch[1] } };
+    return { kind: "takeSessionControl", params: { sessionId: decodePathParam(takeControlMatch[1], "sessionId") } };
   }
 
   if (pathname === "/api/v1/session-control/take" && method === "POST") {
@@ -575,42 +575,48 @@ function route(pathname, method) {
 
   const releaseControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/release$/);
   if (releaseControlMatch && method === "POST") {
-    return { kind: "releaseSessionControl", params: { sessionId: releaseControlMatch[1] } };
+    return { kind: "releaseSessionControl", params: { sessionId: decodePathParam(releaseControlMatch[1], "sessionId") } };
   }
 
   const transferControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/transfer$/);
   if (transferControlMatch && method === "POST") {
-    return { kind: "transferSessionControl", params: { sessionId: transferControlMatch[1] } };
+    return { kind: "transferSessionControl", params: { sessionId: decodePathParam(transferControlMatch[1], "sessionId") } };
   }
 
   const renameControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/rename-client$/);
   if (renameControlClientMatch && method === "POST") {
-    return { kind: "renameSessionControlClient", params: { sessionId: renameControlClientMatch[1] } };
+    return {
+      kind: "renameSessionControlClient",
+      params: { sessionId: decodePathParam(renameControlClientMatch[1], "sessionId") }
+    };
   }
 
   const forgetControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/forget-client$/);
   if (forgetControlClientMatch && method === "POST") {
-    return { kind: "forgetSessionControlClient", params: { sessionId: forgetControlClientMatch[1] } };
+    return {
+      kind: "forgetSessionControlClient",
+      params: { sessionId: decodePathParam(forgetControlClientMatch[1], "sessionId") }
+    };
   }
 
   const restartMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
   if (restartMatch && method === "POST") {
-    return { kind: "restart", params: { sessionId: restartMatch[1] } };
+    return { kind: "restart", params: { sessionId: decodePathParam(restartMatch[1], "sessionId") } };
   }
 
   const interruptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/interrupt$/);
   if (interruptMatch && method === "POST") {
-    return { kind: "interrupt", params: { sessionId: interruptMatch[1] } };
+    return { kind: "interrupt", params: { sessionId: decodePathParam(interruptMatch[1], "sessionId") } };
   }
 
   const terminateMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/terminate$/);
   if (terminateMatch && method === "POST") {
-    return { kind: "terminate", params: { sessionId: terminateMatch[1] } };
+    return { kind: "terminate", params: { sessionId: decodePathParam(terminateMatch[1], "sessionId") } };
   }
 
   const killMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/kill$/);
   if (killMatch && method === "POST") {
-    return { kind: "kill", params: { sessionId: killMatch[1] } };
+    return { kind: "kill", params: { sessionId: decodePathParam(killMatch[1], "sessionId") } };
   }
 
   return { kind: "notFound" };

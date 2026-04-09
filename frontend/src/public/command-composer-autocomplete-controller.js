@@ -224,8 +224,13 @@ export function createCommandComposerAutocompleteController(options = {}) {
       return null;
     }
     const currentValue = String(commandInput.value || "");
-    const start = Number.isInteger(commandInput.selectionStart) ? commandInput.selectionStart : 0;
-    const end = Number.isInteger(commandInput.selectionEnd) ? commandInput.selectionEnd : start;
+    const currentLength = currentValue.length;
+    const rawStart = Number.isInteger(commandInput.selectionStart) ? commandInput.selectionStart : 0;
+    const rawEnd = Number.isInteger(commandInput.selectionEnd) ? commandInput.selectionEnd : rawStart;
+    const boundedStart = Math.min(Math.max(rawStart, 0), currentLength);
+    const boundedEnd = Math.min(Math.max(rawEnd, 0), currentLength);
+    const start = Math.min(boundedStart, boundedEnd);
+    const end = Math.max(boundedStart, boundedEnd);
     return {
       start,
       end,

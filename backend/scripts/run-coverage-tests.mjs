@@ -8,6 +8,7 @@ const testDir = join(rootDir, "test");
 const excluded = new Set([
   "contract-conformance.test.js",
   "nonfunctional.load.test.js",
+  "runtime.request-seams.test.js",
   "runtime.integration.test.js",
   "ws.integration.test.js"
 ]);

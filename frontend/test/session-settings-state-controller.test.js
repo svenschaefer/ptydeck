@@ -547,3 +547,46 @@ test("session-settings state controller surfaces invalid startup parsing feedbac
   assert.equal(startup.tagResult.ok, false);
   assert.equal(startup.sendTerminator, "auto");
 });
+
+test("session-settings state controller marks changed send terminators as dirty", () => {
+  const session = {
+    id: "s1",
+    note: "",
+    inputSafetyProfile: {}
+  };
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    parseSessionEnv: () => ({ ok: true, env: {} }),
+    parseSessionTags: () => ({ ok: true, tags: [] }),
+    normalizeSessionStartupFromSession: () => ({
+      startCwd: "",
+      startCommand: "",
+      env: {},
+      tags: [],
+      mouseForwardingMode: "off"
+    }),
+    getSessionSendTerminator: () => "auto"
+  });
+
+  const entry = {
+    themeSlotSelect: createInput("active"),
+    startCwdInput: createInput(""),
+    startCommandInput: createInput(""),
+    startEnvInput: createInput(""),
+    mouseForwardingModeSelect: createInput("off"),
+    sessionNoteInput: createInput(""),
+    sessionTagsInput: createInput(""),
+    sessionSendTerminatorSelect: createInput("cr"),
+    inputSafetyControls: createInputSafetyControls(),
+    themeInputs: {
+      background: createInput("#000000"),
+      foreground: createInput("#ffffff")
+    }
+  };
+
+  assert.equal(controller.isSessionSettingsDirty(entry, session), true);
+});

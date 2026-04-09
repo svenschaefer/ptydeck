@@ -746,3 +746,91 @@ test("app-runtime composition controller takes control and replays resize retrie
   assert.deepEqual(resizeCalls, [["s-1", { force: true }]]);
   assert.equal(clearErrorCalls, 1);
 });
+
+test("app-runtime composition controller exposes reclaim badge and summary for reconnect-reserved sessions", () => {
+  const harness = createControllerHarness();
+  const session = {
+    id: "s-1",
+    controlState: {
+      currentController: {
+        clientId: "client-remote",
+        active: false,
+        label: "Desktop"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          active: true,
+          accessMode: "operator",
+          label: "Laptop"
+        },
+        {
+          clientId: "client-remote",
+          active: false,
+          accessMode: "operator",
+          label: "Desktop"
+        }
+      ]
+    }
+  };
+
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.setTrustedLocalClientLabel("Laptop");
+
+  assert.deepEqual(harness.hooks.getSessionControlBadgeState(session), {
+    label: "RECLAIM",
+    tone: "owner",
+    title: "Another device is reconnecting. This browser client can reclaim control."
+  });
+  assert.equal(
+    harness.hooks.getSessionControlSummary(session),
+    "Control is reserved for reconnecting device Desktop. Laptop can reclaim it."
+  );
+});
+
+test("app-runtime composition controller renders transfer and forget actions for trusted-local device rows", () => {
+  const harness = createControllerHarness();
+  const container = new FakeElement({ className: "session-control-clients" });
+  const session = {
+    id: "s-1",
+    controlState: {
+      currentController: {
+        clientId: "client-local",
+        active: true,
+        label: "Laptop"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          active: true,
+          accessMode: "operator",
+          label: "Laptop"
+        },
+        {
+          clientId: "client-remote",
+          active: true,
+          accessMode: "operator",
+          label: "Desktop"
+        },
+        {
+          clientId: "client-stale",
+          active: false,
+          activeConnectionCount: 0,
+          accessMode: "operator",
+          label: "Tablet"
+        }
+      ]
+    }
+  };
+
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.renderSessionControlClients(container, session);
+
+  assert.equal(container.children.length, 3);
+
+  const remoteRow = container.children[1];
+  const staleRow = container.children[2];
+
+  assert.equal(remoteRow.find((node) => node.textContent === "Transfer")?.textContent, "Transfer");
+  assert.equal(staleRow.find((node) => node.textContent === "Forget")?.textContent, "Forget");
+});

@@ -991,7 +991,10 @@ function installTestHooks() {
     },
     getInitializationErrorMessage: () => initializationErrorMessage,
     getSessionWriteBlockMessage,
+    getSessionControlSummary,
+    getSessionControlBadgeState,
     getTakeOrReclaimControlLabel,
+    renderSessionControlClients,
     showBlockedWriteReclaimUi,
     handleCommandFeedbackAction,
     getCommandFeedbackActionMeta: () => commandFeedbackActionMeta,
@@ -1207,7 +1210,8 @@ function renderSessionControlClients(container, session) {
       forgetBtn.dataset.clientLabel = getSessionControlClientLabel(client);
       actions.appendChild(forgetBtn);
     }
-    if (actions.childNodes.length > 0) {
+    const actionCount = Number(actions.childNodes?.length ?? actions.children?.length ?? 0);
+    if (actionCount > 0) {
       row.appendChild(actions);
     }
     container.appendChild(row);

@@ -404,3 +404,50 @@ test("command-composer autocomplete controller tolerates clipboard-copy failures
   assert.equal(enterEvent.defaultPrevented, true);
   assert.equal(commandInput.value, "echo selected text");
 });
+
+test("command-composer autocomplete controller normalizes reversed selections before copying", async () => {
+  const commandInput = new FakeInput();
+  commandInput.value = "/help topic";
+  commandInput.setSelectionRange(11, 6);
+  const clipboardWrites = [];
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+
+  controller.bindUiEvents();
+  const enterEvent = createKeyEvent("Enter");
+  commandInput.dispatchEvent(enterEvent);
+  await Promise.resolve();
+
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["topic"]);
+});
+
+test("command-composer autocomplete controller pastes through the fallback insertion path when setRangeText is unavailable", async () => {
+  const commandInput = new FakeInput();
+  commandInput.value = "/help";
+  commandInput.setSelectionRange(5, 5);
+  commandInput.setRangeText = undefined;
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    readClipboardText: async () => " deck"
+  });
+
+  controller.bindUiEvents();
+  const middleDown = createMouseEvent("mousedown", 1);
+  commandInput.dispatchEvent(middleDown);
+  await Promise.resolve();
+
+  assert.equal(middleDown.defaultPrevented, true);
+  assert.equal(commandInput.value, "/help deck");
+  assert.equal(commandInput.selectionStart, 10);
+  assert.equal(commandInput.selectionEnd, 10);
+});
