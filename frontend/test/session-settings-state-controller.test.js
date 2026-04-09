@@ -396,6 +396,49 @@ test("session-settings state controller syncs and reads mouse forwarding mode", 
   });
 });
 
+test("session-settings state controller does not mark cleared start cwd as dirty when the session startup is already empty", () => {
+  const session = {
+    id: "s1",
+    note: "",
+    inputSafetyProfile: {}
+  };
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    parseSessionEnv: () => ({ ok: true, env: {} }),
+    parseSessionTags: () => ({ ok: true, tags: [] }),
+    normalizeSessionStartupFromSession: () => ({
+      startCwd: "",
+      startCommand: "",
+      env: {},
+      tags: [],
+      mouseForwardingMode: "off"
+    }),
+    getSessionSendTerminator: () => "auto"
+  });
+
+  const entry = {
+    themeSlotSelect: createInput("active"),
+    startCwdInput: createInput("   "),
+    startCommandInput: createInput(""),
+    startEnvInput: createInput(""),
+    mouseForwardingModeSelect: createInput("off"),
+    sessionNoteInput: createInput(""),
+    sessionTagsInput: createInput(""),
+    sessionSendTerminatorSelect: createInput("auto"),
+    inputSafetyControls: createInputSafetyControls(),
+    themeInputs: {
+      background: createInput("#000000"),
+      foreground: createInput("#ffffff")
+    }
+  };
+
+  assert.equal(controller.isSessionSettingsDirty(entry, session), false);
+});
+
 test("session-settings state controller syncs and reads multiline session notes", () => {
   const controller = createSessionSettingsStateController({});
   const entry = {

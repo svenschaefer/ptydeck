@@ -431,3 +431,62 @@ test("app bootstrap composition controller forwards trusted-local ws ticket payl
     [["ticket", { clientId: "trusted-device-1", label: "Desk Browser" }]]
   );
 });
+
+test("app bootstrap composition controller tolerates missing optional profile loaders and returns the lifecycle initialization result", async () => {
+  const { calls, options } = createBaseOptions({
+    layoutProfileRuntimeController: null,
+    connectionProfileRuntimeController: null,
+    workspaceManagerRuntimeController: null,
+    getWsTicketPayload: () => ({})
+  });
+
+  const controller = createAppBootstrapCompositionController({
+    ...options,
+    createCommandEngine: () => ({ parseAutocompleteContext: () => ({}) }),
+    createCommandTargetRuntimeController: () => ({
+      resolveTargetSelectors: () => [],
+      resolveFilterSelectors: () => [],
+      resolveDeckToken: () => "",
+      parseSizeCommandArgs: () => null,
+      parseCustomDefinition: () => null,
+      resolveSettingsTargets: () => [],
+      parseSettingsPayload: () => null,
+      resolveQuickSwitchTarget: () => null,
+      activateSessionTarget: () => {},
+      activateDeckTarget: () => {},
+      parseDirectTargetRoutingInput: () => null,
+      formatQuickSwitchPreview: () => ""
+    }),
+    createCommandExecutor: () => ({ execute: async () => true }),
+    createAuthBootstrapRuntimeController: () => ({
+      getWsAuthToken: () => "token",
+      dispose() {}
+    }),
+    createWsRuntimeController: () => ({ start: () => ({ close() {} }) }),
+    createCommandComposerAutocompleteController: () => ({
+      bindUiEvents() {},
+      resetAutocompleteState() {},
+      recordSlashHistory() {},
+      resetSlashHistoryNavigationState() {},
+      dispose() {}
+    }),
+    createCommandComposerRuntimeController: () => ({ dispose() {} }),
+    createAppLifecycleController: () => ({
+      bindUiEvents: () => calls.push(["lifecycle-bind-ui"]),
+      bindWindowEvents: () => calls.push(["lifecycle-bind-window"]),
+      initializeRuntime: async () => {
+        calls.push(["lifecycle-init"]);
+        return "initialized";
+      }
+    })
+  });
+
+  controller.composeControllers();
+  const result = await controller.bootstrapUiAndRuntime();
+
+  assert.equal(result, "initialized");
+  assert.deepEqual(
+    calls.filter((entry) => ["workspace-load", "lifecycle-init"].includes(entry[0])),
+    [["lifecycle-init"], ["workspace-load"]]
+  );
+});

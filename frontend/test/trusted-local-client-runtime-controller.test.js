@@ -94,6 +94,26 @@ test("trusted local client controller can rename the persisted device identity",
   assert.match(storage.getItem(TRUSTED_LOCAL_CLIENT_STORAGE_KEY), /Office Tablet/);
 });
 
+test("trusted local client controller rejects empty or missing rename targets", () => {
+  const storage = createStorage({
+    [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify({
+      format: "ptydeck.trusted-local-client.v1",
+      clientId: "trusted-existing-client",
+      label: "Desk Browser",
+      createdAt: 77
+    })
+  });
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: storage
+  });
+  const emptyController = createTrustedLocalClientRuntimeController({
+    storageRef: createStorage()
+  });
+
+  assert.throws(() => controller.renameClientIdentity("   "), /Device name cannot be empty/);
+  assert.throws(() => emptyController.renameClientIdentity("Desk Browser"), /identity is not available yet/);
+});
+
 test("trusted local client controller recreates malformed stored identity payloads", async () => {
   const storage = createStorage({
     [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify({
@@ -167,5 +187,52 @@ test("trusted local client controller fails clearly when localStorage is unavail
   await assert.rejects(
     () => controller.ensureClientIdentity(),
     /requires browser localStorage/
+  );
+});
+
+test("trusted local client controller surfaces clear storage persistence failures", async () => {
+  const failingStorage = {
+    getItem() {
+      return null;
+    },
+    setItem() {
+      throw new Error("quota exceeded");
+    }
+  };
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: failingStorage,
+    cryptoRef: {
+      randomUUID() {
+        return "12345678-1234-1234-1234-1234567890ab";
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => controller.ensureClientIdentity(),
+    /Failed to persist the trusted local device identity/
+  );
+});
+
+test("trusted local client controller surfaces clear rename persistence failures", () => {
+  const controller = createTrustedLocalClientRuntimeController({
+    storageRef: {
+      getItem() {
+        return JSON.stringify({
+          format: "ptydeck.trusted-local-client.v1",
+          clientId: "trusted-existing-client",
+          label: "Desk Browser",
+          createdAt: 77
+        });
+      },
+      setItem() {
+        throw new Error("quota exceeded");
+      }
+    }
+  });
+
+  assert.throws(
+    () => controller.renameClientIdentity("Office Tablet"),
+    /Failed to persist the updated trusted local device name/
   );
 });

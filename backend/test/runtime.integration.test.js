@@ -745,6 +745,32 @@ test("custom command endpoints persist template commands with validated built-in
     assert.equal(invalidRes.status, 400);
     const invalidPayload = await invalidRes.json();
     assert.equal(invalidPayload.error, "CustomCommandTemplateVariableNotAllowed");
+
+    const plainWithTemplateVariablesRes = await fetch(`${baseUrlA}/custom-commands/plain-vars`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo hello\n",
+        kind: "plain",
+        templateVariables: ["session.cwd"]
+      })
+    });
+    assert.equal(plainWithTemplateVariablesRes.status, 400);
+    const plainWithTemplateVariablesBody = await plainWithTemplateVariablesRes.json();
+    assert.equal(plainWithTemplateVariablesBody.error, "CustomCommandTemplateVariablesNotAllowed");
+
+    const invalidPlaceholderRes = await fetch(`${baseUrlA}/custom-commands/bad-placeholder`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "echo {{param:not valid}}\n",
+        kind: "template",
+        templateVariables: []
+      })
+    });
+    assert.equal(invalidPlaceholderRes.status, 400);
+    const invalidPlaceholderBody = await invalidPlaceholderRes.json();
+    assert.equal(invalidPlaceholderBody.error, "CustomCommandTemplateInvalid");
   } finally {
     await runtimeA.stop();
   }
@@ -2006,6 +2032,30 @@ test("REST rejects oversized request body with 413", async () => {
   }
 });
 
+test("REST rejects malformed JSON bodies and invalid path parameter encodings with 400 validation errors", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime();
+
+  try {
+    const invalidJsonRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{\"shell\":\"sh\","
+    });
+
+    assert.equal(invalidJsonRes.status, 400);
+    const invalidJsonBody = await invalidJsonRes.json();
+    assert.equal(invalidJsonBody.error, "InvalidJson");
+
+    const invalidPathRes = await fetch(`${baseUrl}/custom-commands/%E0%A4%A`);
+
+    assert.equal(invalidPathRes.status, 400);
+    const invalidPathBody = await invalidPathRes.json();
+    assert.equal(invalidPathBody.error, "ValidationError");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("REST create session is rate limited per client", async () => {
   const { runtime, baseUrl } = await createStartedRuntime({
     rateLimitWindowMs: 60000,
@@ -3158,6 +3208,30 @@ test("session file transfer endpoints reject traversal, missing files, oversize 
     assert.equal(traversalRes.status, 400);
     const traversalBody = await traversalRes.json();
     assert.equal(traversalBody.error, "ValidationError");
+
+    const absolutePathRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "C:\\escape.txt",
+        contentBase64: Buffer.from("nope", "utf8").toString("base64")
+      })
+    });
+    assert.equal(absolutePathRes.status, 400);
+    const absolutePathBody = await absolutePathRes.json();
+    assert.equal(absolutePathBody.error, "ValidationError");
+
+    const invalidBase64Res = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/upload`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "invalid.txt",
+        contentBase64: "$$$"
+      })
+    });
+    assert.equal(invalidBase64Res.status, 400);
+    const invalidBase64Body = await invalidBase64Res.json();
+    assert.equal(invalidBase64Body.error, "ValidationError");
 
     const missingDownloadRes = await fetch(`${baseUrl}/sessions/${localSession.id}/file-transfer/download`, {
       method: "POST",

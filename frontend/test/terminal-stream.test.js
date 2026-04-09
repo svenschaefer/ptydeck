@@ -5,6 +5,7 @@ import {
   createSessionStreamAdapter,
   hasMeaningfulStreamActivity,
   normalizeCustomCommandPayloadForShell,
+  normalizePayloadWithoutTrailingNewline,
   sendInputWithConfiguredTerminator,
   withSingleTrailingNewline
 } from "../src/public/terminal-stream.js";
@@ -36,6 +37,29 @@ test("sendInputWithConfiguredTerminator emits delayed CR submit for cr_delay mod
     { sessionId: "s1", payload: "hello\nworld" },
     { sessionId: "s1", payload: "\r" }
   ]);
+});
+
+test("normalizePayloadWithoutTrailingNewline preserves internal lines while trimming trailing newline variants", () => {
+  assert.equal(normalizePayloadWithoutTrailingNewline("alpha\r\nbeta\r\n\r\n"), "alpha\nbeta");
+  assert.equal(normalizePayloadWithoutTrailingNewline("single line\r"), "single line");
+});
+
+test("sendInputWithConfiguredTerminator submits only the delayed CR when cr_delay receives an empty body", async () => {
+  const writes = [];
+  await sendInputWithConfiguredTerminator(
+    async (sessionId, payload) => {
+      writes.push({ sessionId, payload });
+    },
+    "s1",
+    "\n\n",
+    "cr_delay",
+    {
+      normalizeMode: (mode) => mode,
+      delayedSubmitMs: 0
+    }
+  );
+
+  assert.deepEqual(writes, [{ sessionId: "s1", payload: "\r" }]);
 });
 
 test("normalizeCustomCommandPayloadForShell escapes only unmatched single quotes", () => {
@@ -175,4 +199,35 @@ test("createSessionStreamAdapter isolates pending lines and idle timers per sess
     ["idle", "s2"],
     ["idle", "s1"]
   ]);
+});
+
+test("createSessionStreamAdapter resets and disposes per-session pending state", async () => {
+  const idleSessions = [];
+  const adapter = createSessionStreamAdapter({
+    idleMs: 0,
+    onLine() {},
+    onIdle(sessionId) {
+      idleSessions.push(sessionId);
+    }
+  });
+
+  assert.equal(adapter.push("", "alpha"), false);
+  assert.equal(adapter.push("s1", ""), false);
+
+  adapter.push("s1", "alpha");
+  assert.equal(adapter.getPendingLine("s1"), "alpha");
+
+  adapter.resetSession("s1");
+  assert.equal(adapter.getPendingLine("s1"), "");
+
+  adapter.push("s1", "bravo");
+  adapter.disposeSession("s1");
+  assert.equal(adapter.getPendingLine("s1"), "");
+
+  adapter.push("s2", "charlie");
+  adapter.dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(idleSessions, []);
+  assert.equal(adapter.getPendingLine("s2"), "");
 });

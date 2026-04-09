@@ -655,7 +655,7 @@ export function createSessionSettingsStateController(options = {}) {
     const currentStartup = normalizeSessionStartupFromSession(session);
     const draftStartup = readSessionStartupFromControls(entry);
     const draftThemes = readSessionThemeProfilesForSave(entry, session.id, session);
-    if (!draftStartup.startCwd || !draftStartup.envResult.ok || !draftStartup.tagResult.ok) {
+    if (!draftStartup.envResult.ok || !draftStartup.tagResult.ok) {
       return true;
     }
     if (currentStartup.startCwd !== draftStartup.startCwd) {

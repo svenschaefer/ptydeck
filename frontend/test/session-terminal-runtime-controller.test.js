@@ -500,6 +500,21 @@ test("session-terminal-runtime controller defers manual refresh while the termin
   assert.equal(entry.terminal.scrollToBottomCalls, 0);
 });
 
+test("session-terminal-runtime controller returns false for unknown manual refresh targets", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+
+  assert.equal(controller.refreshMountedTerminal("missing"), false);
+  assert.equal(controller.refreshMountedTerminal(""), false);
+});
+
 test("session-terminal-runtime controller copies the terminal selection on plain Enter", async () => {
   const clipboardWrites = [];
   const controller = createSessionTerminalRuntimeController({
@@ -753,6 +768,65 @@ test("session-terminal-runtime controller routes clipboard paste events through 
 
   assert.equal(pasteEvent.defaultPrevented, true);
   assert.deepEqual(pasted, [["s1", "echo hi"]]);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller falls back to reading clipboard text when a paste event has no inline text payload", async () => {
+  const pasted = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    readClipboardText: async () => "echo fallback\n"
+  });
+  const refs = {
+    node: { id: "node" },
+    mount: new FakeMount("mount"),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    pluginBadgesEl: {},
+    unrestoredHintEl: {},
+    sessionStatusEl: {},
+    sessionArtifactsEl: {},
+    settingsDialog: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    sessionSendTerminatorSelect: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  const pasteEvent = createClipboardPasteEvent("");
+  refs.mount.helperTextarea.dispatchEvent(pasteEvent);
+  await Promise.resolve();
+
+  assert.equal(pasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, [["s1", "echo fallback\n"]]);
   assert.equal(entry.terminal.focusCalls, 1);
 });
 

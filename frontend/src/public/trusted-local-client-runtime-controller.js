@@ -154,7 +154,13 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
     }
     const storage = requireStorage();
     const created = createRecord();
-    storage.setItem(storageKey, JSON.stringify(created));
+    try {
+      storage.setItem(storageKey, JSON.stringify(created));
+    } catch (error) {
+      const wrapped = new Error("Failed to persist the trusted local device identity to localStorage.");
+      wrapped.cause = error;
+      throw wrapped;
+    }
     const verified = readStoredRecord();
     if (!verified) {
       throw new Error("Failed to verify the trusted local device identity after writing it to localStorage.");
@@ -181,7 +187,13 @@ export function createTrustedLocalClientRuntimeController(options = {}) {
       ...current,
       label: nextLabel
     };
-    storage.setItem(storageKey, JSON.stringify(nextRecord));
+    try {
+      storage.setItem(storageKey, JSON.stringify(nextRecord));
+    } catch (error) {
+      const wrapped = new Error("Failed to persist the updated trusted local device name.");
+      wrapped.cause = error;
+      throw wrapped;
+    }
     const verified = readStoredRecord();
     if (!verified || verified.label !== nextLabel) {
       throw new Error("Failed to persist the updated trusted local device name.");

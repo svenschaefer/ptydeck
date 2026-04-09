@@ -96,3 +96,66 @@ test("ws-runtime controller retries ws ticket acquisition once after 401 refresh
   assert.deepEqual(refreshReasons, ["ws-ticket-401"]);
   assert.deepEqual(protocols, ["ptydeck.v1", "ptydeck.auth.ticket-123"]);
 });
+
+test("ws-runtime controller delays ready notification until runtime bootstrap is no longer pending and routes unmapped session data through runtime events", () => {
+  const calls = [];
+  let capturedHandlers = null;
+  createWsRuntimeController({
+    createWsClient(_url, handlers) {
+      capturedHandlers = handlers;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getRuntimeBootstrapSource: () => "pending",
+    onRuntimeConnected: () => calls.push(["ready"]),
+    hasTerminal: () => false,
+    observeSessionData: (sessionId, data) => calls.push(["observe", sessionId, data]),
+    applyRuntimeEvent: (event) => calls.push(["event", event.type])
+  }).start();
+
+  capturedHandlers.onState("connected");
+  capturedHandlers.onMessage({ type: "session.data", sessionId: "s2", data: "pwd\n" });
+
+  assert.deepEqual(calls, [
+    ["observe", "s2", "pwd\n"],
+    ["event", "session.data"]
+  ]);
+});
+
+test("ws-runtime controller fails clearly when the ws ticket response is missing a ticket", async () => {
+  let capturedOptions = null;
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => "bearer",
+    createWsTicket: async () => ({ ticket: "   " })
+  }).start();
+
+  await assert.rejects(
+    () => capturedOptions.protocolsProvider(),
+    /did not include a ticket/
+  );
+});
+
+test("ws-runtime controller rethrows the original 401 error when refresh does not recover auth", async () => {
+  let capturedOptions = null;
+  const authError = new Error("Unauthorized");
+  authError.status = 401;
+  createWsRuntimeController({
+    createWsClient(_url, _handlers, options) {
+      capturedOptions = options;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    getWsAuthToken: () => "bearer",
+    createWsTicket: async () => {
+      throw authError;
+    },
+    bootstrapDevAuthToken: async () => false
+  }).start();
+
+  await assert.rejects(() => capturedOptions.protocolsProvider(), authError);
+});
