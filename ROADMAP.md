@@ -14,18 +14,21 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - `v0.4.0-H65`
-- Active scoped tasks:
-  - `MDT-014`
-- Queued next waves:
   - `v0.4.0-H74`
+- Active scoped tasks:
+  - `QLT-213`
+  - `QLT-214`
+  - `QLT-215`
+  - `QLT-216`
+- Queued next waves:
+  - none currently
 
-## Queued Wave Order
+## Active Wave Order
 
-1. `QLT-213` after `MDT-014`
-2. `QLT-214` after `MDT-014`
-3. `QLT-215` after `MDT-014`
-4. `QLT-216` after `MDT-014`
+1. `QLT-213`
+2. `QLT-214`
+3. `QLT-215`
+4. `QLT-216`
 5. `QLT-217` after `QLT-213`, `QLT-214`, `QLT-215`, and `QLT-216`
 
 ## Sequencing Rules

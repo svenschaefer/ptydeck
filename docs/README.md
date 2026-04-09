@@ -118,7 +118,7 @@ Authoritative repository documents remain:
 
 - `MDT-014 Trusted-Local LAN Acceptance.md`
   - Role: executable acceptance/sign-off sheet for the real second-LAN-client validation on `feature/h62-multi-device-control-foundation`
-  - Status: active while `MDT-014` remains open in `TODO.md`
+  - Status: retained as the historical acceptance/sign-off sheet for the trusted-local branch-close wave
   - Canonical companions:
     - `DEPLOYMENT.md` section `8.2`
     - `DEPLOYMENT.md` section `8.3`

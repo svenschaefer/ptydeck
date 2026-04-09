@@ -12,7 +12,7 @@ This file is structured into:
 
 ### Product and UX
 
-- [ ] Add a messaging-adapter framework as the first major post-`feature/h62-multi-device-control-foundation` mainline epic, explicitly after `MDT-014` branch closeout rather than as another branch-local follow-up.
+- [ ] Add a messaging-adapter framework as the next larger post-branch mainline epic after the current `H74` single-user quality follow-up, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
 
 ### Security and Multi-Tenancy
 
