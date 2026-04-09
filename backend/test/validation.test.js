@@ -112,6 +112,30 @@ function createLocalSession(overrides = {}) {
   };
 }
 
+function createReplayExcerpt(overrides = {}) {
+  return {
+    sessionId: "a",
+    sessionState: "running",
+    scope: "visible_replay_excerpt",
+    format: "text",
+    contentType: "text/plain; charset=utf-8",
+    selector: "l:20",
+    selectorKind: "lines",
+    requestedCount: 20,
+    resolvedCount: 12,
+    availableCount: 12,
+    selectorSatisfied: true,
+    shellBlocksSupported: false,
+    data: "line one\nline two",
+    chars: 17,
+    lines: 2,
+    sourceRetainedChars: 17,
+    sourceRetentionLimitChars: 16384,
+    sourceTruncated: false,
+    ...overrides
+  };
+}
+
 test("validateRequest accepts valid input body", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -155,6 +179,41 @@ test("validateRequest accepts valid PTY control requests without a body", () => 
       body: undefined
     });
   });
+});
+
+test("validateRequest accepts valid replay excerpt queries and rejects invalid slice selectors", () => {
+  assert.doesNotThrow(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/sessions/abc/replay-excerpt",
+      params: { sessionId: "abc" },
+      query: { slice: "sp:2" }
+    });
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/sessions/abc/replay-excerpt",
+      params: { sessionId: "abc" },
+      query: { slice: "l:80" }
+    });
+  });
+
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/sessions/abc/replay-excerpt",
+      params: { sessionId: "abc" },
+      query: { slice: "bad" }
+    });
+  }, /Query parameter 'slice' must match 'l:N', 'c:N', or 'sp:N'/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/sessions/abc/replay-excerpt",
+      params: {},
+      query: { slice: "l:20" }
+    });
+  }, /Missing sessionId path parameter/);
 });
 
 test("validateRequest accepts valid session control payloads and rejects invalid transfer payloads", () => {
@@ -1056,6 +1115,36 @@ test("validateResponse accepts share link payloads", () => {
       ]
     });
   });
+});
+
+test("validateResponse accepts replay excerpt payloads and rejects malformed selector metadata", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExcerpt",
+      body: createReplayExcerpt()
+    });
+  });
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExcerpt",
+      body: createReplayExcerpt({
+        selectorKind: "invalid"
+      })
+    });
+  }, /Response does not match SessionReplayExcerpt schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExcerpt",
+      body: createReplayExcerpt({
+        requestedCount: 0
+      })
+    });
+  }, /Response does not match SessionReplayExcerpt schema/);
 });
 
 test("validateRequest accepts valid custom command upsert payload", () => {

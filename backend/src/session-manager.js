@@ -1433,11 +1433,13 @@ export class SessionManager {
       sessionId,
       source: options.trace?.source || "rest"
     });
-    const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : session.meta.kind);
+    const currentKind = normalizeSessionKind(session.meta.kind);
+    const nextKind = normalizeSessionKind(patch.kind !== undefined ? patch.kind : currentKind);
+    const kindChanged = nextKind !== currentKind;
     const nextRemoteAuth =
       patch.remoteAuth !== undefined || patch.kind !== undefined
         ? normalizeRemoteAuth(
-            patch.remoteAuth !== undefined ? patch.remoteAuth : session.meta.remoteAuth,
+            patch.remoteAuth !== undefined ? patch.remoteAuth : kindChanged ? undefined : session.meta.remoteAuth,
             nextKind
           )
         : session.meta.remoteAuth;
@@ -1476,8 +1478,15 @@ export class SessionManager {
         this.clearExpectedExitReason(session);
       }
     }
-    if (Object.prototype.hasOwnProperty.call(patch, "remoteConnection")) {
-      const normalizedRemoteConnection = normalizeRemoteConnection(patch.remoteConnection, nextKind);
+    if (Object.prototype.hasOwnProperty.call(patch, "remoteConnection") || patch.kind !== undefined) {
+      const normalizedRemoteConnection = normalizeRemoteConnection(
+        Object.prototype.hasOwnProperty.call(patch, "remoteConnection")
+          ? patch.remoteConnection
+          : kindChanged
+            ? undefined
+            : session.meta.remoteConnection,
+        nextKind
+      );
       if (normalizedRemoteConnection) {
         session.meta.remoteConnection = normalizedRemoteConnection;
       } else {

@@ -495,6 +495,21 @@ test("SessionManager rejects sp:N replay excerpts when shell blocks are unavaila
   );
 });
 
+test("SessionManager rejects invalid replay excerpt selectors directly", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "sh" });
+
+  fakePty.write("plain shell\r\n");
+
+  assert.throws(
+    () => manager.getReplayExcerpt(created.id, "bad"),
+    /Field 'slice' must match 'l:N', 'c:N', or 'sp:N'/
+  );
+});
+
 test("SessionManager throws on unknown session", () => {
   const manager = new SessionManager({
     createPty: () => createFakePty()
@@ -781,6 +796,111 @@ test("SessionManager updateSession enforces ssh auth secret transitions and sign
   manager.terminate(created.id);
   manager.kill(created.id);
   assert.deepEqual(fakePty.killSignals, ["SIGINT", "SIGTERM", "SIGKILL"]);
+});
+
+test("SessionManager updateSession clears ssh-only metadata and timers when switching back to local", () => {
+  const fakePty = createFakePty();
+  const clearedTimers = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    clearTimeoutFn: (timer) => clearedTimers.push(timer)
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "password"
+    },
+    remoteSecret: "super-secret",
+    startCwd: "~/workspace"
+  });
+
+  const session = manager.get(created.id);
+  session.remoteReconnectTimer = { id: "reconnect" };
+  session.remoteReconnectStabilizeTimer = { id: "stabilize" };
+  session.expectedExitReasonTimer = { id: "expected-exit" };
+  session.expectedExitReason = "restart";
+
+  const updated = manager.updateSession(created.id, {
+    kind: "local",
+    startCwd: "/tmp/local"
+  });
+
+  assert.equal(updated.kind, "local");
+  assert.equal(updated.shell, "bash");
+  assert.equal(updated.startCwd, "/tmp/local");
+  assert.equal(updated.cwd, "/tmp/local");
+  assert.equal(updated.remoteConnection, undefined);
+  assert.equal(updated.remoteAuth, undefined);
+  assert.equal(updated.remoteRuntime, undefined);
+  assert.equal(manager.get(created.id).remoteSecret, undefined);
+  assert.equal(session.remoteReconnectTimer, null);
+  assert.equal(session.remoteReconnectStabilizeTimer, null);
+  assert.equal(session.expectedExitReasonTimer, null);
+  assert.equal(session.expectedExitReason, "");
+  assert.deepEqual(clearedTimers, [{ id: "reconnect" }, { id: "stabilize" }, { id: "expected-exit" }]);
+});
+
+test("SessionManager updateSession requires explicit ssh metadata when switching from local to ssh", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+
+  const created = manager.create({
+    cwd: "/tmp/local"
+  });
+
+  assert.throws(() => {
+    manager.updateSession(created.id, {
+      kind: "ssh"
+    });
+  }, /Field 'remoteConnection' is required for ssh sessions/);
+
+  assert.throws(() => {
+    manager.updateSession(created.id, {
+      kind: "ssh",
+      remoteConnection: {
+        host: "example.internal",
+        port: 22
+      },
+      remoteAuth: {
+        method: "password"
+      }
+    });
+  }, /Field 'remoteSecret' is required when changing to password or keyboardInteractive ssh auth/);
+
+  const updated = manager.updateSession(created.id, {
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    },
+    startCwd: "~/ops"
+  });
+
+  assert.equal(updated.kind, "ssh");
+  assert.equal(updated.shell, "ssh");
+  assert.deepEqual(updated.remoteConnection, {
+    host: "example.internal",
+    port: 22
+  });
+  assert.deepEqual(updated.remoteAuth, {
+    method: "privateKey"
+  });
+  assert.equal(updated.cwd, "~/ops");
+  assert.equal(updated.startCwd, "~/ops");
+  assert.deepEqual(updated.remoteRuntime.reconnectPolicy, {
+    maxAttempts: 3,
+    delayMs: 1500
+  });
 });
 
 test("SessionManager rejects unsupported proxy and forwarding overrides for ssh sessions", () => {
