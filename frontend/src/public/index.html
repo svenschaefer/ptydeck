@@ -149,6 +149,7 @@
                   <button id="workspace-manager-open" type="button">Manage</button>
                   <button id="send-history-open" type="button">History</button>
                   <button id="trusted-local-control-open" type="button">Control</button>
+                  <a id="handbook-open" class="control-pane-link" href="/handbook/index.html">Handbook</a>
                   <p id="control-pane-status" class="control-pane-status"></p>
                   <label class="control-pane-position-wrap">
                     <span>Position</span>
@@ -669,7 +670,8 @@
             </button>
           </div>
           <p class="trusted-local-control-note">
-            Taking control also restores this device's remembered local layout when one is available.
+            Taking control also restores this device's remembered local layout when one is available. See the
+            <a href="/handbook/manual/trusted-local-control.html#device-local-layout-recall">trusted-local control guide</a>.
           </p>
           <div class="trusted-local-control-actions">
             <button id="trusted-local-control-take-all" type="button">All Sessions</button>
@@ -716,7 +718,7 @@
               </button>
             </div>
           </div>
-          <p class="session-settings-hint">Use Startup for launch settings, Input for send and terminal behavior, Note for saved notes and tags, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
+          <p class="session-settings-hint">Use Startup for launch settings, Input for send and terminal behavior, Note for saved notes and tags, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings. Open the <a href="/handbook/reference/session-settings.html">session settings handbook reference</a> for the exact delivered field contract.</p>
           <section class="session-control-panel">
             <div class="session-control-panel-head">
               <p class="session-control-panel-title">Control</p>
@@ -840,7 +842,7 @@
                 <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
               </div>
               <p class="session-settings-inline-hint">
-                These checks are additive, not a global lock. A confirmation appears only when one of the enabled rules matches. Use <strong>Always confirm before send</strong> if you want every non-empty send to stop for confirmation first.
+                These checks are additive, not a global lock. A confirmation appears only when one of the enabled rules matches. Use <strong>Always confirm before send</strong> if you want every non-empty send to stop for confirmation first. See the <a href="/handbook/manual/paste-and-send-safety.html#terminal-local-paste">paste and send safety guide</a> for operator behavior notes.
               </p>
             </section>
             <section class="session-settings-section session-settings-panel-note session-note-controls" hidden>

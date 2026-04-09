@@ -1,0 +1,244 @@
+:root {
+  --handbook-bg: #f3efe6;
+  --handbook-panel: rgba(255, 252, 245, 0.94);
+  --handbook-panel-strong: #fffaf1;
+  --handbook-text: #1c2422;
+  --handbook-muted: #5d6865;
+  --handbook-border: rgba(28, 36, 34, 0.14);
+  --handbook-accent: #0f766e;
+  --handbook-accent-soft: rgba(15, 118, 110, 0.12);
+  --handbook-code-bg: #13221f;
+  --handbook-code-text: #e7f3ef;
+  --handbook-shadow: 0 18px 36px rgba(18, 28, 25, 0.12);
+  --handbook-radius: 20px;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  background: linear-gradient(180deg, #f5f1e8 0%, #efe6d7 100%);
+  color: var(--handbook-text);
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+a {
+  color: var(--handbook-accent);
+  text-decoration-thickness: 0.08em;
+}
+a:hover {
+  text-decoration-thickness: 0.14em;
+}
+code,
+pre,
+.handbook-code {
+  font-family: "Cascadia Code", "Fira Code", Consolas, "Liberation Mono", monospace;
+}
+.handbook-shell {
+  width: min(1360px, calc(100vw - 32px));
+  margin: 24px auto;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(180px, 240px);
+  gap: 20px;
+  align-items: start;
+}
+.handbook-panel,
+.handbook-article,
+.handbook-page-toc {
+  background: var(--handbook-panel);
+  border: 1px solid var(--handbook-border);
+  border-radius: var(--handbook-radius);
+  box-shadow: var(--handbook-shadow);
+  backdrop-filter: blur(10px);
+}
+.handbook-panel {
+  padding: 20px;
+  position: sticky;
+  top: 24px;
+}
+.handbook-brand {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.handbook-brand-title {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+.handbook-brand-subtitle {
+  margin: 0;
+  color: var(--handbook-muted);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+}
+.handbook-nav-group + .handbook-nav-group {
+  margin-top: 18px;
+}
+.handbook-nav-title {
+  margin: 0 0 8px;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 0.77rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--handbook-muted);
+}
+.handbook-nav-list,
+.handbook-page-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.handbook-nav-link,
+.handbook-page-toc-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+.handbook-nav-link:hover,
+.handbook-page-toc-link:hover {
+  background: rgba(255, 255, 255, 0.66);
+}
+.handbook-nav-link.is-current,
+.handbook-page-toc-link.is-current {
+  background: var(--handbook-accent-soft);
+  color: #0a564f;
+  font-weight: 700;
+}
+.handbook-nav-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--handbook-muted);
+  font-size: 0.85rem;
+}
+.handbook-article {
+  padding: 28px 32px 40px;
+}
+.handbook-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--handbook-muted);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 0.94rem;
+}
+.handbook-breadcrumbs span {
+  opacity: 0.65;
+}
+.handbook-article h1,
+.handbook-article h2,
+.handbook-article h3 {
+  line-height: 1.12;
+  scroll-margin-top: 24px;
+}
+.handbook-article h1 {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 3vw, 2.6rem);
+}
+.handbook-article h2 {
+  margin: 28px 0 12px;
+  font-size: clamp(1.45rem, 2vw, 1.85rem);
+}
+.handbook-article h3 {
+  margin: 22px 0 10px;
+  font-size: 1.15rem;
+}
+.handbook-article p,
+.handbook-article li,
+.handbook-article td,
+.handbook-article th {
+  font-size: 1rem;
+  line-height: 1.62;
+}
+.handbook-article ul,
+.handbook-article ol {
+  padding-left: 1.3rem;
+}
+.handbook-article pre {
+  margin: 16px 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border-radius: 16px;
+  background: var(--handbook-code-bg);
+  color: var(--handbook-code-text);
+}
+.handbook-article code {
+  padding: 0.12rem 0.35rem;
+  border-radius: 8px;
+  background: rgba(19, 34, 31, 0.08);
+  color: #103934;
+}
+.handbook-article pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+.handbook-article table {
+  width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+}
+.handbook-article th,
+.handbook-article td {
+  vertical-align: top;
+  text-align: left;
+  border-top: 1px solid var(--handbook-border);
+  padding: 10px 12px 10px 0;
+}
+.handbook-page-toc {
+  padding: 18px 20px;
+  position: sticky;
+  top: 24px;
+}
+.handbook-page-toc-title {
+  margin: 0 0 10px;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--handbook-muted);
+}
+.handbook-page-toc-empty {
+  margin: 0;
+  color: var(--handbook-muted);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+}
+.handbook-callout {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: rgba(15, 118, 110, 0.08);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+@media (max-width: 1100px) {
+  .handbook-shell {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+  .handbook-page-toc {
+    display: none;
+  }
+}
+@media (max-width: 820px) {
+  .handbook-shell {
+    width: min(100vw - 20px, 100%);
+    margin: 10px auto 20px;
+    grid-template-columns: 1fr;
+  }
+  .handbook-panel,
+  .handbook-page-toc {
+    position: static;
+  }
+  .handbook-article {
+    padding: 22px 18px 28px;
+  }
+}

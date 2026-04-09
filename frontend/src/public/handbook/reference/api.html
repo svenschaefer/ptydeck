@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - API Reference</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><a href="/handbook/reference/index.html">Reference</a></nav>
+        <h1 id="api-reference">API Reference</h1>
+
+<p>Generated from <code>backend/openapi/openapi.yaml</code>.</p>
+
+<p>The operator API is served under <code>/api/v1</code>, REST calls use bearer auth, and WebSocket upgrades use the short-lived ticket minted by <code>/auth/ws-ticket</code>.</p>
+
+<h2 id="authentication">Authentication</h2>
+
+<h3 id="auth-dev-token"><code>/auth/dev-token</code></h3>
+
+<ul>
+<li><strong>POST</strong> Create development bearer token (available only in auth dev mode).</li>
+</ul>
+
+<p>Operation ID: <code>createDevToken</code> Request body: optional or none Auth note: Development bootstrap route. Available only when auth dev mode is enabled. Responses: <code>200</code> Token created; <code>400</code> Invalid request; <code>404</code> Auth dev mode is disabled; <code>426</code> TLS required</p>
+
+<h3 id="auth-ws-ticket"><code>/auth/ws-ticket</code></h3>
+
+<ul>
+<li><strong>POST</strong> Create a short-lived one-time WebSocket handshake ticket from an authenticated bearer session.</li>
+</ul>
+
+<p>Operation ID: <code>createWsTicket</code> Request body: optional or none Auth note: Bearer-authenticated route that returns a one-time WebSocket ticket for the browser client. Responses: <code>200</code> WebSocket ticket created; <code>400</code> Invalid request; <code>401</code> Missing or invalid bearer token; <code>403</code> Missing ws:connect scope; <code>426</code> TLS required</p>
+
+<h2 id="connection-profiles">Connection Profiles</h2>
+
+<h3 id="connection-profiles-2"><code>/connection-profiles</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted connection profiles.</li>
+</ul>
+
+<p>Operation ID: <code>listConnectionProfiles</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Connection profile list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create a persisted connection profile.</li>
+</ul>
+
+<p>Operation ID: <code>createConnectionProfile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Connection profile created; <code>400</code> Invalid request; <code>409</code> Connection profile id already exists; <code>426</code> TLS required</p>
+
+<h3 id="connection-profiles-profileid"><code>/connection-profiles/{profileId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get connection profile by id.</li>
+</ul>
+
+<p>Operation ID: <code>getConnectionProfile</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Connection profile found; <code>404</code> Connection profile not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update persisted connection profile metadata/launch settings.</li>
+</ul>
+
+<p>Operation ID: <code>updateConnectionProfile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Connection profile updated; <code>400</code> Invalid request; <code>404</code> Connection profile not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete persisted connection profile by id.</li>
+</ul>
+
+<p>Operation ID: <code>deleteConnectionProfile</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Connection profile deleted; <code>404</code> Connection profile not found; <code>426</code> TLS required</p>
+
+<h2 id="custom-commands">Custom Commands</h2>
+
+<h3 id="custom-commands-2"><code>/custom-commands</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted custom commands.</li>
+</ul>
+
+<p>Operation ID: <code>listCustomCommands</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Custom command list; <code>426</code> TLS required</p>
+
+<h3 id="custom-commands-commandname"><code>/custom-commands/{commandName}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get custom command by name.</li>
+</ul>
+
+<p>Operation ID: <code>getCustomCommand</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Custom command found; <code>404</code> Custom command not found; <code>409</code> Custom command name resolves to multiple scoped commands; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PUT</strong> Create or overwrite custom command by name.</li>
+</ul>
+
+<p>Operation ID: <code>upsertCustomCommand</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Custom command upserted; <code>400</code> Invalid request; <code>409</code> Custom command name conflict or limit exceeded; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete custom command by name.</li>
+</ul>
+
+<p>Operation ID: <code>deleteCustomCommand</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Custom command deleted; <code>404</code> Custom command not found; <code>409</code> Custom command name resolves to multiple scoped commands; <code>426</code> TLS required</p>
+
+<h2 id="decks">Decks</h2>
+
+<h3 id="decks-2"><code>/decks</code></h3>
+
+<ul>
+<li><strong>GET</strong> List decks.</li>
+</ul>
+
+<p>Operation ID: <code>listDecks</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Deck list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create deck.</li>
+</ul>
+
+<p>Operation ID: <code>createDeck</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Deck created; <code>400</code> Invalid request; <code>409</code> Deck id already exists; <code>426</code> TLS required</p>
+
+<h3 id="decks-deckid"><code>/decks/{deckId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get deck by id.</li>
+</ul>
+
+<p>Operation ID: <code>getDeck</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Deck found; <code>404</code> Deck not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update deck metadata/settings.</li>
+</ul>
+
+<p>Operation ID: <code>updateDeck</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Deck updated; <code>400</code> Invalid request; <code>404</code> Deck not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete deck by id.</li>
+</ul>
+
+<p>Operation ID: <code>deleteDeck</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Deck deleted; <code>400</code> Invalid query parameter; <code>404</code> Deck not found; <code>409</code> Deck delete conflict; <code>426</code> TLS required</p>
+
+<h3 id="decks-deckid-sessions-sessionid-move"><code>/decks/{deckId}/sessions/{sessionId}:move</code></h3>
+
+<ul>
+<li><strong>POST</strong> Move session to deck.</li>
+</ul>
+
+<p>Operation ID: <code>moveSessionToDeck</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Move accepted; <code>404</code> Deck or session not found; <code>426</code> TLS required</p>
+
+<h2 id="layout-profiles">Layout Profiles</h2>
+
+<h3 id="layout-profiles-2"><code>/layout-profiles</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted layout profiles.</li>
+</ul>
+
+<p>Operation ID: <code>listLayoutProfiles</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Layout profile list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create a persisted layout profile.</li>
+</ul>
+
+<p>Operation ID: <code>createLayoutProfile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Layout profile created; <code>400</code> Invalid request; <code>409</code> Layout profile id already exists; <code>426</code> TLS required</p>
+
+<h3 id="layout-profiles-profileid"><code>/layout-profiles/{profileId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get layout profile by id.</li>
+</ul>
+
+<p>Operation ID: <code>getLayoutProfile</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Layout profile found; <code>404</code> Layout profile not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update persisted layout profile metadata/layout.</li>
+</ul>
+
+<p>Operation ID: <code>updateLayoutProfile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Layout profile updated; <code>400</code> Invalid request; <code>404</code> Layout profile not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete persisted layout profile by id.</li>
+</ul>
+
+<p>Operation ID: <code>deleteLayoutProfile</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Layout profile deleted; <code>404</code> Layout profile not found; <code>426</code> TLS required</p>
+
+<h2 id="sessions">Sessions</h2>
+
+<h3 id="sessions-2"><code>/sessions</code></h3>
+
+<ul>
+<li><strong>GET</strong> List sessions</li>
+</ul>
+
+<p>Operation ID: <code>listSessions</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create session</li>
+</ul>
+
+<p>Operation ID: <code>createSession</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Session created; <code>400</code> Invalid request; <code>409</code> Session concurrency limit exceeded; <code>429</code> Rate limit exceeded; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid"><code>/sessions/{sessionId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get session</li>
+</ul>
+
+<p>Operation ID: <code>getSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session found; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete session</li>
+</ul>
+
+<p>Operation ID: <code>deleteSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Session deleted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update session metadata</li>
+</ul>
+
+<p>Operation ID: <code>updateSession</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session updated; <code>400</code> Invalid request; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-control-forget-client"><code>/sessions/{sessionId}/control/forget-client</code></h3>
+
+<ul>
+<li><strong>POST</strong> Forget a stale offline trusted-local device attachment for the current session.</li>
+</ul>
+
+<p>Operation ID: <code>forgetSessionControlClient</code> Request body: required Auth note: Bearer-authenticated operator route with explicit auth/scope failures in the contract. Responses: <code>200</code> Stale device forgotten; <code>403</code> Control denied; <code>409</code> Target client is still active or not attached; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-control-release"><code>/sessions/{sessionId}/control/release</code></h3>
+
+<ul>
+<li><strong>POST</strong> Release active control of a session for the current controller.</li>
+</ul>
+
+<p>Operation ID: <code>releaseSessionControl</code> Request body: optional or none Auth note: Bearer-authenticated operator route with explicit auth/scope failures in the contract. Responses: <code>200</code> Session control released; <code>403</code> Control denied; <code>409</code> No active attached client or no current controller; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-control-rename-client"><code>/sessions/{sessionId}/control/rename-client</code></h3>
+
+<ul>
+<li><strong>POST</strong> Rename the current trusted-local attached client for reconnect and handoff flows.</li>
+</ul>
+
+<p>Operation ID: <code>renameSessionControlClient</code> Request body: required Auth note: Bearer-authenticated operator route with explicit auth/scope failures in the contract. Responses: <code>200</code> Trusted-local client renamed; <code>403</code> Control denied; <code>409</code> No active attached client is available for rename; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-control-take"><code>/sessions/{sessionId}/control/take</code></h3>
+
+<ul>
+<li><strong>POST</strong> Take active control of a session for the current attached client.</li>
+</ul>
+
+<p>Operation ID: <code>takeSessionControl</code> Request body: optional or none Auth note: Bearer-authenticated operator route with explicit auth/scope failures in the contract. Responses: <code>200</code> Session control transferred to the requesting client; <code>403</code> Control denied; <code>409</code> No active attached client or another controller still owns the session; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-control-transfer"><code>/sessions/{sessionId}/control/transfer</code></h3>
+
+<ul>
+<li><strong>POST</strong> Transfer active control to another attached client.</li>
+</ul>
+
+<p>Operation ID: <code>transferSessionControl</code> Request body: required Auth note: Bearer-authenticated operator route with explicit auth/scope failures in the contract. Responses: <code>200</code> Session control transferred to the target client; <code>403</code> Control denied; <code>409</code> Target client is not actively attached; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-file-transfer-download"><code>/sessions/{sessionId}/file-transfer/download</code></h3>
+
+<ul>
+<li><strong>POST</strong> Download a bounded file payload relative to the current local session root.</li>
+</ul>
+
+<p>Operation ID: <code>downloadSessionFile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> File payload downloaded; <code>400</code> Invalid request; <code>404</code> Session or file not found; <code>409</code> Transfer unsupported or unavailable; <code>413</code> File exceeds transfer size limit; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-file-transfer-upload"><code>/sessions/{sessionId}/file-transfer/upload</code></h3>
+
+<ul>
+<li><strong>POST</strong> Upload a bounded file payload relative to the current local session root.</li>
+</ul>
+
+<p>Operation ID: <code>uploadSessionFile</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> File payload uploaded; <code>400</code> Invalid request; <code>404</code> Session not found; <code>409</code> Transfer unsupported or unavailable; <code>413</code> File exceeds transfer size limit; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-input"><code>/sessions/{sessionId}/input</code></h3>
+
+<ul>
+<li><strong>POST</strong> Send input bytes to a session PTY.</li>
+</ul>
+
+<p>Operation ID: <code>sendInput</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Input accepted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-interrupt"><code>/sessions/{sessionId}/interrupt</code></h3>
+
+<ul>
+<li><strong>POST</strong> Send SIGINT to the session PTY process.</li>
+</ul>
+
+<p>Operation ID: <code>interruptSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Interrupt accepted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-kill"><code>/sessions/{sessionId}/kill</code></h3>
+
+<ul>
+<li><strong>POST</strong> Send SIGKILL to the session PTY process.</li>
+</ul>
+
+<p>Operation ID: <code>killSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Kill accepted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-replay-excerpt"><code>/sessions/{sessionId}/replay-excerpt</code></h3>
+
+<ul>
+<li><strong>GET</strong> Extract a normalized visible-text replay excerpt for a session.</li>
+</ul>
+
+<p>Operation ID: <code>getSessionReplayExcerpt</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Replay excerpt payload; <code>400</code> Invalid replay excerpt selector; <code>404</code> Session not found; <code>409</code> Requested replay excerpt mode is unavailable for the session; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-replay-export"><code>/sessions/{sessionId}/replay-export</code></h3>
+
+<ul>
+<li><strong>GET</strong> Export the currently retained replay tail for a session.</li>
+</ul>
+
+<p>Operation ID: <code>getSessionReplayExport</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Replay export payload; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-resize"><code>/sessions/{sessionId}/resize</code></h3>
+
+<ul>
+<li><strong>POST</strong> Resize session terminal dimensions.</li>
+</ul>
+
+<p>Operation ID: <code>resizeSession</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Resize accepted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-restart"><code>/sessions/{sessionId}/restart</code></h3>
+
+<ul>
+<li><strong>POST</strong> Restart session process while preserving session identity.</li>
+</ul>
+
+<p>Operation ID: <code>restartSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Session restarted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-swap-quick-id"><code>/sessions/{sessionId}/swap-quick-id</code></h3>
+
+<ul>
+<li><strong>POST</strong> Swap persisted quick-id tokens between two sessions.</li>
+</ul>
+
+<p>Operation ID: <code>swapSessionQuickId</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Quick-id tokens swapped; <code>400</code> Invalid request; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h3 id="sessions-sessionid-terminate"><code>/sessions/{sessionId}/terminate</code></h3>
+
+<ul>
+<li><strong>POST</strong> Send SIGTERM to the session PTY process.</li>
+</ul>
+
+<p>Operation ID: <code>terminateSession</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Terminate accepted; <code>404</code> Session not found; <code>426</code> TLS required</p>
+
+<h2 id="shares">Shares</h2>
+
+<h3 id="shares-2"><code>/shares</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted read-only share links.</li>
+</ul>
+
+<p>Operation ID: <code>listShares</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Share link list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create a read-only spectator share link for a session or deck.</li>
+</ul>
+
+<p>Operation ID: <code>createShareLink</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Share link created; <code>400</code> Invalid request; <code>404</code> Target not found; <code>426</code> TLS required</p>
+
+<h3 id="shares-shareid"><code>/shares/{shareId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get share link metadata by id.</li>
+</ul>
+
+<p>Operation ID: <code>getShareLink</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Share link found; <code>404</code> Share link not found; <code>426</code> TLS required</p>
+
+<h3 id="shares-shareid-revoke"><code>/shares/{shareId}/revoke</code></h3>
+
+<ul>
+<li><strong>POST</strong> Revoke a read-only spectator share link.</li>
+</ul>
+
+<p>Operation ID: <code>revokeShareLink</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Share link revoked; <code>404</code> Share link not found; <code>426</code> TLS required</p>
+
+<h2 id="ssh-host-key-probe">ssh host key probe</h2>
+
+<h3 id="ssh-host-key-probe-2"><code>/ssh-host-key-probe</code></h3>
+
+<ul>
+<li><strong>POST</strong> Probe SSH host keys for a target before trusting one.</li>
+</ul>
+
+<p>Operation ID: <code>probeSshHostKeys</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Probed SSH host keys for the requested target; <code>400</code> Invalid request; <code>502</code> SSH host-key probe failed; <code>503</code> SSH host-key probe unavailable; <code>504</code> SSH host-key probe timed out; <code>426</code> TLS required</p>
+
+<h2 id="ssh-trust">SSH Trust</h2>
+
+<h3 id="ssh-trust-entries"><code>/ssh-trust-entries</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted SSH host-key trust entries.</li>
+</ul>
+
+<p>Operation ID: <code>listSshTrustEntries</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> SSH trust entry list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create or reuse a persisted SSH host-key trust entry.</li>
+</ul>
+
+<p>Operation ID: <code>createSshTrustEntry</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Existing trust entry reused; <code>201</code> Trust entry created; <code>400</code> Invalid request; <code>409</code> Trust entry conflicts with an existing host/key-type mapping; <code>426</code> TLS required</p>
+
+<h3 id="ssh-trust-entries-entryid"><code>/ssh-trust-entries/{entryId}</code></h3>
+
+<ul>
+<li><strong>DELETE</strong> Delete a persisted SSH host-key trust entry.</li>
+</ul>
+
+<p>Operation ID: <code>deleteSshTrustEntry</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Trust entry deleted; <code>404</code> Trust entry not found; <code>426</code> TLS required</p>
+
+<h2 id="workspace-presets">Workspace Presets</h2>
+
+<h3 id="workspace-presets-2"><code>/workspace-presets</code></h3>
+
+<ul>
+<li><strong>GET</strong> List persisted workspace presets.</li>
+</ul>
+
+<p>Operation ID: <code>listWorkspacePresets</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Workspace preset list; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>POST</strong> Create a persisted workspace preset.</li>
+</ul>
+
+<p>Operation ID: <code>createWorkspacePreset</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>201</code> Workspace preset created; <code>400</code> Invalid request; <code>409</code> Workspace preset id already exists; <code>426</code> TLS required</p>
+
+<h3 id="workspace-presets-presetid"><code>/workspace-presets/{presetId}</code></h3>
+
+<ul>
+<li><strong>GET</strong> Get workspace preset by id.</li>
+</ul>
+
+<p>Operation ID: <code>getWorkspacePreset</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Workspace preset found; <code>404</code> Workspace preset not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>PATCH</strong> Update persisted workspace preset metadata/workspace.</li>
+</ul>
+
+<p>Operation ID: <code>updateWorkspacePreset</code> Request body: required Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>200</code> Workspace preset updated; <code>400</code> Invalid request; <code>404</code> Workspace preset not found; <code>426</code> TLS required</p>
+
+<ul>
+<li><strong>DELETE</strong> Delete persisted workspace preset by id.</li>
+</ul>
+
+<p>Operation ID: <code>deleteWorkspacePreset</code> Request body: optional or none Auth note: Operator route under <code>/api/v1</code>; share spectators use share URLs instead of this route family. Responses: <code>204</code> Workspace preset deleted; <code>404</code> Workspace preset not found; <code>426</code> TLS required</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#authentication">Authentication</a></li>
+<li><a class="handbook-page-toc-link" href="#auth-dev-token">`/auth/dev-token`</a></li>
+<li><a class="handbook-page-toc-link" href="#auth-ws-ticket">`/auth/ws-ticket`</a></li>
+<li><a class="handbook-page-toc-link" href="#connection-profiles">Connection Profiles</a></li>
+<li><a class="handbook-page-toc-link" href="#connection-profiles-2">`/connection-profiles`</a></li>
+<li><a class="handbook-page-toc-link" href="#connection-profiles-profileid">`/connection-profiles/{profileId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#custom-commands">Custom Commands</a></li>
+<li><a class="handbook-page-toc-link" href="#custom-commands-2">`/custom-commands`</a></li>
+<li><a class="handbook-page-toc-link" href="#custom-commands-commandname">`/custom-commands/{commandName}`</a></li>
+<li><a class="handbook-page-toc-link" href="#decks">Decks</a></li>
+<li><a class="handbook-page-toc-link" href="#decks-2">`/decks`</a></li>
+<li><a class="handbook-page-toc-link" href="#decks-deckid">`/decks/{deckId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#decks-deckid-sessions-sessionid-move">`/decks/{deckId}/sessions/{sessionId}:move`</a></li>
+<li><a class="handbook-page-toc-link" href="#layout-profiles">Layout Profiles</a></li>
+<li><a class="handbook-page-toc-link" href="#layout-profiles-2">`/layout-profiles`</a></li>
+<li><a class="handbook-page-toc-link" href="#layout-profiles-profileid">`/layout-profiles/{profileId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions">Sessions</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-2">`/sessions`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid">`/sessions/{sessionId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-control-forget-client">`/sessions/{sessionId}/control/forget-client`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-control-release">`/sessions/{sessionId}/control/release`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-control-rename-client">`/sessions/{sessionId}/control/rename-client`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-control-take">`/sessions/{sessionId}/control/take`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-control-transfer">`/sessions/{sessionId}/control/transfer`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-file-transfer-download">`/sessions/{sessionId}/file-transfer/download`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-file-transfer-upload">`/sessions/{sessionId}/file-transfer/upload`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-input">`/sessions/{sessionId}/input`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-interrupt">`/sessions/{sessionId}/interrupt`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-kill">`/sessions/{sessionId}/kill`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-replay-excerpt">`/sessions/{sessionId}/replay-excerpt`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-replay-export">`/sessions/{sessionId}/replay-export`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-resize">`/sessions/{sessionId}/resize`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-restart">`/sessions/{sessionId}/restart`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-swap-quick-id">`/sessions/{sessionId}/swap-quick-id`</a></li>
+<li><a class="handbook-page-toc-link" href="#sessions-sessionid-terminate">`/sessions/{sessionId}/terminate`</a></li>
+<li><a class="handbook-page-toc-link" href="#shares">Shares</a></li>
+<li><a class="handbook-page-toc-link" href="#shares-2">`/shares`</a></li>
+<li><a class="handbook-page-toc-link" href="#shares-shareid">`/shares/{shareId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#shares-shareid-revoke">`/shares/{shareId}/revoke`</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh-host-key-probe">ssh host key probe</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh-host-key-probe-2">`/ssh-host-key-probe`</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh-trust">SSH Trust</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh-trust-entries">`/ssh-trust-entries`</a></li>
+<li><a class="handbook-page-toc-link" href="#ssh-trust-entries-entryid">`/ssh-trust-entries/{entryId}`</a></li>
+<li><a class="handbook-page-toc-link" href="#workspace-presets">Workspace Presets</a></li>
+<li><a class="handbook-page-toc-link" href="#workspace-presets-2">`/workspace-presets`</a></li>
+<li><a class="handbook-page-toc-link" href="#workspace-presets-presetid">`/workspace-presets/{presetId}`</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

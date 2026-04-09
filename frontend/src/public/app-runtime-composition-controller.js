@@ -41,6 +41,7 @@ import {
   createSessionStreamAdapter
 } from "./terminal-stream.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
+import { SYSTEM_SLASH_COMMANDS } from "./system-slash-commands.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
 import { createActionDialogController } from "./ui/action-dialog-controller.js";
 import { createDeckSidebarController } from "./ui/deck-sidebar-controller.js";
@@ -474,33 +475,6 @@ const TERMINAL_THEME_PRESETS = [
 ];
 const TERMINAL_THEME_PRESET_MAP = new Map(TERMINAL_THEME_PRESETS.map((entry) => [entry.id, entry]));
 const TERMINAL_THEME_MODE_SET = new Set(["custom", ...TERMINAL_THEME_PRESETS.map((entry) => entry.id)]);
-const SYSTEM_SLASH_COMMANDS = [
-  "new",
-  "deck",
-  "move",
-  "size",
-  "filter",
-  "close",
-  "switch",
-  "swap",
-  "next",
-  "prev",
-  "list",
-  "rename",
-  "restart",
-  "note",
-  "connection",
-  "layout",
-  "workspace",
-  "broadcast",
-  "share",
-  "replay",
-  "transfer",
-  "settings",
-  "custom",
-  "help",
-  "run"
-];
 let layoutRuntimeController = null;
 let connectionProfileRuntimeController = null;
 let terminalSettings = null;

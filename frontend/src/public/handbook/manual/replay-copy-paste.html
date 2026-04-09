@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Replay Copy and Paste</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="replay-copy-and-paste">Replay Copy and Paste</h1>
+
+<p>Replay-based copy and paste is the bounded way to move visible terminal output from one session into another without selecting text manually.</p>
+
+<h2 id="preview-before-you-move-content">Preview Before You Move Content</h2>
+
+<p>Use preview when you want to inspect the excerpt first:</p>
+
+<pre><code class="language-text">/replay preview 4 l:40
+/replay preview 4 sp:1</code></pre>
+
+<p>Selectors:</p>
+
+<ul>
+<li><code>l:N</code> for the last visible lines</li>
+<li><code>c:N</code> for the last visible characters</li>
+<li><code>sp:N</code> for complete shell blocks when shell-block tracking is available</li>
+</ul>
+
+<h2 id="copy-to-the-browser-clipboard">Copy to the Browser Clipboard</h2>
+
+<pre><code class="language-text">/replay copy 4 l:80</code></pre>
+
+<p>This copies the normalized visible-text excerpt, not raw ANSI control sequences.</p>
+
+<h2 id="paste-into-another-session">Paste into Another Session</h2>
+
+<pre><code class="language-text">/replay paste 4 3 sp:2
+/ccp 4 3 l:80</code></pre>
+
+<p><code>/ccp</code> is just the compact alias for <code>/replay paste</code>.</p>
+
+<p>The target path reuses the normal paste/send runtime, which means replay paste still respects:</p>
+
+<ul>
+<li>send terminators</li>
+<li>send safety</li>
+<li>trusted-local controller gating</li>
+<li>reclaim-and-retry behavior</li>
+</ul>
+
+<h2 id="when-sp-n-is-unavailable">When <code>sp:N</code> Is Unavailable</h2>
+
+<p><code>sp:N</code> is intentionally strict. If robust shell-block boundaries are not available for the source session, the command fails explicitly instead of guessing with prompt regexes.</p>
+
+<p>Use <code>l:N</code> or <code>c:N</code> as the fallback.</p>
+
+<p>The exact command contract stays in the <a href="/handbook/reference/commands.html#replay">slash command reference</a>.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#preview-before-you-move-content">Preview Before You Move Content</a></li>
+<li><a class="handbook-page-toc-link" href="#copy-to-the-browser-clipboard">Copy to the Browser Clipboard</a></li>
+<li><a class="handbook-page-toc-link" href="#paste-into-another-session">Paste into Another Session</a></li>
+<li><a class="handbook-page-toc-link" href="#when-sp-n-is-unavailable">When `sp:N` Is Unavailable</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

@@ -1,10 +1,11 @@
 # Docs Review Index
 
-This directory now contains three document classes:
+This directory now contains four document classes:
 
 - imported architecture-review and strategy notes
 - repository-native ADR process material under `docs/adr/`
 - repository-native operational acceptance notes for branch-specific validation/sign-off
+- repository-native handbook source under `docs/manual/` plus generated reference output under `docs/reference/`
 
 The imported review notes are useful inputs, but they are not the authoritative source of implementation status.
 
@@ -123,7 +124,18 @@ Authoritative repository documents remain:
     - `DEPLOYMENT.md` section `8.2`
     - `DEPLOYMENT.md` section `8.3`
 
-### 9. Messaging Adapter Concept
+### 9. Handbook System
+
+- `manual/`
+- `reference/`
+  - Role: handbook source and generated reference material for the in-app documentation surface served under `/handbook/...`
+  - Status: repository-native source of truth for operator guides and generated reference pages
+  - Current interpretation:
+    - `docs/manual/` stays curated and workflow-oriented
+    - `docs/reference/` stays generated from code/contracts through `npm run docs:generate`
+    - `frontend/src/public/handbook/` is generated output, not a hand-edited documentation source
+
+### 10. Messaging Adapter Concept
 
 - `ptydeck_messaging_adapter_framework_final_concept.md`
   - Role: non-technical product concept for a future messaging-adapter framework

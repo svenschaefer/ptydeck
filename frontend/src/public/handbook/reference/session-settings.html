@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Session Settings Reference</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><a href="/handbook/reference/index.html">Reference</a></nav>
+        <h1 id="session-settings-reference">Session Settings Reference</h1>
+
+<p>Generated from <code>frontend/src/public/index.html</code>, <code>frontend/src/public/input-safety-profile.js</code>, and <code>frontend/src/public/session-mouse-forwarding.js</code>.</p>
+
+<p>Dialog tabs: <code>Startup</code>, <code>Input</code>, <code>Note</code>, <code>Theme</code>.</p>
+
+<p>Use Startup for launch settings, Input for send and terminal behavior, Note for saved notes and tags, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
+
+<h2 id="startup-tab">Startup Tab</h2>
+
+<p>Launch-time session settings. These values affect how the session starts or restarts.</p>
+
+<ul>
+<li>Working Directory</li>
+<li>Start Command Line</li>
+<li>Environment Variables (KEY=VALUE per line)</li>
+</ul>
+
+<h2 id="input-tab">Input Tab</h2>
+
+<p>Send behavior, terminal interaction, and guarded input rules.</p>
+
+<h3 id="send-terminator">Send Terminator</h3>
+
+<table>
+<thead><tr><th>Value</th><th>Label</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td><code>auto</code></td><td>Auto (CR / Enter)</td><td>Yes</td></tr>
+<tr><td><code>crlf</code></td><td>CRLF (\\r\\n)</td><td>No</td></tr>
+<tr><td><code>lf</code></td><td>LF (\\n)</td><td>No</td></tr>
+<tr><td><code>cr</code></td><td>CR (\\r)</td><td>No</td></tr>
+<tr><td><code>cr2</code></td><td>CR2 (\\r\\r)</td><td>No</td></tr>
+<tr><td><code>cr_delay</code></td><td>CR_DELAY (text then delayed \\r)</td><td>No</td></tr>
+</tbody>
+</table>
+
+<h3 id="mouse-forwarding">Mouse Forwarding</h3>
+
+<table>
+<thead><tr><th>Value</th><th>Label</th><th>Runtime Accepted</th></tr></thead>
+<tbody>
+<tr><td><code>off</code></td><td>Off</td><td>Yes</td></tr>
+<tr><td><code>application</code></td><td>Application-controlled</td><td>Yes</td></tr>
+</tbody>
+</table>
+
+<h3 id="send-safety-checks">Send Safety Checks</h3>
+
+<table>
+<thead><tr><th>Setting</th><th>Default</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td>Always confirm before send</td><td>No</td><td>Catch-all guard. Every non-empty send requires confirmation.</td></tr>
+<tr><td>Require structurally valid shell syntax</td><td>No</td><td>Rejects clearly broken shell input such as unbalanced quotes or unfinished blocks.</td></tr>
+<tr><td>Confirm incomplete shell constructs</td><td>No</td><td>Prompts when shell syntax still looks unfinished even if it is not fully rejected.</td></tr>
+<tr><td>Confirm likely natural-language text</td><td>No</td><td>Heuristic only. Catches prose-like input that does not look like a shell command.</td></tr>
+<tr><td>Confirm known dangerous shell patterns</td><td>No</td><td>Pattern-based matcher for destructive commands such as <code>rm -rf</code> or <code>git reset --hard</code>.</td></tr>
+<tr><td>Confirm multiline or large paste input</td><td>No</td><td>Uses the line and character thresholds configured below.</td></tr>
+<tr><td>Auto continue stalled terminal paste</td><td>No</td><td>Terminal-local paste only. Sends the configured terminator automatically after bounded partial-ack stall detection.</td></tr>
+<tr><td>Confirm recent target switches</td><td>No</td><td>Uses the grace window configured below. Outside that window, no prompt is shown.</td></tr>
+</tbody>
+</table>
+
+<h3 id="threshold-defaults">Threshold Defaults</h3>
+
+<table>
+<thead><tr><th>Setting</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td>Target Switch Grace (ms)</td><td><code>4000</code></td></tr>
+<tr><td>Paste Length Threshold</td><td><code>400</code></td></tr>
+<tr><td>Paste Line Threshold</td><td><code>5</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="note-tab">Note Tab</h2>
+
+<p>Persisted per-session note and tag metadata.</p>
+
+<ul>
+<li>Session Note</li>
+<li>Tags (comma/space/newline separated)</li>
+</ul>
+
+<h2 id="theme-tab">Theme Tab</h2>
+
+<p>Session-local appearance controls for active and inactive terminal views.</p>
+
+<p>Primary selectors: <code>Theme Slot</code>, <code>Theme Category</code>, <code>Theme Search</code>, <code>Theme Preset</code>.</p>
+
+<p>Theme slots: <code>active</code> (Active), <code>inactive</code> (Inactive).</p>
+
+<p>Theme categories: <code>all</code> (All), <code>dark</code> (Dark), <code>light</code> (Light).</p>
+
+<p>Advanced custom colors: <code>Background</code>, <code>Foreground</code>, <code>Cursor</code>, <code>Black</code>, <code>Red</code>, <code>Green</code>, <code>Yellow</code>, <code>Blue</code>, <code>Magenta</code>, <code>Cyan</code>, <code>White</code>, <code>Bright Black</code>, <code>Bright Red</code>, <code>Bright Green</code>, <code>Bright Yellow</code>, <code>Bright Blue</code>, <code>Bright Magenta</code>, <code>Bright Cyan</code>, <code>Bright White</code>.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#startup-tab">Startup Tab</a></li>
+<li><a class="handbook-page-toc-link" href="#input-tab">Input Tab</a></li>
+<li><a class="handbook-page-toc-link" href="#send-terminator">Send Terminator</a></li>
+<li><a class="handbook-page-toc-link" href="#mouse-forwarding">Mouse Forwarding</a></li>
+<li><a class="handbook-page-toc-link" href="#send-safety-checks">Send Safety Checks</a></li>
+<li><a class="handbook-page-toc-link" href="#threshold-defaults">Threshold Defaults</a></li>
+<li><a class="handbook-page-toc-link" href="#note-tab">Note Tab</a></li>
+<li><a class="handbook-page-toc-link" href="#theme-tab">Theme Tab</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

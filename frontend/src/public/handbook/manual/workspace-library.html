@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Workspace Library</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="workspace-library">Workspace Library</h1>
+
+<p>The <code>Manage</code> entry in the control pane opens the <code>Workspace Library</code>.</p>
+
+<p>Use it for saved connection profiles and saved workspace presets instead of overloading the left sidebar.</p>
+
+<h2 id="connections">Connections</h2>
+
+<p>Use the <code>Connections</code> tab when you want saved local or SSH launch profiles.</p>
+
+<p>Typical flow:</p>
+
+<ol>
+<li>open <code>Manage</code></li>
+<li>choose <code>Connections</code></li>
+<li>create a new local or SSH draft</li>
+<li>save the profile or <code>Save and Launch</code></li>
+</ol>
+
+<p>Useful slash companions:</p>
+
+<pre><code class="language-text">/connection list
+/connection new local
+/connection save
+/connection apply ops-ssh</code></pre>
+
+<h2 id="workspace-presets">Workspace Presets</h2>
+
+<p>Use the <code>Workspace Presets</code> tab when you want to persist the visible workspace shape and reapply it later.</p>
+
+<p>Useful slash companions:</p>
+
+<pre><code class="language-text">/workspace list
+/workspace save morning-ops
+/workspace apply morning-ops</code></pre>
+
+<h2 id="keep-the-roles-separate">Keep the Roles Separate</h2>
+
+<p>Use these surfaces for different problems:</p>
+
+<ul>
+<li><code>Connections</code>: how a session starts</li>
+<li><code>Workspace Presets</code>: what the visible workspace looks like</li>
+<li>session settings: how one session behaves</li>
+<li>layout profiles: reusable deck layout state</li>
+</ul>
+
+<p>The handbook keeps the workflows here and the exact transport/field contract in the generated reference pages.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#connections">Connections</a></li>
+<li><a class="handbook-page-toc-link" href="#workspace-presets">Workspace Presets</a></li>
+<li><a class="handbook-page-toc-link" href="#keep-the-roles-separate">Keep the Roles Separate</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Paste and Send Safety</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="paste-and-send-safety">Paste and Send Safety</h1>
+
+<p><code>ptydeck</code> has two different input paths:</p>
+
+<ul>
+<li>composer <code>Send</code></li>
+<li>terminal-local paste or typing inside the mounted terminal</li>
+</ul>
+
+<p>They share the same send-safety model, but they do not start from the same UI surface.</p>
+
+<h2 id="guarded-sends">Guarded Sends</h2>
+
+<p>If a rule in the session input-safety profile matches, the input is held for confirmation.</p>
+
+<p>The control pane states that nothing has been sent yet, then shows <code>Send anyway</code> if you want to override the guard.</p>
+
+<p>Use the <a href="/handbook/reference/session-settings.html#input-tab">session settings reference</a> for the exact input-safety switches and thresholds.</p>
+
+<h2 id="terminal-local-paste">Terminal-Local Paste</h2>
+
+<p>Terminal-local paste is routed through the guarded send path instead of bypassing safety checks.</p>
+
+<p>If a large paste looks incomplete, <code>ptydeck</code> can now classify the result as:</p>
+
+<ul>
+<li>complete</li>
+<li>partial</li>
+<li>placeholder-acknowledged</li>
+<li>stalled</li>
+</ul>
+
+<p>For stalled terminal-local paste, use the explicit <code>Continue Paste</code> action in the control pane.</p>
+
+<h2 id="auto-continue">Auto Continue</h2>
+
+<p><code>Paste Auto Continue</code> is intentionally conservative.</p>
+
+<p>Use it only when a session consistently shows the same partial-ack behavior, for example a coding-agent prompt that accepts the first large block and then waits for another submit signal.</p>
+
+<h2 id="practical-checks">Practical Checks</h2>
+
+<p>When paste behavior differs across sessions, compare these first:</p>
+
+<ol>
+<li>the <code>Input</code> tab</li>
+<li>the session&#39;s send terminator</li>
+<li>whether the session has stricter send-safety rules enabled</li>
+</ol>
+
+<p>The field-level truth stays in the <a href="/handbook/reference/session-settings.html#input-tab">generated input reference</a>.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#guarded-sends">Guarded Sends</a></li>
+<li><a class="handbook-page-toc-link" href="#terminal-local-paste">Terminal-Local Paste</a></li>
+<li><a class="handbook-page-toc-link" href="#auto-continue">Auto Continue</a></li>
+<li><a class="handbook-page-toc-link" href="#practical-checks">Practical Checks</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

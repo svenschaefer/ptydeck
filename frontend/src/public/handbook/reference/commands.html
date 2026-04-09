@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Slash Command Reference</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><a href="/handbook/reference/index.html">Reference</a></nav>
+        <h1 id="slash-command-reference">Slash Command Reference</h1>
+
+<p>Generated from <code>frontend/src/public/command-schema.js</code> and <code>frontend/src/public/system-slash-commands.js</code>.</p>
+
+<h2 id="canonical-commands">Canonical Commands</h2>
+
+<table>
+<thead><tr><th>Command</th><th>Description</th><th>Usage</th><th>Aliases</th></tr></thead>
+<tbody>
+<tr><td><code>/broadcast</code></td><td>manage composer broadcast mode for workspace groups</td><td><code>/broadcast status</code><br><code>/broadcast off</code><br><code>/broadcast group [group]</code></td><td>-</td></tr>
+<tr><td><code>/close</code></td><td>delete sessions</td><td><code>/close [selector[,selector...]]</code></td><td><code>/session.close</code></td></tr>
+<tr><td><code>/connection</code></td><td>manage saved connection profiles</td><td><code>/connection list</code><br><code>/connection new &lt;name&gt;</code><br><code>/connection save &lt;name&gt;</code><br><code>/connection show &lt;profile&gt;</code><br><code>/connection apply &lt;profile&gt;</code><br><code>/connection duplicate &lt;profile&gt; &lt;name&gt;</code><br><code>/connection rename &lt;profile&gt; &lt;name&gt;</code><br><code>/connection delete &lt;profile&gt;</code><br><code>/connection draft show</code><br><code>/connection draft new [name]</code><br><code>/connection draft active</code><br><code>/connection draft set &lt;json&gt;</code><br><code>/connection draft save [name]</code><br><code>/connection draft reset</code></td><td>-</td></tr>
+<tr><td><code>/deck</code></td><td>manage decks</td><td><code>/deck list</code><br><code>/deck new &lt;name&gt;</code><br><code>/deck rename &lt;name&gt;</code><br><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code><br><code>/deck switch &lt;deckSelector&gt;</code><br><code>/deck delete [deckSelector] [force]</code></td><td>-</td></tr>
+<tr><td><code>/filter</code></td><td>filter visible terminals</td><td><code>/filter [id/tag[,id/tag...]]</code></td><td>-</td></tr>
+<tr><td><code>/help</code></td><td>show command help</td><td><code>/help</code><br><code>/help &lt;topic&gt;</code><br><code>/help &lt;topic&gt; &lt;subcommand&gt;</code></td><td>-</td></tr>
+<tr><td><code>/layout</code></td><td>manage persisted layout profiles</td><td><code>/layout list</code><br><code>/layout save &lt;name&gt;</code><br><code>/layout apply &lt;profile&gt;</code><br><code>/layout rename &lt;profile&gt; &lt;name&gt;</code><br><code>/layout delete &lt;profile&gt;</code></td><td>-</td></tr>
+<tr><td><code>/list</code></td><td>list sessions</td><td><code>/list</code></td><td><code>/session.list</code></td></tr>
+<tr><td><code>/move</code></td><td>move sessions to a deck</td><td><code>/move &lt;sessionSelector&gt; &lt;deckSelector&gt;</code></td><td>-</td></tr>
+<tr><td><code>/new</code></td><td>create a new session</td><td><code>/new [shell]</code></td><td><code>/session.new</code></td></tr>
+<tr><td><code>/next</code></td><td>focus next session</td><td><code>/next</code></td><td><code>/session.next</code></td></tr>
+<tr><td><code>/note</code></td><td>set or clear a persisted session note</td><td><code>/note [text...]</code></td><td><code>/session.note</code></td></tr>
+<tr><td><code>/prev</code></td><td>focus previous session</td><td><code>/prev</code></td><td><code>/session.prev</code></td></tr>
+<tr><td><code>/rename</code></td><td>rename a session</td><td><code>/rename &lt;name&gt;</code></td><td><code>/session.rename</code></td></tr>
+<tr><td><code>/replay</code></td><td>view retained replay tails or preview/copy/paste normalized replay excerpts</td><td><code>/replay view</code><br><code>/replay export</code><br><code>/replay copy</code><br><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code><br><code>/replay preview &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code><br><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></td><td>-</td></tr>
+<tr><td><code>/restart</code></td><td>restart sessions</td><td><code>/restart [selector[,selector...]]</code></td><td><code>/session.restart</code></td></tr>
+<tr><td><code>/run</code></td><td>run a newline-separated slash-command script</td><td><code>/run + newline-separated slash commands</code><br><code>/cmd1 + newline + /cmd2</code></td><td>-</td></tr>
+<tr><td><code>/share</code></td><td>manage read-only spectator shares for sessions and decks</td><td><code>/share list</code><br><code>/share session</code><br><code>/share deck [deckSelector]</code><br><code>/share revoke &lt;shareId&gt;</code></td><td>-</td></tr>
+<tr><td><code>/size</code></td><td>set deck terminal size</td><td><code>/size &lt;cols&gt; &lt;rows&gt;</code><br><code>/size c&lt;cols&gt;</code><br><code>/size r&lt;rows&gt;</code></td><td>-</td></tr>
+<tr><td><code>/swap</code></td><td>swap quick ids between two sessions</td><td><code>/swap &lt;selectorA&gt; &lt;selectorB&gt;</code></td><td><code>/session.swap</code></td></tr>
+<tr><td><code>/switch</code></td><td>switch active session</td><td><code>/switch &lt;sessionSelector&gt;</code></td><td><code>/session.switch</code></td></tr>
+<tr><td><code>/transfer</code></td><td>upload or download bounded files for one session</td><td><code>/transfer upload [path]</code><br><code>/transfer download &lt;path&gt;</code></td><td>-</td></tr>
+<tr><td><code>/workspace</code></td><td>manage persisted workspace presets</td><td><code>/workspace list</code><br><code>/workspace save &lt;name&gt;</code><br><code>/workspace show &lt;preset&gt;</code><br><code>/workspace apply &lt;preset&gt;</code><br><code>/workspace duplicate &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace rename &lt;preset&gt; &lt;name&gt;</code><br><code>/workspace delete &lt;preset&gt;</code><br><code>/workspace group list</code><br><code>/workspace group save &lt;name&gt;</code><br><code>/workspace group apply &lt;group&gt;</code><br><code>/workspace group rename &lt;group&gt; &lt;name&gt;</code><br><code>/workspace group delete &lt;group&gt;</code><br><code>/workspace group clear</code></td><td>-</td></tr>
+</tbody>
+</table>
+
+<h2 id="broadcast">/broadcast</h2>
+
+<p>manage composer broadcast mode for workspace groups</p>
+
+<h3 id="usage">Usage</h3>
+
+<ul>
+<li><code>/broadcast status</code></li>
+<li><code>/broadcast off</code></li>
+<li><code>/broadcast group [group]</code></li>
+</ul>
+
+<h3 id="subcommands">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/broadcast group</code></td><td>broadcast composer sends to the active or selected workspace group<br>Aliases: <code>/broadcast.group</code></td><td><code>/broadcast group [group]</code></td></tr>
+<tr><td><code>/broadcast off</code></td><td>disable broadcast mode<br>Aliases: <code>/broadcast.off</code></td><td><code>/broadcast off</code></td></tr>
+<tr><td><code>/broadcast status</code></td><td>show current broadcast mode<br>Aliases: <code>/broadcast.status</code></td><td><code>/broadcast status</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="close">/close</h2>
+
+<p>delete sessions</p>
+
+<h3 id="usage-2">Usage</h3>
+
+<ul>
+<li><code>/close [selector[,selector...]]</code></li>
+</ul>
+
+<h3 id="aliases">Aliases</h3>
+
+<p><code>/session.close</code></p>
+
+<h2 id="connection">/connection</h2>
+
+<p>manage saved connection profiles</p>
+
+<h3 id="usage-3">Usage</h3>
+
+<ul>
+<li><code>/connection list</code></li>
+<li><code>/connection new &lt;name&gt;</code></li>
+<li><code>/connection save &lt;name&gt;</code></li>
+<li><code>/connection show &lt;profile&gt;</code></li>
+<li><code>/connection apply &lt;profile&gt;</code></li>
+<li><code>/connection duplicate &lt;profile&gt; &lt;name&gt;</code></li>
+<li><code>/connection rename &lt;profile&gt; &lt;name&gt;</code></li>
+<li><code>/connection delete &lt;profile&gt;</code></li>
+<li><code>/connection draft show</code></li>
+<li><code>/connection draft new [name]</code></li>
+<li><code>/connection draft active</code></li>
+<li><code>/connection draft set &lt;json&gt;</code></li>
+<li><code>/connection draft save [name]</code></li>
+<li><code>/connection draft reset</code></li>
+</ul>
+
+<h3 id="subcommands-2">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/connection apply</code></td><td>start a session from a saved connection profile<br>Aliases: <code>/connection.apply</code></td><td><code>/connection apply &lt;profile&gt;</code></td></tr>
+<tr><td><code>/connection delete</code></td><td>delete a saved connection profile<br>Aliases: <code>/connection.delete</code></td><td><code>/connection delete &lt;profile&gt;</code></td></tr>
+<tr><td><code>/connection draft</code></td><td>inspect or edit the connection profile draft used by the Workspace Library</td><td><code>/connection draft show</code><br><code>/connection draft new [name]</code><br><code>/connection draft active</code><br><code>/connection draft set &lt;json&gt;</code><br><code>/connection draft save [name]</code><br><code>/connection draft reset</code></td></tr>
+<tr><td><code>/connection duplicate</code></td><td>duplicate a saved connection profile<br>Aliases: <code>/connection.duplicate</code></td><td><code>/connection duplicate &lt;profile&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/connection list</code></td><td>list saved connection profiles<br>Aliases: <code>/connection.list</code></td><td><code>/connection list</code></td></tr>
+<tr><td><code>/connection new</code></td><td>create a blank saved connection profile<br>Aliases: <code>/connection.new</code></td><td><code>/connection new &lt;name&gt;</code></td></tr>
+<tr><td><code>/connection rename</code></td><td>rename a saved connection profile<br>Aliases: <code>/connection.rename</code></td><td><code>/connection rename &lt;profile&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/connection save</code></td><td>save a session launch preset as a connection profile<br>Aliases: <code>/connection.save</code></td><td><code>/connection save &lt;name&gt;</code></td></tr>
+<tr><td><code>/connection show</code></td><td>show connection profile details<br>Aliases: <code>/connection.show</code></td><td><code>/connection show &lt;profile&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="custom">/custom</h2>
+
+<p>manage custom commands</p>
+
+<h3 id="usage-4">Usage</h3>
+
+<ul>
+<li><code>/custom [plain|template] [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt; &lt;text&gt;</code></li>
+<li><code>/custom [plain|template] [scope:global|scope:project|scope:session:&lt;selector&gt;] &lt;name&gt; + block</code></li>
+</ul>
+
+<h3 id="subcommands-3">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+
+</tbody>
+</table>
+
+<h2 id="deck">/deck</h2>
+
+<p>manage decks</p>
+
+<h3 id="usage-5">Usage</h3>
+
+<ul>
+<li><code>/deck list</code></li>
+<li><code>/deck new &lt;name&gt;</code></li>
+<li><code>/deck rename &lt;name&gt;</code></li>
+<li><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code></li>
+<li><code>/deck switch &lt;deckSelector&gt;</code></li>
+<li><code>/deck delete [deckSelector] [force]</code></li>
+</ul>
+
+<h3 id="subcommands-4">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/deck delete</code></td><td>delete a deck<br>Aliases: <code>/deck.delete</code></td><td><code>/deck delete [deckSelector] [force]</code></td></tr>
+<tr><td><code>/deck list</code></td><td>list decks<br>Aliases: <code>/deck.list</code></td><td><code>/deck list</code></td></tr>
+<tr><td><code>/deck new</code></td><td>create a deck<br>Aliases: <code>/deck.new</code></td><td><code>/deck new &lt;name&gt;</code></td></tr>
+<tr><td><code>/deck rename</code></td><td>rename the active deck<br>Aliases: <code>/deck.rename</code></td><td><code>/deck rename &lt;name&gt;</code><br><code>/deck rename &lt;deckSelector&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/deck switch</code></td><td>switch active deck<br>Aliases: <code>/deck.switch</code></td><td><code>/deck switch &lt;deckSelector&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="filter">/filter</h2>
+
+<p>filter visible terminals</p>
+
+<h3 id="usage-6">Usage</h3>
+
+<ul>
+<li><code>/filter [id/tag[,id/tag...]]</code></li>
+</ul>
+
+<h2 id="help">/help</h2>
+
+<p>show command help</p>
+
+<h3 id="usage-7">Usage</h3>
+
+<ul>
+<li><code>/help</code></li>
+<li><code>/help &lt;topic&gt;</code></li>
+<li><code>/help &lt;topic&gt; &lt;subcommand&gt;</code></li>
+</ul>
+
+<h2 id="layout">/layout</h2>
+
+<p>manage persisted layout profiles</p>
+
+<h3 id="usage-8">Usage</h3>
+
+<ul>
+<li><code>/layout list</code></li>
+<li><code>/layout save &lt;name&gt;</code></li>
+<li><code>/layout apply &lt;profile&gt;</code></li>
+<li><code>/layout rename &lt;profile&gt; &lt;name&gt;</code></li>
+<li><code>/layout delete &lt;profile&gt;</code></li>
+</ul>
+
+<h3 id="subcommands-5">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/layout apply</code></td><td>apply a saved layout profile<br>Aliases: <code>/layout.apply</code></td><td><code>/layout apply &lt;profile&gt;</code></td></tr>
+<tr><td><code>/layout delete</code></td><td>delete a saved layout profile<br>Aliases: <code>/layout.delete</code></td><td><code>/layout delete &lt;profile&gt;</code></td></tr>
+<tr><td><code>/layout list</code></td><td>list saved layout profiles<br>Aliases: <code>/layout.list</code></td><td><code>/layout list</code></td></tr>
+<tr><td><code>/layout rename</code></td><td>rename a saved layout profile<br>Aliases: <code>/layout.rename</code></td><td><code>/layout rename &lt;profile&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/layout save</code></td><td>save the current workspace layout as a named profile<br>Aliases: <code>/layout.save</code></td><td><code>/layout save &lt;name&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="list">/list</h2>
+
+<p>list sessions</p>
+
+<h3 id="usage-9">Usage</h3>
+
+<ul>
+<li><code>/list</code></li>
+</ul>
+
+<h3 id="aliases-2">Aliases</h3>
+
+<p><code>/session.list</code></p>
+
+<h2 id="move">/move</h2>
+
+<p>move sessions to a deck</p>
+
+<h3 id="usage-10">Usage</h3>
+
+<ul>
+<li><code>/move &lt;sessionSelector&gt; &lt;deckSelector&gt;</code></li>
+</ul>
+
+<h2 id="new">/new</h2>
+
+<p>create a new session</p>
+
+<h3 id="usage-11">Usage</h3>
+
+<ul>
+<li><code>/new [shell]</code></li>
+</ul>
+
+<h3 id="aliases-3">Aliases</h3>
+
+<p><code>/session.new</code></p>
+
+<h2 id="next">/next</h2>
+
+<p>focus next session</p>
+
+<h3 id="usage-12">Usage</h3>
+
+<ul>
+<li><code>/next</code></li>
+</ul>
+
+<h3 id="aliases-4">Aliases</h3>
+
+<p><code>/session.next</code></p>
+
+<h2 id="note">/note</h2>
+
+<p>set or clear a persisted session note</p>
+
+<h3 id="usage-13">Usage</h3>
+
+<ul>
+<li><code>/note [text...]</code></li>
+</ul>
+
+<h3 id="aliases-5">Aliases</h3>
+
+<p><code>/session.note</code></p>
+
+<h2 id="prev">/prev</h2>
+
+<p>focus previous session</p>
+
+<h3 id="usage-14">Usage</h3>
+
+<ul>
+<li><code>/prev</code></li>
+</ul>
+
+<h3 id="aliases-6">Aliases</h3>
+
+<p><code>/session.prev</code></p>
+
+<h2 id="rename">/rename</h2>
+
+<p>rename a session</p>
+
+<h3 id="usage-15">Usage</h3>
+
+<ul>
+<li><code>/rename &lt;name&gt;</code></li>
+</ul>
+
+<h3 id="aliases-7">Aliases</h3>
+
+<p><code>/session.rename</code></p>
+
+<h2 id="replay">/replay</h2>
+
+<p>view retained replay tails or preview/copy/paste normalized replay excerpts</p>
+
+<h3 id="usage-16">Usage</h3>
+
+<ul>
+<li><code>/replay view</code></li>
+<li><code>/replay export</code></li>
+<li><code>/replay copy</code></li>
+<li><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></li>
+<li><code>/replay preview &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></li>
+<li><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></li>
+</ul>
+
+<h3 id="subcommands-6">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/replay copy</code></td><td>copy the retained replay tail or a normalized replay excerpt to the clipboard<br>Aliases: <code>/replay.copy</code></td><td><code>/replay copy</code><br><code>/replay copy &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
+<tr><td><code>/replay export</code></td><td>download the retained replay tail<br>Aliases: <code>/replay.export</code></td><td><code>/replay export</code></td></tr>
+<tr><td><code>/replay paste</code></td><td>paste a normalized replay excerpt from one session into another session<br>Aliases: <code>/ccp</code>, <code>/replay.paste</code></td><td><code>/replay paste &lt;sourceSelector&gt; &lt;targetSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
+<tr><td><code>/replay preview</code></td><td>preview a normalized replay excerpt from one source session<br>Aliases: <code>/replay.preview</code></td><td><code>/replay preview &lt;sourceSelector&gt; &lt;sliceSelector&gt;</code></td></tr>
+<tr><td><code>/replay view</code></td><td>open the retained replay tail in the reading viewer<br>Aliases: <code>/replay.view</code></td><td><code>/replay view</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="restart">/restart</h2>
+
+<p>restart sessions</p>
+
+<h3 id="usage-17">Usage</h3>
+
+<ul>
+<li><code>/restart [selector[,selector...]]</code></li>
+</ul>
+
+<h3 id="aliases-8">Aliases</h3>
+
+<p><code>/session.restart</code></p>
+
+<h2 id="run">/run</h2>
+
+<p>run a newline-separated slash-command script</p>
+
+<h3 id="usage-18">Usage</h3>
+
+<ul>
+<li><code>/run + newline-separated slash commands</code></li>
+<li><code>/cmd1 + newline + /cmd2</code></li>
+</ul>
+
+<h2 id="settings">/settings</h2>
+
+<p>inspect or manage session settings</p>
+
+<h3 id="usage-19">Usage</h3>
+
+<ul>
+<li><code>/settings show</code></li>
+<li><code>/settings startup show</code></li>
+<li><code>/settings startup cwd &lt;path&gt;</code></li>
+<li><code>/settings startup command &lt;text...&gt;</code></li>
+<li><code>/settings startup env &lt;json&gt;</code></li>
+<li><code>/settings startup tags &lt;tag[,tag...]&gt;</code></li>
+<li><code>/settings startup terminator &lt;auto|crlf|lf|cr|cr2|cr_delay&gt;</code></li>
+<li><code>/settings note show</code></li>
+<li><code>/settings note set &lt;text...&gt;</code></li>
+<li><code>/settings note clear</code></li>
+<li><code>/settings theme show [active|inactive]</code></li>
+<li><code>/settings theme preset &lt;active|inactive&gt; &lt;theme&gt;</code></li>
+<li><code>/settings theme set &lt;active|inactive&gt; &lt;key&gt; &lt;#rrggbb&gt;</code></li>
+<li><code>/settings theme reset &lt;active|inactive&gt;</code></li>
+<li><code>/settings input-safety show</code></li>
+<li><code>/settings input-safety set &lt;field&gt; &lt;value&gt;</code></li>
+<li><code>/settings mouse-forwarding show</code></li>
+<li><code>/settings mouse-forwarding set &lt;off|application&gt;</code></li>
+</ul>
+
+<h3 id="subcommands-7">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/settings input-safety</code></td><td>inspect or edit explicit input safety options<br>Aliases: <code>/settings.input-safety</code></td><td><code>/settings input-safety show</code><br><code>/settings input-safety set &lt;field&gt; &lt;value&gt;</code></td></tr>
+<tr><td><code>/settings note</code></td><td>inspect or edit the persisted session note<br>Aliases: <code>/settings.note</code></td><td><code>/settings note show</code><br><code>/settings note set &lt;text...&gt;</code><br><code>/settings note clear</code></td></tr>
+<tr><td><code>/settings show</code></td><td>show session settings<br>Aliases: <code>/settings.show</code></td><td><code>/settings show</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="share">/share</h2>
+
+<p>manage read-only spectator shares for sessions and decks</p>
+
+<h3 id="usage-20">Usage</h3>
+
+<ul>
+<li><code>/share list</code></li>
+<li><code>/share session</code></li>
+<li><code>/share deck [deckSelector]</code></li>
+<li><code>/share revoke &lt;shareId&gt;</code></li>
+</ul>
+
+<h3 id="subcommands-8">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/share deck</code></td><td>create a read-only spectator link for the active or selected deck<br>Aliases: <code>/share.deck</code></td><td><code>/share deck [deckSelector]</code></td></tr>
+<tr><td><code>/share list</code></td><td>list active and revoked share links<br>Aliases: <code>/share.list</code></td><td><code>/share list</code></td></tr>
+<tr><td><code>/share revoke</code></td><td>revoke an existing spectator link<br>Aliases: <code>/share.revoke</code></td><td><code>/share revoke &lt;shareId&gt;</code></td></tr>
+<tr><td><code>/share session</code></td><td>create a read-only spectator link for one session<br>Aliases: <code>/share.session</code></td><td><code>/share session</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="size">/size</h2>
+
+<p>set deck terminal size</p>
+
+<h3 id="usage-21">Usage</h3>
+
+<ul>
+<li><code>/size &lt;cols&gt; &lt;rows&gt;</code></li>
+<li><code>/size c&lt;cols&gt;</code></li>
+<li><code>/size r&lt;rows&gt;</code></li>
+</ul>
+
+<h2 id="swap">/swap</h2>
+
+<p>swap quick ids between two sessions</p>
+
+<h3 id="usage-22">Usage</h3>
+
+<ul>
+<li><code>/swap &lt;selectorA&gt; &lt;selectorB&gt;</code></li>
+</ul>
+
+<h3 id="aliases-9">Aliases</h3>
+
+<p><code>/session.swap</code></p>
+
+<h2 id="switch">/switch</h2>
+
+<p>switch active session</p>
+
+<h3 id="usage-23">Usage</h3>
+
+<ul>
+<li><code>/switch &lt;sessionSelector&gt;</code></li>
+</ul>
+
+<h3 id="aliases-10">Aliases</h3>
+
+<p><code>/session.switch</code></p>
+
+<h2 id="transfer">/transfer</h2>
+
+<p>upload or download bounded files for one session</p>
+
+<h3 id="usage-24">Usage</h3>
+
+<ul>
+<li><code>/transfer upload [path]</code></li>
+<li><code>/transfer download &lt;path&gt;</code></li>
+</ul>
+
+<h3 id="subcommands-9">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/transfer download</code></td><td>download a bounded file from the target session root<br>Aliases: <code>/transfer.download</code></td><td><code>/transfer download &lt;path&gt;</code></td></tr>
+<tr><td><code>/transfer upload</code></td><td>pick a local file and upload it into the target session root<br>Aliases: <code>/transfer.upload</code></td><td><code>/transfer upload [path]</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="workspace">/workspace</h2>
+
+<p>manage persisted workspace presets</p>
+
+<h3 id="usage-25">Usage</h3>
+
+<ul>
+<li><code>/workspace list</code></li>
+<li><code>/workspace save &lt;name&gt;</code></li>
+<li><code>/workspace show &lt;preset&gt;</code></li>
+<li><code>/workspace apply &lt;preset&gt;</code></li>
+<li><code>/workspace duplicate &lt;preset&gt; &lt;name&gt;</code></li>
+<li><code>/workspace rename &lt;preset&gt; &lt;name&gt;</code></li>
+<li><code>/workspace delete &lt;preset&gt;</code></li>
+<li><code>/workspace group list</code></li>
+<li><code>/workspace group save &lt;name&gt;</code></li>
+<li><code>/workspace group apply &lt;group&gt;</code></li>
+<li><code>/workspace group rename &lt;group&gt; &lt;name&gt;</code></li>
+<li><code>/workspace group delete &lt;group&gt;</code></li>
+<li><code>/workspace group clear</code></li>
+</ul>
+
+<h3 id="subcommands-10">Subcommands</h3>
+
+<table>
+<thead><tr><th>Subcommand</th><th>Description</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>/workspace apply</code></td><td>apply a saved workspace preset<br>Aliases: <code>/workspace.apply</code></td><td><code>/workspace apply &lt;preset&gt;</code></td></tr>
+<tr><td><code>/workspace delete</code></td><td>delete a saved workspace preset<br>Aliases: <code>/workspace.delete</code></td><td><code>/workspace delete &lt;preset&gt;</code></td></tr>
+<tr><td><code>/workspace duplicate</code></td><td>duplicate a saved workspace preset<br>Aliases: <code>/workspace.duplicate</code></td><td><code>/workspace duplicate &lt;preset&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/workspace group</code></td><td>manage deck-local workspace groups on the active deck</td><td><code>/workspace group list</code><br><code>/workspace group save &lt;name&gt;</code><br><code>/workspace group apply &lt;group&gt;</code><br><code>/workspace group rename &lt;group&gt; &lt;name&gt;</code><br><code>/workspace group delete &lt;group&gt;</code><br><code>/workspace group clear</code></td></tr>
+<tr><td><code>/workspace list</code></td><td>list saved workspace presets<br>Aliases: <code>/workspace.list</code></td><td><code>/workspace list</code></td></tr>
+<tr><td><code>/workspace rename</code></td><td>rename a saved workspace preset<br>Aliases: <code>/workspace.rename</code></td><td><code>/workspace rename &lt;preset&gt; &lt;name&gt;</code></td></tr>
+<tr><td><code>/workspace save</code></td><td>save the current deck/layout/group workspace state as a named preset<br>Aliases: <code>/workspace.save</code></td><td><code>/workspace save &lt;name&gt;</code></td></tr>
+<tr><td><code>/workspace show</code></td><td>show workspace preset details<br>Aliases: <code>/workspace.show</code></td><td><code>/workspace show &lt;preset&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h2 id="help-topics">Help Topics</h2>
+
+<p>Use <code>/help</code> for the alphabetical command overview, <code>/help &lt;command&gt;</code> for a command topic, <code>/help &lt;command&gt; &lt;subcommand&gt;</code> for a specific subcommand topic, and <code>/help @</code> / <code>/help &gt;</code> for direct-route and quick-switch help.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#canonical-commands">Canonical Commands</a></li>
+<li><a class="handbook-page-toc-link" href="#broadcast">/broadcast</a></li>
+<li><a class="handbook-page-toc-link" href="#usage">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#close">/close</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-2">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#connection">/connection</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-3">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-2">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#custom">/custom</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-4">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-3">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#deck">/deck</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-5">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-4">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#filter">/filter</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-6">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#help">/help</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-7">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#layout">/layout</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-8">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-5">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#list">/list</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-9">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-2">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#move">/move</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-10">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#new">/new</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-11">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-3">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#next">/next</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-12">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-4">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#note">/note</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-13">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-5">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#prev">/prev</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-14">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-6">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#rename">/rename</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-15">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-7">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#replay">/replay</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-16">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-6">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#restart">/restart</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-17">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-8">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#run">/run</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-18">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#settings">/settings</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-19">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-7">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#share">/share</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-20">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-8">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#size">/size</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-21">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#swap">/swap</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-22">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-9">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#switch">/switch</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-23">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#aliases-10">Aliases</a></li>
+<li><a class="handbook-page-toc-link" href="#transfer">/transfer</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-24">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-9">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#workspace">/workspace</a></li>
+<li><a class="handbook-page-toc-link" href="#usage-25">Usage</a></li>
+<li><a class="handbook-page-toc-link" href="#subcommands-10">Subcommands</a></li>
+<li><a class="handbook-page-toc-link" href="#help-topics">Help Topics</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

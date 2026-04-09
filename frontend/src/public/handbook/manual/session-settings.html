@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Session Settings</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="session-settings">Session Settings</h1>
+
+<p>The session settings dialog is for persistent per-session behavior, not transient terminal output.</p>
+
+<h2 id="tabs">Tabs</h2>
+
+<p>The dialog is intentionally split into four tabs:</p>
+
+<ul>
+<li><code>Startup</code></li>
+<li><code>Input</code></li>
+<li><code>Note</code></li>
+<li><code>Theme</code></li>
+</ul>
+
+<p>The exact fields, defaults, and accepted values are generated in the <a href="/handbook/reference/session-settings.html">session settings reference</a>.</p>
+
+<h2 id="startup">Startup</h2>
+
+<p>Use <code>Startup</code> for launch-time state only.</p>
+
+<p>Change these fields here:</p>
+
+<ul>
+<li>working directory</li>
+<li>start command line</li>
+<li>advanced startup environment variables</li>
+</ul>
+
+<p>If you want the session to come back differently after restart, change <code>Startup</code> first and then restart the session.</p>
+
+<h2 id="input">Input</h2>
+
+<p>Use <code>Input</code> for send behavior and guarded input behavior.</p>
+
+<p>This is where you change:</p>
+
+<ul>
+<li>send terminator</li>
+<li>mouse forwarding</li>
+<li>send safety checks and thresholds</li>
+</ul>
+
+<p>If terminal-local paste behaves differently between two sessions, compare the <code>Input</code> tab first. The fastest reference for that is the <a href="/handbook/reference/session-settings.html#input-tab">Input tab section</a>.</p>
+
+<h2 id="note">Note</h2>
+
+<p>Use <code>Note</code> when you want durable operational context directly on the session card.</p>
+
+<p>Typical uses:</p>
+
+<ul>
+<li>explain what the session is for</li>
+<li>pin a reminder about a deploy or branch</li>
+<li>add searchable tags like <code>prod</code>, <code>ops</code>, or <code>migration</code></li>
+</ul>
+
+<h2 id="theme">Theme</h2>
+
+<p>Use <code>Theme</code> when you want different active/inactive visual treatment for a specific session.</p>
+
+<p>The theme tab supports active/inactive slots, preset filtering, and advanced custom colors. For the exact contract, use the <a href="/handbook/reference/session-settings.html#theme-tab">Theme tab reference</a>.</p>
+
+<h2 id="save-or-cancel">Save or Cancel</h2>
+
+<p><code>Cancel</code>, dialog dismiss, and <code>Escape</code> all discard the draft and restore the current persisted session state.</p>
+
+<p><code>Save Settings</code> persists the current draft.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#tabs">Tabs</a></li>
+<li><a class="handbook-page-toc-link" href="#startup">Startup</a></li>
+<li><a class="handbook-page-toc-link" href="#input">Input</a></li>
+<li><a class="handbook-page-toc-link" href="#note">Note</a></li>
+<li><a class="handbook-page-toc-link" href="#theme">Theme</a></li>
+<li><a class="handbook-page-toc-link" href="#save-or-cancel">Save or Cancel</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

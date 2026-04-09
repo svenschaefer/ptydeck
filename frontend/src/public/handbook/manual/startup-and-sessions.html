@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Startup and Sessions</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="startup-and-sessions">Startup and Sessions</h1>
+
+<p>Use this guide when you need to create sessions quickly, place them into the right deck, and recover the same work later.</p>
+
+<h2 id="create-a-session">Create a Session</h2>
+
+<p>You can create sessions from the sidebar, from the <code>New Session</code> action, or with slash commands.</p>
+
+<pre><code class="language-text">/new bash
+/new zsh</code></pre>
+
+<p>If you already know the deck you want, create or switch the deck first:</p>
+
+<pre><code class="language-text">/deck new ops
+/deck switch ops</code></pre>
+
+<p>The full command surface lives in the <a href="/handbook/reference/commands.html">slash command reference</a>.</p>
+
+<h2 id="shape-the-deck">Shape the Deck</h2>
+
+<p>The active deck owns the visible session set, filter, and deck-level terminal size.</p>
+
+<pre><code class="language-text">/size 120 34
+/filter ops
+/list</code></pre>
+
+<p>Use <code>Terminal Size</code> and <code>Saved Layouts</code> in the sidebar for the same operations through the UI.</p>
+
+<h2 id="restart-or-rename-safely">Restart or Rename Safely</h2>
+
+<p>Use slash commands when you already know the session selector, or use the session card toolbar when you are working visually.</p>
+
+<pre><code class="language-text">/rename 4 build-agent
+/restart 4</code></pre>
+
+<p>If the session has startup settings, restart uses the current persisted startup contract from the session settings dialog.</p>
+
+<h2 id="when-to-use-session-settings">When to Use Session Settings</h2>
+
+<p>Open the session settings dialog when you need to change how the session starts or behaves the next time you use it.</p>
+
+<ul>
+<li><code>Startup</code> changes launch-time state.</li>
+<li><code>Input</code> changes send terminator, mouse forwarding, and send safety.</li>
+<li><code>Note</code> stores persistent session notes and tags.</li>
+<li><code>Theme</code> changes the active/inactive terminal appearance.</li>
+</ul>
+
+<p>See <a href="/handbook/manual/session-settings.html">Session Settings</a> for the workflow and <a href="/handbook/reference/session-settings.html">session settings reference</a> for the exact field contract.</p>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#create-a-session">Create a Session</a></li>
+<li><a class="handbook-page-toc-link" href="#shape-the-deck">Shape the Deck</a></li>
+<li><a class="handbook-page-toc-link" href="#restart-or-rename-safely">Restart or Rename Safely</a></li>
+<li><a class="handbook-page-toc-link" href="#when-to-use-session-settings">When to Use Session Settings</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

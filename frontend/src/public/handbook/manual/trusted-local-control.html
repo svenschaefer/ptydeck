@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Trusted-Local Control</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="trusted-local-control">Trusted-Local Control</h1>
+
+<p>Trusted-local control is designed for a single user moving between devices or tabs.</p>
+
+<p>There is one active writer per session.</p>
+
+<h2 id="take-or-reclaim-control">Take or Reclaim Control</h2>
+
+<p>When another client currently controls the session, the non-controller device is read-only for input and authoritative resize.</p>
+
+<p>Use <code>Take Control</code> or <code>Reclaim Control</code> from the session UI or the compact <code>Control</code> dialog.</p>
+
+<p>The takeover path is intentionally direct:</p>
+
+<ul>
+<li>no release-first requirement</li>
+<li>deterministic reclaim</li>
+<li>blocked write paths can retry after takeover</li>
+</ul>
+
+<h2 id="scope">Scope</h2>
+
+<p>Trusted-local takeover can be applied at three scopes:</p>
+
+<ul>
+<li>all sessions</li>
+<li>current deck</li>
+<li>current session</li>
+</ul>
+
+<p>That is why the compact device-level <code>Control</code> dialog exists alongside per-session controls.</p>
+
+<h2 id="device-local-layout-recall">Device-Local Layout Recall</h2>
+
+<p>When takeover succeeds, <code>ptydeck</code> reapplies the remembered layout and terminal-size baseline for the claiming device.</p>
+
+<p>That keeps desktop and laptop form factors usable without forcing one shared layout across all devices.</p>
+
+<h2 id="startup-prompt">Startup Prompt</h2>
+
+<p>When a device opens the frontend and is not currently the controlling device, <code>ptydeck</code> can show a subtle startup prompt asking whether this device should take control and apply its local layouts.</p>
+
+<h2 id="related-references">Related References</h2>
+
+<ul>
+<li><a href="/handbook/reference/session-settings.html#input-tab">session settings reference</a></li>
+<li><a href="/handbook/reference/commands.html">slash command reference</a></li>
+</ul>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#take-or-reclaim-control">Take or Reclaim Control</a></li>
+<li><a class="handbook-page-toc-link" href="#scope">Scope</a></li>
+<li><a class="handbook-page-toc-link" href="#device-local-layout-recall">Device-Local Layout Recall</a></li>
+<li><a class="handbook-page-toc-link" href="#startup-prompt">Startup Prompt</a></li>
+<li><a class="handbook-page-toc-link" href="#related-references">Related References</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

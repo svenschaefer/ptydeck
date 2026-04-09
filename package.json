@@ -12,9 +12,9 @@
   },
   "scripts": {
     "dev": "bash -lc 'npm --prefix backend run dev & npm --prefix frontend run dev & wait'",
-    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "build": "npm run docs:generate && npm --prefix backend run build && npm --prefix frontend run build",
     "scripts:log:check": "./scripts/check-script-logging.sh",
-    "lint": "npm run scripts:log:check && ./scripts/check-adr-process.sh && npm --prefix backend run lint && npm --prefix frontend run lint",
+    "lint": "npm run docs:check && npm run scripts:log:check && ./scripts/check-adr-process.sh && npm --prefix backend run lint && npm --prefix frontend run lint",
     "test:root": "node --test test/*.test.js",
     "test": "npm run test:root && npm --prefix backend run test && npm --prefix frontend run test",
     "test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage",
@@ -30,6 +30,8 @@
     "h62:rollback:restore": "node scripts/restore-h62-rollbacks.mjs",
     "dr:drill": "./scripts/dr-restore-drill.sh",
     "retention:purge": "./scripts/purge-retention.sh",
-    "release:evidence": "./scripts/generate-release-evidence.sh"
+    "release:evidence": "./scripts/generate-release-evidence.sh",
+    "docs:generate": "node scripts/generate-handbook.mjs",
+    "docs:check": "node scripts/generate-handbook.mjs --check"
   }
 }
