@@ -332,3 +332,33 @@ test("split-layout runtime clamps resize ratios and collapses nested removals ba
   assert.deepEqual(entry.paneSessions.main, ["s1", "s3"]);
   assert.deepEqual(entry.paneSessions["side-top"], ["s2"]);
 });
+
+test("split-layout runtime creates a stable default layout when rendering a previously unseen deck", () => {
+  const gridEl = new FakeElement("main");
+  const controller = createSplitLayoutRuntimeController({
+    documentRef: createDocumentRef(),
+    gridEl,
+    defaultDeckId: "default",
+    sortSessionsByQuickId: (sessions) => sessions.slice()
+  });
+
+  const node1 = new FakeElement("article");
+  const node2 = new FakeElement("article");
+  const terminals = new Map([
+    ["s1", { element: node1 }],
+    ["s2", { element: node2 }]
+  ]);
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: [{ id: "s1" }, { id: "s2" }],
+    deckSessions: [{ id: "s1", name: "one" }, { id: "s2", name: "two" }],
+    activeSessionId: "s1",
+    terminals
+  });
+
+  const entry = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(entry.root, { type: "pane", paneId: "main" });
+  assert.deepEqual(entry.paneSessions.main, ["s1", "s2"]);
+  assert.deepEqual(node1.parentNode?.children || [], [node1, node2]);
+});

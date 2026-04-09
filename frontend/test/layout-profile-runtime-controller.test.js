@@ -134,6 +134,45 @@ test("resolveLayoutProfileToken matches exact and unique prefix selectors", () =
   assert.match(resolveLayoutProfileToken(profiles, "missing").error, /Unknown layout profile/);
 });
 
+test("resolveLayoutProfileToken rejects ambiguous profile prefixes deterministically", () => {
+  const profiles = [
+    {
+      id: "ops-a",
+      name: "Ops Alpha",
+      createdAt: 1,
+      updatedAt: 1,
+      layout: {
+        activeDeckId: "ops",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    },
+    {
+      id: "ops-b",
+      name: "Ops Beta",
+      createdAt: 2,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "ops",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    }
+  ];
+
+  const resolved = resolveLayoutProfileToken(profiles, "ops");
+  assert.equal(resolved.profile, null);
+  assert.match(resolved.error, /Ambiguous layout profile 'ops'/);
+});
+
 test("layout profile runtime controller loads, saves, renames, and deletes profiles", async () => {
   const selectEl = createElement("select");
   const statusEl = createElement("p");

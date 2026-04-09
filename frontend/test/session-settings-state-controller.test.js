@@ -487,3 +487,63 @@ test("session-settings state controller syncs and reads explicit input safety co
   assert.equal(profile.confirmOnNaturalLanguageInput, true);
   assert.equal(profile.pasteLengthConfirmThreshold, 123);
 });
+
+test("session-settings state controller surfaces invalid startup parsing feedback deterministically", () => {
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    parseSessionEnv: () => ({ ok: false, error: "Invalid env block." }),
+    parseSessionTags: () => ({ ok: false, error: "Invalid tag list." }),
+    normalizeSessionStartupFromSession: () => ({
+      startCwd: "",
+      startCommand: "",
+      env: {},
+      tags: [],
+      mouseForwardingMode: "off"
+    }),
+    getSessionById: () => ({
+      id: "s1",
+      startCwd: "",
+      startCommand: "",
+      note: "",
+      mouseForwardingMode: "off",
+      inputSafetyProfile: {},
+      activeThemeProfile: {
+        background: "#000000",
+        foreground: "#ffffff"
+      },
+      inactiveThemeProfile: {
+        background: "#000000",
+        foreground: "#ffffff"
+      }
+    }),
+    getSessionSendTerminator: () => "auto"
+  });
+
+  const entry = {
+    themeSlotSelect: createInput("active"),
+    startCwdInput: createInput(""),
+    startCommandInput: createInput(""),
+    startEnvInput: createInput("{"),
+    mouseForwardingModeSelect: createInput("off"),
+    sessionNoteInput: createInput(""),
+    sessionTagsInput: createInput("bad tags"),
+    sessionSendTerminatorSelect: createInput("auto"),
+    inputSafetyControls: createInputSafetyControls(),
+    themeInputs: {
+      background: createInput("#000000"),
+      foreground: createInput("#ffffff")
+    }
+  };
+
+  const dirty = controller.isSessionSettingsDirty(entry, { id: "s1" });
+  const startup = controller.readSessionStartupFromControls(entry);
+
+  assert.equal(dirty, true);
+  assert.equal(startup.envResult.ok, false);
+  assert.equal(startup.tagResult.ok, false);
+  assert.equal(startup.sendTerminator, "auto");
+});

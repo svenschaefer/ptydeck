@@ -106,6 +106,28 @@ test("startup data backup blocks startup when payload copy is missing for an exi
   );
 });
 
+test("startup data backup read helper rejects a manifest whose backup id no longer matches", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
+  const dataPath = join(dir, "sessions.json");
+  await writeFile(
+    `${dataPath}.pre-h62-backup.json`,
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: "legacy-backup",
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: ""
+    }, null, 2),
+    "utf8"
+  );
+
+  await assert.rejects(
+    readStartupDataBackup({ dataPath }),
+    /invalid or incompatible rollback backup manifest/
+  );
+});
+
 test("startup data backup blocks startup when an existing manifest points at a different source or payload path", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
   const dataPath = join(dir, "sessions.json");
@@ -182,6 +204,20 @@ test("startup data backup restore removes the runtime file when the original sou
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
   const dataPath = join(dir, "sessions.json");
   await ensureStartupDataBackup({ dataPath, nowFn: () => 4000 });
+  await writeFile(dataPath, JSON.stringify({ sessions: [{ id: "created-later" }] }, null, 2), "utf8");
+
+  const result = await restoreStartupDataBackup({ dataPath });
+
+  assert.equal(result.restored, true);
+  assert.equal(result.removed, true);
+  await assert.rejects(readFile(dataPath, "utf8"), /ENOENT/);
+});
+
+test("startup data backup restore ignores stray payload copies when the original source was absent", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
+  const dataPath = join(dir, "sessions.json");
+  await ensureStartupDataBackup({ dataPath, nowFn: () => 4000 });
+  await writeFile(`${dataPath}.pre-h62-backup`, "stale-payload", "utf8");
   await writeFile(dataPath, JSON.stringify({ sessions: [{ id: "created-later" }] }, null, 2), "utf8");
 
   const result = await restoreStartupDataBackup({ dataPath });

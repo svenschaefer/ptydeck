@@ -2842,3 +2842,24 @@ test("command executor requires explicit scope when removing an ambiguous scoped
 
   assert.equal(feedback, "Multiple scoped custom commands share /deploy. Use scope:global, scope:project, or scope:session:<selector>.");
 });
+
+test("command executor exposes structured detailed results for success and failure paths", async () => {
+  const executor = createExecutor();
+
+  assert.deepEqual(
+    await executor.executeDetailed({ command: "help", args: [], raw: "/help" }),
+    {
+      ok: true,
+      feedback:
+        "Commands: @ > / broadcast close connection custom deck filter help layout list move new next note prev rename replay restart run settings share size swap switch transfer workspace"
+    }
+  );
+
+  assert.deepEqual(
+    await executor.executeDetailed({ command: "unknown", args: [], raw: "/unknown" }),
+    {
+      ok: false,
+      feedback: "Unknown command: /unknown"
+    }
+  );
+});

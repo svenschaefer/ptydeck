@@ -314,3 +314,10 @@ test("command engine reports ambiguous quick-switch and malformed filter deck se
     error: "Deck selector must be 'deck:<deckSelector>'."
   });
 });
+
+test("command engine suppresses autocomplete for multiline slash and quick-switch inputs", () => {
+  const engine = createEngineFixture();
+
+  assert.equal(engine.parseAutocompleteContext("/help\ndeck"), null);
+  assert.equal(engine.parseAutocompleteContext(">1\n2"), null);
+});

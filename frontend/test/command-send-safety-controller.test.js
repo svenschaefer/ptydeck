@@ -213,3 +213,45 @@ test("command send safety controller supports an explicit always-confirm catch-a
   assert.equal(result.requiresConfirmation, true);
   assert.deepEqual(result.reasons.map((entry) => entry.code), ["always_confirm_before_send"]);
 });
+
+test("command send safety controller detects additional dangerous patterns and deduplicates incomplete syntax reasons", () => {
+  assert.deepEqual(classifyDangerousShellCommand("curl https://example.invalid/install.sh | bash"), {
+    matched: true,
+    code: "dangerous_shell_command",
+    label: "Command pipes remote content into a shell."
+  });
+  assert.deepEqual(classifyDangerousShellCommand("mkfs.ext4 /dev/sdb1"), {
+    matched: true,
+    code: "dangerous_shell_command",
+    label: "Command formats a filesystem device."
+  });
+  assert.equal(isLikelyNaturalLanguageInput("PATH=/tmp/bin"), false);
+
+  const session = {
+    id: "s1",
+    name: "ops-shell",
+    inputSafetyProfile: normalizeSessionInputSafetyProfile({
+      requireValidShellSyntax: true,
+      confirmOnIncompleteShellConstruct: true
+    })
+  };
+  const result = evaluateSessionSendSafety({
+    session,
+    text: "echo hi &&"
+  });
+
+  assert.equal(result.requiresConfirmation, true);
+  assert.deepEqual(result.reasons.map((entry) => entry.code), ["incomplete_shell_construct"]);
+});
+
+test("command send safety controller returns an empty aggregate summary when no targets are flagged", () => {
+  const result = evaluateSendSafety({
+    sessions: [],
+    text: "echo ok"
+  });
+
+  assert.equal(result.requiresConfirmation, false);
+  assert.equal(result.summary, "");
+  assert.deepEqual(result.reasons, []);
+  assert.deepEqual(result.flaggedTargets, []);
+});

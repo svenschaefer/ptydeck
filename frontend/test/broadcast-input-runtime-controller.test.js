@@ -65,3 +65,48 @@ test("broadcast input runtime controller can activate a named group before enabl
   assert.equal(controller.enableGroupBroadcast("api"), "Broadcasting to workspace group [api] API on deck [ops].");
   assert.deepEqual(calls, [["api", "ops"]]);
 });
+
+test("broadcast input runtime controller reports missing active groups and unavailable group members deterministically", () => {
+  const sessions = [{ id: "s1", name: "API", deckId: "ops" }];
+  let activeGroupId = "";
+  const controller = createBroadcastInputRuntimeController({
+    getActiveDeckId: () => "ops",
+    getSessions: () => sessions,
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (value) => value.slice(),
+    listGroupsForDeck: () => [{ id: "build", name: "Build", sessionIds: ["s1"] }],
+    getActiveGroupIdForDeck: () => activeGroupId
+  });
+
+  assert.throws(() => controller.enableGroupBroadcast(), /No active workspace group is selected on deck \[ops\]/);
+  assert.equal(controller.getStatus(), "Broadcast: off.");
+
+  activeGroupId = "build";
+  assert.equal(
+    controller.enableGroupBroadcast("build"),
+    "Broadcasting to workspace group [build] Build on deck [ops]."
+  );
+  sessions.length = 0;
+  assert.deepEqual(controller.getBroadcastTargets(), {
+    active: true,
+    mode: "group",
+    sessions: [],
+    error: "Workspace group [build] Build has no available sessions on deck [ops].",
+    summary: "Target: workspace group unavailable.",
+    routeFeedback: ""
+  });
+});
+
+test("broadcast input runtime controller fails fast when no groups exist for the current deck", () => {
+  const controller = createBroadcastInputRuntimeController({
+    getActiveDeckId: () => "ops",
+    getSessions: () => [{ id: "s1", name: "API", deckId: "ops" }],
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (value) => value.slice(),
+    listGroupsForDeck: () => [],
+    getActiveGroupIdForDeck: () => ""
+  });
+
+  assert.throws(() => controller.enableGroupBroadcast(), /No workspace groups are available on deck \[ops\]/);
+  assert.equal(controller.formatTargetSummary(), "");
+});

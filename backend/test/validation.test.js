@@ -1145,6 +1145,76 @@ test("validateResponse accepts replay excerpt payloads and rejects malformed sel
       })
     });
   }, /Response does not match SessionReplayExcerpt schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExcerpt",
+      body: createReplayExcerpt({
+        sourceRetentionLimitChars: "16384"
+      })
+    });
+  }, /Response does not match SessionReplayExcerpt schema/);
+});
+
+test("validateResponse rejects malformed share lists and file-transfer payload tails", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "shareLinkList",
+      body: [
+        {
+          id: "share-1",
+          targetType: "session",
+          targetId: "session-1",
+          permissionMode: "read_only",
+          createdAt: 1,
+          updatedAt: 2,
+          expiresAt: 3,
+          revokedAt: null,
+          creatorSubject: "dev-user",
+          creatorTenantId: 42,
+          active: true
+        }
+      ]
+    });
+  }, /Response does not match ShareLink\[] schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionFileUpload",
+      body: {
+        sessionId: "a",
+        path: "logs/output.txt",
+        fileName: "output.txt",
+        sizeBytes: -1,
+        created: true
+      }
+    });
+  }, /Response does not match SessionFileUpload schema/);
+});
+
+test("validateRequest rejects malformed replay excerpt selectors and whitespace-only file-transfer paths", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "GET",
+      pathname: "/api/v1/sessions/abc/replay-excerpt",
+      params: { sessionId: "abc" },
+      query: { slice: "sp:01" }
+    });
+  }, /Query parameter 'slice' must match 'l:N', 'c:N', or 'sp:N'/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/download",
+      params: { sessionId: "a" },
+      body: {
+        path: "   "
+      }
+    });
+  }, /Field 'path' must be a non-empty string/);
 });
 
 test("validateRequest accepts valid custom command upsert payload", () => {

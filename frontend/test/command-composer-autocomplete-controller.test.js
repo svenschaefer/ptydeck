@@ -360,3 +360,47 @@ test("command-composer autocomplete controller completes help topics and subcomm
   assert.equal(await controller.autocompleteInput(false), true);
   assert.equal(commandInput.value, "/help deck switch");
 });
+
+test("command-composer autocomplete controller restores the slash-history draft when navigating back down", () => {
+  const commandInput = new FakeInput();
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput
+  });
+
+  controller.bindUiEvents();
+  controller.recordSlashHistory("/switch 1");
+  controller.recordSlashHistory("/restart 2");
+
+  commandInput.value = "/cus";
+  commandInput.dispatchEvent(createKeyEvent("ArrowUp"));
+  commandInput.dispatchEvent(createKeyEvent("ArrowUp"));
+  assert.equal(commandInput.value, "/switch 1");
+
+  commandInput.dispatchEvent(createKeyEvent("ArrowDown"));
+  assert.equal(commandInput.value, "/restart 2");
+
+  commandInput.dispatchEvent(createKeyEvent("ArrowDown"));
+  assert.equal(commandInput.value, "/cus");
+});
+
+test("command-composer autocomplete controller tolerates clipboard-copy failures for plain Enter", async () => {
+  const commandInput = new FakeInput();
+  commandInput.value = "echo selected text";
+  commandInput.setSelectionRange(5, 13);
+  const controller = createCommandComposerAutocompleteController({
+    windowRef: createFakeWindow(),
+    documentRef: createFakeDocument(),
+    commandInput,
+    writeClipboardText: async () => false
+  });
+
+  controller.bindUiEvents();
+  const enterEvent = createKeyEvent("Enter");
+  commandInput.dispatchEvent(enterEvent);
+  await Promise.resolve();
+
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.equal(commandInput.value, "echo selected text");
+});

@@ -590,3 +590,159 @@ test("app-runtime composition controller uses the read-only access summary for b
     "Spectator · Read-only deck ops. Write actions are disabled."
   );
 });
+
+test("app-runtime composition controller clears reclaim UI state when no session can be targeted", () => {
+  const harness = createControllerHarness();
+  const clearedActions = [];
+
+  harness.hooks.setCollaborators({
+    appRuntimeStateController: {
+      clearCommandFeedbackAction(payload) {
+        clearedActions.push(payload);
+      }
+    }
+  });
+  harness.hooks.setCommandFeedbackActionMeta({
+    scope: "session",
+    sessionId: "s-1",
+    retryAction: { kind: "send", sessionId: "s-1", payload: "pwd" }
+  });
+
+  const result = harness.hooks.showBlockedWriteReclaimUi(null);
+
+  assert.equal(result, false);
+  assert.deepEqual(clearedActions, [{ render: false }]);
+  assert.equal(harness.hooks.getCommandFeedbackActionMeta(), null);
+});
+
+test("app-runtime composition controller throws deterministically when this device cannot take control", async () => {
+  const harness = createControllerHarness();
+  const clearedActions = [];
+  const session = {
+    id: "s-1",
+    controlState: {
+      currentController: {
+        clientId: "client-remote",
+        active: true,
+        label: "Desktop"
+      },
+      attachedClients: [
+        {
+          clientId: "client-remote",
+          active: true,
+          accessMode: "operator",
+          label: "Desktop"
+        },
+        {
+          clientId: "client-observer",
+          active: true,
+          accessMode: "spectator",
+          permissionMode: "read_only",
+          label: "Viewer"
+        }
+      ]
+    }
+  };
+
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.setCommandFeedbackActionSessionId("s-1");
+  harness.hooks.setCommandFeedbackActionMeta({
+    scope: "session",
+    sessionId: "s-1",
+    retryAction: { kind: "paste", sessionId: "s-1", payload: "echo hi" }
+  });
+  harness.hooks.setCollaborators({
+    appSessionRuntimeFacadeController: {
+      getSessionById(sessionId) {
+        return sessionId === "s-1" ? session : null;
+      }
+    },
+    appRuntimeStateController: {
+      clearCommandFeedbackAction(payload) {
+        clearedActions.push(payload);
+      }
+    }
+  });
+
+  await assert.rejects(
+    harness.hooks.handleCommandFeedbackAction(),
+    /Waiting for .* to attach to session control/
+  );
+  assert.deepEqual(clearedActions, [{ render: false }]);
+  assert.equal(harness.hooks.getCommandFeedbackActionMeta(), null);
+});
+
+test("app-runtime composition controller takes control and replays resize retries when reclaim is still needed", async () => {
+  const harness = createControllerHarness();
+  const handoffCalls = [];
+  const resizeCalls = [];
+  let clearErrorCalls = 0;
+  const session = {
+    id: "s-1",
+    controlState: {
+      currentController: {
+        clientId: "client-remote",
+        active: false,
+        label: "Desktop"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          active: true,
+          accessMode: "operator",
+          label: "Laptop"
+        },
+        {
+          clientId: "client-remote",
+          active: false,
+          accessMode: "operator",
+          label: "Desktop"
+        }
+      ]
+    }
+  };
+
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.setCommandFeedbackActionSessionId("s-1");
+  harness.hooks.setCommandFeedbackActionMeta({
+    scope: "session",
+    sessionId: "s-1",
+    retryAction: { kind: "resize", sessionId: "s-1" }
+  });
+  harness.hooks.setCollaborators({
+    appSessionRuntimeFacadeController: {
+      getSessionById(sessionId) {
+        return sessionId === "s-1" ? session : null;
+      },
+      formatSessionToken() {
+        return "1";
+      },
+      formatSessionDisplayName() {
+        return "Ops";
+      }
+    },
+    appRuntimeStateController: {
+      clearCommandFeedbackAction() {},
+      clearError() {
+        clearErrorCalls += 1;
+      }
+    },
+    trustedLocalHandoffRuntimeController: {
+      async takeControlScope(scope, payload) {
+        handoffCalls.push([scope, payload]);
+      }
+    },
+    sessionTerminalResizeController: {
+      applyResizeForSession(sessionId, options) {
+        resizeCalls.push([sessionId, options]);
+      }
+    }
+  });
+
+  const result = await harness.hooks.handleCommandFeedbackAction();
+
+  assert.equal(result, true);
+  assert.deepEqual(handoffCalls, [["session", { sessionId: "s-1" }]]);
+  assert.deepEqual(resizeCalls, [["s-1", { force: true }]]);
+  assert.equal(clearErrorCalls, 1);
+});

@@ -1372,3 +1372,55 @@ test("session-terminal-runtime controller leaves unambiguous Ctrl-C untouched wh
   assert.equal(promptCalled, false);
   assert.deepEqual(terminalWrites, []);
 });
+
+test("session-terminal-runtime controller disposes clipboard bindings and restores the custom key handler", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      },
+      clearTimeout() {}
+    }
+  });
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: {
+      node: { id: "node" },
+      mount: new FakeMount("mount"),
+      focusBtn: {},
+      quickIdEl: {},
+      stateBadgeEl: {},
+      pluginBadgesEl: {},
+      unrestoredHintEl: {},
+      sessionStatusEl: {},
+      sessionArtifactsEl: {},
+      settingsDialog: {},
+      startCwdInput: {},
+      startCommandInput: {},
+      startEnvInput: {},
+      sessionSendTerminatorSelect: {},
+      sessionTagsInput: {},
+      startFeedback: {},
+      tagListEl: {},
+      settingsApplyBtn: {},
+      settingsStatus: {},
+      themeCategory: {},
+      themeSearch: {},
+      themeSelect: {},
+      themeBg: {},
+      themeFg: {},
+      themeInputs: {}
+    },
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  assert.equal(entry.terminal.customKeyEventHandler(createPasteShortcutEvent()), false);
+  entry.disposeClipboardBindings();
+  assert.equal(entry.terminal.customKeyEventHandler(createPasteShortcutEvent()), true);
+});
