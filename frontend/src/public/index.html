@@ -716,7 +716,7 @@
               </button>
             </div>
           </div>
-          <p class="session-settings-hint">Use Startup for how the session launches, Note for the saved note, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
+          <p class="session-settings-hint">Use Startup for launch settings, Input for send and terminal behavior, Note for saved notes and tags, and Theme for appearance. Cancel discards draft changes; Save Settings keeps the current settings.</p>
           <section class="session-control-panel">
             <div class="session-control-panel-head">
               <p class="session-control-panel-title">Control</p>
@@ -737,6 +737,7 @@
           </section>
           <div class="session-settings-tabs" role="tablist" aria-label="Session settings sections">
             <button class="session-settings-tab session-settings-tab-startup" type="button">Startup</button>
+            <button class="session-settings-tab session-settings-tab-input" type="button">Input</button>
             <button class="session-settings-tab session-settings-tab-note" type="button">Note</button>
             <button class="session-settings-tab session-settings-tab-theme" type="button">Theme</button>
           </div>
@@ -748,105 +749,108 @@
               <label class="session-startup-label">Start Command Line</label>
               <textarea class="session-start-command" rows="2"></textarea>
               <details class="session-settings-advanced">
-                <summary>Advanced startup and send safety</summary>
+                <summary>Advanced startup</summary>
                 <div class="session-settings-advanced-body">
                   <label class="session-startup-label">Environment Variables (KEY=VALUE per line)</label>
                   <textarea class="session-start-env" rows="4"></textarea>
-                  <label class="session-startup-label">Mouse Forwarding</label>
-                  <select class="session-mouse-forwarding-mode">
-                    <option value="off">Off</option>
-                    <option value="application">Application-controlled</option>
-                  </select>
-                  <label class="session-startup-label">Tags (comma/space/newline separated)</label>
-                  <input class="session-tags-input" type="text" value="" placeholder="backend ops prod" />
-                  <label class="session-startup-label">Send Terminator</label>
-                  <select class="session-send-terminator">
-                    <option value="auto">Auto (CR / Enter)</option>
-                    <option value="crlf">CRLF (\\r\\n)</option>
-                    <option value="lf">LF (\\n)</option>
-                    <option value="cr">CR (\\r)</option>
-                    <option value="cr2">CR2 (\\r\\r)</option>
-                    <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
-                  </select>
-                  <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
-                  <div class="session-input-safety-grid">
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-on-any-input" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Always confirm before send</span>
-                        <span class="session-input-safety-check-detail">Catch-all guard. Every non-empty send requires confirmation.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Require structurally valid shell syntax</span>
-                        <span class="session-input-safety-check-detail">Rejects clearly broken shell input such as unbalanced quotes or unfinished blocks.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Confirm incomplete shell constructs</span>
-                        <span class="session-input-safety-check-detail">Prompts when shell syntax still looks unfinished even if it is not fully rejected.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Confirm likely natural-language text</span>
-                        <span class="session-input-safety-check-detail">Heuristic only. Catches prose-like input that does not look like a shell command.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Confirm known dangerous shell patterns</span>
-                        <span class="session-input-safety-check-detail">Pattern-based matcher for destructive commands such as <code>rm -rf</code> or <code>git reset --hard</code>.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Confirm multiline or large paste input</span>
-                        <span class="session-input-safety-check-detail">Uses the line and character thresholds configured below.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-auto-continue-stalled-paste" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Auto continue stalled terminal paste</span>
-                        <span class="session-input-safety-check-detail">Terminal-local paste only. Sends the configured terminator automatically after bounded partial-ack stall detection.</span>
-                      </span>
-                    </label>
-                    <label class="session-input-safety-check">
-                      <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
-                      <span class="session-input-safety-check-copy">
-                        <span class="session-input-safety-check-title">Confirm recent target switches</span>
-                        <span class="session-input-safety-check-detail">Uses the grace window configured below. Outside that window, no prompt is shown.</span>
-                      </span>
-                    </label>
-                  </div>
-                  <div class="session-input-safety-threshold-grid">
-                    <label class="session-startup-label">Target Switch Grace (ms)</label>
-                    <input class="session-input-safety-target-switch-grace-ms" type="number" min="0" step="1" value="4000" />
-                    <label class="session-startup-label">Paste Length Threshold</label>
-                    <input class="session-input-safety-paste-length-threshold" type="number" min="0" step="1" value="400" />
-                    <label class="session-startup-label">Paste Line Threshold</label>
-                    <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
-                  </div>
-                  <p class="session-settings-inline-hint">
-                    These checks are additive, not a global lock. A confirmation appears only when one of the enabled rules matches. Use <strong>Always confirm before send</strong> if you want every non-empty send to stop for confirmation first.
-                  </p>
                 </div>
               </details>
+            </section>
+            <section class="session-settings-section session-settings-panel-input session-input-controls" hidden>
+              <p class="session-settings-section-title">Input</p>
+              <label class="session-startup-label">Send Terminator</label>
+              <select class="session-send-terminator">
+                <option value="auto">Auto (CR / Enter)</option>
+                <option value="crlf">CRLF (\\r\\n)</option>
+                <option value="lf">LF (\\n)</option>
+                <option value="cr">CR (\\r)</option>
+                <option value="cr2">CR2 (\\r\\r)</option>
+                <option value="cr_delay">CR_DELAY (text then delayed \\r)</option>
+              </select>
+              <label class="session-startup-label">Mouse Forwarding</label>
+              <select class="session-mouse-forwarding-mode">
+                <option value="off">Off</option>
+                <option value="application">Application-controlled</option>
+              </select>
+              <p class="session-settings-section-title session-input-safety-title">Send Safety Checks</p>
+              <div class="session-input-safety-grid">
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-on-any-input" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Always confirm before send</span>
+                    <span class="session-input-safety-check-detail">Catch-all guard. Every non-empty send requires confirmation.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-require-valid-shell-syntax" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Require structurally valid shell syntax</span>
+                    <span class="session-input-safety-check-detail">Rejects clearly broken shell input such as unbalanced quotes or unfinished blocks.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-incomplete-shell-construct" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Confirm incomplete shell constructs</span>
+                    <span class="session-input-safety-check-detail">Prompts when shell syntax still looks unfinished even if it is not fully rejected.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-natural-language-input" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Confirm likely natural-language text</span>
+                    <span class="session-input-safety-check-detail">Heuristic only. Catches prose-like input that does not look like a shell command.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-dangerous-shell-command" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Confirm known dangerous shell patterns</span>
+                    <span class="session-input-safety-check-detail">Pattern-based matcher for destructive commands such as <code>rm -rf</code> or <code>git reset --hard</code>.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-multiline-input" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Confirm multiline or large paste input</span>
+                    <span class="session-input-safety-check-detail">Uses the line and character thresholds configured below.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-auto-continue-stalled-paste" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Auto continue stalled terminal paste</span>
+                    <span class="session-input-safety-check-detail">Terminal-local paste only. Sends the configured terminator automatically after bounded partial-ack stall detection.</span>
+                  </span>
+                </label>
+                <label class="session-input-safety-check">
+                  <input class="session-input-safety-confirm-recent-target-switch" type="checkbox" />
+                  <span class="session-input-safety-check-copy">
+                    <span class="session-input-safety-check-title">Confirm recent target switches</span>
+                    <span class="session-input-safety-check-detail">Uses the grace window configured below. Outside that window, no prompt is shown.</span>
+                  </span>
+                </label>
+              </div>
+              <div class="session-input-safety-threshold-grid">
+                <label class="session-startup-label">Target Switch Grace (ms)</label>
+                <input class="session-input-safety-target-switch-grace-ms" type="number" min="0" step="1" value="4000" />
+                <label class="session-startup-label">Paste Length Threshold</label>
+                <input class="session-input-safety-paste-length-threshold" type="number" min="0" step="1" value="400" />
+                <label class="session-startup-label">Paste Line Threshold</label>
+                <input class="session-input-safety-paste-line-threshold" type="number" min="0" step="1" value="5" />
+              </div>
+              <p class="session-settings-inline-hint">
+                These checks are additive, not a global lock. A confirmation appears only when one of the enabled rules matches. Use <strong>Always confirm before send</strong> if you want every non-empty send to stop for confirmation first.
+              </p>
             </section>
             <section class="session-settings-section session-settings-panel-note session-note-controls" hidden>
               <p class="session-settings-section-title">Note</p>
               <label class="session-startup-label">Session Note</label>
               <textarea class="session-note-input" rows="8" placeholder="Optional persisted session note"></textarea>
+              <label class="session-startup-label">Tags (comma/space/newline separated)</label>
+              <input class="session-tags-input" type="text" value="" placeholder="backend ops prod" />
               <p class="session-settings-inline-hint">
-                Notes are persisted per session. Empty note clears the existing note. The header shows only the first line.
+                Notes and tags are persisted per session. Empty note clears the existing note. The header shows only the first line.
               </p>
             </section>
             <section class="session-settings-section session-settings-panel-theme session-theme-controls" hidden>

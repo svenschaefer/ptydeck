@@ -265,9 +265,11 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   };
   const entry = {
     settingsTabStartupBtn: createInput(),
+    settingsTabInputBtn: createInput(),
     settingsTabNoteBtn: createInput(),
     settingsTabThemeBtn: createInput(),
     settingsPanelStartup: createPanel(),
+    settingsPanelInput: createPanel({ hidden: true }),
     settingsPanelNote: createPanel({ hidden: true }),
     settingsPanelTheme: createPanel({ hidden: true }),
     themeSlotSelect: createInput("active"),
@@ -287,6 +289,14 @@ test("session-settings state controller detects startup/theme/terminator dirtine
   };
 
   assert.equal(controller.isSessionSettingsDirty(entry, session), false);
+
+  controller.setActiveSettingsTab(entry, "input");
+  assert.equal(entry.settingsPanelInput.hidden, false);
+  assert.equal(entry.settingsPanelInput.classList.contains("session-settings-panel-active"), true);
+  assert.equal(entry.settingsPanelInput.getAttribute("aria-hidden"), "false");
+  assert.equal(entry.settingsPanelInput.inert, false);
+  assert.equal(entry.settingsTabInputBtn.classList.contains("active"), true);
+  assert.equal(entry.settingsPanelStartup.classList.contains("session-settings-panel-inactive"), true);
 
   controller.setActiveSettingsTab(entry, "note");
   assert.equal(entry.settingsPanelStartup.hidden, false);
@@ -327,6 +337,7 @@ test("session-settings state controller stabilizes settings layout to the talles
   const entry = {
     settingsLayout: { style: {} },
     settingsTabStartupBtn: createInput(),
+    settingsTabInputBtn: createInput(),
     settingsTabNoteBtn: createInput(),
     settingsTabThemeBtn: createInput(),
     settingsPanelStartup: createPanel({
@@ -334,6 +345,12 @@ test("session-settings state controller stabilizes settings layout to the talles
       scrollHeight: 180,
       offsetHeight: 180,
       clientHeight: 180
+    }),
+    settingsPanelInput: createPanel({
+      hidden: true,
+      scrollHeight: 268,
+      offsetHeight: 0,
+      clientHeight: 0
     }),
     settingsPanelNote: createPanel({
       hidden: true,
@@ -361,7 +378,7 @@ test("session-settings state controller stabilizes settings layout to the talles
 test("session-settings state controller syncs and reads mouse forwarding mode", () => {
   const controller = createSessionSettingsStateController({
     formatSessionEnv: () => "",
-    formatSessionTags: () => "",
+    formatSessionTags: (tags) => (Array.isArray(tags) ? tags.join(" ") : ""),
     parseSessionEnv: () => ({ ok: true, env: {} }),
     parseSessionTags: () => ({ ok: true, tags: [] }),
     getSessionSendTerminator: () => "auto"
@@ -371,6 +388,7 @@ test("session-settings state controller syncs and reads mouse forwarding mode", 
     startCommandInput: createInput(""),
     startEnvInput: createInput(""),
     mouseForwardingModeSelect: createInput("application"),
+    sessionNoteInput: createInput(""),
     sessionTagsInput: createInput(""),
     sessionSendTerminatorSelect: createInput("auto")
   };
@@ -384,8 +402,14 @@ test("session-settings state controller syncs and reads mouse forwarding mode", 
     tags: []
   });
 
+  controller.syncSessionNoteControls(entry, {
+    note: "",
+    tags: ["ops"]
+  });
+
   assert.equal(entry.startCwdInput.value, "/workspace");
   assert.equal(entry.mouseForwardingModeSelect.value, "application");
+  assert.equal(entry.sessionTagsInput.value, "ops");
   assert.deepEqual(controller.readSessionStartupFromControls(entry), {
     startCwd: "/workspace",
     startCommand: "echo hi",
@@ -450,6 +474,24 @@ test("session-settings state controller syncs and reads multiline session notes"
   });
   assert.equal(entry.sessionNoteInput.value, "first line\nsecond line");
   assert.equal(controller.readSessionNoteFromControls(entry), "first line\nsecond line");
+});
+
+test("session-settings state controller syncs session tags with the note controls", () => {
+  const controller = createSessionSettingsStateController({
+    formatSessionTags: (tags) => (Array.isArray(tags) ? tags.join(" ") : "")
+  });
+  const entry = {
+    sessionNoteInput: createInput(""),
+    sessionTagsInput: createInput("")
+  };
+
+  controller.syncSessionNoteControls(entry, {
+    note: "alpha",
+    tags: ["ops", "prod"]
+  });
+
+  assert.equal(entry.sessionNoteInput.value, "alpha");
+  assert.equal(entry.sessionTagsInput.value, "ops prod");
 });
 
 test("session-settings state controller syncs and reads explicit input safety controls", () => {

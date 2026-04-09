@@ -61,6 +61,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
     settingsDismissBtn: createEventTarget(),
     settingsDialog: createEventTarget(),
     settingsTabStartupBtn: createEventTarget(),
+    settingsTabInputBtn: createEventTarget(),
     settingsTabNoteBtn: createEventTarget(),
     settingsTabThemeBtn: createEventTarget(),
     mouseForwardingModeSelect: createEventTarget("off")
@@ -86,6 +87,7 @@ test("session-card-interactions controller wires focus and settings dialog contr
   await refs.focusBtn.emit("click");
   await refs.refreshBtn.emit("click");
   await refs.settingsBtn.emit("click");
+  await refs.settingsTabInputBtn.emit("click");
   await refs.settingsTabNoteBtn.emit("click");
   await refs.settingsTabThemeBtn.emit("click");
   await refs.settingsTabStartupBtn.emit("click");
@@ -101,6 +103,9 @@ test("session-card-interactions controller wires focus and settings dialog contr
     "tab:startup",
     "dirty:false",
     "toggle",
+    "stabilize",
+    "stabilize",
+    "tab:input",
     "stabilize",
     "stabilize",
     "tab:note",
@@ -233,6 +238,7 @@ test("session-card-interactions controller blocks settings apply when startCwd i
   const refs = {
     focusBtn: createEventTarget(),
     settingsApplyBtn: createEventTarget(),
+    settingsTabInputBtn: createEventTarget(),
     mouseForwardingModeSelect: createEventTarget("off"),
     themeSlotSelect: createEventTarget("active"),
     themeSelect: createEventTarget("custom"),
@@ -264,6 +270,7 @@ test("session-card-interactions controller renames the current trusted-local dev
   const controller = createSessionCardInteractionsController();
   const refs = {
     focusBtn: createEventTarget(),
+    settingsTabInputBtn: createEventTarget(),
     sessionControlDeviceNameInput: createEventTarget("Desk Browser"),
     sessionControlDeviceSaveBtn: createEventTarget()
   };
@@ -300,6 +307,7 @@ test("session-card-interactions controller forgets a stale trusted-local device 
   const controller = createSessionCardInteractionsController();
   const refs = {
     focusBtn: createEventTarget(),
+    settingsTabInputBtn: createEventTarget(),
     sessionControlClientsEl: createEventTarget()
   };
 

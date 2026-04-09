@@ -238,6 +238,10 @@ export function createSessionCardInteractionsController(options = {}) {
       setActiveSettingsTab(getEntry(), "startup");
       scheduleSettingsLayoutStabilization();
     });
+    refs.settingsTabInputBtn?.addEventListener("click", () => {
+      setActiveSettingsTab(getEntry(), "input");
+      scheduleSettingsLayoutStabilization();
+    });
     refs.settingsTabNoteBtn?.addEventListener("click", () => {
       setActiveSettingsTab(getEntry(), "note");
       scheduleSettingsLayoutStabilization();

@@ -227,6 +227,7 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
   });
   assert.equal(controller.readSessionNoteFromControls({ id: "entry-1" }), "first line\nsecond line");
   assert.equal(controller.normalizeSessionNoteText("line one\r\nline two"), "line one\nline two");
+  assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "input"), "input");
   assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "note"), "note");
   assert.equal(controller.isSessionSettingsDirty({ id: "entry-1" }, { id: "s1" }), true);
 
@@ -247,6 +248,7 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     ["read-startup", "entry-1"],
     ["read-note", "entry-1"],
     ["normalize-note", "line one\r\nline two"],
+    ["tab", "entry-1", "input"],
     ["tab", "entry-1", "note"],
     ["dirty", "entry-1", "s1"]
   ]);

@@ -9,7 +9,7 @@ const THEME_SLOT_OPTIONS = Object.freeze([
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" }
 ]);
-const SETTINGS_TAB_VALUES = Object.freeze(["startup", "note", "theme"]);
+const SETTINGS_TAB_VALUES = Object.freeze(["startup", "input", "note", "theme"]);
 
 export function createSessionSettingsStateController(options = {}) {
   const themeProfileKeys = Array.isArray(options.themeProfileKeys) ? options.themeProfileKeys.slice() : [];
@@ -371,9 +371,6 @@ export function createSessionSettingsStateController(options = {}) {
     if (entry.mouseForwardingModeSelect) {
       entry.mouseForwardingModeSelect.value = normalizeSessionMouseForwardingMode(session?.mouseForwardingMode);
     }
-    if (entry.sessionTagsInput) {
-      entry.sessionTagsInput.value = formatSessionTags(session.tags);
-    }
     if (entry.sessionSendTerminatorSelect) {
       entry.sessionSendTerminatorSelect.value = getSessionSendTerminator(session.id);
     }
@@ -396,6 +393,9 @@ export function createSessionSettingsStateController(options = {}) {
       return;
     }
     entry.sessionNoteInput.value = normalizeSessionNoteText(session?.note || "");
+    if (entry.sessionTagsInput) {
+      entry.sessionTagsInput.value = formatSessionTags(session?.tags);
+    }
   }
 
   function readSessionNoteFromControls(entry) {
@@ -404,6 +404,8 @@ export function createSessionSettingsStateController(options = {}) {
 
   function getSettingsTabButton(entry, tab) {
     switch (normalizeSettingsTab(tab)) {
+      case "input":
+        return entry?.settingsTabInputBtn || null;
       case "note":
         return entry?.settingsTabNoteBtn || null;
       case "theme":
@@ -415,6 +417,8 @@ export function createSessionSettingsStateController(options = {}) {
 
   function getSettingsTabPanel(entry, tab) {
     switch (normalizeSettingsTab(tab)) {
+      case "input":
+        return entry?.settingsPanelInput || null;
       case "note":
         return entry?.settingsPanelNote || null;
       case "theme":

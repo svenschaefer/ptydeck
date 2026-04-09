@@ -44,10 +44,12 @@ function createNodeStub() {
     ".session-settings-dialog",
     ".session-settings-dismiss",
     ".session-settings-tab-startup",
+    ".session-settings-tab-input",
     ".session-settings-tab-note",
     ".session-settings-tab-theme",
     ".session-settings-layout",
     ".session-settings-panel-startup",
+    ".session-settings-panel-input",
     ".session-settings-panel-note",
     ".session-settings-panel-theme",
     ".session-start-cwd",
@@ -128,9 +130,11 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
   assert.ok(result.settingsTabStartupBtn);
+  assert.ok(result.settingsTabInputBtn);
   assert.ok(result.settingsTabNoteBtn);
   assert.ok(result.settingsTabThemeBtn);
   assert.ok(result.settingsLayout);
+  assert.ok(result.settingsPanelInput);
   assert.ok(result.settingsPanelNote);
   assert.ok(result.sessionNoteInput);
   assert.ok(result.mouseForwardingModeSelect);

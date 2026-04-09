@@ -2846,6 +2846,13 @@ dialog:not([open]) {
   gap: 6px;
 }
 
+.session-input-controls,
+.session-note-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
 .session-startup-label {
   font-size: 11px;
   color: var(--muted);
