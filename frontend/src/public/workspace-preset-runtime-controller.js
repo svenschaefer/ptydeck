@@ -816,6 +816,16 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     return normalized;
   }
 
+  function requireUpsertedPreset(preset, operationLabel) {
+    const normalized = upsertPreset(preset);
+    if (normalized) {
+      return normalized;
+    }
+    throw new Error(
+      `Workspace preset API returned an invalid preset record${normalizeText(operationLabel) ? ` for ${operationLabel}` : ""}.`
+    );
+  }
+
   function removePreset(presetId) {
     const normalizedId = normalizeText(presetId);
     if (!normalizedId) {
@@ -900,10 +910,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     const updated = await api.updateWorkspacePreset(preset.id, {
       workspace: captureCurrentWorkspace()
     });
-    const normalized = upsertPreset(updated);
-    if (normalized) {
-      workspaceState = cloneWorkspaceState(normalized.workspace);
-    }
+    const normalized = requireUpsertedPreset(updated, "workspace persistence");
+    workspaceState = cloneWorkspaceState(normalized.workspace);
     render();
     requestRender();
     return normalized;
@@ -942,10 +950,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
       name: normalizedName,
       workspace: captureCurrentWorkspace()
     });
-    const preset = upsertPreset(created);
-    if (preset) {
-      workspaceState = cloneWorkspaceState(preset.workspace);
-    }
+    const preset = requireUpsertedPreset(created, "workspace preset save");
+    workspaceState = cloneWorkspaceState(preset.workspace);
     requestRender();
     return `Saved workspace preset [${preset.id}] ${preset.name}.`;
   }
@@ -960,8 +966,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
       throw new Error("Workspace preset name is required.");
     }
     const updated = await api.updateWorkspacePreset(preset.id, { name: normalizedName });
-    upsertPreset(updated);
-    return `Renamed workspace preset [${updated.id}] to ${updated.name}.`;
+    const updatedPreset = requireUpsertedPreset(updated, "workspace preset rename");
+    return `Renamed workspace preset [${updatedPreset.id}] to ${updatedPreset.name}.`;
   }
 
   async function duplicatePresetById(presetId, name) {
@@ -977,10 +983,8 @@ export function createWorkspacePresetRuntimeController(options = {}) {
       name: normalizedName,
       workspace: cloneWorkspaceState(preset.workspace)
     });
-    const duplicated = upsertPreset(created);
-    if (duplicated) {
-      workspaceState = cloneWorkspaceState(duplicated.workspace);
-    }
+    const duplicated = requireUpsertedPreset(created, "workspace preset duplicate");
+    workspaceState = cloneWorkspaceState(duplicated.workspace);
     requestRender();
     return `Duplicated workspace preset [${preset.id}] ${preset.name} as [${duplicated.id}] ${duplicated.name}.`;
   }

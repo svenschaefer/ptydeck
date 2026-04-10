@@ -309,6 +309,44 @@ test("validateRequest accepts valid session control payloads and rejects invalid
   });
 });
 
+test("validateRequest rejects mixed trusted-local bulk control selector payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "all", deckId: "ops" }
+    });
+  }, /Field 'deckId' is only allowed when scope is 'deck'/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "all", sessionId: "abc" }
+    });
+  }, /Field 'sessionId' is only allowed when scope is 'session'/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "deck", deckId: "ops", sessionId: "abc" }
+    });
+  }, /Field 'sessionId' is only allowed when scope is 'session'/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/session-control/take",
+      params: {},
+      body: { scope: "session", sessionId: "abc", deckId: "ops" }
+    });
+  }, /Field 'deckId' is only allowed when scope is 'deck'/);
+});
+
 test("validateResponse checks session list schema", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -1685,6 +1723,77 @@ test("validateResponse accepts connection profile payloads", () => {
       body: [body]
     });
   });
+});
+
+test("validateResponse rejects malformed connection profile and workspace preset payloads", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "connectionProfile",
+      body: {
+        id: "ops-ssh",
+        name: "Ops SSH",
+        createdAt: 1,
+        updatedAt: 2,
+        launch: {
+          kind: "ssh",
+          deckId: "ops",
+          shell: "ssh",
+          startCwd: "~",
+          startCommand: "cd ~/app && exec $SHELL -l",
+          env: {
+            LANG: "en_US.UTF-8"
+          },
+          tags: ["ops", "ssh"],
+          themeProfile: THEME_PROFILE,
+          activeThemeProfile: THEME_PROFILE,
+          inactiveThemeProfile: THEME_PROFILE,
+          remoteConnection: {
+            host: "ops.internal",
+            port: 2222,
+            username: "deploy"
+          },
+          remoteAuth: {
+            method: "privateKey",
+            privateKeyPath: 42
+          }
+        }
+      }
+    });
+  }, /Response does not match ConnectionProfile schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "workspacePreset",
+      body: {
+        id: "focus",
+        name: "Focus Workspace",
+        createdAt: 1,
+        updatedAt: 2,
+        workspace: {
+          activeDeckId: "default",
+          layoutProfileId: "ops",
+          controlPaneVisible: true,
+          controlPanePosition: "bottom",
+          controlPaneSize: 240,
+          deckGroups: {
+            default: {
+              activeGroupId: 7,
+              groups: [
+                {
+                  id: "core",
+                  name: "Core Sessions",
+                  sessionIds: ["s-1", "s-2"]
+                }
+              ]
+            }
+          },
+          deckSplitLayouts: {}
+        }
+      }
+    });
+  }, /Response does not match WorkspacePreset schema/);
 });
 
 test("validateRequest accepts valid workspace preset create and patch payloads", () => {

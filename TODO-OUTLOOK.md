@@ -12,7 +12,7 @@ This file is structured into:
 
 ### Product and UX
 
-- [ ] Add a messaging-adapter framework as the next larger mainline epic after the queued `H76` quality follow-up, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
+- [ ] Add a messaging-adapter framework as the next larger mainline epic after the delivered `H76` quality follow-up, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
 
 ### Security and Multi-Tenancy
 

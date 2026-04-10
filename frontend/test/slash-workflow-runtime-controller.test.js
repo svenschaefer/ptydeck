@@ -238,3 +238,46 @@ test("slash-workflow runtime controller enforces the maximum wait timeout guardr
   assert.equal(result.status, "failed");
   assert.equal(result.failure.code, "workflow.guardrail_wait_timeout_exceeded");
 });
+
+test("slash-workflow runtime controller rejects concurrent runs and idle interrupt or kill requests deterministically", async () => {
+  const { controller } = createControllerContext();
+
+  assert.equal(await controller.interruptWorkflowSession(), "No workflow session available to interrupt.");
+  assert.equal(await controller.killWorkflowSession(), "No workflow session available to kill.");
+
+  const pending = controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until session-state /^exited$/ timeout 1h"
+  });
+
+  await assert.rejects(
+    () =>
+      controller.runWorkflowDetailed({
+        kind: "control-script",
+        mode: "multiline",
+        raw: "/list"
+      }),
+    (error) => error?.code === "workflow.already_running"
+  );
+
+  controller.stopActiveWorkflow();
+  await pending;
+});
+
+test("slash-workflow runtime controller surfaces failed action-step feedback explicitly", async () => {
+  const { controller } = createControllerContext({
+    executeControlCommandDetailed: async () => ({ ok: false, feedback: "Denied by policy" })
+  });
+
+  const result = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/list"
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "failed");
+  assert.equal(result.failure.code, "workflow.failed");
+  assert.match(result.feedback, /Denied by policy/);
+});

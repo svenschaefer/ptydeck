@@ -620,6 +620,12 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (scope === "session" && (typeof body.sessionId !== "string" || !body.sessionId.trim())) {
       throw new ApiError(400, "ValidationError", "Field 'sessionId' must be a non-empty string when scope is 'session'.");
     }
+    if (scope !== "deck" && body.deckId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Field 'deckId' is only allowed when scope is 'deck'.");
+    }
+    if (scope !== "session" && body.sessionId !== undefined) {
+      throw new ApiError(400, "ValidationError", "Field 'sessionId' is only allowed when scope is 'session'.");
+    }
   }
 
   if (method === "POST" && pathname.endsWith("/control/release")) {

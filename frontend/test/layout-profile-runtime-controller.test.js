@@ -679,3 +679,60 @@ test("layout profile runtime controller clears stale deck split layouts during d
   assert.ok(currentLayouts.default);
   assert.equal(currentLayouts.ops, undefined);
 });
+
+test("layout profile runtime controller rejects malformed create and update payloads deterministically", async () => {
+  const controller = createLayoutProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl: createElement("select"),
+    statusEl: createElement("p"),
+    api: {
+      async createLayoutProfile() {
+        return {
+          id: "",
+          name: "",
+          layout: null
+        };
+      },
+      async updateLayoutProfile(profileId) {
+        return {
+          id: profileId,
+          name: "",
+          layout: null
+        };
+      }
+    },
+    getDecks: () => [{ id: "default" }],
+    getActiveDeckId: () => "default",
+    getSessionFilterText: () => "",
+    getSidebarVisible: () => true,
+    getDeckTerminalGeometry: () => ({ cols: 96, rows: 24 })
+  });
+
+  await assert.rejects(
+    () => controller.createProfileFromCurrentLayout("Broken Layout"),
+    /Layout profile API returned an invalid profile record for layout profile save/
+  );
+
+  controller.replaceProfiles([
+    {
+      id: "focus",
+      name: "Focus Layout",
+      createdAt: 1,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "default",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    }
+  ]);
+
+  await assert.rejects(
+    () => controller.renameProfileById("focus", "Broken Focus"),
+    /Layout profile API returned an invalid profile record for layout profile rename/
+  );
+});

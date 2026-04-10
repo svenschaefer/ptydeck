@@ -734,3 +734,67 @@ test("workspace preset runtime controller supports prompt-free preset and group 
     "Deleted workspace group [ops-team] Ops Core. The change is local-only until you save or select a workspace preset."
   );
 });
+
+test("workspace preset runtime controller rejects malformed preset API payloads deterministically", async () => {
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    api: {
+      async createWorkspacePreset() {
+        return {
+          id: "",
+          name: "",
+          workspace: null
+        };
+      },
+      async updateWorkspacePreset(presetId) {
+        return {
+          id: presetId,
+          name: "",
+          workspace: null
+        };
+      }
+    },
+    presetSelectEl: new FakeElement("select"),
+    groupSelectEl: new FakeElement("select"),
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [{ id: "s1", deckId: "ops" }],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice()
+  });
+
+  controller.replaceWorkspaceState({
+    activeDeckId: "ops",
+    layoutProfileId: "",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckGroups: {},
+    deckSplitLayouts: {}
+  });
+
+  await assert.rejects(
+    () => controller.createPresetFromCurrentWorkspace("Broken Preset"),
+    /Workspace preset API returned an invalid preset record for workspace preset save/
+  );
+
+  controller.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: controller.getWorkspaceState()
+    }
+  ]);
+  controller.createGroupFromVisibleDeckSessions("Build", "ops");
+
+  await assert.rejects(
+    () => controller.applyGroupById("build", "ops"),
+    /Workspace preset API returned an invalid preset record for workspace persistence/
+  );
+});

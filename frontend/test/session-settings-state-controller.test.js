@@ -632,3 +632,47 @@ test("session-settings state controller marks changed send terminators as dirty"
 
   assert.equal(controller.isSessionSettingsDirty(entry, session), true);
 });
+
+test("session-settings state controller falls back to the startup tab and syncs theme controls without a documentRef", () => {
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background"],
+    defaultTerminalTheme: {
+      background: "#000000"
+    },
+    terminalThemeModeSet: new Set(["custom"]),
+    getSessionById: () => ({
+      id: "s1",
+      activeThemeProfile: { background: "#111111" },
+      inactiveThemeProfile: { background: "#222222" }
+    })
+  });
+
+  const entry = {
+    settingsLayout: { style: {} },
+    settingsTabStartupBtn: createInput(),
+    settingsTabInputBtn: createInput(),
+    settingsTabNoteBtn: createInput(),
+    settingsTabThemeBtn: createInput(),
+    settingsPanelStartup: createPanel(),
+    settingsPanelInput: createPanel({ hidden: true }),
+    settingsPanelNote: createPanel({ hidden: true }),
+    settingsPanelTheme: createPanel({ hidden: true }),
+    themeSlotSelect: createInput(""),
+    themeCategory: createInput(""),
+    themeSearch: createInput(""),
+    themeSelect: createInput(""),
+    themeInputs: {
+      background: createInput("")
+    }
+  };
+
+  controller.syncSessionThemeControls(entry, "s1");
+  controller.setActiveSettingsTab(entry, "unknown");
+
+  assert.equal(entry.themeSlotSelect.value, "active");
+  assert.equal(entry.themeSelect.value, "custom");
+  assert.equal(entry.settingsPanelStartup.hidden, false);
+  assert.equal(entry.settingsPanelInput.hidden, false);
+  assert.equal(entry.settingsPanelInput.classList.contains("session-settings-panel-inactive"), true);
+  assert.equal(entry.settingsPanelInput.getAttribute("aria-hidden"), "true");
+});

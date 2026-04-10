@@ -197,3 +197,59 @@ test("workspace manager runtime controller opens the dialog, switches tabs, and 
   closeBtn.click();
   assert.equal(dialogEl.open, false);
 });
+
+test("workspace manager runtime controller falls back cleanly without modal helpers or selected items", () => {
+  const dialogEl = {
+    open: false,
+    listeners: new Map(),
+    addEventListener(type, handler) {
+      const list = this.listeners.get(type) || [];
+      list.push(handler);
+      this.listeners.set(type, list);
+    }
+  };
+  const openBtn = new FakeElement("button");
+  const closeBtn = new FakeElement("button");
+  const metaEl = new FakeElement("p");
+  const connectionsTabBtn = new FakeElement("button");
+  const workspaceTabBtn = new FakeElement("button");
+  const connectionsPanelEl = new FakeElement("section");
+  const workspacePanelEl = new FakeElement("section");
+  const connectionSummaryEl = new FakeElement("p");
+  const workspacePresetSummaryEl = new FakeElement("p");
+  const workspaceGroupSummaryEl = new FakeElement("p");
+
+  const controller = createWorkspaceManagerRuntimeController({
+    dialogEl,
+    openBtn,
+    closeBtn,
+    metaEl,
+    connectionsTabBtn,
+    workspaceTabBtn,
+    connectionsPanelEl,
+    workspacePanelEl,
+    connectionSummaryEl,
+    workspacePresetSummaryEl,
+    workspaceGroupSummaryEl,
+    getConnectionProfileRuntimeController: () => ({
+      getSelectedProfile: () => null
+    }),
+    getWorkspacePresetRuntimeController: () => ({
+      getSelectedPreset: () => null,
+      listGroupsForDeck: () => [],
+      getActiveGroupIdForDeck: () => ""
+    }),
+    getActiveDeckId: () => ""
+  });
+
+  controller.setActiveTab("invalid");
+  assert.equal(controller.getActiveTab(), "connections");
+  assert.match(connectionSummaryEl.textContent, /No saved connection profile selected/);
+  assert.match(workspacePresetSummaryEl.textContent, /No saved workspace preset selected/);
+  assert.match(workspaceGroupSummaryEl.textContent, /Deck \[default\] · no active group/i);
+
+  openBtn.click();
+  assert.equal(dialogEl.open, true);
+  closeBtn.click();
+  assert.equal(dialogEl.open, false);
+});

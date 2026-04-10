@@ -2,6 +2,14 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-10
+
+- [x] `QLT-218`, `QLT-219`, `QLT-220`, `QLT-221`, and `QLT-222` are now completed as `v0.4.0-H76` on `main`, leaving no active or queued near-term wave in `ROADMAP.md`.
+- [x] Backend request-contract hardening for `backend/src/validation.js` now rejects mixed trusted-local control selectors more strictly (`deckId` only for `scope=deck`, `sessionId` only for `scope=session`) and adds direct response-schema regression coverage for malformed connection-profile and workspace-preset payloads instead of relying only on broad integration behavior.
+- [x] Frontend management-surface hardening now fails fast on malformed persisted management payloads: `frontend/src/public/connection-profile-runtime-controller.js`, `frontend/src/public/workspace-preset-runtime-controller.js`, and `frontend/src/public/layout-profile-runtime-controller.js` now reject invalid create/update responses explicitly instead of silently dereferencing malformed records later in rename, duplicate, save, persistence, or layout-profile flows.
+- [x] Direct frontend regression coverage now closes the targeted H76 operator/runtime seams in `frontend/test/connection-profile-runtime-controller.test.js`, `frontend/test/workspace-preset-runtime-controller.test.js`, `frontend/test/workspace-manager-runtime-controller.test.js`, `frontend/test/layout-profile-runtime-controller.test.js`, `frontend/test/send-history-runtime-controller.test.js`, `frontend/test/paste-observation-runtime-controller.test.js`, `frontend/test/slash-workflow-runtime-controller.test.js`, `frontend/test/session-settings-state-controller.test.js`, and `frontend/test/session-terminal-runtime-controller.test.js`, covering malformed stored-state hydration, bounded paste-continue failure behavior, workflow idle/concurrency guardrails, startup-tab fallback semantics, clipboard-read failure swallowing, and prompt-free workspace-manager recovery.
+- [x] Validation for the `v0.4.0-H76` closeout passed with focused regressions plus the full local quality gate (`npm run lint`, `npm run test`, `npm run test:coverage:check`), with no leftover background validation or push processes after completion; coverage on the final validated tree is backend `94.02%` lines and frontend `93.68%` lines.
+
 ## 2026-04-09
 
 - [x] `DOC-001`, `DOC-002`, `DOC-003`, `DOC-004`, `DOC-005`, `DOC-006`, and `DOC-007` are now completed as `v0.4.0-H75` on `main`, establishing the first repo-native handbook system and leaving no active or queued near-term wave in `ROADMAP.md`.

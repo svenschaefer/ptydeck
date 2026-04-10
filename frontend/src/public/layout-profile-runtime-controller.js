@@ -383,6 +383,16 @@ export function createLayoutProfileRuntimeController(options = {}) {
     return normalized;
   }
 
+  function requireUpsertedProfile(profile, operationLabel) {
+    const normalized = upsertProfile(profile);
+    if (normalized) {
+      return normalized;
+    }
+    throw new Error(
+      `Layout profile API returned an invalid profile record${normalizeText(operationLabel) ? ` for ${operationLabel}` : ""}.`
+    );
+  }
+
   function removeProfile(profileId) {
     const normalizedId = normalizeText(profileId);
     if (!normalizedId) {
@@ -552,7 +562,7 @@ export function createLayoutProfileRuntimeController(options = {}) {
       name: normalizedName,
       layout: captureCurrentLayout()
     });
-    const profile = upsertProfile(created);
+    const profile = requireUpsertedProfile(created, "layout profile save");
     return `Saved layout profile [${profile.id}] ${profile.name}.`;
   }
 
@@ -566,8 +576,8 @@ export function createLayoutProfileRuntimeController(options = {}) {
       throw new Error("Layout profile name is required.");
     }
     const updated = await api.updateLayoutProfile(profile.id, { name: normalizedName });
-    upsertProfile(updated);
-    return `Renamed layout profile [${updated.id}] to ${updated.name}.`;
+    const updatedProfile = requireUpsertedProfile(updated, "layout profile rename");
+    return `Renamed layout profile [${updatedProfile.id}] to ${updatedProfile.name}.`;
   }
 
   async function deleteProfileById(profileId) {

@@ -370,3 +370,31 @@ test("send-history runtime controller pins the opened session, guards draft repl
   assert.deepEqual(controller.listEntriesForSession("s1"), []);
   assert.equal(clearSessionBtn.disabled, true);
 });
+
+test("send-history runtime controller ignores malformed persisted payloads and flushes pending persistence on dispose", () => {
+  const windowRef = createFakeWindow();
+  const localStorageRef = new FakeStorage({
+    [SEND_HISTORY_STORAGE_KEY]: JSON.stringify({
+      sessions: {
+        s1: [null, { id: "bad", sessionId: "s1", submittedAt: "x", text: "", preview: "", textLength: 0, lineCount: 0 }],
+        broken: "nope"
+      }
+    })
+  });
+
+  const controller = createSendHistoryRuntimeController({
+    windowRef,
+    documentRef: new FakeDocument(),
+    localStorageRef,
+    getActiveSession: () => ({ id: "s1", name: "ops" })
+  });
+
+  assert.deepEqual(controller.listEntriesForSession("s1"), []);
+
+  controller.recordSend("s1", "echo hi", { submittedAt: 10 });
+  controller.dispose();
+
+  const persisted = JSON.parse(localStorageRef.getItem(SEND_HISTORY_STORAGE_KEY));
+  assert.equal(persisted.sessions.s1.length, 1);
+  assert.equal(persisted.sessions.s1[0].text, "echo hi");
+});

@@ -175,3 +175,51 @@ test("paste observation runtime controller marks full echo as complete without a
 
   controller.dispose();
 });
+
+test("paste observation runtime controller leaves stalled observations actionable when continue dispatch fails", async () => {
+  const windowRef = createFakeWindow();
+  const panelEl = new FakeTextNode();
+  const summaryEl = new FakeTextNode();
+  const detailEl = new FakeTextNode();
+  const continueBtn = new FakeButton();
+  const continueCalls = [];
+  const activeSession = { id: "s1", name: "alpha" };
+
+  const controller = createPasteObservationRuntimeController({
+    windowRef,
+    panelEl,
+    summaryEl,
+    detailEl,
+    continueBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: () => activeSession,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    requestContinuePaste: async (sessionId, options) => {
+      continueCalls.push([sessionId, options.source, options.auto]);
+      return false;
+    }
+  });
+
+  controller.recordTerminalPaste("s1", "abcdef", { autoContinueEnabled: true });
+  controller.observeSessionOutput("s1", "abc");
+  await windowRef.timers[0].fn();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(continueCalls, [["s1", "auto", true]]);
+  assert.equal(summaryEl.textContent, "Paste into [1] alpha looks stalled.");
+  assert.equal(continueBtn.hidden, false);
+
+  continueBtn.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(continueCalls, [
+    ["s1", "auto", true],
+    ["s1", "manual", false]
+  ]);
+  assert.equal(summaryEl.textContent, "Paste into [1] alpha looks stalled.");
+
+  controller.dispose();
+});

@@ -899,3 +899,74 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   assert.match(deleteTrustFeedback, /Deleted trusted SSH host key/);
   assert.ok(calls.some((entry) => entry[0] === "delete-trust"));
 });
+
+test("connection profile runtime controller rejects malformed create and update payloads deterministically", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const session = {
+    id: "s-local",
+    name: "Local Session",
+    deckId: "default",
+    kind: "local",
+    shell: "bash",
+    cwd: "/workspace",
+    startCwd: "/workspace",
+    startCommand: "npm test",
+    env: {},
+    tags: ["local"],
+    themeProfile: createThemeProfile("#010101"),
+    activeThemeProfile: createThemeProfile("#020202"),
+    inactiveThemeProfile: createThemeProfile("#030303")
+  };
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async createConnectionProfile() {
+        return {
+          id: "",
+          name: "",
+          launch: null
+        };
+      },
+      async updateConnectionProfile(profileId) {
+        return {
+          id: profileId,
+          name: "",
+          launch: null
+        };
+      }
+    },
+    getSessions: () => [session],
+    getSessionById: (sessionId) => (sessionId === session.id ? session : null),
+    getActiveSessionId: () => session.id,
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await assert.rejects(
+    () => controller.createProfileFromSession(session.id, "Broken Profile"),
+    /Connection profile API returned an invalid profile record for connection profile save/
+  );
+
+  controller.replaceProfiles([
+    {
+      id: "ops-local",
+      name: "Ops Local",
+      launch: {
+        kind: "local",
+        deckId: "default",
+        shell: "bash",
+        startCwd: "/workspace",
+        startCommand: "",
+        env: {},
+        tags: [],
+        activeThemeProfile: createThemeProfile("#111111"),
+        inactiveThemeProfile: createThemeProfile("#121212")
+      }
+    }
+  ]);
+
+  await assert.rejects(
+    () => controller.renameProfileById("ops-local", "Ops Local Updated"),
+    /Connection profile API returned an invalid profile record for connection profile rename/
+  );
+});

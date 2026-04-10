@@ -1376,6 +1376,16 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return normalized;
   }
 
+  function requireUpsertedProfile(profile, operationLabel) {
+    const normalized = upsertProfile(profile);
+    if (normalized) {
+      return normalized;
+    }
+    throw new Error(
+      `Connection profile API returned an invalid profile record${normalizeText(operationLabel) ? ` for ${operationLabel}` : ""}.`
+    );
+  }
+
   function removeProfile(profileId) {
     const normalizedId = normalizeText(profileId);
     if (!normalizedId) {
@@ -1427,7 +1437,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
       name: normalizedName,
       launch
     });
-    const profile = upsertProfile(created);
+    const profile = requireUpsertedProfile(created, "connection profile save");
     return `Saved connection profile [${profile.id}] ${profile.name} from [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
   }
 
@@ -1512,8 +1522,8 @@ export function createConnectionProfileRuntimeController(options = {}) {
       throw new Error("Connection profile name is required.");
     }
     const updated = await api.updateConnectionProfile(profile.id, { name: normalizedName });
-    upsertProfile(updated);
-    return `Renamed connection profile [${updated.id}] to ${updated.name}.`;
+    const updatedProfile = requireUpsertedProfile(updated, "connection profile rename");
+    return `Renamed connection profile [${updatedProfile.id}] to ${updatedProfile.name}.`;
   }
 
   async function duplicateProfileById(profileId, name) {
@@ -1529,7 +1539,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
       name: normalizedName,
       launch: profile.launch
     });
-    const duplicated = upsertProfile(created);
+    const duplicated = requireUpsertedProfile(created, "connection profile duplicate");
     return `Duplicated connection profile [${profile.id}] ${profile.name} as [${duplicated.id}] ${duplicated.name}.`;
   }
 
@@ -1552,7 +1562,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
     const existingProfileId = normalizeText(draftState?.profileId);
     if (existingProfileId && getProfile(existingProfileId)) {
       const updated = await api.updateConnectionProfile(existingProfileId, { name, launch });
-      const profile = upsertProfile(updated);
+      const profile = requireUpsertedProfile(updated, "connection profile update");
       setDraftState({
         mode: "profile",
         profileId: profile?.id,
@@ -1562,7 +1572,7 @@ export function createConnectionProfileRuntimeController(options = {}) {
       return `Updated connection profile [${profile.id}] ${profile.name}.`;
     }
     const created = await api.createConnectionProfile({ name, launch });
-    const profile = upsertProfile(created);
+    const profile = requireUpsertedProfile(created, "connection profile save");
     setDraftState({
       mode: "profile",
       profileId: profile?.id,
