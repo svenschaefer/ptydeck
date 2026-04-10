@@ -10,10 +10,6 @@ This file is structured into:
 
 ## Future Epics
 
-### Product and UX
-
-- [ ] Add a messaging-adapter framework as the next larger mainline epic after the delivered `H76` quality follow-up, not as another `feature/h62-multi-device-control-foundation` branch-local continuation.
-
 ### Security and Multi-Tenancy
 
 - [ ] Add complete authentication and authorization model with role scopes.
@@ -59,11 +55,12 @@ This file is structured into:
 
 ### Messaging Adapters
 
-- [ ] `MSG-001` Owner `BE`: Add a provider-independent messaging-event foundation that normalizes session lifecycle, replay-visible output signals, controller/share state changes, and attention-required conditions into a stable adapter-facing event model without coupling the core runtime to any single messaging product.
-- [ ] `MSG-002` Owner `BE`: Add deterministic signal-extraction and trigger-profile support for the first messaging-adapter wave, including explicit shell, coding-agent, build/test, deploy, and transfer-oriented rule bundles plus message-eligibility policy so adapters consume normalized events instead of parsing raw PTY output ad hoc.
-- [ ] `MSG-003` Owner `PLAT`: Add an outbound-only Telegram reference adapter that maps one ptydeck session to one conversation target, supports new-message/update/alert lifecycle behavior, and stays subordinate to existing ptydeck REST/WebSocket/share/control contracts rather than introducing provider-specific runtime authority.
-- [ ] `MSG-004` Owner `BE`: Add a bounded inbound adapter-action contract that can map explicit remote actions such as `status`, `stop`, `retry`, replay excerpt requests, and bounded slash-command execution onto existing ptydeck control/share/send-safety decisions without introducing a second terminal-authority model.
-- [ ] `MSG-005` Owner `QA`: Add closeout validation for the first messaging-adapter wave, including provider-independent event/trigger/message-policy coverage plus end-to-end verification of the Telegram outbound reference adapter and the bounded inbound action contract.
+- The initial outbound-first messaging-adapter foundation and the bounded inbound reference follow-up are now promoted into near-term delivery as `v0.4.0-H77` and `v0.4.0-H78`; only post-reference follow-up work remains in this deferred section.
+
+- [ ] `MSG-008` Owner `BE`: Add richer post-reference trigger profiles and selection controls for deploy, transfer/sync, and long-running worker sessions, plus optional profile auto-detection heuristics, only after the outbound Telegram reference flow and the bounded inbound action contract are both stable.
+- [ ] `MSG-009` Owner `PLAT`: Add a Discord-style interaction-oriented reference adapter on top of the delivered normalized event/action contract, preserving the same single-user ptydeck authority boundaries while validating a richer button-driven remote interaction surface.
+- [ ] `MSG-010` Owner `PLAT`: Add a Slack-style workflow-oriented adapter focused on concise summaries, handoff context, and approval/status-style workflows rather than stream mirroring, only after the first two adapter styles prove the core framework boundaries.
+- [ ] `MSG-011` Owner `QA`: Add cross-adapter parity and contract validation after a second concrete adapter lands, ensuring provider-specific adapters still honor the same normalized event model, bounded action vocabulary, and ptydeck authority rules.
 
 ### Remote / External Theme Compatibility
 
