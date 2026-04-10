@@ -118,6 +118,39 @@ function buildIdentityDetails(hints = []) {
   };
 }
 
+function buildForegroundProcessDetails(inspection, hints = []) {
+  const normalizedHints = hints
+    .map((entry) => normalizeDetailValue(entry))
+    .filter((entry) => entry && typeof entry === "object");
+  const representativeProcess =
+    inspection?.representativeProcess && typeof inspection.representativeProcess === "object"
+      ? normalizeDetailValue(inspection.representativeProcess)
+      : null;
+  const foregroundProcesses = Array.isArray(inspection?.foregroundProcesses)
+    ? inspection.foregroundProcesses
+        .map((entry) => normalizeDetailValue(entry))
+        .filter((entry) => entry && typeof entry === "object")
+    : [];
+  const ancestry = Array.isArray(inspection?.ancestry)
+    ? inspection.ancestry.map((entry) => normalizeDetailValue(entry)).filter((entry) => entry && typeof entry === "object")
+    : [];
+  return {
+    ...(normalizedHints.length ? { foregroundHints: normalizedHints } : {}),
+    foregroundProcess: {
+      terminalPid: Number.isInteger(inspection?.terminalPid) ? inspection.terminalPid : null,
+      terminalProcessGroupId: Number.isInteger(inspection?.terminalProcessGroupId) ? inspection.terminalProcessGroupId : null,
+      terminalSessionId: Number.isInteger(inspection?.terminalSessionId) ? inspection.terminalSessionId : null,
+      ttyPath: typeof inspection?.ttyPath === "string" ? inspection.ttyPath : "",
+      foregroundProcessGroupId: Number.isInteger(inspection?.foregroundProcessGroupId)
+        ? inspection.foregroundProcessGroupId
+        : null,
+      representativeProcess,
+      foregroundProcesses,
+      ancestry
+    }
+  };
+}
+
 function isConfidence(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 }
@@ -257,6 +290,105 @@ function buildExplicitHintIdentity(session, updatedAt) {
   };
 }
 
+function createForegroundProcessHint(type, value, extras = {}) {
+  return normalizeDetailValue({
+    type,
+    value,
+    ...extras
+  });
+}
+
+function buildForegroundProcessIdentity(inspection, updatedAt) {
+  if (!inspection || typeof inspection !== "object") {
+    return buildUnknownTerminalAppIdentity(updatedAt);
+  }
+  const representative = inspection.representativeProcess;
+  if (!representative || typeof representative !== "object") {
+    return buildUnknownTerminalAppIdentity(updatedAt);
+  }
+
+  const representativeName =
+    normalizeLabel(representative.executableName) || normalizeLabel(representative.comm) || normalizeLabel(representative.name);
+  const representativeCommandLine = Array.isArray(representative.commandLine)
+    ? representative.commandLine.join(" ").trim()
+    : "";
+  const representativeCommandLineHint = detectNamedHint(representativeCommandLine);
+  const representativeNameHint = detectNamedHint(representativeName);
+  const shellLabel = normalizeShellLabel(representativeName);
+
+  if (representativeNameHint) {
+    const subcommand =
+      representativeNameHint.subcommand ||
+      representativeCommandLineHint?.subcommand ||
+      "";
+    return {
+      family: representativeNameHint.family,
+      label: representativeNameHint.label,
+      source: "foreground-process",
+      confidence: representativeCommandLineHint ? 0.97 : 0.94,
+      details: buildForegroundProcessDetails(inspection, [
+        createForegroundProcessHint("representativeProcess", representativeName, {
+          matchedLabel: representativeNameHint.label,
+          ...(subcommand ? { subcommand } : {})
+        }),
+        representativeCommandLine
+          ? createForegroundProcessHint("commandLine", representativeCommandLine, {
+              ...(representativeCommandLineHint?.label ? { matchedLabel: representativeCommandLineHint.label } : {}),
+              ...(subcommand ? { subcommand } : {})
+            })
+          : null
+      ]),
+      updatedAt
+    };
+  }
+
+  if (representativeCommandLineHint) {
+    return {
+      family: representativeCommandLineHint.family,
+      label: representativeCommandLineHint.label,
+      source: "foreground-process",
+      confidence: 0.89,
+      details: buildForegroundProcessDetails(inspection, [
+        createForegroundProcessHint("commandLine", representativeCommandLine, {
+          matchedLabel: representativeCommandLineHint.label,
+          ...(representativeCommandLineHint.subcommand ? { subcommand: representativeCommandLineHint.subcommand } : {})
+        })
+      ]),
+      updatedAt
+    };
+  }
+
+  if (shellLabel) {
+    return {
+      family: "shell",
+      label: shellLabel,
+      source: "foreground-process",
+      confidence: 0.78,
+      details: buildForegroundProcessDetails(inspection, [
+        createForegroundProcessHint("representativeProcess", representativeName || shellLabel, {
+          matchedLabel: shellLabel
+        })
+      ]),
+      updatedAt
+    };
+  }
+
+  if (representativeName) {
+    return {
+      family: "unknown",
+      label: representativeName,
+      source: "foreground-process",
+      confidence: 0.52,
+      details: buildForegroundProcessDetails(inspection, [
+        createForegroundProcessHint("representativeProcess", representativeName)
+      ]),
+      updatedAt
+    };
+  }
+
+  return buildUnknownTerminalAppIdentity(updatedAt);
+}
+
 export function buildUnknownTerminalAppIdentity(updatedAt = Date.now()) {
   return {
     family: "unknown",
@@ -309,6 +441,23 @@ export function deriveTerminalAppIdentityFromSessionHints(session, { existingIde
   const normalizedExistingIdentity = normalizeTerminalAppIdentity(existingIdentity, {
     fallbackUpdatedAt: Number.isInteger(updatedAt) ? updatedAt : Date.now()
   });
+  if (terminalAppIdentityEquals(normalizedExistingIdentity, nextIdentity, { includeUpdatedAt: false })) {
+    return normalizedExistingIdentity;
+  }
+  return nextIdentity;
+}
+
+export function deriveTerminalAppIdentityFromForegroundProcess(
+  inspection,
+  { existingIdentity = null, updatedAt = Date.now() } = {}
+) {
+  const normalizedExistingIdentity = normalizeTerminalAppIdentity(existingIdentity, {
+    fallbackUpdatedAt: Number.isInteger(updatedAt) ? updatedAt : Date.now()
+  });
+  const nextIdentity = buildForegroundProcessIdentity(inspection, updatedAt);
+  if (nextIdentity.source === "unknown" && normalizedExistingIdentity.source !== "unknown") {
+    return normalizedExistingIdentity;
+  }
   if (terminalAppIdentityEquals(normalizedExistingIdentity, nextIdentity, { includeUpdatedAt: false })) {
     return normalizedExistingIdentity;
   }

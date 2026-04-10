@@ -9,10 +9,12 @@ import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.j
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
+  deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
   normalizeTerminalAppIdentity,
   terminalAppIdentityEquals
 } from "./terminal-app-identity.js";
+import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
 import { createShellAdapter } from "./shell-adapter.js";
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
@@ -67,6 +69,7 @@ const REMOTE_CONNECTIVITY_OFFLINE = "offline";
 const DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS = 3;
 const DEFAULT_REMOTE_RECONNECT_DELAY_MS = 1500;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
+const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
 const TRACE_TOKEN_MAX_LENGTH = 128;
 
 function normalizeTraceToken(value) {
@@ -585,7 +588,9 @@ export class SessionManager {
     nowFn = Date.now,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout,
-    createTraceId = randomUUID
+    createTraceId = randomUUID,
+    inspectTerminalForegroundProcess,
+    foregroundProcessRefreshDelayMs = DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS
   } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
@@ -622,9 +627,15 @@ export class SessionManager {
         ? remoteReconnectStableMs
         : DEFAULT_REMOTE_RECONNECT_STABLE_MS;
     this.createTraceId = typeof createTraceId === "function" ? createTraceId : randomUUID;
-    this.nowFn = typeof nowFn === "function" ? nowFn : now;
+    this.nowFn = typeof nowFn === "function" ? nowFn : Date.now;
     this.setTimeoutFn = typeof setTimeoutFn === "function" ? setTimeoutFn : setTimeout;
     this.clearTimeoutFn = typeof clearTimeoutFn === "function" ? clearTimeoutFn : clearTimeout;
+    this.inspectTerminalForegroundProcess =
+      typeof inspectTerminalForegroundProcess === "function" ? inspectTerminalForegroundProcess : inspectLinuxTerminalForegroundProcess;
+    this.foregroundProcessRefreshDelayMs =
+      Number.isInteger(foregroundProcessRefreshDelayMs) && foregroundProcessRefreshDelayMs >= 0
+        ? foregroundProcessRefreshDelayMs
+        : DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS;
     this.createPty =
       createPty ||
       (({ command, shell, args = [], cwd, cols, rows, env }) =>
@@ -669,6 +680,14 @@ export class SessionManager {
     }
     this.clearTimeoutFn(session.activityTimer);
     session.activityTimer = null;
+  }
+
+  clearForegroundProcessRefreshTimer(session) {
+    if (!session?.foregroundProcessRefreshTimer) {
+      return;
+    }
+    this.clearTimeoutFn(session.foregroundProcessRefreshTimer);
+    session.foregroundProcessRefreshTimer = null;
   }
 
   clearRemoteReconnectTimer(session) {
@@ -840,6 +859,9 @@ export class SessionManager {
     session.shellAdapter = shellAdapter;
     session.cwdTrackingBuffer = "";
     session.replayShellBlockTrackingSupported = shellAdapter?.capability?.shellBlockTrackingSupported === true;
+    this.scheduleSessionForegroundProcessIdentityRefresh(session, {
+      delayMs: this.foregroundProcessRefreshDelayMs
+    });
     ptyProcess.onData((data) => {
       const streamResult = session.shellAdapter.consumeOutput(session, data);
       const cleaned = typeof streamResult?.cleaned === "string" ? streamResult.cleaned : "";
@@ -881,6 +903,10 @@ export class SessionManager {
           sessionId: session.id,
           data: cleaned,
           promptBoundaries,
+          trace
+        });
+        this.scheduleSessionForegroundProcessIdentityRefresh(session, {
+          delayMs: this.foregroundProcessRefreshDelayMs,
           trace
         });
       }
@@ -999,6 +1025,7 @@ export class SessionManager {
 
   handlePtyExit(session, exit) {
     this.clearSessionActivityTimer(session);
+    this.clearForegroundProcessRefreshTimer(session);
     this.clearRemoteReconnectStabilizeTimer(session);
     const exitTimestamp = this.nowFn();
     const exitCode = Number.isInteger(exit?.exitCode) ? exit.exitCode : null;
@@ -1246,6 +1273,58 @@ export class SessionManager {
     });
   }
 
+  refreshSessionForegroundProcessIdentity(sessionId, options = {}) {
+    const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
+    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
+    if (!session || session.meta.kind !== SESSION_KIND_LOCAL || !session.ptyProcess || !Number.isInteger(session.ptyProcess.pid)) {
+      return normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
+        fallbackUpdatedAt: updatedAt
+      });
+    }
+    const inspection = this.inspectTerminalForegroundProcess(session.ptyProcess.pid, {
+      sessionId: session.id,
+      ptyPath: session.ptyProcess._pty || "",
+      updatedAt
+    });
+    const nextIdentity = deriveTerminalAppIdentityFromForegroundProcess(inspection, {
+      existingIdentity: session.meta.appIdentity,
+      updatedAt
+    });
+    return this.applySessionAppIdentity(session, nextIdentity, {
+      emitUpdatedEvent: options.emitUpdatedEvent === true,
+      trace: options.trace || null,
+      updatedAt
+    });
+  }
+
+  scheduleSessionForegroundProcessIdentityRefresh(
+    session,
+    { delayMs = this.foregroundProcessRefreshDelayMs, trace = null } = {}
+  ) {
+    if (
+      !session ||
+      session.meta.kind !== SESSION_KIND_LOCAL ||
+      !session.ptyProcess ||
+      !Number.isInteger(session.ptyProcess.pid) ||
+      session.ptyProcess.pid <= 0
+    ) {
+      return false;
+    }
+    this.clearForegroundProcessRefreshTimer(session);
+    const currentPtyProcess = session.ptyProcess;
+    session.foregroundProcessRefreshTimer = this.setTimeoutFn(() => {
+      session.foregroundProcessRefreshTimer = null;
+      if (this.sessions.get(session.id) !== session || session.ptyProcess !== currentPtyProcess) {
+        return;
+      }
+      this.refreshSessionForegroundProcessIdentity(session, {
+        emitUpdatedEvent: true,
+        trace
+      });
+    }, Math.max(0, delayMs));
+    return true;
+  }
+
   transitionToRunning(session) {
     if (!session || session.meta.state === SESSION_STATE_RUNNING) {
       return session?.meta || null;
@@ -1372,6 +1451,7 @@ export class SessionManager {
       currentShellBlockStart: null,
       replayShellBlockTrackingSupported: false,
       activityTimer: null,
+      foregroundProcessRefreshTimer: null,
       remoteReconnectTimer: null,
       remoteReconnectStabilizeTimer: null,
       expectedExitReasonTimer: null,
@@ -1454,6 +1534,10 @@ export class SessionManager {
     const timestamp = this.nowFn();
     session.lastActivityAt = timestamp;
     session.meta.updatedAt = timestamp;
+    this.scheduleSessionForegroundProcessIdentityRefresh(session, {
+      delayMs: this.foregroundProcessRefreshDelayMs,
+      trace: options.trace || null
+    });
   }
 
   resize(sessionId, cols, rows, options = {}) {
@@ -1680,6 +1764,7 @@ export class SessionManager {
       source: options.trace?.source || "rest"
     });
     this.clearSessionActivityTimer(session);
+    this.clearForegroundProcessRefreshTimer(session);
     this.clearRemoteReconnectTimers(session);
     this.clearExpectedExitReason(session);
     session.expectedExitReason = reason;

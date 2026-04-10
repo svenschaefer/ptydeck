@@ -1,0 +1,128 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  inspectLinuxTerminalForegroundProcess,
+  parseLinuxProcStat,
+  readLinuxProcessSnapshot
+} from "../src/terminal-foreground-process.js";
+
+function createProcFixtures(entries) {
+  const files = new Map();
+  for (const [pid, entry] of Object.entries(entries)) {
+    files.set(`/proc/${pid}/stat`, entry.stat || "");
+    files.set(`/proc/${pid}/status`, entry.status || "");
+    files.set(`/proc/${pid}/cmdline`, entry.cmdline || "");
+    files.set(`/proc/${pid}/exe`, entry.exe || "");
+    files.set(`/proc/${pid}/fd/0`, entry.tty || "");
+  }
+  return {
+    readFileSync(filePath) {
+      if (!files.has(filePath) || filePath.endsWith("/exe") || filePath.endsWith("/fd/0")) {
+        throw new Error(`missing file ${filePath}`);
+      }
+      return files.get(filePath);
+    },
+    readlinkSync(filePath) {
+      if (!files.has(filePath) || (!filePath.endsWith("/exe") && !filePath.endsWith("/fd/0"))) {
+        throw new Error(`missing link ${filePath}`);
+      }
+      return files.get(filePath);
+    },
+    readdirSync() {
+      return Object.keys(entries).map((name) => ({
+        name,
+        isDirectory() {
+          return true;
+        }
+      }));
+    }
+  };
+}
+
+test("parseLinuxProcStat extracts process-group and terminal fields", () => {
+  const parsed = parseLinuxProcStat(
+    "87287 (bash) S 87277 87287 87287 34821 87304 4194304 1112 1841 0 2 0 1 1 1 20 0 1 0 95424526 6389760 1280"
+  );
+
+  assert.deepEqual(parsed, {
+    pid: 87287,
+    comm: "bash",
+    state: "S",
+    ppid: 87277,
+    pgrp: 87287,
+    sessionId: 87287,
+    ttyNr: 34821,
+    tpgid: 87304
+  });
+});
+
+test("readLinuxProcessSnapshot normalizes proc payloads", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  const snapshot = readLinuxProcessSnapshot(200, fixtures);
+
+  assert.equal(snapshot.pid, 200);
+  assert.equal(snapshot.ppid, 100);
+  assert.equal(snapshot.pgrp, 200);
+  assert.equal(snapshot.tpgid, 210);
+  assert.equal(snapshot.name, "bash");
+  assert.equal(snapshot.executableName, "bash");
+  assert.deepEqual(snapshot.commandLine, ["bash", "--login"]);
+  assert.equal(snapshot.ttyPath, "/dev/pts/5");
+});
+
+test("inspectLinuxTerminalForegroundProcess resolves the foreground group representative and ancestry", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    210: {
+      stat: "210 (codex) S 200 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tcodex\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "codex\u0000--json\u0000",
+      exe: "/usr/local/bin/codex",
+      tty: "/dev/pts/5"
+    },
+    211: {
+      stat: "211 (node) S 210 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tnode\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "node\u0000worker.js\u0000",
+      exe: "/usr/bin/node",
+      tty: "/dev/pts/5"
+    },
+    300: {
+      stat: "300 (other) S 1 300 300 34822 300 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tother\nNSpgid:\t300\nNSsid:\t300\n",
+      cmdline: "other\u0000",
+      exe: "/usr/bin/other",
+      tty: "/dev/pts/6"
+    }
+  });
+
+  const inspection = inspectLinuxTerminalForegroundProcess(200, fixtures);
+
+  assert.equal(inspection.terminalPid, 200);
+  assert.equal(inspection.foregroundProcessGroupId, 210);
+  assert.equal(inspection.ttyPath, "/dev/pts/5");
+  assert.equal(inspection.representativeProcess.pid, 210);
+  assert.equal(inspection.representativeProcess.executableName, "codex");
+  assert.deepEqual(
+    inspection.foregroundProcesses.map((entry) => entry.pid),
+    [210, 211]
+  );
+  assert.equal(inspection.ancestry.length, 1);
+  assert.equal(inspection.ancestry[0].pid, 200);
+  assert.equal(inspection.ancestry[0].executableName, "bash");
+});

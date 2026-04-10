@@ -17,11 +17,13 @@ const INPUT_SAFETY_PROFILE = {
   pasteLineConfirmThreshold: 4
 };
 
-function createFakePty() {
+function createFakePty({ pid = 4001, ptyPath = "/dev/pts/test" } = {}) {
   let lastExitHandler = null;
   let lastDataHandler = null;
 
   return {
+    pid,
+    _pty: ptyPath,
     writes: [],
     resizeCalls: [],
     killSignals: [],
@@ -185,6 +187,73 @@ test("SessionManager setSessionAppIdentity emits session.updated for later runti
   assert.equal(updates[0].session.appIdentity.label, "codex");
   assert.equal(updates[0].session.appIdentity.source, "foreground-process");
   assert.equal(updates[0].session.appIdentity.details.processName, "codex");
+});
+
+test("SessionManager schedules and applies foreground-process identity refresh for local PTYs", () => {
+  const fakePty = createFakePty({ pid: 4321, ptyPath: "/dev/pts/9" });
+  const scheduled = [];
+  const cleared = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    inspectTerminalForegroundProcess(pid, details) {
+      assert.equal(pid, 4321);
+      assert.equal(details.ptyPath, "/dev/pts/9");
+      return {
+        terminalPid: 4321,
+        foregroundProcessGroupId: 5000,
+        representativeProcess: {
+          pid: 5000,
+          ppid: 4321,
+          executableName: "codex",
+          comm: "codex",
+          name: "codex",
+          executablePath: "/usr/local/bin/codex",
+          commandLine: ["codex", "--json"],
+          ttyPath: "/dev/pts/9"
+        },
+        foregroundProcesses: [],
+        ancestry: [
+          {
+            pid: 4321,
+            ppid: 100,
+            executableName: "bash",
+            comm: "bash",
+            name: "bash",
+            executablePath: "/usr/bin/bash",
+            commandLine: ["bash"],
+            ttyPath: "/dev/pts/9"
+          }
+        ]
+      };
+    },
+    setTimeoutFn(fn) {
+      scheduled.push(fn);
+      return fn;
+    },
+    clearTimeoutFn(timer) {
+      cleared.push(timer);
+    }
+  });
+  const updates = [];
+  manager.on("session.updated", (event) => updates.push(event));
+
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  assert.equal(created.appIdentity.family, "shell");
+  assert.equal(scheduled.length, 1);
+
+  updates.length = 0;
+  const pendingRefresh = scheduled.shift();
+  pendingRefresh();
+
+  const refreshed = manager.get(created.id).meta.appIdentity;
+  assert.equal(refreshed.family, "coding-agent");
+  assert.equal(refreshed.label, "codex");
+  assert.equal(refreshed.source, "foreground-process");
+  assert.equal(updates.length, 1);
+
+  manager.sendInput(created.id, "status\r");
+  assert.equal(cleared.length >= 1, true);
+  assert.equal(scheduled.length >= 1, true);
 });
 
 test("SessionManager emits stable exit metadata", () => {

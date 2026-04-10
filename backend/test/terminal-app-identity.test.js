@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildUnknownTerminalAppIdentity,
+  deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
   normalizeTerminalAppIdentity,
   terminalAppIdentityEquals
@@ -87,4 +88,97 @@ test("normalizeTerminalAppIdentity coerces malformed payloads to the unknown con
   );
 
   assert.deepEqual(identity, buildUnknownTerminalAppIdentity(1710000000004));
+});
+
+test("deriveTerminalAppIdentityFromForegroundProcess recognizes coding-agent processes directly", () => {
+  const identity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      terminalPid: 200,
+      foregroundProcessGroupId: 210,
+      representativeProcess: {
+        pid: 210,
+        ppid: 200,
+        executableName: "codex",
+        comm: "codex",
+        name: "codex",
+        executablePath: "/usr/local/bin/codex",
+        commandLine: ["codex", "--json"],
+        ttyPath: "/dev/pts/5"
+      },
+      foregroundProcesses: [
+        {
+          pid: 210,
+          ppid: 200,
+          executableName: "codex",
+          comm: "codex",
+          name: "codex",
+          executablePath: "/usr/local/bin/codex",
+          commandLine: ["codex", "--json"],
+          ttyPath: "/dev/pts/5"
+        }
+      ],
+      ancestry: [
+        {
+          pid: 200,
+          ppid: 100,
+          executableName: "bash",
+          comm: "bash",
+          name: "bash",
+          executablePath: "/usr/bin/bash",
+          commandLine: ["bash"],
+          ttyPath: "/dev/pts/5"
+        }
+      ]
+    },
+    { updatedAt: 1710000000005 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.source, "foreground-process");
+  assert.equal(identity.details.foregroundProcess.representativeProcess.pid, 210);
+});
+
+test("deriveTerminalAppIdentityFromForegroundProcess falls back deterministically for shell wrappers and multiplexers", () => {
+  const shellIdentity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 300,
+        ppid: 1,
+        executableName: "bash",
+        comm: "bash",
+        name: "bash",
+        executablePath: "/usr/bin/bash",
+        commandLine: ["bash"],
+        ttyPath: "/dev/pts/7"
+      },
+      foregroundProcesses: [],
+      ancestry: []
+    },
+    { updatedAt: 1710000000006 }
+  );
+  assert.equal(shellIdentity.family, "shell");
+  assert.equal(shellIdentity.label, "bash");
+  assert.equal(shellIdentity.source, "foreground-process");
+
+  const tmuxIdentity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 301,
+        ppid: 1,
+        executableName: "tmux",
+        comm: "tmux",
+        name: "tmux",
+        executablePath: "/usr/bin/tmux",
+        commandLine: ["tmux"],
+        ttyPath: "/dev/pts/7"
+      },
+      foregroundProcesses: [],
+      ancestry: []
+    },
+    { updatedAt: 1710000000007 }
+  );
+  assert.equal(tmuxIdentity.family, "tui");
+  assert.equal(tmuxIdentity.label, "tmux");
+  assert.equal(tmuxIdentity.source, "foreground-process");
 });
