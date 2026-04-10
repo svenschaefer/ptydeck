@@ -46,6 +46,34 @@
 
 <p>The adapter is intentionally not a remote shell.</p>
 
+<h2 id="noise-control-and-diagnostics">Noise Control and Diagnostics</h2>
+
+<p>The delivered Telegram baseline now favors one stable status thread over chatty line-by-line output.</p>
+
+<p>That means:</p>
+
+<ul>
+<li>duplicate status churn is suppressed aggressively</li>
+<li>low-value agentic CLI chatter such as <code>Ran ...</code>, <code>Edited ...</code>, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message</li>
+<li>coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently</li>
+</ul>
+
+<p>When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.</p>
+
+<p>Health and readiness now expose a bounded recent messaging trace:</p>
+
+<pre><code class="language-bash">curl -s http://127.0.0.1:18080/health | jq &#39;.messaging.trace&#39;
+curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre>
+
+<p>That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.</p>
+
+<p>For persisted local analysis, enable the existing backend debug log:</p>
+
+<pre><code class="language-env">BACKEND_DEBUG_LOGS=1
+BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
+
+<p>Then inspect structured <code>messaging.event.trace</code> lines in that log file.</p>
+
 <h2 id="what-it-can-do">What It Can Do</h2>
 
 <p>The Telegram reference adapter can:</p>
@@ -235,6 +263,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li>the same messaging summary in <code>/ready</code></li>
 <li><code>ptydeck_messaging_*</code> metric lines in <code>/metrics</code></li>
 <li>when inbound is enabled, additional <code>ptydeck_messaging_inbound_*</code> counters</li>
+<li>a bounded <code>.messaging.trace.recent</code> ring for recent outbound candidate and suppression analysis</li>
 </ul>
 
 <h3 id="8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</h3>
@@ -327,6 +356,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
       <aside class="handbook-page-toc">
         <p class="handbook-page-toc-title">On This Page</p>
         <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#noise-control-and-diagnostics">Noise Control and Diagnostics</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>
 <li><a class="handbook-page-toc-link" href="#session-mapping">Session Mapping</a></li>

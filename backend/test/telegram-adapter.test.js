@@ -162,6 +162,36 @@ test("telegram adapter records delivery failures without throwing them through t
   assert.equal(adapter.getStatus().lastErrorAt, 55);
 });
 
+test("telegram adapter reports structured rate-limit metadata on delivery failures", async () => {
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    configuredTargets: 1,
+    nowFn: () => 77,
+    transport: {
+      async sendMessage() {
+        throw new Error("Too Many Requests: retry after 8");
+      },
+      async editMessage() {
+        throw new Error("Too Many Requests: retry after 8");
+      }
+    }
+  });
+
+  const result = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created"
+  });
+
+  assert.equal(result.delivered, false);
+  assert.equal(result.rateLimited, true);
+  assert.equal(result.retryAfterSeconds, 8);
+  assert.equal(result.recommendedBackoffMs, 8000);
+  assert.equal(adapter.getStatus().lastRetryAfterSeconds, 8);
+  assert.equal(adapter.getStatus().lastRecommendedBackoffMs, 8000);
+});
+
 test("telegram adapter polls bounded inbound commands and records metrics", async () => {
   const sends = [];
   const callbackAnswers = [];

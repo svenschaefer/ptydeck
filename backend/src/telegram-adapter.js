@@ -3,6 +3,7 @@ const TELEGRAM_CALLBACK_PREFIX = "ptydeck:";
 const DEFAULT_POLL_TIMEOUT_SECONDS = 3;
 const POLL_RETRY_DELAY_MS = 250;
 const TELEGRAM_ALLOWED_UPDATES = Object.freeze(["message", "callback_query"]);
+const TELEGRAM_RATE_LIMIT_PATTERN = /\bretry after\s+(\d+)\b/i;
 
 function normalizeNonEmptyString(value) {
   if (typeof value !== "string") {
@@ -87,6 +88,31 @@ function truncateCallbackText(value, maxLength = 120) {
     return normalized;
   }
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function parseTelegramRateLimitMetadata(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const match = message.match(TELEGRAM_RATE_LIMIT_PATTERN);
+  if (!match) {
+    return {
+      rateLimited: false,
+      retryAfterSeconds: null,
+      recommendedBackoffMs: null
+    };
+  }
+  const retryAfterSeconds = Number.parseInt(match[1], 10);
+  if (!Number.isInteger(retryAfterSeconds) || retryAfterSeconds <= 0) {
+    return {
+      rateLimited: false,
+      retryAfterSeconds: null,
+      recommendedBackoffMs: null
+    };
+  }
+  return {
+    rateLimited: true,
+    retryAfterSeconds,
+    recommendedBackoffMs: retryAfterSeconds * 1000
+  };
 }
 
 export function parseTelegramInboundCommand(input = {}) {
@@ -279,6 +305,9 @@ export function createTelegramAdapter(options = {}) {
     lastDeliveredAt: null,
     lastErrorAt: null,
     lastError: "",
+    lastRateLimitedAt: null,
+    lastRetryAfterSeconds: null,
+    lastRecommendedBackoffMs: null,
     inboundHandledTotal: 0,
     inboundFailedTotal: 0,
     inboundBacklogSkippedTotal: 0,
@@ -386,13 +415,20 @@ export function createTelegramAdapter(options = {}) {
         messageId: Number.isInteger(result?.messageId) ? result.messageId : null
       };
     } catch (error) {
+      const rateLimit = parseTelegramRateLimitMetadata(error);
       metrics.failedTotal += 1;
       metrics.lastErrorAt = nowFn();
       metrics.lastError = error instanceof Error ? error.message : String(error || "Telegram adapter delivery failed.");
+      metrics.lastRateLimitedAt = rateLimit.rateLimited ? metrics.lastErrorAt : metrics.lastRateLimitedAt;
+      metrics.lastRetryAfterSeconds = rateLimit.rateLimited ? rateLimit.retryAfterSeconds : metrics.lastRetryAfterSeconds;
+      metrics.lastRecommendedBackoffMs = rateLimit.rateLimited
+        ? rateLimit.recommendedBackoffMs
+        : metrics.lastRecommendedBackoffMs;
       return {
         delivered: false,
         action,
-        error: metrics.lastError
+        error: metrics.lastError,
+        ...rateLimit
       };
     }
   }
@@ -558,6 +594,9 @@ export function createTelegramAdapter(options = {}) {
       lastDeliveredAt: metrics.lastDeliveredAt,
       lastErrorAt: metrics.lastErrorAt,
       lastError: metrics.lastError,
+      lastRateLimitedAt: metrics.lastRateLimitedAt,
+      lastRetryAfterSeconds: metrics.lastRetryAfterSeconds,
+      lastRecommendedBackoffMs: metrics.lastRecommendedBackoffMs,
       inboundHandledTotal: metrics.inboundHandledTotal,
       inboundFailedTotal: metrics.inboundFailedTotal,
       inboundBacklogSkippedTotal: metrics.inboundBacklogSkippedTotal,

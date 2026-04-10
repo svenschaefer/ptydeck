@@ -10,6 +10,36 @@ Use it when you want:
 
 The adapter is intentionally not a remote shell.
 
+## Noise Control and Diagnostics
+
+The delivered Telegram baseline now favors one stable status thread over chatty line-by-line output.
+
+That means:
+
+- duplicate status churn is suppressed aggressively
+- low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message
+- coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently
+
+When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.
+
+Health and readiness now expose a bounded recent messaging trace:
+
+```bash
+curl -s http://127.0.0.1:18080/health | jq '.messaging.trace'
+curl -s http://127.0.0.1:18080/ready | jq '.messaging.trace'
+```
+
+That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.
+
+For persisted local analysis, enable the existing backend debug log:
+
+```env
+BACKEND_DEBUG_LOGS=1
+BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log
+```
+
+Then inspect structured `messaging.event.trace` lines in that log file.
+
 ## What It Can Do
 
 The Telegram reference adapter can:
@@ -191,6 +221,7 @@ Expect:
 - the same messaging summary in `/ready`
 - `ptydeck_messaging_*` metric lines in `/metrics`
 - when inbound is enabled, additional `ptydeck_messaging_inbound_*` counters
+- a bounded `.messaging.trace.recent` ring for recent outbound candidate and suppression analysis
 
 ### 8. Run a Minimal Telegram Smoke Test
 

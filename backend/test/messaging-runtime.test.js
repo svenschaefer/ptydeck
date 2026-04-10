@@ -73,7 +73,7 @@ test("messaging inbound replay selector stays bounded and rejects invalid values
 test("messaging message policy returns explicit new update alert and suppress decisions", () => {
   const created = applyMessagingMessagePolicy({ type: "session.lifecycle.created", threadKey: "status", text: "created" }, {});
   const updated = applyMessagingMessagePolicy(
-    { type: "session.output.summary", threadKey: "status", text: "summary" },
+    { type: "session.output.summary", threadKey: "status", text: "summary", comparableText: "summary" },
     { messageCreated: true }
   );
   const alerted = applyMessagingMessagePolicy(
@@ -81,14 +81,21 @@ test("messaging message policy returns explicit new update alert and suppress de
     { messageCreated: true }
   );
   const suppressed = applyMessagingMessagePolicy(
-    { type: "session.output.summary", threadKey: "status", text: "summary" },
-    { lastText: "summary", messageCreated: true }
+    { type: "session.output.summary", threadKey: "status", text: "summary", comparableText: "summary" },
+    { lastComparableText: "summary", messageCreated: true }
+  );
+  const noisy = applyMessagingMessagePolicy(
+    { type: "session.output.summary", threadKey: "status", text: "tail", noiseClass: "status_tail" },
+    { messageCreated: true }
   );
 
   assert.equal(created.action, "new");
   assert.equal(updated.action, "update");
   assert.equal(alerted.action, "alert");
   assert.equal(suppressed.action, "suppress");
+  assert.equal(suppressed.reason, "duplicate_signature");
+  assert.equal(noisy.action, "suppress");
+  assert.equal(noisy.reason, "noise_status_tail");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -145,11 +152,163 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.match(sends[0].text, /\[9\] codex: Session created\./);
   assert.match(sends[1].text, /Tests failed/);
   assert.ok(edits.some((entry) => /Plan updated/.test(entry.text)));
-  assert.ok(edits.some((entry) => /Prompt ready/.test(entry.text)));
   assert.ok(edits.some((entry) => /Controller changed to notebook/.test(entry.text)));
   assert.ok(edits.some((entry) => /Share access created/.test(entry.text)));
   assert.ok(edits.some((entry) => /Session idle/.test(entry.text)));
   assert.equal(runtime.buildStatusSummary().enabled, true);
+});
+
+test("messaging runtime keeps bounded traces and reports Telegram rate-limit delivery outcomes", async () => {
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage() {
+          throw new Error("Too Many Requests: retry after 8");
+        },
+        async editMessage() {
+          throw new Error("Too Many Requests: retry after 8");
+        }
+      };
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", createSession({ name: "codex", quickIdToken: "C" }), {
+    traceId: "trace-rate-limit"
+  });
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.trace.capacity >= 100, true);
+  assert.equal(status.trace.capturedTotal >= 1, true);
+  assert.equal(status.trace.recent.length >= 1, true);
+  assert.equal(status.trace.recent.at(-1).delivery[0].rateLimited, true);
+  assert.equal(status.trace.recent.at(-1).delivery[0].retryAfterSeconds, 8);
+  assert.equal(status.adapters[0].lastRetryAfterSeconds, 8);
+});
+
+test("messaging runtime aggregates coding-agent summaries and suppresses noisy duplicate churn", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 10 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 11 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.95
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "agg-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "gpt-5.4 xhigh · 55% left · C:\\code\\snixy · gpt-5.4 · sni…\nPlan updated\nValidated copy deploy\n",
+    promptBoundaries: [],
+    trace: { traceId: "agg-2" }
+  });
+  await runtime.observeSessionData({ session, data: "", promptBoundaries: [0], trace: { traceId: "agg-3" } });
+  await runtime.observeSessionData({
+    session,
+    data: "gpt-5.4 xhigh · 54% left · C:\\code\\snixy · gpt-5.4 · sni…\nValidated copy deploy\n",
+    promptBoundaries: [],
+    trace: { traceId: "agg-4" }
+  });
+  now += 2500;
+  await runtime.observeSessionData({ session, data: "", promptBoundaries: [0], trace: { traceId: "agg-5" } });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Plan updated \| Validated copy deploy/);
+  assert.doesNotMatch(edits[0].text, /55% left/);
+  assert.doesNotMatch(edits[0].text, /C:\\code\\snixy/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "duplicate_signature"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "prompt_after_status_update"));
+});
+
+test("messaging runtime filters low-value coding-agent run and edit updates while tracing them", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 900;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 20 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 21 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "filter-1" });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Ran node --input-type=module <<'EOF'\n" +
+      "Edited backend/test/runtime.integration.test.js (+3 -0)\n" +
+      "Validated messaging trace coverage\n",
+    promptBoundaries: [],
+    trace: { traceId: "filter-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "",
+    promptBoundaries: [0],
+    trace: { traceId: "filter-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Validated messaging trace coverage/);
+  assert.doesNotMatch(edits[0].text, /\bRan node\b/);
+  assert.doesNotMatch(edits[0].text, /\bEdited backend\/test\/runtime\.integration\.test\.js\b/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_run_update"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_edit_update"));
 });
 
 test("messaging runtime handles bounded inbound status stop retry and replay actions", async () => {

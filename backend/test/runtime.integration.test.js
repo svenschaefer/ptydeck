@@ -294,6 +294,9 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
     const health = await healthRes.json();
     assert.equal(health.messaging.enabled, true);
     assert.equal(health.messaging.adapters[0].configuredTargets, 1);
+    assert.equal(health.messaging.trace.capacity >= 100, true);
+    assert.equal(health.messaging.trace.capturedTotal >= 1, true);
+    assert.equal(Array.isArray(health.messaging.trace.recent), true);
 
     const readyRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/ready`);
     assert.equal(readyRes.status, 200);

@@ -65,6 +65,7 @@ Optional for troubleshooting:
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
+- Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions
 
 Optional local auth baseline (development only):
 
@@ -187,9 +188,11 @@ When Telegram messaging is configured, verify additionally:
 
 - `/health` returns a top-level `messaging` summary with `enabled: true`
 - `/ready` returns the same `messaging` summary
+- `/health.messaging.trace` and `/ready.messaging.trace` expose a bounded recent trace ring for candidate, suppression, and delivery analysis
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
 - A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` only through the bounded adapter action set; unsupported text must not trigger arbitrary runtime actions
+- Repeated low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, diff/update summaries, and separator-only fragments should now stay suppressed or coalesced into one evolving status thread instead of spraying many near-duplicate Telegram messages
 
 Session API:
 
