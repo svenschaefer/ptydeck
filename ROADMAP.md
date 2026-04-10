@@ -18,11 +18,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active scoped tasks:
   - none currently
 - Queued next waves:
-  - none currently
+  - `v0.4.0-H76`
 
 ## Active Wave Order
 
-- none currently
+- `v0.4.0-H76`
+  1. `QLT-218`
+  2. `QLT-219`
+  3. `QLT-220`
+  4. `QLT-221` after `QLT-219` and `QLT-220`
+  5. `QLT-222` after `QLT-218`, `QLT-219`, `QLT-220`, and `QLT-221`
 
 ## Sequencing Rules
 
