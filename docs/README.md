@@ -147,6 +147,17 @@ Authoritative repository documents remain:
     - the primary mapping model is session-first, with deck-level rollups only as later extensions
     - inbound chat actions are bounded extensions of the ptydeck control/slash model rather than a parallel terminal authority
 
+### 11. Terminal App Identity Design
+
+- `Terminal App Identity Foundation Design.md`
+  - Role: repository-native implementation design for the queued `v0.4.0-H79` terminal-app-identity foundation
+  - Status:
+    - planning/design source for the upcoming runtime identity layer
+    - not an implementation-status source of truth
+  - Current interpretation:
+    - use it as the canonical design source for normalized app identity, source priority, confidence arbitration, and the first consumer integration seams
+    - keep final delivery status in `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, and `CODEX_CONTEXT.md`
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:
