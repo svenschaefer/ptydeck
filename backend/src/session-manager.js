@@ -844,7 +844,18 @@ export class SessionManager {
       const cleaned = typeof streamResult?.cleaned === "string" ? streamResult.cleaned : "";
       const promptBoundaries = Array.isArray(streamResult?.promptBoundaries) ? streamResult.promptBoundaries : [];
       if (!cleaned && promptBoundaries.length > 0) {
+        const trace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+          sessionId: session.id,
+          source: "pty"
+        });
+        this.updateSessionTraceSeed(session, trace, { source: "pty" });
         this.appendReplayOutput(session, "", promptBoundaries);
+        this.events.emit("session.data", {
+          sessionId: session.id,
+          data: "",
+          promptBoundaries,
+          trace
+        });
         return;
       }
       if (cleaned) {
@@ -868,6 +879,7 @@ export class SessionManager {
         this.events.emit("session.data", {
           sessionId: session.id,
           data: cleaned,
+          promptBoundaries,
           trace
         });
       }
@@ -1025,6 +1037,7 @@ export class SessionManager {
       signal: session.meta.exitSignal,
       exitedAt: session.meta.exitedAt,
       updatedAt: session.meta.updatedAt,
+      session: { ...session.meta },
       trace
     });
     if (current === session) {
@@ -1610,6 +1623,7 @@ export class SessionManager {
     this.events.emit("session.closed", {
       sessionId,
       reason,
+      session: { ...session.meta },
       trace: createTraceEnvelope(this.createTraceId, session.traceSeed, {
         sessionId,
         source: session.traceSeed?.source || "rest"

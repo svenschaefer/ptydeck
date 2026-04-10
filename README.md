@@ -13,10 +13,12 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
 - Session replay/export, replay-excerpt clipboard relay via `/replay ...` and `/ccp`, file transfer, read-only sharing, and saved connection profiles
+- Outbound-only single-user messaging foundation with normalized session events, bounded trigger profiles, and a Telegram reference adapter for mapped sessions
 - Multi-device terminal-control foundation with visible control metadata, take/release/transfer control actions, trusted-local scope takeover (`all sessions`, `this deck`, `this session`), and automatic device-local layout recall on successful takeover
 - Dedicated `Workspace Library` manager for guided local/SSH connection profiles, first-connect SSH trust verification, workspace presets, and deck-group management outside the sidebar
 - Per-session safety controls, dual theme slots, multiline notes, and controlled mouse forwarding
 - REST + WebSocket backend with restart-safe persistence and deterministic contracts
+- Provider-independent outbound messaging event model with Telegram as the first reference adapter and operator-visible health/metrics state
 
 ## Architecture
 

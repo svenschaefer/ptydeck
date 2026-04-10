@@ -329,7 +329,7 @@ test("SessionManager strips cwd markers from terminal output", () => {
   fakePty.write("pwd\r\n/home/wsl\r\n");
 
   assert.equal(manager.get(created.id).meta.cwd, "/home/wsl");
-  assert.deepEqual(chunks, ["pwd\r\n/home/wsl\r\n"]);
+  assert.deepEqual(chunks, ["", "pwd\r\n/home/wsl\r\n"]);
 });
 
 test("SessionManager strips split cwd markers across chunks", () => {
@@ -350,7 +350,7 @@ test("SessionManager strips split cwd markers across chunks", () => {
   fakePty.write("echo ok\r\nok\r\n");
 
   assert.equal(manager.get(created.id).meta.cwd, "/home/wsl");
-  assert.deepEqual(chunks, ["echo ok\r\nok\r\n"]);
+  assert.deepEqual(chunks, ["", "echo ok\r\nok\r\n"]);
 });
 
 test("SessionManager snapshot includes buffered terminal output", () => {

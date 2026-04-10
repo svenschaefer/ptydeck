@@ -54,7 +54,7 @@ This file is structured into:
 
 ### Messaging Adapters
 
-- The initial outbound-first messaging-adapter foundation and the bounded inbound reference follow-up are now promoted into near-term delivery as `v0.4.0-H77` and `v0.4.0-H78`; only post-reference follow-up work remains in this deferred section.
+- The outbound-first messaging-adapter foundation is now delivered as `v0.4.0-H77`, and the bounded inbound reference follow-up remains the only near-term messaging wave in `TODO.md` / `ROADMAP.md`; only post-reference follow-up work remains in this deferred section.
 
 - [ ] `MSG-008` Owner `BE`: Add richer post-reference trigger profiles and selection controls for deploy, transfer/sync, and long-running worker sessions, plus optional profile auto-detection heuristics, only after the outbound Telegram reference flow and the bounded inbound action contract are both stable.
 - [ ] `MSG-009` Owner `PLAT`: Add a Discord-style interaction-oriented reference adapter on top of the delivered normalized event/action contract, preserving the same single-user ptydeck authority boundaries while validating a richer button-driven remote interaction surface.

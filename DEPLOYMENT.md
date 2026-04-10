@@ -72,6 +72,36 @@ Optional local auth baseline (development only):
 - Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
 - Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
 
+Optional outbound messaging adapter baseline:
+
+- Backend: `MESSAGING_TELEGRAM_BOT_TOKEN` or `MESSAGING_TELEGRAM_BOT_TOKEN_FILE`
+- Backend: `MESSAGING_TELEGRAM_TARGETS` or `MESSAGING_TELEGRAM_TARGETS_FILE`
+- Backend (optional override): `MESSAGING_TELEGRAM_API_BASE_URL`
+
+Target mapping payload format:
+
+```json
+[
+  {
+    "sessionName": "codex",
+    "chatId": "123456789",
+    "profile": "coding-agent"
+  },
+  {
+    "quickIdToken": "4",
+    "chatId": "123456789",
+    "messageThreadId": 12,
+    "profile": "build-test"
+  }
+]
+```
+
+Notes:
+
+- At least one of `sessionId`, `quickIdToken`, or `sessionName` is required per mapping entry.
+- Outbound messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
+- The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
+
 ## 4.1 Secrets Management Strategy (ENT-005 Baseline)
 
 Runtime secret injection pattern:
@@ -129,6 +159,12 @@ curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/ready
 curl -s http://127.0.0.1:18080/metrics | head -n 20
 ```
+
+When outbound messaging is configured, verify additionally:
+
+- `/health` returns a top-level `messaging` summary with `enabled: true`
+- `/ready` returns the same `messaging` summary
+- `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 
 Session API:
 

@@ -218,6 +218,91 @@ test("REST lifecycle endpoints work end-to-end", async () => {
   }
 });
 
+test("runtime exposes messaging health/metrics and emits outbound telegram updates for mapped sessions", async () => {
+  const sends = [];
+  const edits = [];
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 90 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 91 };
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", startCommand: "npm test" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    await waitFor(() => sends.length >= 1, 2000);
+    assert.match(sends[0].text, /build-run: Session created\./);
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "PASS test suite\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    await waitFor(() => edits.some((entry) => /PASS test suite/.test(entry.text)), 2000);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.enabled, true);
+    assert.equal(health.messaging.adapters[0].configuredTargets, 1);
+
+    const readyRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/ready`);
+    assert.equal(readyRes.status, 200);
+    const ready = await readyRes.json();
+    assert.equal(ready.messaging.enabled, true);
+
+    const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metrics = await metricsRes.text();
+    assert.match(metrics, /ptydeck_messaging_adapter_enabled\{adapter="telegram"\} 1/);
+    assert.match(metrics, /ptydeck_messaging_deliveries_total\{adapter="telegram",outcome="success"\}/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session PTY control endpoints send deterministic signals and remove killed sessions", async () => {
   const killSignals = [];
   const { runtime, baseUrl } = await createStartedRuntime({

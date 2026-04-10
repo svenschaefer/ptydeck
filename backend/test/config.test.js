@@ -35,6 +35,9 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.authAudience, "ptydeck-local");
   assert.equal(config.authDevTokenTtlSeconds, 900);
   assert.equal(config.authWsTicketTtlSeconds, 30);
+  assert.equal(config.messagingTelegramBotToken, "");
+  assert.deepEqual(config.messagingTelegramTargets, []);
+  assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.org");
 });
 
 test("loadConfig maps environment values", () => {
@@ -66,7 +69,10 @@ test("loadConfig maps environment values", () => {
     AUTH_AUDIENCE: "aud-a",
     AUTH_DEV_TOKEN_TTL_SECONDS: "1200",
     AUTH_WS_TICKET_TTL_SECONDS: "45",
-    ENFORCE_TLS_INGRESS: "true"
+    ENFORCE_TLS_INGRESS: "true",
+    MESSAGING_TELEGRAM_BOT_TOKEN: "telegram-token",
+    MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001", profile: "build-test" }]),
+    MESSAGING_TELEGRAM_API_BASE_URL: "https://api.telegram.example"
   });
 
   assert.equal(config.port, 9090);
@@ -99,6 +105,9 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.authAudience, "aud-a");
   assert.equal(config.authDevTokenTtlSeconds, 1200);
   assert.equal(config.authWsTicketTtlSeconds, 45);
+  assert.equal(config.messagingTelegramBotToken, "telegram-token");
+  assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001", profile: "build-test" }]);
+  assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.example");
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
@@ -244,5 +253,20 @@ test("loadConfig rejects invalid data encryption configuration", () => {
   assert.throws(
     () => loadConfig({ DATA_ENCRYPTION_KEYS: "key-a:not-base64", DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a" }),
     /must be 32 bytes/
+  );
+});
+
+test("loadConfig rejects partial or malformed telegram messaging configuration", () => {
+  assert.throws(
+    () => loadConfig({ MESSAGING_TELEGRAM_BOT_TOKEN: "token" }),
+    /MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together/
+  );
+  assert.throws(
+    () => loadConfig({ MESSAGING_TELEGRAM_TARGETS: "[{\"sessionName\":\"build\",\"chatId\":\"1001\"}]" }),
+    /MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together/
+  );
+  assert.throws(
+    () => loadConfig({ MESSAGING_TELEGRAM_BOT_TOKEN: "token", MESSAGING_TELEGRAM_TARGETS: "{bad}" }),
+    /MESSAGING_TELEGRAM_TARGETS must contain a valid JSON array/
   );
 });

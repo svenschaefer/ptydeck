@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
+import { createMessagingRuntime } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import {
@@ -2751,6 +2752,15 @@ export function createRuntime(config) {
     }
   }
 
+  const messagingRuntime = createMessagingRuntime({
+    telegramBotToken: config.messagingTelegramBotToken,
+    telegramTargets: config.messagingTelegramTargets,
+    telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
+    createTelegramTransport: config.createMessagingTelegramTransport,
+    fetchImpl: config.fetchImpl,
+    logDebug
+  });
+
   function buildCorsHeaders(req, traceContext = null) {
     const requestOrigin = typeof req.headers.origin === "string" ? req.headers.origin : "";
     const allowAnyOrigin = corsAllowedOrigins.includes("*");
@@ -2824,6 +2834,13 @@ export function createRuntime(config) {
     return activeSessionCount;
   }
 
+  function buildHealthPayload() {
+    return {
+      status: "ok",
+      messaging: messagingRuntime.buildStatusSummary()
+    };
+  }
+
   function buildReadyPayload() {
     return {
       status: isReady ? "ready" : "starting",
@@ -2837,7 +2854,8 @@ export function createRuntime(config) {
           startupWarmupEnabled && startupWarmupQuietDeadlineAt > 0
             ? Math.max(0, startupWarmupQuietDeadlineAt - Date.now())
             : 0
-      }
+      },
+      messaging: messagingRuntime.buildStatusSummary()
     };
   }
 
@@ -2993,6 +3011,17 @@ export function createRuntime(config) {
         `ptydeck_http_requests_by_route_total{method="${escapePrometheusLabel(method)}",route="${escapePrometheusLabel(route)}"} ${count}`
       );
     }
+    lines.push("# HELP ptydeck_messaging_events_total Messaging events grouped by profile, event type, and policy decision.");
+    lines.push("# TYPE ptydeck_messaging_events_total counter");
+    lines.push("# HELP ptydeck_messaging_deliveries_total Messaging adapter deliveries grouped by adapter and outcome.");
+    lines.push("# TYPE ptydeck_messaging_deliveries_total counter");
+    lines.push("# HELP ptydeck_messaging_actions_total Messaging adapter actions grouped by adapter and action.");
+    lines.push("# TYPE ptydeck_messaging_actions_total counter");
+    lines.push("# HELP ptydeck_messaging_adapter_enabled Whether a messaging adapter is enabled.");
+    lines.push("# TYPE ptydeck_messaging_adapter_enabled gauge");
+    lines.push("# HELP ptydeck_messaging_adapter_configured_targets Number of configured messaging targets for an adapter.");
+    lines.push("# TYPE ptydeck_messaging_adapter_configured_targets gauge");
+    lines.push(...messagingRuntime.renderMetricLines());
     return `${lines.join("\n")}\n`;
   }
 
@@ -5763,6 +5792,10 @@ function tryCreateRestoredSession({
     try {
       await persistNow("session.activity.completed");
       const apiSession = getApiSessionOrThrow(event.sessionId);
+      await messagingRuntime.observeSessionIdle({
+        session: apiSession,
+        trace: event.trace
+      });
       broadcast({
         type: "session.activity.completed",
         sessionId: event.sessionId,
@@ -5793,39 +5826,71 @@ function tryCreateRestoredSession({
   const wsEventNames = ["session.created", "session.started", "session.updated", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
-      if (eventName !== "session.data") {
-        logDebug(
-          "session.event",
-          {
-            type: eventName,
-            sessionId: event.session?.id || event.sessionId || null,
-            deckId: event.session?.deckId || null
-          },
-          event.trace
-        );
-      }
-      if ((eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") && event && event.session) {
-        broadcast({
-          type: eventName,
-          ...event,
-          session: toApiSession(event.session)
-        }, event.trace);
-      } else {
-        broadcast({ type: eventName, ...event }, event.trace);
-      }
-      if (eventName === "session.created") {
-        metrics.sessionsCreatedTotal += 1;
-      } else if (eventName === "session.started") {
-        metrics.sessionsStartedTotal += 1;
-      } else if (eventName === "session.exit") {
-        metrics.sessionsExitedTotal += 1;
-      }
-      if (eventName !== "session.data") {
-        if (eventName === "session.created" || eventName === "session.started" || eventName === "session.exit" || eventName === "session.closed") {
-          reconcileStartupWarmup();
+      void (async () => {
+        const eventSessionSnapshot =
+          event && event.session && typeof event.session === "object" ? structuredClone(event.session) : null;
+        const apiEventSession = eventSessionSnapshot ? toApiSession(eventSessionSnapshot, eventSessionSnapshot.state) : null;
+        if (eventName !== "session.data") {
+          logDebug(
+            "session.event",
+            {
+              type: eventName,
+              sessionId: eventSessionSnapshot?.id || event.sessionId || null,
+              deckId: eventSessionSnapshot?.deckId || null
+            },
+            event.trace
+          );
         }
-        persistSoon();
-      }
+        if (eventName === "session.data") {
+          const apiSession = getApiSessionOrThrow(event.sessionId);
+          await messagingRuntime.observeSessionData({
+            session: apiSession,
+            data: event.data,
+            promptBoundaries: Array.isArray(event.promptBoundaries) ? event.promptBoundaries : [],
+            trace: event.trace
+          });
+        } else if (eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") {
+          await messagingRuntime.observeSessionLifecycle(eventName, apiEventSession, event.trace);
+        } else if ((eventName === "session.exit" || eventName === "session.closed") && apiEventSession) {
+          await messagingRuntime.observeSessionLifecycle(
+            eventName,
+            apiEventSession,
+            event.trace,
+            event
+          );
+        }
+        if ((eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") && apiEventSession) {
+          broadcast({
+            type: eventName,
+            ...event,
+            session: apiEventSession
+          }, event.trace);
+        } else if (eventName === "session.data") {
+          if (typeof event.data === "string" && event.data.length > 0) {
+            broadcast({ type: eventName, sessionId: event.sessionId, data: event.data, trace: event.trace }, event.trace);
+          }
+        } else {
+          broadcast({ type: eventName, ...event }, event.trace);
+        }
+        if (eventName === "session.created") {
+          metrics.sessionsCreatedTotal += 1;
+        } else if (eventName === "session.started") {
+          metrics.sessionsStartedTotal += 1;
+        } else if (eventName === "session.exit") {
+          metrics.sessionsExitedTotal += 1;
+        }
+        if (eventName !== "session.data") {
+          if (eventName === "session.created" || eventName === "session.started" || eventName === "session.exit" || eventName === "session.closed") {
+            reconcileStartupWarmup();
+          }
+          persistSoon();
+        }
+      })().catch((error) => {
+        if (error instanceof ApiError && error.error === "SessionNotFound" && eventName === "session.data") {
+          return;
+        }
+        console.error(`failed to process ${eventName} event`, error);
+      });
     });
   }
 
@@ -5891,7 +5956,7 @@ function tryCreateRestoredSession({
       ensureTlsIngress(requestContext);
 
       if (match.kind === "health") {
-        writeJsonResponse(200, { status: "ok" });
+        writeJsonResponse(200, buildHealthPayload());
         return;
       }
 
@@ -5964,6 +6029,23 @@ function tryCreateRestoredSession({
         const payload = createShareLink(body, auth, req, requestContext);
         validateResponse({ statusCode: 201, body: payload, expect: "shareLink" });
         await persistNow("share-link.create");
+        if (payload.targetType === SHARE_LINK_TARGET_TYPE_SESSION) {
+          await messagingRuntime.observeShareChange({
+            action: "created",
+            shareLink: payload,
+            session: getApiSessionOrThrow(payload.targetId),
+            trace: requestTraceContext
+          });
+        } else if (payload.targetType === SHARE_LINK_TARGET_TYPE_DECK) {
+          for (const session of listApiSessions(null).filter((entry) => entry.deckId === payload.targetId)) {
+            await messagingRuntime.observeShareChange({
+              action: "created",
+              shareLink: payload,
+              session,
+              trace: requestTraceContext
+            });
+          }
+        }
         writeJsonResponse(201, payload);
         return;
       }
@@ -5979,6 +6061,23 @@ function tryCreateRestoredSession({
         const payload = revokeShareLink(match.params.shareId);
         validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
         await persistNow("share-link.revoke");
+        if (payload.targetType === SHARE_LINK_TARGET_TYPE_SESSION) {
+          await messagingRuntime.observeShareChange({
+            action: "revoked",
+            shareLink: payload,
+            session: getApiSessionOrThrow(payload.targetId),
+            trace: requestTraceContext
+          });
+        } else if (payload.targetType === SHARE_LINK_TARGET_TYPE_DECK) {
+          for (const session of listApiSessions(null).filter((entry) => entry.deckId === payload.targetId)) {
+            await messagingRuntime.observeShareChange({
+              action: "revoked",
+              shareLink: payload,
+              session,
+              trace: requestTraceContext
+            });
+          }
+        }
         writeJsonResponse(200, payload);
         return;
       }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createDataEncryptionProvider } from "./key-provider.js";
 import { parseTrustedProxy } from "./proxy.js";
 
@@ -35,6 +37,41 @@ function parseOrigin(value, key) {
   } catch {
     throw new Error(`${key} contains invalid origin: ${value}`);
   }
+}
+
+function readOptionalEnvText(env, key) {
+  const rawValue = String(env[key] || "").trim();
+  const rawFilePath = String(env[`${key}_FILE`] || "").trim();
+  if (rawValue && rawFilePath) {
+    throw new Error(`${key} and ${key}_FILE cannot both be set.`);
+  }
+  if (rawValue) {
+    return rawValue;
+  }
+  if (!rawFilePath) {
+    return "";
+  }
+  try {
+    return readFileSync(resolve(rawFilePath), "utf8").trim();
+  } catch (error) {
+    throw new Error(`${key}_FILE could not be read: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
+}
+
+function parseJsonArray(rawValue, key) {
+  if (!rawValue) {
+    return [];
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    throw new Error(`${key} must contain a valid JSON array.`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${key} must contain a JSON array.`);
+  }
+  return parsed;
 }
 
 function parseBoolean(rawValue) {
@@ -107,6 +144,9 @@ export function loadConfig(env = process.env) {
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
   const debugLogFile = String(env.BACKEND_DEBUG_LOG_FILE || "").trim();
+  const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
+  const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
+  const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
   const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
   const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
   const authAudience = String(env.AUTH_AUDIENCE || "ptydeck-local").trim();
@@ -124,6 +164,12 @@ export function loadConfig(env = process.env) {
   }
   if (authEnabled && !authAudience) {
     throw new Error("AUTH_AUDIENCE must not be empty when auth is enabled.");
+  }
+  if ((messagingTelegramBotToken && messagingTelegramTargets.length === 0) || (!messagingTelegramBotToken && messagingTelegramTargets.length > 0)) {
+    throw new Error("MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together.");
+  }
+  if (messagingTelegramApiBaseUrl) {
+    parseOrigin(messagingTelegramApiBaseUrl, "MESSAGING_TELEGRAM_API_BASE_URL");
   }
   const port = parsePort(env.PORT || 18080, "PORT");
   const maxBodyBytes = parsePositiveInt(env.MAX_BODY_BYTES || 1024 * 1024, "MAX_BODY_BYTES");
@@ -213,6 +259,9 @@ export function loadConfig(env = process.env) {
     authIssuer,
     authAudience,
     authDevTokenTtlSeconds,
-    authWsTicketTtlSeconds
+    authWsTicketTtlSeconds,
+    messagingTelegramBotToken,
+    messagingTelegramTargets,
+    messagingTelegramApiBaseUrl
   };
 }
