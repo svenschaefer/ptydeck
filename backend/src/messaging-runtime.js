@@ -18,6 +18,7 @@ const MAX_INBOUND_REPLAY_SHELL_BLOCKS = 3;
 const MAX_INBOUND_RESPONSE_TEXT_LENGTH = 3800;
 const PROMPT_STATUS_SUPPRESSION_WINDOW_MS = 1500;
 const IDLE_STATUS_SUPPRESSION_WINDOW_MS = 2000;
+const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
@@ -446,8 +447,9 @@ function classifyTerminalLine(profile, line, recentLines = []) {
     return null;
   }
   const activeProfile = PROFILE_PATTERNS[profile] || PROFILE_PATTERNS["generic-shell"];
-  const combinedTail = [...recentLines.slice(-1), visibleLine].filter(Boolean).join(" | ");
-  if (/^traceback/i.test(recentLines[recentLines.length - 1] || "")) {
+  const previousLine = recentLines[recentLines.length - 1] || "";
+  const combinedTail = [previousLine, visibleLine].filter(Boolean).join(" | ");
+  if (/^traceback/i.test(previousLine)) {
     return {
       type: "session.attention.required",
       severity: "attention",
@@ -456,7 +458,7 @@ function classifyTerminalLine(profile, line, recentLines = []) {
     };
   }
   for (const pattern of activeProfile.attention) {
-    if (pattern.test(visibleLine) || pattern.test(combinedTail)) {
+    if (pattern.test(visibleLine)) {
       return {
         type: "session.attention.required",
         severity: "attention",
@@ -513,6 +515,17 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     return Object.freeze({ action: "suppress", messageKey, reason: "lifecycle_closed" });
   }
   if (type === "session.attention.required") {
+    const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
+    if (
+      comparableText &&
+      lastComparableText &&
+      (isSubsetComparableText(comparableText, lastComparableText) || isSubsetComparableText(lastComparableText, comparableText)) &&
+      lastDeliveredAt > 0 &&
+      Number.isInteger(event?.occurredAt) &&
+      event.occurredAt - lastDeliveredAt < ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS
+    ) {
+      return Object.freeze({ action: "suppress", messageKey: "attention", reason: "attention_duplicate_churn" });
+    }
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
   }
   if (type === "session.prompt.ready") {
@@ -1193,6 +1206,22 @@ export function createMessagingRuntime(options = {}) {
       }
       const classified = classifyTerminalLine(profile, line, state.recentLines);
       if (classified?.type === "session.attention.required") {
+        const attentionNoise = classifyNoiseSignature(classified.summary, session, profile);
+        if (attentionNoise.lowInformation) {
+          recordSuppressedFragmentTrace({
+            session,
+            profile,
+            classified,
+            trace,
+            reason: `noise_${attentionNoise.noiseClass}`,
+            summary: classified.summary,
+            comparableText: attentionNoise.comparableText,
+            noiseClass: attentionNoise.noiseClass,
+            aggregationReason: "attention_filter"
+          });
+          pushRecentLine(state, visibleLine);
+          return;
+        }
         await dispatchEvent(
           createEvent({
             session,
@@ -1202,7 +1231,8 @@ export function createMessagingRuntime(options = {}) {
             severity: classified.severity,
             threadKey: classified.threadKey,
             trace,
-            nowFn
+            nowFn,
+            comparableText: attentionNoise.comparableText
           })
         );
       } else if (classified?.type === "session.output.summary") {

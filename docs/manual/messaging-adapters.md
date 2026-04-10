@@ -17,8 +17,10 @@ The delivered Telegram baseline now favors one stable status thread over chatty 
 That means:
 
 - duplicate status churn is suppressed aggressively
+- repeated attention churn from the same logical failure is now damped so one error does not fan out into many nearly identical Telegram alerts
 - low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message
 - coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently
+- structural follow-up lines such as trailing `}` or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword
 
 When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.
 
@@ -30,6 +32,8 @@ curl -s http://127.0.0.1:18080/ready | jq '.messaging.trace'
 ```
 
 That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.
+
+The Telegram adapter status now also surfaces active outbound backoff state after a Bot API `retry after` response, so repeated rate-limit failures can be distinguished from ordinary transport errors.
 
 For persisted local analysis, enable the existing backend debug log:
 

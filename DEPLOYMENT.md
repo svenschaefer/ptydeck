@@ -189,10 +189,12 @@ When Telegram messaging is configured, verify additionally:
 - `/health` returns a top-level `messaging` summary with `enabled: true`
 - `/ready` returns the same `messaging` summary
 - `/health.messaging.trace` and `/ready.messaging.trace` expose a bounded recent trace ring for candidate, suppression, and delivery analysis
+- `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
 - A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` only through the bounded adapter action set; unsupported text must not trigger arbitrary runtime actions
 - Repeated low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, diff/update summaries, and separator-only fragments should now stay suppressed or coalesced into one evolving status thread instead of spraying many near-duplicate Telegram messages
+- Repeated attention churn from one logical failure should no longer fan out into many nearly identical alerts, and structural tail lines such as trailing `}` should not appear as standalone Telegram attention messages
 
 Session API:
 

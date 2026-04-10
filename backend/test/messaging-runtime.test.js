@@ -88,6 +88,16 @@ test("messaging message policy returns explicit new update alert and suppress de
     { type: "session.output.summary", threadKey: "status", text: "tail", noiseClass: "status_tail" },
     { messageCreated: true }
   );
+  const attentionChurn = applyMessagingMessagePolicy(
+    {
+      type: "session.attention.required",
+      threadKey: "attention",
+      text: "Retry blocked validation failed",
+      comparableText: "retry blocked validation failed",
+      occurredAt: 5_000
+    },
+    { lastComparableText: "validation failed", lastDeliveredAt: 1_000 }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(updated.action, "update");
@@ -96,6 +106,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(suppressed.reason, "duplicate_signature");
   assert.equal(noisy.action, "suppress");
   assert.equal(noisy.reason, "noise_status_tail");
+  assert.equal(attentionChurn.action, "suppress");
+  assert.equal(attentionChurn.reason, "attention_duplicate_churn");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -309,6 +321,54 @@ test("messaging runtime filters low-value coding-agent run and edit updates whil
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_run_update"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_edit_update"));
+});
+
+test("messaging runtime suppresses repeated identical attention churn and ignores structural tail lines", async () => {
+  const sends = [];
+  let now = 1200;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "plain-shell", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 30 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 31 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "plain-shell",
+    quickIdToken: "S",
+    startCommand: "bash"
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "\"Clearing the persisted still-capture session failed.\",\n}\n",
+    promptBoundaries: [],
+    trace: { traceId: "attention-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\"Clearing the persisted still-capture session failed.\",\n}\n",
+    promptBoundaries: [],
+    trace: { traceId: "attention-2" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /still-capture session failed/);
+  assert.doesNotMatch(sends[0].text, /\}\s*$/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "duplicate"));
+  assert.ok(status.trace.recent.every((entry) => entry.summary !== "}"));
 });
 
 test("messaging runtime handles bounded inbound status stop retry and replay actions", async () => {

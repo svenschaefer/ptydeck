@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-11
+
+- [x] `MSG-017`, `MSG-018`, and `MSG-019` are now completed as `v0.4.0-H81` on `main`, closing the trace-driven Telegram fine-tuning follow-up and leaving no active or queued near-term wave in `ROADMAP.md`.
+- [x] `backend/src/messaging-runtime.js` now classifies attention lines more conservatively: generic attention matching no longer inherits error keywords through the previous-line `combinedTail`, structural follow-up lines such as trailing `}` no longer become standalone alerts, and repeated attention churn from the same logical failure is now damped through message-policy suppression instead of fanning out into many nearly identical Telegram alerts.
+- [x] `backend/src/telegram-adapter.js` now enforces adapter-local outbound backoff after Telegram Bot API `retry after` responses, exposing `backoffActive`, `backoffUntil`, and `backoffRemainingMs` in adapter status so one noisy mapped session no longer turns a rate-limited bot into thousands of repeated failed send attempts while the runtime still keeps the rate-limit evidence visible.
+- [x] Direct regression coverage now closes the `H81` seams in `backend/test/messaging-runtime.test.js` and `backend/test/telegram-adapter.test.js`, covering repeated attention suppression, structural-tail false-positive rejection, and deterministic adapter backoff behavior after Telegram rate limits.
+
 ## 2026-04-10
 
 - [x] `MSG-012`, `MSG-013`, `MSG-014`, `MSG-016`, and `MSG-015` are now completed as `v0.4.0-H80` on `main`, closing the messaging-noise hardening wave and leaving no active or queued near-term wave in `ROADMAP.md`.

@@ -308,6 +308,7 @@ export function createTelegramAdapter(options = {}) {
     lastRateLimitedAt: null,
     lastRetryAfterSeconds: null,
     lastRecommendedBackoffMs: null,
+    backoffUntil: null,
     inboundHandledTotal: 0,
     inboundFailedTotal: 0,
     inboundBacklogSkippedTotal: 0,
@@ -355,6 +356,19 @@ export function createTelegramAdapter(options = {}) {
     if (!text) {
       return { delivered: false, skipped: true, reason: "empty" };
     }
+    const now = nowFn();
+    if (Number.isInteger(metrics.backoffUntil) && now < metrics.backoffUntil) {
+      const remainingMs = Math.max(1, metrics.backoffUntil - now);
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "backoff_active",
+        action,
+        rateLimited: true,
+        retryAfterSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+        recommendedBackoffMs: remainingMs
+      };
+    }
 
     try {
       let result = null;
@@ -390,6 +404,7 @@ export function createTelegramAdapter(options = {}) {
         metrics.deliveredTotal += 1;
         metrics.updatedTotal += 1;
         metrics.lastDeliveredAt = state.lastUpdatedAt;
+        metrics.backoffUntil = null;
         return { delivered: true, action, messageId: state.messageId };
       }
 
@@ -409,6 +424,7 @@ export function createTelegramAdapter(options = {}) {
         metrics.alertedTotal += 1;
       }
       metrics.lastDeliveredAt = nowFn();
+      metrics.backoffUntil = null;
       return {
         delivered: true,
         action,
@@ -424,6 +440,10 @@ export function createTelegramAdapter(options = {}) {
       metrics.lastRecommendedBackoffMs = rateLimit.rateLimited
         ? rateLimit.recommendedBackoffMs
         : metrics.lastRecommendedBackoffMs;
+      metrics.backoffUntil =
+        rateLimit.rateLimited && Number.isInteger(rateLimit.recommendedBackoffMs)
+          ? metrics.lastErrorAt + rateLimit.recommendedBackoffMs
+          : metrics.backoffUntil;
       return {
         delivered: false,
         action,
@@ -582,6 +602,9 @@ export function createTelegramAdapter(options = {}) {
   }
 
   function getStatus() {
+    const now = nowFn();
+    const backoffActive = Number.isInteger(metrics.backoffUntil) && metrics.backoffUntil > now;
+    const backoffRemainingMs = backoffActive ? metrics.backoffUntil - now : 0;
     return {
       adapter: "telegram",
       enabled,
@@ -597,6 +620,9 @@ export function createTelegramAdapter(options = {}) {
       lastRateLimitedAt: metrics.lastRateLimitedAt,
       lastRetryAfterSeconds: metrics.lastRetryAfterSeconds,
       lastRecommendedBackoffMs: metrics.lastRecommendedBackoffMs,
+      backoffActive,
+      backoffUntil: Number.isInteger(metrics.backoffUntil) ? metrics.backoffUntil : null,
+      backoffRemainingMs,
       inboundHandledTotal: metrics.inboundHandledTotal,
       inboundFailedTotal: metrics.inboundFailedTotal,
       inboundBacklogSkippedTotal: metrics.inboundBacklogSkippedTotal,

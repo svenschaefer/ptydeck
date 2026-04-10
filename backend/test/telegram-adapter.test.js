@@ -192,6 +192,62 @@ test("telegram adapter reports structured rate-limit metadata on delivery failur
   assert.equal(adapter.getStatus().lastRecommendedBackoffMs, 8000);
 });
 
+test("telegram adapter honors Telegram retry-after backoff before attempting another outbound send", async () => {
+  let now = 100;
+  let sendCalls = 0;
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    configuredTargets: 1,
+    nowFn: () => now,
+    transport: {
+      async sendMessage() {
+        sendCalls += 1;
+        if (sendCalls === 1) {
+          throw new Error("Too Many Requests: retry after 8");
+        }
+        return { messageId: 91 };
+      },
+      async editMessage() {
+        throw new Error("edit should not be used in this test");
+      }
+    }
+  });
+
+  const first = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created"
+  });
+
+  now = 200;
+  const second = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created again"
+  });
+
+  now = 8_200;
+  const third = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created after backoff"
+  });
+
+  assert.equal(first.delivered, false);
+  assert.equal(first.rateLimited, true);
+  assert.equal(second.delivered, false);
+  assert.equal(second.skipped, true);
+  assert.equal(second.reason, "backoff_active");
+  assert.equal(second.rateLimited, true);
+  assert.equal(sendCalls, 2);
+  assert.equal(third.delivered, true);
+  assert.equal(adapter.getStatus().backoffActive, false);
+  assert.equal(adapter.getStatus().backoffRemainingMs, 0);
+});
+
 test("telegram adapter polls bounded inbound commands and records metrics", async () => {
   const sends = [];
   const callbackAnswers = [];
