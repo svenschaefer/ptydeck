@@ -28,7 +28,6 @@ This file is structured into:
 ### Extensibility
 
 - [ ] Add plugin interface for project-specific automations.
-- [ ] Add a platform-independent messaging-adapter framework with outbound-first reference delivery before richer inbound remote-action phases.
 
 ## Deferred Explicit Backlog
 
