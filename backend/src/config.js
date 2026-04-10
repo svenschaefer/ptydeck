@@ -147,6 +147,11 @@ export function loadConfig(env = process.env) {
   const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
   const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
+  const messagingTelegramInboundEnabled = parseBoolean(env.MESSAGING_TELEGRAM_INBOUND_ENABLED);
+  const messagingTelegramPollTimeoutSeconds = parsePositiveInt(
+    env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
+    "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
+  );
   const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
   const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
   const authAudience = String(env.AUTH_AUDIENCE || "ptydeck-local").trim();
@@ -167,6 +172,11 @@ export function loadConfig(env = process.env) {
   }
   if ((messagingTelegramBotToken && messagingTelegramTargets.length === 0) || (!messagingTelegramBotToken && messagingTelegramTargets.length > 0)) {
     throw new Error("MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together.");
+  }
+  if (messagingTelegramInboundEnabled && (!messagingTelegramBotToken || messagingTelegramTargets.length === 0)) {
+    throw new Error(
+      "MESSAGING_TELEGRAM_INBOUND_ENABLED requires MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS."
+    );
   }
   if (messagingTelegramApiBaseUrl) {
     parseOrigin(messagingTelegramApiBaseUrl, "MESSAGING_TELEGRAM_API_BASE_URL");
@@ -262,6 +272,8 @@ export function loadConfig(env = process.env) {
     authWsTicketTtlSeconds,
     messagingTelegramBotToken,
     messagingTelegramTargets,
-    messagingTelegramApiBaseUrl
+    messagingTelegramApiBaseUrl,
+    messagingTelegramInboundEnabled,
+    messagingTelegramPollTimeoutSeconds
   };
 }

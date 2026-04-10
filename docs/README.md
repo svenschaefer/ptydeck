@@ -138,12 +138,14 @@ Authoritative repository documents remain:
 ### 10. Messaging Adapter Concept
 
 - `ptydeck_messaging_adapter_framework_final_concept.md`
-  - Role: non-technical product concept for a future messaging-adapter framework
-  - Status: reference concept only; not an active implementation-status document
+  - Role: non-technical product concept for the messaging-adapter framework now delivered on `main` as the first reference baseline
+  - Status:
+    - the outbound-first Telegram reference wave and the bounded inbound reference wave are now delivered on `main`
+    - the concept document remains useful for product boundaries and later adapter families, but it is not the implementation-status source of truth
   - Current interpretation:
     - adapters must remain subordinate to existing ptydeck session, share, and control contracts
     - the primary mapping model is session-first, with deck-level rollups only as later extensions
-    - inbound chat actions should be bounded extensions of the ptydeck control/slash model rather than a parallel terminal authority
+    - inbound chat actions are bounded extensions of the ptydeck control/slash model rather than a parallel terminal authority
 
 ## Consolidation Outcome
 

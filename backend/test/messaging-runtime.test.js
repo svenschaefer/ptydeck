@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   applyMessagingMessagePolicy,
   createMessagingRuntime,
+  normalizeMessagingInboundReplaySelector,
   normalizeMessagingTargets,
   resolveMessagingTriggerProfile
 } from "../src/messaging-runtime.js";
@@ -14,6 +15,8 @@ function createSession(overrides = {}) {
     quickIdToken: "4",
     shell: "bash",
     startCommand: "",
+    state: "running",
+    kind: "local",
     controlState: {
       currentController: null,
       attachedClients: [],
@@ -21,6 +24,21 @@ function createSession(overrides = {}) {
     },
     ...overrides
   };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitFor(predicate, timeoutMs = 1500) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await predicate()) {
+      return;
+    }
+    await sleep(10);
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
 test("messaging runtime normalizes targets and resolves trigger profiles deterministically", () => {
@@ -39,6 +57,17 @@ test("messaging runtime normalizes targets and resolves trigger profiles determi
   assert.equal(resolveMessagingTriggerProfile(createSession({ name: "Codex agent", startCommand: "codex" })), "coding-agent");
   assert.equal(resolveMessagingTriggerProfile(createSession({ name: "build-run", startCommand: "npm test" })), "build-test");
   assert.equal(resolveMessagingTriggerProfile(createSession({ name: "plain-shell", startCommand: "bash" })), "generic-shell");
+});
+
+test("messaging inbound replay selector stays bounded and rejects invalid values", () => {
+  assert.equal(normalizeMessagingInboundReplaySelector(), "l:40");
+  assert.equal(normalizeMessagingInboundReplaySelector("l:400"), "l:80");
+  assert.equal(normalizeMessagingInboundReplaySelector("c:9000"), "c:3000");
+  assert.equal(normalizeMessagingInboundReplaySelector("sp:9"), "sp:3");
+  assert.throws(
+    () => normalizeMessagingInboundReplaySelector("bad"),
+    /Replay selector must match 'l:N', 'c:N', or 'sp:N'/
+  );
 });
 
 test("messaging message policy returns explicit new update alert and suppress decisions", () => {
@@ -123,7 +152,150 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.equal(runtime.buildStatusSummary().enabled, true);
 });
 
-test("messaging runtime ignores unmapped sessions and exposes adapter metrics", async () => {
+test("messaging runtime handles bounded inbound status stop retry and replay actions", async () => {
+  const outboundMessages = [];
+  const callbackAnswers = [];
+  const updateQueue = [];
+  const stopCalls = [];
+  const retryCalls = [];
+  const replaySelectors = [];
+  let session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 200 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 200 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery(payload) {
+          callbackAnswers.push(payload);
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    },
+    async requestMessagingStop(sessionId) {
+      stopCalls.push(sessionId);
+      session = { ...session, state: "exited" };
+    },
+    async requestMessagingRetry(sessionId) {
+      retryCalls.push(sessionId);
+      session = { ...session, state: "starting" };
+      return session;
+    },
+    async requestMessagingReplayExcerpt(sessionId, selector) {
+      replaySelectors.push({ sessionId, selector });
+      return {
+        selector,
+        selectorKind: selector.startsWith("sp:") ? "shell_blocks" : "lines",
+        resolvedCount: 2,
+        availableCount: 2,
+        selectorSatisfied: true,
+        data: "prompt 1\nline 1\nprompt 2\nline 2"
+      };
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push(
+      { update_id: 1, message: { chat: { id: 1001 }, text: "/status" } },
+      {
+        update_id: 2,
+        callback_query: {
+          id: "cb-1",
+          data: "ptydeck:replay:sp:9",
+          message: { chat: { id: 1001 } }
+        }
+      },
+      { update_id: 3, message: { chat: { id: 1001 }, text: "/stop" } },
+      { update_id: 4, message: { chat: { id: 1001 }, text: "/retry" } }
+    );
+
+    await waitFor(() => outboundMessages.length >= 4 && callbackAnswers.length >= 1, 1500);
+
+    assert.match(outboundMessages[0].text, /Status for \[9\] codex/);
+    assert.match(outboundMessages[0].text, /State: running/);
+    assert.match(outboundMessages[1].text, /\[9\] codex replay sp:3/);
+    assert.match(outboundMessages[2].text, /Stop requested for \[9\] codex/);
+    assert.match(outboundMessages[3].text, /Retry started for \[9\] codex/);
+    assert.deepEqual(stopCalls, ["s-codex"]);
+    assert.deepEqual(retryCalls, ["s-codex"]);
+    assert.deepEqual(replaySelectors, [{ sessionId: "s-codex", selector: "sp:3" }]);
+    assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
+    assert.match(callbackAnswers[0].text, /Replay sp:3/);
+    assert.equal(runtime.buildStatusSummary().adapters[0].inboundHandledTotal >= 4, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime rejects unmapped or unavailable inbound actions deterministically", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 300 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 300 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      throw new Error("Mapped ptydeck session is unavailable.");
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push(
+      { update_id: 1, message: { chat: { id: 9999 }, text: "/status" } },
+      { update_id: 2, message: { chat: { id: 1001 }, text: "/status" } }
+    );
+
+    await waitFor(() => outboundMessages.length >= 2, 1500);
+    assert.match(outboundMessages[0].text, /not mapped to a ptydeck session/);
+    assert.match(outboundMessages[1].text, /Mapped ptydeck session is unavailable/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime ignores unmapped outbound sessions and exposes adapter metrics", async () => {
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
     telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],

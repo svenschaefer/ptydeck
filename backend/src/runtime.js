@@ -2756,8 +2756,14 @@ export function createRuntime(config) {
     telegramBotToken: config.messagingTelegramBotToken,
     telegramTargets: config.messagingTelegramTargets,
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
+    telegramInboundEnabled: config.messagingTelegramInboundEnabled,
+    telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
     createTelegramTransport: config.createMessagingTelegramTransport,
     fetchImpl: config.fetchImpl,
+    resolveSessionForMessagingTarget,
+    requestMessagingStop,
+    requestMessagingRetry,
+    requestMessagingReplayExcerpt,
     logDebug
   });
 
@@ -3021,6 +3027,12 @@ export function createRuntime(config) {
     lines.push("# TYPE ptydeck_messaging_adapter_enabled gauge");
     lines.push("# HELP ptydeck_messaging_adapter_configured_targets Number of configured messaging targets for an adapter.");
     lines.push("# TYPE ptydeck_messaging_adapter_configured_targets gauge");
+    lines.push("# HELP ptydeck_messaging_inbound_enabled Whether bounded inbound messaging is enabled for an adapter.");
+    lines.push("# TYPE ptydeck_messaging_inbound_enabled gauge");
+    lines.push("# HELP ptydeck_messaging_inbound_polling Whether an adapter inbound poll loop is currently active.");
+    lines.push("# TYPE ptydeck_messaging_inbound_polling gauge");
+    lines.push("# HELP ptydeck_messaging_inbound_total Bounded inbound messaging interactions grouped by adapter and outcome.");
+    lines.push("# TYPE ptydeck_messaging_inbound_total counter");
     lines.push(...messagingRuntime.renderMetricLines());
     return `${lines.join("\n")}\n`;
   }
@@ -5401,6 +5413,88 @@ export function createRuntime(config) {
     };
   }
 
+  function resolveSessionForMessagingTarget(target) {
+    const normalizedSessionId = typeof target?.sessionId === "string" ? target.sessionId.trim() : "";
+    if (normalizedSessionId) {
+      return getApiSessionOrThrow(normalizedSessionId);
+    }
+
+    const normalizedQuickIdToken = typeof target?.quickIdToken === "string" ? target.quickIdToken.trim() : "";
+    const normalizedSessionName = typeof target?.sessionName === "string" ? target.sessionName.trim() : "";
+    const matches = manager.list().filter((session) => {
+      if (normalizedQuickIdToken && getSessionQuickIdToken(session.id) !== normalizedQuickIdToken) {
+        return false;
+      }
+      if (normalizedSessionName && session.name !== normalizedSessionName) {
+        return false;
+      }
+      return Boolean(normalizedQuickIdToken || normalizedSessionName);
+    });
+    if (matches.length === 0) {
+      throw new ApiError(404, "SessionNotFound", "Mapped ptydeck session was not found.");
+    }
+    if (matches.length > 1) {
+      throw new ApiError(
+        409,
+        "MessagingTargetAmbiguous",
+        "Mapped ptydeck session is ambiguous. Narrow the Telegram target selector."
+      );
+    }
+    return toApiSession(matches[0]);
+  }
+
+  function requestMessagingStop(sessionId, options = {}) {
+    manager.terminate(sessionId, options);
+    return null;
+  }
+
+  function requestMessagingRetry(sessionId, options = {}) {
+    try {
+      const payload = manager.restart(sessionId, options);
+      assignSessionQuickIdToken(payload.id, payload.quickIdToken);
+      return toApiSession(payload);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+
+    const snapshot = options.sessionSnapshot && typeof options.sessionSnapshot === "object" ? options.sessionSnapshot : null;
+    if (!snapshot || !snapshot.id) {
+      throw new ApiError(404, "SessionNotFound", `Session '${sessionId}' was not found.`);
+    }
+    const payload = manager.create({
+      id: snapshot.id,
+      kind: snapshot.kind,
+      remoteConnection: snapshot.remoteConnection,
+      remoteAuth: snapshot.remoteAuth,
+      remoteSecret: snapshot.remoteSecret,
+      quickIdToken: snapshot.quickIdToken,
+      cwd: snapshot.startCwd || snapshot.cwd,
+      shell: snapshot.shell,
+      name: snapshot.name,
+      startCwd: snapshot.startCwd || snapshot.cwd,
+      startCommand: snapshot.startCommand || "",
+      env: snapshot.env || {},
+      note: snapshot.note,
+      mouseForwardingMode: snapshot.mouseForwardingMode,
+      inputSafetyProfile: snapshot.inputSafetyProfile,
+      tags: snapshot.tags || [],
+      themeProfile: snapshot.themeProfile || {},
+      activeThemeProfile: snapshot.activeThemeProfile,
+      inactiveThemeProfile: snapshot.inactiveThemeProfile,
+      createdAt: snapshot.createdAt,
+      updatedAt: Date.now(),
+      trace: options.trace
+    });
+    assignSessionQuickIdToken(payload.id, payload.quickIdToken);
+    return toApiSession(payload);
+  }
+
+  function requestMessagingReplayExcerpt(sessionId, selector) {
+    return buildSessionReplayExcerptOrThrow(sessionId, selector);
+  }
+
   function resolveSessionTransferRootOrThrow(session) {
     const rawRoot =
       typeof session?.meta?.cwd === "string" && session.meta.cwd.trim()
@@ -7389,6 +7483,7 @@ function tryCreateRestoredSession({
     await new Promise((resolve) => {
       server.listen(config.port, resolve);
     });
+    await messagingRuntime.start();
     if (typeof config.onBeforeReady === "function") {
       await config.onBeforeReady();
     }
@@ -7414,6 +7509,7 @@ function tryCreateRestoredSession({
       persistTimer = null;
     }
     clearSessionControlAttachmentPruneTimer();
+    await messagingRuntime.stop();
 
     for (const ws of sockets) {
       ws.closeReasonHint = "server_shutdown";

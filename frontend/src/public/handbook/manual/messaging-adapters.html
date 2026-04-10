@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ptydeck Handbook - Messaging Adapters</title>
+    <link rel="stylesheet" href="/handbook/styles.css" />
+  </head>
+  <body>
+    <div class="handbook-shell">
+      <aside class="handbook-panel">
+        <div class="handbook-brand">
+          <p class="handbook-brand-title">ptydeck Handbook</p>
+          <p class="handbook-brand-subtitle">Generated reference plus curated operator guides kept in repo.</p>
+        </div>
+        <section class="handbook-nav-group"><p class="handbook-nav-title">Manual</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/index.html"><span>Overview</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/startup-and-sessions.html"><span>Startup and Sessions</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/paste-and-send-safety.html"><span>Paste and Send Safety</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/replay-copy-paste.html"><span>Replay Copy and Paste</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link is-current" href="/handbook/manual/messaging-adapters.html"><span>Messaging Adapters</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/workspace-library.html"><span>Workspace Library</span><span class="handbook-nav-meta">guide</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/manual/trusted-local-control.html"><span>Trusted-Local Control</span><span class="handbook-nav-meta">guide</span></a></li>
+</ul></section>
+<section class="handbook-nav-group"><p class="handbook-nav-title">Reference</p><ul class="handbook-nav-list">
+<li><a class="handbook-nav-link" href="/handbook/reference/index.html"><span>Reference Overview</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/commands.html"><span>Slash Commands</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/api.html"><span>API</span><span class="handbook-nav-meta">generated</span></a></li>
+<li><a class="handbook-nav-link" href="/handbook/reference/session-settings.html"><span>Session Settings</span><span class="handbook-nav-meta">generated</span></a></li>
+</ul></section>
+      </aside>
+      <main class="handbook-article">
+        <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
+        <h1 id="messaging-adapters">Messaging Adapters</h1>
+
+<p><code>ptydeck</code> now ships a single-user Telegram reference adapter on top of the provider-independent messaging contract.</p>
+
+<p>Use it when you want:</p>
+
+<ul>
+<li>concise external session status updates</li>
+<li>bounded remote follow-up from a mapped Telegram chat</li>
+<li>a stable session-to-chat mapping without opening a second terminal UI</li>
+</ul>
+
+<p>The adapter is intentionally not a remote shell.</p>
+
+<h2 id="what-it-can-do">What It Can Do</h2>
+
+<p>The Telegram reference adapter can:</p>
+
+<ul>
+<li>send normalized outbound status, summary, idle, attention, control, and share updates for mapped sessions</li>
+<li>keep those updates compact through the shipped trigger profiles</li>
+<li>accept only the bounded inbound action set:</li>
+</ul>
+
+<p>- <code>/status</code> - <code>/stop</code> - <code>/retry</code> - <code>/replay</code> - <code>/replay l:N</code> - <code>/replay c:N</code> - <code>/replay sp:N</code></p>
+
+<ul>
+<li>expose the same bounded actions through Telegram buttons on adapter-owned messages</li>
+</ul>
+
+<h2 id="what-it-cannot-do">What It Cannot Do</h2>
+
+<p>The adapter does not:</p>
+
+<ul>
+<li>execute arbitrary shell input from Telegram</li>
+<li>bypass controller, read-only, share, or send-safety rules</li>
+<li>parse open-ended free-text intent</li>
+<li>mirror raw PTY chunks as a second terminal stream</li>
+</ul>
+
+<p>If you need the exact command or settings contract, use the generated reference pages instead of repeating them here:</p>
+
+<ul>
+<li><a href="/handbook/reference/commands.html">Slash command reference</a></li>
+<li><a href="/handbook/reference/api.html">API reference</a></li>
+</ul>
+
+<h2 id="session-mapping">Session Mapping</h2>
+
+<p>A Telegram target maps one ptydeck session to one chat destination.</p>
+
+<p>Each mapping entry needs:</p>
+
+<ul>
+<li><code>chatId</code></li>
+<li>at least one selector:</li>
+</ul>
+
+<p>- <code>sessionId</code> - <code>quickIdToken</code> - <code>sessionName</code></p>
+
+<p>Optional fields:</p>
+
+<ul>
+<li><code>messageThreadId</code></li>
+<li><code>profile</code></li>
+</ul>
+
+<p>The shipped trigger profiles are:</p>
+
+<ul>
+<li><code>generic-shell</code></li>
+<li><code>coding-agent</code></li>
+<li><code>build-test</code></li>
+</ul>
+
+<h2 id="bounded-inbound-semantics">Bounded Inbound Semantics</h2>
+
+<h3 id="status"><code>status</code></h3>
+
+<p>Returns a compact session status summary for the mapped session.</p>
+
+<h3 id="stop"><code>stop</code></h3>
+
+<p>Requests a bounded stop against the mapped session.</p>
+
+<p>Behavior:</p>
+
+<ul>
+<li>if the session is still active, <code>ptydeck</code> issues the normal stop path</li>
+<li>if the session is already gone, the command resolves idempotently as already stopped</li>
+</ul>
+
+<h3 id="retry"><code>retry</code></h3>
+
+<p>Starts the mapped session again through the existing ptydeck restart/create path.</p>
+
+<p>Behavior:</p>
+
+<ul>
+<li>if the session is still running, retry is rejected</li>
+<li>if the session already exited, the adapter retries from the last known bounded session snapshot instead of inventing a second runtime model</li>
+</ul>
+
+<h3 id="replay"><code>replay</code></h3>
+
+<p>Returns a visible-text replay excerpt from the mapped session.</p>
+
+<p>Defaults and bounds:</p>
+
+<ul>
+<li><code>/replay</code> defaults to <code>l:40</code></li>
+<li><code>l:N</code> is bounded to a safe maximum</li>
+<li><code>c:N</code> is bounded to a safe maximum</li>
+<li><code>sp:N</code> is bounded and only works where shell-block tracking is actually available</li>
+</ul>
+
+<h2 id="operational-notes">Operational Notes</h2>
+
+<ul>
+<li>Telegram inbound is opt-in through backend config.</li>
+<li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
+<li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
+<li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
+</ul>
+
+<h2 id="related-docs">Related Docs</h2>
+
+<ul>
+<li><a href="../../DEPLOYMENT.md">DEPLOYMENT.md</a></li>
+<li><a href="../ptydeck_messaging_adapter_framework_final_concept.md">Messaging adapter concept</a></li>
+</ul>
+      </main>
+      <aside class="handbook-page-toc">
+        <p class="handbook-page-toc-title">On This Page</p>
+        <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
+<li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>
+<li><a class="handbook-page-toc-link" href="#session-mapping">Session Mapping</a></li>
+<li><a class="handbook-page-toc-link" href="#bounded-inbound-semantics">Bounded Inbound Semantics</a></li>
+<li><a class="handbook-page-toc-link" href="#status">`status`</a></li>
+<li><a class="handbook-page-toc-link" href="#stop">`stop`</a></li>
+<li><a class="handbook-page-toc-link" href="#retry">`retry`</a></li>
+<li><a class="handbook-page-toc-link" href="#replay">`replay`</a></li>
+<li><a class="handbook-page-toc-link" href="#operational-notes">Operational Notes</a></li>
+<li><a class="handbook-page-toc-link" href="#related-docs">Related Docs</a></li>
+</ul>
+      </aside>
+    </div>
+  </body>
+</html>

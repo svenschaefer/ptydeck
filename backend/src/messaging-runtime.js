@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { normalizeVisibleReplayText } from "./replay-excerpt.js";
+import { ApiError } from "./errors.js";
+import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapter.js";
 
 export const MESSAGING_TRIGGER_PROFILES = Object.freeze(["generic-shell", "coding-agent", "build-test"]);
@@ -7,6 +8,11 @@ const MESSAGING_TRIGGER_PROFILE_SET = new Set(MESSAGING_TRIGGER_PROFILES);
 const MAX_EVENT_SUMMARY_LENGTH = 280;
 const MAX_RECENT_LINES = 4;
 const CONTROL_EVENT_SIGNATURE_NONE = "none";
+const DEFAULT_INBOUND_REPLAY_SELECTOR = "l:40";
+const MAX_INBOUND_REPLAY_LINES = 80;
+const MAX_INBOUND_REPLAY_CHARS = 3000;
+const MAX_INBOUND_REPLAY_SHELL_BLOCKS = 3;
+const MAX_INBOUND_RESPONSE_TEXT_LENGTH = 3800;
 
 const PROFILE_PATTERNS = Object.freeze({
   "generic-shell": Object.freeze({
@@ -61,6 +67,17 @@ function normalizePositiveInteger(value) {
 
 function truncateSummary(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
   const normalized = normalizeVisibleReplayText(value).replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function truncateResponseText(value, maxLength = MAX_INBOUND_RESPONSE_TEXT_LENGTH) {
+  const normalized = typeof value === "string" ? value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() : "";
   if (!normalized) {
     return "";
   }
@@ -278,15 +295,81 @@ function buildThreadStateKey(target, sessionId, threadKey) {
   return `${target.chatId}:${Number.isInteger(target.messageThreadId) ? target.messageThreadId : 0}:${sessionId}:${threadKey}`;
 }
 
+function buildConversationKey(chatId, messageThreadId) {
+  return `${normalizeNonEmptyString(chatId)}:${Number.isInteger(messageThreadId) ? messageThreadId : 0}`;
+}
+
+function buildInboundTrace(request, sessionId) {
+  return {
+    source: `messaging:${normalizeNonEmptyString(request?.adapter) || "adapter"}`,
+    sessionId: normalizeNonEmptyString(sessionId)
+  };
+}
+
+function buildInboundStatusText(session, profile) {
+  const lines = [
+    `Status for ${buildSessionLabel(session)}`,
+    `State: ${normalizeNonEmptyString(session?.state) || "unknown"}`
+  ];
+  if (profile) {
+    lines.push(`Trigger profile: ${profile}`);
+  }
+  const kind = normalizeNonEmptyString(session?.kind);
+  if (kind) {
+    lines.push(`Kind: ${kind}`);
+  }
+  const controller = normalizeNonEmptyString(session?.controlState?.currentController?.clientId || session?.controlState?.currentController?.label || session?.controlState?.currentController);
+  lines.push(`Controller: ${controller || "none"}`);
+  const attachedCount = Array.isArray(session?.controlState?.attachedClients) ? session.controlState.attachedClients.length : 0;
+  lines.push(`Attached clients: ${attachedCount}`);
+  return truncateResponseText(lines.join("\n"));
+}
+
+export function normalizeMessagingInboundReplaySelector(selector) {
+  const normalized = normalizeNonEmptyString(selector).toLowerCase() || DEFAULT_INBOUND_REPLAY_SELECTOR;
+  const parsed = parseReplaySliceSelector(normalized);
+  if (!parsed) {
+    throw new ApiError(400, "ValidationError", "Replay selector must match 'l:N', 'c:N', or 'sp:N'.");
+  }
+  let maxCount = MAX_INBOUND_REPLAY_LINES;
+  if (parsed.selectorKind === "chars") {
+    maxCount = MAX_INBOUND_REPLAY_CHARS;
+  } else if (parsed.selectorKind === "shell_blocks") {
+    maxCount = MAX_INBOUND_REPLAY_SHELL_BLOCKS;
+  }
+  const boundedCount = Math.min(parsed.requestedCount, maxCount);
+  return `${parsed.selectorToken}:${boundedCount}`;
+}
+
+function buildReplayResponseText(session, excerpt) {
+  const header = `${buildSessionLabel(session)} replay ${excerpt.selector}`;
+  const meta = `${excerpt.resolvedCount}/${excerpt.availableCount} ${excerpt.selectorKind.replace("_", " ")}${excerpt.selectorSatisfied ? "" : " (partial)"}`;
+  const body = normalizeVisibleReplayText(excerpt.data || "").trim();
+  const text = body ? `${header}\n${meta}\n\n${body}` : `${header}\n${meta}\n\n(no retained replay text)`;
+  return truncateResponseText(text);
+}
+
+async function defaultNoop() {
+  return null;
+}
+
 export function createMessagingRuntime(options = {}) {
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
   const targetMappings = normalizeMessagingTargets(options.telegramTargets);
   const sessionStates = new Map();
   const threadStates = new Map();
   const eventMetrics = new Map();
+  const recentSessionByConversationKey = new Map();
   const logDebug = typeof options.logDebug === "function" ? options.logDebug : () => {};
+  const resolveSessionForMessagingTarget =
+    typeof options.resolveSessionForMessagingTarget === "function" ? options.resolveSessionForMessagingTarget : () => null;
+  const requestMessagingStop = typeof options.requestMessagingStop === "function" ? options.requestMessagingStop : defaultNoop;
+  const requestMessagingRetry = typeof options.requestMessagingRetry === "function" ? options.requestMessagingRetry : defaultNoop;
+  const requestMessagingReplayExcerpt =
+    typeof options.requestMessagingReplayExcerpt === "function" ? options.requestMessagingReplayExcerpt : defaultNoop;
   const adapters = [];
   const telegramEnabled = Boolean(options.telegramBotToken && targetMappings.length > 0);
+  const telegramInboundEnabled = telegramEnabled && options.telegramInboundEnabled === true;
   const telegramTransportFactory =
     typeof options.createTelegramTransport === "function" ? options.createTelegramTransport : createTelegramTransport;
   const telegramTransport = telegramEnabled
@@ -298,11 +381,24 @@ export function createMessagingRuntime(options = {}) {
     : null;
   const telegramAdapter = createTelegramAdapter({
     enabled: telegramEnabled,
+    inboundEnabled: telegramInboundEnabled,
     configuredTargets: targetMappings.length,
+    pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
     transport: telegramTransport,
     nowFn
   });
   adapters.push(telegramAdapter);
+
+  const conversationTargetIndex = new Map();
+  const ambiguousConversationKeys = new Set();
+  for (const target of targetMappings) {
+    const key = buildConversationKey(target.chatId, target.messageThreadId);
+    if (conversationTargetIndex.has(key)) {
+      ambiguousConversationKeys.add(key);
+      continue;
+    }
+    conversationTargetIndex.set(key, target);
+  }
 
   function bumpEventMetric(profile, type, action) {
     const key = `${profile}:${type}:${action}`;
@@ -350,6 +446,32 @@ export function createMessagingRuntime(options = {}) {
     return bestMatch;
   }
 
+  function resolveInboundTarget(target) {
+    const key = buildConversationKey(target?.chatId, target?.messageThreadId);
+    if (!key || key === ":0") {
+      return { error: "unmapped" };
+    }
+    if (ambiguousConversationKeys.has(key)) {
+      return { error: "ambiguous" };
+    }
+    const mapping = conversationTargetIndex.get(key);
+    if (!mapping) {
+      return { error: "unmapped" };
+    }
+    return { target: mapping };
+  }
+
+  function rememberSessionForTarget(target, session) {
+    if (!target || !session || !normalizeNonEmptyString(session.id)) {
+      return;
+    }
+    recentSessionByConversationKey.set(buildConversationKey(target.chatId, target.messageThreadId), { ...session });
+  }
+
+  function getCachedSessionForTarget(target) {
+    return recentSessionByConversationKey.get(buildConversationKey(target?.chatId, target?.messageThreadId)) || null;
+  }
+
   function getOrCreateSessionState(sessionId) {
     let state = sessionStates.get(sessionId);
     if (state) {
@@ -365,6 +487,7 @@ export function createMessagingRuntime(options = {}) {
     if (!target) {
       return null;
     }
+    rememberSessionForTarget(target, event.session);
     const threadState = getThreadState(target, event.sessionId, event.threadKey);
     const decision = applyMessagingMessagePolicy(event, threadState);
     bumpEventMetric(event.profile, event.type, decision.action);
@@ -621,6 +744,173 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
+  async function executeInboundAction(request = {}) {
+    const inboundResolution = resolveInboundTarget(request.target);
+    if (inboundResolution.error === "unmapped") {
+      const result = {
+        ok: false,
+        callbackText: "Unmapped chat.",
+        text: "This Telegram chat is not mapped to a ptydeck session."
+      };
+      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "unmapped" }, null);
+      return result;
+    }
+    if (inboundResolution.error === "ambiguous") {
+      const result = {
+        ok: false,
+        callbackText: "Ambiguous mapping.",
+        text: "This Telegram chat matches multiple ptydeck messaging targets. Narrow the mapping before using inbound actions."
+      };
+      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "ambiguous" }, null);
+      return result;
+    }
+
+    const target = inboundResolution.target;
+    let session = null;
+    let resolvedLiveSession = true;
+    try {
+      session = await resolveSessionForMessagingTarget(target);
+    } catch (error) {
+      resolvedLiveSession = false;
+      session = getCachedSessionForTarget(target);
+      if (!session) {
+        const result = {
+          ok: false,
+          callbackText: "Session unavailable.",
+          text: error instanceof Error ? error.message : "Mapped ptydeck session is unavailable."
+        };
+        logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "resolve_failed" }, null);
+        return result;
+      }
+    }
+    if (!session || !normalizeNonEmptyString(session.id)) {
+      const result = {
+        ok: false,
+        callbackText: "Session unavailable.",
+        text: "Mapped ptydeck session is unavailable."
+      };
+      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "session_missing" }, null);
+      return result;
+    }
+
+    const action = normalizeNonEmptyString(request.command?.action || request.action).toLowerCase();
+    const trace = buildInboundTrace(request, session.id);
+    const profile = resolveMessagingTriggerProfile(session, target);
+
+    try {
+      if (action === "status") {
+        const result = {
+          ok: true,
+          callbackText: "Status ready.",
+          text: buildInboundStatusText(session, profile)
+        };
+        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        return result;
+      }
+
+      if (action === "stop") {
+        if (session.state !== "running" && session.state !== "starting") {
+          const result = {
+            ok: true,
+            callbackText: "Already stopped.",
+            text: truncateResponseText(`${buildSessionLabel(session)} is already stopped.`)
+          };
+          logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true, idempotent: true }, trace);
+          return result;
+        }
+        await requestMessagingStop(session.id, { trace });
+        const result = {
+          ok: true,
+          callbackText: "Stop requested.",
+          text: truncateResponseText(`Stop requested for ${buildSessionLabel(session)}.`)
+        };
+        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        return result;
+      }
+
+      if (action === "retry") {
+        if (resolvedLiveSession && (session.state === "running" || session.state === "starting")) {
+          const result = {
+            ok: false,
+            callbackText: "Retry unavailable.",
+            text: truncateResponseText(`Retry is unavailable while ${buildSessionLabel(session)} is ${session.state}.`)
+          };
+          logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, reason: "running" }, trace);
+          return result;
+        }
+        const restartedSession = await requestMessagingRetry(session.id, {
+          trace,
+          sessionSnapshot: session,
+          target
+        });
+        const effectiveSession = restartedSession && restartedSession.id ? restartedSession : session;
+        const result = {
+          ok: true,
+          callbackText: "Retry started.",
+          text: truncateResponseText(`Retry started for ${buildSessionLabel(effectiveSession)}.`)
+        };
+        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        return result;
+      }
+
+      if (action === "replay") {
+        const selector = normalizeMessagingInboundReplaySelector(request.command?.selector || request.selector);
+        const excerpt = await requestMessagingReplayExcerpt(session.id, selector, { trace });
+        const result = {
+          ok: true,
+          callbackText: `Replay ${selector}.`,
+          text: buildReplayResponseText(session, excerpt)
+        };
+        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true, selector }, trace);
+        return result;
+      }
+
+      const result = {
+        ok: false,
+        callbackText: "Unsupported action.",
+        text: "Unsupported messaging action. Use status, stop, retry, or replay."
+      };
+      logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, reason: "unsupported" }, trace);
+      return result;
+    } catch (error) {
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Messaging action failed.";
+      const result = {
+        ok: false,
+        callbackText: statusCode >= 500 ? "Action failed." : "Action rejected.",
+        text: truncateResponseText(message)
+      };
+      logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, statusCode }, trace);
+      return result;
+    }
+  }
+
+  async function start() {
+    for (const adapter of adapters) {
+      if (typeof adapter.startInbound === "function") {
+        await adapter.startInbound({
+          onCommand: (request) => executeInboundAction({
+            ...request,
+            adapter: "telegram"
+          })
+        });
+      }
+    }
+  }
+
+  async function stop() {
+    for (const adapter of adapters) {
+      if (typeof adapter.stop === "function") {
+        await adapter.stop();
+      }
+    }
+  }
+
   function buildStatusSummary() {
     return {
       enabled: telegramEnabled,
@@ -643,6 +933,8 @@ export function createMessagingRuntime(options = {}) {
   }
 
   return {
+    start,
+    stop,
     observeSessionLifecycle,
     observeSessionData,
     observeSessionIdle,

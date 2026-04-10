@@ -310,6 +310,13 @@ const HANDBOOK_PAGE_DEFINITIONS = Object.freeze([
     handbookHref: "/handbook/manual/replay-copy-paste.html"
   },
   {
+    sourcePath: "docs/manual/messaging-adapters.md",
+    outputPath: "frontend/src/public/handbook/manual/messaging-adapters.html",
+    section: "Manual",
+    navTitle: "Messaging Adapters",
+    handbookHref: "/handbook/manual/messaging-adapters.html"
+  },
+  {
     sourcePath: "docs/manual/workspace-library.md",
     outputPath: "frontend/src/public/handbook/manual/workspace-library.html",
     section: "Manual",

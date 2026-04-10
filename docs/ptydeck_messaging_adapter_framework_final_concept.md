@@ -24,7 +24,7 @@ ptydeck already has a real runtime model:
 - REST and WebSocket contracts
 - replay and export capabilities
 - share links with read-only spectator access
-- trusted-local multi-device control on the feature branch
+- trusted-local multi-device control in the mainline single-user runtime
 - a bounded slash-command surface for operator workflows
 
 A messaging adapter framework must extend that model, not compete with it.

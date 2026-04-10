@@ -72,11 +72,13 @@ Optional local auth baseline (development only):
 - Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
 - Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
 
-Optional outbound messaging adapter baseline:
+Optional single-user Telegram messaging adapter baseline:
 
 - Backend: `MESSAGING_TELEGRAM_BOT_TOKEN` or `MESSAGING_TELEGRAM_BOT_TOKEN_FILE`
 - Backend: `MESSAGING_TELEGRAM_TARGETS` or `MESSAGING_TELEGRAM_TARGETS_FILE`
 - Backend (optional override): `MESSAGING_TELEGRAM_API_BASE_URL`
+- Backend (optional bounded inbound enable): `MESSAGING_TELEGRAM_INBOUND_ENABLED=1`
+- Backend (optional bounded inbound long-poll timeout): `MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS`
 
 Target mapping payload format:
 
@@ -99,8 +101,17 @@ Target mapping payload format:
 Notes:
 
 - At least one of `sessionId`, `quickIdToken`, or `sessionName` is required per mapping entry.
-- Outbound messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
+- Messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
+- The shipped bounded inbound command set is intentionally limited to:
+  - `/status`
+  - `/stop`
+  - `/retry`
+  - `/replay`
+  - `/replay l:N`
+  - `/replay c:N`
+  - `/replay sp:N`
+- Telegram button affordances map onto the same bounded action contract; there is no free-text remote shell execution path.
 
 ## 4.1 Secrets Management Strategy (ENT-005 Baseline)
 
@@ -160,11 +171,13 @@ curl -s http://127.0.0.1:18080/ready
 curl -s http://127.0.0.1:18080/metrics | head -n 20
 ```
 
-When outbound messaging is configured, verify additionally:
+When Telegram messaging is configured, verify additionally:
 
 - `/health` returns a top-level `messaging` summary with `enabled: true`
 - `/ready` returns the same `messaging` summary
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
+- If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
+- A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` only through the bounded adapter action set; unsupported text must not trigger arbitrary runtime actions
 
 Session API:
 

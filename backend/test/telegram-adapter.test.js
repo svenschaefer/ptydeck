@@ -1,8 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTelegramAdapter, createTelegramTransport } from "../src/telegram-adapter.js";
+import { createTelegramAdapter, createTelegramTransport, parseTelegramInboundCommand } from "../src/telegram-adapter.js";
 
-test("telegram transport sends and edits messages through the Telegram Bot API shape", async () => {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitFor(predicate, timeoutMs = 1500) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await predicate()) {
+      return;
+    }
+    await sleep(10);
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms`);
+}
+
+test("telegram transport sends edits polls and answers through the Telegram Bot API shape", async () => {
   const requests = [];
   const transport = createTelegramTransport({
     botToken: "bot-token",
@@ -12,6 +27,18 @@ test("telegram transport sends and edits messages through the Telegram Bot API s
       return {
         ok: true,
         async json() {
+          if (url.endsWith("/getUpdates")) {
+            return {
+              ok: true,
+              result: [{ update_id: 7 }]
+            };
+          }
+          if (url.endsWith("/answerCallbackQuery")) {
+            return {
+              ok: true,
+              result: true
+            };
+          }
           return {
             ok: true,
             result: {
@@ -25,11 +52,17 @@ test("telegram transport sends and edits messages through the Telegram Bot API s
 
   const sent = await transport.sendMessage({ chatId: "1001", text: "hello" });
   const edited = await transport.editMessage({ chatId: "1001", messageId: 41, text: "updated" });
+  const updates = await transport.getUpdates({ offset: 8, timeoutSeconds: 5, limit: 50, allowedUpdates: ["message"] });
+  const answered = await transport.answerCallbackQuery({ callbackQueryId: "cb-1", text: "ok", showAlert: true });
 
   assert.equal(sent.messageId, 1);
   assert.equal(edited.messageId, 2);
+  assert.deepEqual(updates, [{ update_id: 7 }]);
+  assert.equal(answered, true);
   assert.equal(requests[0].url, "https://telegram.example.test/botbot-token/sendMessage");
   assert.equal(requests[1].url, "https://telegram.example.test/botbot-token/editMessageText");
+  assert.equal(requests[2].url, "https://telegram.example.test/botbot-token/getUpdates");
+  assert.equal(requests[3].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     chat_id: "1001",
     text: "hello"
@@ -39,6 +72,28 @@ test("telegram transport sends and edits messages through the Telegram Bot API s
     message_id: 41,
     text: "updated"
   });
+  assert.deepEqual(JSON.parse(requests[2].options.body), {
+    offset: 8,
+    timeout: 5,
+    limit: 50,
+    allowed_updates: ["message"]
+  });
+  assert.deepEqual(JSON.parse(requests[3].options.body), {
+    callback_query_id: "cb-1",
+    text: "ok",
+    show_alert: true
+  });
+});
+
+test("telegram inbound command parsing stays deterministic for buttons and text fallbacks", () => {
+  assert.deepEqual(parseTelegramInboundCommand({ callbackData: "ptydeck:status" }), { action: "status" });
+  assert.deepEqual(parseTelegramInboundCommand({ callbackData: "ptydeck:replay:sp:2" }), { action: "replay", selector: "sp:2" });
+  assert.deepEqual(parseTelegramInboundCommand({ text: "/status" }), { action: "status" });
+  assert.deepEqual(parseTelegramInboundCommand({ text: "/retry@ptydeck_bot" }), { action: "retry" });
+  assert.deepEqual(parseTelegramInboundCommand({ text: "/replay l:40" }), { action: "replay", selector: "l:40" });
+  assert.equal(parseTelegramInboundCommand({ text: "/replay l:40 extra" }), null);
+  assert.equal(parseTelegramInboundCommand({ text: "status" }), null);
+  assert.equal(parseTelegramInboundCommand({ callbackData: "other:status" }), null);
 });
 
 test("telegram adapter updates an existing thread and falls back to a new message when edit fails", async () => {
@@ -105,4 +160,76 @@ test("telegram adapter records delivery failures without throwing them through t
   assert.equal(result.error, "telegram offline");
   assert.equal(adapter.getStatus().failedTotal, 1);
   assert.equal(adapter.getStatus().lastErrorAt, 55);
+});
+
+test("telegram adapter polls bounded inbound commands and records metrics", async () => {
+  const sends = [];
+  const callbackAnswers = [];
+  const updateQueue = [];
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 400;
+      return () => ++current;
+    })(),
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        return { messageId: sends.length + 40 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 40 };
+      },
+      async getUpdates() {
+        if (updateQueue.length > 0) {
+          return updateQueue.splice(0, updateQueue.length);
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery(payload) {
+        callbackAnswers.push(payload);
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand(command) {
+      if (command.source === "callback") {
+        return { ok: true, callbackText: "Replay ready.", text: "Replay for [4] build-run" };
+      }
+      return { ok: true, text: "Status for [4] build-run" };
+    }
+  });
+
+  try {
+    updateQueue.push(
+      { update_id: 1, message: { chat: { id: 1001 }, text: "/status" } },
+      {
+        update_id: 2,
+        callback_query: {
+          id: "cb-1",
+          data: "ptydeck:replay:l:20",
+          message: { chat: { id: 1001 } }
+        }
+      }
+    );
+
+    await waitFor(() => sends.length >= 2 && callbackAnswers.length >= 1, 1500);
+
+    assert.match(sends[0].text, /Status for \[4\] build-run/);
+    assert.match(sends[1].text, /Replay for \[4\] build-run/);
+    assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
+    assert.match(callbackAnswers[0].text, /Replay ready/);
+    assert.equal(adapter.getStatus().pollingActive, true);
+    assert.equal(adapter.getStatus().inboundHandledTotal >= 2, true);
+  } finally {
+    await adapter.stop();
+  }
+
+  assert.equal(adapter.getStatus().pollingActive, false);
 });

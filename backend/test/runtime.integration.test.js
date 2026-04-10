@@ -303,6 +303,122 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
   }
 });
 
+test("runtime executes bounded inbound telegram actions end-to-end for mapped sessions", async () => {
+  const sends = [];
+  const edits = [];
+  const callbackAnswers = [];
+  const updateQueue = [];
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 120 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 121 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery(payload) {
+          callbackAnswers.push(payload);
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", startCommand: "npm test" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    await waitFor(() => sends.some((entry) => /build-run: Session created\./.test(entry.text)), 2000);
+
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    await waitFor(() => sends.some((entry) => /Status for \[[^\]]+\] build-run/.test(entry.text)), 2000);
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "line 1\nline 2\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    updateQueue.push({
+      update_id: 2,
+      callback_query: {
+        id: "cb-1",
+        data: "ptydeck:replay:l:1",
+        message: { chat: { id: 1001 } }
+      }
+    });
+    await waitFor(() => sends.some((entry) => /build-run replay l:1/.test(entry.text)), 2000);
+    assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
+
+    updateQueue.push({ update_id: 3, message: { chat: { id: 1001 }, text: "/stop" } });
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      return res.status === 404;
+    }, 2000);
+
+    updateQueue.push({ update_id: 4, message: { chat: { id: 1001 }, text: "/retry" } });
+    await waitFor(async () => {
+      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
+      if (res.status !== 200) {
+        return false;
+      }
+      const payload = await res.json();
+      return payload.state === "running" || payload.state === "starting";
+    }, 2000);
+
+    const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metrics = await metricsRes.text();
+    assert.match(metrics, /ptydeck_messaging_inbound_enabled\{adapter="telegram"\} 1/);
+    assert.match(metrics, /ptydeck_messaging_inbound_total\{adapter="telegram",outcome="handled"\}/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session PTY control endpoints send deterministic signals and remove killed sessions", async () => {
   const killSignals = [];
   const { runtime, baseUrl } = await createStartedRuntime({
