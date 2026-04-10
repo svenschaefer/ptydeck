@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildUnknownTerminalAppIdentity,
+  createTerminalAppIdentityRuntimeState,
+  deriveTerminalAppIdentityCandidateFromOutputHeuristics,
   deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
   deriveTerminalAppIdentityFromTerminalSignals,
   normalizeTerminalAppIdentity,
+  reconcileTerminalAppIdentityRuntimeState,
   terminalAppIdentityEquals
 } from "../src/terminal-app-identity.js";
 
@@ -273,4 +276,99 @@ test("deriveTerminalAppIdentityFromTerminalSignals does not override stronger fo
   assert.equal(identity.family, "coding-agent");
   assert.equal(identity.label, "codex");
   assert.equal(identity.source, "foreground-process");
+});
+
+test("deriveTerminalAppIdentityCandidateFromOutputHeuristics recognizes bounded coding-agent separators", () => {
+  const identity = deriveTerminalAppIdentityCandidateFromOutputHeuristics(
+    "\n────────────────────────────────────────────────────────────────────────────────\n",
+    { updatedAt: 1710000000012 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.source, "output-heuristic");
+});
+
+test("terminal app identity arbitration lets corroborated shell signals override stale explicit coding-agent hints", () => {
+  const initialState = createTerminalAppIdentityRuntimeState(
+    {
+      shell: "/bin/bash",
+      startCommand: "codex"
+    },
+    { updatedAt: 1710000000013 }
+  );
+  const reconciled = reconcileTerminalAppIdentityRuntimeState(
+    initialState,
+    {
+      "foreground-process": {
+        family: "shell",
+        label: "bash",
+        source: "foreground-process",
+        confidence: 0.78,
+        details: {
+          foregroundProcess: {
+            representativeProcess: {
+              executableName: "bash"
+            }
+          }
+        },
+        updatedAt: 1710000000014
+      },
+      "shell-marker": {
+        family: "shell",
+        label: "bash",
+        source: "shell-marker",
+        confidence: 0.78,
+        details: {
+          shellMarkers: {
+            lastMarker: "prompt-start"
+          }
+        },
+        updatedAt: 1710000000014
+      }
+    },
+    {
+      session: {
+        shell: "/bin/bash",
+        startCommand: "codex"
+      },
+      currentIdentity: initialState.current,
+      updatedAt: 1710000000014
+    }
+  );
+
+  assert.equal(reconciled.current.family, "shell");
+  assert.equal(reconciled.current.label, "bash");
+  assert.equal(reconciled.current.source, "foreground-process");
+  assert.deepEqual(reconciled.current.details.arbitration.supportingSources, ["foreground-process", "shell-marker"]);
+});
+
+test("terminal app identity arbitration keeps stronger explicit coding-agent labels over weaker output-only hints", () => {
+  const initialState = createTerminalAppIdentityRuntimeState(
+    {
+      shell: "/bin/bash",
+      startCommand: "codex"
+    },
+    { updatedAt: 1710000000015 }
+  );
+  const reconciled = reconcileTerminalAppIdentityRuntimeState(
+    initialState,
+    {
+      "output-heuristic": deriveTerminalAppIdentityCandidateFromOutputHeuristics("✦ Section\n", {
+        updatedAt: 1710000000016
+      })
+    },
+    {
+      session: {
+        shell: "/bin/bash",
+        startCommand: "codex"
+      },
+      currentIdentity: initialState.current,
+      updatedAt: 1710000000016
+    }
+  );
+
+  assert.equal(reconciled.current.family, "coding-agent");
+  assert.equal(reconciled.current.label, "codex");
+  assert.equal(reconciled.current.source, "explicit-hint");
 });

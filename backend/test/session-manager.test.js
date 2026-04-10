@@ -295,6 +295,84 @@ test("SessionManager applies shell-marker and alternate-screen identity hints fr
   assert.equal(scheduled.length >= 1, true);
 });
 
+test("SessionManager arbitration lets corroborated shell runtime signals override stale explicit coding-agent hints", () => {
+  const fakePty = createFakePty({ pid: 4323, ptyPath: "/dev/pts/11" });
+  const scheduled = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    inspectTerminalForegroundProcess() {
+      return {
+        terminalPid: 4323,
+        foregroundProcessGroupId: 6000,
+        representativeProcess: {
+          pid: 6000,
+          ppid: 4323,
+          executableName: "bash",
+          comm: "bash",
+          name: "bash",
+          executablePath: "/usr/bin/bash",
+          commandLine: ["bash"],
+          ttyPath: "/dev/pts/11"
+        },
+        foregroundProcesses: [],
+        ancestry: []
+      };
+    },
+    setTimeoutFn(fn) {
+      scheduled.push(fn);
+      return fn;
+    },
+    clearTimeoutFn() {}
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "/bin/bash",
+    startCommand: "codex"
+  });
+  assert.equal(created.appIdentity.family, "coding-agent");
+
+  scheduled.length = 0;
+  fakePty.write("\u001b]133;A\u0007");
+  const pendingTimers = [...scheduled];
+  for (const pendingTimer of pendingTimers) {
+    pendingTimer();
+  }
+
+  const current = manager.get(created.id).meta.appIdentity;
+  assert.equal(current.family, "shell");
+  assert.equal(current.label, "bash");
+  assert.equal(current.source, "foreground-process");
+});
+
+test("SessionManager uses bounded output heuristics when no stronger runtime signal exists", () => {
+  const fakePty = createFakePty({ pid: 4324, ptyPath: "/dev/pts/12" });
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    inspectTerminalForegroundProcess() {
+      return null;
+    },
+    setTimeoutFn(fn) {
+      return fn;
+    },
+    clearTimeoutFn() {}
+  });
+  const updates = [];
+  manager.on("session.updated", (event) => updates.push(event));
+
+  const created = manager.create({ cwd: "/tmp", shell: "/bin/bash" });
+  assert.equal(created.appIdentity.family, "shell");
+  updates.length = 0;
+
+  fakePty.write("────────────────────────────────────────────────────────────────────────────────\n");
+
+  const current = manager.get(created.id).meta.appIdentity;
+  assert.equal(current.family, "coding-agent");
+  assert.equal(current.label, "codex");
+  assert.equal(current.source, "output-heuristic");
+  assert.equal(updates.length, 1);
+});
+
 test("SessionManager emits stable exit metadata", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({

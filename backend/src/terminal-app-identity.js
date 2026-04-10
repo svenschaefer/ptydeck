@@ -19,10 +19,42 @@ export const TERMINAL_APP_IDENTITY_SOURCE_VALUES = Object.freeze([
   "output-heuristic"
 ]);
 
+export const TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES = Object.freeze([
+  "explicit-hint",
+  "foreground-process",
+  "shell-marker",
+  "terminal-mode",
+  "output-heuristic"
+]);
+
 const TERMINAL_APP_IDENTITY_FAMILY_SET = new Set(TERMINAL_APP_IDENTITY_FAMILY_VALUES);
 const TERMINAL_APP_IDENTITY_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_SOURCE_VALUES);
+const TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES);
 const SHELL_LABELS = new Set(["bash", "zsh", "fish", "sh"]);
 const BUILD_SUBCOMMAND_PATTERN = "(?:test|build|check|clippy|lint)";
+const OUTPUT_HEURISTIC_MAX_AGE_MS = 10_000;
+const RECENT_CANDIDATE_HISTORY_LIMIT = 12;
+const FAMILY_REPLACEMENT_DELTA = 0.03;
+const LABEL_REPLACEMENT_DELTA = 0.02;
+const TUI_FAMILY_CONTINUITY_DELTA = 0.04;
+
+const SOURCE_PRIORITY_RANK = Object.freeze({
+  unknown: 0,
+  "output-heuristic": 1,
+  "terminal-mode": 2,
+  "shell-marker": 3,
+  "foreground-process": 4,
+  "explicit-hint": 5
+});
+
+const SOURCE_PRIORITY_WEIGHT = Object.freeze({
+  unknown: 0,
+  "output-heuristic": 0.02,
+  "terminal-mode": 0.03,
+  "shell-marker": 0.04,
+  "foreground-process": 0.05,
+  "explicit-hint": 0.06
+});
 
 const EXPLICIT_HINT_MATCHERS = Object.freeze([
   { family: "coding-agent", label: "codex", pattern: /\bcodex\b/i },
@@ -48,6 +80,37 @@ const BUILD_HINT_MATCHERS = Object.freeze([
   { label: "pnpm", pattern: new RegExp(`\\bpnpm\\s+(?:run\\s+)?(${BUILD_SUBCOMMAND_PATTERN})\\b`, "i"), captureSubcommand: true },
   { label: "yarn", pattern: new RegExp(`\\byarn\\s+(${BUILD_SUBCOMMAND_PATTERN})\\b`, "i"), captureSubcommand: true },
   { label: "bun", pattern: new RegExp(`\\bbun\\s+(?:run\\s+)?(${BUILD_SUBCOMMAND_PATTERN})\\b`, "i"), captureSubcommand: true }
+]);
+
+const OUTPUT_HEURISTIC_MATCHERS = Object.freeze([
+  Object.freeze({
+    family: "coding-agent",
+    label: "codex",
+    confidence: 0.48,
+    type: "separator",
+    pattern: /(?:^|\n)\s*─{16,}\s*(?=\n|$)/u
+  }),
+  Object.freeze({
+    family: "coding-agent",
+    label: "gemini",
+    confidence: 0.46,
+    type: "section-marker",
+    pattern: /(?:^|\n)\s*✦(?:\s|$)/u
+  }),
+  Object.freeze({
+    family: "build-test",
+    label: "jest",
+    confidence: 0.44,
+    type: "summary",
+    pattern: /\bTest Suites:\s+\d+\s+(?:failed|passed|total)/i
+  }),
+  Object.freeze({
+    family: "build-test",
+    label: "pytest",
+    confidence: 0.44,
+    type: "summary",
+    pattern: /(?:^|\n)=+\s+\d+\s+(?:passed|failed|error(?:s)?|skipped).+?in\s+[0-9.]+s\s+=+(?:\n|$)/i
+  })
 ]);
 
 function normalizeLabel(value) {
@@ -188,6 +251,33 @@ function buildTerminalModeDetails(signalState, hints = []) {
   };
 }
 
+function buildOutputHeuristicDetails(output, matcher) {
+  return {
+    outputHeuristics: {
+      type: matcher.type,
+      label: matcher.label,
+      preview: normalizeHintText(typeof output === "string" ? output.slice(0, 240) : "")
+    }
+  };
+}
+
+function buildArbitrationDetails(baseDetails, group) {
+  const normalizedBaseDetails =
+    baseDetails && typeof baseDetails === "object" && !Array.isArray(baseDetails)
+      ? normalizeDetailValue(baseDetails)
+      : {};
+  return {
+    ...normalizedBaseDetails,
+    arbitration: {
+      familyScore: group.effectiveScore,
+      supportingSources: group.supportingSources,
+      labelSupportSources: group.labelSupportingSources,
+      candidateCount: group.candidates.length,
+      recentCandidateCount: group.recentCandidateCount
+    }
+  };
+}
+
 function isConfidence(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 }
@@ -197,6 +287,13 @@ function roundConfidence(value) {
     return 0;
   }
   return Math.round(value * 100) / 100;
+}
+
+function clampConfidenceScore(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.round(Math.max(0, Math.min(0.99, value)) * 100) / 100;
 }
 
 function detectBuildHint(text) {
@@ -354,10 +451,7 @@ function buildForegroundProcessIdentity(inspection, updatedAt) {
   const shellLabel = normalizeShellLabel(representativeName);
 
   if (representativeNameHint) {
-    const subcommand =
-      representativeNameHint.subcommand ||
-      representativeCommandLineHint?.subcommand ||
-      "";
+    const subcommand = representativeNameHint.subcommand || representativeCommandLineHint?.subcommand || "";
     return {
       family: representativeNameHint.family,
       label: representativeNameHint.label,
@@ -416,9 +510,7 @@ function buildForegroundProcessIdentity(inspection, updatedAt) {
       label: representativeName,
       source: "foreground-process",
       confidence: 0.52,
-      details: buildForegroundProcessDetails(inspection, [
-        createForegroundProcessHint("representativeProcess", representativeName)
-      ]),
+      details: buildForegroundProcessDetails(inspection, [createForegroundProcessHint("representativeProcess", representativeName)]),
       updatedAt
     };
   }
@@ -426,50 +518,14 @@ function buildForegroundProcessIdentity(inspection, updatedAt) {
   return buildUnknownTerminalAppIdentity(updatedAt);
 }
 
-function buildTerminalSignalIdentity(signalState, session, normalizedExistingIdentity, updatedAt) {
-  const shellLabel =
-    normalizeShellLabel(session?.shell) ||
-    (normalizedExistingIdentity.family === "shell" ? normalizeShellLabel(normalizedExistingIdentity.label) : "");
+function buildShellMarkerIdentity(signalState, session, updatedAt) {
   const hasShellMarker = Number.isInteger(signalState?.lastShellMarkerAt);
   const hasCurrentDirectory = typeof signalState?.currentDirectory === "string" && signalState.currentDirectory.trim().length > 0;
-  const hasAlternateScreen = signalState?.alternateScreenActive === true;
-
-  if (hasAlternateScreen) {
-    if (
-      (normalizedExistingIdentity.source === "foreground-process" && normalizedExistingIdentity.confidence >= 0.75) ||
-      (normalizedExistingIdentity.source === "explicit-hint" &&
-        normalizedExistingIdentity.family !== "shell" &&
-        normalizedExistingIdentity.confidence >= 0.84)
-    ) {
-      return normalizedExistingIdentity;
-    }
-    const family =
-      normalizedExistingIdentity.family === "editor" ||
-      normalizedExistingIdentity.family === "pager" ||
-      normalizedExistingIdentity.family === "tui"
-        ? normalizedExistingIdentity.family
-        : "tui";
-    return {
-      family,
-      label: family === "tui" ? "" : normalizedExistingIdentity.label,
-      source: "terminal-mode",
-      confidence: family === "tui" ? 0.64 : 0.68,
-      details: buildTerminalModeDetails(signalState, [
-        normalizeDetailValue({
-          type: "alternateScreen",
-          code: signalState?.alternateScreenCode,
-          active: true
-        })
-      ]),
-      updatedAt
-    };
-  }
-
   if (!hasShellMarker && !hasCurrentDirectory) {
-    return normalizedExistingIdentity;
+    return buildUnknownTerminalAppIdentity(updatedAt);
   }
-
-  const nextIdentity = {
+  const shellLabel = normalizeShellLabel(session?.shell);
+  return {
     family: "shell",
     label: shellLabel,
     source: "shell-marker",
@@ -484,23 +540,47 @@ function buildTerminalSignalIdentity(signalState, session, normalizedExistingIde
     ]),
     updatedAt
   };
+}
 
-  if (
-    normalizedExistingIdentity.source === "foreground-process" &&
-    normalizedExistingIdentity.family !== "unknown" &&
-    normalizedExistingIdentity.confidence >= nextIdentity.confidence
-  ) {
-    return normalizedExistingIdentity;
+function buildTerminalModeIdentity(signalState, updatedAt) {
+  if (signalState?.alternateScreenActive !== true) {
+    return buildUnknownTerminalAppIdentity(updatedAt);
   }
-  if (
-    normalizedExistingIdentity.source === "explicit-hint" &&
-    normalizedExistingIdentity.family !== "unknown" &&
-    normalizedExistingIdentity.family !== "shell" &&
-    normalizedExistingIdentity.confidence >= nextIdentity.confidence
-  ) {
-    return normalizedExistingIdentity;
+  return {
+    family: "tui",
+    label: "",
+    source: "terminal-mode",
+    confidence: 0.64,
+    details: buildTerminalModeDetails(signalState, [
+      normalizeDetailValue({
+        type: "alternateScreen",
+        code: signalState?.alternateScreenCode,
+        active: true
+      })
+    ]),
+    updatedAt
+  };
+}
+
+function buildOutputHeuristicIdentity(output, updatedAt) {
+  const normalizedOutput = typeof output === "string" ? output : "";
+  if (!normalizedOutput.trim()) {
+    return buildUnknownTerminalAppIdentity(updatedAt);
   }
-  return nextIdentity;
+  for (const matcher of OUTPUT_HEURISTIC_MATCHERS) {
+    if (!matcher.pattern.test(normalizedOutput)) {
+      continue;
+    }
+    return {
+      family: matcher.family,
+      label: matcher.label,
+      source: "output-heuristic",
+      confidence: matcher.confidence,
+      details: buildOutputHeuristicDetails(normalizedOutput, matcher),
+      updatedAt
+    };
+  }
+  return buildUnknownTerminalAppIdentity(updatedAt);
 }
 
 export function buildUnknownTerminalAppIdentity(updatedAt = Date.now()) {
@@ -550,6 +630,416 @@ export function terminalAppIdentityEquals(left, right, { includeUpdatedAt = true
   );
 }
 
+function buildUnknownCandidateMap(updatedAt) {
+  return Object.fromEntries(
+    TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES.map((source) => [source, buildUnknownTerminalAppIdentity(updatedAt)])
+  );
+}
+
+function createRecentCandidateEntry(source, candidate, observedAt) {
+  return normalizeDetailValue({
+    source,
+    candidateSource: candidate?.source || "unknown",
+    family: candidate?.family || "unknown",
+    label: candidate?.label || "",
+    confidence: isConfidence(candidate?.confidence) ? roundConfidence(candidate.confidence) : 0,
+    observedAt: Number.isInteger(observedAt) ? observedAt : null
+  });
+}
+
+export function createTerminalAppIdentityRuntimeState(
+  session,
+  { currentIdentity = null, updatedAt = Date.now() } = {}
+) {
+  const normalizedUpdatedAt = Number.isInteger(updatedAt) ? updatedAt : Date.now();
+  const explicitCandidate = buildExplicitHintIdentity(session, normalizedUpdatedAt);
+  const initialCurrent = normalizeTerminalAppIdentity(currentIdentity || explicitCandidate, {
+    fallbackUpdatedAt: normalizedUpdatedAt
+  });
+  const candidates = {
+    ...buildUnknownCandidateMap(normalizedUpdatedAt),
+    "explicit-hint": explicitCandidate
+  };
+  if (
+    initialCurrent.source !== "unknown" &&
+    Object.prototype.hasOwnProperty.call(candidates, initialCurrent.source)
+  ) {
+    candidates[initialCurrent.source] = initialCurrent;
+  }
+  return {
+    current: initialCurrent,
+    candidates,
+    recentCandidates:
+      explicitCandidate.source === "unknown"
+        ? []
+        : [createRecentCandidateEntry("explicit-hint", explicitCandidate, normalizedUpdatedAt)],
+    lastForegroundProbeAt: 0,
+    lastOutputHintAt: 0
+  };
+}
+
+export function normalizeTerminalAppIdentityRuntimeState(
+  input,
+  { session = null, currentIdentity = null, updatedAt = Date.now() } = {}
+) {
+  const fallback = createTerminalAppIdentityRuntimeState(session, {
+    currentIdentity,
+    updatedAt
+  });
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return fallback;
+  }
+  const normalizedCandidates = buildUnknownCandidateMap(updatedAt);
+  const rawCandidates = input.candidates && typeof input.candidates === "object" && !Array.isArray(input.candidates) ? input.candidates : {};
+  for (const source of TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES) {
+    normalizedCandidates[source] = normalizeTerminalAppIdentity(rawCandidates[source], { fallbackUpdatedAt: updatedAt });
+  }
+  if (normalizedCandidates["explicit-hint"].source === "unknown") {
+    normalizedCandidates["explicit-hint"] = fallback.candidates["explicit-hint"];
+  }
+  return {
+    current: normalizeTerminalAppIdentity(input.current || currentIdentity || fallback.current, {
+      fallbackUpdatedAt: updatedAt
+    }),
+    candidates: normalizedCandidates,
+    recentCandidates: Array.isArray(input.recentCandidates)
+      ? input.recentCandidates
+          .map((entry) => normalizeDetailValue(entry))
+          .filter((entry) => entry && typeof entry === "object")
+          .slice(-RECENT_CANDIDATE_HISTORY_LIMIT)
+      : fallback.recentCandidates,
+    lastForegroundProbeAt: Number.isInteger(input.lastForegroundProbeAt) ? input.lastForegroundProbeAt : 0,
+    lastOutputHintAt: Number.isInteger(input.lastOutputHintAt) ? input.lastOutputHintAt : 0
+  };
+}
+
+function getCandidateEffectiveScore(candidate, { updatedAt, lastOutputHintAt = 0 } = {}) {
+  const normalizedCandidate = normalizeTerminalAppIdentity(candidate, { fallbackUpdatedAt: updatedAt });
+  if (normalizedCandidate.family === "unknown" || normalizedCandidate.source === "unknown") {
+    return -1;
+  }
+  if (normalizedCandidate.source === "output-heuristic") {
+    const referenceAt = Number.isInteger(normalizedCandidate.updatedAt)
+      ? normalizedCandidate.updatedAt
+      : Number.isInteger(lastOutputHintAt)
+        ? lastOutputHintAt
+        : 0;
+    if (!referenceAt || updatedAt - referenceAt > OUTPUT_HEURISTIC_MAX_AGE_MS) {
+      return -1;
+    }
+  }
+  return clampConfidenceScore(normalizedCandidate.confidence + (SOURCE_PRIORITY_WEIGHT[normalizedCandidate.source] || 0));
+}
+
+function compareCandidateEntries(left, right) {
+  const effectiveDelta = right.effectiveScore - left.effectiveScore;
+  if (effectiveDelta !== 0) {
+    return effectiveDelta;
+  }
+  const confidenceDelta = right.candidate.confidence - left.candidate.confidence;
+  if (confidenceDelta !== 0) {
+    return confidenceDelta;
+  }
+  const priorityDelta = (SOURCE_PRIORITY_RANK[right.candidate.source] || 0) - (SOURCE_PRIORITY_RANK[left.candidate.source] || 0);
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+  return left.candidate.label.localeCompare(right.candidate.label, "en-US", { sensitivity: "base" });
+}
+
+function buildArbitrationGroups(candidateMap, { updatedAt, recentCandidates = [], lastOutputHintAt = 0 } = {}) {
+  const groups = new Map();
+  for (const source of TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES) {
+    const candidate = normalizeTerminalAppIdentity(candidateMap?.[source], { fallbackUpdatedAt: updatedAt });
+    const effectiveScore = getCandidateEffectiveScore(candidate, { updatedAt, lastOutputHintAt });
+    if (effectiveScore < 0) {
+      continue;
+    }
+    const entry = { source, candidate, effectiveScore };
+    let group = groups.get(candidate.family);
+    if (!group) {
+      group = {
+        family: candidate.family,
+        candidates: [],
+        labels: new Map(),
+        recentCandidateCount: recentCandidates.length
+      };
+      groups.set(candidate.family, group);
+    }
+    group.candidates.push(entry);
+    const labelKey = candidate.label || "";
+    if (!group.labels.has(labelKey)) {
+      group.labels.set(labelKey, {
+        label: labelKey,
+        candidates: []
+      });
+    }
+    group.labels.get(labelKey).candidates.push(entry);
+  }
+
+  const normalizedGroups = Array.from(groups.values()).map((group) => {
+    group.candidates.sort(compareCandidateEntries);
+    const supportingSources = Array.from(new Set(group.candidates.map((entry) => entry.candidate.source))).sort(
+      (left, right) => (SOURCE_PRIORITY_RANK[right] || 0) - (SOURCE_PRIORITY_RANK[left] || 0)
+    );
+    const topEntry = group.candidates[0];
+    const supportBonus = Math.min(0.12, (group.candidates.length - 1) * 0.08);
+    const effectiveScore = clampConfidenceScore(topEntry.effectiveScore + supportBonus);
+    const labelGroups = Array.from(group.labels.values()).map((labelGroup) => {
+      labelGroup.candidates.sort(compareCandidateEntries);
+      const labelTopEntry = labelGroup.candidates[0];
+      const labelSupportBonus = labelGroup.label ? Math.min(0.08, (labelGroup.candidates.length - 1) * 0.06) : 0;
+      const labelEffectiveScore = clampConfidenceScore(labelTopEntry.effectiveScore + labelSupportBonus);
+      const labelSupportingSources = Array.from(new Set(labelGroup.candidates.map((entry) => entry.candidate.source))).sort(
+        (left, right) => (SOURCE_PRIORITY_RANK[right] || 0) - (SOURCE_PRIORITY_RANK[left] || 0)
+      );
+      return {
+        ...labelGroup,
+        topEntry: labelTopEntry,
+        labelEffectiveScore,
+        labelSupportingSources
+      };
+    });
+    labelGroups.sort((left, right) => {
+      const effectiveDelta = right.labelEffectiveScore - left.labelEffectiveScore;
+      if (effectiveDelta !== 0) {
+        return effectiveDelta;
+      }
+      if (left.label && !right.label) {
+        return -1;
+      }
+      if (!left.label && right.label) {
+        return 1;
+      }
+      return left.label.localeCompare(right.label, "en-US", { sensitivity: "base" });
+    });
+    const bestLabelGroup = labelGroups[0];
+    const resolvedLabel =
+      bestLabelGroup && bestLabelGroup.label && bestLabelGroup.labelEffectiveScore >= effectiveScore - 0.08
+        ? bestLabelGroup.label
+        : "";
+    const resolvedLabelGroup =
+      labelGroups.find((labelGroup) => labelGroup.label === resolvedLabel) || bestLabelGroup || { candidates: group.candidates, labelSupportingSources: [] };
+    const resolvedTopEntry = resolvedLabelGroup.topEntry || topEntry;
+    const resolvedConfidence = roundConfidence(
+      Math.min(0.99, resolvedTopEntry.candidate.confidence + Math.min(0.12, (group.candidates.length - 1) * 0.06))
+    );
+    return {
+      family: group.family,
+      candidates: group.candidates,
+      topEntry,
+      effectiveScore,
+      resolvedLabel,
+      resolvedTopEntry,
+      resolvedConfidence,
+      supportingSources,
+      labelSupportingSources: resolvedLabelGroup.labelSupportingSources || [],
+      recentCandidateCount: group.recentCandidateCount
+    };
+  });
+
+  normalizedGroups.sort((left, right) => {
+    const effectiveDelta = right.effectiveScore - left.effectiveScore;
+    if (effectiveDelta !== 0) {
+      return effectiveDelta;
+    }
+    const priorityDelta =
+      (SOURCE_PRIORITY_RANK[right.resolvedTopEntry?.candidate?.source] || 0) -
+      (SOURCE_PRIORITY_RANK[left.resolvedTopEntry?.candidate?.source] || 0);
+    if (priorityDelta !== 0) {
+      return priorityDelta;
+    }
+    return left.family.localeCompare(right.family, "en-US", { sensitivity: "base" });
+  });
+
+  return normalizedGroups;
+}
+
+function buildIdentityFromGroup(group, updatedAt) {
+  const topCandidate = normalizeTerminalAppIdentity(group?.resolvedTopEntry?.candidate, { fallbackUpdatedAt: updatedAt });
+  if (topCandidate.family === "unknown" || topCandidate.source === "unknown") {
+    return buildUnknownTerminalAppIdentity(updatedAt);
+  }
+  return {
+    family: group.family,
+    label: group.resolvedLabel,
+    source: topCandidate.source,
+    confidence: group.resolvedConfidence,
+    details: buildArbitrationDetails(topCandidate.details, group),
+    updatedAt
+  };
+}
+
+function getCurrentReferenceScore(currentIdentity, groups, { candidateMap = null, updatedAt, lastOutputHintAt = 0 } = {}) {
+  const normalizedCurrent = normalizeTerminalAppIdentity(currentIdentity, { fallbackUpdatedAt: updatedAt });
+  if (normalizedCurrent.family === "unknown" || normalizedCurrent.source === "unknown") {
+    return -1;
+  }
+  if (TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_SET.has(normalizedCurrent.source)) {
+    const sourceCandidate = normalizeTerminalAppIdentity(candidateMap?.[normalizedCurrent.source], {
+      fallbackUpdatedAt: updatedAt
+    });
+    if (!terminalAppIdentityEquals(sourceCandidate, normalizedCurrent, { includeUpdatedAt: false })) {
+      return -1;
+    }
+  }
+  const matchingGroup = groups.find((group) => group.family === normalizedCurrent.family);
+  if (matchingGroup) {
+    return matchingGroup.effectiveScore;
+  }
+  return Math.max(-1, getCandidateEffectiveScore(normalizedCurrent, { updatedAt, lastOutputHintAt }) - 0.04);
+}
+
+function selectArbitratedIdentity(candidateMap, { currentIdentity = null, recentCandidates = [], updatedAt = Date.now(), lastOutputHintAt = 0 } = {}) {
+  const groups = buildArbitrationGroups(candidateMap, {
+    updatedAt,
+    recentCandidates,
+    lastOutputHintAt
+  });
+  const normalizedCurrent = normalizeTerminalAppIdentity(currentIdentity, { fallbackUpdatedAt: updatedAt });
+  if (!groups.length) {
+    return normalizedCurrent.source !== "unknown" ? normalizedCurrent : buildUnknownTerminalAppIdentity(updatedAt);
+  }
+  const winner = groups[0];
+  if (normalizedCurrent.family === "unknown" || normalizedCurrent.source === "unknown") {
+    return buildIdentityFromGroup(winner, updatedAt);
+  }
+  const currentScore = getCurrentReferenceScore(normalizedCurrent, groups, {
+    candidateMap,
+    updatedAt,
+    lastOutputHintAt
+  });
+  const bestSpecificGroup = groups.find((group) => group.family !== "shell" && group.family !== "unknown");
+  const winnerDynamicSupportCount = winner.supportingSources.filter(
+    (source) => source === "foreground-process" || source === "shell-marker" || source === "terminal-mode"
+  ).length;
+  const terminalModeGroup = groups.find(
+    (group) => group.resolvedTopEntry?.candidate?.source === "terminal-mode" && group.family === "tui"
+  );
+  if (
+    terminalModeGroup &&
+    (
+      (winner.family === "shell" && terminalModeGroup.effectiveScore >= winner.effectiveScore - 0.2) ||
+      ((normalizedCurrent.family === "shell" || normalizedCurrent.family === "unknown") &&
+        terminalModeGroup.effectiveScore >= currentScore - 0.12)
+    )
+  ) {
+    return buildIdentityFromGroup(terminalModeGroup, updatedAt);
+  }
+  if (
+    winner.family !== normalizedCurrent.family &&
+    normalizedCurrent.source === "explicit-hint" &&
+    winnerDynamicSupportCount >= 2 &&
+    winner.effectiveScore >= currentScore - 0.12
+  ) {
+    return buildIdentityFromGroup(winner, updatedAt);
+  }
+  if (
+    normalizedCurrent.family === "shell" &&
+    bestSpecificGroup &&
+    bestSpecificGroup.effectiveScore >= currentScore - 0.22
+  ) {
+    return buildIdentityFromGroup(bestSpecificGroup, updatedAt);
+  }
+  if (winner.family !== normalizedCurrent.family && winner.effectiveScore < currentScore + FAMILY_REPLACEMENT_DELTA) {
+    return normalizedCurrent;
+  }
+  if (
+    winner.family === normalizedCurrent.family &&
+    winner.resolvedLabel !== normalizedCurrent.label &&
+    winner.effectiveScore < currentScore + LABEL_REPLACEMENT_DELTA
+  ) {
+    return normalizedCurrent;
+  }
+  if (
+    winner.family === "tui" &&
+    (normalizedCurrent.family === "editor" || normalizedCurrent.family === "pager" || normalizedCurrent.family === "tui") &&
+    winner.effectiveScore < currentScore + TUI_FAMILY_CONTINUITY_DELTA
+  ) {
+    return normalizedCurrent;
+  }
+  return buildIdentityFromGroup(winner, updatedAt);
+}
+
+export function reconcileTerminalAppIdentityRuntimeState(
+  state,
+  updates,
+  { session = null, currentIdentity = null, updatedAt = Date.now() } = {}
+) {
+  const normalizedUpdatedAt = Number.isInteger(updatedAt) ? updatedAt : Date.now();
+  const normalizedState = normalizeTerminalAppIdentityRuntimeState(state, {
+    session,
+    currentIdentity,
+    updatedAt: normalizedUpdatedAt
+  });
+  const nextState = {
+    ...normalizedState,
+    candidates: {
+      ...normalizedState.candidates
+    },
+    recentCandidates: [...normalizedState.recentCandidates]
+  };
+  const normalizedUpdates = updates && typeof updates === "object" && !Array.isArray(updates) ? updates : {};
+
+  for (const source of TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES) {
+    if (!Object.prototype.hasOwnProperty.call(normalizedUpdates, source)) {
+      continue;
+    }
+    const nextCandidate = normalizeTerminalAppIdentity(normalizedUpdates[source], {
+      fallbackUpdatedAt: normalizedUpdatedAt
+    });
+    const previousCandidate = normalizeTerminalAppIdentity(nextState.candidates[source], {
+      fallbackUpdatedAt: normalizedUpdatedAt
+    });
+    nextState.candidates[source] = nextCandidate;
+    if (!terminalAppIdentityEquals(previousCandidate, nextCandidate)) {
+      nextState.recentCandidates.push(createRecentCandidateEntry(source, nextCandidate, normalizedUpdatedAt));
+      nextState.recentCandidates = nextState.recentCandidates.slice(-RECENT_CANDIDATE_HISTORY_LIMIT);
+    }
+    if (source === "foreground-process") {
+      nextState.lastForegroundProbeAt = normalizedUpdatedAt;
+    }
+    if (source === "output-heuristic" && nextCandidate.source === "output-heuristic") {
+      nextState.lastOutputHintAt = normalizedUpdatedAt;
+    }
+  }
+
+  const resolvedCurrent = selectArbitratedIdentity(nextState.candidates, {
+    currentIdentity: currentIdentity || normalizedState.current,
+    recentCandidates: nextState.recentCandidates,
+    updatedAt: normalizedUpdatedAt,
+    lastOutputHintAt: nextState.lastOutputHintAt
+  });
+  nextState.current = resolvedCurrent;
+  return {
+    state: nextState,
+    current: resolvedCurrent
+  };
+}
+
+export function deriveTerminalAppIdentityCandidateFromSessionHints(session, { updatedAt = Date.now() } = {}) {
+  return buildExplicitHintIdentity(session, updatedAt);
+}
+
+export function deriveTerminalAppIdentityCandidateFromForegroundProcess(inspection, { updatedAt = Date.now() } = {}) {
+  return buildForegroundProcessIdentity(inspection, updatedAt);
+}
+
+export function deriveTerminalAppIdentityCandidatesFromTerminalSignals(
+  signalState,
+  session,
+  { updatedAt = Date.now() } = {}
+) {
+  return {
+    "shell-marker": buildShellMarkerIdentity(signalState, session, updatedAt),
+    "terminal-mode": buildTerminalModeIdentity(signalState, updatedAt)
+  };
+}
+
+export function deriveTerminalAppIdentityCandidateFromOutputHeuristics(output, { updatedAt = Date.now() } = {}) {
+  return buildOutputHeuristicIdentity(output, updatedAt);
+}
+
 export function deriveTerminalAppIdentityFromSessionHints(session, { existingIdentity = null, updatedAt = Date.now() } = {}) {
   const nextIdentity = buildExplicitHintIdentity(session, updatedAt);
   const normalizedExistingIdentity = normalizeTerminalAppIdentity(existingIdentity, {
@@ -583,12 +1073,24 @@ export function deriveTerminalAppIdentityFromTerminalSignals(
   session,
   { existingIdentity = null, updatedAt = Date.now() } = {}
 ) {
+  const runtimeState = createTerminalAppIdentityRuntimeState(session, {
+    currentIdentity: existingIdentity,
+    updatedAt
+  });
+  const reconciled = reconcileTerminalAppIdentityRuntimeState(
+    runtimeState,
+    deriveTerminalAppIdentityCandidatesFromTerminalSignals(signalState, session, { updatedAt }),
+    {
+      session,
+      currentIdentity: existingIdentity,
+      updatedAt
+    }
+  );
   const normalizedExistingIdentity = normalizeTerminalAppIdentity(existingIdentity, {
     fallbackUpdatedAt: Number.isInteger(updatedAt) ? updatedAt : Date.now()
   });
-  const nextIdentity = buildTerminalSignalIdentity(signalState, session, normalizedExistingIdentity, updatedAt);
-  if (terminalAppIdentityEquals(normalizedExistingIdentity, nextIdentity, { includeUpdatedAt: false })) {
+  if (terminalAppIdentityEquals(normalizedExistingIdentity, reconciled.current, { includeUpdatedAt: false })) {
     return normalizedExistingIdentity;
   }
-  return nextIdentity;
+  return reconciled.current;
 }

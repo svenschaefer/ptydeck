@@ -9,10 +9,16 @@ import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.j
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
+  createTerminalAppIdentityRuntimeState,
+  deriveTerminalAppIdentityCandidateFromForegroundProcess,
+  deriveTerminalAppIdentityCandidateFromOutputHeuristics,
+  deriveTerminalAppIdentityCandidateFromSessionHints,
+  deriveTerminalAppIdentityCandidatesFromTerminalSignals,
   deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
-  deriveTerminalAppIdentityFromTerminalSignals,
+  normalizeTerminalAppIdentityRuntimeState,
   normalizeTerminalAppIdentity,
+  reconcileTerminalAppIdentityRuntimeState,
   terminalAppIdentityEquals
 } from "./terminal-app-identity.js";
 import { inspectLinuxTerminalForegroundProcess } from "./terminal-foreground-process.js";
@@ -884,14 +890,27 @@ export class SessionManager {
         return trace;
       };
       const signalResult = this.observeSessionTerminalSignals(session, data, {
-        emitUpdatedEvent: true,
-        updatedAt: getTimestamp(),
-        trace: getTrace()
+        updatedAt: getTimestamp()
       });
       const streamResult = session.shellAdapter.consumeOutput(session, data);
       const cleaned = typeof streamResult?.cleaned === "string" ? streamResult.cleaned : "";
       const promptBoundaries = Array.isArray(streamResult?.promptBoundaries) ? streamResult.promptBoundaries : [];
+      const outputHintResult = cleaned
+        ? this.observeSessionOutputHeuristics(session, cleaned, {
+            updatedAt: getTimestamp()
+          })
+        : {
+            candidateMatched: false,
+            appIdentityChanged: false,
+            metaChanged: false
+          };
       if (!cleaned && promptBoundaries.length > 0) {
+        if (signalResult.metaChanged) {
+          this.emitSessionUpdated(session, {
+            trace: getTrace(),
+            updatedAt: getTimestamp()
+          });
+        }
         this.appendReplayOutput(session, "", promptBoundaries);
         this.events.emit("session.data", {
           sessionId: session.id,
@@ -916,6 +935,12 @@ export class SessionManager {
         } else {
           session.meta.updatedAt = activityTimestamp;
         }
+        if (signalResult.metaChanged || outputHintResult.metaChanged) {
+          this.emitSessionUpdated(session, {
+            trace: getTrace(),
+            updatedAt: activityTimestamp
+          });
+        }
         this.appendReplayOutput(session, cleaned, promptBoundaries);
         this.scheduleSessionActivityCompletion(session);
         this.events.emit("session.data", {
@@ -929,6 +954,12 @@ export class SessionManager {
           trace: getTrace()
         });
       } else if (signalResult.signals.length > 0) {
+        if (signalResult.metaChanged) {
+          this.emitSessionUpdated(session, {
+            trace: getTrace(),
+            updatedAt: getTimestamp()
+          });
+        }
         this.scheduleSessionForegroundProcessIdentityRefresh(session, {
           delayMs: this.foregroundProcessRefreshDelayMs,
           trace: getTrace()
@@ -1243,6 +1274,23 @@ export class SessionManager {
     return session;
   }
 
+  emitSessionUpdated(session, { trace = null, updatedAt = this.nowFn() } = {}) {
+    const updateTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId: session.id,
+      source: trace?.source || session.traceSeed?.source || "runtime"
+    });
+    this.updateSessionTraceSeed(session, updateTrace, {
+      sessionId: session.id,
+      source: updateTrace.source || "runtime"
+    });
+    session.meta.updatedAt = updatedAt;
+    this.events.emit("session.updated", {
+      session: session.meta,
+      trace: updateTrace
+    });
+    return updateTrace;
+  }
+
   applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
     const currentIdentity = normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
       fallbackUpdatedAt: updatedAt
@@ -1250,6 +1298,43 @@ export class SessionManager {
     const normalizedNextIdentity = normalizeTerminalAppIdentity(nextIdentity, {
       fallbackUpdatedAt: updatedAt
     });
+    const runtimeState = normalizeTerminalAppIdentityRuntimeState(session?.appIdentityState, {
+      session: session?.meta,
+      currentIdentity,
+      updatedAt
+    });
+    const nextRuntimeState = {
+      ...runtimeState,
+      current: normalizedNextIdentity,
+      candidates: {
+        ...runtimeState.candidates
+      },
+      recentCandidates: [...runtimeState.recentCandidates]
+    };
+    if (normalizedNextIdentity.source !== "unknown" && Object.prototype.hasOwnProperty.call(nextRuntimeState.candidates, normalizedNextIdentity.source)) {
+      const previousCandidate = normalizeTerminalAppIdentity(nextRuntimeState.candidates[normalizedNextIdentity.source], {
+        fallbackUpdatedAt: updatedAt
+      });
+      nextRuntimeState.candidates[normalizedNextIdentity.source] = normalizedNextIdentity;
+      if (!terminalAppIdentityEquals(previousCandidate, normalizedNextIdentity)) {
+        nextRuntimeState.recentCandidates.push({
+          source: normalizedNextIdentity.source,
+          candidateSource: normalizedNextIdentity.source,
+          family: normalizedNextIdentity.family,
+          label: normalizedNextIdentity.label,
+          confidence: normalizedNextIdentity.confidence,
+          observedAt: updatedAt
+        });
+        nextRuntimeState.recentCandidates = nextRuntimeState.recentCandidates.slice(-12);
+      }
+      if (normalizedNextIdentity.source === "foreground-process") {
+        nextRuntimeState.lastForegroundProbeAt = updatedAt;
+      }
+      if (normalizedNextIdentity.source === "output-heuristic") {
+        nextRuntimeState.lastOutputHintAt = updatedAt;
+      }
+    }
+    session.appIdentityState = nextRuntimeState;
     if (terminalAppIdentityEquals(currentIdentity, normalizedNextIdentity, { includeUpdatedAt: false })) {
       session.meta.appIdentity = currentIdentity;
       return session.meta.appIdentity;
@@ -1257,34 +1342,71 @@ export class SessionManager {
     session.meta.appIdentity = normalizedNextIdentity;
     session.meta.updatedAt = updatedAt;
     if (emitUpdatedEvent) {
-      const updateTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
-        sessionId: session.id,
-        source: trace?.source || session.traceSeed?.source || "runtime"
-      });
-      this.updateSessionTraceSeed(session, updateTrace, {
-        sessionId: session.id,
-        source: updateTrace.source || "runtime"
-      });
-      this.events.emit("session.updated", {
-        session: session.meta,
-        trace: updateTrace
+      this.emitSessionUpdated(session, {
+        trace,
+        updatedAt
       });
     }
     return session.meta.appIdentity;
   }
 
+  reconcileSessionAppIdentity(
+    session,
+    candidateUpdates,
+    { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn(), metaChanged = false } = {}
+  ) {
+    const currentIdentity = normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
+      fallbackUpdatedAt: updatedAt
+    });
+    const currentState = normalizeTerminalAppIdentityRuntimeState(session?.appIdentityState, {
+      session: session?.meta,
+      currentIdentity,
+      updatedAt
+    });
+    const reconciled = reconcileTerminalAppIdentityRuntimeState(currentState, candidateUpdates, {
+      session: session?.meta,
+      currentIdentity,
+      updatedAt
+    });
+    session.appIdentityState = reconciled.state;
+    const identityChanged = !terminalAppIdentityEquals(currentIdentity, reconciled.current, { includeUpdatedAt: false });
+    session.meta.appIdentity = identityChanged ? reconciled.current : currentIdentity;
+    const nextMetaChanged = metaChanged || identityChanged;
+    if (nextMetaChanged) {
+      session.meta.updatedAt = updatedAt;
+    }
+    if (emitUpdatedEvent && nextMetaChanged) {
+      this.emitSessionUpdated(session, {
+        trace,
+        updatedAt
+      });
+    }
+    return {
+      identity: session.meta.appIdentity,
+      identityChanged,
+      metaChanged: nextMetaChanged,
+      state: session.appIdentityState
+    };
+  }
+
   refreshSessionAppIdentity(sessionId, options = {}) {
     const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
     const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
-    const nextIdentity = deriveTerminalAppIdentityFromSessionHints(session.meta, {
-      existingIdentity: session.meta.appIdentity,
+    const nextCandidate = deriveTerminalAppIdentityCandidateFromSessionHints(session.meta, {
       updatedAt
     });
-    return this.applySessionAppIdentity(session, nextIdentity, {
-      emitUpdatedEvent: options.emitUpdatedEvent === true,
-      trace: options.trace || null,
-      updatedAt
-    });
+    const reconciled = this.reconcileSessionAppIdentity(
+      session,
+      {
+        "explicit-hint": nextCandidate
+      },
+      {
+        emitUpdatedEvent: options.emitUpdatedEvent === true,
+        trace: options.trace || null,
+        updatedAt
+      }
+    );
+    return reconciled.identity;
   }
 
   setSessionAppIdentity(sessionId, appIdentity, options = {}) {
@@ -1310,15 +1432,21 @@ export class SessionManager {
       ptyPath: session.ptyProcess._pty || "",
       updatedAt
     });
-    const nextIdentity = deriveTerminalAppIdentityFromForegroundProcess(inspection, {
-      existingIdentity: session.meta.appIdentity,
+    const nextCandidate = deriveTerminalAppIdentityCandidateFromForegroundProcess(inspection, {
       updatedAt
     });
-    return this.applySessionAppIdentity(session, nextIdentity, {
-      emitUpdatedEvent: options.emitUpdatedEvent === true,
-      trace: options.trace || null,
-      updatedAt
-    });
+    const reconciled = this.reconcileSessionAppIdentity(
+      session,
+      {
+        "foreground-process": nextCandidate
+      },
+      {
+        emitUpdatedEvent: options.emitUpdatedEvent === true,
+        trace: options.trace || null,
+        updatedAt
+      }
+    );
+    return reconciled.identity;
   }
 
   observeSessionTerminalSignals(session, chunk, options = {}) {
@@ -1338,7 +1466,8 @@ export class SessionManager {
       return {
         ...result,
         appIdentityChanged: false,
-        cwdChanged: false
+        cwdChanged: false,
+        metaChanged: false
       };
     }
     const nextCwd = typeof result.state.currentDirectory === "string" ? result.state.currentDirectory.trim() : "";
@@ -1347,22 +1476,60 @@ export class SessionManager {
       session.meta.cwd = nextCwd;
       session.meta.updatedAt = updatedAt;
     }
-    const previousIdentity = normalizeTerminalAppIdentity(session.meta.appIdentity, {
-      fallbackUpdatedAt: updatedAt
-    });
-    const nextIdentity = deriveTerminalAppIdentityFromTerminalSignals(result.state, session.meta, {
-      existingIdentity: previousIdentity,
-      updatedAt
-    });
-    const appliedIdentity = this.applySessionAppIdentity(session, nextIdentity, {
-      emitUpdatedEvent: options.emitUpdatedEvent === true,
-      trace: options.trace || null,
-      updatedAt
-    });
+    const reconciled = this.reconcileSessionAppIdentity(
+      session,
+      deriveTerminalAppIdentityCandidatesFromTerminalSignals(result.state, session.meta, {
+        updatedAt
+      }),
+      {
+        emitUpdatedEvent: options.emitUpdatedEvent === true,
+        trace: options.trace || null,
+        updatedAt,
+        metaChanged: cwdChanged
+      }
+    );
     return {
       ...result,
-      appIdentityChanged: !terminalAppIdentityEquals(previousIdentity, appliedIdentity),
-      cwdChanged
+      appIdentityChanged: reconciled.identityChanged,
+      cwdChanged,
+      metaChanged: reconciled.metaChanged
+    };
+  }
+
+  observeSessionOutputHeuristics(session, output, options = {}) {
+    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
+    if (!session) {
+      return {
+        candidateMatched: false,
+        appIdentityChanged: false,
+        metaChanged: false
+      };
+    }
+    const nextCandidate = deriveTerminalAppIdentityCandidateFromOutputHeuristics(output, {
+      updatedAt
+    });
+    if (nextCandidate.source !== "output-heuristic") {
+      return {
+        candidateMatched: false,
+        appIdentityChanged: false,
+        metaChanged: false
+      };
+    }
+    const reconciled = this.reconcileSessionAppIdentity(
+      session,
+      {
+        "output-heuristic": nextCandidate
+      },
+      {
+        emitUpdatedEvent: options.emitUpdatedEvent === true,
+        trace: options.trace || null,
+        updatedAt
+      }
+    );
+    return {
+      candidateMatched: true,
+      appIdentityChanged: reconciled.identityChanged,
+      metaChanged: reconciled.metaChanged
     };
   }
 
@@ -1509,10 +1676,31 @@ export class SessionManager {
     });
 
     const initialReplayOutput = this.buildReplayRetentionResult(replayOutput);
+    const initialAppIdentity = deriveTerminalAppIdentityFromSessionHints(
+      {
+        kind: normalizedKind,
+        shell: normalizedShell,
+        ...(typeof name === "string" ? { name } : {}),
+        startCommand: normalizedStartCommand
+      },
+      { updatedAt: updatedTimestamp }
+    );
     const session = {
       id,
       ptyProcess: null,
       shellAdapter: null,
+      appIdentityState: createTerminalAppIdentityRuntimeState(
+        {
+          kind: normalizedKind,
+          shell: normalizedShell,
+          ...(typeof name === "string" ? { name } : {}),
+          startCommand: normalizedStartCommand
+        },
+        {
+          currentIdentity: initialAppIdentity,
+          updatedAt: updatedTimestamp
+        }
+      ),
       terminalSignalState: createEmptyTerminalSignalState(),
       cwdTrackingBuffer: "",
       outputBuffer: initialReplayOutput.value,
@@ -1556,15 +1744,7 @@ export class SessionManager {
         themeProfile: normalizedThemeSlots.themeProfile,
         activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
         inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
-        appIdentity: deriveTerminalAppIdentityFromSessionHints(
-          {
-            kind: normalizedKind,
-            shell: normalizedShell,
-            ...(typeof name === "string" ? { name } : {}),
-            startCommand: normalizedStartCommand
-          },
-          { updatedAt: updatedTimestamp }
-        ),
+        appIdentity: initialAppIdentity,
         state: SESSION_STATE_STARTING,
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
@@ -1785,10 +1965,10 @@ export class SessionManager {
     }
     const updatedAt = this.nowFn();
     session.meta.updatedAt = updatedAt;
-    session.meta.appIdentity = deriveTerminalAppIdentityFromSessionHints(session.meta, {
-      existingIdentity: session.meta.appIdentity,
+    const refreshedIdentity = this.refreshSessionAppIdentity(session, {
       updatedAt
     });
+    session.meta.appIdentity = refreshedIdentity;
     return session.meta;
   }
 
