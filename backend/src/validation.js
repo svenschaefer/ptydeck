@@ -5,6 +5,10 @@ import {
   SESSION_INPUT_SAFETY_PROFILE_KEYS
 } from "./session-input-safety-profile.js";
 import { SESSION_MOUSE_FORWARDING_MODE_VALUES } from "./session-mouse-forwarding.js";
+import {
+  TERMINAL_APP_IDENTITY_FAMILY_VALUES,
+  TERMINAL_APP_IDENTITY_SOURCE_VALUES
+} from "./terminal-app-identity.js";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -35,6 +39,8 @@ const THEME_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const CUSTOM_COMMAND_SCOPE_VALUES = new Set(["global", "project", "session"]);
 const SESSION_KIND_VALUES = new Set(["local", "ssh"]);
 const REMOTE_AUTH_METHOD_VALUES = new Set(["password", "privateKey", "keyboardInteractive"]);
+const TERMINAL_APP_IDENTITY_FAMILY_SET = new Set(TERMINAL_APP_IDENTITY_FAMILY_VALUES);
+const TERMINAL_APP_IDENTITY_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_SOURCE_VALUES);
 const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
 const BASE64_CONTENT_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
@@ -163,6 +169,41 @@ function isInputSafetyProfile(value) {
 
 function isMouseForwardingMode(value) {
   return typeof value === "string" && SESSION_MOUSE_FORWARDING_MODE_VALUES.includes(value);
+}
+
+function isTerminalAppIdentityDetailValue(value) {
+  if (value === null) {
+    return true;
+  }
+  if (typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.every((entry) => isTerminalAppIdentityDetailValue(entry));
+  }
+  if (!isObject(value)) {
+    return false;
+  }
+  return Object.values(value).every((entry) => isTerminalAppIdentityDetailValue(entry));
+}
+
+function isTerminalAppIdentity(value) {
+  return (
+    isObject(value) &&
+    TERMINAL_APP_IDENTITY_FAMILY_SET.has(value.family) &&
+    typeof value.label === "string" &&
+    TERMINAL_APP_IDENTITY_SOURCE_SET.has(value.source) &&
+    typeof value.confidence === "number" &&
+    Number.isFinite(value.confidence) &&
+    value.confidence >= 0 &&
+    value.confidence <= 1 &&
+    isObject(value.details) &&
+    Object.values(value.details).every((entry) => isTerminalAppIdentityDetailValue(entry)) &&
+    Number.isInteger(value.updatedAt)
+  );
 }
 
 function isDeck(value) {
@@ -1078,6 +1119,7 @@ function isSession(value) {
     (value.name === undefined || typeof value.name === "string") &&
     (value.note === undefined || typeof value.note === "string") &&
     isMouseForwardingMode(value.mouseForwardingMode) &&
+    isTerminalAppIdentity(value.appIdentity) &&
     (value.remoteConnection === undefined || isRemoteConnection(value.remoteConnection)) &&
     (value.remoteAuth === undefined || isRemoteAuth(value.remoteAuth)) &&
     (value.remoteRuntime === undefined || isRemoteRuntime(value.remoteRuntime)) &&

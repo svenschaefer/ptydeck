@@ -87,6 +87,22 @@ const CONTROL_STATE = {
   ]
 };
 
+const SHELL_APP_IDENTITY = {
+  family: "shell",
+  label: "bash",
+  source: "explicit-hint",
+  confidence: 0.64,
+  details: {
+    explicitHints: [
+      {
+        type: "shell",
+        value: "bash"
+      }
+    ]
+  },
+  updatedAt: 1
+};
+
 function createLocalSession(overrides = {}) {
   return {
     id: "a",
@@ -96,6 +112,7 @@ function createLocalSession(overrides = {}) {
     kind: "local",
     cwd: "/tmp",
     shell: "bash",
+    appIdentity: SHELL_APP_IDENTITY,
     mouseForwardingMode: "off",
     inputSafetyProfile: INPUT_SAFETY_PROFILE,
     startCwd: "/tmp",
@@ -361,6 +378,7 @@ test("validateResponse checks session list schema", () => {
           kind: "local",
           cwd: "/tmp",
           shell: "bash",
+          appIdentity: SHELL_APP_IDENTITY,
           note: "needs review",
           mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
@@ -394,6 +412,14 @@ test("validateResponse accepts ssh session remote runtime metadata", () => {
         kind: "ssh",
         cwd: "~/workspace",
         shell: "ssh",
+        appIdentity: {
+          family: "unknown",
+          label: "",
+          source: "unknown",
+          confidence: 0,
+          details: {},
+          updatedAt: 10
+        },
         mouseForwardingMode: "application",
         remoteConnection: {
           host: "example.internal",
@@ -525,6 +551,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           kind: "local",
           cwd: "/tmp",
           shell: "bash",
+          appIdentity: SHELL_APP_IDENTITY,
           mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",
@@ -546,6 +573,7 @@ test("validateResponse accepts quick-id swap payload", () => {
           kind: "local",
           cwd: "/tmp",
           shell: "bash",
+          appIdentity: SHELL_APP_IDENTITY,
           mouseForwardingMode: "off",
           inputSafetyProfile: INPUT_SAFETY_PROFILE,
           startCwd: "/tmp",

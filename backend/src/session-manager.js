@@ -8,11 +8,12 @@ import { ApiError } from "./errors.js";
 import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
+import {
+  deriveTerminalAppIdentityFromSessionHints,
+  normalizeTerminalAppIdentity,
+  terminalAppIdentityEquals
+} from "./terminal-app-identity.js";
 import { createShellAdapter } from "./shell-adapter.js";
-
-function now() {
-  return Date.now();
-}
 
 const DEFAULT_SESSION_REPLAY_MEMORY_MAX_CHARS = 16 * 1024;
 const DEFAULT_SSH_CLIENT = "ssh";
@@ -581,7 +582,7 @@ export class SessionManager {
     remoteReconnectStableMs = DEFAULT_REMOTE_RECONNECT_STABLE_MS,
     sshAskpassPath = DEFAULT_SSH_ASKPASS_PATH,
     sshKnownHostsPath = DEFAULT_SSH_KNOWN_HOSTS_PATH,
-    nowFn = now,
+    nowFn = Date.now,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout,
     createTraceId = randomUUID
@@ -1191,6 +1192,60 @@ export class SessionManager {
     return session;
   }
 
+  applySessionAppIdentity(session, nextIdentity, { emitUpdatedEvent = false, trace = null, updatedAt = this.nowFn() } = {}) {
+    const currentIdentity = normalizeTerminalAppIdentity(session?.meta?.appIdentity, {
+      fallbackUpdatedAt: updatedAt
+    });
+    const normalizedNextIdentity = normalizeTerminalAppIdentity(nextIdentity, {
+      fallbackUpdatedAt: updatedAt
+    });
+    if (terminalAppIdentityEquals(currentIdentity, normalizedNextIdentity, { includeUpdatedAt: false })) {
+      session.meta.appIdentity = currentIdentity;
+      return session.meta.appIdentity;
+    }
+    session.meta.appIdentity = normalizedNextIdentity;
+    session.meta.updatedAt = updatedAt;
+    if (emitUpdatedEvent) {
+      const updateTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+        sessionId: session.id,
+        source: trace?.source || session.traceSeed?.source || "runtime"
+      });
+      this.updateSessionTraceSeed(session, updateTrace, {
+        sessionId: session.id,
+        source: updateTrace.source || "runtime"
+      });
+      this.events.emit("session.updated", {
+        session: session.meta,
+        trace: updateTrace
+      });
+    }
+    return session.meta.appIdentity;
+  }
+
+  refreshSessionAppIdentity(sessionId, options = {}) {
+    const session = typeof sessionId === "string" ? this.get(sessionId) : sessionId;
+    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
+    const nextIdentity = deriveTerminalAppIdentityFromSessionHints(session.meta, {
+      existingIdentity: session.meta.appIdentity,
+      updatedAt
+    });
+    return this.applySessionAppIdentity(session, nextIdentity, {
+      emitUpdatedEvent: options.emitUpdatedEvent === true,
+      trace: options.trace || null,
+      updatedAt
+    });
+  }
+
+  setSessionAppIdentity(sessionId, appIdentity, options = {}) {
+    const session = this.get(sessionId);
+    const updatedAt = Number.isInteger(options.updatedAt) ? options.updatedAt : this.nowFn();
+    return this.applySessionAppIdentity(session, appIdentity, {
+      emitUpdatedEvent: options.emitUpdatedEvent !== false,
+      trace: options.trace || null,
+      updatedAt
+    });
+  }
+
   transitionToRunning(session) {
     if (!session || session.meta.state === SESSION_STATE_RUNNING) {
       return session?.meta || null;
@@ -1351,6 +1406,15 @@ export class SessionManager {
         themeProfile: normalizedThemeSlots.themeProfile,
         activeThemeProfile: normalizedThemeSlots.activeThemeProfile,
         inactiveThemeProfile: normalizedThemeSlots.inactiveThemeProfile,
+        appIdentity: deriveTerminalAppIdentityFromSessionHints(
+          {
+            kind: normalizedKind,
+            shell: normalizedShell,
+            ...(typeof name === "string" ? { name } : {}),
+            startCommand: normalizedStartCommand
+          },
+          { updatedAt: updatedTimestamp }
+        ),
         state: SESSION_STATE_STARTING,
         activityState: SESSION_ACTIVITY_STATE_INACTIVE,
         activityUpdatedAt: initialActivityTimestamp,
@@ -1565,7 +1629,12 @@ export class SessionManager {
       session.meta.activeThemeProfile = normalizedThemeSlots.activeThemeProfile;
       session.meta.inactiveThemeProfile = normalizedThemeSlots.inactiveThemeProfile;
     }
-    session.meta.updatedAt = now();
+    const updatedAt = this.nowFn();
+    session.meta.updatedAt = updatedAt;
+    session.meta.appIdentity = deriveTerminalAppIdentityFromSessionHints(session.meta, {
+      existingIdentity: session.meta.appIdentity,
+      updatedAt
+    });
     return session.meta;
   }
 

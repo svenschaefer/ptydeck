@@ -8,6 +8,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const indexHtmlPath = path.join(repoRoot, 'frontend/src/public/index.html');
 const commandReferencePath = path.join(repoRoot, 'docs/reference/commands.md');
 const manualDir = path.join(repoRoot, 'docs/manual');
+const EXTERNAL_MESSAGING_COMMAND_EXAMPLES = new Set(['/status', '/stop', '/retry']);
 
 async function loadModule(relativePath) {
   return import(pathToFileURL(path.join(repoRoot, relativePath)).href);
@@ -52,6 +53,9 @@ test('documented slash-command examples resolve to known command topics', async 
   const examples = markdownFiles.flatMap((entry) => collectDocumentedSlashExamples(fs.readFileSync(path.join(manualDir, entry), 'utf8')));
   assert.ok(examples.length > 0, 'Expected at least one documented slash-command example.');
   for (const example of examples) {
+    if (EXTERNAL_MESSAGING_COMMAND_EXAMPLES.has(example)) {
+      continue;
+    }
     const parsed = interpretComposerInput(example);
     assert.equal(parsed.kind, 'control', `Expected ${example} to resolve as a control command.`);
     assert.ok(registry.get(parsed.command), `Expected ${example} to resolve to a known slash command or alias.`);

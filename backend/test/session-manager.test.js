@@ -78,6 +78,9 @@ test("SessionManager create/list/get/delete lifecycle", () => {
   assert.equal(created.startCwd, "/tmp");
   assert.equal(created.startCommand, "");
   assert.equal(created.note, undefined);
+  assert.equal(created.appIdentity.family, "shell");
+  assert.equal(created.appIdentity.label, "bash");
+  assert.equal(created.appIdentity.source, "explicit-hint");
   assert.equal(created.mouseForwardingMode, "off");
   assert.deepEqual(created.env, {});
   assert.equal(typeof created.inputSafetyProfile, "object");
@@ -96,6 +99,7 @@ test("SessionManager create/list/get/delete lifecycle", () => {
 
   const session = manager.get(created.id);
   assert.equal(session.meta.shell, "bash");
+  assert.equal(session.meta.appIdentity.family, "shell");
 
   manager.delete(created.id);
   assert.equal(fakePty.killed, true);
@@ -121,6 +125,66 @@ test("SessionManager emits explicit created and started lifecycle events", () =>
     { type: "session.started", state: "running" },
     { type: "session.updated", state: "running" }
   ]);
+});
+
+test("SessionManager refreshes explicit app identity when startup hints change", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => 1710000000000
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "/bin/bash",
+    name: "codex",
+    startCommand: "codex --json"
+  });
+
+  assert.equal(created.appIdentity.family, "coding-agent");
+  assert.equal(created.appIdentity.label, "codex");
+  assert.equal(created.appIdentity.source, "explicit-hint");
+
+  const updated = manager.updateSession(created.id, {
+    name: "build-run",
+    startCommand: "npm test"
+  });
+
+  assert.equal(updated.appIdentity.family, "build-test");
+  assert.equal(updated.appIdentity.label, "npm");
+  assert.equal(updated.appIdentity.source, "explicit-hint");
+  assert.equal(updated.appIdentity.updatedAt, 1710000000000);
+});
+
+test("SessionManager setSessionAppIdentity emits session.updated for later runtime sources", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: (() => {
+      let current = 1710000000100;
+      return () => current++;
+    })()
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  const updates = [];
+  manager.on("session.updated", (event) => updates.push(event));
+
+  manager.setSessionAppIdentity(created.id, {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.91,
+    details: {
+      processName: "codex",
+      pid: 321
+    }
+  });
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].session.appIdentity.family, "coding-agent");
+  assert.equal(updates[0].session.appIdentity.label, "codex");
+  assert.equal(updates[0].session.appIdentity.source, "foreground-process");
+  assert.equal(updates[0].session.appIdentity.details.processName, "codex");
 });
 
 test("SessionManager emits stable exit metadata", () => {

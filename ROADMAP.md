@@ -14,16 +14,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - none currently
-- Active scoped tasks:
-  - none currently
-- Queued next waves:
   - `v0.4.0-H79`
+- Active scoped tasks:
+  - `APP-002`
+  - `APP-003`
+- Queued next waves:
+  - none currently
 
 ## Active Wave Order
 
 - `v0.4.0-H79`
-  - `APP-001`
   - `APP-002` after `APP-001`
   - `APP-003` after `APP-001`
   - `APP-004` after `APP-001`, `APP-002`, and `APP-003`

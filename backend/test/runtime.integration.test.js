@@ -155,6 +155,8 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const created = await createRes.json();
     assert.equal(typeof created.id, "string");
     assert.equal(created.state, "running");
+    assert.equal(created.appIdentity.family, "shell");
+    assert.equal(created.appIdentity.label, "sh");
     assert.equal(created.controlState.owner.subject, "local-operator");
     assert.equal(created.controlState.currentController, null);
     assert.deepEqual(created.controlState.attachedClients, []);
@@ -171,15 +173,18 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(typeof getPayload.cwd, "string");
     assert.ok(getPayload.cwd.length > 0);
     assert.equal(getPayload.state, "running");
+    assert.equal(getPayload.appIdentity.family, "shell");
 
     const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "main-shell" })
+      body: JSON.stringify({ name: "codex", startCommand: "codex --json" })
     });
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
-    assert.equal(patched.name, "main-shell");
+    assert.equal(patched.name, "codex");
+    assert.equal(patched.appIdentity.family, "coding-agent");
+    assert.equal(patched.appIdentity.label, "codex");
 
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
@@ -208,6 +213,8 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
+    assert.equal(restarted.appIdentity.family, "coding-agent");
+    assert.equal(restarted.appIdentity.label, "codex");
 
     const deleteRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "DELETE"

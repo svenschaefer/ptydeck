@@ -27,6 +27,7 @@ import {
 } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import { SessionManager } from "./session-manager.js";
+import { deriveTerminalAppIdentityFromSessionHints, normalizeTerminalAppIdentity } from "./terminal-app-identity.js";
 import {
   computeSshTrustFingerprintSha256,
   DEFAULT_SSH_HOST_KEY_PROBE_TIMEOUT_MS,
@@ -5291,8 +5292,19 @@ export function createRuntime(config) {
   function toApiSession(session, explicitState) {
     const sessionState = typeof explicitState === "string" && explicitState.trim() ? explicitState.trim() : String(session?.state || "").trim();
     const sessionModel = withDeckId(session);
+    const appIdentity = normalizeTerminalAppIdentity(sessionModel.appIdentity, {
+      fallbackUpdatedAt: Number.isInteger(sessionModel.updatedAt) ? sessionModel.updatedAt : Date.now()
+    });
+    const resolvedAppIdentity =
+      appIdentity.source === "unknown" && !sessionModel.appIdentity
+        ? deriveTerminalAppIdentityFromSessionHints(sessionModel, {
+            existingIdentity: sessionModel.appIdentity,
+            updatedAt: Number.isInteger(sessionModel.updatedAt) ? sessionModel.updatedAt : Date.now()
+          })
+        : appIdentity;
     return {
       ...sessionModel,
+      appIdentity: resolvedAppIdentity,
       state: sessionState || "running",
       controlState: buildApiSessionControlState(session.id, sessionModel)
     };
@@ -7335,6 +7347,15 @@ function tryCreateRestoredSession({
           themeProfile: themeSlots.themeProfile,
           activeThemeProfile: themeSlots.activeThemeProfile,
           inactiveThemeProfile: themeSlots.inactiveThemeProfile,
+          appIdentity: deriveTerminalAppIdentityFromSessionHints(
+            {
+              kind,
+              shell: requestedShell,
+              ...(typeof session.name === "string" ? { name: session.name } : {}),
+              startCommand: startupConfig.startCommand
+            },
+            { updatedAt: restoredUpdatedAt }
+          ),
           deckId: persistedDeckId,
           createdAt: restoredCreatedAt,
           updatedAt: restoredUpdatedAt
