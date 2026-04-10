@@ -4,6 +4,7 @@ import {
   buildUnknownTerminalAppIdentity,
   deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
+  deriveTerminalAppIdentityFromTerminalSignals,
   normalizeTerminalAppIdentity,
   terminalAppIdentityEquals
 } from "../src/terminal-app-identity.js";
@@ -181,4 +182,95 @@ test("deriveTerminalAppIdentityFromForegroundProcess falls back deterministicall
   assert.equal(tmuxIdentity.family, "tui");
   assert.equal(tmuxIdentity.label, "tmux");
   assert.equal(tmuxIdentity.source, "foreground-process");
+});
+
+test("deriveTerminalAppIdentityFromTerminalSignals promotes shell markers into shell identity", () => {
+  const identity = deriveTerminalAppIdentityFromTerminalSignals(
+    {
+      shellPhase: "prompt",
+      lastShellMarkerProtocol: "osc-133",
+      lastShellMarker: "prompt-start",
+      lastShellMarkerAt: 1710000000008,
+      currentDirectory: "/workspace/code/ptydeck",
+      currentDirectoryProtocol: "osc-1337",
+      currentDirectoryUpdatedAt: 1710000000008,
+      alternateScreenActive: false,
+      alternateScreenCode: null,
+      alternateScreenUpdatedAt: null
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000008 }
+  );
+
+  assert.equal(identity.family, "shell");
+  assert.equal(identity.label, "bash");
+  assert.equal(identity.source, "shell-marker");
+  assert.equal(identity.details.shellMarkers.currentDirectory, "/workspace/code/ptydeck");
+});
+
+test("deriveTerminalAppIdentityFromTerminalSignals uses alternate screen as a bounded tui-family hint", () => {
+  const identity = deriveTerminalAppIdentityFromTerminalSignals(
+    {
+      shellPhase: "output",
+      lastShellMarkerProtocol: "osc-633",
+      lastShellMarker: "command-output-start",
+      lastShellMarkerAt: 1710000000009,
+      currentDirectory: "",
+      currentDirectoryProtocol: "",
+      currentDirectoryUpdatedAt: null,
+      alternateScreenActive: true,
+      alternateScreenCode: 1049,
+      alternateScreenUpdatedAt: 1710000000009
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000009 }
+  );
+
+  assert.equal(identity.family, "tui");
+  assert.equal(identity.label, "");
+  assert.equal(identity.source, "terminal-mode");
+  assert.equal(identity.details.terminalMode.alternateScreenCode, 1049);
+});
+
+test("deriveTerminalAppIdentityFromTerminalSignals does not override stronger foreground-process identities", () => {
+  const existingIdentity = {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.94,
+    details: {
+      foregroundProcess: {
+        representativeProcess: {
+          executableName: "codex"
+        }
+      }
+    },
+    updatedAt: 1710000000010
+  };
+  const identity = deriveTerminalAppIdentityFromTerminalSignals(
+    {
+      shellPhase: "prompt",
+      lastShellMarkerProtocol: "osc-133",
+      lastShellMarker: "prompt-start",
+      lastShellMarkerAt: 1710000000011,
+      currentDirectory: "/workspace",
+      currentDirectoryProtocol: "osc-1337",
+      currentDirectoryUpdatedAt: 1710000000011,
+      alternateScreenActive: false,
+      alternateScreenCode: null,
+      alternateScreenUpdatedAt: null
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { existingIdentity, updatedAt: 1710000000011 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.source, "foreground-process");
 });

@@ -151,6 +151,43 @@ function buildForegroundProcessDetails(inspection, hints = []) {
   };
 }
 
+function buildShellMarkerDetails(signalState, hints = []) {
+  const normalizedHints = hints
+    .map((entry) => normalizeDetailValue(entry))
+    .filter((entry) => entry && typeof entry === "object");
+  return {
+    ...(normalizedHints.length ? { shellMarkerHints: normalizedHints } : {}),
+    shellMarkers: {
+      shellPhase: typeof signalState?.shellPhase === "string" ? signalState.shellPhase : "unknown",
+      lastProtocol: typeof signalState?.lastShellMarkerProtocol === "string" ? signalState.lastShellMarkerProtocol : "",
+      lastMarker: typeof signalState?.lastShellMarker === "string" ? signalState.lastShellMarker : "",
+      lastMarkerAt: Number.isInteger(signalState?.lastShellMarkerAt) ? signalState.lastShellMarkerAt : null,
+      currentDirectory: typeof signalState?.currentDirectory === "string" ? signalState.currentDirectory : "",
+      currentDirectoryProtocol:
+        typeof signalState?.currentDirectoryProtocol === "string" ? signalState.currentDirectoryProtocol : "",
+      currentDirectoryUpdatedAt: Number.isInteger(signalState?.currentDirectoryUpdatedAt)
+        ? signalState.currentDirectoryUpdatedAt
+        : null
+    }
+  };
+}
+
+function buildTerminalModeDetails(signalState, hints = []) {
+  const normalizedHints = hints
+    .map((entry) => normalizeDetailValue(entry))
+    .filter((entry) => entry && typeof entry === "object");
+  return {
+    ...(normalizedHints.length ? { terminalModeHints: normalizedHints } : {}),
+    terminalMode: {
+      alternateScreenActive: signalState?.alternateScreenActive === true,
+      alternateScreenCode: Number.isInteger(signalState?.alternateScreenCode) ? signalState.alternateScreenCode : null,
+      alternateScreenUpdatedAt: Number.isInteger(signalState?.alternateScreenUpdatedAt)
+        ? signalState.alternateScreenUpdatedAt
+        : null
+    }
+  };
+}
+
 function isConfidence(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 }
@@ -389,6 +426,83 @@ function buildForegroundProcessIdentity(inspection, updatedAt) {
   return buildUnknownTerminalAppIdentity(updatedAt);
 }
 
+function buildTerminalSignalIdentity(signalState, session, normalizedExistingIdentity, updatedAt) {
+  const shellLabel =
+    normalizeShellLabel(session?.shell) ||
+    (normalizedExistingIdentity.family === "shell" ? normalizeShellLabel(normalizedExistingIdentity.label) : "");
+  const hasShellMarker = Number.isInteger(signalState?.lastShellMarkerAt);
+  const hasCurrentDirectory = typeof signalState?.currentDirectory === "string" && signalState.currentDirectory.trim().length > 0;
+  const hasAlternateScreen = signalState?.alternateScreenActive === true;
+
+  if (hasAlternateScreen) {
+    if (
+      (normalizedExistingIdentity.source === "foreground-process" && normalizedExistingIdentity.confidence >= 0.75) ||
+      (normalizedExistingIdentity.source === "explicit-hint" &&
+        normalizedExistingIdentity.family !== "shell" &&
+        normalizedExistingIdentity.confidence >= 0.84)
+    ) {
+      return normalizedExistingIdentity;
+    }
+    const family =
+      normalizedExistingIdentity.family === "editor" ||
+      normalizedExistingIdentity.family === "pager" ||
+      normalizedExistingIdentity.family === "tui"
+        ? normalizedExistingIdentity.family
+        : "tui";
+    return {
+      family,
+      label: family === "tui" ? "" : normalizedExistingIdentity.label,
+      source: "terminal-mode",
+      confidence: family === "tui" ? 0.64 : 0.68,
+      details: buildTerminalModeDetails(signalState, [
+        normalizeDetailValue({
+          type: "alternateScreen",
+          code: signalState?.alternateScreenCode,
+          active: true
+        })
+      ]),
+      updatedAt
+    };
+  }
+
+  if (!hasShellMarker && !hasCurrentDirectory) {
+    return normalizedExistingIdentity;
+  }
+
+  const nextIdentity = {
+    family: "shell",
+    label: shellLabel,
+    source: "shell-marker",
+    confidence: hasCurrentDirectory ? 0.78 : 0.72,
+    details: buildShellMarkerDetails(signalState, [
+      normalizeDetailValue({
+        type: "shellMarker",
+        protocol: signalState?.lastShellMarkerProtocol || "",
+        marker: signalState?.lastShellMarker || "",
+        ...(hasCurrentDirectory ? { currentDirectory: signalState.currentDirectory } : {})
+      })
+    ]),
+    updatedAt
+  };
+
+  if (
+    normalizedExistingIdentity.source === "foreground-process" &&
+    normalizedExistingIdentity.family !== "unknown" &&
+    normalizedExistingIdentity.confidence >= nextIdentity.confidence
+  ) {
+    return normalizedExistingIdentity;
+  }
+  if (
+    normalizedExistingIdentity.source === "explicit-hint" &&
+    normalizedExistingIdentity.family !== "unknown" &&
+    normalizedExistingIdentity.family !== "shell" &&
+    normalizedExistingIdentity.confidence >= nextIdentity.confidence
+  ) {
+    return normalizedExistingIdentity;
+  }
+  return nextIdentity;
+}
+
 export function buildUnknownTerminalAppIdentity(updatedAt = Date.now()) {
   return {
     family: "unknown",
@@ -458,6 +572,21 @@ export function deriveTerminalAppIdentityFromForegroundProcess(
   if (nextIdentity.source === "unknown" && normalizedExistingIdentity.source !== "unknown") {
     return normalizedExistingIdentity;
   }
+  if (terminalAppIdentityEquals(normalizedExistingIdentity, nextIdentity, { includeUpdatedAt: false })) {
+    return normalizedExistingIdentity;
+  }
+  return nextIdentity;
+}
+
+export function deriveTerminalAppIdentityFromTerminalSignals(
+  signalState,
+  session,
+  { existingIdentity = null, updatedAt = Date.now() } = {}
+) {
+  const normalizedExistingIdentity = normalizeTerminalAppIdentity(existingIdentity, {
+    fallbackUpdatedAt: Number.isInteger(updatedAt) ? updatedAt : Date.now()
+  });
+  const nextIdentity = buildTerminalSignalIdentity(signalState, session, normalizedExistingIdentity, updatedAt);
   if (terminalAppIdentityEquals(normalizedExistingIdentity, nextIdentity, { includeUpdatedAt: false })) {
     return normalizedExistingIdentity;
   }

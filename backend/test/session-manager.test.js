@@ -256,6 +256,45 @@ test("SessionManager schedules and applies foreground-process identity refresh f
   assert.equal(scheduled.length >= 1, true);
 });
 
+test("SessionManager applies shell-marker and alternate-screen identity hints from PTY output", () => {
+  const fakePty = createFakePty({ pid: 4322, ptyPath: "/dev/pts/10" });
+  const scheduled = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    inspectTerminalForegroundProcess() {
+      return null;
+    },
+    setTimeoutFn(fn) {
+      scheduled.push(fn);
+      return fn;
+    },
+    clearTimeoutFn() {}
+  });
+  const updates = [];
+  manager.on("session.updated", (event) => updates.push(event));
+
+  const created = manager.create({ cwd: "/tmp", shell: "/bin/bash" });
+  assert.equal(created.appIdentity.family, "shell");
+
+  updates.length = 0;
+  fakePty.write("\u001b]1337;CurrentDir=/workspace/code/ptydeck\u0007\u001b]133;A\u0007");
+
+  const afterShellMarker = manager.get(created.id).meta;
+  assert.equal(afterShellMarker.cwd, "/workspace/code/ptydeck");
+  assert.equal(afterShellMarker.appIdentity.family, "shell");
+  assert.equal(afterShellMarker.appIdentity.source, "shell-marker");
+  assert.equal(updates.length, 1);
+
+  updates.length = 0;
+  fakePty.write("\u001b[?1049h");
+
+  const afterAlternateScreen = manager.get(created.id).meta.appIdentity;
+  assert.equal(afterAlternateScreen.family, "tui");
+  assert.equal(afterAlternateScreen.source, "terminal-mode");
+  assert.equal(updates.length, 1);
+  assert.equal(scheduled.length >= 1, true);
+});
+
 test("SessionManager emits stable exit metadata", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({
