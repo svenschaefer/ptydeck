@@ -35,6 +35,7 @@ function createNodeStub() {
     ".session-quick-id",
     ".session-focus",
     ".session-state-badge",
+    ".session-app-identity",
     ".terminal-toolbar-meta",
     ".session-note-text",
     ".session-unrestored-hint",
@@ -108,6 +109,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
     getSessionStateHintText: () => "hint",
     isSessionUnrestored: () => false,
     isSessionExited: () => false,
+    renderSessionAppIdentity: () => calls.push("app"),
     renderSessionTagList: () => calls.push("tags"),
     renderSessionNote: () => calls.push("note"),
     setSessionCardVisibility: (_node, visible) => calls.push(`visible:${visible}`)
@@ -141,5 +143,5 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.themeSlotSelect);
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);
-  assert.deepEqual(calls, ["tags", "note", "visible:true"]);
+  assert.deepEqual(calls, ["app", "tags", "note", "visible:true"]);
 });

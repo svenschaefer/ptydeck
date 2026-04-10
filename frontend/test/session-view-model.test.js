@@ -44,3 +44,32 @@ test("session runtime helpers prefer formal lifecycle state and expose starting 
   assert.equal(model.getSessionRuntimeState(idleSession), "idle");
   assert.equal(model.getSessionRuntimeState(closedSession), "closed");
 });
+
+test("session view model formats visible non-shell app identity details", () => {
+  const codexSession = {
+    id: "codex-1",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.91,
+      details: {},
+      updatedAt: 42
+    }
+  };
+  const shellSession = {
+    id: "shell-1",
+    appIdentity: {
+      family: "shell",
+      label: "bash",
+      source: "foreground-process",
+      confidence: 0.82,
+      details: {},
+      updatedAt: 42
+    }
+  };
+
+  assert.equal(model.getSessionAppIdentityText(codexSession), "codex");
+  assert.match(model.getSessionAppIdentityTitle(codexSession), /foreground process/i);
+  assert.equal(model.getSessionAppIdentityText(shellSession), "");
+});

@@ -42,7 +42,9 @@ test("session-card-meta controller updates dirty/saved state", () => {
     settingsDirty: false
   };
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    getSessionAppIdentityText: () => "",
+    getSessionAppIdentityTitle: () => ""
   });
 
   controller.setSettingsDirty(entry, true);
@@ -60,23 +62,31 @@ test("session-card-meta controller updates dirty/saved state", () => {
 
 test("session-card-meta controller renders note preview line, tooltip, and tags", () => {
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    getSessionAppIdentityText: (session) => (session?.appIdentity?.label ? session.appIdentity.label : ""),
+    getSessionAppIdentityTitle: () => "Active app: codex (coding-agent) via foreground process · 91% confidence."
   });
 
   const entry = {
     sessionMetaRowEl: { hidden: true },
+    sessionAppIdentityEl: { textContent: "", title: "", hidden: true },
     sessionNoteEl: { textContent: "", title: "", hidden: true },
     tagListEl: { textContent: "", title: "", classList: createClassList() }
   };
   const session = {
     id: "s-1",
     note: "check metrics\ncapture logs",
-    tags: ["alpha", "beta"]
+    tags: ["alpha", "beta"],
+    appIdentity: { label: "codex" }
   };
 
+  controller.renderSessionAppIdentity(entry, session);
   controller.renderSessionNote(entry, session);
   controller.renderSessionTagList(entry, session);
 
+  assert.equal(entry.sessionAppIdentityEl.textContent, "codex");
+  assert.equal(entry.sessionAppIdentityEl.title, "Active app: codex (coding-agent) via foreground process · 91% confidence.");
+  assert.equal(entry.sessionAppIdentityEl.hidden, false);
   assert.equal(entry.sessionNoteEl.textContent, "check metrics...");
   assert.equal(entry.sessionNoteEl.title, "check metrics\ncapture logs");
   assert.equal(entry.sessionNoteEl.hidden, false);
@@ -86,11 +96,14 @@ test("session-card-meta controller renders note preview line, tooltip, and tags"
 
 test("session-card-meta controller hides meta row when note and tags are empty", () => {
   const controller = createSessionCardMetaController({
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : [])
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    getSessionAppIdentityText: () => "",
+    getSessionAppIdentityTitle: () => ""
   });
 
   const entry = {
     sessionMetaRowEl: { hidden: false },
+    sessionAppIdentityEl: { textContent: "", title: "", hidden: true },
     sessionNoteEl: { textContent: "", hidden: false },
     tagListEl: { textContent: "", classList: createClassList() }
   };

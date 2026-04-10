@@ -332,6 +332,7 @@ export function createSessionGridController(options = {}) {
           stateBadgeEl: refs.stateBadgeEl,
           controlBadgeEl: refs.controlBadgeEl,
           sessionMetaRowEl: refs.sessionMetaRowEl,
+          sessionAppIdentityEl: refs.sessionAppIdentityEl,
           sessionNoteEl: refs.sessionNoteEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           refreshBtn: refs.refreshBtn,

@@ -65,6 +65,22 @@ test("session-ui facade controller delegates session view-model behavior", () =>
         env: { FOO: "bar" },
         tags: ["ops"]
       };
+    },
+    getSessionAppIdentity() {
+      return {
+        family: "coding-agent",
+        label: "codex",
+        source: "foreground-process",
+        confidence: 0.91,
+        details: {},
+        updatedAt: 42
+      };
+    },
+    getSessionAppIdentityText() {
+      return "codex";
+    },
+    getSessionAppIdentityTitle() {
+      return "Active app: codex (coding-agent) via foreground process · 91% confidence.";
     }
   };
   const controller = createSessionUiFacadeController({
@@ -93,6 +109,19 @@ test("session-ui facade controller delegates session view-model behavior", () =>
     env: { FOO: "bar" },
     tags: ["ops"]
   });
+  assert.deepEqual(controller.getSessionAppIdentity({ id: "s1" }), {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.91,
+    details: {},
+    updatedAt: 42
+  });
+  assert.equal(controller.getSessionAppIdentityText({ id: "s1" }), "codex");
+  assert.equal(
+    controller.getSessionAppIdentityTitle({ id: "s1" }),
+    "Active app: codex (coding-agent) via foreground process · 91% confidence."
+  );
   assert.deepEqual(calls, [
     ["state", "s1"],
     ["unrestored", "s1"],
@@ -265,6 +294,9 @@ test("session-ui facade controller delegates meta rendering and falls back safel
     },
     renderSessionNote(entry, session) {
       calls.push(["note", entry.id, session.id]);
+    },
+    renderSessionAppIdentity(entry, session) {
+      calls.push(["app", entry.id, session.id]);
     }
   };
   const controller = createSessionUiFacadeController({
@@ -276,11 +308,13 @@ test("session-ui facade controller delegates meta rendering and falls back safel
   const session = { id: "s1" };
 
   controller.setSettingsDirty(entry, true);
+  controller.renderSessionAppIdentity(entry, session);
   controller.renderSessionTagList(entry, session);
   controller.renderSessionNote(entry, session);
 
   assert.deepEqual(calls, [
     ["dirty", "entry-1", true],
+    ["app", "entry-1", "s1"],
     ["tags", "entry-1", "s1"],
     ["note", "entry-1", "s1"]
   ]);

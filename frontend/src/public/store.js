@@ -6,6 +6,7 @@ import {
   resolveCustomCommandForSession,
   resolveExactCustomCommand
 } from "./custom-command-model.js";
+import { normalizeSessionAppIdentity } from "./session-app-identity.js";
 
 const DEFAULT_CONNECTION_STATE = "connecting";
 const DEFAULT_DECK_ID = "default";
@@ -106,6 +107,7 @@ function cloneSessionRecord(session) {
       session.inactiveThemeProfile && typeof session.inactiveThemeProfile === "object"
         ? { ...session.inactiveThemeProfile }
         : session.inactiveThemeProfile,
+    appIdentity: normalizeSessionAppIdentity(session.appIdentity),
     tags: Array.isArray(session.tags) ? session.tags.slice() : session.tags,
     meta: session.meta && typeof session.meta === "object" ? { ...session.meta } : session.meta,
     pluginBadges: Array.isArray(session.pluginBadges) ? session.pluginBadges.map((badge) => ({ ...badge })) : [],
@@ -422,6 +424,7 @@ function withSessionActivityDefaults(session) {
           .filter(Boolean)
           .slice(-SESSION_COMMAND_CORRELATION_LIMIT)
       : [],
+    appIdentity: normalizeSessionAppIdentity(session.appIdentity),
     meta: normalizeSessionMeta(session.meta),
     tags: normalizeSessionTags(session.tags)
   };

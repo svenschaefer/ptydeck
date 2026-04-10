@@ -14,8 +14,7 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `APP-005` Owner `FE`: Add a subtle operator-visible active-app surface that can expose the current detected app family/label/source/confidence for a session without bloating the main UI, and wire the normalized identity state into existing runtime consumers that benefit immediately from higher-confidence app awareness rather than duplicating detection logic in frontend-only heuristics.
-- `APP-006` Owner `QA`: Add closeout validation for `v0.4.0-H79`, including direct backend identity-contract tests, local foreground-process detection coverage, shell-marker and alternate-screen signal handling regression depth, low-confidence fallback behavior, frontend visibility smoke coverage, and a deterministic full local quality-gate rerun.
+- none currently
 
 ## Active Ownership Role
 

@@ -8,6 +8,7 @@ export function createSessionCardRenderController(options = {}) {
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
   const syncTerminalViewportAfterShow = options.syncTerminalViewportAfterShow || (() => {});
   const ensureQuickId = options.ensureQuickId || ((sessionId) => String(sessionId || ""));
+  const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
@@ -79,6 +80,7 @@ export function createSessionCardRenderController(options = {}) {
       entry.unrestoredHintEl.textContent = stateHintText;
     }
 
+    renderSessionAppIdentity(entry, session);
     renderSessionTagList(entry, session);
     renderSessionNote(entry, session);
     renderSessionControl(entry, session);

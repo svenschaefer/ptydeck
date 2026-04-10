@@ -4,6 +4,7 @@ export function createSessionCardFactoryController(options = {}) {
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
   const isSessionExited = options.isSessionExited || (() => false);
+  const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
@@ -15,6 +16,7 @@ export function createSessionCardFactoryController(options = {}) {
     const stateBadgeEl = node.querySelector(".session-state-badge");
     const controlBadgeEl = node.querySelector(".session-control-badge");
     const sessionMetaRowEl = node.querySelector(".terminal-toolbar-meta");
+    const sessionAppIdentityEl = node.querySelector(".session-app-identity");
     const sessionNoteEl = node.querySelector(".session-note-text");
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const refreshBtn = node.querySelector(".session-refresh");
@@ -123,8 +125,9 @@ export function createSessionCardFactoryController(options = {}) {
       unrestoredHintEl.hidden = !stateHintText;
       unrestoredHintEl.textContent = stateHintText;
     }
-    renderSessionTagList({ sessionMetaRowEl, sessionNoteEl, tagListEl }, session);
-    renderSessionNote({ sessionMetaRowEl, sessionNoteEl, tagListEl }, session);
+    renderSessionAppIdentity({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
+    renderSessionTagList({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
+    renderSessionNote({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
     setSessionCardVisibility(node, visible);
 
     return {
@@ -134,6 +137,7 @@ export function createSessionCardFactoryController(options = {}) {
       stateBadgeEl,
       controlBadgeEl,
       sessionMetaRowEl,
+      sessionAppIdentityEl,
       sessionNoteEl,
       unrestoredHintEl,
       refreshBtn,

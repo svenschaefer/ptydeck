@@ -1807,7 +1807,9 @@ runtimeEventController = createRuntimeEventController({
 });
 
 sessionCardMetaController = createSessionCardMetaController({
-  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags
+  normalizeSessionTags: sessionUiFacadeController.normalizeSessionTags,
+  getSessionAppIdentityText: sessionUiFacadeController.getSessionAppIdentityText,
+  getSessionAppIdentityTitle: sessionUiFacadeController.getSessionAppIdentityTitle
 });
 
 sessionDisposalController = createSessionDisposalController();
@@ -1818,6 +1820,7 @@ sessionCardFactoryController = createSessionCardFactoryController({
   getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
   isSessionExited: sessionUiFacadeController.isSessionExited,
+  renderSessionAppIdentity: sessionUiFacadeController.renderSessionAppIdentity,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible)
@@ -1877,6 +1880,7 @@ sessionCardRenderController = createSessionCardRenderController({
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible),
   syncTerminalViewportAfterShow: (sessionId, entry) => appSessionRuntimeFacadeController?.syncTerminalViewportAfterShow(sessionId, entry),
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
+  renderSessionAppIdentity: sessionUiFacadeController.renderSessionAppIdentity,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,

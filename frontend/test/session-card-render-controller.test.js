@@ -47,6 +47,7 @@ function createEntry() {
     focusBtn: { textContent: "" },
     quickIdEl: { textContent: "" },
     stateBadgeEl: { hidden: true, textContent: "" },
+    sessionAppIdentityEl: { hidden: true, textContent: "", title: "" },
     unrestoredHintEl: { hidden: true, textContent: "" },
     settingsDirty: false,
     isVisible: true,
@@ -67,6 +68,7 @@ test("session-card-render controller updates visibility and metadata", () => {
     setSessionCardVisibility: (_node, visible) => calls.push(`visible:${visible}`),
     syncTerminalViewportAfterShow: (sessionId) => calls.push(`sync:${sessionId}`),
     ensureQuickId: () => "A",
+    renderSessionAppIdentity: () => calls.push("app"),
     renderSessionTagList: () => calls.push("tags"),
     renderSessionNote: () => calls.push("note"),
     syncSessionStartupControls: () => calls.push("startup"),
@@ -94,6 +96,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   assert.equal(entry.isVisible, false);
   assert.equal(entry.followOnShow, false);
   assert.deepEqual(calls.includes("sync:s1"), false);
+  assert.deepEqual(calls.includes("app"), true);
   assert.deepEqual(calls.includes("tags"), true);
   assert.deepEqual(calls.includes("note"), true);
   assert.deepEqual(calls.includes("theme"), false);

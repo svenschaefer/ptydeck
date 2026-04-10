@@ -15,6 +15,45 @@ test("store tracks sessions and active session", () => {
   assert.equal(store.getState().activeSessionId, "b");
 });
 
+test("store normalizes and snapshots session app identity state defensively", () => {
+  const store = createStore();
+  store.setSessions([
+    {
+      id: "a",
+      deckId: "default",
+      appIdentity: {
+        family: "coding-agent",
+        label: " Codex ",
+        source: "foreground-process",
+        confidence: 0.914,
+        details: {
+          processName: "codex"
+        },
+        updatedAt: 10
+      }
+    }
+  ]);
+
+  const firstState = store.getState();
+  assert.deepEqual(firstState.sessions[0].appIdentity, {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.91,
+    details: {
+      processName: "codex"
+    },
+    updatedAt: 10
+  });
+
+  firstState.sessions[0].appIdentity.label = "mutated";
+  firstState.sessions[0].appIdentity.details.processName = "mutated";
+
+  const secondState = store.getState();
+  assert.equal(secondState.sessions[0].appIdentity.label, "codex");
+  assert.equal(secondState.sessions[0].appIdentity.details.processName, "codex");
+});
+
 test("store tracks connection state", () => {
   const store = createStore();
   store.setConnectionState("connected");

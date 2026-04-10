@@ -107,7 +107,18 @@ test("paste observation runtime controller auto-continues bounded placeholder st
   const detailEl = new FakeTextNode();
   const continueBtn = new FakeButton();
   const continueCalls = [];
-  const activeSession = { id: "s1", name: "alpha" };
+  const activeSession = {
+    id: "s1",
+    name: "alpha",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.91,
+      details: {},
+      updatedAt: 42
+    }
+  };
   let showCount = 0;
 
   const controller = createPasteObservationRuntimeController({
@@ -137,6 +148,7 @@ test("paste observation runtime controller auto-continues bounded placeholder st
   assert.equal(showCount, 1);
   assert.deepEqual(continueCalls, [["s1", "auto", 1]]);
   assert.match(summaryEl.textContent, /Sent Continue Paste automatically/);
+  assert.match(detailEl.textContent, /Codex placeholder acknowledgement/i);
   assert.equal(continueBtn.hidden, true);
 
   const observation = controller.getObservation("s1");
@@ -172,6 +184,55 @@ test("paste observation runtime controller marks full echo as complete without a
   assert.equal(summaryEl.textContent, "Paste into [1] alpha looks complete.");
   assert.equal(continueBtn.hidden, true);
   assert.match(detailEl.textContent, /Observed 7 pasted chars/);
+
+  controller.dispose();
+});
+
+test("paste observation runtime controller suppresses codex placeholder heuristics for confidently different app labels", async () => {
+  const windowRef = createFakeWindow();
+  const panelEl = new FakeTextNode();
+  const summaryEl = new FakeTextNode();
+  const detailEl = new FakeTextNode();
+  const continueBtn = new FakeButton();
+  const continueCalls = [];
+  const activeSession = {
+    id: "s1",
+    name: "alpha",
+    appIdentity: {
+      family: "coding-agent",
+      label: "gemini",
+      source: "foreground-process",
+      confidence: 0.88,
+      details: {},
+      updatedAt: 42
+    }
+  };
+
+  const controller = createPasteObservationRuntimeController({
+    windowRef,
+    panelEl,
+    summaryEl,
+    detailEl,
+    continueBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: () => activeSession,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    requestContinuePaste: async (sessionId, options) => {
+      continueCalls.push([sessionId, options.source, options.attempt]);
+      return true;
+    }
+  });
+
+  controller.recordTerminalPaste("s1", "abcdefghij", { autoContinueEnabled: true });
+  controller.observeSessionOutput("s1", "[Pasted Content 4 chars]");
+  await windowRef.timers[0].fn();
+  await Promise.resolve();
+
+  assert.deepEqual(continueCalls, []);
+  assert.equal(summaryEl.textContent, "Paste into [1] alpha looks stalled.");
+  assert.match(detailEl.textContent, /No matching echo or known placeholder acknowledgement/i);
+  assert.equal(continueBtn.hidden, false);
 
   controller.dispose();
 });

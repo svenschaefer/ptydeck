@@ -1,4 +1,9 @@
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
+import {
+  formatSessionAppIdentityText,
+  formatSessionAppIdentityTitle,
+  resolveSessionAppIdentity
+} from "./session-app-identity.js";
 
 export function formatSessionDisplayName(session) {
   return session?.name || String(session?.id || "").slice(0, 8);
@@ -245,6 +250,18 @@ export function createSessionViewModel(options = {}) {
     };
   }
 
+  function getSessionAppIdentity(session) {
+    return resolveSessionAppIdentity(session);
+  }
+
+  function getSessionAppIdentityText(session) {
+    return formatSessionAppIdentityText(getSessionAppIdentity(session));
+  }
+
+  function getSessionAppIdentityTitle(session) {
+    return formatSessionAppIdentityTitle(getSessionAppIdentity(session));
+  }
+
   return {
     formatSessionDisplayName: displayName,
     resolveSessionDeckId,
@@ -266,6 +283,9 @@ export function createSessionViewModel(options = {}) {
     formatSessionTags,
     parseSessionTags,
     parseSessionEnv,
-    normalizeSessionStartupFromSession
+    normalizeSessionStartupFromSession,
+    getSessionAppIdentity,
+    getSessionAppIdentityText,
+    getSessionAppIdentityTitle
   };
 }

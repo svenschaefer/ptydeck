@@ -239,6 +239,27 @@ export function createSessionUiFacadeController(options = {}) {
     return getSessionViewModel()?.normalizeSessionStartupFromSession?.(session) || createDefaultSessionStartupState();
   }
 
+  function getSessionAppIdentity(session) {
+    return (
+      getSessionViewModel()?.getSessionAppIdentity?.(session) || {
+        family: "unknown",
+        label: "",
+        source: "unknown",
+        confidence: 0,
+        details: {},
+        updatedAt: null
+      }
+    );
+  }
+
+  function getSessionAppIdentityText(session) {
+    return getSessionViewModel()?.getSessionAppIdentityText?.(session) || "";
+  }
+
+  function getSessionAppIdentityTitle(session) {
+    return getSessionViewModel()?.getSessionAppIdentityTitle?.(session) || "";
+  }
+
   function readSessionStartupFromControls(entry) {
     const settingsStateController = getSessionSettingsStateController();
     if (typeof settingsStateController?.readSessionStartupFromControls === "function") {
@@ -299,6 +320,10 @@ export function createSessionUiFacadeController(options = {}) {
     getSessionCardMetaController()?.renderSessionNote?.(entry, session);
   }
 
+  function renderSessionAppIdentity(entry, session) {
+    getSessionCardMetaController()?.renderSessionAppIdentity?.(entry, session);
+  }
+
   return {
     isValidHexColor,
     normalizeThemeSlot,
@@ -336,6 +361,9 @@ export function createSessionUiFacadeController(options = {}) {
     syncSessionNoteControls,
     syncSessionInputSafetyControls,
     normalizeSessionStartupFromSession,
+    getSessionAppIdentity,
+    getSessionAppIdentityText,
+    getSessionAppIdentityTitle,
     readSessionStartupFromControls,
     readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
@@ -344,6 +372,7 @@ export function createSessionUiFacadeController(options = {}) {
     setActiveSettingsTab,
     setSettingsDirty,
     isSessionSettingsDirty,
+    renderSessionAppIdentity,
     renderSessionTagList,
     renderSessionNote
   };

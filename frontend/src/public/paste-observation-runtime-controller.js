@@ -1,13 +1,17 @@
 import { normalizePayloadWithoutTrailingNewline, normalizeVisibleTerminalText } from "./terminal-stream.js";
+import {
+  formatSessionPasteObservationAppLabel,
+  getSessionPasteObservationProfile
+} from "./session-app-identity.js";
 
 export const PASTE_OBSERVATION_QUIET_WINDOW_MS = 480;
 export const PASTE_OBSERVATION_MAX_AUTO_CONTINUES = 2;
 export const PASTE_OBSERVATION_MAX_VISIBLE_BUFFER = 48_000;
 
-const KNOWN_PLACEHOLDER_PATTERNS = [
-  /\[\s*Pasted Content\s+(\d+)\s+chars?\s*\]/gi,
-  /Pasted Content\s+(\d+)\s+chars?/gi
-];
+const KNOWN_PLACEHOLDER_PATTERNS = Object.freeze({
+  codex: [/\[\s*Pasted Content\s+(\d+)\s+chars?\s*\]/gi, /Pasted Content\s+(\d+)\s+chars?/gi],
+  generic: [/\[\s*Pasted Content\s+(\d+)\s+chars?\s*\]/gi, /Pasted Content\s+(\d+)\s+chars?/gi]
+});
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -32,10 +36,23 @@ function clampVisibleBuffer(value, maxLength) {
   return normalized.slice(normalized.length - maxLength);
 }
 
-function findKnownPlaceholderAckChars(value) {
+function getPlaceholderPatterns(session) {
+  const profile = getSessionPasteObservationProfile(session);
+  return KNOWN_PLACEHOLDER_PATTERNS[profile] || [];
+}
+
+function getPlaceholderAcknowledgementLabel(session) {
+  const label = formatSessionPasteObservationAppLabel(session);
+  if (label === "Codex") {
+    return "Codex placeholder acknowledgement";
+  }
+  return "Placeholder acknowledgement";
+}
+
+function findKnownPlaceholderAckChars(value, session) {
   const text = String(value || "");
   let maxChars = 0;
-  for (const pattern of KNOWN_PLACEHOLDER_PATTERNS) {
+  for (const pattern of getPlaceholderPatterns(session)) {
     pattern.lastIndex = 0;
     let match = pattern.exec(text);
     while (match) {
@@ -60,7 +77,7 @@ function findPayloadPrefixLength(observed, payload, previousLength = 0) {
   }
   const maxLength = Math.min(payloadText.length, observedText.length);
   for (let length = maxLength; length > previousLength; length -= 1) {
-    if (observedText.includes(payloadText.slice(0, length))) {
+    if (observedText.includes(payloadText.slice(0, length)) && (length > 1 || previousLength > 0)) {
       return length;
     }
   }
@@ -101,17 +118,18 @@ function buildObservationSummary(observation, sessionMeta) {
     return "";
   }
   const sessionLabel = `[${sessionMeta.token}] ${sessionMeta.name}`;
+  const placeholderLabel = getPlaceholderAcknowledgementLabel(sessionMeta.session);
   if (observation.autoContinuePending === true) {
     return `Paste into ${sessionLabel} looked stalled. Sent Continue Paste automatically.`;
   }
   if (observation.status === "complete") {
     if (observation.placeholderChars >= observation.payloadChars && observation.placeholderChars > 0) {
-      return `Paste into ${sessionLabel} acknowledged the full payload as a placeholder block.`;
+      return `Paste into ${sessionLabel} acknowledged the full payload as a ${placeholderLabel.toLowerCase()} block.`;
     }
     return `Paste into ${sessionLabel} looks complete.`;
   }
   if (observation.status === "placeholder") {
-    return `Paste into ${sessionLabel} acknowledged a placeholder block.`;
+    return `Paste into ${sessionLabel} acknowledged a ${placeholderLabel.toLowerCase()} block.`;
   }
   if (observation.status === "partial") {
     return `Paste into ${sessionLabel} is being echoed back in chunks.`;
@@ -122,29 +140,33 @@ function buildObservationSummary(observation, sessionMeta) {
   return `Watching the last terminal paste into ${sessionLabel}.`;
 }
 
-function buildObservationDetail(observation) {
+function buildObservationDetail(observation, sessionMeta) {
   if (!observation) {
     return "";
   }
   const payloadStats = `${formatCount(observation.payloadChars)} chars · ${formatCount(observation.payloadLines)} lines`;
+  const placeholderLabel = getPlaceholderAcknowledgementLabel(sessionMeta?.session);
   if (observation.autoContinuePending === true) {
+    if (observation.placeholderChars > 0) {
+      return `Payload: ${payloadStats}. Auto continue is on. Attempt ${observation.autoContinueAttempts}/${PASTE_OBSERVATION_MAX_AUTO_CONTINUES} sent the session terminator after ${placeholderLabel.toLowerCase()} reported ${formatCount(observation.placeholderChars)} pasted chars.`;
+    }
     return `Payload: ${payloadStats}. Auto continue is on. Attempt ${observation.autoContinueAttempts}/${PASTE_OBSERVATION_MAX_AUTO_CONTINUES} sent the session terminator and is waiting for more output.`;
   }
   if (observation.status === "complete") {
     if (observation.placeholderChars >= observation.payloadChars && observation.placeholderChars > 0) {
-      return `Payload: ${payloadStats}. Placeholder acknowledgement reported ${formatCount(observation.placeholderChars)} pasted chars.`;
+      return `Payload: ${payloadStats}. ${placeholderLabel} reported ${formatCount(observation.placeholderChars)} pasted chars.`;
     }
     return `Payload: ${payloadStats}. Observed ${formatCount(observation.echoedChars)} pasted chars in the raw session output.`;
   }
   if (observation.status === "placeholder") {
-    return `Payload: ${payloadStats}. Placeholder acknowledgement reported ${formatCount(observation.placeholderChars)} pasted chars so far.`;
+    return `Payload: ${payloadStats}. ${placeholderLabel} reported ${formatCount(observation.placeholderChars)} pasted chars so far.`;
   }
   if (observation.status === "partial") {
     return `Payload: ${payloadStats}. Observed ${formatCount(observation.echoedChars)} pasted chars in the raw session output so far.`;
   }
   if (observation.status === "stalled") {
     if (observation.placeholderChars > 0) {
-      return `Payload: ${payloadStats}. Placeholder acknowledgement reported ${formatCount(observation.placeholderChars)} pasted chars before the quiet window elapsed.`;
+      return `Payload: ${payloadStats}. ${placeholderLabel} reported ${formatCount(observation.placeholderChars)} pasted chars before the quiet window elapsed.`;
     }
     if (observation.echoedChars > 0) {
       return `Payload: ${payloadStats}. Observed ${formatCount(observation.echoedChars)} pasted chars before the quiet window elapsed.`;
@@ -233,7 +255,7 @@ export function createPasteObservationRuntimeController(options = {}) {
       summaryEl.textContent = buildObservationSummary(observation, sessionMeta);
     }
     if (detailEl) {
-      detailEl.textContent = buildObservationDetail(observation);
+      detailEl.textContent = buildObservationDetail(observation, sessionMeta);
     }
     if (continueBtn) {
       const allowContinue = observation.status === "stalled" && observation.autoContinuePending !== true && !isObservationComplete(observation);
@@ -364,7 +386,10 @@ export function createPasteObservationRuntimeController(options = {}) {
       `${observation.observedVisible}${normalizeVisibleTerminalText(chunk)}`,
       observation.maxVisibleBuffer
     );
-    observation.placeholderChars = Math.max(observation.placeholderChars, findKnownPlaceholderAckChars(observation.observedVisible));
+    observation.placeholderChars = Math.max(
+      observation.placeholderChars,
+      findKnownPlaceholderAckChars(observation.observedVisible, getSessionById(sessionId))
+    );
     observation.echoedChars = Math.max(
       observation.echoedChars,
       findPayloadPrefixLength(observation.observedVisible, observation.payloadVisible, observation.echoedChars)
