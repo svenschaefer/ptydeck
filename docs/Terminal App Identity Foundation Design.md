@@ -230,6 +230,25 @@ Examples:
 - known test-summary/result lines
 - stable agent/tool banners
 
+### 11.1 Message-Separator Hints
+
+Some terminal apps expose practically useful separator patterns that can help with broad app-family recognition or later block-boundary heuristics.
+
+Examples observed in real CLI usage:
+
+- Codex CLI may emit a long horizontal separator made from repeated box-drawing characters such as `───────────────────────────────────────`
+- Gemini CLI may introduce relevant sections with `✦`
+- Claude CLI may emit markers such as `---`, `●`, or `✻`, but those examples are too ambiguous in normal output flow to count as strong separators on their own
+
+Rules for these patterns:
+
+- treat them as weak fallback hints only
+- require corroboration from stronger sources before assigning a concrete app label
+- prefer broad-family effects such as “likely coding-agent style output” over hard app identity
+- reject overly common markers such as short `---` or single bullets when they also occur frequently inside ordinary output
+
+In other words, separator patterns are useful operational knowledge, but they are not a substitute for foreground-process or shell-marker signals.
+
 ## 12. Arbitration Model
 
 Each source should emit a candidate:
