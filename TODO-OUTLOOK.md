@@ -55,6 +55,7 @@ This file is structured into:
 ### Messaging Adapters
 
 - The outbound-first messaging-adapter foundation (`v0.4.0-H77`) and the bounded inbound Telegram reference follow-up (`v0.4.0-H78`) are now both delivered on `main`; only post-reference follow-up work remains in this deferred section.
+- Post-reference trigger auto-detection follow-ups in this section should build on the queued `v0.4.0-H79` terminal-app-identity foundation instead of re-implementing app heuristics inside messaging-specific code.
 
 - [ ] `MSG-008` Owner `BE`: Add richer post-reference trigger profiles and selection controls for deploy, transfer/sync, and long-running worker sessions, plus optional profile auto-detection heuristics, only after the outbound Telegram reference flow and the bounded inbound action contract are both stable.
 - [ ] `MSG-009` Owner `PLAT`: Add a Discord-style interaction-oriented reference adapter on top of the delivered normalized event/action contract, preserving the same single-user ptydeck authority boundaries while validating a richer button-driven remote interaction surface.
