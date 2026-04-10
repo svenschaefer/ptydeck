@@ -63,6 +63,162 @@ The shipped trigger profiles are:
 - `coding-agent`
 - `build-test`
 
+## Setup Checklist
+
+Use this sequence for a first real Telegram setup.
+
+### 1. Create the Bot
+
+In Telegram, talk to `@BotFather` and create a new bot with `/newbot`.
+
+Capture the issued bot token. `ptydeck` uses that token directly against the Telegram Bot API; there is no separate ptydeck-side Telegram login or OAuth flow.
+
+### 2. Add the Bot to the Destination Chat
+
+Choose the destination first:
+
+- direct 1:1 chat with the bot
+- group chat
+- supergroup topic/thread
+
+Then make sure the bot is present in that destination and can receive updates there.
+
+### 3. Discover `chatId` and Optional `messageThreadId`
+
+Send at least one message in the target chat or topic, then inspect Telegram updates for the bot.
+
+Example:
+
+```bash
+curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates" | jq
+```
+
+Look for:
+
+- `message.chat.id` -> `chatId`
+- `message.message_thread_id` -> `messageThreadId` when using a topic/thread
+
+Notes:
+
+- group and supergroup chat IDs are often negative
+- if you use topics, keep `chatId` stable and set the specific `messageThreadId`
+
+### 4. Choose the ptydeck Session Selector
+
+Each mapping entry must include at least one of:
+
+- `sessionId`
+- `quickIdToken`
+- `sessionName`
+
+Practical guidance:
+
+- use `sessionId` when you want the narrowest exact mapping
+- use `quickIdToken` when you work from stable quick IDs in the UI
+- use `sessionName` only when names are intentionally unique enough for that role
+
+If the same Telegram chat/thread maps ambiguously to multiple sessions, bounded inbound actions are rejected until the mapping is narrowed.
+
+### 5. Configure the Backend
+
+You can either place values directly in `backend/.env` or load them from files.
+
+Direct example:
+
+```env
+MESSAGING_TELEGRAM_BOT_TOKEN=123456:replace_with_real_token
+MESSAGING_TELEGRAM_TARGETS=[
+  {
+    "sessionName": "codex",
+    "chatId": "123456789",
+    "profile": "coding-agent"
+  },
+  {
+    "quickIdToken": "4",
+    "chatId": "-1001234567890",
+    "messageThreadId": 12,
+    "profile": "build-test"
+  }
+]
+MESSAGING_TELEGRAM_INBOUND_ENABLED=1
+MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
+```
+
+File-backed example:
+
+```env
+MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
+MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
+MESSAGING_TELEGRAM_INBOUND_ENABLED=1
+MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
+```
+
+Example `telegram-targets.json`:
+
+```json
+[
+  {
+    "sessionName": "codex",
+    "chatId": "123456789",
+    "profile": "coding-agent"
+  }
+]
+```
+
+### 6. Start ptydeck
+
+Start the normal local runtime:
+
+```bash
+npm run dev
+```
+
+If the bot token and target mappings are both present, the messaging runtime becomes active automatically. If either side is missing, messaging stays disabled without making the core runtime unhealthy.
+
+### 7. Verify Adapter Health
+
+Check:
+
+```bash
+curl -s http://127.0.0.1:18080/health | jq
+curl -s http://127.0.0.1:18080/ready | jq
+curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging
+```
+
+Expect:
+
+- a top-level messaging summary in `/health`
+- the same messaging summary in `/ready`
+- `ptydeck_messaging_*` metric lines in `/metrics`
+- when inbound is enabled, additional `ptydeck_messaging_inbound_*` counters
+
+### 8. Run a Minimal Telegram Smoke Test
+
+Outbound:
+
+1. Start or use a mapped session.
+2. Produce some real activity in that session.
+3. Confirm a compact Telegram update appears in the mapped chat/thread.
+
+Inbound:
+
+Try:
+
+```text
+/status
+/replay
+/replay l:20
+/stop
+/retry
+```
+
+Or use the inline buttons:
+
+- `Status`
+- `Replay`
+- `Stop`
+- `Retry`
+
 ## Bounded Inbound Semantics
 
 ### `status`
@@ -104,6 +260,7 @@ Defaults and bounds:
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
+- `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, while alert/new-message decisions can create a new Telegram message instead of mutating the existing one.
 
 ## Related Docs
 

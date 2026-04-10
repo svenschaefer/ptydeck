@@ -112,6 +112,18 @@ Notes:
   - `/replay c:N`
   - `/replay sp:N`
 - Telegram button affordances map onto the same bounded action contract; there is no free-text remote shell execution path.
+- To discover `chatId` and optional `messageThreadId`, send at least one message in the destination chat/topic and inspect:
+
+```bash
+curl -s "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates" | jq
+```
+
+Use:
+
+- `message.chat.id` -> `chatId`
+- `message.message_thread_id` -> `messageThreadId`
+
+- The handbook guide [docs/manual/messaging-adapters.md](docs/manual/messaging-adapters.md) now includes the full operator setup and first-smoke sequence.
 
 ## 4.1 Secrets Management Strategy (ENT-005 Baseline)
 

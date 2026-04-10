@@ -108,6 +108,164 @@
 <li><code>build-test</code></li>
 </ul>
 
+<h2 id="setup-checklist">Setup Checklist</h2>
+
+<p>Use this sequence for a first real Telegram setup.</p>
+
+<h3 id="1-create-the-bot">1. Create the Bot</h3>
+
+<p>In Telegram, talk to <code>@BotFather</code> and create a new bot with <code>/newbot</code>.</p>
+
+<p>Capture the issued bot token. <code>ptydeck</code> uses that token directly against the Telegram Bot API; there is no separate ptydeck-side Telegram login or OAuth flow.</p>
+
+<h3 id="2-add-the-bot-to-the-destination-chat">2. Add the Bot to the Destination Chat</h3>
+
+<p>Choose the destination first:</p>
+
+<ul>
+<li>direct 1:1 chat with the bot</li>
+<li>group chat</li>
+<li>supergroup topic/thread</li>
+</ul>
+
+<p>Then make sure the bot is present in that destination and can receive updates there.</p>
+
+<h3 id="3-discover-chatid-and-optional-messagethreadid">3. Discover <code>chatId</code> and Optional <code>messageThreadId</code></h3>
+
+<p>Send at least one message in the target chat or topic, then inspect Telegram updates for the bot.</p>
+
+<p>Example:</p>
+
+<pre><code class="language-bash">curl -s &quot;https://api.telegram.org/bot&lt;YOUR_BOT_TOKEN&gt;/getUpdates&quot; | jq</code></pre>
+
+<p>Look for:</p>
+
+<ul>
+<li><code>message.chat.id</code> -&gt; <code>chatId</code></li>
+<li><code>message.message_thread_id</code> -&gt; <code>messageThreadId</code> when using a topic/thread</li>
+</ul>
+
+<p>Notes:</p>
+
+<ul>
+<li>group and supergroup chat IDs are often negative</li>
+<li>if you use topics, keep <code>chatId</code> stable and set the specific <code>messageThreadId</code></li>
+</ul>
+
+<h3 id="4-choose-the-ptydeck-session-selector">4. Choose the ptydeck Session Selector</h3>
+
+<p>Each mapping entry must include at least one of:</p>
+
+<ul>
+<li><code>sessionId</code></li>
+<li><code>quickIdToken</code></li>
+<li><code>sessionName</code></li>
+</ul>
+
+<p>Practical guidance:</p>
+
+<ul>
+<li>use <code>sessionId</code> when you want the narrowest exact mapping</li>
+<li>use <code>quickIdToken</code> when you work from stable quick IDs in the UI</li>
+<li>use <code>sessionName</code> only when names are intentionally unique enough for that role</li>
+</ul>
+
+<p>If the same Telegram chat/thread maps ambiguously to multiple sessions, bounded inbound actions are rejected until the mapping is narrowed.</p>
+
+<h3 id="5-configure-the-backend">5. Configure the Backend</h3>
+
+<p>You can either place values directly in <code>backend/.env</code> or load them from files.</p>
+
+<p>Direct example:</p>
+
+<pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN=123456:replace_with_real_token
+MESSAGING_TELEGRAM_TARGETS=[
+  {
+    &quot;sessionName&quot;: &quot;codex&quot;,
+    &quot;chatId&quot;: &quot;123456789&quot;,
+    &quot;profile&quot;: &quot;coding-agent&quot;
+  },
+  {
+    &quot;quickIdToken&quot;: &quot;4&quot;,
+    &quot;chatId&quot;: &quot;-1001234567890&quot;,
+    &quot;messageThreadId&quot;: 12,
+    &quot;profile&quot;: &quot;build-test&quot;
+  }
+]
+MESSAGING_TELEGRAM_INBOUND_ENABLED=1
+MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
+
+<p>File-backed example:</p>
+
+<pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
+MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
+MESSAGING_TELEGRAM_INBOUND_ENABLED=1
+MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
+
+<p>Example <code>telegram-targets.json</code>:</p>
+
+<pre><code class="language-json">[
+  {
+    &quot;sessionName&quot;: &quot;codex&quot;,
+    &quot;chatId&quot;: &quot;123456789&quot;,
+    &quot;profile&quot;: &quot;coding-agent&quot;
+  }
+]</code></pre>
+
+<h3 id="6-start-ptydeck">6. Start ptydeck</h3>
+
+<p>Start the normal local runtime:</p>
+
+<pre><code class="language-bash">npm run dev</code></pre>
+
+<p>If the bot token and target mappings are both present, the messaging runtime becomes active automatically. If either side is missing, messaging stays disabled without making the core runtime unhealthy.</p>
+
+<h3 id="7-verify-adapter-health">7. Verify Adapter Health</h3>
+
+<p>Check:</p>
+
+<pre><code class="language-bash">curl -s http://127.0.0.1:18080/health | jq
+curl -s http://127.0.0.1:18080/ready | jq
+curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
+
+<p>Expect:</p>
+
+<ul>
+<li>a top-level messaging summary in <code>/health</code></li>
+<li>the same messaging summary in <code>/ready</code></li>
+<li><code>ptydeck_messaging_*</code> metric lines in <code>/metrics</code></li>
+<li>when inbound is enabled, additional <code>ptydeck_messaging_inbound_*</code> counters</li>
+</ul>
+
+<h3 id="8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</h3>
+
+<p>Outbound:</p>
+
+<ol>
+<li>Start or use a mapped session.</li>
+<li>Produce some real activity in that session.</li>
+<li>Confirm a compact Telegram update appears in the mapped chat/thread.</li>
+</ol>
+
+<p>Inbound:</p>
+
+<p>Try:</p>
+
+<pre><code class="language-text">/status
+/replay
+/replay l:20
+/stop
+/retry</code></pre>
+
+<p>Or use the inline buttons:</p>
+
+<ul>
+<li><code>Status</code></li>
+<li><code>Replay</code></li>
+<li><code>Stop</code></li>
+<li><code>Retry</code></li>
+</ul>
+
 <h2 id="bounded-inbound-semantics">Bounded Inbound Semantics</h2>
 
 <h3 id="status"><code>status</code></h3>
@@ -156,6 +314,7 @@
 <li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
 <li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
+<li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, while alert/new-message decisions can create a new Telegram message instead of mutating the existing one.</li>
 </ul>
 
 <h2 id="related-docs">Related Docs</h2>
@@ -171,6 +330,15 @@
 <li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>
 <li><a class="handbook-page-toc-link" href="#session-mapping">Session Mapping</a></li>
+<li><a class="handbook-page-toc-link" href="#setup-checklist">Setup Checklist</a></li>
+<li><a class="handbook-page-toc-link" href="#1-create-the-bot">1. Create the Bot</a></li>
+<li><a class="handbook-page-toc-link" href="#2-add-the-bot-to-the-destination-chat">2. Add the Bot to the Destination Chat</a></li>
+<li><a class="handbook-page-toc-link" href="#3-discover-chatid-and-optional-messagethreadid">3. Discover `chatId` and Optional `messageThreadId`</a></li>
+<li><a class="handbook-page-toc-link" href="#4-choose-the-ptydeck-session-selector">4. Choose the ptydeck Session Selector</a></li>
+<li><a class="handbook-page-toc-link" href="#5-configure-the-backend">5. Configure the Backend</a></li>
+<li><a class="handbook-page-toc-link" href="#6-start-ptydeck">6. Start ptydeck</a></li>
+<li><a class="handbook-page-toc-link" href="#7-verify-adapter-health">7. Verify Adapter Health</a></li>
+<li><a class="handbook-page-toc-link" href="#8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</a></li>
 <li><a class="handbook-page-toc-link" href="#bounded-inbound-semantics">Bounded Inbound Semantics</a></li>
 <li><a class="handbook-page-toc-link" href="#status">`status`</a></li>
 <li><a class="handbook-page-toc-link" href="#stop">`stop`</a></li>
