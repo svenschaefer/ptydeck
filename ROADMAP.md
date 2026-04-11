@@ -18,15 +18,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active scoped tasks:
   - none currently
 - Queued next waves:
-  - `v0.4.0-H98`
+  - none currently
 
 ## Active Wave Order
 
-1. `v0.4.0-H98`
-   - `MSG-030`
-   - `MSG-031` after `MSG-030`
-   - `MSG-032` after `MSG-030` and `MSG-031`
-   - `MSG-033` after `MSG-030`, `MSG-031`, and `MSG-032`
+- none currently
 
 ## Sequencing Rules
 

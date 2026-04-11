@@ -471,7 +471,7 @@ test("runtime captures codex raw stream chunks to the analysis file and exposes 
   }
 });
 
-test("runtime executes bounded inbound telegram actions end-to-end for mapped sessions", async () => {
+test("runtime executes bounded inbound telegram topic text and actions end-to-end for mapped sessions", async () => {
   const sends = [];
   const edits = [];
   const callbackAnswers = [];
@@ -552,10 +552,8 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
       update_id: 1,
       message: {
         chat: telegramChat,
-        message_thread_id: 77,
-        is_topic_message: true,
         from: { id: 42, username: "sven" },
-        text: "@ptydeck_bot ping"
+        text: "echo TELEGRAM_OK"
       }
     });
     await waitFor(async () => {
@@ -563,6 +561,13 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
       const health = await healthRes.json();
       return health.messaging.adapters[0].inboundTrace.capturedTotal >= 1;
     }, 2000);
+    await waitFor(() => sends.some((entry) => /Input sent to \[[^\]]+\] build-run/.test(entry.text)), 2000);
+
+    const afterTelegramInputRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+    assert.equal(afterTelegramInputRes.status, 200);
+    const afterTelegramInput = await afterTelegramInputRes.json();
+    assert.equal(afterTelegramInput.controlState.lastInput.subject, "local-operator");
+    assert.equal(afterTelegramInput.controlState.lastInput.clientId, null);
 
     updateQueue.push({ update_id: 2, message: { chat: telegramChat, text: "/status" } });
     await waitFor(() => sends.some((entry) => /Status for \[[^\]]+\] build-run/.test(entry.text)), 2000);
@@ -607,14 +612,14 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
     const health = await healthRes.json();
     const inboundTrace = health.messaging.adapters[0].inboundTrace;
     assert.equal(inboundTrace.capturedTotal >= 5, true);
-    const ignoredPing = inboundTrace.recent.find((entry) => entry.reason === "unsupported_text");
-    assert.equal(Boolean(ignoredPing), true);
-    assert.equal(ignoredPing.chatId, "-100200300");
-    assert.equal(ignoredPing.chatType, "supergroup");
-    assert.equal(ignoredPing.chatTitle, "ptydeck");
-    assert.equal(ignoredPing.chatIsForum, true);
-    assert.equal(ignoredPing.messageThreadId, 77);
-    assert.equal(ignoredPing.preview, "@ptydeck_bot ping");
+    const inputText = inboundTrace.recent.find((entry) => entry.reason === "input_text" && entry.phase === "handled");
+    assert.equal(Boolean(inputText), true);
+    assert.equal(inputText.chatId, "-100200300");
+    assert.equal(inputText.chatType, "supergroup");
+    assert.equal(inputText.chatTitle, "ptydeck");
+    assert.equal(inputText.chatIsForum, true);
+    assert.equal(inputText.messageThreadId, null);
+    assert.equal(inputText.preview, "echo TELEGRAM_OK");
 
     const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
     assert.equal(metricsRes.status, 200);

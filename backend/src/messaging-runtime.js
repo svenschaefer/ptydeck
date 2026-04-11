@@ -940,6 +940,20 @@ async function defaultNoop() {
   return null;
 }
 
+export function normalizeMessagingInboundInputPayload(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalizedLines = value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n+$/g, "");
+  if (!normalizedLines.trim()) {
+    return "";
+  }
+  return `${normalizedLines}\r`;
+}
+
 export function createMessagingRuntime(options = {}) {
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
   const targetMappings = normalizeMessagingTargets(options.telegramTargets);
@@ -960,6 +974,8 @@ export function createMessagingRuntime(options = {}) {
     typeof options.resolveSessionForMessagingTarget === "function" ? options.resolveSessionForMessagingTarget : () => null;
   const requestMessagingStop = typeof options.requestMessagingStop === "function" ? options.requestMessagingStop : defaultNoop;
   const requestMessagingRetry = typeof options.requestMessagingRetry === "function" ? options.requestMessagingRetry : defaultNoop;
+  const requestMessagingSendInput =
+    typeof options.requestMessagingSendInput === "function" ? options.requestMessagingSendInput : defaultNoop;
   const requestMessagingReplayExcerpt =
     typeof options.requestMessagingReplayExcerpt === "function" ? options.requestMessagingReplayExcerpt : defaultNoop;
   const adapters = [];
@@ -1942,6 +1958,40 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
 
     try {
+      if (action === "input") {
+        const payload = normalizeMessagingInboundInputPayload(request.text);
+        if (!payload) {
+          const result = {
+            ok: false,
+            callbackText: "Input rejected.",
+            text: "Telegram text input was empty after normalization."
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "empty_input" }),
+            trace
+          );
+          return result;
+        }
+        await requestMessagingSendInput(session.id, payload, {
+          trace,
+          sessionSnapshot: session,
+          target,
+          preview: request.preview || request.text || ""
+        });
+        const result = {
+          ok: true,
+          callbackText: "Input sent.",
+          text: truncateResponseText(`Input sent to ${buildSessionLabel(session)}.`)
+        };
+        logDebug(
+          "messaging.inbound.action",
+          buildInboundLogDetails(request, { sessionId: session.id, ok: true, inputLength: payload.length }),
+          trace
+        );
+        return result;
+      }
+
       if (action === "status") {
         const result = {
           ok: true,

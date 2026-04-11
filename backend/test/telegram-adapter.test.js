@@ -141,6 +141,7 @@ test("telegram inbound command parsing stays deterministic for buttons and text 
   assert.deepEqual(parseTelegramInboundCommand({ text: "/replay l:40" }), { action: "replay", selector: "l:40" });
   assert.equal(parseTelegramInboundCommand({ text: "/replay l:40 extra" }), null);
   assert.equal(parseTelegramInboundCommand({ text: "status" }), null);
+  assert.equal(parseTelegramInboundCommand({ text: "//status" }), null);
   assert.equal(parseTelegramInboundCommand({ callbackData: "other:status" }), null);
 });
 
@@ -918,8 +919,8 @@ test("telegram adapter polls bounded inbound commands and records metrics", asyn
   assert.equal(adapter.getStatus().pollingActive, false);
 });
 
-test("telegram adapter records unsupported inbound group messages with chat metadata for discovery", async () => {
-  let commandCalls = 0;
+test("telegram adapter routes plain inbound group text as session input with chat metadata preserved", async () => {
+  const inboundCalls = [];
   let served = false;
   const adapter = createTelegramAdapter({
     configured: true,
@@ -976,21 +977,23 @@ test("telegram adapter records unsupported inbound group messages with chat meta
   });
 
   await adapter.startInbound({
-    async onCommand() {
-      commandCalls += 1;
-      return { ok: true, text: "should not run" };
+    async onCommand(command) {
+      inboundCalls.push(command);
+      return { ok: true, text: "Input sent." };
     }
   });
 
   try {
-    await waitFor(() => adapter.getStatus().inboundTrace.capturedTotal >= 1, 1500);
+    await waitFor(() => adapter.getStatus().inboundTrace.capturedTotal >= 1 && inboundCalls.length >= 1, 1500);
     const status = adapter.getStatus();
     const last = status.inboundTrace.recent.at(-1);
-    assert.equal(commandCalls, 0);
+    assert.equal(inboundCalls.length, 1);
+    assert.equal(inboundCalls[0].command.action, "input");
+    assert.equal(inboundCalls[0].text, "@ptydeck_bot ping");
     assert.equal(status.inboundObservedTotal, 1);
-    assert.equal(status.inboundHandledTotal, 0);
-    assert.equal(last.phase, "ignored");
-    assert.equal(last.reason, "unsupported_text");
+    assert.equal(status.inboundHandledTotal, 1);
+    assert.equal(last.phase, "handled");
+    assert.equal(last.reason, "input_text");
     assert.equal(last.chatId, "-100200300");
     assert.equal(last.messageThreadId, 77);
     assert.equal(last.chatType, "supergroup");
@@ -1002,6 +1005,55 @@ test("telegram adapter records unsupported inbound group messages with chat meta
     assert.equal(last.fromUsername, "sven");
     assert.equal(last.preview, "@ptydeck_bot ping");
     assert.equal(last.commandMatched, false);
+  } finally {
+    await adapter.stop();
+  }
+});
+
+test("telegram adapter preserves literal slash-prefixed input via double-slash escape", async () => {
+  const inboundCalls = [];
+  let served = false;
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!served) {
+          served = true;
+          return [{ update_id: 1, message: { chat: { id: -100200300, type: "supergroup" }, text: "//status" } }];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand(command) {
+      inboundCalls.push(command);
+      return { ok: true, text: "Input sent." };
+    }
+  });
+
+  try {
+    await waitFor(() => inboundCalls.length >= 1, 1500);
+    assert.equal(inboundCalls[0].command.action, "input");
+    assert.equal(inboundCalls[0].text, "/status");
   } finally {
     await adapter.stop();
   }

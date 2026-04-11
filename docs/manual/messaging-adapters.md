@@ -78,14 +78,14 @@ That capture is analysis-only and independent of Telegram delivery. It records b
 
 Use it when the question is about rendered Codex block structure, restart-time chunk boundaries, or later allowlist-/signal-first message selection, because the backend debug log remains metadata-oriented and the short replay tail can fall out of memory too quickly during restart churn.
 
-The Telegram adapter now also logs inbound discovery events before command filtering through `messaging.inbound.update`, so unsupported group/topic messages such as `@ptydeck_bot ping` still leave a diagnosable trail with:
+The Telegram adapter now also logs inbound discovery events before and during command/input handling through `messaging.inbound.update`, so group/topic messages such as `@ptydeck_bot ping`, plain text input, and still-unsupported non-text payloads all leave a diagnosable trail with:
 
 - `chatId`
 - `messageThreadId`
 - chat type/title/username
 - whether the chat is a forum
 - preview text
-- parse result such as `command`, `unsupported_text`, or `non_text_message`
+- parse result such as `command`, `input_text`, `unsupported_text`, or `non_text_message`
 
 This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API `getUpdates` inspection may then look empty while `inboundTrace` still shows what the live runtime actually observed.
 
@@ -116,7 +116,7 @@ The Telegram reference adapter can:
 
 - send normalized outbound status, summary, idle, attention, control, and share updates for mapped sessions
 - keep those updates compact through the shipped trigger profiles
-- accept only the bounded inbound action set:
+- accept the bounded inbound bot command set:
   - `/status`
   - `/stop`
   - `/retry`
@@ -124,15 +124,17 @@ The Telegram reference adapter can:
   - `/replay l:N`
   - `/replay c:N`
   - `/replay sp:N`
+- route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
+- preserve literal slash-prefixed terminal input through a `//...` escape (`//status` -> `/status`)
 - expose the same bounded actions through Telegram buttons on adapter-owned messages
 
 ## What It Cannot Do
 
 The adapter does not:
 
-- execute arbitrary shell input from Telegram
 - bypass controller, read-only, share, or send-safety rules
-- parse open-ended free-text intent
+- parse open-ended free-text intent beyond direct text-to-input forwarding
+- execute Telegram text for unmapped chats/topics or for controller-denied sessions
 - mirror raw PTY chunks as a second terminal stream
 
 If you need the exact command or settings contract, use the generated reference pages instead of repeating them here:
@@ -329,12 +331,17 @@ Inbound:
 Try:
 
 ```text
+echo TELEGRAM_OK
 /status
 /replay
 /replay l:20
 /stop
 /retry
 ```
+
+Literal slash-prefixed terminal input example:
+
+`//status` -> `/status`
 
 Or use the inline buttons:
 
@@ -344,6 +351,19 @@ Or use the inline buttons:
 - `Retry`
 
 ## Bounded Inbound Semantics
+
+### plain text input
+
+Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`.
+
+Behavior:
+
+- known bot commands (`/status`, `/stop`, `/retry`, `/replay`) still take priority as adapter commands
+- other plain text is written to the mapped PTY as terminal input
+- multiline payloads are normalized to one final `\r` terminator
+- exact slash-prefixed literal terminal input can be forced with `//...`
+- whitespace-only payloads are rejected instead of writing meaningless PTY input
+- existing controller/access checks remain in force, so Telegram input does not bypass the normal single-writer control model
 
 ### `status`
 
@@ -380,10 +400,10 @@ Defaults and bounds:
 
 ## Operational Notes
 
-- Telegram inbound is opt-in through backend config.
+- Telegram inbound is enabled automatically whenever Telegram bot credentials and target mappings are configured.
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
-- `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including unsupported messages that were seen but did not map to a ptydeck command.
+- `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including accepted `input_text` observations and unsupported/non-text messages that never become ptydeck actions.
 - `/health.messaging.adapters[0].targetTrace` and `/ready.messaging.adapters[0].targetTrace` expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.
 - `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.

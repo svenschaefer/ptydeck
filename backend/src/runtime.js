@@ -2784,6 +2784,7 @@ export function createRuntime(config) {
     resolveSessionForMessagingTarget,
     requestMessagingStop,
     requestMessagingRetry,
+    requestMessagingSendInput,
     requestMessagingReplayExcerpt,
     logDebug
   });
@@ -5567,6 +5568,20 @@ export function createRuntime(config) {
     });
     assignSessionQuickIdToken(payload.id, payload.quickIdToken);
     return toApiSession(payload);
+  }
+
+  function requestMessagingSendInput(sessionId, data, options = {}) {
+    getApiSessionOrThrow(sessionId);
+    ensureSessionControllerAccess(sessionId, null, null, "send terminal input");
+    manager.sendInput(sessionId, data, {
+      trace: {
+        ...(options.trace && typeof options.trace === "object" ? options.trace : {}),
+        sessionId
+      }
+    });
+    recordSessionLastInput(sessionId, null, null);
+    broadcastSessionUpdated(sessionId, options.trace || null);
+    return getApiSessionOrThrow(sessionId);
   }
 
   function requestMessagingReplayExcerpt(sessionId, selector) {

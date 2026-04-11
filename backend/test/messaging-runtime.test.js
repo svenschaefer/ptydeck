@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ApiError } from "../src/errors.js";
 import {
   applyMessagingMessagePolicy,
   createMessagingRuntime,
+  normalizeMessagingInboundInputPayload,
   normalizeMessagingInboundReplaySelector,
   normalizeMessagingTopicBindings,
   normalizeMessagingTargets,
@@ -82,6 +84,12 @@ test("messaging inbound replay selector stays bounded and rejects invalid values
     () => normalizeMessagingInboundReplaySelector("bad"),
     /Replay selector must match 'l:N', 'c:N', or 'sp:N'/
   );
+});
+
+test("messaging inbound input payload normalization stays bounded and deterministic", () => {
+  assert.equal(normalizeMessagingInboundInputPayload("status"), "status\r");
+  assert.equal(normalizeMessagingInboundInputPayload("line 1\r\nline 2\n\n"), "line 1\nline 2\r");
+  assert.equal(normalizeMessagingInboundInputPayload("   \n\t"), "");
 });
 
 test("messaging message policy returns explicit new update alert and suppress decisions", () => {
@@ -1574,13 +1582,14 @@ test("messaging runtime suppresses idle after a recent status attempt was skippe
   assert.ok(status.trace.recent.some((entry) => entry.reason === "idle_after_status_attempt"));
 });
 
-test("messaging runtime handles bounded inbound status stop retry and replay actions", async () => {
+test("messaging runtime handles bounded inbound status input stop retry and replay actions", async () => {
   const outboundMessages = [];
   const callbackAnswers = [];
   const updateQueue = [];
   const stopCalls = [];
   const retryCalls = [];
   const replaySelectors = [];
+  const inputCalls = [];
   let session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
@@ -1622,6 +1631,10 @@ test("messaging runtime handles bounded inbound status stop retry and replay act
       session = { ...session, state: "starting" };
       return session;
     },
+    async requestMessagingSendInput(sessionId, data) {
+      inputCalls.push({ sessionId, data });
+      return session;
+    },
     async requestMessagingReplayExcerpt(sessionId, selector) {
       replaySelectors.push({ sessionId, selector });
       return {
@@ -1639,31 +1652,86 @@ test("messaging runtime handles bounded inbound status stop retry and replay act
   try {
     updateQueue.push(
       { update_id: 1, message: { chat: { id: 1001 }, text: "/status" } },
+      { update_id: 2, message: { chat: { id: 1001 }, text: "echo FROM_TELEGRAM" } },
       {
-        update_id: 2,
+        update_id: 3,
         callback_query: {
           id: "cb-1",
           data: "ptydeck:replay:sp:9",
           message: { chat: { id: 1001 } }
         }
       },
-      { update_id: 3, message: { chat: { id: 1001 }, text: "/stop" } },
-      { update_id: 4, message: { chat: { id: 1001 }, text: "/retry" } }
+      { update_id: 4, message: { chat: { id: 1001 }, text: "/stop" } },
+      { update_id: 5, message: { chat: { id: 1001 }, text: "/retry" } }
     );
 
-    await waitFor(() => outboundMessages.length >= 4 && callbackAnswers.length >= 1, 1500);
+    await waitFor(() => outboundMessages.length >= 5 && callbackAnswers.length >= 1, 1500);
 
     assert.match(outboundMessages[0].text, /Status for \[9\] codex/);
     assert.match(outboundMessages[0].text, /State: running/);
-    assert.match(outboundMessages[1].text, /\[9\] codex replay sp:3/);
-    assert.match(outboundMessages[2].text, /Stop requested for \[9\] codex/);
-    assert.match(outboundMessages[3].text, /Retry started for \[9\] codex/);
+    assert.match(outboundMessages[1].text, /Input sent to \[9\] codex/);
+    assert.match(outboundMessages[2].text, /\[9\] codex replay sp:3/);
+    assert.match(outboundMessages[3].text, /Stop requested for \[9\] codex/);
+    assert.match(outboundMessages[4].text, /Retry started for \[9\] codex/);
     assert.deepEqual(stopCalls, ["s-codex"]);
     assert.deepEqual(retryCalls, ["s-codex"]);
+    assert.deepEqual(inputCalls, [{ sessionId: "s-codex", data: "echo FROM_TELEGRAM\r" }]);
     assert.deepEqual(replaySelectors, [{ sessionId: "s-codex", selector: "sp:3" }]);
     assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
     assert.match(callbackAnswers[0].text, /Replay sp:3/);
-    assert.equal(runtime.buildStatusSummary().adapters[0].inboundHandledTotal >= 4, true);
+    assert.equal(runtime.buildStatusSummary().adapters[0].inboundHandledTotal >= 5, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime returns telegram input control failures without suppressing the rejection", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const inputCalls = [];
+  const session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 260 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 260 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    },
+    async requestMessagingSendInput(sessionId, data) {
+      inputCalls.push({ sessionId, data });
+      throw new ApiError(403, "ControlDenied", "Only the active controller may send terminal input.");
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "pwd" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.deepEqual(inputCalls, [{ sessionId: "s-codex", data: "pwd\r" }]);
+    assert.match(outboundMessages[0].text, /Only the active controller may send terminal input/);
   } finally {
     await runtime.stop();
   }

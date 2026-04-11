@@ -196,6 +196,20 @@ export function parseTelegramInboundCommand(input = {}) {
   return Object.freeze({ action });
 }
 
+function normalizeTelegramInboundTextPayload(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!normalized.trim()) {
+    return "";
+  }
+  if (normalized.startsWith("//")) {
+    return normalized.slice(1);
+  }
+  return normalized;
+}
+
 function summarizeTelegramChat(chat) {
   if (!chat || typeof chat !== "object") {
     return {
@@ -273,12 +287,14 @@ function inspectTelegramInboundUpdate(update = {}) {
   const message = update?.message;
   if (message && typeof message === "object") {
     const chat = summarizeTelegramChat(message?.chat);
-    const command = parseTelegramInboundCommand({ text: message.text });
-    const hasText = normalizeNonEmptyString(message?.text).length > 0;
+    const rawText = typeof message?.text === "string" ? message.text : "";
+    const command = parseTelegramInboundCommand({ text: rawText });
+    const inputText = command ? "" : normalizeTelegramInboundTextPayload(rawText);
+    const hasText = rawText.length > 0;
     const observation = {
       updateId,
       source: "message",
-      reason: chat.chatId ? (command ? "command" : hasText ? "unsupported_text" : "non_text_message") : "missing_chat",
+      reason: chat.chatId ? (command ? "command" : inputText ? "input_text" : hasText ? "unsupported_text" : "non_text_message") : "missing_chat",
       chatId: chat.chatId,
       messageThreadId: Number.isInteger(message?.message_thread_id) ? message.message_thread_id : null,
       chatType: chat.chatType,
@@ -294,7 +310,7 @@ function inspectTelegramInboundUpdate(update = {}) {
       selector: command?.selector || "",
       callbackQueryId: ""
     };
-    if (!chat.chatId || !command) {
+    if (!chat.chatId || (!command && !inputText)) {
       return { observation, inbound: null };
     }
     return {
@@ -313,7 +329,8 @@ function inspectTelegramInboundUpdate(update = {}) {
           chatId: chat.chatId,
           ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
         },
-        command
+        command: command || { action: "input" },
+        ...(inputText ? { text: inputText } : {})
       }
     };
   }
