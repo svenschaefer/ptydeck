@@ -414,7 +414,7 @@ export function createTelegramAdapter(options = {}) {
         text,
         ...(replyMarkup ? { replyMarkup } : {})
       });
-      if (action === "new") {
+      if (action === "new" || action === "alert") {
         state.messageId = Number.isInteger(result?.messageId) ? result.messageId : state.messageId;
         state.lastText = text;
         state.lastUpdatedAt = nowFn();

@@ -39,6 +39,7 @@ const ZERO_ISSUE_COUNT_PATTERN = /^\s*0\s+(?:error(?:\(s\))?|errors|warning(?:\(
 const CODING_AGENT_TAIL_MARKERS = Object.freeze([
   /\s+(?:[•*]\s*)?Ran\b/i,
   /\s+(?:[•*]\s*)?Edited\b/i,
+  /\s+[│|]\s*[A-Za-z_][\w.-]*(?:\|[A-Za-z_][\w.-]*){1,}\|?/u,
   /\s+(?:documentation|ocumentation|umentation|entation|tation)\s+in\s+@filename\b/i,
   /\s+(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/i,
   /\s+\d{1,3}%\s+(?:left|used|remaining)\b/i,
@@ -630,13 +631,24 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   }
   if (type === "session.attention.required") {
     const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
+    const withinAttentionWindow =
+      lastDeliveredAt > 0 &&
+      Number.isInteger(event?.occurredAt) &&
+      event.occurredAt - lastDeliveredAt < ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS;
+    if (
+      comparableText &&
+      lastComparableText &&
+      isSubsetComparableText(lastComparableText, comparableText) &&
+      withinAttentionWindow &&
+      threadState.messageCreated === true
+    ) {
+      return Object.freeze({ action: "update", messageKey: "attention", reason: "attention_followup_update" });
+    }
     if (
       comparableText &&
       lastComparableText &&
       (isSubsetComparableText(comparableText, lastComparableText) || isSubsetComparableText(lastComparableText, comparableText)) &&
-      lastDeliveredAt > 0 &&
-      Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - lastDeliveredAt < ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS
+      withinAttentionWindow
     ) {
       return Object.freeze({ action: "suppress", messageKey: "attention", reason: "attention_duplicate_churn" });
     }
@@ -1164,7 +1176,10 @@ export function createMessagingRuntime(options = {}) {
       delivered = delivered || result?.delivered === true;
     }
     if (delivered) {
-      threadState.messageCreated = decision.action === "new" || decision.action === "update" ? true : threadState.messageCreated;
+      threadState.messageCreated =
+        decision.action === "new" || decision.action === "update" || decision.action === "alert"
+          ? true
+          : threadState.messageCreated;
       threadState.lastText = event.text;
       threadState.lastComparableText = event.comparableText || "";
       threadState.lastAction = decision.action;

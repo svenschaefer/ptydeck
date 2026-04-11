@@ -134,6 +134,45 @@ test("telegram adapter updates an existing thread and falls back to a new messag
   assert.equal(adapter.getStatus().updatedTotal, 1);
 });
 
+test("telegram adapter can update an existing attention thread after an initial alert send", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    configuredTargets: 1,
+    nowFn: () => 321,
+    transport: {
+      async sendMessage(payload) {
+        calls.push({ method: "send", payload });
+        return { messageId: 71 };
+      },
+      async editMessage(payload) {
+        calls.push({ method: "edit", payload });
+        return { messageId: payload.messageId };
+      }
+    }
+  });
+
+  const alerted = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "alert", messageKey: "attention" },
+    threadKey: "attention",
+    text: "attention required"
+  });
+  const updated = await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "update", messageKey: "attention" },
+    threadKey: "attention",
+    text: "attention required with stack trace"
+  });
+
+  assert.equal(alerted.delivered, true);
+  assert.equal(updated.delivered, true);
+  assert.deepEqual(calls.map((entry) => entry.method), ["send", "edit"]);
+  assert.equal(calls[1].payload.messageId, 71);
+  assert.equal(adapter.getStatus().updatedTotal, 1);
+  assert.equal(adapter.getStatus().alertedTotal, 1);
+});
+
 test("telegram adapter records delivery failures without throwing them through the runtime", async () => {
   const adapter = createTelegramAdapter({
     enabled: true,

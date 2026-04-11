@@ -98,6 +98,20 @@ test("messaging message policy returns explicit new update alert and suppress de
     },
     { lastComparableText: "validation failed", lastDeliveredAt: 1_000 }
   );
+  const attentionFollowupUpdate = applyMessagingMessagePolicy(
+    {
+      type: "session.attention.required",
+      threadKey: "attention",
+      text: "Retry blocked because validation failed in workspace startup",
+      comparableText: "retry blocked because validation failed in workspace startup",
+      occurredAt: 5_500
+    },
+    {
+      messageCreated: true,
+      lastComparableText: "validation failed",
+      lastDeliveredAt: 1_000
+    }
+  );
   const repeatedIdle = applyMessagingMessagePolicy(
     {
       type: "session.activity.idle",
@@ -137,6 +151,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(noisy.reason, "noise_status_tail");
   assert.equal(attentionChurn.action, "suppress");
   assert.equal(attentionChurn.reason, "attention_duplicate_churn");
+  assert.equal(attentionFollowupUpdate.action, "update");
+  assert.equal(attentionFollowupUpdate.reason, "attention_followup_update");
   assert.equal(repeatedIdle.action, "suppress");
   assert.equal(repeatedIdle.reason, "idle_repeat");
   assert.equal(idleAfterUndeliveredSummary.action, "suppress");
@@ -406,6 +422,7 @@ test("messaging runtime suppresses repeated identical attention churn and ignore
 
 test("messaging runtime strips coding-agent tails and terminal-control residue from repeated fatal alerts and suppresses zero-issue counts", async () => {
   const sends = [];
+  const edits = [];
   let now = 1_320;
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
@@ -418,6 +435,7 @@ test("messaging runtime strips coding-agent tails and terminal-control residue f
           return { messageId: sends.length + 35 };
         },
         async editMessage(payload) {
+          edits.push(payload);
           return { messageId: payload.messageId || 36 };
         }
       };
@@ -448,14 +466,17 @@ test("messaging runtime strips coding-agent tails and terminal-control residue f
   });
 
   assert.equal(sends.length, 2);
+  assert.equal(edits.length, 1);
   assert.match(sends[1].text, /fatal: not a git repository/);
+  assert.match(edits[0].text, /fatal: not a git repository/);
   assert.doesNotMatch(sends[1].text, /Get-Content/);
   assert.doesNotMatch(sends[1].text, /38;5;2m/);
   assert.doesNotMatch(sends[1].text, /9;1H/);
   assert.doesNotMatch(sends[1].text, /100% left/);
+  assert.doesNotMatch(edits[0].text, /100% left/);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_duplicate_churn"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_followup_update"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_zero_issue_count"));
 });
 
@@ -504,6 +525,113 @@ test("messaging runtime suppresses short coding-agent attention snippet tails af
   assert.equal(sends.length, 2);
   assert.match(sends[1].text, /fatal: unable to access/);
   assert.doesNotMatch(sends[1].text, /eine Exception geworfen/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_snippet_tail"));
+});
+
+test("messaging runtime edits an existing attention thread when a richer follow-up for the same issue arrives", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 1_380;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 50 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 52 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "attention-update-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "fatal: unable to access 'https://github.com/svenschaefer/snixy/'\n",
+    promptBoundaries: [],
+    trace: { traceId: "attention-update-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "fatal: unable to access 'https://github.com/svenschaefer/snixy/': Failed to connect to github.com port 443\n",
+    promptBoundaries: [],
+    trace: { traceId: "attention-update-3" }
+  });
+
+  assert.equal(sends.length, 2);
+  assert.equal(edits.length, 1);
+  assert.match(sends[1].text, /fatal: unable to access/);
+  assert.match(edits[0].text, /Failed to connect to github\.com port 443/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_followup_update"));
+});
+
+test("messaging runtime trims coding-agent identifier tails from attention lines and suppresses duplicate follow-on alerts", async () => {
+  const sends = [];
+  let now = 1_390;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 55 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 56 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "attention-tail-1" });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "Die ersten Leseaufrufe sind an den 1s-Timeout gelaufen.\n" +
+      "Die ersten Leseaufrufe sind an den 1s-Timeout gelaufen. │ ExecuteTrayActionAsync|OnRestoreControlRequested|\n",
+    promptBoundaries: [],
+    trace: { traceId: "attention-tail-2" }
+  });
+
+  assert.equal(sends.length, 2);
+  assert.match(sends[1].text, /Die ersten Leseaufrufe sind an den 1s-Timeout gelaufen\./);
+  assert.doesNotMatch(sends[1].text, /ExecuteTrayActionAsync/);
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_snippet_tail"));

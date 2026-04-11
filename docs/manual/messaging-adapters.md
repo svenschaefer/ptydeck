@@ -18,6 +18,7 @@ That means:
 
 - duplicate status churn is suppressed aggressively
 - repeated attention churn from the same logical failure is now damped so one error does not fan out into many nearly identical Telegram alerts
+- when a later line adds meaningful detail to the same recent failure, the adapter now edits the existing attention post instead of sending a second alert
 - low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message
 - coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently
 - structural follow-up lines such as trailing `}` or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword
@@ -301,7 +302,7 @@ Defaults and bounds:
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
-- `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, while alert/new-message decisions can create a new Telegram message instead of mutating the existing one.
+- `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
 
 ## Related Docs
 
