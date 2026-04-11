@@ -90,6 +90,8 @@ function parseAuthMode(rawValue) {
   throw new Error("AUTH_MODE must be one of: off, dev, prod.");
 }
 
+const TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE = true;
+
 export function loadConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
   const enforceTlsIngress = parseBoolean(env.ENFORCE_TLS_INGRESS ?? (nodeEnv === "production" ? "1" : "0"));
@@ -147,8 +149,8 @@ export function loadConfig(env = process.env) {
   const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
   const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
-  const messagingTelegramOutboundEnabled = parseBoolean(env.MESSAGING_TELEGRAM_OUTBOUND_ENABLED);
-  const messagingTelegramInboundEnabled = parseBoolean(env.MESSAGING_TELEGRAM_INBOUND_ENABLED);
+  const messagingTelegramOutboundEnabled = false;
+  const messagingTelegramInboundEnabled = Boolean(messagingTelegramBotToken && messagingTelegramTargets.length > 0);
   const messagingTelegramPollTimeoutSeconds = parsePositiveInt(
     env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
     "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
@@ -173,11 +175,6 @@ export function loadConfig(env = process.env) {
   }
   if ((messagingTelegramBotToken && messagingTelegramTargets.length === 0) || (!messagingTelegramBotToken && messagingTelegramTargets.length > 0)) {
     throw new Error("MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together.");
-  }
-  if (messagingTelegramInboundEnabled && (!messagingTelegramBotToken || messagingTelegramTargets.length === 0)) {
-    throw new Error(
-      "MESSAGING_TELEGRAM_INBOUND_ENABLED requires MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS."
-    );
   }
   if (messagingTelegramApiBaseUrl) {
     parseOrigin(messagingTelegramApiBaseUrl, "MESSAGING_TELEGRAM_API_BASE_URL");
@@ -275,6 +272,7 @@ export function loadConfig(env = process.env) {
     messagingTelegramTargets,
     messagingTelegramApiBaseUrl,
     messagingTelegramOutboundEnabled,
+    messagingTelegramOutboundHardBreakActive: TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE,
     messagingTelegramInboundEnabled,
     messagingTelegramPollTimeoutSeconds
   };

@@ -966,7 +966,9 @@ export function createMessagingRuntime(options = {}) {
   const telegramTopicBindings = new Map();
   const sessionWorkQueues = new Map();
   const telegramConfigured = Boolean(options.telegramBotToken && targetMappings.length > 0);
-  const telegramOutboundEnabled = telegramConfigured && options.telegramOutboundEnabled === true;
+  const telegramOutboundHardBreakActive = options.telegramOutboundHardBreakActive === true;
+  const telegramOutboundEnabled =
+    telegramConfigured && !telegramOutboundHardBreakActive && options.telegramOutboundEnabled === true;
   const telegramInboundEnabled = telegramConfigured && options.telegramInboundEnabled === true;
   const telegramTransportFactory =
     typeof options.createTelegramTransport === "function" ? options.createTelegramTransport : createTelegramTransport;
@@ -980,6 +982,7 @@ export function createMessagingRuntime(options = {}) {
   const telegramAdapter = createTelegramAdapter({
     configured: telegramConfigured,
     deliveryEnabled: telegramOutboundEnabled,
+    deliveryHardBreakActive: telegramOutboundHardBreakActive,
     inboundEnabled: telegramInboundEnabled,
     configuredTargets: targetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
@@ -2056,6 +2059,7 @@ export function createMessagingRuntime(options = {}) {
     return {
       enabled: telegramConfigured,
       deliveryEnabled: telegramOutboundEnabled,
+      deliveryHardBreakActive: telegramOutboundHardBreakActive,
       adapters: adapters.map((adapter) => adapter.getStatus()),
       trace: {
         capacity: MAX_MESSAGING_TRACE_ENTRIES,

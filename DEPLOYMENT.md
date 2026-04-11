@@ -81,8 +81,6 @@ Optional single-user Telegram messaging adapter baseline:
 - Backend: `MESSAGING_TELEGRAM_BOT_TOKEN` or `MESSAGING_TELEGRAM_BOT_TOKEN_FILE`
 - Backend: `MESSAGING_TELEGRAM_TARGETS` or `MESSAGING_TELEGRAM_TARGETS_FILE`
 - Backend (optional override): `MESSAGING_TELEGRAM_API_BASE_URL`
-- Backend (explicit outbound re-enable): `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1`
-- Backend (optional bounded inbound enable): `MESSAGING_TELEGRAM_INBOUND_ENABLED=1`
 - Backend (optional bounded inbound long-poll timeout): `MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS`
 
 Target mapping payload format:
@@ -113,7 +111,8 @@ Notes:
 - Static mappings require at least one of `sessionId`, `quickIdToken`, or `sessionName` per entry.
 - A selectorless target is now allowed only for `topicMode: "deck-session"` and means: route every live session dynamically into that forum-enabled supergroup, provisioning one topic per terminal/session in real time.
 - Messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
-- Hard-break default: Telegram outbound delivery is now off until `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1` is set explicitly.
+- Hard-break baseline: Telegram outbound delivery is currently hard-disabled in the shipped product path while the forum topology and later allowlist-/signal-first rebuild are being established. There is intentionally no environment-variable re-enable switch at this stage.
+- Inbound observation/command handling is always enabled whenever a bot token and target mappings are configured; there is intentionally no separate environment toggle for that path.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
 - The shipped bounded inbound command set is intentionally limited to:
   - `/status`

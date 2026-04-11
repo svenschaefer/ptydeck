@@ -150,13 +150,14 @@ A selectorless target is now allowed only for `topicMode: "deck-session"`. That 
 
 ## Delivery Hard Break
 
-Telegram outbound delivery is now off by default until it is re-enabled explicitly with `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1`.
+Telegram outbound delivery is currently hard-disabled in the shipped product path.
 
 That hard break is intentional:
 
 - no new Telegram chat messages are sent while the operator topology is being rebuilt
 - `topicMode: "deck-session"` can still validate the target chat and provision per-terminal forum topics
-- once the forum-enabled supergroup topology is visibly correct, outbound delivery can be re-enabled from a clean baseline
+- there is intentionally no environment-variable re-enable switch at this stage
+- inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path
 
 The shipped trigger profiles are:
 
@@ -236,8 +237,6 @@ MESSAGING_TELEGRAM_TARGETS=[
     "profile": "coding-agent"
   }
 ]
-MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
-MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
 ```
 
@@ -246,8 +245,6 @@ File-backed example:
 ```env
 MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
 MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
-MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
-MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
 ```
 

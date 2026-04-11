@@ -453,6 +453,7 @@ export function createTelegramTransport(options = {}) {
 export function createTelegramAdapter(options = {}) {
   const configured = options.configured === true;
   const deliveryEnabled = configured && options.deliveryEnabled === true;
+  const deliveryHardBreakActive = options.deliveryHardBreakActive === true;
   const inboundEnabled = configured && options.inboundEnabled === true;
   const transport = configured ? options.transport : null;
   if (configured && (!transport || typeof transport.sendMessage !== "function" || typeof transport.editMessage !== "function")) {
@@ -1189,6 +1190,7 @@ export function createTelegramAdapter(options = {}) {
       adapter: "telegram",
       enabled: configured,
       deliveryEnabled,
+      deliveryHardBreakActive,
       inboundEnabled,
       configuredTargets,
       deliveredTotal: metrics.deliveredTotal,

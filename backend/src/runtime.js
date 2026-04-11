@@ -2761,6 +2761,7 @@ export function createRuntime(config) {
     telegramTopicBindings: Array.from(telegramTopicBindings.values()),
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
     telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
+    telegramOutboundHardBreakActive: config.messagingTelegramOutboundHardBreakActive,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
     createTelegramTransport: config.createMessagingTelegramTransport,
