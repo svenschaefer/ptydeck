@@ -243,6 +243,7 @@ Expect:
 - `ptydeck_messaging_*` metric lines in `/metrics`
 - when inbound is enabled, additional `ptydeck_messaging_inbound_*` counters
 - a bounded `.messaging.trace.recent` ring for recent outbound candidate and suppression analysis
+- transient inbound polling failures during backlog drain or later live polling should now surface in the inbound counters and last-error fields while the adapter retries instead of stopping inbound permanently after one startup transport error
 
 ### 8. Run a Minimal Telegram Smoke Test
 

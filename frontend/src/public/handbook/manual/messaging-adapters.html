@@ -287,6 +287,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li><code>ptydeck_messaging_*</code> metric lines in <code>/metrics</code></li>
 <li>when inbound is enabled, additional <code>ptydeck_messaging_inbound_*</code> counters</li>
 <li>a bounded <code>.messaging.trace.recent</code> ring for recent outbound candidate and suppression analysis</li>
+<li>transient inbound polling failures during backlog drain or later live polling should now surface in the inbound counters and last-error fields while the adapter retries instead of stopping inbound permanently after one startup transport error</li>
 </ul>
 
 <h3 id="8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</h3>

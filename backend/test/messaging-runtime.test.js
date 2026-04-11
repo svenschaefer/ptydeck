@@ -1163,6 +1163,200 @@ test("messaging runtime rejects unmapped or unavailable inbound actions determin
   }
 });
 
+test("messaging runtime rejects ambiguous inbound mappings deterministically", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [
+      { chatId: "1001", sessionName: "mapped-a" },
+      { chatId: "1001", sessionName: "mapped-b" }
+    ],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 320 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 320 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.match(outboundMessages[0].text, /matches multiple ptydeck messaging targets/i);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime falls back to the cached session snapshot when live target resolution fails", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const retryCalls = [];
+  const session = createSession({ id: "s-cached", name: "codex", quickIdToken: "9", startCommand: "codex" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 330 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 330 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      throw new Error("Live lookup failed.");
+    },
+    async requestMessagingRetry(sessionId, options = {}) {
+      retryCalls.push({ sessionId, options });
+      return { ...session, state: "starting" };
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "cached-1" });
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/retry" } });
+    await waitFor(() => outboundMessages.length >= 2, 1500);
+    assert.match(outboundMessages[1].text, /Retry started for \[9\] codex/);
+    assert.equal(retryCalls.length, 1);
+    assert.equal(retryCalls[0].sessionId, "s-cached");
+    assert.equal(retryCalls[0].options.sessionSnapshot.id, "s-cached");
+    assert.equal(retryCalls[0].options.target.chatId, "1001");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime rejects inbound actions when the mapped session payload is missing", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 340 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 340 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return { id: "", name: "mapped" };
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.match(outboundMessages[0].text, /Mapped ptydeck session is unavailable/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime rejects retry while a live mapped session is still running", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const retryCalls = [];
+  const session = createSession({ id: "s-live", name: "codex", quickIdToken: "9", startCommand: "codex", state: "running" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 350 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 350 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    },
+    async requestMessagingRetry(sessionId) {
+      retryCalls.push(sessionId);
+      return session;
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/retry" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.match(outboundMessages[0].text, /Retry is unavailable while \[9\] codex is running/);
+    assert.deepEqual(retryCalls, []);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("messaging runtime ignores unmapped outbound sessions and exposes adapter metrics", async () => {
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",

@@ -536,7 +536,21 @@ export function createTelegramAdapter(options = {}) {
     pollState.promise = (async () => {
       try {
         try {
-          await drainBacklog();
+          while (!pollState.stopRequested) {
+            try {
+              await drainBacklog();
+              break;
+            } catch (error) {
+              if (isAbortError(error) && pollState.stopRequested) {
+                break;
+              }
+              metrics.inboundFailedTotal += 1;
+              metrics.lastInboundErrorAt = nowFn();
+              metrics.lastInboundError =
+                error instanceof Error ? error.message : String(error || "Telegram inbound polling failed.");
+              await delay(POLL_RETRY_DELAY_MS);
+            }
+          }
           while (!pollState.stopRequested) {
             let updates = [];
             try {

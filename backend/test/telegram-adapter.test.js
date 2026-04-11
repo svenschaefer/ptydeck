@@ -96,6 +96,75 @@ test("telegram inbound command parsing stays deterministic for buttons and text 
   assert.equal(parseTelegramInboundCommand({ callbackData: "other:status" }), null);
 });
 
+test("telegram adapter validates transport requirements and inbound start states deterministically", async () => {
+  assert.throws(
+    () => createTelegramAdapter({ enabled: true, transport: { sendMessage: async () => ({ messageId: 1 }) } }),
+    /sendMessage\/editMessage transport methods/
+  );
+  assert.throws(
+    () =>
+      createTelegramAdapter({
+        enabled: true,
+        inboundEnabled: true,
+        transport: {
+          sendMessage: async () => ({ messageId: 1 }),
+          editMessage: async ({ messageId }) => ({ messageId })
+        }
+      }),
+    /getUpdates\/answerCallbackQuery transport methods/
+  );
+
+  const disabled = createTelegramAdapter({ enabled: false });
+  assert.deepEqual(await disabled.startInbound({ onCommand: async () => ({ ok: true }) }), {
+    started: false,
+    reason: "disabled"
+  });
+
+  const outboundOnly = createTelegramAdapter({
+    enabled: true,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      }
+    }
+  });
+  assert.deepEqual(await outboundOnly.startInbound({ onCommand: async () => ({ ok: true }) }), {
+    started: false,
+    reason: "inbound_disabled"
+  });
+
+  const inbound = createTelegramAdapter({
+    enabled: true,
+    inboundEnabled: true,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async getUpdates() {
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await assert.rejects(() => inbound.startInbound({}), /requires an onCommand handler/);
+  assert.deepEqual(await inbound.startInbound({ onCommand: async () => ({ ok: true }) }), { started: true });
+  assert.deepEqual(await inbound.startInbound({ onCommand: async () => ({ ok: true }) }), {
+    started: true,
+    reason: "already_started"
+  });
+  await inbound.stop();
+});
+
 test("telegram adapter updates an existing thread and falls back to a new message when edit fails", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
@@ -171,6 +240,57 @@ test("telegram adapter can update an existing attention thread after an initial 
   assert.equal(calls[1].payload.messageId, 71);
   assert.equal(adapter.getStatus().updatedTotal, 1);
   assert.equal(adapter.getStatus().alertedTotal, 1);
+});
+
+test("telegram adapter preserves alert thread continuity across edit fallback sends", async () => {
+  const calls = [];
+  let fallbackTriggered = false;
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 500;
+      return () => ++current;
+    })(),
+    transport: {
+      async sendMessage(payload) {
+        calls.push({ method: "send", payload });
+        return { messageId: calls.length === 1 ? 71 : 72 };
+      },
+      async editMessage(payload) {
+        calls.push({ method: "edit", payload });
+        if (!fallbackTriggered) {
+          fallbackTriggered = true;
+          throw new Error("message not found");
+        }
+        return { messageId: payload.messageId };
+      }
+    }
+  });
+
+  await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "alert", messageKey: "attention" },
+    threadKey: "attention",
+    text: "attention required"
+  });
+  await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "update", messageKey: "attention" },
+    threadKey: "attention",
+    text: "attention required with context"
+  });
+  await adapter.handleEvent({
+    target: { chatId: "1001" },
+    decision: { action: "update", messageKey: "attention" },
+    threadKey: "attention",
+    text: "attention required with stack trace"
+  });
+
+  assert.deepEqual(calls.map((entry) => entry.method), ["send", "edit", "send", "edit"]);
+  assert.equal(calls[1].payload.messageId, 71);
+  assert.equal(calls[3].payload.messageId, 72);
+  assert.equal(adapter.getStatus().updatedTotal, 2);
 });
 
 test("telegram adapter records delivery failures without throwing them through the runtime", async () => {
@@ -285,6 +405,193 @@ test("telegram adapter honors Telegram retry-after backoff before attempting ano
   assert.equal(third.delivered, true);
   assert.equal(adapter.getStatus().backoffActive, false);
   assert.equal(adapter.getStatus().backoffRemainingMs, 0);
+});
+
+test("telegram adapter drains multi-batch backlog before polling live inbound commands", async () => {
+  const sends = [];
+  const getUpdatesCalls = [];
+  let livePollReleased = false;
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    inboundEnabled: true,
+    configuredTargets: 2,
+    nowFn: (() => {
+      let current = 900;
+      return () => ++current;
+    })(),
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        return { messageId: sends.length + 80 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 80 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        getUpdatesCalls.push(timeoutSeconds);
+        if (timeoutSeconds === 0 && getUpdatesCalls.filter((entry) => entry === 0).length === 1) {
+          return Array.from({ length: 100 }, (_, index) => ({ update_id: index + 1 }));
+        }
+        if (timeoutSeconds === 0 && getUpdatesCalls.filter((entry) => entry === 0).length === 2) {
+          return [
+            { update_id: 101 },
+            { update_id: 102 },
+            { update_id: 103 }
+          ];
+        }
+        if (!livePollReleased) {
+          livePollReleased = true;
+          return [
+            { update_id: 104, message: { chat: { id: 1001 }, text: "/status" } },
+            { update_id: 105, message: { chat: { id: 1001 }, text: "ignored free text" } }
+          ];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand() {
+      return { ok: true, text: "Status for [4] backlog-run" };
+    }
+  });
+
+  try {
+    await waitFor(() => sends.length >= 1, 1500);
+    assert.match(sends[0].text, /Status for \[4\] backlog-run/);
+    assert.equal(adapter.getStatus().inboundBacklogSkippedTotal, 103);
+    assert.deepEqual(getUpdatesCalls.slice(0, 3), [0, 0, 1]);
+  } finally {
+    await adapter.stop();
+  }
+});
+
+test("telegram adapter records polling failures and recovers on a later inbound command", async () => {
+  const sends = [];
+  let pollCalls = 0;
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 1_200;
+      return () => ++current;
+    })(),
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        return { messageId: sends.length + 120 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 120 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        pollCalls += 1;
+        if (pollCalls === 1) {
+          throw new Error("temporary telegram outage");
+        }
+        if (timeoutSeconds === 0 && pollCalls === 2) {
+          return [];
+        }
+        if (pollCalls === 3) {
+          return [{ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } }];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand() {
+      return { ok: true, text: "Status for [4] recovered-run" };
+    }
+  });
+
+  try {
+    await waitFor(() => sends.length >= 1, 1500);
+    assert.match(sends[0].text, /recovered-run/);
+    assert.equal(adapter.getStatus().inboundFailedTotal >= 1, true);
+    assert.match(adapter.getStatus().lastInboundError, /temporary telegram outage/);
+    assert.equal(adapter.getStatus().inboundHandledTotal >= 1, true);
+  } finally {
+    await adapter.stop();
+  }
+});
+
+test("telegram adapter swallows callback acknowledgement failures after command failures", async () => {
+  const sends = [];
+  const callbackAnswers = [];
+  let liveServed = false;
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 1_500;
+      return () => ++current;
+    })(),
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        return { messageId: sends.length + 150 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 150 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!liveServed) {
+          liveServed = true;
+          return [
+            {
+              update_id: 1,
+              callback_query: {
+                id: "cb-err",
+                data: "ptydeck:status",
+                message: { chat: { id: 1001 } }
+              }
+            }
+          ];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery(payload) {
+        callbackAnswers.push(payload);
+        throw new Error("callback transport failed");
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand() {
+      throw new Error("command failed");
+    }
+  });
+
+  try {
+    await waitFor(() => adapter.getStatus().inboundFailedTotal >= 1, 1500);
+    assert.equal(sends.length, 0);
+    assert.equal(callbackAnswers.length, 1);
+    assert.match(callbackAnswers[0].text, /command failed/i);
+    assert.match(adapter.getStatus().lastInboundError, /command failed/);
+  } finally {
+    await adapter.stop();
+  }
 });
 
 test("telegram adapter polls bounded inbound commands and records metrics", async () => {
