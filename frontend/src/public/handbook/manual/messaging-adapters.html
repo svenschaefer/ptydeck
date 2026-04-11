@@ -125,6 +125,8 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <p>A Telegram target maps one ptydeck session to one chat destination.</p>
 
+<p>For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same <code>chatId</code> and gets its own <code>messageThreadId</code>. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.</p>
+
 <p>Each mapping entry needs:</p>
 
 <ul>

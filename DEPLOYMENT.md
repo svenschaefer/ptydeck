@@ -113,6 +113,7 @@ Notes:
   - `/replay c:N`
   - `/replay sp:N`
 - Telegram button affordances map onto the same bounded action contract; there is no free-text remote shell execution path.
+- Recommended live topology: use one forum-enabled Telegram supergroup for ptydeck and create one topic per mapped terminal/session. In that shape, all mappings share the same `chatId` and differ by `messageThreadId`. The direct 1:1 bot chat is useful only for bootstrap, smoke tests, and initial `chatId` discovery.
 - To discover `chatId` and optional `messageThreadId`, send at least one message in the destination chat/topic and inspect:
 
 ```bash

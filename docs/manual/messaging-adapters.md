@@ -87,6 +87,8 @@ If you need the exact command or settings contract, use the generated reference 
 
 A Telegram target maps one ptydeck session to one chat destination.
 
+For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same `chatId` and gets its own `messageThreadId`. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.
+
 Each mapping entry needs:
 
 - `chatId`
