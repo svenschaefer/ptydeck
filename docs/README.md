@@ -166,7 +166,7 @@ Authoritative repository documents remain:
     - active analytical reference for the post-hard-break Telegram redesign
     - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
   - Current interpretation:
-    - use it when reasoning about restart-phase flooding, control-change chatter, idle churn, prompt-ready timing, and repeated target/topic validation during startup
+    - use it when reasoning about restart-phase flooding, control-change chatter, idle churn, prompt-ready timing, repeated target/topic validation during startup, and the difference between cold bootstrap, reconnect/remount, and restored-PTY-burst restart regimes
     - use the companion helper script `scripts/analyze-restart-streaming.mjs` to reproduce the same restart-window summaries from `/tmp/ptydeck-backend-debug.log`
 
 ## Consolidation Outcome

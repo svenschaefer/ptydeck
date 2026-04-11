@@ -2,14 +2,15 @@
 
 ## Purpose
 
-This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later Telegram adapter work can start from an accurate model instead of another round of symptom-driven tuning.
+This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
 
-The focus here is strictly analytical:
+The focus here is analytical only:
 
 - what a backend restart looks like from the perspective of restored PTY sessions
-- which runtime and frontend events are emitted during that phase
-- when the messaging layer already classifies restart-time events as message-worthy
-- why the restart phase is structurally flood-prone even when outbound delivery is hard-disabled
+- which backend and frontend paths are active before `runtime.ready`
+- which restart-time signals are structural and which are session- or browser-specific
+- why the restart phase is flood-prone even when outbound delivery is hard-disabled
+- where the current messaging path already loses semantics that matter for later allowlist-style delivery
 
 ## Evidence Base
 
@@ -21,15 +22,24 @@ The findings in this document are based on:
   - `backend/src/runtime.js`
   - `backend/src/session-manager.js`
   - `backend/src/messaging-runtime.js`
-  - `backend/src/telegram-adapter.js`
+  - `backend/src/shell-adapter.js`
+  - `backend/src/terminal-output-signals.js`
+  - `frontend/src/public/startup-warmup-controller.js`
+  - `frontend/src/public/app-lifecycle-controller.js`
+  - `frontend/src/public/ws-client.js`
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`
+  - `frontend/src/public/ui/session-terminal-resize-controller.js`
+  - `frontend/src/public/session-runtime-controller.js`
 
-The concrete restart window analyzed here is:
+This note compares three concrete restart-related windows from `2026-04-11`:
 
+- `2026-04-11T19:55:20.000Z` to `2026-04-11T19:55:37.000Z`
+- `2026-04-11T20:08:00.000Z` to `2026-04-11T20:08:09.500Z`
 - `2026-04-11T20:22:29.000Z` to `2026-04-11T20:22:46.999Z`
 
 ## Helper Script
 
-To make the restart analysis reproducible, the repository now includes:
+To keep the analysis reproducible, the repository includes:
 
 - `scripts/analyze-restart-streaming.mjs`
 
@@ -41,131 +51,143 @@ node scripts/analyze-restart-streaming.mjs \
   --end 2026-04-11T20:22:46.999Z
 ```
 
-The script parses the debug log, filters one restart window, and summarizes:
+The script parses the debug log, filters one window, and summarizes:
 
 - HTTP request volume
 - session event volume
 - messaging event volume
+- decision reasons
 - per-session timelines
 - target validation and topic reuse churn
 
-## High-Level Restart Model
+## Executive Summary
 
-A restart is not a quiet boot followed by later session activity.
+A restart is not one thing. In the current system it can be dominated by at least three different mechanisms:
 
-Instead, once the backend process comes back and the browser reconnects, the system immediately enters a mixed restore and remount phase with four concurrent layers:
+1. cold browser bootstrap traffic
+2. already-open browser reconnect and terminal remount traffic
+3. restored PTY output bursts from sessions that never stopped producing output
 
-1. runtime restore and startup warmup
-2. browser remount traffic against existing sessions
-3. session activity state transitions driven by restored PTY output
-4. messaging target revalidation and message classification
+Those mechanisms can happen independently or overlap.
 
-That means the restart phase already contains enough structure to generate message-worthy events before `runtime.ready` is emitted.
+The most important architectural fact is this:
 
-## Measured Restart Window
+- the backend starts accepting HTTP and WebSocket traffic before `runtime.ready`
+- startup warmup only delays `runtime.ready`
+- startup warmup does not suppress session classification or messaging classification
 
-Observed between `2026-04-11T20:22:29.160Z` and `2026-04-11T20:22:46.471Z`:
+That means restart-time streaming already contains enough structure to generate message-worthy events before the system is considered ready.
+
+A second important fact is this:
+
+- the messaging path mostly operates on normalized visible text
+- ANSI formatting, color, bold emphasis, and other visual terminal cues are largely discarded before classification
+- for coding-agent CLIs such as Codex, that means the current classifier loses part of the semantic structure that operators actually see on screen
+
+## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
+
+The current backend startup order matters more than any individual noise rule.
+
+In `backend/src/runtime.js`:
+
+1. persisted state is restored
+2. `server.listen(config.port, ...)` starts accepting traffic
+3. `messagingRuntime.start()` runs
+4. session targets are ensured for restored sessions
+5. startup warmup gate is released
+6. `reconcileStartupWarmup()` runs
+7. only after the warmup quiet period is satisfied does `runtime.ready` fire
+
+So `runtime.ready` is not the point at which the process starts handling traffic. It is a later milestone.
+
+This explains why restart windows already contain:
+
+- REST requests
+- WebSocket reconnects
+- session activity transitions
+- messaging target revalidation
+- message classification
+
+before `runtime.ready` appears in the log.
+
+## The Three Restart Regimes
+
+### 1. Cold Browser Bootstrap Regime
+
+Observed in the `19:55` window.
+
+The frontend startup path is:
+
+1. `waitForStartupWarmup()`
+2. `bootstrapDevAuthToken()`
+3. `startWsRuntime()`
+
+That is implemented in `frontend/src/public/app-lifecycle-controller.js`.
+
+`waitForStartupWarmup()` in `frontend/src/public/startup-warmup-controller.js` polls `/ready` every `250ms` until the backend reports `status: ready` or the operator skips the wait.
+
+That produces a restart window with characteristics like:
+
+- many `GET /ready`
+- optional `OPTIONS /ready`
+- no terminal remount traffic yet
+- auth and WS setup only after `runtime.ready`
+
+Measured in the `19:55` window:
+
+- `70` `http.request.start`
+- `70` `http.request.done`
+- `114` `GET /ready`
+- `6` `OPTIONS /ready`
+- `1` `runtime.ready`
+- `1` `ws.upgrade.accepted`
+- `1` `ws.snapshot.sent`
+- only `1` `session.event`
+- but still `15` `messaging.event.trace`
+
+Interpretation:
+
+- even a mostly bootstrap-oriented restart can overlap a noisy restored PTY session
+- cold bootstrap reduces browser remount churn, but it does not protect against restored PTY flooding
+
+### 2. Already-Open Browser Reconnect / Remount Regime
+
+Observed clearly in the `20:22` window.
+
+This path is different from cold bootstrap. An already-open browser does not need to go back through the warmup page flow in the same way. `frontend/src/public/ws-client.js` reconnects automatically as soon as the backend accepts connections.
+
+Because the backend is already listening before `runtime.ready`, the browser can reconnect during startup warmup.
+
+Once the frontend remounts terminals, it immediately stimulates the runtime.
+
+The relevant frontend behavior is:
+
+- `frontend/src/public/ui/session-terminal-runtime-controller.js`
+  - on mount, immediately calls `applyResizeForSession(session.id)`
+  - then runs local stabilization passes at `120ms`, `400ms`, and `900ms`
+  - also attaches a `ResizeObserver` that can trigger more resize activity
+- `frontend/src/public/ui/session-terminal-resize-controller.js`
+  - local resize happens immediately
+  - remote resize is posted after `180ms`
+  - additional deferred resize passes run at `250ms`, `700ms`, and `1400ms`
+  - `document.fonts.ready` can trigger another forced resize pass
+- `frontend/src/public/session-runtime-controller.js`
+  - snapshot replay stabilization also runs at `0ms`, `120ms`, `400ms`, and `900ms`, but with `skipRemote: true`
+
+The result is a restart-time remount pattern with multiple resize waves.
+
+Measured in the `20:22` window:
 
 - `43` `http.request.start`
 - `43` `http.request.done`
-- `28` `messaging.target.update`
+- six distinct `/resize` POST routes repeated multiple times
+- three distinct `/input` POST routes
 - `18` `session.event`
 - `12` `messaging.event.trace`
 - `12` `runtime.startup_warmup.active`
-- `11` `persist.save.start`
-- `11` `persist.save.ok`
-- `5` `messaging.target.ensure`
-- `1` `runtime.startup_warmup.quiet_wait`
 - `1` `runtime.ready`
 
-Timing from first observed restart-window event:
-
-- `16.31s` until `runtime.startup_warmup.quiet_wait`
-- `17.31s` until `runtime.ready`
-
-## Sequence of What Actually Happens
-
-### 1. The browser immediately remounts terminals
-
-The first visible restart-window events are not Telegram-related. They are frontend-originated REST calls such as:
-
-- `OPTIONS /api/v1/sessions/<id>/resize`
-- `POST /api/v1/sessions/<id>/resize`
-- later also `OPTIONS /api/v1/sessions/<id>/input`
-- later also `POST /api/v1/sessions/<id>/input`
-
-This means the restart phase is not only a backend concern. The browser remount itself actively stimulates session traffic.
-
-### 2. Session activity starts almost immediately
-
-As soon as restored PTY output arrives, `session-manager` marks sessions active:
-
-- `session.activity.started`
-
-This comes from `SessionManager.emitSessionActivityStarted()` and is triggered from the PTY data path when cleaned output is observed.
-
-The startup warmup then tracks these active sessions in `runtime.reconcileStartupWarmup()`.
-
-### 3. Session updates trigger messaging lifecycle observation
-
-For restart-time sessions, `session.updated` follows quickly after the first activity burst.
-
-In the analyzed window, the first `session.updated` events appeared within about `100-180ms` after the first `session.activity.started` events.
-
-In `messaging-runtime`, `session.updated` does not produce a generic lifecycle message. It specifically runs `observeControlChange()`, which can produce:
-
-- `session.control.changed`
-- summary example: `Control became unclaimed (1 attached client).`
-
-This is already a key restart-noise source because it is caused by session attachment state changes during browser remount, not by meaningful terminal progress.
-
-### 4. Telegram target readiness is rechecked during restart traffic
-
-During the same restart window, the adapter repeatedly logs:
-
-- `target_validated_cached`
-- `topic_reused`
-
-The analyzed window contained:
-
-- `14` `target_validated_cached`
-- `14` `topic_reused`
-
-For example, one session produced:
-
-- `5` cached target validations
-- `5` topic reuses
-
-inside a single restart window.
-
-This is not provisioning failure. It is repeated target resolution and topic reuse during normal restart-time event handling.
-
-### 5. Message classification starts before runtime readiness
-
-Even with Telegram outbound hard-disabled, the messaging layer still records what it would have treated as send-worthy.
-
-In the analyzed window, the messaging layer classified:
-
-- `7` `session.activity.idle`
-- `3` `session.control.changed`
-- `2` `session.prompt.ready`
-
-Decision reasons were:
-
-- `7` `new:status_update`
-- `2` `new:prompt_ready`
-- `2` `suppress:noise_idle_after_unclassified_chatter`
-- `1` `suppress:noise_idle_after_low_value_chatter`
-
-This is the most important restart insight:
-
-- the restart phase already contains multiple status candidates before `runtime.ready`
-- the flooding problem is therefore not only a terminal-output problem
-- it is also a restart-state and remount-state classification problem
-
-### 6. Idle events are a major restart-time flood source
-
-A common restart-time sequence per session was:
+Per session, the common sequence was:
 
 1. `session.activity.started`
 2. `session.updated`
@@ -173,171 +195,311 @@ A common restart-time sequence per session was:
 4. `session.activity.completed`
 5. `session.activity.idle -> new`
 
-This means one restart can generate at least two message-worthy status updates per session before any meaningful operator-facing work has happened.
+That means remount traffic alone can create message-worthy status churn even before meaningful terminal output is considered.
 
-For some sessions, a later second burst then adds:
+### 3. Restored PTY Output Burst Regime
 
-6. `session.activity.started`
-7. `session.prompt.ready -> new`
-8. `session.activity.completed`
-9. `session.activity.idle -> suppress`
+Observed very clearly in the `20:08` window.
 
-So even without terminal noise, the restart phase itself can generate:
+This regime is important because it proves that restart flooding is not only a browser problem.
 
-- control-change chatter
-- idle chatter
-- prompt-ready chatter
+Measured in the `20:08` window:
 
-## Per-Session Shape in the Analyzed Window
+- `1972` `messaging.target.update`
+- `987` `messaging.event.trace`
+- `0` HTTP request events in the analyzed window
+- `1` `session.event`
+- `1` `runtime.ready`
 
-Observed session patterns:
+Within that same window:
 
-### `ai-playbooks + playbooks (local runner)`
+- `911` `session.attention.required`
+- `75` `session.output.summary`
+- `1` `session.activity.idle`
+- `986` `target_validated_cached`
+- `986` `topic_reused`
 
-- `2` activity starts
-- `2` updates
-- `2` activity completions
-- messaging:
-  - `1` `session.control.changed -> new`
-  - `1` `session.prompt.ready -> new`
-  - `1` `session.activity.idle -> new`
-  - `1` `session.activity.idle -> suppress`
-- target churn:
-  - `5` cached validations
-  - `5` topic reuses
+All of that belonged to one topic-mapped session:
 
-### `ai-playbooks + codex-runner`
+- `infra + infra-gcp`
 
-- `1` activity start
-- `1` update
-- `1` completion
-- messaging:
-  - `1` `session.control.changed -> new`
-  - `1` `session.activity.idle -> new`
-- target churn:
-  - `3` cached validations
-  - `3` topic reuses
+Interpretation:
 
-### `ai-playbooks + shields (local runner)`
+- the restart phase can be dominated by a single restored PTY stream
+- the browser does not need to contribute anything for the runtime to become flood-prone
+- repeated topic resolution and repeated classification amplify the cost of that burst
 
-- `2` activity starts
-- `2` completions
-- messaging:
-  - `1` `session.activity.idle -> new`
-  - `1` `session.prompt.ready -> new`
-  - `1` `session.activity.idle -> suppress`
-- target churn:
-  - `2` cached validations
-  - `2` topic reuses
+## Restart-Time Sequence in Concrete Code Paths
 
-### `ai-playbooks + ai-playbooks`
+### Backend PTY Data Path
 
-- `1` activity start
-- `2` updates
-- `1` completion
-- messaging:
-  - `1` `session.control.changed -> new`
-  - `1` `session.activity.idle -> new`
-- target churn:
-  - `4` cached validations
-  - `4` topic reuses
+In `backend/src/session-manager.js`, `attachPtyProcess(...).ptyProcess.onData(...)` is the first important streaming seam.
 
-### `ptydeck + ptydeck`
+For each chunk, the current order is effectively:
 
-Inside this specific restart window, the visible event was only the late completion side:
+1. observe terminal signals
+2. let the shell adapter consume output and produce `cleaned` plus `promptBoundaries`
+3. run output heuristics and app-identity updates on `cleaned`
+4. if cleaned output exists:
+   - mark remote connected if needed
+   - update `lastActivityAt`
+   - emit `session.activity.started` if the session was idle
+   - emit `session.updated` if metadata changed
+   - append replay output
+   - schedule activity completion
+   - emit `session.data`
+   - schedule foreground-process identity refresh
 
-- `1` activity completion
-- `1` idle suppression due to low-value chatter
+This is why one PTY burst can generate both lifecycle events and message classification work.
 
-That does not mean the session was quiet in general. It only means its restart-relevant activity fell later in the warmup window and did not emit the earlier control/prompt sequence seen on some other sessions.
+### Runtime Event Wiring
 
-## Why Restart Is Flood-Prone
+In `backend/src/runtime.js`:
 
-### Structural reason 1: frontend remount generates traffic immediately
+- `session.activity.started`:
+  - logs `session.event`
+  - calls `reconcileStartupWarmup()`
+  - schedules persistence
+- `session.activity.completed`:
+  - logs `session.event`
+  - calls `reconcileStartupWarmup()`
+  - persists immediately
+  - calls `messagingRuntime.observeSessionIdle(...)`
+- `session.created`, `session.started`, `session.updated`, `session.data`, `session.exit`, `session.closed` are all wired through the same runtime event bridge
 
-The browser starts resize and input calls against restored sessions almost immediately after backend restart.
+So restart-time streaming is already flowing into messaging before anything like a product-level restart mode exists.
 
-That traffic is sufficient to stimulate PTY activity, session activity transitions, and updated session metadata before the runtime is considered ready.
+### Messaging Lifecycle Path
 
-### Structural reason 2: startup warmup does not suppress message classification
+In `backend/src/messaging-runtime.js`:
 
-`runtime.startup_warmup` delays `runtime.ready`, but it does not itself prevent messaging classification.
+- `session.updated` is not treated as a generic lifecycle event
+- it directly runs `observeControlChange()`
+- `observeControlChange()` compares a control signature and can emit `session.control.changed`
 
-So the runtime is still in a startup phase while the messaging layer is already deciding that some events are worth sending.
+That is why reconnect/remount churn can produce status-thread movement even if no operator-meaningful terminal milestone occurred.
 
-### Structural reason 3: `session.updated` is restart-sensitive
+### Messaging Data Path
 
-`session.updated` during remount currently maps to `observeControlChange()`.
+Also in `backend/src/messaging-runtime.js`, `observeSessionDataInternal(...)`:
 
-That is a weak operator signal during restart because “control became unclaimed” is often just a byproduct of reconnect/reattach behavior.
+- splits chunks by `promptBoundaries`
+- classifies completed lines into:
+  - `session.attention.required`
+  - `session.output.summary`
+  - or nothing
+- queues summaries into `pendingSummaryBlock`
+- flushes summary blocks:
+  - on separator hints
+  - on prompt boundaries
+  - on quiet windows during idle
+- emits `session.prompt.ready` after a prompt-boundary flush
 
-### Structural reason 4: idle after restart is often not meaningful
+This is why restart-time `prompt ready`, summary, and idle can all appear in the same warmup window.
 
-`session.activity.completed` triggers `observeSessionIdle()`.
+## Why `session.activity.idle` Is Structurally Dangerous During Restart
 
-During restart, that often reflects the end of remount churn, not the end of a meaningful terminal work unit.
+`session.activity.completed` calls `observeSessionIdle(...)` immediately after persistence. That means restart-time bursts naturally culminate in `session.activity.idle` candidates.
 
-So restart-time idle can become message-worthy even though it does not represent a meaningful user-facing state transition.
+The `20:22` window showed this pattern clearly:
 
-### Structural reason 5: target resolution is duplicated across layers
+- `7` idle classifications
+- several of them were `new:status_update`
+- only some were suppressed as post-chatter noise
 
-Topic validation and reuse are repeated because target readiness is touched in more than one place:
+This matters because idle is not currently treated as a restart-specific concept. It is treated as a normal meaningful state transition unless nearby heuristics suppress it.
 
-- `runtime.start()` eagerly calls `messagingRuntime.ensureSessionTarget(...)` for all restored sessions
-- `observeSessionLifecycleInternal(...)` also ensures the target for mapped lifecycle events
-- `telegram-adapter.handleEvent(...)` resolves the effective target again before handling the event
+So even if later allowlist delivery is introduced, idle will remain dangerous unless restart-time semantics are modeled explicitly.
 
-This does not itself create outbound messages, but it contributes to restart-phase churn and makes the trace stream denser and harder to reason about.
+## Repeated Target Validation Is Amplification, Not the Root Cause
 
-## What the Hard Break Already Reveals
+The restart windows repeatedly showed:
 
-The hard break on Telegram outbound is useful because it exposes restart-time candidate messages without letting them escape to Telegram.
+- `target_validated_cached`
+- `topic_reused`
 
-During the analyzed restart, the system still produced would-be deliveries such as:
+This churn is real, but it is amplification rather than the original source of relevance.
 
-- `session.control.changed -> new`
-- `session.activity.idle -> new`
-- `session.prompt.ready -> new`
+The duplication comes from multiple layers:
 
-That proves the current flooding risk is still present in classification logic even when transport is silent.
+- `runtime.start()` eagerly ensures targets for restored sessions
+- `messaging-runtime.observeSessionLifecycleInternal()` ensures targets again
+- `telegram-adapter.handleEvent()` resolves effective targets again for delivery
+- `telegram-adapter.ensureTarget()` also resolves forum targets and topic bindings
 
-This is exactly the right analytical baseline for the later redesign.
+So once a session starts generating restart-time events, target resolution work is repeated around those events.
 
-## Working Restart Understanding
+That repetition matters for diagnostics and cost, but it is not the root semantic problem. The root problem is that restart-time events are already being treated as message candidates.
 
-The current restart behavior can be summarized as:
+## Formatting Matters: The Current Messaging Path Is Mostly Text-Only
 
-1. restore sessions
-2. rebind browser terminals
-3. browser sends resize/input traffic
-4. sessions enter temporary activity bursts
-5. startup warmup tracks active sessions
-6. messaging target readiness is repeatedly revalidated/reused
-7. messaging classifies restart-time control, prompt, and idle events as message-worthy
-8. only after a quiet period does runtime become ready
+This is especially relevant for coding-agent CLIs such as Codex.
 
-So from the perspective of streaming, restart is not a neutral prelude. It is an active phase with its own event grammar.
+Today, the messaging path does not work on a faithful visual model of the terminal. It works mostly on normalized text.
 
-## Implications for Future Clean Delivery Logic
+The relevant points are:
 
-This document is analytical, not prescriptive, but the observations constrain the next implementation direction.
+- `backend/src/shell-adapter.js`
+  - the shell adapter only removes injected cwd markers and exposes prompt boundaries
+  - it does not preserve a richer styling model for messaging
+- `backend/src/replay-excerpt.js`
+  - `normalizeVisibleReplayText()` strips ANSI escape sequences and control codes
+- `backend/src/messaging-runtime.js`
+  - `truncateSummary()` calls `normalizeVisibleReplayText()`
+  - `sanitizeMessageCandidate()` then applies additional normalization and low-value-tail trimming
+- `backend/src/terminal-output-signals.js`
+  - only a small subset of escape-sequence semantics is preserved today:
+    - prompt/command markers
+    - current-directory metadata
+    - alternate-screen transitions
 
-A clean future adapter path cannot be built on “watch all terminal output and filter noise later” alone.
+That means the current messaging classifier mostly loses:
 
-It must account for restart as its own mode.
+- color
+- bold emphasis
+- many cursor / region / style distinctions
+- the difference between visually dominant headers and visually secondary fragments
 
-At minimum, later clean delivery logic will need to distinguish between:
+For Codex-style output this matters because operator significance often depends on more than the literal words. Long separators, colored emphasis, and structurally distinct headings can mean:
 
-- restart/remount stabilization
-- genuine user-visible progress
-- genuine failure/attention conditions
-- prompt readiness that matters versus prompt readiness caused by restore/remount churn
-- idle that marks the end of real work versus idle that only marks the end of startup turbulence
+- a new block has started
+- the previous block is complete
+- this line is a heading rather than body text
+- this fragment is visually subordinate and should not be sent alone
 
-## Practical Conclusion
+The current system only preserves a thin slice of that information.
 
-The restart-phase flooding risk is currently driven more by runtime/session/control sequencing than by raw terminal text.
+So any later allowlist-style redesign should not assume that plain text alone is a sufficient basis for Codex-quality message extraction.
 
-That is the key analytical conclusion.
+## What the Current Analysis Explains About Flooding
 
-If later work starts from that understanding, the next step can be a clean “not forwarded by default, selectively forwarded when semantically meaningful” model instead of another round of output-pattern tuning.
+The restart-phase flooding problem is not one bug. It is the superposition of several independent effects:
+
+1. server accepts traffic before `runtime.ready`
+2. already-open browsers can reconnect during startup warmup
+3. terminal mounts generate immediate remote resize traffic
+4. remount traffic can create control-change churn through `session.updated`
+5. activity completion naturally generates idle candidates
+6. restored PTY output can flood the classifier with no browser traffic at all
+7. target validation and topic reuse repeat around each classified event
+8. the classifier mostly operates on normalized text and therefore misses some structural visual cues that would help separate meaning from chatter
+
+## What Is Still Not Fully Understood
+
+One observed restart-time behavior still needs caution in interpretation:
+
+- `/input` requests clearly appear in restart windows
+- the logs prove that they happen
+- the current code inspection proves several deterministic mount-time resize paths
+- but it does not yet prove one single purely mount-driven code path that fully explains every restart-time `/input` request
+
+So the correct current statement is:
+
+- restart-time `/input` traffic is real and relevant
+- it participates in restart churn
+- but its full frontend origin is not yet narrowed to one single deterministic source
+
+That uncertainty should remain explicit in future analysis rather than being hand-waved into certainty.
+
+## Implications for the Next Messaging Direction
+
+The post-hard-break redesign should not resume from "filter more lines".
+
+This analysis supports a different direction:
+
+1. treat restart as an explicit runtime mode, not just ordinary session activity
+2. separate cold bootstrap, browser remount churn, and restored PTY burst behavior
+3. classify message-worthiness from a smaller set of explicit state transitions
+4. use replayable trace windows as the evaluation surface
+5. preserve more structural stream information for coding-agent sessions than plain normalized text alone
+
+A later allowlist- or signal-first delivery path should therefore start from:
+
+- explicit restart-aware suppression or quarantine rules
+- explicit session-state transitions that are allowed to surface externally
+- app-specific block boundaries that can use prompt markers, separator hints, and retained visual structure together
+- edit/update reuse as the default for evolving session state, not new-message fanout
+
+## Comparison Snapshot of the Three Windows
+
+### `19:55` Window
+
+Dominant shape:
+
+- cold browser bootstrap
+- `/ready` polling before WebSocket
+- still overlapped by one noisy restored PTY session
+
+Measured highlights:
+
+- `114` `GET /ready`
+- `15` messaging events
+- `14` attention alerts
+- `1` summary update
+- only `1` session event
+
+### `20:08` Window
+
+Dominant shape:
+
+- restored PTY burst only
+- essentially no browser traffic in the measured window
+
+Measured highlights:
+
+- `911` attention alerts
+- `75` summaries
+- `986` cached target validations
+- `986` topic reuses
+- `0` HTTP events in the window
+
+### `20:22` Window
+
+Dominant shape:
+
+- reconnect / remount churn during startup warmup
+- multi-session resize and input traffic before `runtime.ready`
+
+Measured highlights:
+
+- `43` HTTP requests started
+- `18` session events
+- `12` messaging events
+- `7` idle classifications
+- `3` control-change classifications
+- `2` prompt-ready classifications
+
+## Practical Reading of a Real Restart
+
+When reading future restart logs, the most useful first question is not:
+
+- "Which line classifier misbehaved?"
+
+It is:
+
+- "Which restart regime am I looking at?"
+
+Use this order:
+
+1. Is the window dominated by `/ready` polling and later auth/WS startup?
+   - cold bootstrap regime
+2. Is the window dominated by `resize` and `input` traffic across several sessions during warmup?
+   - reconnect/remount regime
+3. Is the window dominated by one session generating hundreds of `attention` or `summary` events with little or no HTTP traffic?
+   - restored PTY burst regime
+
+Only after that distinction does it make sense to reason about message forwarding policy.
+
+## Conclusion
+
+The restart phase is currently flood-prone by architecture, not just by bad regexes.
+
+The most important analytical conclusions are:
+
+- startup warmup delays `runtime.ready` but does not isolate the runtime from restart traffic
+- frontend remount and restored PTY output are independent flood sources
+- `session.updated -> session.control.changed` and `session.activity.completed -> session.activity.idle` are structural restart-noise transitions
+- repeated target validation is amplification around those transitions
+- the current classifier operates on normalized text and therefore already discards some formatting semantics that matter for coding-agent output
+
+Any later messaging rebuild that wants clean, targeted delivery must start from this model rather than from more ad hoc noise filters.
