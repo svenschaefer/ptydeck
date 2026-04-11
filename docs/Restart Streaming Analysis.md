@@ -371,6 +371,72 @@ The current system only preserves a thin slice of that information.
 
 So any later allowlist-style redesign should not assume that plain text alone is a sufficient basis for Codex-quality message extraction.
 
+## Operator-View Evidence from Codex Terminal Dumps
+
+Two local Codex terminal dump examples captured on `2026-04-11` add an operator-view perspective that the backend debug log does not show on its own.
+
+Those captures are not raw PTY byte streams. They are already rendered terminal transcripts. That distinction matters.
+
+Measured with `scripts/analyze-terminal-dump-visuals.mjs`:
+
+- the shorter `22:41` capture contains `127` visible lines, `21` top-level bullets, `15` separator-delimited blocks, `13` subordinate `└` tails, and `1` footer ribbon, with no ESC bytes remaining
+- the longer `23:30` capture contains `509` visible lines, `80` top-level bullets, `51` separator-delimited blocks, `37` subordinate `└` tails, `2` worked-for banners, and `1` footer ribbon, again with no ESC bytes remaining
+
+What they still preserve well:
+
+- prompt lines beginning with `›`
+- action-category bullets such as `• Updated Plan`, `• Explored`, `• Ran`, `• Waited for background terminal`, and `• Context compacted`
+- subordinate result tails beginning with `└`
+- checklist items marked with `□`
+- heavy separator bars made of `─`
+- elapsed-time banners such as `─ Worked for 1m 47s ─`
+- footer-style status lines with model, cwd, token budget, and usage metadata separated by `·`
+- visible wrap behavior and indentation, including command-output blocks prefixed by `│`
+
+What they do not preserve:
+
+- raw ESC bytes
+- actual ANSI color/style spans
+- cursor motion and screen-region updates
+- alternate-screen transitions as raw control sequences
+
+In other words, the dump examples preserve the operator-visible block grammar, but not the low-level styling stream.
+
+That difference is crucial for later clean delivery work.
+
+The examples show that Codex output meaning is expressed through a layered visual grammar, not just through literal line text:
+
+- `• Updated Plan` starts a planning block that should not be confused with ordinary terminal output
+- `• Explored` and `• Ran` introduce action/result sections with subordinate `└` payloads
+- long `─` bars separate thought units and activity phases
+- `─ Worked for ... ─` signals elapsed work summaries rather than ordinary output
+- the footer line acts like a persistent status ribbon, not a new semantic event
+- indentation and wrap structure show whether a line is primary content or only the continuation of a command/result block
+
+This matters because the current messaging path strips down to normalized visible text, then classifies line by line. The operator-view dumps show that a meaningful unit is often a whole visual block:
+
+- heading line
+- subordinate explanation/result lines
+- separator or elapsed-work banner
+- footer/status ribbon that should almost never be forwarded as a message
+
+So the semantic gap is now clearer:
+
+1. raw PTY analysis is needed if future delivery wants actual color/style semantics
+2. rendered-transcript analysis is needed if future delivery wants operator-visible block roles
+3. the current pipeline preserves only a thin slice of either model
+
+The practical implication is that a future allowlist-/signal-first delivery path should not choose between "raw text" and "raw ANSI". It will likely need both:
+
+- a bounded structural model from the rendered stream
+- plus selected low-level terminal signals where styling or mode changes carry meaning
+
+To keep that analysis reproducible, the repository now also includes:
+
+- `scripts/analyze-terminal-dump-visuals.mjs`
+
+That helper summarizes prompt/bullet/separator/footer structure, confirms whether ESC bytes are still present, and provides a repeatable operator-view grammar summary for local terminal transcript examples.
+
 ## What the Current Analysis Explains About Flooding
 
 The restart-phase flooding problem is not one bug. It is the superposition of several independent effects:
