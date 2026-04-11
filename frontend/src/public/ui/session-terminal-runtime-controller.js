@@ -699,11 +699,18 @@ export function createSessionTerminalRuntimeController(options = {}) {
     terminals.set(session.id, entry);
     afterEntryRegistered(entry, session);
 
-    const observer = new ResizeObserverCtor(() => {
-      applyResizeForSession(session.id);
-    });
-    observer.observe(refs.mount);
-    terminalObservers.set(session.id, observer);
+    const observer =
+      typeof ResizeObserverCtor === "function"
+        ? new ResizeObserverCtor(() => {
+            applyResizeForSession(session.id);
+          })
+        : null;
+    if (observer && typeof observer.observe === "function") {
+      observer.observe(refs.mount);
+    }
+    if (terminalObservers && typeof terminalObservers.set === "function" && observer) {
+      terminalObservers.set(session.id, observer);
+    }
 
     onFirstTerminalMounted();
     applyResizeForSession(session.id);

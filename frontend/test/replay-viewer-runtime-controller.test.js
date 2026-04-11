@@ -38,6 +38,16 @@ function createElement() {
   };
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 test("replay viewer runtime controller opens and renders retained replay tails", async () => {
   const dialogEl = createElement();
   const titleEl = createElement();
@@ -163,4 +173,115 @@ test("replay viewer runtime controller keeps export actions disabled when replay
   assert.equal(downloadBtn.disabled, true);
   assert.equal(copyBtn.disabled, true);
   assert.match(statusEl.textContent, /backend failed/);
+});
+
+test("replay viewer runtime controller falls back to dialog class toggles and empty replay messaging", async () => {
+  const classOps = [];
+  const dialogEl = {
+    ...createElement(),
+    showModal: undefined,
+    close: undefined,
+    classList: {
+      add(token) {
+        classOps.push(["add", token]);
+      },
+      remove(token) {
+        classOps.push(["remove", token]);
+      }
+    }
+  };
+  const titleEl = createElement();
+  const metaEl = createElement();
+  const statusEl = createElement();
+  const contentEl = createElement();
+  const controller = createReplayViewerRuntimeController({
+    dialogEl,
+    titleEl,
+    metaEl,
+    statusEl,
+    contentEl,
+    refreshBtn: createElement(),
+    downloadBtn: createElement(),
+    copyBtn: createElement(),
+    closeBtn: createElement(),
+    loadSessionReplay: async () => ({
+      data: "",
+      retainedChars: 0,
+      retentionLimitChars: 32,
+      truncated: false
+    }),
+    buildReplayRetentionSummary: () => "",
+    formatSessionToken: () => "9",
+    formatSessionDisplayName: () => "delta"
+  });
+
+  await controller.openSessionReplayViewer({ id: "s9", name: "delta" });
+
+  assert.equal(dialogEl.open, true);
+  assert.equal(titleEl.textContent, "Replay Tail · [9] delta");
+  assert.equal(metaEl.textContent, "Retained replay tail.");
+  assert.equal(statusEl.textContent, "No retained replay tail is currently available for this session.");
+  assert.equal(contentEl.textContent, "");
+  assert.deepEqual(classOps, [["add", "open"]]);
+
+  let prevented = false;
+  dialogEl.emit("cancel", {
+    preventDefault() {
+      prevented = true;
+    }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(dialogEl.open, false);
+  assert.deepEqual(classOps, [
+    ["add", "open"],
+    ["remove", "open"]
+  ]);
+});
+
+test("replay viewer runtime controller ignores stale refresh results once a newer refresh wins", async () => {
+  const deferred = createDeferred();
+  let callCount = 0;
+  const contentEl = createElement();
+  const statusEl = createElement();
+  const controller = createReplayViewerRuntimeController({
+    dialogEl: createElement(),
+    titleEl: createElement(),
+    metaEl: createElement(),
+    statusEl,
+    contentEl,
+    refreshBtn: createElement(),
+    downloadBtn: createElement(),
+    copyBtn: createElement(),
+    closeBtn: createElement(),
+    loadSessionReplay: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return deferred.promise;
+      }
+      return {
+        data: "fresh\n",
+        retainedChars: 6,
+        retentionLimitChars: 32,
+        truncated: false
+      };
+    }
+  });
+
+  const openPromise = controller.openSessionReplayViewer({ id: "s1", name: "alpha" });
+  await Promise.resolve();
+
+  const secondPayload = await controller.refreshActiveSession();
+  deferred.resolve({
+    data: "stale\n",
+    retainedChars: 6,
+    retentionLimitChars: 32,
+    truncated: false
+  });
+  await openPromise;
+
+  assert.equal(secondPayload.data, "fresh\n");
+  assert.equal(controller.getActivePayload()?.data, "fresh\n");
+  assert.equal(statusEl.textContent, "Showing the full retained replay tail currently available.");
+  assert.equal(contentEl.textContent, "fresh\n");
 });

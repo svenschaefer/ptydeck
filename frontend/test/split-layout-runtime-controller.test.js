@@ -62,6 +62,10 @@ class FakeElement {
     }
   }
 
+  click() {
+    this.dispatch("click");
+  }
+
   getBoundingClientRect() {
     return { left: 0, top: 0, width: 1000, height: 800 };
   }
@@ -71,6 +75,33 @@ function createDocumentRef() {
   return {
     createElement(tagName) {
       return new FakeElement(tagName);
+    }
+  };
+}
+
+function createWindowRef() {
+  const listeners = new Map();
+  return {
+    addEventListener(type, handler) {
+      const next = listeners.get(type) || [];
+      next.push(handler);
+      listeners.set(type, next);
+    },
+    removeEventListener(type, handler) {
+      const next = listeners.get(type) || [];
+      listeners.set(
+        type,
+        next.filter((entry) => entry !== handler)
+      );
+    },
+    dispatch(type, event = {}) {
+      for (const handler of listeners.get(type) || []) {
+        handler({
+          type,
+          preventDefault() {},
+          ...event
+        });
+      }
     }
   };
 }
@@ -361,4 +392,118 @@ test("split-layout runtime creates a stable default layout when rendering a prev
   assert.deepEqual(entry.root, { type: "pane", paneId: "main" });
   assert.deepEqual(entry.paneSessions.main, ["s1", "s2"]);
   assert.deepEqual(node1.parentNode?.children || [], [node1, node2]);
+});
+
+test("split-layout runtime wires pane action buttons and resize handles through render-time controls", () => {
+  const requestRenderCalls = [];
+  const resizeCalls = [];
+  const deferredResizeCalls = [];
+  const activeSessions = [];
+  const gridEl = new FakeElement("main");
+  const windowRef = createWindowRef();
+  const controller = createSplitLayoutRuntimeController({
+    documentRef: createDocumentRef(),
+    windowRef,
+    gridEl,
+    defaultDeckId: "default",
+    requestRender: () => requestRenderCalls.push("render"),
+    scheduleGlobalResize: (payload) => resizeCalls.push(payload),
+    scheduleDeferredResizePasses: (payload) => deferredResizeCalls.push(payload),
+    setActiveSession: (sessionId) => activeSessions.push(sessionId),
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    formatSessionToken: (sessionId) => String(sessionId || "").replace(/^s/, ""),
+    formatSessionDisplayName: (session) => session?.name || session?.id || ""
+  });
+
+  const terminals = new Map([
+    ["s1", { element: new FakeElement("article") }],
+    ["s2", { element: new FakeElement("article") }]
+  ]);
+  const deckSessions = [
+    { id: "s1", name: "one" },
+    { id: "s2", name: "two" }
+  ];
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: deckSessions,
+    deckSessions,
+    activeSessionId: "s2",
+    terminals
+  });
+
+  const canvasEl = gridEl.children[0];
+  const paneEl = canvasEl.children[0];
+  const actionsEl = paneEl.children[0].children[1];
+  const sessionSelectEl = actionsEl.children[0];
+  const assignBtn = actionsEl.children[1];
+  const useActiveBtn = actionsEl.children[2];
+  const splitRowBtn = actionsEl.children[3];
+
+  sessionSelectEl.value = "s1";
+  assignBtn.click();
+  useActiveBtn.click();
+  splitRowBtn.click();
+
+  let entry = controller.getDeckSplitLayout("ops");
+  assert.equal(entry.root.type, "row");
+  assert.deepEqual(activeSessions, ["s1"]);
+  assert.equal(requestRenderCalls.length, 3);
+  assert.deepEqual(resizeCalls, [
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true }
+  ]);
+  assert.deepEqual(deferredResizeCalls, [
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true }
+  ]);
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: deckSessions,
+    deckSessions,
+    activeSessionId: "s2",
+    terminals
+  });
+
+  const splitContainerEl = canvasEl.children[0];
+  const resizeHandleEl = splitContainerEl.children[1];
+  resizeHandleEl.dispatch("pointerdown", {
+    button: 0,
+    clientX: 500,
+    clientY: 200
+  });
+  windowRef.dispatch("pointermove", {
+    clientX: 900,
+    clientY: 200
+  });
+  windowRef.dispatch("pointerup");
+
+  entry = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(entry.root.weights, [0.9, 0.1]);
+
+  const secondPaneEl = splitContainerEl.children[2].children[0];
+  const secondActionsEl = secondPaneEl.children[0].children[1];
+  const removeBtn = secondActionsEl.children[5];
+  removeBtn.click();
+
+  entry = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(entry.root, { type: "pane", paneId: "main" });
+  assert.equal(requestRenderCalls.length, 4);
+  assert.deepEqual(resizeCalls, [
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true }
+  ]);
+  assert.deepEqual(deferredResizeCalls, [
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true },
+    { deckId: "ops", force: true }
+  ]);
 });

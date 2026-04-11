@@ -16,7 +16,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active release waves:
   - `v0.4.0-H84`
 - Active scoped tasks:
-  - `QLT-225`
   - `QLT-226`
   - `QLT-227`
 - Queued next waves:
@@ -25,9 +24,8 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Active Wave Order
 
 - `v0.4.0-H84`
-  1. `QLT-225`
-  2. `QLT-226`
-  3. `QLT-227` after `QLT-225` and `QLT-226`
+  1. `QLT-226`
+  2. `QLT-227` after `QLT-226`
 
 ## Sequencing Rules
 

@@ -309,3 +309,107 @@ test("layout runtime controller binds UI events and applies deck terminal settin
   assert.equal(applyCalls[1].payload.settings.terminal.cols, 122);
   assert.equal(applyCalls[1].payload.settings.terminal.rows, 34);
 });
+
+test("layout runtime controller falls back cleanly when persisted state is malformed or storage operations fail", () => {
+  let sessionInputSettings = {};
+  let terminalSettings = {
+    cols: 81,
+    rows: 22,
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  };
+  const controller = createLayoutRuntimeController({
+    localStorageRef: {
+      getItem(key) {
+        if (key === "ptydeck.settings.v1") {
+          return "{";
+        }
+        if (key === "ptydeck.session-input-settings.v1") {
+          return "{\"s-1\":";
+        }
+        throw new Error("storage unavailable");
+      },
+      setItem() {
+        throw new Error("read only");
+      },
+      removeItem() {
+        throw new Error("read only");
+      }
+    },
+    sendTerminatorModeSet: new Set(["auto", "lf", "crlf"]),
+    getTerminalSettings: () => terminalSettings,
+    setTerminalSettings: (next) => {
+      terminalSettings = next;
+    },
+    getSessionInputSettings: () => sessionInputSettings,
+    setSessionInputSettings: (next) => {
+      sessionInputSettings = next;
+    }
+  });
+
+  assert.deepEqual(controller.loadTerminalSettings(), {
+    cols: 80,
+    rows: 20,
+    sidebarVisible: true,
+    sidebarPanels: {
+      find: false,
+      terminalSize: false,
+      savedLayouts: false
+    }
+  });
+  assert.deepEqual(controller.loadSessionInputSettings(), {});
+  assert.equal(controller.loadStoredSessionFilterText(), "");
+  assert.equal(controller.getSessionSendTerminator("missing"), "auto");
+
+  controller.saveTerminalSettings();
+  controller.saveSessionInputSettings();
+  controller.saveStoredSessionFilterText("");
+});
+
+test("layout runtime controller uses geometry and apply fallbacks when no layout controller is available", async () => {
+  const errors = [];
+  let terminalSettings = {
+    cols: 90,
+    rows: 24,
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  };
+  const controller = createLayoutRuntimeController({
+    getTerminalSettings: () => terminalSettings,
+    setTerminalSettings: (next) => {
+      terminalSettings = next;
+    },
+    settingsColsEl: { value: "999" },
+    settingsRowsEl: { value: "3" },
+    setError: (message) => errors.push(message),
+    getErrorMessage: (error, fallback) => error?.message || fallback
+  });
+
+  assert.equal(controller.measureTerminalCellWidthPx(), 10);
+  assert.equal(controller.computeFixedMountHeightPx(3), 120);
+  assert.equal(controller.computeFixedCardWidthPx(20), 260);
+  assert.deepEqual(controller.readSettingsFromUi(), {
+    cols: 400,
+    rows: 5,
+    sidebarVisible: false,
+    sidebarPanels: {
+      find: true,
+      terminalSize: false,
+      savedLayouts: true
+    }
+  });
+
+  assert.equal(controller.setSidebarPanelCollapsed("", true), false);
+  assert.equal(controller.setSidebarPanelCollapsed("missing", true), false);
+
+  await controller.onApplySettings();
+  assert.deepEqual(errors, ["No active deck available."]);
+});

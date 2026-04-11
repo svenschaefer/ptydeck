@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `QLT-225` Owner `FE`: Add direct coverage and quality hardening for the lower-covered terminal and layout runtime core in `frontend/src/public/split-layout-runtime-controller.js`, `frontend/src/public/layout-runtime-controller.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, and `frontend/src/public/replay-viewer-runtime-controller.js`, focusing on pane-tree mutation corner cases, terminal refresh/mount sequencing, replay viewer fallback states, and layout persistence edge handling.
 - `QLT-226` Owner `FE`: Add direct coverage and targeted hardening for the management and workflow controllers with remaining large branch gaps: `frontend/src/public/connection-profile-runtime-controller.js`, `frontend/src/public/workspace-preset-runtime-controller.js`, `frontend/src/public/send-history-runtime-controller.js`, `frontend/src/public/paste-observation-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/slash-workflow-source-adapter.js`, especially around malformed stored state, recovery paths, retry/cancel branches, and cross-controller edge-case coordination.
 - `QLT-227` Owner `QA`: Add closeout validation for `v0.4.0-H84`, including focused regression coverage for the backend/frontend hotspot files promoted in `QLT-225` and `QLT-226` plus a deterministic full local `lint`, `test`, and `test:coverage:check` rerun on the final tree.
 

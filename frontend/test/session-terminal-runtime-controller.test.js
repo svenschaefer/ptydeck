@@ -235,6 +235,50 @@ class FakeWindowEventTarget extends FakeEventTarget {
   clearTimeout() {}
 }
 
+function createTerminalCardRefs(id = "mount") {
+  return {
+    node: { id: `${id}-node` },
+    mount: new FakeMount(id),
+    focusBtn: {},
+    quickIdEl: {},
+    stateBadgeEl: {},
+    sessionMetaRowEl: {},
+    sessionAppIdentityEl: {},
+    sessionNoteEl: {},
+    unrestoredHintEl: {},
+    refreshBtn: {},
+    settingsDialog: {},
+    settingsTabStartupBtn: {},
+    settingsTabInputBtn: {},
+    settingsTabNoteBtn: {},
+    settingsTabThemeBtn: {},
+    settingsPanelStartup: {},
+    settingsPanelInput: {},
+    settingsPanelNote: {},
+    settingsPanelTheme: {},
+    startCwdInput: {},
+    startCommandInput: {},
+    startEnvInput: {},
+    mouseForwardingModeSelect: {},
+    sessionNoteInput: {},
+    sessionSendTerminatorSelect: {},
+    inputSafetyControls: {},
+    sessionTagsInput: {},
+    startFeedback: {},
+    tagListEl: {},
+    settingsApplyBtn: {},
+    settingsCancelBtn: {},
+    settingsStatus: {},
+    themeCategory: {},
+    themeSearch: {},
+    themeSlotSelect: {},
+    themeSelect: {},
+    themeBg: {},
+    themeFg: {},
+    themeInputs: {}
+  };
+}
+
 test("session-terminal-runtime controller mounts terminal, registers entry, and schedules resize", () => {
   const calls = [];
   const timers = [];
@@ -1545,4 +1589,76 @@ test("session-terminal-runtime controller disposes clipboard bindings and restor
   assert.equal(entry.terminal.customKeyEventHandler(createPasteShortcutEvent()), false);
   entry.disposeClipboardBindings();
   assert.equal(entry.terminal.customKeyEventHandler(createPasteShortcutEvent()), true);
+});
+
+test("session-terminal-runtime controller mounts without ResizeObserver support", () => {
+  const calls = [];
+  const terminals = new Map();
+  const terminalObservers = new Map();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    terminals,
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => calls.push("sync")
+  });
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: createTerminalCardRefs("no-resize-observer"),
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers,
+    applyResizeForSession: (sessionId, options) =>
+      calls.push(`resize:${sessionId}:${options?.force === true}:${options?.skipRemote === true}`)
+  });
+
+  assert.equal(terminals.get("s1"), entry);
+  assert.equal(terminalObservers.size, 0);
+  assert.deepEqual(entry.terminal.refreshCalls, [[0, 23]]);
+  assert.equal(entry.terminal.scrollToBottomCalls, 1);
+  assert.deepEqual(calls, ["resize:s1:false:false", "resize:s1:true:true", "sync", "sync"]);
+});
+
+test("session-terminal-runtime controller skips follow-on scroll during manual refresh when disabled", () => {
+  const calls = [];
+  const terminals = new Map();
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    terminals,
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => calls.push("sync")
+  });
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs: createTerminalCardRefs("no-follow-on-show"),
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers: new Map(),
+    applyResizeForSession: (sessionId, options) =>
+      calls.push(`resize:${sessionId}:${options?.force === true}:${options?.skipRemote === true}`)
+  });
+
+  entry.followOnShow = false;
+  entry.terminal.refreshCalls.length = 0;
+  entry.terminal.scrollToBottomCalls = 0;
+  calls.length = 0;
+
+  assert.equal(controller.refreshMountedTerminal("s1"), true);
+  assert.deepEqual(entry.terminal.refreshCalls, [[0, 23]]);
+  assert.equal(entry.terminal.scrollToBottomCalls, 0);
+  assert.deepEqual(calls, ["resize:s1:true:true", "sync", "sync"]);
 });
