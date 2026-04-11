@@ -105,6 +105,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   };
   const controller = createSessionCardFactoryController({
     ensureQuickId: () => "Q",
+    getSessionHeaderLabel: (session) => `${session.name} (codex)`,
     getSessionStateBadgeText: () => "RUNNING",
     getSessionStateHintText: () => "hint",
     isSessionUnrestored: () => false,
@@ -123,7 +124,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
     visible: true
   });
 
-  assert.equal(result.focusBtn.textContent, "alpha");
+  assert.equal(result.focusBtn.textContent, "alpha (codex)");
   assert.equal(result.quickIdEl.textContent, "Q");
   assert.equal(result.stateBadgeEl.hidden, false);
   assert.equal(result.stateBadgeEl.textContent, "RUNNING");
@@ -144,4 +145,32 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);
   assert.deepEqual(calls, ["app", "tags", "note", "visible:true"]);
+});
+
+test("session-card-factory controller uses the derived session header label", () => {
+  const template = {
+    content: {
+      firstElementChild: {
+        cloneNode() {
+          return createNodeStub();
+        }
+      }
+    }
+  };
+  const controller = createSessionCardFactoryController({
+    ensureQuickId: () => "Q",
+    getSessionHeaderLabel: (session) => `${session.name} (codex)`,
+    renderSessionAppIdentity: () => {},
+    renderSessionTagList: () => {},
+    renderSessionNote: () => {},
+    setSessionCardVisibility: () => {}
+  });
+
+  const result = controller.createSessionCardView({
+    template,
+    session: { id: "s1", name: "ptydeck" },
+    visible: true
+  });
+
+  assert.equal(result.focusBtn.textContent, "ptydeck (codex)");
 });

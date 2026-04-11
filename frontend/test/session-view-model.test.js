@@ -73,3 +73,35 @@ test("session view model formats visible non-shell app identity details", () => 
   assert.match(model.getSessionAppIdentityTitle(codexSession), /foreground process/i);
   assert.equal(model.getSessionAppIdentityText(shellSession), "");
 });
+
+test("session view model appends visible active app labels to the session header without duplicating matching names", () => {
+  const plainSession = { id: "plain-1", name: "ptydeck" };
+  const codexSession = {
+    id: "codex-1",
+    name: "ptydeck",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.91,
+      details: {},
+      updatedAt: 42
+    }
+  };
+  const duplicateSession = {
+    id: "codex-2",
+    name: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.91,
+      details: {},
+      updatedAt: 42
+    }
+  };
+
+  assert.equal(model.getSessionHeaderLabel(plainSession), "ptydeck");
+  assert.equal(model.getSessionHeaderLabel(codexSession), "ptydeck (codex)");
+  assert.equal(model.getSessionHeaderLabel(duplicateSession), "codex");
+});

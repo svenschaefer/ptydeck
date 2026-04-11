@@ -1,5 +1,6 @@
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
 import {
+  formatSessionHeaderAppLabel,
   formatSessionAppIdentityText,
   formatSessionAppIdentityTitle,
   resolveSessionAppIdentity
@@ -262,6 +263,15 @@ export function createSessionViewModel(options = {}) {
     return formatSessionAppIdentityTitle(getSessionAppIdentity(session));
   }
 
+  function getSessionHeaderLabel(session) {
+    const baseLabel = displayName(session);
+    const appLabel = formatSessionHeaderAppLabel(getSessionAppIdentity(session), baseLabel);
+    if (!appLabel) {
+      return baseLabel;
+    }
+    return `${baseLabel} (${appLabel})`;
+  }
+
   return {
     formatSessionDisplayName: displayName,
     resolveSessionDeckId,
@@ -286,6 +296,7 @@ export function createSessionViewModel(options = {}) {
     normalizeSessionStartupFromSession,
     getSessionAppIdentity,
     getSessionAppIdentityText,
-    getSessionAppIdentityTitle
+    getSessionAppIdentityTitle,
+    getSessionHeaderLabel
   };
 }

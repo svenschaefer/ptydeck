@@ -1,5 +1,9 @@
 export function createSessionCardFactoryController(options = {}) {
   const ensureQuickId = options.ensureQuickId || ((sessionId) => String(sessionId || ""));
+  const getSessionHeaderLabel =
+    typeof options.getSessionHeaderLabel === "function"
+      ? options.getSessionHeaderLabel
+      : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const getSessionStateBadgeText = options.getSessionStateBadgeText || (() => "");
   const getSessionStateHintText = options.getSessionStateHintText || (() => "");
   const isSessionUnrestored = options.isSessionUnrestored || (() => false);
@@ -109,7 +113,7 @@ export function createSessionCardFactoryController(options = {}) {
     const stateHintText = getSessionStateHintText(session);
 
     if (focusBtn) {
-      focusBtn.textContent = session.name || session.id.slice(0, 8);
+      focusBtn.textContent = getSessionHeaderLabel(session);
     }
     if (quickIdEl) {
       quickIdEl.textContent = quickId;

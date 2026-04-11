@@ -81,6 +81,9 @@ test("session-ui facade controller delegates session view-model behavior", () =>
     },
     getSessionAppIdentityTitle() {
       return "Active app: codex (coding-agent) via foreground process · 91% confidence.";
+    },
+    getSessionHeaderLabel() {
+      return "ptydeck (codex)";
     }
   };
   const controller = createSessionUiFacadeController({
@@ -122,6 +125,7 @@ test("session-ui facade controller delegates session view-model behavior", () =>
     controller.getSessionAppIdentityTitle({ id: "s1" }),
     "Active app: codex (coding-agent) via foreground process · 91% confidence."
   );
+  assert.equal(controller.getSessionHeaderLabel({ id: "s1" }), "ptydeck (codex)");
   assert.deepEqual(calls, [
     ["state", "s1"],
     ["unrestored", "s1"],

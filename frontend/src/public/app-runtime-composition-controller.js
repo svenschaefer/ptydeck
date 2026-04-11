@@ -1816,6 +1816,7 @@ sessionDisposalController = createSessionDisposalController();
 
 sessionCardFactoryController = createSessionCardFactoryController({
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
+  getSessionHeaderLabel: sessionUiFacadeController.getSessionHeaderLabel,
   getSessionStateBadgeText: sessionUiFacadeController.getSessionStateBadgeText,
   getSessionStateHintText: sessionUiFacadeController.getSessionStateHintText,
   isSessionUnrestored: sessionUiFacadeController.isSessionUnrestored,
@@ -1880,6 +1881,7 @@ sessionCardRenderController = createSessionCardRenderController({
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible),
   syncTerminalViewportAfterShow: (sessionId, entry) => appSessionRuntimeFacadeController?.syncTerminalViewportAfterShow(sessionId, entry),
   ensureQuickId: (sessionId) => appSessionRuntimeFacadeController?.ensureQuickId(sessionId) || "?",
+  getSessionHeaderLabel: sessionUiFacadeController.getSessionHeaderLabel,
   renderSessionAppIdentity: sessionUiFacadeController.renderSessionAppIdentity,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,

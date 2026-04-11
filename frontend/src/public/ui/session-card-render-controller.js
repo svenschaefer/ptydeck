@@ -8,6 +8,10 @@ export function createSessionCardRenderController(options = {}) {
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
   const syncTerminalViewportAfterShow = options.syncTerminalViewportAfterShow || (() => {});
   const ensureQuickId = options.ensureQuickId || ((sessionId) => String(sessionId || ""));
+  const getSessionHeaderLabel =
+    typeof options.getSessionHeaderLabel === "function"
+      ? options.getSessionHeaderLabel
+      : (session) => session?.name || String(session?.id || "").slice(0, 8);
   const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
@@ -68,7 +72,7 @@ export function createSessionCardRenderController(options = {}) {
       syncTerminalViewportAfterShow(session.id, entry);
     }
 
-    entry.focusBtn.textContent = session.name || session.id.slice(0, 8);
+    entry.focusBtn.textContent = getSessionHeaderLabel(session);
     entry.quickIdEl.textContent = ensureQuickId(session.id);
 
     if (entry.stateBadgeEl) {

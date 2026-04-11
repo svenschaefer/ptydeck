@@ -132,6 +132,19 @@ export function formatSessionAppIdentityText(identity, options = {}) {
   return SESSION_APP_IDENTITY_FAMILY_DISPLAY[normalized.family] || normalized.family;
 }
 
+export function formatSessionHeaderAppLabel(identity, sessionName = "") {
+  const normalized = normalizeSessionAppIdentity(identity);
+  const appText = formatSessionAppIdentityText(normalized);
+  if (!appText) {
+    return "";
+  }
+  const normalizedSessionName = normalizeText(sessionName).toLowerCase();
+  if (normalizedSessionName && normalizedSessionName === appText.toLowerCase()) {
+    return "";
+  }
+  return appText;
+}
+
 export function formatSessionAppIdentityTitle(identity) {
   const normalized = normalizeSessionAppIdentity(identity);
   if (normalized.family === "unknown") {

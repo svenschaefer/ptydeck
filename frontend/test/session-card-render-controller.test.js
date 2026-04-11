@@ -62,6 +62,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   const controller = createSessionCardRenderController({
     isSessionUnrestored: () => false,
     isSessionExited: () => false,
+    getSessionHeaderLabel: (session) => `${session.name} (codex)`,
     getSessionStateBadgeText: () => "RUNNING",
     getSessionStateHintText: () => "",
     isTerminalAtBottom: () => false,
@@ -91,7 +92,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   assert.equal(entry.element.classList.contains("attention"), false);
   assert.equal(entry.stateBadgeEl.hidden, false);
   assert.equal(entry.stateBadgeEl.textContent, "RUNNING");
-  assert.equal(entry.focusBtn.textContent, "alpha");
+  assert.equal(entry.focusBtn.textContent, "alpha (codex)");
   assert.equal(entry.quickIdEl.textContent, "A");
   assert.equal(entry.isVisible, false);
   assert.equal(entry.followOnShow, false);
@@ -165,4 +166,20 @@ test("session-card-render controller restores terminal focus when a render inter
   });
 
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-card-render controller falls back to the base session label when no derived header label function is provided", () => {
+  const entry = createEntry();
+  const controller = createSessionCardRenderController({
+    setSessionCardVisibility: () => {}
+  });
+
+  controller.updateExistingSessionCard({
+    entry,
+    session: { id: "s9", name: "gamma" },
+    activeSessionId: "other",
+    nextVisible: true
+  });
+
+  assert.equal(entry.focusBtn.textContent, "gamma");
 });

@@ -260,6 +260,10 @@ export function createSessionUiFacadeController(options = {}) {
     return getSessionViewModel()?.getSessionAppIdentityTitle?.(session) || "";
   }
 
+  function getSessionHeaderLabel(session) {
+    return getSessionViewModel()?.getSessionHeaderLabel?.(session) || "";
+  }
+
   function readSessionStartupFromControls(entry) {
     const settingsStateController = getSessionSettingsStateController();
     if (typeof settingsStateController?.readSessionStartupFromControls === "function") {
@@ -364,6 +368,7 @@ export function createSessionUiFacadeController(options = {}) {
     getSessionAppIdentity,
     getSessionAppIdentityText,
     getSessionAppIdentityTitle,
+    getSessionHeaderLabel,
     readSessionStartupFromControls,
     readSessionNoteFromControls,
     readSessionInputSafetyFromControls,
