@@ -637,6 +637,59 @@ test("messaging runtime trims coding-agent identifier tails from attention lines
   assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_snippet_tail"));
 });
 
+test("messaging runtime trims review and path tails from coding-agent fatal lines and suppresses planning status chatter", async () => {
+  const sends = [];
+  let now = 1_395;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 57 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 58 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "review-tail-1" });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "completed, der nächste aktive Block ist v0.41.0-control-shell-clarity-follow-up\n" +
+      "- v0.3.0-reliability: make hotkey registration failure recoverable and clearly9;1H ?? src/SnippingTool/Services/CaptureSessionService.cs\n" +
+      "└ fatal: not a git repository (or any of the parent directories): .git h 10…/review on my current changes m Run /review on my current changes \\code\\snixy ·\n",
+    promptBoundaries: [],
+    trace: { traceId: "review-tail-2" }
+  });
+
+  assert.equal(sends.length, 2);
+  assert.match(sends[1].text, /fatal: not a git repository/);
+  assert.doesNotMatch(sends[1].text, /review on my current changes/i);
+  assert.doesNotMatch(sends[1].text, /\\code\\snixy/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_workflow_planning_status"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_workflow_version_bullet"));
+});
+
 test("messaging runtime avoids summary context bleed and trims coding-agent breadcrumb tails", async () => {
   const sends = [];
   const edits = [];
@@ -700,6 +753,53 @@ test("messaging runtime avoids summary context bleed and trims coding-agent brea
     )
   );
   assert.ok(status.trace.recent.every((entry) => !/Coverage of the changes/.test(entry.text || "")));
+});
+
+test("messaging runtime suppresses short low-value os error attention fragments", async () => {
+  const sends = [];
+  let now = 1_760;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 59 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 60 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "os-error-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "falsch. (os error 123)\n".repeat(3),
+    promptBoundaries: [],
+    trace: { traceId: "os-error-2" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Session created/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_low_value_fragment"));
 });
 
 test("messaging runtime suppresses repeated idle updates without intervening status changes", async () => {

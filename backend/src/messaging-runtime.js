@@ -36,14 +36,20 @@ const STRONG_STATUS_SIGNAL_PATTERN =
 const STRONG_ATTENTION_SIGNAL_PATTERN =
   /\b(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied|timed out|timeout|refused|blocked|conflict)\b/i;
 const ZERO_ISSUE_COUNT_PATTERN = /^\s*0\s+(?:error(?:\(s\))?|errors|warning(?:\(s\))?|warnings)\b/i;
+const SHORT_OS_ERROR_FRAGMENT_PATTERN = /\(\s*os error \d+\s*\)$/i;
 const CODING_AGENT_TAIL_MARKERS = Object.freeze([
   /\s+(?:[•*]\s*)?Ran\b/i,
   /\s+(?:[•*]\s*)?Edited\b/i,
+  /\s+h\s+\d{1,3}….*$/u,
+  /\s+(?:Run\s+)?\/review on my current changes\b.*$/i,
+  /\/review on my current changes\b.*$/i,
   /\s+[│|]\s*[A-Za-z_][\w.-]*(?:\|[A-Za-z_][\w.-]*){1,}\|?/u,
   /\s+(?:documentation|ocumentation|umentation|entation|tation)\s+in\s+@filename\b/i,
   /\s+(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/i,
   /\s+\d{1,3}%\s+(?:left|used|remaining)\b/i,
-  /\s+[A-Za-z]:\\/
+  /\s+[A-Za-z]:\\/,
+  /\s+\\(?:[\w .-]+\\){1,}[\w .-]*$/u,
+  /\s+\?\?\s+[^\s].*$/u
 ]);
 const LOW_VALUE_FILTER_RULES = Object.freeze([
   Object.freeze({
@@ -56,6 +62,21 @@ const LOW_VALUE_FILTER_RULES = Object.freeze([
     id: "markdown_file_list",
     codingAgentOnly: true,
     pattern: /(?:\b[\w.-]+\.md\b(?:\s+|$)){2,}/i
+  }),
+  Object.freeze({
+    id: "workflow_version_bullet",
+    codingAgentOnly: true,
+    pattern: /^(?:-\s+)?v\d+\.\d+\.\d+(?:-[\w-]+)?:\s+/i
+  }),
+  Object.freeze({
+    id: "workflow_planning_status",
+    codingAgentOnly: true,
+    pattern: /(?:next active block|next active wave|queued next wave|nächste aktive block|nächste aktive welle)\b/i
+  }),
+  Object.freeze({
+    id: "review_instruction",
+    codingAgentOnly: true,
+    pattern: /(?:^|\s)(?:run\s+)?\/review on my current changes\b/i
   }),
   Object.freeze({
     id: "run_update",
@@ -286,6 +307,18 @@ function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profil
     return true;
   }
   if (!/[\\/:(]/.test(normalizedSummary) && !/^\s*[A-Z0-9_.-]/.test(normalizedSummary)) {
+    return true;
+  }
+  return false;
+}
+
+function isLowValueAttentionFragment(summary, session, profile) {
+  const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
+  if (!normalizedSummary) {
+    return false;
+  }
+  const wordCount = normalizedSummary.split(/\s+/).filter(Boolean).length;
+  if (SHORT_OS_ERROR_FRAGMENT_PATTERN.test(normalizedSummary) && wordCount <= 4 && normalizedSummary.length <= 40) {
     return true;
   }
   return false;
@@ -1375,6 +1408,20 @@ export function createMessagingRuntime(options = {}) {
             summary: classified.summary,
             comparableText: attentionNoise.comparableText,
             noiseClass: attentionNoise.noiseClass,
+            aggregationReason: "attention_filter"
+          });
+          pushRecentLine(state, visibleLine);
+          return;
+        }
+        if (isLowValueAttentionFragment(classified.summary, session, profile)) {
+          recordSuppressedFragmentTrace({
+            session,
+            profile,
+            classified,
+            trace,
+            reason: "attention_low_value_fragment",
+            summary: classified.summary,
+            comparableText: attentionNoise.comparableText,
             aggregationReason: "attention_filter"
           });
           pushRecentLine(state, visibleLine);
