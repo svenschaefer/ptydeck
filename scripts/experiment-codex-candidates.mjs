@@ -24,6 +24,8 @@ let sessionName = "";
 let deckId = "";
 let tailEntries = 0;
 let format = "text";
+let stableMinKeptEntries = 6;
+let stableMinKeepRatio = 0.08;
 const files = [];
 
 for (let index = 0; index < args.length; index += 1) {
@@ -53,6 +55,16 @@ for (let index = 0; index < args.length; index += 1) {
     index += 1;
     continue;
   }
+  if (value === "--stable-min-kept-entries") {
+    stableMinKeptEntries = Number.parseInt(args[index + 1] || "", 10);
+    index += 1;
+    continue;
+  }
+  if (value === "--stable-min-keep-ratio") {
+    stableMinKeepRatio = Number.parseFloat(args[index + 1] || "");
+    index += 1;
+    continue;
+  }
   files.push(value);
 }
 
@@ -63,6 +75,12 @@ if (!["json", "text"].includes(format)) {
   usage();
 }
 if (!Number.isFinite(tailEntries) || tailEntries < 0) {
+  usage();
+}
+if (!Number.isFinite(stableMinKeptEntries) || stableMinKeptEntries < 0) {
+  usage();
+}
+if (!Number.isFinite(stableMinKeepRatio) || stableMinKeepRatio < 0 || stableMinKeepRatio > 1) {
   usage();
 }
 
@@ -330,6 +348,34 @@ function analyzeVisibleSource(name, visibleText, metadata = {}) {
   };
 }
 
+function isStableCaptureWindow(metadata = {}) {
+  const scopedEntries = Number(metadata.scopedEntries || 0);
+  const keptEntries = Number(metadata.keptEntries || 0);
+  const keepRatio = scopedEntries > 0 ? keptEntries / scopedEntries : 0;
+  return keptEntries >= stableMinKeptEntries && keepRatio >= stableMinKeepRatio;
+}
+
+function augmentCandidatesForCapture(analysis) {
+  if (!analysis || analysis.metadata.kind !== "capture_jsonl") {
+    return analysis;
+  }
+  const stableWindow = isStableCaptureWindow(analysis.metadata);
+  return {
+    ...analysis,
+    metadata: {
+      ...analysis.metadata,
+      keepRatio: analysis.metadata.scopedEntries > 0
+        ? analysis.metadata.keptEntries / analysis.metadata.scopedEntries
+        : 0,
+      stableWindow
+    },
+    candidates: {
+      ...analysis.candidates,
+      stableStrict: stableWindow ? analysis.candidates.strict.slice() : []
+    }
+  };
+}
+
 function loadCaptureAnalysis(filePath, filters = {}) {
   const lines = normalizeLineBreaks(fs.readFileSync(filePath, "utf8")).split("\n");
   const entries = [];
@@ -367,7 +413,7 @@ function loadCaptureAnalysis(filePath, filters = {}) {
   const scopedEntries = tailEntries > 0 ? entries.slice(-tailEntries) : entries;
   const keptEntries = scopedEntries.filter((entry) => entry.kept);
   const combinedVisibleText = keptEntries.map((entry) => entry.visibleText).join("");
-  return analyzeVisibleSource(path.basename(filePath), combinedVisibleText, {
+  return augmentCandidatesForCapture(analyzeVisibleSource(path.basename(filePath), combinedVisibleText, {
     kind: "capture_jsonl",
     path: filePath,
     sessionName: filters.sessionName || "",
@@ -385,7 +431,7 @@ function loadCaptureAnalysis(filePath, filters = {}) {
         }, new Map())
         .entries()
     )
-  });
+  }));
 }
 
 const analyses = [];
@@ -425,6 +471,8 @@ for (const analysis of analyses) {
     console.log(`capture keptEntries: ${analysis.metadata.keptEntries}`);
     console.log(`capture droppedEntries: ${analysis.metadata.droppedEntries}`);
     console.log(`capture droppedKinds: ${JSON.stringify(analysis.metadata.droppedKinds)}`);
+    console.log(`capture keepRatio: ${analysis.metadata.keepRatio}`);
+    console.log(`capture stableWindow: ${analysis.metadata.stableWindow}`);
   }
   console.log("loose candidates:");
   for (const candidate of analysis.candidates.loose) {
@@ -439,6 +487,15 @@ for (const analysis of analyses) {
   }
   if (analysis.candidates.strict.length === 0) {
     console.log("- none");
+  }
+  if (analysis.metadata.kind === "capture_jsonl") {
+    console.log("stable strict candidates:");
+    for (const candidate of analysis.candidates.stableStrict) {
+      console.log(`- L${candidate.startLine}-${candidate.endLine}: ${candidate.text}`);
+    }
+    if (analysis.candidates.stableStrict.length === 0) {
+      console.log("- none");
+    }
   }
   console.log("");
 }

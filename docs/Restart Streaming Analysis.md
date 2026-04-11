@@ -174,6 +174,8 @@ Two candidate modes are reported:
   - first `info` bullet after a major separator
 - `strict`
   - same as `loose`, but only when the next block in the same section is an anti-pattern block such as `ran`, `explored`, `waited`, `context_compacted`, or `updated_plan`
+- `stableStrict`
+  - `strict`, but only when the capture window itself looks stable instead of redraw-dominated
 
 ### Result 1: The Synthetic Sollfall Works
 
@@ -232,6 +234,72 @@ The dump experiment shows that we still need at least one more dimension, such a
 - stable end-of-section detection instead of immediate block forwarding
 
 The important outcome is that this next step should build on block typing and section semantics, not on another round of line-level blacklist tuning.
+
+## Restart/Remount Suppression Experiment
+
+The next experiment layer adds a deliberately blunt stability gate for captured live windows:
+
+- keep only windows with at least `6` substantial captured entries
+- and a keep ratio of at least `0.08`
+
+Where:
+
+- `substantial` means not blank, not a tiny overlay fragment, and not the known background-terminal status ribbon
+- `keep ratio` means `keptEntries / scopedEntries` inside the chosen capture tail
+
+This is not meant as a final product rule. It is an analytical probe for the question:
+
+- "Can restart/remount and overlay churn be rejected at the window level before any block candidate is even considered?"
+
+### Result 4: The Live `ptydeck` Tail Fails the Stability Gate Across Multiple Tail Sizes
+
+The current `ptydeck` session was tested at several tail sizes:
+
+- `1200` entries
+  - `12` kept
+  - keep ratio `0.01`
+  - `stableStrict = 0`
+- `600` entries
+  - `11` kept
+  - keep ratio `0.0183`
+  - `stableStrict = 0`
+- `300` entries
+  - `4` kept
+  - keep ratio `0.0133`
+  - `stableStrict = 0`
+- `120` entries
+  - `3` kept
+  - keep ratio `0.025`
+  - `stableStrict = 0`
+- `60` entries
+  - `3` kept
+  - keep ratio `0.05`
+  - `stableStrict = 0`
+
+This is a strong signal that the recent live `ptydeck` activity was still dominated by redraw, overlay, or remount-like churn rather than a stable Codex section that should even be considered for delivery.
+
+That outcome is useful:
+
+- it suppresses the live tail consistently
+- it does so for a structural reason
+- it does not depend on fragile text blacklists
+
+### Result 5: Stability Suppression and Section Semantics Solve Different Problems
+
+The stability gate only applies to captured live windows, because only those windows carry chunk-level density and churn information.
+
+The visual Codex dump files remain useful for:
+
+- validating the rendered block grammar
+- validating that the synthetic separator-plus-info example behaves as expected
+- demonstrating that section semantics alone still leave too many plausible `info` candidates
+
+So the current analytical split is now clearer:
+
+- capture-level stability gating is the right tool for restart/remount suppression
+- rendered block parsing and block typing are the right tools for message-shape extraction inside already-stable sections
+
+Both are necessary. Neither one is sufficient on its own.
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 
