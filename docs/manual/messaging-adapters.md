@@ -18,13 +18,15 @@ That means:
 
 - duplicate status churn is suppressed aggressively
 - repeated attention churn from the same logical failure is now damped so one error does not fan out into many nearly identical Telegram alerts
+- exact repeated failure lines can now alert again after the bounded churn window expires instead of being suppressed forever by older duplicate state
 - when a later line adds meaningful detail to the same recent failure, the adapter now edits the existing attention post instead of sending a second alert
 - low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message
 - coding-agent planning chatter such as `next active block ...`, version bullets, and `/review on my current changes` echoes is now treated as low-value noise rather than operator-facing Telegram status
 - coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently
+- prompt-boundary handling is now chunk-position-aware, so summary or attention text that arrives in the same PTY chunk as a prompt marker is flushed before any later `Prompt ready.` update can be considered
 - structural follow-up lines such as trailing `}` or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword
 - status summaries no longer inherit generic completion keywords into unrelated follow-up lines, so prompt echoes, file lists, and similar tails do not become accidental Telegram updates just because a previous line contained `done` or `updated`
-- coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, partial terminal-control residue such as `38;5;2m` or `9;1H` is stripped before classification, and repeated `Session idle.` updates are damped instead of churning the status thread
+- coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, partial terminal-control residue such as `38;5;2m` or `9;1H` is stripped before classification, actionable path-bearing diagnostics are preserved when they are part of the real failure line, and repeated `Session idle.` updates are damped instead of churning the status thread
 - zero-count issue lines such as `0 Error(s)` are treated as low-value noise rather than user-facing status updates
 - short coding-agent snippet follow-ons after a stronger failure line stay suppressed instead of becoming their own Telegram alert just because they still contain words like `Exception`
 - short low-value OS-error fragments such as `falsch. (os error 123)` are suppressed when they arrive without enough standalone context to be useful as operator-facing alerts
@@ -88,6 +90,10 @@ If you need the exact command or settings contract, use the generated reference 
 A Telegram target maps one ptydeck session to one chat destination.
 
 For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same `chatId` and gets its own `messageThreadId`. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.
+
+Recommended topic naming convention:
+
+- `<deck name> + <terminal name>`
 
 Each mapping entry needs:
 

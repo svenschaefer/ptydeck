@@ -141,6 +141,22 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastObservedEventAt: 8_100
     }
   );
+  const attentionRepeatAfterWindow = applyMessagingMessagePolicy(
+    {
+      type: "session.attention.required",
+      threadKey: "attention",
+      text: "fatal: not a git repository",
+      comparableText: "fatal: not a git repository",
+      occurredAt: 50_000
+    },
+    {
+      messageCreated: true,
+      lastText: "fatal: not a git repository",
+      lastComparableText: "fatal: not a git repository",
+      lastDeliveredAt: 1_000,
+      lastEventType: "session.attention.required"
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(updated.action, "update");
@@ -157,6 +173,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(repeatedIdle.reason, "idle_repeat");
   assert.equal(idleAfterUndeliveredSummary.action, "suppress");
   assert.equal(idleAfterUndeliveredSummary.reason, "idle_after_status_attempt");
+  assert.equal(attentionRepeatAfterWindow.action, "alert");
+  assert.equal(attentionRepeatAfterWindow.reason, "attention_required");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -217,6 +235,58 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.ok(edits.some((entry) => /Share access created/.test(entry.text)));
   assert.ok(edits.some((entry) => /Session idle/.test(entry.text)));
   assert.equal(runtime.buildStatusSummary().enabled, true);
+});
+
+test("messaging runtime flushes same-chunk summary content before prompt updates", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 300;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 70 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 71 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "same-chunk-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "Plan updated\n",
+    promptBoundaries: [13],
+    trace: { traceId: "same-chunk-2" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Plan updated/);
+  assert.doesNotMatch(edits[0].text, /Prompt ready/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.summary === "Plan updated"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "prompt_after_status_update"));
 });
 
 test("messaging runtime keeps bounded traces and reports Telegram rate-limit delivery outcomes", async () => {
@@ -416,7 +486,7 @@ test("messaging runtime suppresses repeated identical attention churn and ignore
   assert.doesNotMatch(sends[0].text, /\}\s*$/);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "duplicate"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_duplicate_churn"));
   assert.ok(status.trace.recent.every((entry) => entry.summary !== "}"));
 });
 
@@ -585,6 +655,64 @@ test("messaging runtime edits an existing attention thread when a richer follow-
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_followup_update"));
+});
+
+test("messaging runtime preserves actionable path diagnostics and keeps distinct path failures separate", async () => {
+  const sends = [];
+  let now = 1_385;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 53 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 54 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "path-distinct-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "error: build failed in C:\\code\\snixy\\src\\Foo.cs at line 12\n",
+    promptBoundaries: [],
+    trace: { traceId: "path-distinct-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "fatal: unable to access 'https://github.com/org-a/repo-a/': Failed to connect\n",
+    promptBoundaries: [],
+    trace: { traceId: "path-distinct-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "fatal: unable to access 'https://github.com/org-b/repo-b/': Failed to connect\n",
+    promptBoundaries: [],
+    trace: { traceId: "path-distinct-4" }
+  });
+
+  assert.equal(sends.length, 4);
+  assert.match(sends[1].text, /C:\\code\\snixy\\src\\Foo\.cs at line 12/);
+  assert.match(sends[2].text, /org-a\/repo-a/);
+  assert.match(sends[3].text, /org-b\/repo-b/);
 });
 
 test("messaging runtime trims coding-agent identifier tails from attention lines and suppresses duplicate follow-on alerts", async () => {

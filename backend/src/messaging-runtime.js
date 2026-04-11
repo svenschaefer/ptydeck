@@ -47,8 +47,8 @@ const CODING_AGENT_TAIL_MARKERS = Object.freeze([
   /\s+(?:documentation|ocumentation|umentation|entation|tation)\s+in\s+@filename\b/i,
   /\s+(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/i,
   /\s+\d{1,3}%\s+(?:left|used|remaining)\b/i,
-  /\s+[A-Za-z]:\\/,
-  /\s+\\(?:[\w .-]+\\){1,}[\w .-]*$/u,
+  /\s+[|·•]\s*[A-Za-z]:\\[^\s|·•]*(?=\s+[|·•]|$)/u,
+  /\s+[|·•]\s*\\(?:[\w .-]+\\){1,}[\w .-]*(?=\s+[|·•]|$)/u,
   /\s+\?\?\s+[^\s].*$/u
 ]);
 const LOW_VALUE_FILTER_RULES = Object.freeze([
@@ -230,6 +230,23 @@ function createComparableText(value) {
   }
   return normalized
     .replace(WINDOWS_OR_POSIX_PATH_PATTERN, "<path>")
+    .replace(MODEL_TOKEN_PATTERN, "<model>")
+    .replace(BUDGET_TOKEN_PATTERN, "<budget>")
+    .replace(EFFORT_TOKEN_PATTERN, "<effort>")
+    .replace(/\bcodex\b/gi, "<agent>")
+    .replace(/\bclaude\b/gi, "<agent>")
+    .replace(/\bgemini\b/gi, "<agent>")
+    .replace(/[|·•]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createAttentionComparableText(value) {
+  const normalized = truncateSummary(value).toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  return normalized
     .replace(MODEL_TOKEN_PATTERN, "<model>")
     .replace(BUDGET_TOKEN_PATTERN, "<budget>")
     .replace(EFFORT_TOKEN_PATTERN, "<effort>")
@@ -640,12 +657,6 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   ) {
     return Object.freeze({ action: "suppress", messageKey, reason: "idle_repeat" });
   }
-  if (threadState.lastText === text) {
-    return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });
-  }
-  if (comparableText && lastComparableText && isSubsetComparableText(comparableText, lastComparableText)) {
-    return Object.freeze({ action: "suppress", messageKey, reason: "duplicate_signature" });
-  }
   if (type === "session.lifecycle.created") {
     return Object.freeze({ action: "new", messageKey, reason: "lifecycle_created" });
   }
@@ -671,6 +682,7 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     if (
       comparableText &&
       lastComparableText &&
+      comparableText !== lastComparableText &&
       isSubsetComparableText(lastComparableText, comparableText) &&
       withinAttentionWindow &&
       threadState.messageCreated === true
@@ -686,6 +698,12 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
       return Object.freeze({ action: "suppress", messageKey: "attention", reason: "attention_duplicate_churn" });
     }
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
+  }
+  if (threadState.lastText === text) {
+    return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });
+  }
+  if (comparableText && lastComparableText && isSubsetComparableText(comparableText, lastComparableText)) {
+    return Object.freeze({ action: "suppress", messageKey, reason: "duplicate_signature" });
   }
   if (type === "session.prompt.ready") {
     const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
@@ -1333,7 +1351,14 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     const chunk = typeof data === "string" ? data : String(data ?? "");
-    if (Array.isArray(promptBoundaries) && promptBoundaries.length > 0) {
+    const normalizedPromptBoundaries = Array.from(
+      new Set(
+        (Array.isArray(promptBoundaries) ? promptBoundaries : [])
+          .map((entry) => (Number.isInteger(entry) && entry >= 0 && entry <= chunk.length ? entry : null))
+          .filter((entry) => entry !== null)
+      )
+    ).sort((left, right) => left - right);
+    async function dispatchPromptReady() {
       await flushPendingSummaryBlock(session, profile, state, trace, "prompt_boundary");
       await dispatchEvent(
         createEvent({
@@ -1346,9 +1371,6 @@ export function createMessagingRuntime(options = {}) {
           nowFn
         })
       );
-    }
-    if (!chunk) {
-      return;
     }
     async function consumeCompletedLine(line) {
       const visibleLine = sanitizeMessageCandidate(line, session, profile);
@@ -1397,6 +1419,7 @@ export function createMessagingRuntime(options = {}) {
       }
       const classified = classifyTerminalLine(session, profile, visibleLine, state.recentLines);
       if (classified?.type === "session.attention.required") {
+        const attentionComparableText = createAttentionComparableText(classified.summary);
         const attentionNoise = classifyNoiseSignature(classified.summary, session, profile);
         if (attentionNoise.lowInformation) {
           recordSuppressedFragmentTrace({
@@ -1406,7 +1429,7 @@ export function createMessagingRuntime(options = {}) {
             trace,
             reason: `noise_${attentionNoise.noiseClass}`,
             summary: classified.summary,
-            comparableText: attentionNoise.comparableText,
+            comparableText: attentionComparableText,
             noiseClass: attentionNoise.noiseClass,
             aggregationReason: "attention_filter"
           });
@@ -1421,7 +1444,7 @@ export function createMessagingRuntime(options = {}) {
             trace,
             reason: "attention_low_value_fragment",
             summary: classified.summary,
-            comparableText: attentionNoise.comparableText,
+            comparableText: attentionComparableText,
             aggregationReason: "attention_filter"
           });
           pushRecentLine(state, visibleLine);
@@ -1435,7 +1458,7 @@ export function createMessagingRuntime(options = {}) {
             trace,
             reason: "attention_snippet_tail",
             summary: classified.summary,
-            comparableText: attentionNoise.comparableText,
+            comparableText: attentionComparableText,
             aggregationReason: "attention_filter"
           });
           pushRecentLine(state, visibleLine);
@@ -1451,7 +1474,7 @@ export function createMessagingRuntime(options = {}) {
             threadKey: classified.threadKey,
             trace,
             nowFn,
-            comparableText: attentionNoise.comparableText
+            comparableText: attentionComparableText
           })
         );
       } else if (classified?.type === "session.output.summary") {
@@ -1459,26 +1482,49 @@ export function createMessagingRuntime(options = {}) {
       }
       pushRecentLine(state, visibleLine);
     }
-    for (let index = 0; index < chunk.length; index += 1) {
-      const char = chunk[index];
-      const nextChar = chunk[index + 1];
-      if (char === "\r" && nextChar === "\n") {
-        await consumeCompletedLine(state.pendingLine);
-        state.pendingLine = "";
-        index += 1;
-        continue;
+    async function processChunkSegment(segment) {
+      if (!segment) {
+        return;
       }
-      if (char === "\r") {
-        state.pendingLine = "";
-        continue;
+      for (let index = 0; index < segment.length; index += 1) {
+        const char = segment[index];
+        const nextChar = segment[index + 1];
+        if (char === "\r" && nextChar === "\n") {
+          await consumeCompletedLine(state.pendingLine);
+          state.pendingLine = "";
+          index += 1;
+          continue;
+        }
+        if (char === "\r") {
+          state.pendingLine = "";
+          continue;
+        }
+        if (char === "\n") {
+          await consumeCompletedLine(state.pendingLine);
+          state.pendingLine = "";
+          continue;
+        }
+        state.pendingLine += char;
       }
-      if (char === "\n") {
-        await consumeCompletedLine(state.pendingLine);
-        state.pendingLine = "";
-        continue;
-      }
-      state.pendingLine += char;
     }
+    if (!chunk) {
+      for (const _boundary of normalizedPromptBoundaries) {
+        await dispatchPromptReady();
+      }
+      return;
+    }
+    let chunkCursor = 0;
+    for (const boundary of normalizedPromptBoundaries) {
+      const nextBoundary = Math.max(chunkCursor, boundary);
+      await processChunkSegment(chunk.slice(chunkCursor, nextBoundary));
+      if (state.pendingLine) {
+        await consumeCompletedLine(state.pendingLine);
+        state.pendingLine = "";
+      }
+      await dispatchPromptReady();
+      chunkCursor = nextBoundary;
+    }
+    await processChunkSegment(chunk.slice(chunkCursor));
   }
 
   async function observeSessionIdle({ session, trace }) {
