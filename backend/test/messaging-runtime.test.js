@@ -113,6 +113,20 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastDeliveredAt: 5_000
     }
   );
+  const idleAfterUndeliveredSummary = applyMessagingMessagePolicy(
+    {
+      type: "session.activity.idle",
+      threadKey: "status",
+      text: "Session idle.",
+      comparableText: "session idle.",
+      occurredAt: 9_000
+    },
+    {
+      messageCreated: true,
+      lastObservedEventType: "session.output.summary",
+      lastObservedEventAt: 8_100
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(updated.action, "update");
@@ -125,6 +139,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(attentionChurn.reason, "attention_duplicate_churn");
   assert.equal(repeatedIdle.action, "suppress");
   assert.equal(repeatedIdle.reason, "idle_repeat");
+  assert.equal(idleAfterUndeliveredSummary.action, "suppress");
+  assert.equal(idleAfterUndeliveredSummary.reason, "idle_after_status_attempt");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -388,6 +404,111 @@ test("messaging runtime suppresses repeated identical attention churn and ignore
   assert.ok(status.trace.recent.every((entry) => entry.summary !== "}"));
 });
 
+test("messaging runtime strips coding-agent tails and terminal-control residue from repeated fatal alerts and suppresses zero-issue counts", async () => {
+  const sends = [];
+  let now = 1_320;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 35 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 36 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "fatal-tail-1" });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "└ fatal: not a git repository (or any of the parent directories): .git ocumentation in @filename 38;5;2m• Ran Get-Content -Path src\\\\SnippingTool\\\\Services\\\\ScreenCaptureService.cs\n" +
+      "0 Error(s)\n" +
+      "└ fatal: not a git repository (or any of the parent directories): .git 9;1H high · 100% left · C:\\\\code\\\\snixy · gpt-5.4 · snixy\n",
+    promptBoundaries: [],
+    trace: { traceId: "fatal-tail-2" }
+  });
+
+  assert.equal(sends.length, 2);
+  assert.match(sends[1].text, /fatal: not a git repository/);
+  assert.doesNotMatch(sends[1].text, /Get-Content/);
+  assert.doesNotMatch(sends[1].text, /38;5;2m/);
+  assert.doesNotMatch(sends[1].text, /9;1H/);
+  assert.doesNotMatch(sends[1].text, /100% left/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_duplicate_churn"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_zero_issue_count"));
+});
+
+test("messaging runtime suppresses short coding-agent attention snippet tails after a stronger failure line", async () => {
+  const sends = [];
+  let now = 1_360;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 45 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 46 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "snippet-tail-1" });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "└ fatal: unable to access 'https://github.com/svenschaefer/snixy/': Failed to connect\n" +
+      "eine Exception geworfen.\n",
+    promptBoundaries: [],
+    trace: { traceId: "snippet-tail-2" }
+  });
+
+  assert.equal(sends.length, 2);
+  assert.match(sends[1].text, /fatal: unable to access/);
+  assert.doesNotMatch(sends[1].text, /eine Exception geworfen/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "attention_snippet_tail"));
+});
+
 test("messaging runtime avoids summary context bleed and trims coding-agent breadcrumb tails", async () => {
   const sends = [];
   const edits = [];
@@ -492,6 +613,55 @@ test("messaging runtime suppresses repeated idle updates without intervening sta
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "idle_repeat"));
+});
+
+test("messaging runtime suppresses idle after a recent status attempt was skipped during telegram backoff", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 2_200;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "plain-shell", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          if (sends.length === 1) {
+            return { messageId: 91 };
+          }
+          throw new Error("Too Many Requests: retry after 8");
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          throw new Error("message to edit not found");
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "plain-shell",
+    quickIdToken: "S",
+    startCommand: "bash"
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "idle-backoff-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "Worker started successfully.\n",
+    promptBoundaries: [],
+    trace: { traceId: "idle-backoff-2" }
+  });
+  await runtime.observeSessionIdle({ session, trace: { traceId: "idle-backoff-3" } });
+
+  assert.equal(sends.length, 2);
+  assert.equal(edits.length, 1);
+  assert.match(sends[0].text, /Session created/);
+  assert.doesNotMatch(sends.at(-1).text, /Session idle/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "idle_after_status_attempt"));
 });
 
 test("messaging runtime handles bounded inbound status stop retry and replay actions", async () => {

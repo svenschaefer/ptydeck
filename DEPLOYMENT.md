@@ -196,6 +196,7 @@ When Telegram messaging is configured, verify additionally:
 - Repeated low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, diff/update summaries, and separator-only fragments should now stay suppressed or coalesced into one evolving status thread instead of spraying many near-duplicate Telegram messages
 - Repeated attention churn from one logical failure should no longer fan out into many nearly identical alerts, and structural tail lines such as trailing `}` should not appear as standalone Telegram attention messages
 - Status updates should no longer inherit `done`/`updated` from a previous line into unrelated prompt echoes, Markdown file lists, or similar follow-up tails, and repeated `Session idle.` updates should not keep bumping the same Telegram thread without an intervening meaningful status change
+- Telegram-visible failure lines should now shed appended coding-agent breadcrumb tails and partial terminal-control residue such as `38;5;2m` or `9;1H`, zero-count issue lines such as `0 Error(s)` should stay suppressed, and short snippet follow-ons after a stronger failure line should not emerge as their own Telegram alerts
 
 Session API:
 

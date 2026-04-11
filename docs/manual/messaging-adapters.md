@@ -22,7 +22,9 @@ That means:
 - coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently
 - structural follow-up lines such as trailing `}` or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword
 - status summaries no longer inherit generic completion keywords into unrelated follow-up lines, so prompt echoes, file lists, and similar tails do not become accidental Telegram updates just because a previous line contained `done` or `updated`
-- coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, and repeated `Session idle.` updates are damped instead of churning the status thread
+- coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, partial terminal-control residue such as `38;5;2m` or `9;1H` is stripped before classification, and repeated `Session idle.` updates are damped instead of churning the status thread
+- zero-count issue lines such as `0 Error(s)` are treated as low-value noise rather than user-facing status updates
+- short coding-agent snippet follow-ons after a stronger failure line stay suppressed instead of becoming their own Telegram alert just because they still contain words like `Exception`
 
 When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.
 
@@ -36,6 +38,8 @@ curl -s http://127.0.0.1:18080/ready | jq '.messaging.trace'
 That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.
 
 The Telegram adapter status now also surfaces active outbound backoff state after a Bot API `retry after` response, so repeated rate-limit failures can be distinguished from ordinary transport errors.
+
+One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later `Session idle.` event should still stay suppressed. The trace will show the skipped status attempt plus the later `idle_after_status_attempt` suppression instead of silently bumping the thread with low-value idle churn.
 
 For persisted local analysis, enable the existing backend debug log:
 

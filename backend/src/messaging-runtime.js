@@ -29,8 +29,21 @@ const BUDGET_TOKEN_PATTERN = /\b\d{1,3}%\s+(?:left|used|remaining)\b/gi;
 const EFFORT_TOKEN_PATTERN = /\b(?:xhigh|high|medium|low)\b/gi;
 const LOW_INFORMATION_FRAGMENT_PATTERN =
   /^(?:<(?:path|model|budget|effort|agent)>|\b(?:left|remaining|context|cwd|dir|session|thread)\b|\||·|•)+$/i;
+const PARTIAL_TERMINAL_CONTROL_PATTERN =
+  /(?:\u001b\[[0-9;]*[A-Za-z]|\[[0-9;]{2,}[A-Za-z]|(?:^|[\s|·•])\d{1,3}(?:;\d{1,3}){1,6}[A-Za-z](?=$|[\s|·•]))/g;
 const STRONG_STATUS_SIGNAL_PATTERN =
   /\b(?:plan|validated?|generated?|wrote|updated?|restored|reclaimed|pushed|committed|tests?|lint|coverage|build|status|done|completed|ready|started|saved|connected|copied|uploaded|downloaded|created|deleted|renamed|applied|failed|failure|error|warning|blocked|conflict)\b/i;
+const STRONG_ATTENTION_SIGNAL_PATTERN =
+  /\b(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied|timed out|timeout|refused|blocked|conflict)\b/i;
+const ZERO_ISSUE_COUNT_PATTERN = /^\s*0\s+(?:error(?:\(s\))?|errors|warning(?:\(s\))?|warnings)\b/i;
+const CODING_AGENT_TAIL_MARKERS = Object.freeze([
+  /\s+(?:[•*]\s*)?Ran\b/i,
+  /\s+(?:[•*]\s*)?Edited\b/i,
+  /\s+(?:documentation|ocumentation|umentation|entation|tation)\s+in\s+@filename\b/i,
+  /\s+(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/i,
+  /\s+\d{1,3}%\s+(?:left|used|remaining)\b/i,
+  /\s+[A-Za-z]:\\/
+]);
 const LOW_VALUE_FILTER_RULES = Object.freeze([
   Object.freeze({
     id: "workflow_instruction",
@@ -214,6 +227,69 @@ function stripLowValueFragments(value) {
     .trim();
 }
 
+function stripTerminalNoiseFragments(value) {
+  return String(value || "")
+    .replace(PARTIAL_TERMINAL_CONTROL_PATTERN, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function trimCodingAgentLowValueTail(value, session, profile) {
+  if (!isCodingAgentContext(session, profile)) {
+    return value;
+  }
+  let trimmed = String(value || "").trim();
+  for (const pattern of CODING_AGENT_TAIL_MARKERS) {
+    const match = pattern.exec(trimmed);
+    if (!match || match.index <= 0) {
+      continue;
+    }
+    const prefix = trimmed.slice(0, match.index).trim();
+    if (!prefix) {
+      continue;
+    }
+    if (STRONG_STATUS_SIGNAL_PATTERN.test(prefix) || STRONG_ATTENTION_SIGNAL_PATTERN.test(prefix) || prefix.length >= 48) {
+      trimmed = prefix;
+      break;
+    }
+  }
+  return trimmed;
+}
+
+function sanitizeMessageCandidate(value, session, profile) {
+  const normalized = truncateSummary(value);
+  if (!normalized) {
+    return "";
+  }
+  return truncateSummary(trimCodingAgentLowValueTail(stripTerminalNoiseFragments(normalized), session, profile));
+}
+
+function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profile) {
+  if (!isCodingAgentContext(session, profile)) {
+    return false;
+  }
+  const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
+  if (!normalizedSummary) {
+    return false;
+  }
+  const strongPrefixPattern = /^(?:[•*]\s*)?(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied)\b/i;
+  if (strongPrefixPattern.test(normalizedSummary)) {
+    return false;
+  }
+  const previousLine = sanitizeMessageCandidate(recentLines[recentLines.length - 1] || "", session, profile);
+  if (!previousLine || !STRONG_ATTENTION_SIGNAL_PATTERN.test(previousLine)) {
+    return false;
+  }
+  const wordCount = normalizedSummary.split(/\s+/).filter(Boolean).length;
+  if (wordCount <= 10) {
+    return true;
+  }
+  if (!/[\\/:(]/.test(normalizedSummary) && !/^\s*[A-Z0-9_.-]/.test(normalizedSummary)) {
+    return true;
+  }
+  return false;
+}
+
 function matchLowValueFilterPattern(value, session, profile) {
   const normalized = truncateSummary(value);
   if (!normalized) {
@@ -295,7 +371,7 @@ function isSubsetComparableText(currentComparableText, previousComparableText) {
 }
 
 function sanitizeSummaryFragment(summary, session, profile) {
-  const normalizedSummary = truncateSummary(summary);
+  const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
   if (!normalizedSummary) {
     return "";
   }
@@ -468,13 +544,13 @@ function createEvent({
   });
 }
 
-function classifyTerminalLine(profile, line, recentLines = []) {
-  const visibleLine = truncateSummary(line);
+function classifyTerminalLine(session, profile, line, recentLines = []) {
+  const visibleLine = sanitizeMessageCandidate(line, session, profile);
   if (!visibleLine) {
     return null;
   }
   const activeProfile = PROFILE_PATTERNS[profile] || PROFILE_PATTERNS["generic-shell"];
-  const previousLine = recentLines[recentLines.length - 1] || "";
+  const previousLine = sanitizeMessageCandidate(recentLines[recentLines.length - 1] || "", session, profile);
   const combinedTail = [previousLine, visibleLine].filter(Boolean).join(" | ");
   if (/^traceback/i.test(previousLine)) {
     return {
@@ -605,6 +681,15 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
       event.occurredAt - threadState.lastDeliveredAt < IDLE_STATUS_SUPPRESSION_WINDOW_MS
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "idle_after_status_update" });
+    }
+    if (
+      type === "session.activity.idle" &&
+      threadState.lastObservedEventType === "session.output.summary" &&
+      Number.isInteger(threadState.lastObservedEventAt) &&
+      Number.isInteger(event?.occurredAt) &&
+      event.occurredAt - threadState.lastObservedEventAt < IDLE_STATUS_SUPPRESSION_WINDOW_MS
+    ) {
+      return Object.freeze({ action: "suppress", messageKey, reason: "idle_after_status_attempt" });
     }
     return Object.freeze({ action: threadState.messageCreated === true ? "update" : "new", messageKey, reason: "status_update" });
   }
@@ -1057,6 +1142,8 @@ export function createMessagingRuntime(options = {}) {
       recordDispatchTrace(event, decision, target, []);
       return decision;
     }
+    threadState.lastObservedEventType = event.type;
+    threadState.lastObservedEventAt = event.occurredAt;
     let delivered = false;
     const deliveryResults = [];
     for (const adapter of adapters) {
@@ -1216,7 +1303,7 @@ export function createMessagingRuntime(options = {}) {
       return;
     }
     async function consumeCompletedLine(line) {
-      const visibleLine = truncateSummary(line);
+      const visibleLine = sanitizeMessageCandidate(line, session, profile);
       const lowValueNoise = classifyNoiseSignature(visibleLine, session, profile);
       if (visibleLine && lowValueNoise.lowInformation && lowValueNoise.noiseClass.startsWith("low_value_")) {
         recordSuppressedFragmentTrace({
@@ -1237,12 +1324,30 @@ export function createMessagingRuntime(options = {}) {
         pushRecentLine(state, visibleLine);
         return;
       }
+      if (visibleLine && ZERO_ISSUE_COUNT_PATTERN.test(visibleLine)) {
+        recordSuppressedFragmentTrace({
+          session,
+          profile,
+          classified: {
+            type: "session.output.summary",
+            severity: "info",
+            threadKey: "status"
+          },
+          trace,
+          reason: "noise_zero_issue_count",
+          summary: visibleLine,
+          comparableText: createComparableText(visibleLine),
+          aggregationReason: "line_filter"
+        });
+        pushRecentLine(state, visibleLine);
+        return;
+      }
       if (isSeparatorHint(visibleLine, session, profile)) {
         await flushPendingSummaryBlock(session, profile, state, trace, "separator_hint");
         pushRecentLine(state, visibleLine);
         return;
       }
-      const classified = classifyTerminalLine(profile, line, state.recentLines);
+      const classified = classifyTerminalLine(session, profile, visibleLine, state.recentLines);
       if (classified?.type === "session.attention.required") {
         const attentionNoise = classifyNoiseSignature(classified.summary, session, profile);
         if (attentionNoise.lowInformation) {
@@ -1255,6 +1360,20 @@ export function createMessagingRuntime(options = {}) {
             summary: classified.summary,
             comparableText: attentionNoise.comparableText,
             noiseClass: attentionNoise.noiseClass,
+            aggregationReason: "attention_filter"
+          });
+          pushRecentLine(state, visibleLine);
+          return;
+        }
+        if (isLikelyAttentionSnippetTail(classified.summary, state.recentLines, session, profile)) {
+          recordSuppressedFragmentTrace({
+            session,
+            profile,
+            classified,
+            trace,
+            reason: "attention_snippet_tail",
+            summary: classified.summary,
+            comparableText: attentionNoise.comparableText,
             aggregationReason: "attention_filter"
           });
           pushRecentLine(state, visibleLine);
