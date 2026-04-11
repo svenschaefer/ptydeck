@@ -19,16 +19,30 @@ const MAX_INBOUND_RESPONSE_TEXT_LENGTH = 3800;
 const PROMPT_STATUS_SUPPRESSION_WINDOW_MS = 1500;
 const IDLE_STATUS_SUPPRESSION_WINDOW_MS = 2000;
 const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
+const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
 const WINDOWS_OR_POSIX_PATH_PATTERN = /(?:[A-Za-z]:\\|\/)[^\s|·•]+/g;
 const MODEL_TOKEN_PATTERN = /\b(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/gi;
-const BUDGET_TOKEN_PATTERN = /\b\d{1,3}%\s+left\b/gi;
+const BUDGET_TOKEN_PATTERN = /\b\d{1,3}%\s+(?:left|used|remaining)\b/gi;
 const EFFORT_TOKEN_PATTERN = /\b(?:xhigh|high|medium|low)\b/gi;
 const LOW_INFORMATION_FRAGMENT_PATTERN =
   /^(?:<(?:path|model|budget|effort|agent)>|\b(?:left|remaining|context|cwd|dir|session|thread)\b|\||·|•)+$/i;
+const STRONG_STATUS_SIGNAL_PATTERN =
+  /\b(?:plan|validated?|generated?|wrote|updated?|restored|reclaimed|pushed|committed|tests?|lint|coverage|build|status|done|completed|ready|started|saved|connected|copied|uploaded|downloaded|created|deleted|renamed|applied|failed|failure|error|warning|blocked|conflict)\b/i;
 const LOW_VALUE_FILTER_RULES = Object.freeze([
+  Object.freeze({
+    id: "workflow_instruction",
+    codingAgentOnly: true,
+    pattern:
+      /(?:do a final validation|commit and push|take care that all md'?s are up-to-date|what are the open tasks|update todo\.md|roadmap\.md|changelog\.md|codex_context\.md)/i
+  }),
+  Object.freeze({
+    id: "markdown_file_list",
+    codingAgentOnly: true,
+    pattern: /(?:\b[\w.-]+\.md\b(?:\s+|$)){2,}/i
+  }),
   Object.freeze({
     id: "run_update",
     codingAgentOnly: true,
@@ -243,6 +257,19 @@ function classifyNoiseSignature(value, session = null, profile = "") {
   }
   const stripped = stripLowValueFragments(comparableText);
   const strippedTokenCount = stripped ? stripped.split(/\s+/).filter(Boolean).length : 0;
+  const placeholderCount = (comparableText.match(/<(?:path|model|budget|effort|agent)>/g) || []).length;
+  if (
+    isCodingAgentContext(session, profile) &&
+    placeholderCount >= 2 &&
+    strippedTokenCount <= 4 &&
+    !STRONG_STATUS_SIGNAL_PATTERN.test(stripped)
+  ) {
+    return {
+      comparableText,
+      lowInformation: true,
+      noiseClass: "status_tail"
+    };
+  }
   if (!stripped || LOW_INFORMATION_FRAGMENT_PATTERN.test(stripped) || (strippedTokenCount <= 1 && /</.test(comparableText))) {
     return {
       comparableText,
@@ -468,11 +495,11 @@ function classifyTerminalLine(profile, line, recentLines = []) {
     }
   }
   for (const pattern of activeProfile.summary) {
-    if (pattern.test(visibleLine) || pattern.test(combinedTail)) {
+    if (pattern.test(visibleLine)) {
       return {
         type: "session.output.summary",
         severity: "info",
-        summary: combinedTail !== visibleLine ? combinedTail : visibleLine,
+        summary: visibleLine,
         threadKey: "status"
       };
     }
@@ -491,6 +518,17 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   const lastComparableText = normalizeNonEmptyString(threadState.lastComparableText);
   if (normalizeNonEmptyString(event?.noiseClass) && event.noiseClass !== "none") {
     return Object.freeze({ action: "suppress", messageKey, reason: `noise_${event.noiseClass}` });
+  }
+  if (
+    type === "session.activity.idle" &&
+    threadState.lastEventType === "session.activity.idle" &&
+    comparableText &&
+    lastComparableText === comparableText &&
+    Number.isInteger(threadState.lastDeliveredAt) &&
+    Number.isInteger(event?.occurredAt) &&
+    event.occurredAt - threadState.lastDeliveredAt < REPEATED_IDLE_SUPPRESSION_WINDOW_MS
+  ) {
+    return Object.freeze({ action: "suppress", messageKey, reason: "idle_repeat" });
   }
   if (threadState.lastText === text) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });

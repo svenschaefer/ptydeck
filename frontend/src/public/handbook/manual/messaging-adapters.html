@@ -58,6 +58,8 @@
 <li>low-value agentic CLI chatter such as <code>Ran ...</code>, <code>Edited ...</code>, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message</li>
 <li>coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently</li>
 <li>structural follow-up lines such as trailing <code>}</code> or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword</li>
+<li>status summaries no longer inherit generic completion keywords into unrelated follow-up lines, so prompt echoes, file lists, and similar tails do not become accidental Telegram updates just because a previous line contained <code>done</code> or <code>updated</code></li>
+<li>coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, and repeated <code>Session idle.</code> updates are damped instead of churning the status thread</li>
 </ul>
 
 <p>When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.</p>

@@ -195,6 +195,7 @@ When Telegram messaging is configured, verify additionally:
 - A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` only through the bounded adapter action set; unsupported text must not trigger arbitrary runtime actions
 - Repeated low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, diff/update summaries, and separator-only fragments should now stay suppressed or coalesced into one evolving status thread instead of spraying many near-duplicate Telegram messages
 - Repeated attention churn from one logical failure should no longer fan out into many nearly identical alerts, and structural tail lines such as trailing `}` should not appear as standalone Telegram attention messages
+- Status updates should no longer inherit `done`/`updated` from a previous line into unrelated prompt echoes, Markdown file lists, or similar follow-up tails, and repeated `Session idle.` updates should not keep bumping the same Telegram thread without an intervening meaningful status change
 
 Session API:
 
