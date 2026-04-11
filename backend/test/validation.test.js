@@ -153,6 +153,22 @@ function createReplayExcerpt(overrides = {}) {
   };
 }
 
+function createReplayExport(overrides = {}) {
+  return {
+    sessionId: "a",
+    sessionState: "running",
+    scope: "retained_replay_tail",
+    format: "text",
+    contentType: "text/plain; charset=utf-8",
+    fileName: "ptydeck-session-a-replay.txt",
+    data: "line one\nline two",
+    retainedChars: 17,
+    retentionLimitChars: 16384,
+    truncated: false,
+    ...overrides
+  };
+}
+
 test("validateRequest accepts valid input body", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -901,6 +917,62 @@ test("validateRequest rejects invalid input safety profile type", () => {
   });
 });
 
+test("validateRequest rejects malformed nested session startup and settings payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        kind: "ssh",
+        remoteConnection: {
+          host: "example.internal",
+          port: "22"
+        }
+      }
+    });
+  }, /Field 'remoteConnection' must be a valid remote connection object/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        remoteAuth: {
+          method: "oauth"
+        }
+      }
+    });
+  }, /Field 'remoteAuth' must be a valid remote auth object/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        inputSafetyProfile: {
+          confirmOnAnyInput: "yes"
+        }
+      }
+    });
+  }, /Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        themeProfile: {
+          background: "blue"
+        }
+      }
+    });
+  }, /Field 'themeProfile' must contain only supported hex color entries/);
+});
+
 test("validateRequest accepts valid dev token request payload", () => {
   assert.doesNotThrow(() => {
     validateRequest({
@@ -959,6 +1031,45 @@ test("validateRequest rejects invalid auth and share request branches", () => {
       body: {}
     });
   });
+});
+
+test("validateRequest rejects malformed share, file-transfer, and custom-command edge variants", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/shares",
+      params: {},
+      body: {
+        targetType: "session",
+        targetId: "session-1",
+        expiresInSeconds: "3600"
+      }
+    });
+  }, /Field 'expiresInSeconds' must be an integer/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions/a/file-transfer/upload",
+      params: {},
+      body: {
+        path: "logs/output.txt",
+        contentBase64: "aGVsbG8="
+      }
+    });
+  }, /Missing sessionId path parameter/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PUT",
+      pathname: "/api/v1/custom-commands/docu",
+      params: { commandName: "docu" },
+      body: {
+        content: "echo hi\n",
+        templateVariables: ["session.cwd", 2]
+      }
+    });
+  }, /Field 'templateVariables' must be a string array/);
 });
 
 test("validateRequest rejects invalid trusted-local control and management patch edge cases", () => {
@@ -1366,6 +1477,66 @@ test("validateRequest rejects invalid custom command upsert payload", () => {
   });
 });
 
+test("validateRequest rejects malformed connection profile launch, layout profile, and workspace preset payloads", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/connection-profiles",
+      params: {},
+      body: {
+        name: "Ops SSH",
+        launch: {
+          themeProfile: {
+            background: "blue"
+          }
+        }
+      }
+    });
+  }, /Field 'launch.themeProfile' must contain only supported hex color entries/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/connection-profiles/ops-ssh",
+      params: { profileId: "ops-ssh" },
+      body: {
+        launch: {
+          remoteAuth: {
+            method: "oauth"
+          }
+        }
+      }
+    });
+  }, /Field 'launch.remoteAuth' must be a valid remote auth object/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/layout-profiles",
+      params: {},
+      body: {
+        name: "Focus Layout",
+        layout: {
+          controlPaneVisible: "yes"
+        }
+      }
+    });
+  }, /Field 'layout' must contain only supported layout profile settings/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/workspace-presets/focus",
+      params: { presetId: "focus" },
+      body: {
+        workspace: {
+          controlPanePosition: "center"
+        }
+      }
+    });
+  }, /Field 'workspace' must contain only supported workspace preset settings/);
+});
+
 test("validateResponse accepts custom command payloads", () => {
   assert.doesNotThrow(() => {
     validateResponse({
@@ -1401,6 +1572,116 @@ test("validateResponse accepts custom command payloads", () => {
       ]
     });
   });
+});
+
+test("validateResponse accepts replay export payloads and rejects malformed catalog response variants", () => {
+  assert.doesNotThrow(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExport",
+      body: createReplayExport()
+    });
+  });
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 500,
+      expect: "error",
+      body: {
+        error: "ValidationError"
+      }
+    });
+  }, /Error response schema mismatch/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sessionReplayExport",
+      body: createReplayExport({
+        retainedChars: -1
+      })
+    });
+  }, /Response does not match SessionReplayExport schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "customCommandList",
+      body: [
+        {
+          name: "docu",
+          content: "echo hi\n",
+          kind: "template",
+          scope: "session",
+          sessionId: "session-1",
+          precedence: 300,
+          templateVariables: [1],
+          createdAt: 1,
+          updatedAt: 2
+        }
+      ]
+    });
+  }, /Response does not match CustomCommand\[] schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "deckList",
+      body: [
+        {
+          id: "ops",
+          name: "Operations",
+          settings: null,
+          createdAt: 1,
+          updatedAt: 2
+        }
+      ]
+    });
+  }, /Response does not match Deck\[] schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "workspacePresetList",
+      body: [
+        {
+          id: "focus",
+          name: "Focus Workspace",
+          createdAt: 1,
+          updatedAt: 2,
+          workspace: {
+            activeDeckId: "default",
+            controlPaneVisible: true,
+            controlPanePosition: "bottom",
+            controlPaneSize: 240,
+            deckGroups: {
+              default: {
+                activeGroupId: 7,
+                groups: []
+              }
+            },
+            deckSplitLayouts: {}
+          }
+        }
+      ]
+    });
+  }, /Response does not match WorkspacePreset\[] schema/);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "sshHostKeyProbeCandidateList",
+      body: [
+        {
+          host: "example.internal",
+          port: 22,
+          keyType: "ssh-ed25519",
+          publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIB9zdXBlcmZha2VrZXlibG9iZm9ydGVzdHM",
+          fingerprintSha256: "bad"
+        }
+      ]
+    });
+  }, /Response does not match SshHostKeyProbeCandidate\[] schema/);
 });
 
 test("validateRequest accepts valid layout profile create and patch payloads", () => {

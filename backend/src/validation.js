@@ -146,6 +146,15 @@ function isThemeProfile(value) {
   return keys.every((key) => THEME_PROFILE_KEYS.includes(key));
 }
 
+function isThemeProfilePatch(value) {
+  return (
+    isObject(value) &&
+    Object.entries(value).every(
+      ([key, entry]) => THEME_PROFILE_KEYS.includes(key) && typeof entry === "string" && THEME_HEX_PATTERN.test(entry)
+    )
+  );
+}
+
 function isInputSafetyProfile(value) {
   if (!isObject(value)) {
     return false;
@@ -165,6 +174,29 @@ function isInputSafetyProfile(value) {
     }
   }
   return keys.every((key) => SESSION_INPUT_SAFETY_PROFILE_KEYS.includes(key));
+}
+
+function isInputSafetyProfilePatch(value) {
+  if (!isObject(value)) {
+    return false;
+  }
+  const allowedKeys = new Set(SESSION_INPUT_SAFETY_PROFILE_KEYS);
+  for (const [key, entry] of Object.entries(value)) {
+    if (!allowedKeys.has(key)) {
+      return false;
+    }
+    if (SESSION_INPUT_SAFETY_PROFILE_BOOLEAN_KEYS.includes(key)) {
+      if (typeof entry !== "boolean") {
+        return false;
+      }
+      continue;
+    }
+    const limits = SESSION_INPUT_SAFETY_PROFILE_INTEGER_LIMITS[key];
+    if (!limits || !Number.isInteger(entry) || entry < limits.min || entry > limits.max) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isMouseForwardingMode(value) {
@@ -282,6 +314,23 @@ function isLayoutProfileLayout(value) {
   );
 }
 
+function isLayoutProfileLayoutPatch(value) {
+  return (
+    isObject(value) &&
+    (value.activeDeckId === undefined || typeof value.activeDeckId === "string") &&
+    (value.sidebarVisible === undefined || typeof value.sidebarVisible === "boolean") &&
+    (value.sessionFilterText === undefined || typeof value.sessionFilterText === "string") &&
+    (value.controlPaneVisible === undefined || typeof value.controlPaneVisible === "boolean") &&
+    (value.controlPanePosition === undefined || ["top", "bottom", "left", "right"].includes(value.controlPanePosition)) &&
+    (value.controlPaneSize === undefined ||
+      (Number.isInteger(value.controlPaneSize) && value.controlPaneSize >= 120 && value.controlPaneSize <= 960)) &&
+    (value.deckTerminalSettings === undefined ||
+      (isObject(value.deckTerminalSettings) &&
+        Object.values(value.deckTerminalSettings).every((entry) => isLayoutProfileDeckTerminalSettings(entry)))) &&
+    (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
+  );
+}
+
 function isLayoutProfile(value) {
   return (
     isObject(value) &&
@@ -324,6 +373,22 @@ function isWorkspacePresetWorkspace(value) {
     value.controlPaneSize <= 960 &&
     isObject(value.deckGroups) &&
     Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry)) &&
+    (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
+  );
+}
+
+function isWorkspacePresetWorkspacePatch(value) {
+  return (
+    isObject(value) &&
+    (value.activeDeckId === undefined || typeof value.activeDeckId === "string") &&
+    (value.layoutProfileId === undefined || typeof value.layoutProfileId === "string") &&
+    (value.controlPaneVisible === undefined || typeof value.controlPaneVisible === "boolean") &&
+    (value.controlPanePosition === undefined || ["top", "bottom", "left", "right"].includes(value.controlPanePosition)) &&
+    (value.controlPaneSize === undefined ||
+      (Number.isInteger(value.controlPaneSize) && value.controlPaneSize >= 120 && value.controlPaneSize <= 960)) &&
+    (value.deckGroups === undefined ||
+      (isObject(value.deckGroups) &&
+        Object.values(value.deckGroups).every((entry) => isWorkspacePresetDeckGroups(entry)))) &&
     (value.deckSplitLayouts === undefined || isDeckSplitLayoutMap(value.deckSplitLayouts))
   );
 }
@@ -398,6 +463,12 @@ function validateConnectionProfileLaunchPayload(value, fieldPathPrefix = "launch
   if (value.remoteAuth !== undefined && !isObject(value.remoteAuth)) {
     throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteAuth' must be an object.`);
   }
+  if (value.remoteConnection !== undefined && !isRemoteConnection(value.remoteConnection)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteConnection' must be a valid remote connection object.`);
+  }
+  if (value.remoteAuth !== undefined && !isRemoteAuth(value.remoteAuth)) {
+    throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteAuth' must be a valid remote auth object.`);
+  }
   if (value.remoteSecret !== undefined) {
     throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.remoteSecret' is not supported for connection profiles.`);
   }
@@ -419,6 +490,27 @@ function validateConnectionProfileLaunchPayload(value, fieldPathPrefix = "launch
   }
   if (value.inactiveThemeProfile !== undefined && !isObject(value.inactiveThemeProfile)) {
     throw new ApiError(400, "ValidationError", `Field '${fieldPathPrefix}.inactiveThemeProfile' must be an object.`);
+  }
+  if (value.themeProfile !== undefined && !isThemeProfilePatch(value.themeProfile)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPathPrefix}.themeProfile' must contain only supported hex color entries.`
+    );
+  }
+  if (value.activeThemeProfile !== undefined && !isThemeProfilePatch(value.activeThemeProfile)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPathPrefix}.activeThemeProfile' must contain only supported hex color entries.`
+    );
+  }
+  if (value.inactiveThemeProfile !== undefined && !isThemeProfilePatch(value.inactiveThemeProfile)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field '${fieldPathPrefix}.inactiveThemeProfile' must contain only supported hex color entries.`
+    );
   }
 }
 
@@ -470,6 +562,19 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body?.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
     }
+    if (body?.remoteConnection !== undefined && !isRemoteConnection(body.remoteConnection)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be a valid remote connection object.");
+    }
+    if (body?.remoteAuth !== undefined && !isRemoteAuth(body.remoteAuth)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be a valid remote auth object.");
+    }
+    if (body?.inputSafetyProfile !== undefined && !isInputSafetyProfilePatch(body.inputSafetyProfile)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries."
+      );
+    }
     if (body?.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
@@ -488,6 +593,19 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body?.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
+    }
+    if (body?.themeProfile !== undefined && !isThemeProfilePatch(body.themeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must contain only supported hex color entries.");
+    }
+    if (body?.activeThemeProfile !== undefined && !isThemeProfilePatch(body.activeThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must contain only supported hex color entries.");
+    }
+    if (body?.inactiveThemeProfile !== undefined && !isThemeProfilePatch(body.inactiveThemeProfile)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'inactiveThemeProfile' must contain only supported hex color entries."
+      );
     }
   }
 
@@ -551,6 +669,19 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
     }
+    if (body.remoteConnection !== undefined && !isRemoteConnection(body.remoteConnection)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be a valid remote connection object.");
+    }
+    if (body.remoteAuth !== undefined && !isRemoteAuth(body.remoteAuth)) {
+      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be a valid remote auth object.");
+    }
+    if (body.inputSafetyProfile !== undefined && !isInputSafetyProfilePatch(body.inputSafetyProfile)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries."
+      );
+    }
     if (body.env !== undefined) {
       if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
         throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
@@ -569,6 +700,19 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
       throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
+    }
+    if (body.themeProfile !== undefined && !isThemeProfilePatch(body.themeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must contain only supported hex color entries.");
+    }
+    if (body.activeThemeProfile !== undefined && !isThemeProfilePatch(body.activeThemeProfile)) {
+      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must contain only supported hex color entries.");
+    }
+    if (body.inactiveThemeProfile !== undefined && !isThemeProfilePatch(body.inactiveThemeProfile)) {
+      throw new ApiError(
+        400,
+        "ValidationError",
+        "Field 'inactiveThemeProfile' must contain only supported hex color entries."
+      );
     }
   }
 
@@ -998,6 +1142,9 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body.layout !== undefined && !isObject(body.layout)) {
       throw new ApiError(400, "ValidationError", "Field 'layout' must be an object.");
     }
+    if (body.layout !== undefined && !isLayoutProfileLayoutPatch(body.layout)) {
+      throw new ApiError(400, "ValidationError", "Field 'layout' must contain only supported layout profile settings.");
+    }
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/layout-profiles\/[^/]+$/)) {
@@ -1015,6 +1162,9 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.layout !== undefined && !isObject(body.layout)) {
       throw new ApiError(400, "ValidationError", "Field 'layout' must be an object.");
+    }
+    if (body.layout !== undefined && !isLayoutProfileLayoutPatch(body.layout)) {
+      throw new ApiError(400, "ValidationError", "Field 'layout' must contain only supported layout profile settings.");
     }
   }
 
@@ -1043,6 +1193,9 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body.workspace !== undefined && !isObject(body.workspace)) {
       throw new ApiError(400, "ValidationError", "Field 'workspace' must be an object.");
     }
+    if (body.workspace !== undefined && !isWorkspacePresetWorkspacePatch(body.workspace)) {
+      throw new ApiError(400, "ValidationError", "Field 'workspace' must contain only supported workspace preset settings.");
+    }
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/workspace-presets\/[^/]+$/)) {
@@ -1060,6 +1213,9 @@ export function validateRequest({ method, pathname, params, query, body }) {
     }
     if (body.workspace !== undefined && !isObject(body.workspace)) {
       throw new ApiError(400, "ValidationError", "Field 'workspace' must be an object.");
+    }
+    if (body.workspace !== undefined && !isWorkspacePresetWorkspacePatch(body.workspace)) {
+      throw new ApiError(400, "ValidationError", "Field 'workspace' must contain only supported workspace preset settings.");
     }
   }
 
