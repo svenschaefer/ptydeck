@@ -62,6 +62,7 @@ This file is structured into:
 - [ ] `MSG-009` Owner `PLAT`: Add a Discord-style interaction-oriented reference adapter on top of the delivered normalized event/action contract, preserving the same single-user ptydeck authority boundaries while validating a richer button-driven remote interaction surface.
 - [ ] `MSG-010` Owner `PLAT`: Add a Slack-style workflow-oriented adapter focused on concise summaries, handoff context, and approval/status-style workflows rather than stream mirroring, only after the first two adapter styles prove the core framework boundaries.
 - [ ] `MSG-011` Owner `QA`: Add cross-adapter parity and contract validation after a second concrete adapter lands, ensuring provider-specific adapters still honor the same normalized event model, bounded action vocabulary, and ptydeck authority rules.
+- [ ] `MSG-028` Owner `PLAT`: Add Telegram forum-topic provisioning and operator helpers for the recommended live topology, including deterministic per-session topic naming based on `<deck name> + <terminal name>` plus diagnostics that keep the one-topic-per-terminal model explicit instead of relying on manual naming discipline alone.
 
 ### Remote / External Theme Compatibility
 

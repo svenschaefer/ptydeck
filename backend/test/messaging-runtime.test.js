@@ -141,6 +141,31 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastObservedEventAt: 8_100
     }
   );
+  const codingAgentIdleAfterRecentStatus = applyMessagingMessagePolicy(
+    {
+      type: "session.activity.idle",
+      threadKey: "status",
+      text: "Session idle.",
+      comparableText: "session idle.",
+      occurredAt: 28_000,
+      profile: "generic-shell",
+      session: createSession({
+        name: "codex",
+        startCommand: "codex",
+        appIdentity: {
+          family: "coding-agent",
+          label: "codex",
+          source: "explicit-hint",
+          confidence: 0.98
+        }
+      })
+    },
+    {
+      messageCreated: true,
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 10_000
+    }
+  );
   const attentionRepeatAfterWindow = applyMessagingMessagePolicy(
     {
       type: "session.attention.required",
@@ -173,6 +198,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(repeatedIdle.reason, "idle_repeat");
   assert.equal(idleAfterUndeliveredSummary.action, "suppress");
   assert.equal(idleAfterUndeliveredSummary.reason, "idle_after_status_attempt");
+  assert.equal(codingAgentIdleAfterRecentStatus.action, "suppress");
+  assert.equal(codingAgentIdleAfterRecentStatus.reason, "idle_after_status_update");
   assert.equal(attentionRepeatAfterWindow.action, "alert");
   assert.equal(attentionRepeatAfterWindow.reason, "attention_required");
 });
@@ -204,7 +231,7 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   const session = createSession({ name: "codex", startCommand: "codex", quickIdToken: "9" });
 
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "t-1" });
-  await runtime.observeSessionData({ session, data: "Plan updated\n", promptBoundaries: [], trace: { traceId: "t-2" } });
+  await runtime.observeSessionData({ session, data: "Validated copy deploy\n", promptBoundaries: [], trace: { traceId: "t-2" } });
   await runtime.observeSessionData({ session, data: "", promptBoundaries: [0], trace: { traceId: "t-3" } });
   await runtime.observeSessionLifecycle(
     "session.updated",
@@ -230,7 +257,7 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.equal(sends.length, 2);
   assert.match(sends[0].text, /\[9\] codex: Session created\./);
   assert.match(sends[1].text, /Tests failed/);
-  assert.ok(edits.some((entry) => /Plan updated/.test(entry.text)));
+  assert.ok(edits.some((entry) => /Validated copy deploy/.test(entry.text)));
   assert.ok(edits.some((entry) => /Controller changed to notebook/.test(entry.text)));
   assert.ok(edits.some((entry) => /Share access created/.test(entry.text)));
   assert.ok(edits.some((entry) => /Session idle/.test(entry.text)));
@@ -274,18 +301,18 @@ test("messaging runtime flushes same-chunk summary content before prompt updates
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "same-chunk-1" });
   await runtime.observeSessionData({
     session,
-    data: "Plan updated\n",
-    promptBoundaries: [13],
+    data: "Validated copy deploy\n",
+    promptBoundaries: [22],
     trace: { traceId: "same-chunk-2" }
   });
 
   assert.equal(sends.length, 1);
   assert.equal(edits.length, 1);
-  assert.match(edits[0].text, /Plan updated/);
+  assert.match(edits[0].text, /Validated copy deploy/);
   assert.doesNotMatch(edits[0].text, /Prompt ready/);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.summary === "Plan updated"));
+  assert.ok(status.trace.recent.some((entry) => entry.summary === "Validated copy deploy"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "prompt_after_status_update"));
 });
 
@@ -355,7 +382,7 @@ test("messaging runtime aggregates coding-agent summaries and suppresses noisy d
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "agg-1" });
   await runtime.observeSessionData({
     session,
-    data: "gpt-5.4 xhigh · 55% left · C:\\code\\snixy · gpt-5.4 · sni…\nPlan updated\nValidated copy deploy\n",
+    data: "gpt-5.4 xhigh · 55% left · C:\\code\\snixy · gpt-5.4 · sni…\nValidated copy deploy\nTests passed\n",
     promptBoundaries: [],
     trace: { traceId: "agg-2" }
   });
@@ -371,7 +398,7 @@ test("messaging runtime aggregates coding-agent summaries and suppresses noisy d
 
   assert.equal(sends.length, 1);
   assert.equal(edits.length, 1);
-  assert.match(edits[0].text, /Plan updated \| Validated copy deploy/);
+  assert.match(edits[0].text, /Validated copy deploy \| Tests passed/);
   assert.doesNotMatch(edits[0].text, /55% left/);
   assert.doesNotMatch(edits[0].text, /C:\\code\\snixy/);
 
@@ -856,7 +883,7 @@ test("messaging runtime avoids summary context bleed and trims coding-agent brea
   await runtime.observeSessionData({
     session,
     data:
-      "Plan updated\n" +
+      "Validated copy deploy\n" +
       "Coverage of the changes, apply fixes if needed, and so on, till done. Do a final validation.\n" +
       "gpt-5.4 xhigh · 100% left · C:\\\\code\\\\snixy · gpt-5.4 · snixy · main · 0% used … | └ # DONE\n" +
       "│ motion-session-handoff/export\\\" TODO.md ROADMAP.md DONE.md CHANGELOG.md\n",
@@ -868,7 +895,6 @@ test("messaging runtime avoids summary context bleed and trims coding-agent brea
 
   assert.equal(sends.length, 1);
   assert.equal(edits.length, 1);
-  assert.match(edits[0].text, /Plan updated/);
   assert.match(edits[0].text, /# DONE/);
   assert.doesNotMatch(edits[0].text, /Coverage of the changes/);
   assert.doesNotMatch(edits[0].text, /C:\\\\code\\\\snixy/);
@@ -881,6 +907,59 @@ test("messaging runtime avoids summary context bleed and trims coding-agent brea
     )
   );
   assert.ok(status.trace.recent.every((entry) => !/Coverage of the changes/.test(entry.text || "")));
+});
+
+test("messaging runtime suppresses low-value coding-agent plan updates and the follow-on idle churn they would otherwise trigger", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 1_700;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 58 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 59 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "plan-noise-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "Updated Plan\n",
+    promptBoundaries: [],
+    trace: { traceId: "plan-noise-2" }
+  });
+  now += 10_000;
+  await runtime.observeSessionIdle({ session, trace: { traceId: "plan-noise-3" } });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 0);
+  assert.match(sends[0].text, /Session created/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_workflow_plan_update"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_idle_after_low_value_chatter"));
 });
 
 test("messaging runtime suppresses short low-value os error attention fragments", async () => {

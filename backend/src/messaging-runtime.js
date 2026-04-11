@@ -18,6 +18,7 @@ const MAX_INBOUND_REPLAY_SHELL_BLOCKS = 3;
 const MAX_INBOUND_RESPONSE_TEXT_LENGTH = 3800;
 const PROMPT_STATUS_SUPPRESSION_WINDOW_MS = 1500;
 const IDLE_STATUS_SUPPRESSION_WINDOW_MS = 2000;
+const CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS = 30_000;
 const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
 
@@ -52,6 +53,11 @@ const CODING_AGENT_TAIL_MARKERS = Object.freeze([
   /\s+\?\?\s+[^\s].*$/u
 ]);
 const LOW_VALUE_FILTER_RULES = Object.freeze([
+  Object.freeze({
+    id: "workflow_plan_update",
+    codingAgentOnly: true,
+    pattern: /^(?:[•*]\s*)?(?:updated plan|plan updated)\b/i
+  }),
   Object.freeze({
     id: "workflow_instruction",
     codingAgentOnly: true,
@@ -547,7 +553,8 @@ function createSessionStreamState() {
     recentLines: [],
     pendingSummaryBlock: createPendingSummaryBlock(),
     lastControlSignature: CONTROL_EVENT_SIGNATURE_NONE,
-    lastLifecycleType: ""
+    lastLifecycleType: "",
+    lastSuppressedStatusLikeAt: 0
   };
 }
 
@@ -643,6 +650,9 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
   const comparableText = normalizeNonEmptyString(event?.comparableText);
   const lastComparableText = normalizeNonEmptyString(threadState.lastComparableText);
+  const idleStatusSuppressionWindowMs = isCodingAgentContext(event?.session, event?.profile)
+    ? CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS
+    : IDLE_STATUS_SUPPRESSION_WINDOW_MS;
   if (normalizeNonEmptyString(event?.noiseClass) && event.noiseClass !== "none") {
     return Object.freeze({ action: "suppress", messageKey, reason: `noise_${event.noiseClass}` });
   }
@@ -741,7 +751,7 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
       threadState.lastEventType === "session.output.summary" &&
       Number.isInteger(threadState.lastDeliveredAt) &&
       Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - threadState.lastDeliveredAt < IDLE_STATUS_SUPPRESSION_WINDOW_MS
+      event.occurredAt - threadState.lastDeliveredAt < idleStatusSuppressionWindowMs
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "idle_after_status_update" });
     }
@@ -750,7 +760,7 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
       threadState.lastObservedEventType === "session.output.summary" &&
       Number.isInteger(threadState.lastObservedEventAt) &&
       Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - threadState.lastObservedEventAt < IDLE_STATUS_SUPPRESSION_WINDOW_MS
+      event.occurredAt - threadState.lastObservedEventAt < idleStatusSuppressionWindowMs
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "idle_after_status_attempt" });
     }
@@ -1376,6 +1386,7 @@ export function createMessagingRuntime(options = {}) {
       const visibleLine = sanitizeMessageCandidate(line, session, profile);
       const lowValueNoise = classifyNoiseSignature(visibleLine, session, profile);
       if (visibleLine && lowValueNoise.lowInformation && lowValueNoise.noiseClass.startsWith("low_value_")) {
+        state.lastSuppressedStatusLikeAt = nowFn();
         recordSuppressedFragmentTrace({
           session,
           profile,
@@ -1395,6 +1406,7 @@ export function createMessagingRuntime(options = {}) {
         return;
       }
       if (visibleLine && ZERO_ISSUE_COUNT_PATTERN.test(visibleLine)) {
+        state.lastSuppressedStatusLikeAt = nowFn();
         recordSuppressedFragmentTrace({
           session,
           profile,
@@ -1535,6 +1547,29 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
+    if (
+      isCodingAgentContext(session, profile) &&
+      state.pendingSummaryBlock.fragments.length === 0 &&
+      Number.isInteger(state.lastSuppressedStatusLikeAt) &&
+      state.lastSuppressedStatusLikeAt > 0
+    ) {
+      const idleOccurredAt = nowFn();
+      if (idleOccurredAt - state.lastSuppressedStatusLikeAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
+        await dispatchEvent(
+          createEvent({
+            session,
+            profile,
+            type: "session.activity.idle",
+            summary: "Session idle.",
+            threadKey: "status",
+            trace,
+            nowFn: () => idleOccurredAt,
+            noiseClass: "idle_after_low_value_chatter"
+          })
+        );
+        return;
+      }
+    }
     await dispatchEvent(
       createEvent({
         session,
