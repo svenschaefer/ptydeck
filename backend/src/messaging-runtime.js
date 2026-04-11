@@ -197,6 +197,25 @@ function truncateTraceText(value, maxLength = 240) {
   return normalized || "";
 }
 
+function buildInboundLogDetails(request = {}, extra = {}) {
+  return {
+    adapter: request.adapter || "telegram",
+    source: normalizeNonEmptyString(request.source) || "unknown",
+    action: normalizeNonEmptyString(request.command?.action || request.action),
+    selector: normalizeNonEmptyString(request.command?.selector || request.selector),
+    chatId: normalizeNonEmptyString(request.target?.chatId) || null,
+    messageThreadId: Number.isInteger(request.target?.messageThreadId) ? request.target.messageThreadId : null,
+    chatType: normalizeNonEmptyString(request.chatType) || null,
+    chatTitle: normalizeNonEmptyString(request.chatTitle) || null,
+    chatUsername: normalizeNonEmptyString(request.chatUsername) || null,
+    chatIsForum: typeof request.chatIsForum === "boolean" ? request.chatIsForum : null,
+    fromUserId: Number.isInteger(request.fromUserId) ? request.fromUserId : null,
+    fromUsername: normalizeNonEmptyString(request.fromUsername) || null,
+    preview: truncateTraceText(request.preview, 200),
+    ...extra
+  };
+}
+
 function buildSessionLabel(session) {
   const quickIdToken = normalizeNonEmptyString(session?.quickIdToken);
   const name = normalizeNonEmptyString(session?.name) || normalizeNonEmptyString(session?.shell) || normalizeNonEmptyString(session?.id);
@@ -964,7 +983,8 @@ export function createMessagingRuntime(options = {}) {
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
     transport: telegramTransport,
     topicBindings: normalizeMessagingTopicBindings(options.telegramTopicBindings),
-    nowFn
+    nowFn,
+    logDebug
   });
   adapters.push(telegramAdapter);
 
@@ -1871,7 +1891,7 @@ export function createMessagingRuntime(options = {}) {
         callbackText: "Unmapped chat.",
         text: "This Telegram chat is not mapped to a ptydeck session."
       };
-      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "unmapped" }, null);
+      logDebug("messaging.inbound.reject", buildInboundLogDetails(request, { reason: "unmapped" }), null);
       return result;
     }
     if (inboundResolution.error === "ambiguous") {
@@ -1880,7 +1900,7 @@ export function createMessagingRuntime(options = {}) {
         callbackText: "Ambiguous mapping.",
         text: "This Telegram chat matches multiple ptydeck messaging targets. Narrow the mapping before using inbound actions."
       };
-      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "ambiguous" }, null);
+      logDebug("messaging.inbound.reject", buildInboundLogDetails(request, { reason: "ambiguous" }), null);
       return result;
     }
 
@@ -1898,7 +1918,7 @@ export function createMessagingRuntime(options = {}) {
           callbackText: "Session unavailable.",
           text: error instanceof Error ? error.message : "Mapped ptydeck session is unavailable."
         };
-        logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "resolve_failed" }, null);
+        logDebug("messaging.inbound.reject", buildInboundLogDetails(request, { reason: "resolve_failed" }), null);
         return result;
       }
     }
@@ -1908,7 +1928,7 @@ export function createMessagingRuntime(options = {}) {
         callbackText: "Session unavailable.",
         text: "Mapped ptydeck session is unavailable."
       };
-      logDebug("messaging.inbound.reject", { adapter: request.adapter || "telegram", reason: "session_missing" }, null);
+      logDebug("messaging.inbound.reject", buildInboundLogDetails(request, { reason: "session_missing" }), null);
       return result;
     }
 
@@ -1923,7 +1943,7 @@ export function createMessagingRuntime(options = {}) {
           callbackText: "Status ready.",
           text: buildInboundStatusText(session, profile)
         };
-        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true }), trace);
         return result;
       }
 
@@ -1934,7 +1954,7 @@ export function createMessagingRuntime(options = {}) {
             callbackText: "Already stopped.",
             text: truncateResponseText(`${buildSessionLabel(session)} is already stopped.`)
           };
-          logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true, idempotent: true }, trace);
+          logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true, idempotent: true }), trace);
           return result;
         }
         await requestMessagingStop(session.id, { trace });
@@ -1943,7 +1963,7 @@ export function createMessagingRuntime(options = {}) {
           callbackText: "Stop requested.",
           text: truncateResponseText(`Stop requested for ${buildSessionLabel(session)}.`)
         };
-        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true }), trace);
         return result;
       }
 
@@ -1954,7 +1974,7 @@ export function createMessagingRuntime(options = {}) {
             callbackText: "Retry unavailable.",
             text: truncateResponseText(`Retry is unavailable while ${buildSessionLabel(session)} is ${session.state}.`)
           };
-          logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, reason: "running" }, trace);
+          logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "running" }), trace);
           return result;
         }
         const restartedSession = await requestMessagingRetry(session.id, {
@@ -1968,7 +1988,7 @@ export function createMessagingRuntime(options = {}) {
           callbackText: "Retry started.",
           text: truncateResponseText(`Retry started for ${buildSessionLabel(effectiveSession)}.`)
         };
-        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true }, trace);
+        logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true }), trace);
         return result;
       }
 
@@ -1980,7 +2000,7 @@ export function createMessagingRuntime(options = {}) {
           callbackText: `Replay ${selector}.`,
           text: buildReplayResponseText(session, excerpt)
         };
-        logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: true, selector }, trace);
+        logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true, selector }), trace);
         return result;
       }
 
@@ -1989,7 +2009,7 @@ export function createMessagingRuntime(options = {}) {
         callbackText: "Unsupported action.",
         text: "Unsupported messaging action. Use status, stop, retry, or replay."
       };
-      logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, reason: "unsupported" }, trace);
+      logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "unsupported" }), trace);
       return result;
     } catch (error) {
       const statusCode = error instanceof ApiError ? error.statusCode : 500;
@@ -2004,7 +2024,7 @@ export function createMessagingRuntime(options = {}) {
         callbackText: statusCode >= 500 ? "Action failed." : "Action rejected.",
         text: truncateResponseText(message)
       };
-      logDebug("messaging.inbound.action", { adapter: request.adapter || "telegram", action, sessionId: session.id, ok: false, statusCode }, trace);
+      logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: false, statusCode }), trace);
       return result;
     }
   }

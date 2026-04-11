@@ -57,6 +57,17 @@ BACKEND_DEBUG_LOGS=1
 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log
 ```
 
+The Telegram adapter now also logs inbound discovery events before command filtering through `messaging.inbound.update`, so unsupported group/topic messages such as `@ptydeck_bot ping` still leave a diagnosable trail with:
+
+- `chatId`
+- `messageThreadId`
+- chat type/title/username
+- whether the chat is a forum
+- preview text
+- parse result such as `command`, `unsupported_text`, or `non_text_message`
+
+This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API `getUpdates` inspection may then look empty while `inboundTrace` still shows what the live runtime actually observed.
+
 Then inspect structured `messaging.event.trace` lines in that log file.
 
 ## What It Can Do
@@ -341,6 +352,7 @@ Defaults and bounds:
 - Telegram inbound is opt-in through backend config.
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
+- `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including unsupported messages that were seen but did not map to a ptydeck command.
 - `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.

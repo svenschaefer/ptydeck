@@ -4,6 +4,8 @@ const DEFAULT_POLL_TIMEOUT_SECONDS = 3;
 const POLL_RETRY_DELAY_MS = 250;
 const TELEGRAM_ALLOWED_UPDATES = Object.freeze(["message", "callback_query"]);
 const TELEGRAM_RATE_LIMIT_PATTERN = /\bretry after\s+(\d+)\b/i;
+const MAX_TELEGRAM_INBOUND_TRACE_ENTRIES = 25;
+const MAX_TELEGRAM_INBOUND_PREVIEW_LENGTH = 200;
 
 function normalizeNonEmptyString(value) {
   if (typeof value !== "string") {
@@ -112,6 +114,17 @@ function truncateCallbackText(value, maxLength = 120) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+function truncateInboundPreview(value, maxLength = MAX_TELEGRAM_INBOUND_PREVIEW_LENGTH) {
+  const normalized = normalizeNonEmptyString(String(value || "")).replace(/\s+/g, " ");
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
 function parseTelegramRateLimitMetadata(error) {
   const message = error instanceof Error ? error.message : String(error || "");
   const match = message.match(TELEGRAM_RATE_LIMIT_PATTERN);
@@ -182,47 +195,150 @@ export function parseTelegramInboundCommand(input = {}) {
   return Object.freeze({ action });
 }
 
-function normalizeTelegramInboundUpdate(update = {}) {
+function summarizeTelegramChat(chat) {
+  if (!chat || typeof chat !== "object") {
+    return {
+      chatId: null,
+      messageThreadId: null,
+      chatType: "",
+      chatTitle: "",
+      chatUsername: "",
+      chatIsForum: null,
+      isTopicMessage: null
+    };
+  }
+  return {
+    chatId: normalizeChatId(chat.id) || null,
+    messageThreadId: null,
+    chatType: normalizeNonEmptyString(chat.type).toLowerCase(),
+    chatTitle: normalizeNonEmptyString(chat.title),
+    chatUsername: normalizeNonEmptyString(chat.username),
+    chatIsForum: typeof chat.is_forum === "boolean" ? chat.is_forum : null,
+    isTopicMessage: null
+  };
+}
+
+function inspectTelegramInboundUpdate(update = {}) {
   const updateId = Number.isInteger(update?.update_id) ? update.update_id : null;
   const callbackQuery = update?.callback_query;
   if (callbackQuery && typeof callbackQuery === "object") {
     const message = callbackQuery.message && typeof callbackQuery.message === "object" ? callbackQuery.message : null;
-    const chatId = normalizeChatId(message?.chat?.id);
+    const chat = summarizeTelegramChat(message?.chat);
     const command = parseTelegramInboundCommand({ callbackData: callbackQuery.data });
-    if (!chatId || !command) {
-      return null;
-    }
-    return {
+    const observation = {
       updateId,
       source: "callback",
-      callbackQueryId: normalizeNonEmptyString(callbackQuery.id),
-      target: {
-        chatId,
-        ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
-      },
-      command
+      reason: chat.chatId ? (command ? "command" : "unsupported_callback") : "missing_chat",
+      chatId: chat.chatId,
+      messageThreadId: Number.isInteger(message?.message_thread_id) ? message.message_thread_id : null,
+      chatType: chat.chatType,
+      chatTitle: chat.chatTitle,
+      chatUsername: chat.chatUsername,
+      chatIsForum: chat.chatIsForum,
+      isTopicMessage: typeof message?.is_topic_message === "boolean" ? message.is_topic_message : null,
+      fromUserId: Number.isInteger(callbackQuery?.from?.id) ? callbackQuery.from.id : null,
+      fromUsername: normalizeNonEmptyString(callbackQuery?.from?.username),
+      preview: truncateInboundPreview(callbackQuery.data),
+      commandMatched: Boolean(command),
+      action: command?.action || "",
+      selector: command?.selector || "",
+      callbackQueryId: normalizeNonEmptyString(callbackQuery.id)
+    };
+    if (!chat.chatId || !command) {
+      return { observation, inbound: null };
+    }
+    return {
+      observation,
+      inbound: {
+        updateId,
+        source: "callback",
+        callbackQueryId: normalizeNonEmptyString(callbackQuery.id),
+        chatType: chat.chatType,
+        chatTitle: chat.chatTitle,
+        chatUsername: chat.chatUsername,
+        chatIsForum: chat.chatIsForum,
+        fromUserId: observation.fromUserId,
+        fromUsername: observation.fromUsername,
+        preview: observation.preview,
+        target: {
+          chatId: chat.chatId,
+          ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
+        },
+        command
+      }
     };
   }
 
   const message = update?.message;
   if (message && typeof message === "object") {
-    const chatId = normalizeChatId(message?.chat?.id);
+    const chat = summarizeTelegramChat(message?.chat);
     const command = parseTelegramInboundCommand({ text: message.text });
-    if (!chatId || !command) {
-      return null;
-    }
-    return {
+    const hasText = normalizeNonEmptyString(message?.text).length > 0;
+    const observation = {
       updateId,
       source: "message",
-      target: {
-        chatId,
-        ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
-      },
-      command
+      reason: chat.chatId ? (command ? "command" : hasText ? "unsupported_text" : "non_text_message") : "missing_chat",
+      chatId: chat.chatId,
+      messageThreadId: Number.isInteger(message?.message_thread_id) ? message.message_thread_id : null,
+      chatType: chat.chatType,
+      chatTitle: chat.chatTitle,
+      chatUsername: chat.chatUsername,
+      chatIsForum: chat.chatIsForum,
+      isTopicMessage: typeof message?.is_topic_message === "boolean" ? message.is_topic_message : null,
+      fromUserId: Number.isInteger(message?.from?.id) ? message.from.id : null,
+      fromUsername: normalizeNonEmptyString(message?.from?.username),
+      preview: truncateInboundPreview(message?.text),
+      commandMatched: Boolean(command),
+      action: command?.action || "",
+      selector: command?.selector || "",
+      callbackQueryId: ""
+    };
+    if (!chat.chatId || !command) {
+      return { observation, inbound: null };
+    }
+    return {
+      observation,
+      inbound: {
+        updateId,
+        source: "message",
+        chatType: chat.chatType,
+        chatTitle: chat.chatTitle,
+        chatUsername: chat.chatUsername,
+        chatIsForum: chat.chatIsForum,
+        fromUserId: observation.fromUserId,
+        fromUsername: observation.fromUsername,
+        preview: observation.preview,
+        target: {
+          chatId: chat.chatId,
+          ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
+        },
+        command
+      }
     };
   }
 
-  return null;
+  return {
+    observation: {
+      updateId,
+      source: "unsupported",
+      reason: "unsupported_update_type",
+      chatId: null,
+      messageThreadId: null,
+      chatType: "",
+      chatTitle: "",
+      chatUsername: "",
+      chatIsForum: null,
+      isTopicMessage: null,
+      fromUserId: null,
+      fromUsername: "",
+      preview: "",
+      commandMatched: false,
+      action: "",
+      selector: "",
+      callbackQueryId: ""
+    },
+    inbound: null
+  };
 }
 
 export function createTelegramTransport(options = {}) {
@@ -348,9 +464,12 @@ export function createTelegramAdapter(options = {}) {
     throw new Error("Telegram inbound adapter requires getUpdates/answerCallbackQuery transport methods when enabled.");
   }
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
+  const logDebug = typeof options.logDebug === "function" ? options.logDebug : null;
   const configuredTargets = Number.isInteger(options.configuredTargets) && options.configuredTargets >= 0 ? options.configuredTargets : 0;
   const pollTimeoutSeconds = normalizeTelegramPollTimeoutSeconds(options.pollTimeoutSeconds);
   const threadState = new Map();
+  const inboundTraceEntries = [];
+  let inboundTraceCapturedTotal = 0;
   const replyMarkup = inboundEnabled ? buildTelegramReplyMarkup() : null;
   const metrics = {
     deliveredTotal: 0,
@@ -364,6 +483,7 @@ export function createTelegramAdapter(options = {}) {
     lastRetryAfterSeconds: null,
     lastRecommendedBackoffMs: null,
     backoffUntil: null,
+    inboundObservedTotal: 0,
     inboundHandledTotal: 0,
     inboundFailedTotal: 0,
     inboundBacklogSkippedTotal: 0,
@@ -407,6 +527,48 @@ export function createTelegramAdapter(options = {}) {
     });
   }
   metrics.activeTopicCount = forumTopicState.size;
+
+  function appendInboundTraceEntry(entry) {
+    inboundTraceCapturedTotal += 1;
+    inboundTraceEntries.push({
+      recordedAt: nowFn(),
+      ...entry
+    });
+    if (inboundTraceEntries.length > MAX_TELEGRAM_INBOUND_TRACE_ENTRIES) {
+      inboundTraceEntries.splice(0, inboundTraceEntries.length - MAX_TELEGRAM_INBOUND_TRACE_ENTRIES);
+    }
+  }
+
+  function recordInboundObservation(observation, phase, extra = {}) {
+    const entry = {
+      phase,
+      updateId: Number.isInteger(observation?.updateId) ? observation.updateId : null,
+      source: normalizeNonEmptyString(observation?.source) || "unknown",
+      reason: normalizeNonEmptyString(observation?.reason),
+      chatId: observation?.chatId || null,
+      messageThreadId: Number.isInteger(observation?.messageThreadId) ? observation.messageThreadId : null,
+      chatType: normalizeNonEmptyString(observation?.chatType),
+      chatTitle: normalizeNonEmptyString(observation?.chatTitle),
+      chatUsername: normalizeNonEmptyString(observation?.chatUsername),
+      chatIsForum: typeof observation?.chatIsForum === "boolean" ? observation.chatIsForum : null,
+      isTopicMessage: typeof observation?.isTopicMessage === "boolean" ? observation.isTopicMessage : null,
+      fromUserId: Number.isInteger(observation?.fromUserId) ? observation.fromUserId : null,
+      fromUsername: normalizeNonEmptyString(observation?.fromUsername),
+      preview: truncateInboundPreview(observation?.preview),
+      commandMatched: observation?.commandMatched === true,
+      action: normalizeNonEmptyString(observation?.action),
+      selector: normalizeNonEmptyString(observation?.selector),
+      callbackQueryId: normalizeNonEmptyString(observation?.callbackQueryId),
+      ...extra
+    };
+    appendInboundTraceEntry(entry);
+    if (logDebug) {
+      logDebug("messaging.inbound.update", {
+        adapter: "telegram",
+        ...entry
+      });
+    }
+  }
 
   function getThreadState(target, threadKey) {
     const stateKey = buildTargetStateKey(target, threadKey);
@@ -849,7 +1011,13 @@ export function createTelegramAdapter(options = {}) {
               if (pollState.stopRequested) {
                 break;
               }
-              const inbound = normalizeTelegramInboundUpdate(update);
+              const inspected = inspectTelegramInboundUpdate(update);
+              const observation = inspected?.observation || null;
+              const inbound = inspected?.inbound || null;
+              if (observation) {
+                metrics.inboundObservedTotal += 1;
+                recordInboundObservation(observation, inbound ? "received" : "ignored");
+              }
               if (!inbound) {
                 continue;
               }
@@ -859,10 +1027,18 @@ export function createTelegramAdapter(options = {}) {
                 await emitInboundResponse(inbound, result);
                 metrics.inboundHandledTotal += 1;
                 metrics.lastInboundAt = nowFn();
+                recordInboundObservation(observation, "handled", {
+                  ok: result?.ok !== false,
+                  responsePreview: truncateInboundPreview(result?.text || result?.callbackText)
+                });
               } catch (error) {
                 metrics.inboundFailedTotal += 1;
                 metrics.lastInboundErrorAt = nowFn();
                 metrics.lastInboundError = error instanceof Error ? error.message : String(error || "Telegram inbound command failed.");
+                recordInboundObservation(observation, "failed", {
+                  ok: false,
+                  error: metrics.lastInboundError
+                });
                 try {
                   await acknowledgeCallback(inbound, { ok: false, text: metrics.lastInboundError });
                 } catch {
@@ -918,6 +1094,7 @@ export function createTelegramAdapter(options = {}) {
       backoffActive,
       backoffUntil: Number.isInteger(metrics.backoffUntil) ? metrics.backoffUntil : null,
       backoffRemainingMs,
+      inboundObservedTotal: metrics.inboundObservedTotal,
       inboundHandledTotal: metrics.inboundHandledTotal,
       inboundFailedTotal: metrics.inboundFailedTotal,
       inboundBacklogSkippedTotal: metrics.inboundBacklogSkippedTotal,
@@ -937,7 +1114,12 @@ export function createTelegramAdapter(options = {}) {
       validatedForumTargetTotal: metrics.validatedForumTargetTotal,
       lastTargetValidationAt: metrics.lastTargetValidationAt,
       lastTargetValidationErrorAt: metrics.lastTargetValidationErrorAt,
-      lastTargetValidationError: metrics.lastTargetValidationError
+      lastTargetValidationError: metrics.lastTargetValidationError,
+      inboundTrace: {
+        capacity: MAX_TELEGRAM_INBOUND_TRACE_ENTRIES,
+        capturedTotal: inboundTraceCapturedTotal,
+        recent: inboundTraceEntries.slice(-MAX_TELEGRAM_INBOUND_TRACE_ENTRIES)
+      }
     };
   }
 
@@ -956,6 +1138,7 @@ export function createTelegramAdapter(options = {}) {
       `ptydeck_messaging_deliveries_total{adapter="telegram",outcome="failure"} ${metrics.failedTotal}`,
       `ptydeck_messaging_actions_total{adapter="telegram",action="update"} ${metrics.updatedTotal}`,
       `ptydeck_messaging_actions_total{adapter="telegram",action="alert"} ${metrics.alertedTotal}`,
+      `ptydeck_messaging_inbound_total{adapter="telegram",outcome="observed"} ${metrics.inboundObservedTotal}`,
       `ptydeck_messaging_inbound_total{adapter="telegram",outcome="handled"} ${metrics.inboundHandledTotal}`,
       `ptydeck_messaging_inbound_total{adapter="telegram",outcome="failure"} ${metrics.inboundFailedTotal}`,
       `ptydeck_messaging_inbound_total{adapter="telegram",outcome="skipped_backlog"} ${metrics.inboundBacklogSkippedTotal}`,

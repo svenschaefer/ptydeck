@@ -66,6 +66,7 @@ Optional for troubleshooting:
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 - Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions
+- Messaging-specific note: Telegram inbound discovery now also emits structured `messaging.inbound.update` debug lines before ptydeck command filtering, so raw group/topic messages such as bot mentions can be inspected with `chatId`, `messageThreadId`, chat type/title, and parse outcome even when they are not supported commands
 
 Optional local auth baseline (development only):
 
@@ -205,9 +206,11 @@ When Telegram messaging is configured, verify additionally:
 - `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed
 - `/ready` returns the same `messaging` summary
 - `/health.messaging.trace` and `/ready.messaging.trace` expose a bounded recent trace ring for candidate, suppression, and delivery analysis
+- `/health.messaging.adapters[0].inboundTrace` exposes a bounded recent Telegram inbound observation ring with raw `chatId`, `messageThreadId`, chat metadata, preview text, and parse outcome, including unsupported group messages that never become ptydeck actions
 - `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
 - When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
+- `/metrics` now also exposes `ptydeck_messaging_inbound_total{adapter="telegram",outcome="observed"}` for raw inbound observations seen before command filtering
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
 - If bounded inbound is enabled, transient Telegram polling failures during startup backlog drain and later live polling should now increment the inbound failure counters while the adapter retries instead of leaving inbound permanently inactive after one startup transport error
 - A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` only through the bounded adapter action set; unsupported text must not trigger arbitrary runtime actions

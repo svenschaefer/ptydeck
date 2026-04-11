@@ -901,3 +901,92 @@ test("telegram adapter polls bounded inbound commands and records metrics", asyn
 
   assert.equal(adapter.getStatus().pollingActive, false);
 });
+
+test("telegram adapter records unsupported inbound group messages with chat metadata for discovery", async () => {
+  let commandCalls = 0;
+  let served = false;
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 2_000;
+      return () => ++current;
+    })(),
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!served) {
+          served = true;
+          return [
+            {
+              update_id: 1,
+              message: {
+                chat: {
+                  id: -100200300,
+                  type: "supergroup",
+                  title: "ptydeck",
+                  username: "ptydeck_group",
+                  is_forum: true
+                },
+                message_thread_id: 77,
+                is_topic_message: true,
+                from: {
+                  id: 42,
+                  username: "sven"
+                },
+                text: "@ptydeck_bot ping"
+              }
+            }
+          ];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand() {
+      commandCalls += 1;
+      return { ok: true, text: "should not run" };
+    }
+  });
+
+  try {
+    await waitFor(() => adapter.getStatus().inboundTrace.capturedTotal >= 1, 1500);
+    const status = adapter.getStatus();
+    const last = status.inboundTrace.recent.at(-1);
+    assert.equal(commandCalls, 0);
+    assert.equal(status.inboundObservedTotal, 1);
+    assert.equal(status.inboundHandledTotal, 0);
+    assert.equal(last.phase, "ignored");
+    assert.equal(last.reason, "unsupported_text");
+    assert.equal(last.chatId, "-100200300");
+    assert.equal(last.messageThreadId, 77);
+    assert.equal(last.chatType, "supergroup");
+    assert.equal(last.chatTitle, "ptydeck");
+    assert.equal(last.chatUsername, "ptydeck_group");
+    assert.equal(last.chatIsForum, true);
+    assert.equal(last.isTopicMessage, true);
+    assert.equal(last.fromUserId, 42);
+    assert.equal(last.fromUsername, "sven");
+    assert.equal(last.preview, "@ptydeck_bot ping");
+    assert.equal(last.commandMatched, false);
+  } finally {
+    await adapter.stop();
+  }
+});

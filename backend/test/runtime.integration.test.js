@@ -319,10 +319,17 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
   const edits = [];
   const callbackAnswers = [];
   const updateQueue = [];
+  const telegramChat = {
+    id: -100200300,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group",
+    is_forum: true
+  };
   const { runtime, baseUrl } = await createStartedRuntime({
     messagingTelegramBotToken: "telegram-token",
     messagingTelegramOutboundEnabled: true,
-    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200300" }],
     messagingTelegramInboundEnabled: true,
     messagingTelegramPollTimeoutSeconds: 1,
     createMessagingTelegramTransport() {
@@ -384,7 +391,23 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
 
     await waitFor(() => sends.some((entry) => /build-run: Session created\./.test(entry.text)), 2000);
 
-    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    updateQueue.push({
+      update_id: 1,
+      message: {
+        chat: telegramChat,
+        message_thread_id: 77,
+        is_topic_message: true,
+        from: { id: 42, username: "sven" },
+        text: "@ptydeck_bot ping"
+      }
+    });
+    await waitFor(async () => {
+      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+      const health = await healthRes.json();
+      return health.messaging.adapters[0].inboundTrace.capturedTotal >= 1;
+    }, 2000);
+
+    updateQueue.push({ update_id: 2, message: { chat: telegramChat, text: "/status" } });
     await waitFor(() => sends.some((entry) => /Status for \[[^\]]+\] build-run/.test(entry.text)), 2000);
 
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
@@ -395,23 +418,24 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
     assert.equal(inputRes.status, 204);
 
     updateQueue.push({
-      update_id: 2,
+      update_id: 3,
       callback_query: {
         id: "cb-1",
         data: "ptydeck:replay:l:1",
-        message: { chat: { id: 1001 } }
+        from: { id: 42, username: "sven" },
+        message: { chat: telegramChat }
       }
     });
     await waitFor(() => sends.some((entry) => /build-run replay l:1/.test(entry.text)), 2000);
     assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
 
-    updateQueue.push({ update_id: 3, message: { chat: { id: 1001 }, text: "/stop" } });
+    updateQueue.push({ update_id: 4, message: { chat: telegramChat, text: "/stop" } });
     await waitFor(async () => {
       const res = await fetch(`${baseUrl}/sessions/${created.id}`);
       return res.status === 404;
     }, 2000);
 
-    updateQueue.push({ update_id: 4, message: { chat: { id: 1001 }, text: "/retry" } });
+    updateQueue.push({ update_id: 5, message: { chat: telegramChat, text: "/retry" } });
     await waitFor(async () => {
       const res = await fetch(`${baseUrl}/sessions/${created.id}`);
       if (res.status !== 200) {
@@ -421,10 +445,25 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
       return payload.state === "running" || payload.state === "starting";
     }, 2000);
 
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    const inboundTrace = health.messaging.adapters[0].inboundTrace;
+    assert.equal(inboundTrace.capturedTotal >= 5, true);
+    const ignoredPing = inboundTrace.recent.find((entry) => entry.reason === "unsupported_text");
+    assert.equal(Boolean(ignoredPing), true);
+    assert.equal(ignoredPing.chatId, "-100200300");
+    assert.equal(ignoredPing.chatType, "supergroup");
+    assert.equal(ignoredPing.chatTitle, "ptydeck");
+    assert.equal(ignoredPing.chatIsForum, true);
+    assert.equal(ignoredPing.messageThreadId, 77);
+    assert.equal(ignoredPing.preview, "@ptydeck_bot ping");
+
     const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
     assert.equal(metricsRes.status, 200);
     const metrics = await metricsRes.text();
     assert.match(metrics, /ptydeck_messaging_inbound_enabled\{adapter="telegram"\} 1/);
+    assert.match(metrics, /ptydeck_messaging_inbound_total\{adapter="telegram",outcome="observed"\}/);
     assert.match(metrics, /ptydeck_messaging_inbound_total\{adapter="telegram",outcome="handled"\}/);
   } finally {
     await runtime.stop();
