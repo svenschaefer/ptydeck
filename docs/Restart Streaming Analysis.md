@@ -56,6 +56,7 @@ node scripts/analyze-restart-streaming.mjs \
 For Codex-oriented block analysis against the raw captured stream, the repository also includes:
 
 - `scripts/analyze-codex-stream-blocks.mjs`
+- `scripts/experiment-codex-candidates.mjs`
 
 Example usage:
 
@@ -63,6 +64,13 @@ Example usage:
 node scripts/analyze-codex-stream-blocks.mjs \
   --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
   --session-name ptydeck
+```
+
+```bash
+node scripts/experiment-codex-candidates.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck \
+  --tail-entries 1200
 ```
 
 The script parses the debug log, filters one window, and summarizes:
@@ -145,6 +153,85 @@ Use it for:
 - validating future allowlist-/signal-first message rules offline without re-enabling Telegram delivery
 
 This capture is the correct persisted source when the question is: "Which raw chunk and cleaned visible text produced this operator-visible Codex block?"
+
+## Codex Candidate-Extraction Experiments
+
+The next analytical step after identifying the visual Codex grammar was to test whether a deliberately conservative candidate rule can isolate useful blocks from real restart-time and live-session capture noise.
+
+The experiment script `scripts/experiment-codex-candidates.mjs` applies four stages:
+
+1. filter captured entries to Codex sessions only
+2. drop blank entries, tiny overlay fragments, and the known background-terminal status ribbon
+3. reconstruct visible text only from the remaining substantial entries
+4. parse the result into Codex bullet blocks and keep only:
+   - `type == info`
+   - directly after a major separator
+   - with normalized text only, without `└` / `│` tails
+
+Two candidate modes are reported:
+
+- `loose`
+  - first `info` bullet after a major separator
+- `strict`
+  - same as `loose`, but only when the next block in the same section is an anti-pattern block such as `ran`, `explored`, `waited`, `context_compacted`, or `updated_plan`
+
+### Result 1: The Synthetic Sollfall Works
+
+Against the exact synthetic example:
+
+- separator
+- one `•` info block
+- then only `• Ran ...` blocks
+
+the experiment returns exactly one `loose` and one `strict` candidate:
+
+- `Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand, damit der Analyse-Slice sauber abgeschlossen ist.`
+
+So the proposed block grammar is internally coherent for the kind of isolated Codex section the operator has in mind.
+
+### Result 2: The Latest Real `ptydeck` Window Produces No Strict Candidate
+
+Against the current live raw-stream capture for session `ptydeck`:
+
+- window: last `1200` entries
+- kept after chunk-level filtering: `15`
+- dropped: `1185`
+  - `860` blank
+  - `323` overlay fragments
+  - `1` status ribbon
+  - `1` other substantial-but-not-structural entry
+
+The reconstructed visible text still contains mainly:
+
+- local analysis commentary
+- `• Ran ...` blocks
+- overlay / redraw remnants
+
+The experiment therefore yields:
+
+- `1` `loose` candidate
+- `0` `strict` candidates
+
+That is a desirable result. In that real window, the safe answer is "send nothing" rather than trying to squeeze meaning out of redraw noise and local operator tooling output.
+
+### Result 3: The Visual Dumps Still Yield Too Many Strict Candidates
+
+Against the two curated visual Codex dump files:
+
+- the candidate rule does isolate real `info` bullets
+- but there are still many `strict` candidates
+
+This means the rule is directionally correct but still not selective enough as a final delivery gate. The remaining gap is not line filtering anymore. It is section semantics.
+
+The dump experiment shows that we still need at least one more dimension, such as:
+
+- restart/remount mode suppression
+- user-turn correlation
+- operator-origin versus tool-origin distinction
+- section-length and section-purpose modeling
+- stable end-of-section detection instead of immediate block forwarding
+
+The important outcome is that this next step should build on block typing and section semantics, not on another round of line-level blacklist tuning.
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 
