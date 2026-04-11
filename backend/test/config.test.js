@@ -38,6 +38,7 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.messagingTelegramBotToken, "");
   assert.deepEqual(config.messagingTelegramTargets, []);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.org");
+  assert.equal(config.messagingTelegramOutboundEnabled, false);
   assert.equal(config.messagingTelegramInboundEnabled, false);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 3);
 });
@@ -75,6 +76,7 @@ test("loadConfig maps environment values", () => {
     MESSAGING_TELEGRAM_BOT_TOKEN: "telegram-token",
     MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001", profile: "build-test" }]),
     MESSAGING_TELEGRAM_API_BASE_URL: "https://api.telegram.example",
+    MESSAGING_TELEGRAM_OUTBOUND_ENABLED: "true",
     MESSAGING_TELEGRAM_INBOUND_ENABLED: "true",
     MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS: "7"
   });
@@ -112,6 +114,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.messagingTelegramBotToken, "telegram-token");
   assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001", profile: "build-test" }]);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.example");
+  assert.equal(config.messagingTelegramOutboundEnabled, true);
   assert.equal(config.messagingTelegramInboundEnabled, true);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 7);
 });

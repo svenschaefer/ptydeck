@@ -78,6 +78,7 @@ Optional single-user Telegram messaging adapter baseline:
 - Backend: `MESSAGING_TELEGRAM_BOT_TOKEN` or `MESSAGING_TELEGRAM_BOT_TOKEN_FILE`
 - Backend: `MESSAGING_TELEGRAM_TARGETS` or `MESSAGING_TELEGRAM_TARGETS_FILE`
 - Backend (optional override): `MESSAGING_TELEGRAM_API_BASE_URL`
+- Backend (explicit outbound re-enable): `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1`
 - Backend (optional bounded inbound enable): `MESSAGING_TELEGRAM_INBOUND_ENABLED=1`
 - Backend (optional bounded inbound long-poll timeout): `MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS`
 
@@ -109,6 +110,7 @@ Notes:
 
 - At least one of `sessionId`, `quickIdToken`, or `sessionName` is required per mapping entry.
 - Messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
+- Hard-break default: Telegram outbound delivery is now off until `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1` is set explicitly.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
 - The shipped bounded inbound command set is intentionally limited to:
   - `/status`
@@ -121,7 +123,8 @@ Notes:
 - Telegram button affordances map onto the same bounded action contract; there is no free-text remote shell execution path.
 - Recommended live topology: use one forum-enabled Telegram supergroup for ptydeck and create one topic per mapped terminal/session. In that shape, all mappings share the same `chatId` and differ by `messageThreadId`. The direct 1:1 bot chat is useful only for bootstrap, smoke tests, and initial `chatId` discovery.
 - A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.
-- Automatic per-terminal topic provisioning is now available through `topicMode: "deck-session"`. When that mode is configured for a mapped session target, the adapter creates or reuses one Telegram forum topic per terminal/session and persists the resulting `messageThreadId` binding.
+- The currently referenced invite target `https://t.me/+J4MInwk9nSg1MWJi` presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics that `topicMode: "deck-session"` requires.
+- Automatic per-terminal topic provisioning is now available through `topicMode: "deck-session"`. When that mode is configured for a mapped session target, the adapter validates that the target chat is a forum-enabled supergroup, then creates or reuses one Telegram forum topic per terminal/session and persists the resulting `messageThreadId` binding. This provisioning path still runs while outbound delivery remains disabled.
 - Delivered topic naming convention for that forum layout: `<deck name> + <terminal name>`.
 - To discover `chatId` and optional `messageThreadId`, send at least one message in the destination chat/topic and inspect:
 
@@ -199,10 +202,11 @@ curl -s http://127.0.0.1:18080/metrics | head -n 20
 When Telegram messaging is configured, verify additionally:
 
 - `/health` returns a top-level `messaging` summary with `enabled: true`
+- `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed
 - `/ready` returns the same `messaging` summary
 - `/health.messaging.trace` and `/ready.messaging.trace` expose a bounded recent trace ring for candidate, suppression, and delivery analysis
 - `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
-- When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
+- When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
 - If bounded inbound is enabled, transient Telegram polling failures during startup backlog drain and later live polling should now increment the inbound failure counters while the adapter retries instead of leaving inbound permanently inactive after one startup transport error

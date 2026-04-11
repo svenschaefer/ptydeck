@@ -298,6 +298,11 @@ export function createTelegramTransport(options = {}) {
         { signal }
       );
     },
+    async getChat({ chatId } = {}) {
+      return request("getChat", {
+        chat_id: normalizeChatId(chatId)
+      });
+    },
     async createForumTopic({ chatId, name, iconColor, iconCustomEmojiId }) {
       const result = await request("createForumTopic", {
         chat_id: chatId,
@@ -329,10 +334,11 @@ export function createTelegramTransport(options = {}) {
 }
 
 export function createTelegramAdapter(options = {}) {
-  const enabled = options.enabled === true;
-  const inboundEnabled = enabled && options.inboundEnabled === true;
-  const transport = enabled ? options.transport : null;
-  if (enabled && (!transport || typeof transport.sendMessage !== "function" || typeof transport.editMessage !== "function")) {
+  const configured = options.configured === true;
+  const deliveryEnabled = configured && options.deliveryEnabled === true;
+  const inboundEnabled = configured && options.inboundEnabled === true;
+  const transport = configured ? options.transport : null;
+  if (configured && (!transport || typeof transport.sendMessage !== "function" || typeof transport.editMessage !== "function")) {
     throw new Error("Telegram adapter requires sendMessage/editMessage transport methods when enabled.");
   }
   if (
@@ -372,7 +378,11 @@ export function createTelegramAdapter(options = {}) {
     lastTopicRenameAt: null,
     lastTopicErrorAt: null,
     lastTopicError: "",
-    activeTopicCount: 0
+    activeTopicCount: 0,
+    validatedForumTargetTotal: 0,
+    lastTargetValidationAt: null,
+    lastTargetValidationErrorAt: null,
+    lastTargetValidationError: ""
   };
   const pollState = {
     stopRequested: false,
@@ -381,6 +391,7 @@ export function createTelegramAdapter(options = {}) {
     nextUpdateOffset: null
   };
   const forumTopicState = new Map();
+  const forumTargetValidationState = new Map();
   for (const binding of Array.isArray(options.topicBindings) ? options.topicBindings : []) {
     const stateKey = buildForumTopicStateKey({
       chatId: binding?.chatId,
@@ -428,6 +439,56 @@ export function createTelegramAdapter(options = {}) {
     return state;
   }
 
+  async function validateForumTarget(target) {
+    const chatId = normalizeChatId(target?.chatId);
+    const cached = forumTargetValidationState.get(chatId);
+    if (cached?.valid === true) {
+      return cached;
+    }
+    if (!transport || typeof transport.getChat !== "function") {
+      throw new Error("Telegram forum-topic provisioning requires getChat transport method.");
+    }
+    const chat = await transport.getChat({ chatId });
+    const type = normalizeNonEmptyString(chat?.type).toLowerCase();
+    const isForum = chat?.is_forum === true;
+    const descriptor = {
+      valid: type === "supergroup" && isForum === true,
+      type,
+      isForum,
+      title: normalizeNonEmptyString(chat?.title)
+    };
+    metrics.lastTargetValidationAt = nowFn();
+    if (!descriptor.valid) {
+      const kind =
+        type === "channel"
+          ? "channel"
+          : type === "supergroup"
+            ? "non-forum supergroup"
+            : type || "unknown chat type";
+      const error = `Telegram target ${chatId} must be a forum-enabled supergroup for topicMode deck-session; got ${kind}.`;
+      metrics.lastTargetValidationErrorAt = metrics.lastTargetValidationAt;
+      metrics.lastTargetValidationError = error;
+      throw new Error(error);
+    }
+    metrics.validatedForumTargetTotal += 1;
+    metrics.lastTargetValidationErrorAt = null;
+    metrics.lastTargetValidationError = "";
+    forumTargetValidationState.set(chatId, descriptor);
+    return descriptor;
+  }
+
+  function noteTargetFailure(error) {
+    const message = error instanceof Error ? error.message : String(error || "Telegram topic provisioning failed.");
+    metrics.topicProvisionFailedTotal += 1;
+    metrics.lastTopicErrorAt = nowFn();
+    metrics.lastTopicError = message;
+    if (!metrics.lastTargetValidationError) {
+      metrics.lastTargetValidationErrorAt = metrics.lastTopicErrorAt;
+      metrics.lastTargetValidationError = message;
+    }
+    return message;
+  }
+
   async function resolveEffectiveTarget(target) {
     if (target?.topicMode !== "deck-session") {
       return { target };
@@ -439,6 +500,7 @@ export function createTelegramAdapter(options = {}) {
     ) {
       throw new Error("Telegram forum-topic provisioning requires createForumTopic/editForumTopic transport methods.");
     }
+    await validateForumTarget(target);
     const topicState = getForumTopicState(target);
     const desiredTopicName = normalizeForumTopicName(target?.topicName, "ptydeck");
     if (!Number.isInteger(topicState.messageThreadId)) {
@@ -484,8 +546,33 @@ export function createTelegramAdapter(options = {}) {
     };
   }
 
+  async function ensureTarget(target) {
+    if (!configured) {
+      return { ok: false, skipped: true, reason: "disabled" };
+    }
+    if (!target?.chatId) {
+      return { ok: false, skipped: true, reason: "unmapped" };
+    }
+    try {
+      const resolved = await resolveEffectiveTarget(target);
+      return {
+        ok: true,
+        reason: target?.topicMode === "deck-session" ? "target_ready" : "target_valid",
+        target: resolved.target,
+        ...(resolved.topicBinding ? { topicBinding: resolved.topicBinding } : {})
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "topic_provision_failed",
+        error: noteTargetFailure(error)
+      };
+    }
+  }
+
   async function handleEvent(event) {
-    if (!enabled) {
+    if (!configured) {
       return { delivered: false, skipped: true, reason: "disabled" };
     }
     const target = event?.target;
@@ -493,13 +580,6 @@ export function createTelegramAdapter(options = {}) {
       return { delivered: false, skipped: true, reason: "unmapped" };
     }
     const action = String(event?.decision?.action || "");
-    if (!action || action === "suppress") {
-      return { delivered: false, skipped: true, reason: "suppressed" };
-    }
-    const text = String(event.text || "").trim();
-    if (!text) {
-      return { delivered: false, skipped: true, reason: "empty" };
-    }
     let effectiveTarget = target;
     let topicBinding = null;
     try {
@@ -507,15 +587,41 @@ export function createTelegramAdapter(options = {}) {
       effectiveTarget = resolved.target;
       topicBinding = resolved.topicBinding || null;
     } catch (error) {
-      metrics.topicProvisionFailedTotal += 1;
-      metrics.lastTopicErrorAt = nowFn();
-      metrics.lastTopicError = error instanceof Error ? error.message : String(error || "Telegram topic provisioning failed.");
       return {
         delivered: false,
         skipped: true,
         reason: "topic_provision_failed",
         action,
-        error: metrics.lastTopicError
+        error: noteTargetFailure(error)
+      };
+    }
+    if (!action || action === "suppress") {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "suppressed",
+        ...(topicBinding ? { topicBinding } : {}),
+        target: effectiveTarget
+      };
+    }
+    const text = String(event.text || "").trim();
+    if (!text) {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "empty",
+        ...(topicBinding ? { topicBinding } : {}),
+        target: effectiveTarget
+      };
+    }
+    if (!deliveryEnabled) {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "delivery_disabled",
+        action,
+        ...(topicBinding ? { topicBinding } : {}),
+        target: effectiveTarget
       };
     }
     const state = getThreadState(effectiveTarget, event.decision?.messageKey || event.threadKey || "status");
@@ -668,6 +774,9 @@ export function createTelegramAdapter(options = {}) {
   }
 
   async function emitInboundResponse(inbound, result = {}) {
+    if (!deliveryEnabled) {
+      return;
+    }
     const responseText = normalizeNonEmptyString(result.text);
     if (!responseText) {
       return;
@@ -692,8 +801,8 @@ export function createTelegramAdapter(options = {}) {
   }
 
   async function startInbound(options = {}) {
-    if (!enabled || !inboundEnabled) {
-      return { started: false, reason: enabled ? "inbound_disabled" : "disabled" };
+    if (!configured || !inboundEnabled) {
+      return { started: false, reason: configured ? "inbound_disabled" : "disabled" };
     }
     if (pollState.promise) {
       return { started: true, reason: "already_started" };
@@ -792,7 +901,8 @@ export function createTelegramAdapter(options = {}) {
     const backoffRemainingMs = backoffActive ? metrics.backoffUntil - now : 0;
     return {
       adapter: "telegram",
-      enabled,
+      enabled: configured,
+      deliveryEnabled,
       inboundEnabled,
       configuredTargets,
       deliveredTotal: metrics.deliveredTotal,
@@ -823,16 +933,22 @@ export function createTelegramAdapter(options = {}) {
       lastTopicRenameAt: metrics.lastTopicRenameAt,
       lastTopicErrorAt: metrics.lastTopicErrorAt,
       lastTopicError: metrics.lastTopicError,
-      activeTopicCount: metrics.activeTopicCount
+      activeTopicCount: metrics.activeTopicCount,
+      validatedForumTargetTotal: metrics.validatedForumTargetTotal,
+      lastTargetValidationAt: metrics.lastTargetValidationAt,
+      lastTargetValidationErrorAt: metrics.lastTargetValidationErrorAt,
+      lastTargetValidationError: metrics.lastTargetValidationError
     };
   }
 
   function renderMetricLines() {
-    const enabledValue = enabled ? 1 : 0;
+    const enabledValue = configured ? 1 : 0;
+    const deliveryEnabledValue = deliveryEnabled ? 1 : 0;
     const inboundEnabledValue = inboundEnabled ? 1 : 0;
     const pollingValue = metrics.pollingActive ? 1 : 0;
     return [
       `ptydeck_messaging_adapter_enabled{adapter="telegram"} ${enabledValue}`,
+      `ptydeck_messaging_delivery_enabled{adapter="telegram"} ${deliveryEnabledValue}`,
       `ptydeck_messaging_adapter_configured_targets{adapter="telegram"} ${configuredTargets}`,
       `ptydeck_messaging_inbound_enabled{adapter="telegram"} ${inboundEnabledValue}`,
       `ptydeck_messaging_inbound_polling{adapter="telegram"} ${pollingValue}`,
@@ -851,6 +967,7 @@ export function createTelegramAdapter(options = {}) {
   }
 
   return {
+    ensureTarget,
     handleEvent,
     startInbound,
     stop,

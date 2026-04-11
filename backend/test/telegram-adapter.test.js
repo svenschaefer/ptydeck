@@ -17,7 +17,7 @@ async function waitFor(predicate, timeoutMs = 1500) {
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-test("telegram transport sends edits forum-topic calls polls and answers through the Telegram Bot API shape", async () => {
+test("telegram transport sends edits forum-topic calls polls, gets chats, and answers through the Telegram Bot API shape", async () => {
   const requests = [];
   const transport = createTelegramTransport({
     botToken: "bot-token",
@@ -45,6 +45,17 @@ test("telegram transport sends edits forum-topic calls polls and answers through
               result: true
             };
           }
+          if (url.endsWith("/getChat")) {
+            return {
+              ok: true,
+              result: {
+                id: -1001,
+                title: "ptydeck",
+                type: "supergroup",
+                is_forum: true
+              }
+            };
+          }
           if (url.endsWith("/createForumTopic")) {
             return {
               ok: true,
@@ -69,6 +80,7 @@ test("telegram transport sends edits forum-topic calls polls and answers through
   const edited = await transport.editMessage({ chatId: "1001", messageId: 41, text: "updated" });
   const topic = await transport.createForumTopic({ chatId: "-1001", name: "Ops + codex" });
   const editedTopic = await transport.editForumTopic({ chatId: "-1001", messageThreadId: 55, name: "Ops + codex renamed" });
+  const chat = await transport.getChat({ chatId: "-1001" });
   const updates = await transport.getUpdates({ offset: 8, timeoutSeconds: 5, limit: 50, allowedUpdates: ["message"] });
   const answered = await transport.answerCallbackQuery({ callbackQueryId: "cb-1", text: "ok", showAlert: true });
 
@@ -76,14 +88,17 @@ test("telegram transport sends edits forum-topic calls polls and answers through
   assert.equal(edited.messageId, 2);
   assert.equal(topic.messageThreadId, 3);
   assert.equal(editedTopic.ok, true);
+  assert.equal(chat.type, "supergroup");
+  assert.equal(chat.is_forum, true);
   assert.deepEqual(updates, [{ update_id: 7 }]);
   assert.equal(answered, true);
   assert.equal(requests[0].url, "https://telegram.example.test/botbot-token/sendMessage");
   assert.equal(requests[1].url, "https://telegram.example.test/botbot-token/editMessageText");
   assert.equal(requests[2].url, "https://telegram.example.test/botbot-token/createForumTopic");
   assert.equal(requests[3].url, "https://telegram.example.test/botbot-token/editForumTopic");
-  assert.equal(requests[4].url, "https://telegram.example.test/botbot-token/getUpdates");
-  assert.equal(requests[5].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
+  assert.equal(requests[4].url, "https://telegram.example.test/botbot-token/getChat");
+  assert.equal(requests[5].url, "https://telegram.example.test/botbot-token/getUpdates");
+  assert.equal(requests[6].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     chat_id: "1001",
     text: "hello"
@@ -103,12 +118,15 @@ test("telegram transport sends edits forum-topic calls polls and answers through
     name: "Ops + codex renamed"
   });
   assert.deepEqual(JSON.parse(requests[4].options.body), {
+    chat_id: "-1001"
+  });
+  assert.deepEqual(JSON.parse(requests[5].options.body), {
     offset: 8,
     timeout: 5,
     limit: 50,
     allowed_updates: ["message"]
   });
-  assert.deepEqual(JSON.parse(requests[5].options.body), {
+  assert.deepEqual(JSON.parse(requests[6].options.body), {
     callback_query_id: "cb-1",
     text: "ok",
     show_alert: true
@@ -128,13 +146,13 @@ test("telegram inbound command parsing stays deterministic for buttons and text 
 
 test("telegram adapter validates transport requirements and inbound start states deterministically", async () => {
   assert.throws(
-    () => createTelegramAdapter({ enabled: true, transport: { sendMessage: async () => ({ messageId: 1 }) } }),
+    () => createTelegramAdapter({ configured: true, transport: { sendMessage: async () => ({ messageId: 1 }) } }),
     /sendMessage\/editMessage transport methods/
   );
   assert.throws(
     () =>
       createTelegramAdapter({
-        enabled: true,
+        configured: true,
         inboundEnabled: true,
         transport: {
           sendMessage: async () => ({ messageId: 1 }),
@@ -151,7 +169,7 @@ test("telegram adapter validates transport requirements and inbound start states
   });
 
   const outboundOnly = createTelegramAdapter({
-    enabled: true,
+    configured: true,
     transport: {
       async sendMessage() {
         return { messageId: 1 };
@@ -167,7 +185,7 @@ test("telegram adapter validates transport requirements and inbound start states
   });
 
   const inbound = createTelegramAdapter({
-    enabled: true,
+    configured: true,
     inboundEnabled: true,
     transport: {
       async sendMessage() {
@@ -198,7 +216,8 @@ test("telegram adapter validates transport requirements and inbound start states
 test("telegram adapter updates an existing thread and falls back to a new message when edit fails", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => 123,
     transport: {
@@ -236,7 +255,8 @@ test("telegram adapter updates an existing thread and falls back to a new messag
 test("telegram adapter can update an existing attention thread after an initial alert send", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => 321,
     transport: {
@@ -276,7 +296,8 @@ test("telegram adapter preserves alert thread continuity across edit fallback se
   const calls = [];
   let fallbackTriggered = false;
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {
       let current = 500;
@@ -326,13 +347,18 @@ test("telegram adapter preserves alert thread continuity across edit fallback se
 test("telegram adapter provisions and reuses forum topics per terminal thread", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {
       let current = 700;
       return () => ++current;
     })(),
     transport: {
+      async getChat() {
+        calls.push({ method: "getChat" });
+        return { id: -1001, type: "supergroup", is_forum: true, title: "ptydeck" };
+      },
       async createForumTopic(payload) {
         calls.push({ method: "createTopic", payload });
         return { messageThreadId: 44, name: payload.name };
@@ -381,20 +407,125 @@ test("telegram adapter provisions and reuses forum topics per terminal thread", 
 
   assert.equal(first.delivered, true);
   assert.equal(second.delivered, true);
-  assert.deepEqual(calls.map((entry) => entry.method), ["createTopic", "send", "editTopic", "edit"]);
-  assert.equal(calls[1].payload.messageThreadId, 44);
-  assert.equal(calls[3].payload.messageThreadId, 44);
+  assert.deepEqual(calls.map((entry) => entry.method), ["getChat", "createTopic", "send", "editTopic", "edit"]);
+  assert.equal(calls[2].payload.messageThreadId, 44);
+  assert.equal(calls[4].payload.messageThreadId, 44);
   assert.equal(first.topicBinding.messageThreadId, 44);
   assert.equal(first.topicBinding.topicName, "Operations + codex");
   assert.equal(second.topicBinding.topicName, "Operations Renamed + codex");
   assert.equal(adapter.getStatus().provisionedTopicTotal, 1);
   assert.equal(adapter.getStatus().renamedTopicTotal, 1);
   assert.equal(adapter.getStatus().activeTopicCount, 1);
+  assert.equal(adapter.getStatus().validatedForumTargetTotal, 1);
+});
+
+test("telegram adapter can provision deck-session topics while delivery is disabled", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    configuredTargets: 1,
+    nowFn: () => 880,
+    transport: {
+      async getChat() {
+        calls.push({ method: "getChat" });
+        return { id: -1001, type: "supergroup", is_forum: true };
+      },
+      async createForumTopic(payload) {
+        calls.push({ method: "createTopic", payload });
+        return { messageThreadId: 66, name: payload.name };
+      },
+      async editForumTopic() {
+        calls.push({ method: "editTopic" });
+        return { ok: true };
+      },
+      async sendMessage(payload) {
+        calls.push({ method: "send", payload });
+        return { messageId: 77 };
+      },
+      async editMessage(payload) {
+        calls.push({ method: "edit", payload });
+        return { messageId: payload.messageId || 77 };
+      }
+    }
+  });
+
+  const ensured = await adapter.ensureTarget({
+    chatId: "-1001",
+    sessionId: "s1",
+    topicMode: "deck-session",
+    topicName: "Operations + codex",
+    stateKey: "-1001:s1",
+    topicStateKey: "-1001:s1"
+  });
+  const event = await adapter.handleEvent({
+    target: {
+      chatId: "-1001",
+      sessionId: "s1",
+      topicMode: "deck-session",
+      topicName: "Operations + codex",
+      stateKey: "-1001:s1",
+      topicStateKey: "-1001:s1"
+    },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created"
+  });
+
+  assert.equal(ensured.ok, true);
+  assert.equal(ensured.topicBinding.messageThreadId, 66);
+  assert.equal(event.delivered, false);
+  assert.equal(event.reason, "delivery_disabled");
+  assert.equal(event.target.messageThreadId, 66);
+  assert.deepEqual(calls.map((entry) => entry.method), ["getChat", "createTopic"]);
+  assert.equal(adapter.getStatus().deliveryEnabled, false);
+  assert.equal(adapter.getStatus().provisionedTopicTotal, 1);
+});
+
+test("telegram adapter rejects channel targets for deck-session provisioning with a clear error", async () => {
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    configuredTargets: 1,
+    nowFn: () => 901,
+    transport: {
+      async getChat() {
+        return { id: -1001, type: "channel", title: "ptydeck" };
+      },
+      async createForumTopic() {
+        throw new Error("should not create topic for channel");
+      },
+      async editForumTopic() {
+        throw new Error("should not edit topic for channel");
+      },
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      }
+    }
+  });
+
+  const result = await adapter.ensureTarget({
+    chatId: "-1001",
+    sessionId: "s1",
+    topicMode: "deck-session",
+    topicName: "Operations + codex",
+    stateKey: "-1001:s1",
+    topicStateKey: "-1001:s1"
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "topic_provision_failed");
+  assert.match(result.error, /forum-enabled supergroup/);
+  assert.match(adapter.getStatus().lastTargetValidationError, /forum-enabled supergroup/);
 });
 
 test("telegram adapter records delivery failures without throwing them through the runtime", async () => {
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => 55,
     transport: {
@@ -422,7 +553,8 @@ test("telegram adapter records delivery failures without throwing them through t
 
 test("telegram adapter reports structured rate-limit metadata on delivery failures", async () => {
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => 77,
     transport: {
@@ -454,7 +586,8 @@ test("telegram adapter honors Telegram retry-after backoff before attempting ano
   let now = 100;
   let sendCalls = 0;
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => now,
     transport: {
@@ -511,7 +644,8 @@ test("telegram adapter drains multi-batch backlog before polling live inbound co
   const getUpdatesCalls = [];
   let livePollReleased = false;
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 2,
     nowFn: (() => {
@@ -575,7 +709,8 @@ test("telegram adapter records polling failures and recovers on a later inbound 
   const sends = [];
   let pollCalls = 0;
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {
@@ -633,7 +768,8 @@ test("telegram adapter swallows callback acknowledgement failures after command 
   const callbackAnswers = [];
   let liveServed = false;
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {
@@ -698,7 +834,8 @@ test("telegram adapter polls bounded inbound commands and records metrics", asyn
   const callbackAnswers = [];
   const updateQueue = [];
   const adapter = createTelegramAdapter({
-    enabled: true,
+    configured: true,
+    deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {

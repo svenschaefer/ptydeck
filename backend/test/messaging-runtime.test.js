@@ -268,6 +268,7 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
       return () => ++current;
     })(),
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex" }],
     createTelegramTransport() {
       return {
@@ -326,6 +327,7 @@ test("messaging runtime suppresses startup lifecycle, prompt, and initial contro
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -394,6 +396,7 @@ test("messaging runtime provisions forum topics per terminal using deck name plu
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", topicMode: "deck-session", profile: "coding-agent" }],
     resolveDeckNameForSession: () => "Operations",
     onTelegramTopicBindingUpsert: async (binding) => {
@@ -401,6 +404,9 @@ test("messaging runtime provisions forum topics per terminal using deck name plu
     },
     createTelegramTransport() {
       return {
+        async getChat() {
+          return { id: 1001, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
         async createForumTopic({ chatId, name }) {
           createdTopics.push({ chatId, name });
           return { messageThreadId: 55, name };
@@ -468,11 +474,15 @@ test("messaging runtime reuses persisted forum topic bindings instead of reprovi
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", topicMode: "deck-session", profile: "coding-agent" }],
     telegramTopicBindings: [{ chatId: "1001", sessionId: "codex-session", messageThreadId: 81, topicName: "Operations + codex" }],
     resolveDeckNameForSession: () => "Operations",
     createTelegramTransport() {
       return {
+        async getChat() {
+          return { id: 1001, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
         async createForumTopic({ chatId, name }) {
           createdTopics.push({ chatId, name });
           return { messageThreadId: 82, name };
@@ -511,6 +521,7 @@ test("messaging runtime flushes same-chunk summary content before prompt updates
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -559,6 +570,7 @@ test("messaging runtime flushes same-chunk summary content before prompt updates
 test("messaging runtime keeps bounded traces and reports Telegram rate-limit delivery outcomes", async () => {
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex" }],
     createTelegramTransport() {
       return {
@@ -592,6 +604,7 @@ test("messaging runtime aggregates coding-agent summaries and suppresses noisy d
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -654,6 +667,7 @@ test("messaging runtime filters low-value coding-agent run and edit updates whil
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -715,6 +729,7 @@ test("messaging runtime suppresses repeated identical attention churn and ignore
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "plain-shell", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -764,6 +779,7 @@ test("messaging runtime strips coding-agent tails and terminal-control residue f
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -823,6 +839,7 @@ test("messaging runtime suppresses short coding-agent attention snippet tails af
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -874,6 +891,7 @@ test("messaging runtime edits an existing attention thread when a richer follow-
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -930,6 +948,7 @@ test("messaging runtime preserves actionable path diagnostics and keeps distinct
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -988,6 +1007,7 @@ test("messaging runtime trims coding-agent identifier tails from attention lines
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1038,6 +1058,7 @@ test("messaging runtime trims review and path tails from coding-agent fatal line
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1092,6 +1113,7 @@ test("messaging runtime avoids summary context bleed and trims coding-agent brea
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1156,6 +1178,7 @@ test("messaging runtime suppresses low-value coding-agent plan updates and the f
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1209,6 +1232,7 @@ test("messaging runtime suppresses git-hash coding-agent commit subjects and the
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1262,6 +1286,7 @@ test("messaging runtime suppresses idle after unclassified coding-agent planning
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1314,6 +1339,7 @@ test("messaging runtime suppresses short low-value os error attention fragments"
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1362,6 +1388,7 @@ test("messaging runtime suppresses repeated idle updates without intervening sta
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "plain-shell", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1403,6 +1430,7 @@ test("messaging runtime suppresses idle after a recent status attempt was skippe
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "plain-shell", profile: "generic-shell" }],
     createTelegramTransport() {
       return {
@@ -1455,6 +1483,7 @@ test("messaging runtime handles bounded inbound status stop retry and replay act
   let session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     telegramInboundEnabled: true,
     telegramPollTimeoutSeconds: 1,
@@ -1544,6 +1573,7 @@ test("messaging runtime rejects unmapped or unavailable inbound actions determin
   const updateQueue = [];
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],
     telegramInboundEnabled: true,
     telegramPollTimeoutSeconds: 1,
@@ -1593,6 +1623,7 @@ test("messaging runtime rejects ambiguous inbound mappings deterministically", a
   const updateQueue = [];
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [
       { chatId: "1001", sessionName: "mapped-a" },
       { chatId: "1001", sessionName: "mapped-b" }
@@ -1639,6 +1670,7 @@ test("messaging runtime falls back to the cached session snapshot when live targ
   const session = createSession({ id: "s-cached", name: "codex", quickIdToken: "9", startCommand: "codex" });
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     telegramInboundEnabled: true,
     telegramPollTimeoutSeconds: 1,
@@ -1692,6 +1724,7 @@ test("messaging runtime rejects inbound actions when the mapped session payload 
   const updateQueue = [];
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],
     telegramInboundEnabled: true,
     telegramPollTimeoutSeconds: 1,
@@ -1738,6 +1771,7 @@ test("messaging runtime rejects retry while a live mapped session is still runni
   const session = createSession({ id: "s-live", name: "codex", quickIdToken: "9", startCommand: "codex", state: "running" });
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
     telegramInboundEnabled: true,
     telegramPollTimeoutSeconds: 1,
@@ -1785,6 +1819,7 @@ test("messaging runtime rejects retry while a live mapped session is still runni
 test("messaging runtime ignores unmapped outbound sessions and exposes adapter metrics", async () => {
   const runtime = createMessagingRuntime({
     telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "mapped" }],
     createTelegramTransport() {
       return {

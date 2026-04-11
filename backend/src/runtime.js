@@ -2759,6 +2759,7 @@ export function createRuntime(config) {
     telegramTargets: config.messagingTelegramTargets,
     telegramTopicBindings: Array.from(telegramTopicBindings.values()),
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
+    telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
     createTelegramTransport: config.createMessagingTelegramTransport,
@@ -7581,6 +7582,22 @@ function tryCreateRestoredSession({
       server.listen(config.port, resolve);
     });
     await messagingRuntime.start();
+    for (const session of manager.list()) {
+      try {
+        await messagingRuntime.ensureSessionTarget(toApiSession(session, session.state), {
+          source: "runtime.start"
+        });
+      } catch (error) {
+        logDebug(
+          "messaging.target.ensure_failed",
+          {
+            sessionId: session?.id || null,
+            error: error instanceof Error ? error.message : String(error || "Unknown messaging target setup failure.")
+          },
+          { source: "runtime.start", sessionId: session?.id || "" }
+        );
+      }
+    }
     if (typeof config.onBeforeReady === "function") {
       await config.onBeforeReady();
     }

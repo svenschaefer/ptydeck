@@ -135,6 +135,8 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <p>A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.</p>
 
+<p>The currently referenced invite target <code>https://t.me/+J4MInwk9nSg1MWJi</code> presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics required by <code>topicMode: &quot;deck-session&quot;</code>.</p>
+
 <p>Recommended topic naming convention:</p>
 
 <ul>
@@ -159,6 +161,18 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 </ul>
 
 <p>When <code>topicMode</code> is set to <code>deck-session</code>, <code>ptydeck</code> provisions one Telegram forum topic per terminal/session automatically and persists the resulting <code>messageThreadId</code> binding for later reuse. In that mode, the configured <code>chatId</code> must point at a forum-enabled supergroup.</p>
+
+<h2 id="delivery-hard-break">Delivery Hard Break</h2>
+
+<p>Telegram outbound delivery is now off by default until it is re-enabled explicitly with <code>MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1</code>.</p>
+
+<p>That hard break is intentional:</p>
+
+<ul>
+<li>no new Telegram chat messages are sent while the operator topology is being rebuilt</li>
+<li><code>topicMode: &quot;deck-session&quot;</code> can still validate the target chat and provision per-terminal forum topics</li>
+<li>once the forum-enabled supergroup topology is visibly correct, outbound delivery can be re-enabled from a clean baseline</li>
+</ul>
 
 <p>The shipped trigger profiles are:</p>
 
@@ -252,6 +266,7 @@ MESSAGING_TELEGRAM_TARGETS=[
     &quot;profile&quot;: &quot;build-test&quot;
   }
 ]
+MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
 MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
 
@@ -259,6 +274,7 @@ MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
 
 <pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
 MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
+MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
 MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
 
@@ -381,7 +397,8 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li>Telegram inbound is opt-in through backend config.</li>
 <li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
 <li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
-<li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters and active topic-binding totals.</li>
+<li><code>/health.messaging.deliveryEnabled</code> shows whether outbound Telegram delivery is currently allowed.</li>
+<li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
 <li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.</li>
 <li>Forum-topic provisioning is also deterministic: for <code>topicMode: &quot;deck-session&quot;</code>, the adapter creates or reuses a topic named <code>&lt;deck name&gt; + &lt;terminal name&gt;</code> and persists that binding instead of relying on manual topic naming discipline.</li>
@@ -401,6 +418,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>
 <li><a class="handbook-page-toc-link" href="#session-mapping">Session Mapping</a></li>
+<li><a class="handbook-page-toc-link" href="#delivery-hard-break">Delivery Hard Break</a></li>
 <li><a class="handbook-page-toc-link" href="#setup-checklist">Setup Checklist</a></li>
 <li><a class="handbook-page-toc-link" href="#1-create-the-bot">1. Create the Bot</a></li>
 <li><a class="handbook-page-toc-link" href="#2-add-the-bot-to-the-destination-chat">2. Add the Bot to the Destination Chat</a></li>

@@ -230,6 +230,7 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
   const edits = [];
   const { runtime, baseUrl } = await createStartedRuntime({
     messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
     messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
     createMessagingTelegramTransport() {
       return {
@@ -320,6 +321,7 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
   const updateQueue = [];
   const { runtime, baseUrl } = await createStartedRuntime({
     messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
     messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
     messagingTelegramInboundEnabled: true,
     messagingTelegramPollTimeoutSeconds: 1,
@@ -443,9 +445,13 @@ test("runtime provisions telegram forum topics per terminal and persists the bin
     maxBodyBytes: 1024 * 1024,
     startupWarmupQuietMs: 20,
     messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
     messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200300", topicMode: "deck-session" }],
     createMessagingTelegramTransport() {
       return {
+        async getChat() {
+          return { id: -100200300, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
         async createForumTopic(payload) {
           createdTopics.push(payload);
           return { messageThreadId: 55, name: payload.name };
@@ -505,9 +511,9 @@ test("runtime provisions telegram forum topics per terminal and persists the bin
     });
     assert.equal(createRes.status, 201);
 
-    await waitFor(() => createdTopics.length >= 1 && sends.length >= 1, 2000);
+    await waitFor(() => createdTopics.length >= 1, 2000);
     assert.deepEqual(createdTopics, [{ chatId: "-100200300", name: "Operations + build-run" }]);
-    assert.equal(sends[0].messageThreadId, 55);
+    assert.equal(sends.length, 0);
 
     await waitFor(async () => {
       const persistedState = JSON.parse(await readFile(dataPath, "utf8"));
@@ -523,6 +529,14 @@ test("runtime provisions telegram forum topics per terminal and persists the bin
         updatedAt: persistedState.messagingTelegramTopicBindings[0].updatedAt
       }
     ]);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.enabled, true);
+    assert.equal(health.messaging.deliveryEnabled, false);
+    assert.equal(health.messaging.adapters[0].deliveryEnabled, false);
+    assert.equal(health.messaging.adapters[0].activeTopicCount, 1);
   } finally {
     await runtime.stop();
   }

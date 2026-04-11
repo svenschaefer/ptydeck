@@ -147,6 +147,7 @@ export function loadConfig(env = process.env) {
   const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
   const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
+  const messagingTelegramOutboundEnabled = parseBoolean(env.MESSAGING_TELEGRAM_OUTBOUND_ENABLED);
   const messagingTelegramInboundEnabled = parseBoolean(env.MESSAGING_TELEGRAM_INBOUND_ENABLED);
   const messagingTelegramPollTimeoutSeconds = parsePositiveInt(
     env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
@@ -273,6 +274,7 @@ export function loadConfig(env = process.env) {
     messagingTelegramBotToken,
     messagingTelegramTargets,
     messagingTelegramApiBaseUrl,
+    messagingTelegramOutboundEnabled,
     messagingTelegramInboundEnabled,
     messagingTelegramPollTimeoutSeconds
   };

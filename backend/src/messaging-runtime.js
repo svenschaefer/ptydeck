@@ -944,11 +944,12 @@ export function createMessagingRuntime(options = {}) {
   const adapters = [];
   const telegramTopicBindings = new Map();
   const sessionWorkQueues = new Map();
-  const telegramEnabled = Boolean(options.telegramBotToken && targetMappings.length > 0);
-  const telegramInboundEnabled = telegramEnabled && options.telegramInboundEnabled === true;
+  const telegramConfigured = Boolean(options.telegramBotToken && targetMappings.length > 0);
+  const telegramOutboundEnabled = telegramConfigured && options.telegramOutboundEnabled === true;
+  const telegramInboundEnabled = telegramConfigured && options.telegramInboundEnabled === true;
   const telegramTransportFactory =
     typeof options.createTelegramTransport === "function" ? options.createTelegramTransport : createTelegramTransport;
-  const telegramTransport = telegramEnabled
+  const telegramTransport = telegramConfigured
     ? telegramTransportFactory({
         botToken: options.telegramBotToken,
         apiBaseUrl: options.telegramApiBaseUrl,
@@ -956,7 +957,8 @@ export function createMessagingRuntime(options = {}) {
       })
     : null;
   const telegramAdapter = createTelegramAdapter({
-    enabled: telegramEnabled,
+    configured: telegramConfigured,
+    deliveryEnabled: telegramOutboundEnabled,
     inboundEnabled: telegramInboundEnabled,
     configuredTargets: targetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
@@ -1004,6 +1006,21 @@ export function createMessagingRuntime(options = {}) {
       telegramTopicBindings.set(buildTelegramTopicBindingKey(binding.chatId, binding.sessionId), binding);
     }
     rebuildConversationTargetIndex(normalizedBindings);
+  }
+
+  async function upsertTelegramTopicBinding(binding) {
+    const normalizedBinding = normalizeMessagingTopicBindingEntry(binding);
+    if (!normalizedBinding) {
+      return;
+    }
+    const bindingKey = buildTelegramTopicBindingKey(normalizedBinding.chatId, normalizedBinding.sessionId);
+    const existingBinding = telegramTopicBindings.get(bindingKey) || null;
+    if (telegramTopicBindingsEqual(existingBinding, normalizedBinding)) {
+      return;
+    }
+    telegramTopicBindings.set(bindingKey, normalizedBinding);
+    rebuildConversationTargetIndex(Array.from(telegramTopicBindings.values()));
+    await onTelegramTopicBindingUpsert(normalizedBinding);
   }
 
   replaceTelegramTopicBindings(options.telegramTopicBindings);
@@ -1107,6 +1124,42 @@ export function createMessagingRuntime(options = {}) {
     state = createSessionStreamState();
     sessionStates.set(sessionId, state);
     return state;
+  }
+
+  async function ensureSessionTargetInternal(session, trace, resolvedTarget = null) {
+    const target = resolvedTarget || resolveTarget(session);
+    if (!target) {
+      return null;
+    }
+    rememberSessionForTarget(target, session);
+    let finalTarget = target;
+    for (const adapter of adapters) {
+      if (typeof adapter.ensureTarget !== "function") {
+        continue;
+      }
+      const result = await adapter.ensureTarget(target);
+      if (result?.target?.chatId) {
+        finalTarget = result.target;
+      }
+      if (result?.topicBinding) {
+        await upsertTelegramTopicBinding(result.topicBinding);
+      }
+      logDebug(
+        "messaging.target.ensure",
+        {
+          adapter: adapter.getStatus?.().adapter || "adapter",
+          sessionId: normalizeNonEmptyString(session?.id),
+          ok: result?.ok === true,
+          reason: normalizeNonEmptyString(result?.reason),
+          error: normalizeNonEmptyString(result?.error),
+          chatId: normalizeNonEmptyString(finalTarget?.chatId),
+          messageThreadId: Number.isInteger(finalTarget?.messageThreadId) ? finalTarget.messageThreadId : null
+        },
+        trace || null
+      );
+    }
+    rememberSessionForTarget(finalTarget, session);
+    return finalTarget;
   }
 
   function appendTraceEntry(entry) {
@@ -1393,16 +1446,7 @@ export function createMessagingRuntime(options = {}) {
         finalTarget = result.target;
       }
       if (result?.topicBinding?.chatId && result?.topicBinding?.sessionId && Number.isInteger(result?.topicBinding?.messageThreadId)) {
-        const binding = normalizeMessagingTopicBindingEntry(result.topicBinding);
-        if (binding) {
-          const bindingKey = buildTelegramTopicBindingKey(binding.chatId, binding.sessionId);
-          const existingBinding = telegramTopicBindings.get(bindingKey) || null;
-          if (!telegramTopicBindingsEqual(existingBinding, binding)) {
-            telegramTopicBindings.set(bindingKey, binding);
-            rebuildConversationTargetIndex(Array.from(telegramTopicBindings.values()));
-            await onTelegramTopicBindingUpsert(binding);
-          }
-        }
+        await upsertTelegramTopicBinding(result.topicBinding);
       }
       deliveryResults.push({
         adapter: adapter.getStatus?.().adapter || "adapter",
@@ -1459,6 +1503,7 @@ export function createMessagingRuntime(options = {}) {
     if (!target) {
       return null;
     }
+    await ensureSessionTargetInternal(session, trace, target);
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     if (type === "session.created") {
@@ -1987,7 +2032,8 @@ export function createMessagingRuntime(options = {}) {
 
   function buildStatusSummary() {
     return {
-      enabled: telegramEnabled,
+      enabled: telegramConfigured,
+      deliveryEnabled: telegramOutboundEnabled,
       adapters: adapters.map((adapter) => adapter.getStatus()),
       trace: {
         capacity: MAX_MESSAGING_TRACE_ENTRIES,
@@ -2027,10 +2073,15 @@ export function createMessagingRuntime(options = {}) {
     return runSessionWork(session?.id, () => observeShareChangeInternal({ action, shareLink, session, trace }));
   }
 
+  function ensureSessionTarget(session, trace) {
+    return runSessionWork(session?.id, () => ensureSessionTargetInternal(session, trace));
+  }
+
   return {
     start,
     stop,
     replaceTelegramTopicBindings,
+    ensureSessionTarget,
     observeSessionLifecycle,
     observeSessionData,
     observeSessionIdle,

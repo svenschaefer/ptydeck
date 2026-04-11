@@ -97,6 +97,8 @@ For the live operator model, the recommended destination is one forum-enabled Te
 
 A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.
 
+The currently referenced invite target `https://t.me/+J4MInwk9nSg1MWJi` presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics required by `topicMode: "deck-session"`.
+
 Recommended topic naming convention:
 
 - `<deck name> + <terminal name>`
@@ -116,6 +118,16 @@ Optional fields:
 - `profile`
 
 When `topicMode` is set to `deck-session`, `ptydeck` provisions one Telegram forum topic per terminal/session automatically and persists the resulting `messageThreadId` binding for later reuse. In that mode, the configured `chatId` must point at a forum-enabled supergroup.
+
+## Delivery Hard Break
+
+Telegram outbound delivery is now off by default until it is re-enabled explicitly with `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1`.
+
+That hard break is intentional:
+
+- no new Telegram chat messages are sent while the operator topology is being rebuilt
+- `topicMode: "deck-session"` can still validate the target chat and provision per-terminal forum topics
+- once the forum-enabled supergroup topology is visibly correct, outbound delivery can be re-enabled from a clean baseline
 
 The shipped trigger profiles are:
 
@@ -200,6 +212,7 @@ MESSAGING_TELEGRAM_TARGETS=[
     "profile": "build-test"
   }
 ]
+MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
 MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
 ```
@@ -209,6 +222,7 @@ File-backed example:
 ```env
 MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
 MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
+MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
 MESSAGING_TELEGRAM_INBOUND_ENABLED=1
 MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3
 ```
@@ -327,7 +341,8 @@ Defaults and bounds:
 - Telegram inbound is opt-in through backend config.
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
-- When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters and active topic-binding totals.
+- `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed.
+- When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
 - `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
 - Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` and persists that binding instead of relying on manual topic naming discipline.

@@ -57,11 +57,13 @@ This file is structured into:
 - The outbound-first messaging-adapter foundation (`v0.4.0-H77`) and the bounded inbound Telegram reference follow-up (`v0.4.0-H78`) are now both delivered on `main`; only post-reference follow-up work remains in this deferred section.
 - Post-reference trigger auto-detection follow-ups in this section should build on the delivered `v0.4.0-H79` terminal-app-identity foundation instead of re-implementing app heuristics inside messaging-specific code.
 - The delivered `v0.4.0-H80` follow-up now adds bounded messaging traces, duplicate/noise suppression, app-aware aggregation, and explicit low-value filter patterns for agentic CLI chatter; only post-reference adapter/profile expansion work remains in this deferred section.
+- The delivered `v0.4.0-H88` hard-break reset now pauses outbound Telegram delivery by default and shifts the next messaging direction toward allowlist-/signal-first delivery from a clean baseline instead of continuing line-by-line noise filtering as the primary strategy.
 
 - [ ] `MSG-008` Owner `BE`: Add richer post-reference trigger profiles and selection controls for deploy, transfer/sync, and long-running worker sessions, plus optional profile auto-detection heuristics, only after the outbound Telegram reference flow and the bounded inbound action contract are both stable.
 - [ ] `MSG-009` Owner `PLAT`: Add a Discord-style interaction-oriented reference adapter on top of the delivered normalized event/action contract, preserving the same single-user ptydeck authority boundaries while validating a richer button-driven remote interaction surface.
 - [ ] `MSG-010` Owner `PLAT`: Add a Slack-style workflow-oriented adapter focused on concise summaries, handoff context, and approval/status-style workflows rather than stream mirroring, only after the first two adapter styles prove the core framework boundaries.
 - [ ] `MSG-011` Owner `QA`: Add cross-adapter parity and contract validation after a second concrete adapter lands, ensuring provider-specific adapters still honor the same normalized event model, bounded action vocabulary, and ptydeck authority rules.
+- [ ] `MSG-029` Owner `BE`: Rework Telegram outbound delivery from a clean post-hard-break baseline toward an allowlist-/signal-first model, with explicit message-worthy state transitions, replayable trace-to-message evaluation, and deterministic edit/update reuse before broader adapter/profile expansion resumes.
 
 ### Remote / External Theme Compatibility
 
