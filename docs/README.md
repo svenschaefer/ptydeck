@@ -158,6 +158,17 @@ Authoritative repository documents remain:
     - use it as the canonical design source for normalized app identity, source priority, confidence arbitration, and the first consumer integration seams
     - keep final delivery status in `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, and `CODEX_CONTEXT.md`
 
+### 12. Restart Streaming Analysis
+
+- `Restart Streaming Analysis.md`
+  - Role: repository-native analysis note for how restored sessions, frontend remount traffic, startup warmup, and messaging classification interact during a backend restart
+  - Status:
+    - active analytical reference for the post-hard-break Telegram redesign
+    - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
+  - Current interpretation:
+    - use it when reasoning about restart-phase flooding, control-change chatter, idle churn, prompt-ready timing, and repeated target/topic validation during startup
+    - use the companion helper script `scripts/analyze-restart-streaming.mjs` to reproduce the same restart-window summaries from `/tmp/ptydeck-backend-debug.log`
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:
