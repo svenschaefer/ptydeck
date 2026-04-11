@@ -12,7 +12,8 @@ function createEmptyState(sessions = []) {
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: [],
-    shareLinks: []
+    shareLinks: [],
+    messagingTelegramTopicBindings: []
   };
 }
 
@@ -21,17 +22,18 @@ function normalizePersistedState(value) {
     return createEmptyState(value);
   }
   if (value && Array.isArray(value.sessions) && Array.isArray(value.customCommands)) {
-    return {
-      sessions: value.sessions,
-      sessionOutputs: Array.isArray(value.sessionOutputs) ? value.sessionOutputs : [],
-      customCommands: value.customCommands,
+      return {
+        sessions: value.sessions,
+        sessionOutputs: Array.isArray(value.sessionOutputs) ? value.sessionOutputs : [],
+        customCommands: value.customCommands,
       decks: Array.isArray(value.decks) ? value.decks : [],
       connectionProfiles: Array.isArray(value.connectionProfiles) ? value.connectionProfiles : [],
       layoutProfiles: Array.isArray(value.layoutProfiles) ? value.layoutProfiles : [],
-      workspacePresets: Array.isArray(value.workspacePresets) ? value.workspacePresets : [],
-      sshTrustEntries: Array.isArray(value.sshTrustEntries) ? value.sshTrustEntries : [],
-      shareLinks: Array.isArray(value.shareLinks) ? value.shareLinks : []
-    };
+        workspacePresets: Array.isArray(value.workspacePresets) ? value.workspacePresets : [],
+        sshTrustEntries: Array.isArray(value.sshTrustEntries) ? value.sshTrustEntries : [],
+        shareLinks: Array.isArray(value.shareLinks) ? value.shareLinks : [],
+        messagingTelegramTopicBindings: Array.isArray(value.messagingTelegramTopicBindings) ? value.messagingTelegramTopicBindings : []
+      };
   }
   return null;
 }
@@ -148,7 +150,8 @@ export class JsonPersistence {
       layoutProfiles: [],
       workspacePresets: [],
       sshTrustEntries: [],
-      shareLinks: []
+      shareLinks: [],
+      messagingTelegramTopicBindings: []
     });
   }
 
@@ -161,7 +164,8 @@ export class JsonPersistence {
     layoutProfiles,
     workspacePresets,
     sshTrustEntries,
-    shareLinks
+    shareLinks,
+    messagingTelegramTopicBindings
   }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -175,7 +179,8 @@ export class JsonPersistence {
         layoutProfiles: Array.isArray(layoutProfiles) ? layoutProfiles : [],
         workspacePresets: Array.isArray(workspacePresets) ? workspacePresets : [],
         sshTrustEntries: Array.isArray(sshTrustEntries) ? sshTrustEntries : [],
-        shareLinks: Array.isArray(shareLinks) ? shareLinks : []
+        shareLinks: Array.isArray(shareLinks) ? shareLinks : [],
+        messagingTelegramTopicBindings: Array.isArray(messagingTelegramTopicBindings) ? messagingTelegramTopicBindings : []
       },
       null,
       2

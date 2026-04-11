@@ -383,7 +383,16 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         updatedAt: 13
       }
     ],
-    shareLinks: []
+    shareLinks: [],
+    messagingTelegramTopicBindings: [
+      {
+        chatId: "-100123456",
+        sessionId: "a",
+        messageThreadId: 55,
+        topicName: "Operations + build-run",
+        updatedAt: 14
+      }
+    ]
   };
 
   await persistence.saveState(state);
@@ -411,7 +420,8 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: [],
-    shareLinks: []
+    shareLinks: [],
+    messagingTelegramTopicBindings: []
   });
 });
 
@@ -439,7 +449,8 @@ test("JsonPersistence loadState supports encrypted legacy array payload format",
     layoutProfiles: [],
     workspacePresets: [],
     sshTrustEntries: [],
-    shareLinks: []
+    shareLinks: [],
+    messagingTelegramTopicBindings: []
   });
 });
 

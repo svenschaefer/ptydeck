@@ -21,6 +21,8 @@ const IDLE_STATUS_SUPPRESSION_WINDOW_MS = 2000;
 const CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS = 30_000;
 const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
+const STARTUP_CHATTER_SUPPRESSION_WINDOW_MS = 15_000;
+const TELEGRAM_TOPIC_NAME_MAX_LENGTH = 128;
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
@@ -491,6 +493,7 @@ function normalizeMessagingTargetEntry(entry) {
   const chatId = normalizeNonEmptyString(entry.chatId) || String(entry.chatId ?? "").trim();
   const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
   const profile = normalizeMessagingProfile(entry.profile);
+  const topicMode = normalizeNonEmptyString(entry.topicMode).toLowerCase() === "deck-session" ? "deck-session" : "";
   if (!chatId || (!sessionId && !quickIdToken && !sessionName)) {
     return null;
   }
@@ -500,7 +503,8 @@ function normalizeMessagingTargetEntry(entry) {
     sessionName,
     chatId,
     ...(Number.isInteger(messageThreadId) ? { messageThreadId } : {}),
-    ...(profile ? { profile } : {})
+    ...(profile ? { profile } : {}),
+    ...(topicMode ? { topicMode } : {})
   });
 }
 
@@ -509,6 +513,34 @@ export function normalizeMessagingTargets(entries = []) {
     return [];
   }
   return entries.map((entry) => normalizeMessagingTargetEntry(entry)).filter(Boolean);
+}
+
+function normalizeMessagingTopicBindingEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const chatId = normalizeNonEmptyString(entry.chatId) || String(entry.chatId ?? "").trim();
+  const sessionId = normalizeNonEmptyString(entry.sessionId);
+  const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
+  if (!chatId || !sessionId || !Number.isInteger(messageThreadId)) {
+    return null;
+  }
+  const topicName = truncateSummary(normalizeNonEmptyString(entry.topicName), TELEGRAM_TOPIC_NAME_MAX_LENGTH);
+  const updatedAt = Number.isInteger(entry.updatedAt) && entry.updatedAt > 0 ? entry.updatedAt : 0;
+  return Object.freeze({
+    chatId,
+    sessionId,
+    messageThreadId,
+    ...(topicName ? { topicName } : {}),
+    ...(updatedAt ? { updatedAt } : {})
+  });
+}
+
+export function normalizeMessagingTopicBindings(entries = []) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+  return entries.map((entry) => normalizeMessagingTopicBindingEntry(entry)).filter(Boolean);
 }
 
 export function resolveMessagingTriggerProfile(session, target = null) {
@@ -657,6 +689,11 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
   const comparableText = normalizeNonEmptyString(event?.comparableText);
   const lastComparableText = normalizeNonEmptyString(threadState.lastComparableText);
+  const lastEventType = normalizeNonEmptyString(threadState.lastEventType);
+  const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
+  const occurredAt = Number.isInteger(event?.occurredAt) ? event.occurredAt : 0;
+  const withinStartupChatterWindow =
+    lastDeliveredAt > 0 && occurredAt > 0 && occurredAt - lastDeliveredAt < STARTUP_CHATTER_SUPPRESSION_WINDOW_MS;
   const idleStatusSuppressionWindowMs = isCodingAgentContext(event?.session, event?.profile)
     ? CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS
     : IDLE_STATUS_SUPPRESSION_WINDOW_MS;
@@ -675,10 +712,13 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     return Object.freeze({ action: "suppress", messageKey, reason: "idle_repeat" });
   }
   if (type === "session.lifecycle.created") {
+    if (lastEventType === "session.lifecycle.started" && withinStartupChatterWindow) {
+      return Object.freeze({ action: "suppress", messageKey, reason: "lifecycle_created_after_started" });
+    }
     return Object.freeze({ action: "new", messageKey, reason: "lifecycle_created" });
   }
   if (type === "session.lifecycle.started") {
-    return Object.freeze({ action: threadState.messageCreated === true ? "update" : "new", messageKey, reason: "lifecycle_started" });
+    return Object.freeze({ action: "suppress", messageKey, reason: "lifecycle_started_noise" });
   }
   if (type === "session.lifecycle.exited") {
     return Object.freeze({
@@ -723,12 +763,14 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate_signature" });
   }
   if (type === "session.prompt.ready") {
-    const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
+    if ((lastEventType === "session.lifecycle.created" || lastEventType === "session.lifecycle.started") && withinStartupChatterWindow) {
+      return Object.freeze({ action: "suppress", messageKey, reason: "prompt_after_lifecycle" });
+    }
     if (
-      threadState.lastEventType === "session.output.summary" &&
+      lastEventType === "session.output.summary" &&
       lastDeliveredAt > 0 &&
-      Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - lastDeliveredAt < PROMPT_STATUS_SUPPRESSION_WINDOW_MS
+      occurredAt > 0 &&
+      occurredAt - lastDeliveredAt < PROMPT_STATUS_SUPPRESSION_WINDOW_MS
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "prompt_after_status_update" });
     }
@@ -736,13 +778,13 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
       threadState.messageCreated === true &&
       threadState.lastAction === "update" &&
       lastDeliveredAt > 0 &&
-      Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - lastDeliveredAt < 10_000
+      occurredAt > 0 &&
+      occurredAt - lastDeliveredAt < 10_000
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "prompt_redundant" });
     }
     const lastPromptAt = Number.isInteger(threadState.lastPromptAt) ? threadState.lastPromptAt : 0;
-    if (lastPromptAt > 0 && Number.isInteger(event?.occurredAt) && event.occurredAt - lastPromptAt < 800) {
+    if (lastPromptAt > 0 && occurredAt > 0 && occurredAt - lastPromptAt < 800) {
       return Object.freeze({ action: "suppress", messageKey, reason: "prompt_debounce" });
     }
     return Object.freeze({ action: threadState.messageCreated === true ? "update" : "new", messageKey, reason: "prompt_ready" });
@@ -754,11 +796,19 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     type === "session.share.changed"
   ) {
     if (
+      type === "session.control.changed" &&
+      /^control became unclaimed\b/i.test(normalizeNonEmptyString(event?.summary)) &&
+      (lastEventType === "session.lifecycle.created" || lastEventType === "session.lifecycle.started") &&
+      withinStartupChatterWindow
+    ) {
+      return Object.freeze({ action: "suppress", messageKey, reason: "startup_control_chatter" });
+    }
+    if (
       type === "session.activity.idle" &&
-      threadState.lastEventType === "session.output.summary" &&
-      Number.isInteger(threadState.lastDeliveredAt) &&
-      Number.isInteger(event?.occurredAt) &&
-      event.occurredAt - threadState.lastDeliveredAt < idleStatusSuppressionWindowMs
+      lastEventType === "session.output.summary" &&
+      lastDeliveredAt > 0 &&
+      occurredAt > 0 &&
+      occurredAt - lastDeliveredAt < idleStatusSuppressionWindowMs
     ) {
       return Object.freeze({ action: "suppress", messageKey, reason: "idle_after_status_update" });
     }
@@ -777,11 +827,42 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
 }
 
 function buildThreadStateKey(target, sessionId, threadKey) {
+  const stateKey = normalizeNonEmptyString(target?.stateKey);
+  if (stateKey) {
+    return `${stateKey}:${threadKey}`;
+  }
   return `${target.chatId}:${Number.isInteger(target.messageThreadId) ? target.messageThreadId : 0}:${sessionId}:${threadKey}`;
 }
 
 function buildConversationKey(chatId, messageThreadId) {
   return `${normalizeNonEmptyString(chatId)}:${Number.isInteger(messageThreadId) ? messageThreadId : 0}`;
+}
+
+function buildTelegramTopicBindingKey(chatId, sessionId) {
+  return `${normalizeNonEmptyString(chatId)}:${normalizeNonEmptyString(sessionId)}`;
+}
+
+function telegramTopicBindingsEqual(left, right) {
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    normalizeNonEmptyString(left.chatId) === normalizeNonEmptyString(right.chatId) &&
+    normalizeNonEmptyString(left.sessionId) === normalizeNonEmptyString(right.sessionId) &&
+    normalizePositiveInteger(left.messageThreadId) === normalizePositiveInteger(right.messageThreadId) &&
+    normalizeNonEmptyString(left.topicName) === normalizeNonEmptyString(right.topicName)
+  );
+}
+
+function buildTelegramTopicName(deckName, session) {
+  const normalizedDeckName = normalizeNonEmptyString(deckName) || normalizeNonEmptyString(session?.deckId) || "Default";
+  const normalizedSessionName =
+    normalizeNonEmptyString(session?.name) ||
+    normalizeNonEmptyString(session?.shell) ||
+    normalizeNonEmptyString(session?.quickIdToken) ||
+    normalizeNonEmptyString(session?.id) ||
+    "terminal";
+  return truncateSummary(`${normalizedDeckName} + ${normalizedSessionName}`, TELEGRAM_TOPIC_NAME_MAX_LENGTH);
 }
 
 function buildInboundTrace(request, sessionId) {
@@ -848,6 +929,12 @@ export function createMessagingRuntime(options = {}) {
   const traceEntries = [];
   let traceCapturedTotal = 0;
   const logDebug = typeof options.logDebug === "function" ? options.logDebug : () => {};
+  const resolveDeckNameForSession =
+    typeof options.resolveDeckNameForSession === "function"
+      ? options.resolveDeckNameForSession
+      : (session) => normalizeNonEmptyString(session?.deckId) || "Default";
+  const onTelegramTopicBindingUpsert =
+    typeof options.onTelegramTopicBindingUpsert === "function" ? options.onTelegramTopicBindingUpsert : defaultNoop;
   const resolveSessionForMessagingTarget =
     typeof options.resolveSessionForMessagingTarget === "function" ? options.resolveSessionForMessagingTarget : () => null;
   const requestMessagingStop = typeof options.requestMessagingStop === "function" ? options.requestMessagingStop : defaultNoop;
@@ -855,6 +942,8 @@ export function createMessagingRuntime(options = {}) {
   const requestMessagingReplayExcerpt =
     typeof options.requestMessagingReplayExcerpt === "function" ? options.requestMessagingReplayExcerpt : defaultNoop;
   const adapters = [];
+  const telegramTopicBindings = new Map();
+  const sessionWorkQueues = new Map();
   const telegramEnabled = Boolean(options.telegramBotToken && targetMappings.length > 0);
   const telegramInboundEnabled = telegramEnabled && options.telegramInboundEnabled === true;
   const telegramTransportFactory =
@@ -872,20 +961,52 @@ export function createMessagingRuntime(options = {}) {
     configuredTargets: targetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
     transport: telegramTransport,
+    topicBindings: normalizeMessagingTopicBindings(options.telegramTopicBindings),
     nowFn
   });
   adapters.push(telegramAdapter);
 
   const conversationTargetIndex = new Map();
   const ambiguousConversationKeys = new Set();
-  for (const target of targetMappings) {
-    const key = buildConversationKey(target.chatId, target.messageThreadId);
-    if (conversationTargetIndex.has(key)) {
-      ambiguousConversationKeys.add(key);
-      continue;
+
+  function rebuildConversationTargetIndex(dynamicBindings = []) {
+    conversationTargetIndex.clear();
+    ambiguousConversationKeys.clear();
+    for (const target of targetMappings) {
+      if (target.topicMode === "deck-session" && !Number.isInteger(target.messageThreadId)) {
+        continue;
+      }
+      const key = buildConversationKey(target.chatId, target.messageThreadId);
+      if (conversationTargetIndex.has(key)) {
+        ambiguousConversationKeys.add(key);
+        continue;
+      }
+      conversationTargetIndex.set(key, target);
     }
-    conversationTargetIndex.set(key, target);
+    for (const binding of dynamicBindings) {
+      const key = buildConversationKey(binding.chatId, binding.messageThreadId);
+      if (conversationTargetIndex.has(key)) {
+        ambiguousConversationKeys.add(key);
+        continue;
+      }
+      conversationTargetIndex.set(key, {
+        chatId: binding.chatId,
+        sessionId: binding.sessionId,
+        messageThreadId: binding.messageThreadId
+      });
+    }
   }
+
+  function replaceTelegramTopicBindings(entries = []) {
+    telegramTopicBindings.clear();
+    const normalizedBindings = normalizeMessagingTopicBindings(entries);
+    for (const binding of normalizedBindings) {
+      telegramTopicBindings.set(buildTelegramTopicBindingKey(binding.chatId, binding.sessionId), binding);
+    }
+    rebuildConversationTargetIndex(normalizedBindings);
+  }
+
+  replaceTelegramTopicBindings(options.telegramTopicBindings);
 
   function bumpEventMetric(profile, type, action) {
     const key = `${profile}:${type}:${action}`;
@@ -933,7 +1054,23 @@ export function createMessagingRuntime(options = {}) {
         bestMatch = target;
       }
     }
-    return bestMatch;
+    if (!bestMatch) {
+      return null;
+    }
+    if (bestMatch.topicMode !== "deck-session") {
+      return bestMatch;
+    }
+    const binding = telegramTopicBindings.get(buildTelegramTopicBindingKey(bestMatch.chatId, session.id)) || null;
+    const topicName = buildTelegramTopicName(resolveDeckNameForSession(session), session);
+    return Object.freeze({
+      ...bestMatch,
+      sessionId: session.id,
+      topicMode: "deck-session",
+      topicName,
+      stateKey: `${bestMatch.chatId}:${session.id}`,
+      topicStateKey: `${bestMatch.chatId}:${session.id}`,
+      ...(binding && Number.isInteger(binding.messageThreadId) ? { messageThreadId: binding.messageThreadId } : {})
+    });
   }
 
   function resolveInboundTarget(target) {
@@ -1025,6 +1162,25 @@ export function createMessagingRuntime(options = {}) {
     if (traceEntries.length > MAX_MESSAGING_TRACE_ENTRIES) {
       traceEntries.splice(0, traceEntries.length - MAX_MESSAGING_TRACE_ENTRIES);
     }
+  }
+
+  async function runSessionWork(sessionId, work) {
+    const normalizedSessionId = normalizeNonEmptyString(sessionId);
+    if (!normalizedSessionId) {
+      return work();
+    }
+    const previous = sessionWorkQueues.get(normalizedSessionId) || Promise.resolve();
+    let current = null;
+    current = previous
+      .catch(() => {})
+      .then(work)
+      .finally(() => {
+        if (sessionWorkQueues.get(normalizedSessionId) === current) {
+          sessionWorkQueues.delete(normalizedSessionId);
+        }
+      });
+    sessionWorkQueues.set(normalizedSessionId, current);
+    return current;
   }
 
   function buildEventCorrelationKey(event, target, decision) {
@@ -1226,12 +1382,28 @@ export function createMessagingRuntime(options = {}) {
     threadState.lastObservedEventAt = event.occurredAt;
     let delivered = false;
     const deliveryResults = [];
+    let finalTarget = target;
     for (const adapter of adapters) {
       const result = await adapter.handleEvent({
         ...event,
         target,
         decision
       });
+      if (result?.target?.chatId) {
+        finalTarget = result.target;
+      }
+      if (result?.topicBinding?.chatId && result?.topicBinding?.sessionId && Number.isInteger(result?.topicBinding?.messageThreadId)) {
+        const binding = normalizeMessagingTopicBindingEntry(result.topicBinding);
+        if (binding) {
+          const bindingKey = buildTelegramTopicBindingKey(binding.chatId, binding.sessionId);
+          const existingBinding = telegramTopicBindings.get(bindingKey) || null;
+          if (!telegramTopicBindingsEqual(existingBinding, binding)) {
+            telegramTopicBindings.set(bindingKey, binding);
+            rebuildConversationTargetIndex(Array.from(telegramTopicBindings.values()));
+            await onTelegramTopicBindingUpsert(binding);
+          }
+        }
+      }
       deliveryResults.push({
         adapter: adapter.getStatus?.().adapter || "adapter",
         delivered: result?.delivered === true,
@@ -1257,7 +1429,8 @@ export function createMessagingRuntime(options = {}) {
         threadState.lastPromptAt = event.occurredAt;
       }
     }
-    recordDispatchTrace(event, decision, target, deliveryResults);
+    rememberSessionForTarget(finalTarget, event.session);
+    recordDispatchTrace(event, decision, finalTarget, deliveryResults);
     return decision;
   }
 
@@ -1281,7 +1454,7 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  async function observeSessionLifecycle(type, session, trace, extra = {}) {
+  async function observeSessionLifecycleInternal(type, session, trace, extra = {}) {
     const target = resolveTarget(session);
     if (!target) {
       return null;
@@ -1360,7 +1533,7 @@ export function createMessagingRuntime(options = {}) {
     return null;
   }
 
-  async function observeSessionData({ session, data, promptBoundaries = [], trace }) {
+  async function observeSessionDataInternal({ session, data, promptBoundaries = [], trace }) {
     const target = resolveTarget(session);
     if (!target) {
       return;
@@ -1551,7 +1724,7 @@ export function createMessagingRuntime(options = {}) {
     await processChunkSegment(chunk.slice(chunkCursor));
   }
 
-  async function observeSessionIdle({ session, trace }) {
+  async function observeSessionIdleInternal({ session, trace }) {
     const target = resolveTarget(session);
     if (!target) {
       return;
@@ -1618,7 +1791,7 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  async function observeShareChange({ action, shareLink, session, trace }) {
+  async function observeShareChangeInternal({ action, shareLink, session, trace }) {
     if (!session) {
       return;
     }
@@ -1838,9 +2011,26 @@ export function createMessagingRuntime(options = {}) {
     return lines;
   }
 
+  function observeSessionLifecycle(type, session, trace, extra = {}) {
+    return runSessionWork(session?.id, () => observeSessionLifecycleInternal(type, session, trace, extra));
+  }
+
+  function observeSessionData({ session, data, promptBoundaries = [], trace }) {
+    return runSessionWork(session?.id, () => observeSessionDataInternal({ session, data, promptBoundaries, trace }));
+  }
+
+  function observeSessionIdle({ session, trace }) {
+    return runSessionWork(session?.id, () => observeSessionIdleInternal({ session, trace }));
+  }
+
+  function observeShareChange({ action, shareLink, session, trace }) {
+    return runSessionWork(session?.id, () => observeShareChangeInternal({ action, shareLink, session, trace }));
+  }
+
   return {
     start,
     stop,
+    replaceTelegramTopicBindings,
     observeSessionLifecycle,
     observeSessionData,
     observeSessionIdle,

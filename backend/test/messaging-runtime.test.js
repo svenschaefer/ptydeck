@@ -4,6 +4,7 @@ import {
   applyMessagingMessagePolicy,
   createMessagingRuntime,
   normalizeMessagingInboundReplaySelector,
+  normalizeMessagingTopicBindings,
   normalizeMessagingTargets,
   resolveMessagingTriggerProfile
 } from "../src/messaging-runtime.js";
@@ -46,12 +47,23 @@ test("messaging runtime normalizes targets and resolves trigger profiles determi
     null,
     { chatId: "1001" },
     { chatId: "1002", sessionName: "build", profile: "build-test" },
-    { chatId: 1003, quickId: "A1", profile: "coding-agent" }
+    { chatId: 1003, quickId: "A1", profile: "coding-agent" },
+    { chatId: "1004", sessionName: "ops", topicMode: "deck-session", profile: "coding-agent" }
   ]);
 
   assert.deepEqual(targets, [
     { chatId: "1002", sessionId: "", quickIdToken: "", sessionName: "build", profile: "build-test" },
-    { chatId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" }
+    { chatId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" },
+    { chatId: "1004", sessionId: "", quickIdToken: "", sessionName: "ops", profile: "coding-agent", topicMode: "deck-session" }
+  ]);
+
+  const topicBindings = normalizeMessagingTopicBindings([
+    null,
+    { chatId: "1001", sessionId: "s-1", messageThreadId: 81, topicName: "Ops + codex", updatedAt: 123 },
+    { chatId: "1001", sessionId: "", messageThreadId: 82 }
+  ]);
+  assert.deepEqual(topicBindings, [
+    { chatId: "1001", sessionId: "s-1", messageThreadId: 81, topicName: "Ops + codex", updatedAt: 123 }
   ]);
 
   assert.equal(resolveMessagingTriggerProfile(createSession({ name: "Codex agent", startCommand: "codex" })), "coding-agent");
@@ -72,6 +84,14 @@ test("messaging inbound replay selector stays bounded and rejects invalid values
 
 test("messaging message policy returns explicit new update alert and suppress decisions", () => {
   const created = applyMessagingMessagePolicy({ type: "session.lifecycle.created", threadKey: "status", text: "created" }, {});
+  const started = applyMessagingMessagePolicy(
+    { type: "session.lifecycle.started", threadKey: "status", text: "started", occurredAt: 2_000 },
+    {}
+  );
+  const createdAfterStarted = applyMessagingMessagePolicy(
+    { type: "session.lifecycle.created", threadKey: "status", text: "created", occurredAt: 3_000 },
+    { lastEventType: "session.lifecycle.started", lastDeliveredAt: 1_000 }
+  );
   const updated = applyMessagingMessagePolicy(
     { type: "session.output.summary", threadKey: "status", text: "summary", comparableText: "summary" },
     { messageCreated: true }
@@ -182,8 +202,39 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastEventType: "session.attention.required"
     }
   );
+  const promptAfterLifecycle = applyMessagingMessagePolicy(
+    {
+      type: "session.prompt.ready",
+      threadKey: "status",
+      text: "Prompt ready.",
+      occurredAt: 6_000
+    },
+    {
+      messageCreated: true,
+      lastEventType: "session.lifecycle.created",
+      lastDeliveredAt: 3_000
+    }
+  );
+  const startupControlChatter = applyMessagingMessagePolicy(
+    {
+      type: "session.control.changed",
+      threadKey: "status",
+      text: "Control became unclaimed (1 attached client).",
+      summary: "Control became unclaimed (1 attached client).",
+      occurredAt: 7_000
+    },
+    {
+      messageCreated: true,
+      lastEventType: "session.lifecycle.created",
+      lastDeliveredAt: 3_000
+    }
+  );
 
   assert.equal(created.action, "new");
+  assert.equal(started.action, "suppress");
+  assert.equal(started.reason, "lifecycle_started_noise");
+  assert.equal(createdAfterStarted.action, "suppress");
+  assert.equal(createdAfterStarted.reason, "lifecycle_created_after_started");
   assert.equal(updated.action, "update");
   assert.equal(alerted.action, "alert");
   assert.equal(suppressed.action, "suppress");
@@ -202,6 +253,10 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(codingAgentIdleAfterRecentStatus.reason, "idle_after_status_update");
   assert.equal(attentionRepeatAfterWindow.action, "alert");
   assert.equal(attentionRepeatAfterWindow.reason, "attention_required");
+  assert.equal(promptAfterLifecycle.action, "suppress");
+  assert.equal(promptAfterLifecycle.reason, "prompt_after_lifecycle");
+  assert.equal(startupControlChatter.action, "suppress");
+  assert.equal(startupControlChatter.reason, "startup_control_chatter");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -262,6 +317,191 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.ok(edits.some((entry) => /Share access created/.test(entry.text)));
   assert.ok(edits.some((entry) => /Session idle/.test(entry.text)));
   assert.equal(runtime.buildStatusSummary().enabled, true);
+});
+
+test("messaging runtime suppresses startup lifecycle, prompt, and initial control chatter after session creation", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 220;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 92 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 93 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "startup-noise-session",
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "explicit-hint",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.started", session, { traceId: "startup-noise-1" });
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "startup-noise-2" });
+  await runtime.observeSessionData({
+    session,
+    data: "",
+    promptBoundaries: [0],
+    trace: { traceId: "startup-noise-3" }
+  });
+  await runtime.observeSessionLifecycle(
+    "session.updated",
+    {
+      ...session,
+      controlState: {
+        currentController: null,
+        attachedClients: [{ clientId: "local-browser", active: true }],
+        readOnly: false
+      }
+    },
+    { traceId: "startup-noise-4" }
+  );
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 0);
+  assert.match(sends[0].text, /Session created/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "lifecycle_started_noise"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "prompt_after_lifecycle"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "startup_control_chatter"));
+});
+
+test("messaging runtime provisions forum topics per terminal using deck name plus terminal name", async () => {
+  const sends = [];
+  const edits = [];
+  const createdTopics = [];
+  const topicBindings = [];
+  let now = 400;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", topicMode: "deck-session", profile: "coding-agent" }],
+    resolveDeckNameForSession: () => "Operations",
+    onTelegramTopicBindingUpsert: async (binding) => {
+      topicBindings.push(binding);
+    },
+    createTelegramTransport() {
+      return {
+        async createForumTopic({ chatId, name }) {
+          createdTopics.push({ chatId, name });
+          return { messageThreadId: 55, name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 70 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 71 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "codex-session",
+    name: "codex",
+    deckId: "ops",
+    startCommand: "codex"
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "topic-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "Validated copy deploy\n",
+    promptBoundaries: [],
+    trace: { traceId: "topic-2" }
+  });
+  await runtime.observeSessionLifecycle(
+    "session.updated",
+    {
+      ...session,
+      controlState: {
+        currentController: "local-browser",
+        attachedClients: [{ clientId: "local-browser", active: true }],
+        readOnly: false
+      }
+    },
+    { traceId: "topic-3" }
+  );
+
+  assert.deepEqual(createdTopics, [{ chatId: "1001", name: "Operations + codex" }]);
+  assert.equal(sends[0].messageThreadId, 55);
+  assert.ok(edits.some((entry) => entry.messageThreadId === 55));
+  assert.deepEqual(topicBindings, [
+    {
+      chatId: "1001",
+      sessionId: "codex-session",
+      messageThreadId: 55,
+      topicName: "Operations + codex",
+      updatedAt: topicBindings[0].updatedAt
+    }
+  ]);
+});
+
+test("messaging runtime reuses persisted forum topic bindings instead of reprovisioning topics", async () => {
+  const sends = [];
+  const createdTopics = [];
+  let now = 500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", topicMode: "deck-session", profile: "coding-agent" }],
+    telegramTopicBindings: [{ chatId: "1001", sessionId: "codex-session", messageThreadId: 81, topicName: "Operations + codex" }],
+    resolveDeckNameForSession: () => "Operations",
+    createTelegramTransport() {
+      return {
+        async createForumTopic({ chatId, name }) {
+          createdTopics.push({ chatId, name });
+          return { messageThreadId: 82, name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 80 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 81 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "codex-session",
+    name: "codex",
+    deckId: "ops",
+    startCommand: "codex"
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "topic-bind-1" });
+
+  assert.equal(createdTopics.length, 0);
+  assert.equal(sends[0].messageThreadId, 81);
 });
 
 test("messaging runtime flushes same-chunk summary content before prompt updates", async () => {

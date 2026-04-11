@@ -25,9 +25,31 @@ function normalizeChatId(value) {
 }
 
 function buildTargetStateKey(target, threadKey) {
+  const stateKey = normalizeNonEmptyString(target?.stateKey);
+  if (stateKey) {
+    return `${stateKey}:${String(threadKey || "status")}`;
+  }
   const chatId = normalizeChatId(target?.chatId);
   const messageThreadId = Number.isInteger(target?.messageThreadId) ? target.messageThreadId : 0;
   return `${chatId}:${messageThreadId}:${String(threadKey || "status")}`;
+}
+
+function buildForumTopicStateKey(target) {
+  const stateKey = normalizeNonEmptyString(target?.topicStateKey) || normalizeNonEmptyString(target?.stateKey);
+  if (stateKey) {
+    return stateKey;
+  }
+  const chatId = normalizeChatId(target?.chatId);
+  const sessionId = normalizeNonEmptyString(target?.sessionId);
+  return `${chatId}:${sessionId || "session"}`;
+}
+
+function normalizeForumTopicName(value, fallback = "ptydeck") {
+  const normalized = normalizeNonEmptyString(String(value || "").replace(/\s+/g, " "));
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized.slice(0, 128).trimEnd();
 }
 
 function buildTelegramReplyMarkup() {
@@ -275,6 +297,33 @@ export function createTelegramTransport(options = {}) {
         },
         { signal }
       );
+    },
+    async createForumTopic({ chatId, name, iconColor, iconCustomEmojiId }) {
+      const result = await request("createForumTopic", {
+        chat_id: chatId,
+        name: normalizeForumTopicName(name),
+        ...(Number.isInteger(iconColor) ? { icon_color: iconColor } : {}),
+        ...(normalizeNonEmptyString(iconCustomEmojiId) ? { icon_custom_emoji_id: normalizeNonEmptyString(iconCustomEmojiId) } : {})
+      });
+      return {
+        messageThreadId: Number.isInteger(result?.message_thread_id) ? result.message_thread_id : null,
+        name: normalizeNonEmptyString(result?.name) || normalizeForumTopicName(name),
+        raw: result
+      };
+    },
+    async editForumTopic({ chatId, messageThreadId, name, iconCustomEmojiId }) {
+      const result = await request("editForumTopic", {
+        chat_id: chatId,
+        message_thread_id: messageThreadId,
+        ...(normalizeNonEmptyString(name) ? { name: normalizeForumTopicName(name) } : {}),
+        ...(iconCustomEmojiId !== undefined
+          ? { icon_custom_emoji_id: String(iconCustomEmojiId || "") }
+          : {})
+      });
+      return {
+        ok: result === true,
+        raw: result
+      };
     }
   };
 }
@@ -315,7 +364,15 @@ export function createTelegramAdapter(options = {}) {
     lastInboundAt: null,
     lastInboundErrorAt: null,
     lastInboundError: "",
-    pollingActive: false
+    pollingActive: false,
+    provisionedTopicTotal: 0,
+    renamedTopicTotal: 0,
+    topicProvisionFailedTotal: 0,
+    lastTopicProvisionAt: null,
+    lastTopicRenameAt: null,
+    lastTopicErrorAt: null,
+    lastTopicError: "",
+    activeTopicCount: 0
   };
   const pollState = {
     stopRequested: false,
@@ -323,6 +380,22 @@ export function createTelegramAdapter(options = {}) {
     abortController: null,
     nextUpdateOffset: null
   };
+  const forumTopicState = new Map();
+  for (const binding of Array.isArray(options.topicBindings) ? options.topicBindings : []) {
+    const stateKey = buildForumTopicStateKey({
+      chatId: binding?.chatId,
+      sessionId: binding?.sessionId
+    });
+    if (!stateKey || !Number.isInteger(binding?.messageThreadId)) {
+      continue;
+    }
+    forumTopicState.set(stateKey, {
+      messageThreadId: binding.messageThreadId,
+      topicName: normalizeNonEmptyString(binding?.topicName),
+      updatedAt: Number.isInteger(binding?.updatedAt) ? binding.updatedAt : null
+    });
+  }
+  metrics.activeTopicCount = forumTopicState.size;
 
   function getThreadState(target, threadKey) {
     const stateKey = buildTargetStateKey(target, threadKey);
@@ -339,6 +412,78 @@ export function createTelegramAdapter(options = {}) {
     return state;
   }
 
+  function getForumTopicState(target) {
+    const stateKey = buildForumTopicStateKey(target);
+    let state = forumTopicState.get(stateKey);
+    if (state) {
+      return state;
+    }
+    state = {
+      messageThreadId: Number.isInteger(target?.messageThreadId) ? target.messageThreadId : null,
+      topicName: normalizeNonEmptyString(target?.topicName),
+      updatedAt: null
+    };
+    forumTopicState.set(stateKey, state);
+    metrics.activeTopicCount = forumTopicState.size;
+    return state;
+  }
+
+  async function resolveEffectiveTarget(target) {
+    if (target?.topicMode !== "deck-session") {
+      return { target };
+    }
+    if (
+      !transport ||
+      typeof transport.createForumTopic !== "function" ||
+      typeof transport.editForumTopic !== "function"
+    ) {
+      throw new Error("Telegram forum-topic provisioning requires createForumTopic/editForumTopic transport methods.");
+    }
+    const topicState = getForumTopicState(target);
+    const desiredTopicName = normalizeForumTopicName(target?.topicName, "ptydeck");
+    if (!Number.isInteger(topicState.messageThreadId)) {
+      const created = await transport.createForumTopic({
+        chatId: target.chatId,
+        name: desiredTopicName
+      });
+      if (!Number.isInteger(created?.messageThreadId)) {
+        throw new Error("Telegram forum-topic provisioning did not return a message_thread_id.");
+      }
+      topicState.messageThreadId = created.messageThreadId;
+      topicState.topicName = created.name || desiredTopicName;
+      topicState.updatedAt = nowFn();
+      metrics.provisionedTopicTotal += 1;
+      metrics.lastTopicProvisionAt = topicState.updatedAt;
+      metrics.lastTopicErrorAt = null;
+      metrics.lastTopicError = "";
+    } else if (desiredTopicName && desiredTopicName !== topicState.topicName) {
+      await transport.editForumTopic({
+        chatId: target.chatId,
+        messageThreadId: topicState.messageThreadId,
+        name: desiredTopicName
+      });
+      topicState.topicName = desiredTopicName;
+      topicState.updatedAt = nowFn();
+      metrics.renamedTopicTotal += 1;
+      metrics.lastTopicRenameAt = topicState.updatedAt;
+      metrics.lastTopicErrorAt = null;
+      metrics.lastTopicError = "";
+    }
+    return {
+      target: {
+        ...target,
+        messageThreadId: topicState.messageThreadId
+      },
+      topicBinding: {
+        chatId: target.chatId,
+        sessionId: normalizeNonEmptyString(target?.sessionId),
+        messageThreadId: topicState.messageThreadId,
+        topicName: topicState.topicName || desiredTopicName,
+        updatedAt: Number.isInteger(topicState.updatedAt) ? topicState.updatedAt : nowFn()
+      }
+    };
+  }
+
   async function handleEvent(event) {
     if (!enabled) {
       return { delivered: false, skipped: true, reason: "disabled" };
@@ -351,11 +496,29 @@ export function createTelegramAdapter(options = {}) {
     if (!action || action === "suppress") {
       return { delivered: false, skipped: true, reason: "suppressed" };
     }
-    const state = getThreadState(target, event.decision?.messageKey || event.threadKey || "status");
     const text = String(event.text || "").trim();
     if (!text) {
       return { delivered: false, skipped: true, reason: "empty" };
     }
+    let effectiveTarget = target;
+    let topicBinding = null;
+    try {
+      const resolved = await resolveEffectiveTarget(target);
+      effectiveTarget = resolved.target;
+      topicBinding = resolved.topicBinding || null;
+    } catch (error) {
+      metrics.topicProvisionFailedTotal += 1;
+      metrics.lastTopicErrorAt = nowFn();
+      metrics.lastTopicError = error instanceof Error ? error.message : String(error || "Telegram topic provisioning failed.");
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "topic_provision_failed",
+        action,
+        error: metrics.lastTopicError
+      };
+    }
+    const state = getThreadState(effectiveTarget, event.decision?.messageKey || event.threadKey || "status");
     const now = nowFn();
     if (Number.isInteger(metrics.backoffUntil) && now < metrics.backoffUntil) {
       const remainingMs = Math.max(1, metrics.backoffUntil - now);
@@ -376,24 +539,24 @@ export function createTelegramAdapter(options = {}) {
         if (Number.isInteger(state.messageId)) {
           try {
             result = await transport.editMessage({
-              chatId: target.chatId,
-              messageThreadId: target.messageThreadId,
+              chatId: effectiveTarget.chatId,
+              messageThreadId: effectiveTarget.messageThreadId,
               messageId: state.messageId,
               text,
               ...(replyMarkup ? { replyMarkup } : {})
             });
           } catch {
             result = await transport.sendMessage({
-              chatId: target.chatId,
-              messageThreadId: target.messageThreadId,
+              chatId: effectiveTarget.chatId,
+              messageThreadId: effectiveTarget.messageThreadId,
               text,
               ...(replyMarkup ? { replyMarkup } : {})
             });
           }
         } else {
           result = await transport.sendMessage({
-            chatId: target.chatId,
-            messageThreadId: target.messageThreadId,
+            chatId: effectiveTarget.chatId,
+            messageThreadId: effectiveTarget.messageThreadId,
             text,
             ...(replyMarkup ? { replyMarkup } : {})
           });
@@ -405,12 +568,18 @@ export function createTelegramAdapter(options = {}) {
         metrics.updatedTotal += 1;
         metrics.lastDeliveredAt = state.lastUpdatedAt;
         metrics.backoffUntil = null;
-        return { delivered: true, action, messageId: state.messageId };
+        return {
+          delivered: true,
+          action,
+          messageId: state.messageId,
+          target: effectiveTarget,
+          ...(topicBinding ? { topicBinding } : {})
+        };
       }
 
       result = await transport.sendMessage({
-        chatId: target.chatId,
-        messageThreadId: target.messageThreadId,
+        chatId: effectiveTarget.chatId,
+        messageThreadId: effectiveTarget.messageThreadId,
         text,
         ...(replyMarkup ? { replyMarkup } : {})
       });
@@ -428,7 +597,9 @@ export function createTelegramAdapter(options = {}) {
       return {
         delivered: true,
         action,
-        messageId: Number.isInteger(result?.messageId) ? result.messageId : null
+        messageId: Number.isInteger(result?.messageId) ? result.messageId : null,
+        target: effectiveTarget,
+        ...(topicBinding ? { topicBinding } : {})
       };
     } catch (error) {
       const rateLimit = parseTelegramRateLimitMetadata(error);
@@ -644,7 +815,15 @@ export function createTelegramAdapter(options = {}) {
       lastInboundErrorAt: metrics.lastInboundErrorAt,
       lastInboundError: metrics.lastInboundError,
       pollingActive: metrics.pollingActive,
-      pollTimeoutSeconds
+      pollTimeoutSeconds,
+      provisionedTopicTotal: metrics.provisionedTopicTotal,
+      renamedTopicTotal: metrics.renamedTopicTotal,
+      topicProvisionFailedTotal: metrics.topicProvisionFailedTotal,
+      lastTopicProvisionAt: metrics.lastTopicProvisionAt,
+      lastTopicRenameAt: metrics.lastTopicRenameAt,
+      lastTopicErrorAt: metrics.lastTopicErrorAt,
+      lastTopicError: metrics.lastTopicError,
+      activeTopicCount: metrics.activeTopicCount
     };
   }
 
@@ -663,7 +842,11 @@ export function createTelegramAdapter(options = {}) {
       `ptydeck_messaging_actions_total{adapter="telegram",action="alert"} ${metrics.alertedTotal}`,
       `ptydeck_messaging_inbound_total{adapter="telegram",outcome="handled"} ${metrics.inboundHandledTotal}`,
       `ptydeck_messaging_inbound_total{adapter="telegram",outcome="failure"} ${metrics.inboundFailedTotal}`,
-      `ptydeck_messaging_inbound_total{adapter="telegram",outcome="skipped_backlog"} ${metrics.inboundBacklogSkippedTotal}`
+      `ptydeck_messaging_inbound_total{adapter="telegram",outcome="skipped_backlog"} ${metrics.inboundBacklogSkippedTotal}`,
+      `ptydeck_messaging_topics_total{adapter="telegram",outcome="provisioned"} ${metrics.provisionedTopicTotal}`,
+      `ptydeck_messaging_topics_total{adapter="telegram",outcome="renamed"} ${metrics.renamedTopicTotal}`,
+      `ptydeck_messaging_topics_total{adapter="telegram",outcome="provision_failed"} ${metrics.topicProvisionFailedTotal}`,
+      `ptydeck_messaging_topics_active{adapter="telegram"} ${metrics.activeTopicCount}`
     ];
   }
 

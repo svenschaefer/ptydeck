@@ -429,6 +429,105 @@ test("runtime executes bounded inbound telegram actions end-to-end for mapped se
   }
 });
 
+test("runtime provisions telegram forum topics per terminal and persists the binding", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sends = [];
+  const createdTopics = [];
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200300", topicMode: "deck-session" }],
+    createMessagingTelegramTransport() {
+      return {
+        async createForumTopic(payload) {
+          createdTopics.push(payload);
+          return { messageThreadId: 55, name: payload.name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 150 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 151 };
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+  await runtime.start();
+  const { port } = runtime.getAddress();
+  const baseUrl = `http://127.0.0.1:${port}/api/v1`;
+
+  try {
+    const createDeckRes = await fetch(`${baseUrl}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Operations" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", deckId: "ops", startCommand: "npm test" })
+    });
+    assert.equal(createRes.status, 201);
+
+    await waitFor(() => createdTopics.length >= 1 && sends.length >= 1, 2000);
+    assert.deepEqual(createdTopics, [{ chatId: "-100200300", name: "Operations + build-run" }]);
+    assert.equal(sends[0].messageThreadId, 55);
+
+    await waitFor(async () => {
+      const persistedState = JSON.parse(await readFile(dataPath, "utf8"));
+      return Array.isArray(persistedState.messagingTelegramTopicBindings) && persistedState.messagingTelegramTopicBindings.length >= 1;
+    }, 2000);
+    const persistedState = JSON.parse(await readFile(dataPath, "utf8"));
+    assert.deepEqual(persistedState.messagingTelegramTopicBindings, [
+      {
+        chatId: "-100200300",
+        sessionId: persistedState.messagingTelegramTopicBindings[0].sessionId,
+        messageThreadId: 55,
+        topicName: "Operations + build-run",
+        updatedAt: persistedState.messagingTelegramTopicBindings[0].updatedAt
+      }
+    ]);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("session PTY control endpoints send deterministic signals and remove killed sessions", async () => {
   const killSignals = [];
   const { runtime, baseUrl } = await createStartedRuntime({

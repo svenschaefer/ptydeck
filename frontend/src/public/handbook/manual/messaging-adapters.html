@@ -133,6 +133,8 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <p>For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same <code>chatId</code> and gets its own <code>messageThreadId</code>. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.</p>
 
+<p>A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.</p>
+
 <p>Recommended topic naming convention:</p>
 
 <ul>
@@ -152,8 +154,11 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <ul>
 <li><code>messageThreadId</code></li>
+<li><code>topicMode</code></li>
 <li><code>profile</code></li>
 </ul>
+
+<p>When <code>topicMode</code> is set to <code>deck-session</code>, <code>ptydeck</code> provisions one Telegram forum topic per terminal/session automatically and persists the resulting <code>messageThreadId</code> binding for later reuse. In that mode, the configured <code>chatId</code> must point at a forum-enabled supergroup.</p>
 
 <p>The shipped trigger profiles are:</p>
 
@@ -264,6 +269,12 @@ MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
     &quot;sessionName&quot;: &quot;codex&quot;,
     &quot;chatId&quot;: &quot;123456789&quot;,
     &quot;profile&quot;: &quot;coding-agent&quot;
+  },
+  {
+    &quot;sessionName&quot;: &quot;build-run&quot;,
+    &quot;chatId&quot;: &quot;-1001234567890&quot;,
+    &quot;topicMode&quot;: &quot;deck-session&quot;,
+    &quot;profile&quot;: &quot;coding-agent&quot;
   }
 ]</code></pre>
 
@@ -370,8 +381,10 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li>Telegram inbound is opt-in through backend config.</li>
 <li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
 <li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
+<li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters and active topic-binding totals.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
 <li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.</li>
+<li>Forum-topic provisioning is also deterministic: for <code>topicMode: &quot;deck-session&quot;</code>, the adapter creates or reuses a topic named <code>&lt;deck name&gt; + &lt;terminal name&gt;</code> and persists that binding instead of relying on manual topic naming discipline.</li>
 </ul>
 
 <h2 id="related-docs">Related Docs</h2>

@@ -17,7 +17,7 @@ async function waitFor(predicate, timeoutMs = 1500) {
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-test("telegram transport sends edits polls and answers through the Telegram Bot API shape", async () => {
+test("telegram transport sends edits forum-topic calls polls and answers through the Telegram Bot API shape", async () => {
   const requests = [];
   const transport = createTelegramTransport({
     botToken: "bot-token",
@@ -39,6 +39,21 @@ test("telegram transport sends edits polls and answers through the Telegram Bot 
               result: true
             };
           }
+          if (url.endsWith("/editForumTopic")) {
+            return {
+              ok: true,
+              result: true
+            };
+          }
+          if (url.endsWith("/createForumTopic")) {
+            return {
+              ok: true,
+              result: {
+                message_thread_id: requests.length,
+                name: "Ops + codex"
+              }
+            };
+          }
           return {
             ok: true,
             result: {
@@ -52,17 +67,23 @@ test("telegram transport sends edits polls and answers through the Telegram Bot 
 
   const sent = await transport.sendMessage({ chatId: "1001", text: "hello" });
   const edited = await transport.editMessage({ chatId: "1001", messageId: 41, text: "updated" });
+  const topic = await transport.createForumTopic({ chatId: "-1001", name: "Ops + codex" });
+  const editedTopic = await transport.editForumTopic({ chatId: "-1001", messageThreadId: 55, name: "Ops + codex renamed" });
   const updates = await transport.getUpdates({ offset: 8, timeoutSeconds: 5, limit: 50, allowedUpdates: ["message"] });
   const answered = await transport.answerCallbackQuery({ callbackQueryId: "cb-1", text: "ok", showAlert: true });
 
   assert.equal(sent.messageId, 1);
   assert.equal(edited.messageId, 2);
+  assert.equal(topic.messageThreadId, 3);
+  assert.equal(editedTopic.ok, true);
   assert.deepEqual(updates, [{ update_id: 7 }]);
   assert.equal(answered, true);
   assert.equal(requests[0].url, "https://telegram.example.test/botbot-token/sendMessage");
   assert.equal(requests[1].url, "https://telegram.example.test/botbot-token/editMessageText");
-  assert.equal(requests[2].url, "https://telegram.example.test/botbot-token/getUpdates");
-  assert.equal(requests[3].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
+  assert.equal(requests[2].url, "https://telegram.example.test/botbot-token/createForumTopic");
+  assert.equal(requests[3].url, "https://telegram.example.test/botbot-token/editForumTopic");
+  assert.equal(requests[4].url, "https://telegram.example.test/botbot-token/getUpdates");
+  assert.equal(requests[5].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     chat_id: "1001",
     text: "hello"
@@ -73,12 +94,21 @@ test("telegram transport sends edits polls and answers through the Telegram Bot 
     text: "updated"
   });
   assert.deepEqual(JSON.parse(requests[2].options.body), {
+    chat_id: "-1001",
+    name: "Ops + codex"
+  });
+  assert.deepEqual(JSON.parse(requests[3].options.body), {
+    chat_id: "-1001",
+    message_thread_id: 55,
+    name: "Ops + codex renamed"
+  });
+  assert.deepEqual(JSON.parse(requests[4].options.body), {
     offset: 8,
     timeout: 5,
     limit: 50,
     allowed_updates: ["message"]
   });
-  assert.deepEqual(JSON.parse(requests[3].options.body), {
+  assert.deepEqual(JSON.parse(requests[5].options.body), {
     callback_query_id: "cb-1",
     text: "ok",
     show_alert: true
@@ -291,6 +321,75 @@ test("telegram adapter preserves alert thread continuity across edit fallback se
   assert.equal(calls[1].payload.messageId, 71);
   assert.equal(calls[3].payload.messageId, 72);
   assert.equal(adapter.getStatus().updatedTotal, 2);
+});
+
+test("telegram adapter provisions and reuses forum topics per terminal thread", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    enabled: true,
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 700;
+      return () => ++current;
+    })(),
+    transport: {
+      async createForumTopic(payload) {
+        calls.push({ method: "createTopic", payload });
+        return { messageThreadId: 44, name: payload.name };
+      },
+      async editForumTopic(payload) {
+        calls.push({ method: "editTopic", payload });
+        return { ok: true };
+      },
+      async sendMessage(payload) {
+        calls.push({ method: "send", payload });
+        return { messageId: 91 };
+      },
+      async editMessage(payload) {
+        calls.push({ method: "edit", payload });
+        return { messageId: payload.messageId || 91 };
+      }
+    }
+  });
+
+  const first = await adapter.handleEvent({
+    target: {
+      chatId: "-1001",
+      sessionId: "s1",
+      topicMode: "deck-session",
+      topicName: "Operations + codex",
+      stateKey: "-1001:s1",
+      topicStateKey: "-1001:s1"
+    },
+    decision: { action: "new", messageKey: "status" },
+    threadKey: "status",
+    text: "session created"
+  });
+  const second = await adapter.handleEvent({
+    target: {
+      chatId: "-1001",
+      sessionId: "s1",
+      topicMode: "deck-session",
+      topicName: "Operations Renamed + codex",
+      stateKey: "-1001:s1",
+      topicStateKey: "-1001:s1"
+    },
+    decision: { action: "update", messageKey: "status" },
+    threadKey: "status",
+    text: "session updated"
+  });
+
+  assert.equal(first.delivered, true);
+  assert.equal(second.delivered, true);
+  assert.deepEqual(calls.map((entry) => entry.method), ["createTopic", "send", "editTopic", "edit"]);
+  assert.equal(calls[1].payload.messageThreadId, 44);
+  assert.equal(calls[3].payload.messageThreadId, 44);
+  assert.equal(first.topicBinding.messageThreadId, 44);
+  assert.equal(first.topicBinding.topicName, "Operations + codex");
+  assert.equal(second.topicBinding.topicName, "Operations Renamed + codex");
+  assert.equal(adapter.getStatus().provisionedTopicTotal, 1);
+  assert.equal(adapter.getStatus().renamedTopicTotal, 1);
+  assert.equal(adapter.getStatus().activeTopicCount, 1);
 });
 
 test("telegram adapter records delivery failures without throwing them through the runtime", async () => {

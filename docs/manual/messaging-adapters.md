@@ -95,6 +95,8 @@ A Telegram target maps one ptydeck session to one chat destination.
 
 For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same `chatId` and gets its own `messageThreadId`. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.
 
+A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.
+
 Recommended topic naming convention:
 
 - `<deck name> + <terminal name>`
@@ -110,7 +112,10 @@ Each mapping entry needs:
 Optional fields:
 
 - `messageThreadId`
+- `topicMode`
 - `profile`
+
+When `topicMode` is set to `deck-session`, `ptydeck` provisions one Telegram forum topic per terminal/session automatically and persists the resulting `messageThreadId` binding for later reuse. In that mode, the configured `chatId` must point at a forum-enabled supergroup.
 
 The shipped trigger profiles are:
 
@@ -216,6 +221,12 @@ Example `telegram-targets.json`:
     "sessionName": "codex",
     "chatId": "123456789",
     "profile": "coding-agent"
+  },
+  {
+    "sessionName": "build-run",
+    "chatId": "-1001234567890",
+    "topicMode": "deck-session",
+    "profile": "coding-agent"
   }
 ]
 ```
@@ -316,8 +327,10 @@ Defaults and bounds:
 - Telegram inbound is opt-in through backend config.
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
+- When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters and active topic-binding totals.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
 - `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
+- Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` and persists that binding instead of relying on manual topic naming discipline.
 
 ## Related Docs
 

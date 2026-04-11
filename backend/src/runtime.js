@@ -8,7 +8,7 @@ import { WebSocketServer } from "ws";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
-import { createMessagingRuntime } from "./messaging-runtime.js";
+import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import {
@@ -2607,6 +2607,7 @@ export function createRuntime(config) {
   const workspacePresets = new Map();
   const sshTrustEntries = new Map();
   const shareLinks = new Map();
+  const telegramTopicBindings = new Map();
   const sessionControlStaleClientTtlMs =
     Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
       ? config.sessionControlStaleClientTtlMs
@@ -2756,11 +2757,20 @@ export function createRuntime(config) {
   const messagingRuntime = createMessagingRuntime({
     telegramBotToken: config.messagingTelegramBotToken,
     telegramTargets: config.messagingTelegramTargets,
+    telegramTopicBindings: Array.from(telegramTopicBindings.values()),
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
     createTelegramTransport: config.createMessagingTelegramTransport,
     fetchImpl: config.fetchImpl,
+    resolveDeckNameForSession: (session) => {
+      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
+      return decks.get(deckId)?.name || deckId || "Default";
+    },
+    onTelegramTopicBindingUpsert: async (binding) => {
+      telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
+      await persistNow("messaging.telegram.topic_binding");
+    },
     resolveSessionForMessagingTarget,
     requestMessagingStop,
     requestMessagingRetry,
@@ -3710,12 +3720,12 @@ export function createRuntime(config) {
   function reassignDeckSessions(deckId, targetDeckId) {
     for (const session of manager.list()) {
       if (resolveSessionDeckId(session.id) === deckId) {
-        sessionDeckAssignments.set(session.id, targetDeckId);
+        setSessionDeckAssignment(session.id, targetDeckId);
       }
     }
     for (const [sessionId] of unrestoredSessions.entries()) {
       if (resolveSessionDeckId(sessionId) === deckId) {
-        sessionDeckAssignments.set(sessionId, targetDeckId);
+        setSessionDeckAssignment(sessionId, targetDeckId);
       }
     }
   }
@@ -4597,7 +4607,7 @@ export function createRuntime(config) {
     if (sourceDeckId === deckId) {
       return false;
     }
-    sessionDeckAssignments.set(sessionId, deckId);
+    setSessionDeckAssignment(sessionId, deckId);
     cleanupLayoutProfiles();
     cleanupWorkspacePresets();
     return true;
@@ -4618,8 +4628,35 @@ export function createRuntime(config) {
       return assigned;
     }
     ensureDefaultDeck();
-    sessionDeckAssignments.set(sessionId, DEFAULT_DECK_ID);
+    setSessionDeckAssignment(sessionId, DEFAULT_DECK_ID);
     return DEFAULT_DECK_ID;
+  }
+
+  function setSessionDeckAssignment(sessionId, deckId) {
+    const normalizedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+    const normalizedDeckId =
+      typeof deckId === "string" && deckId.trim() && decks.has(deckId.trim())
+        ? deckId.trim()
+        : DEFAULT_DECK_ID;
+    if (!normalizedSessionId) {
+      return normalizedDeckId;
+    }
+    sessionDeckAssignments.set(normalizedSessionId, normalizedDeckId);
+    try {
+      const activeSession = manager.get(normalizedSessionId).meta;
+      if (activeSession && activeSession.deckId !== normalizedDeckId) {
+        activeSession.deckId = normalizedDeckId;
+      }
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+    }
+    const unrestoredSession = unrestoredSessions.get(normalizedSessionId);
+    if (unrestoredSession && unrestoredSession.deckId !== normalizedDeckId) {
+      unrestoredSession.deckId = normalizedDeckId;
+    }
+    return normalizedDeckId;
   }
 
   function normalizeQuickIdToken(value) {
@@ -4745,10 +4782,23 @@ export function createRuntime(config) {
   }
 
   function withDeckId(session) {
+    const sessionId = typeof session?.id === "string" ? session.id : "";
+    const explicitDeckId =
+      typeof session?.deckId === "string" && session.deckId.trim() && decks.has(session.deckId.trim())
+        ? session.deckId.trim()
+        : "";
+    const assignedDeckId =
+      sessionId && typeof sessionDeckAssignments.get(sessionId) === "string" && decks.has(sessionDeckAssignments.get(sessionId))
+        ? sessionDeckAssignments.get(sessionId)
+        : "";
+    const effectiveDeckId = assignedDeckId || explicitDeckId || resolveSessionDeckId(sessionId);
+    if (sessionId) {
+      setSessionDeckAssignment(sessionId, effectiveDeckId);
+    }
     return {
       ...session,
-      deckId: resolveSessionDeckId(session.id),
-      quickIdToken: getSessionQuickIdToken(session.id)
+      deckId: effectiveDeckId,
+      quickIdToken: getSessionQuickIdToken(sessionId)
     };
   }
 
@@ -5285,6 +5335,9 @@ export function createRuntime(config) {
       sshTrustEntries: Array.from(sshTrustEntries.values()).sort(compareSshTrustEntries).map(toApiSshTrustEntry),
       shareLinks: Array.from(shareLinks.values())
         .sort(compareShareLinkEntries)
+        .map((entry) => ({ ...entry })),
+      messagingTelegramTopicBindings: Array.from(telegramTopicBindings.values())
+        .sort((left, right) => `${left.chatId}:${left.sessionId}`.localeCompare(`${right.chatId}:${right.sessionId}`))
         .map((entry) => ({ ...entry }))
     };
   }
@@ -5485,6 +5538,7 @@ export function createRuntime(config) {
       cwd: snapshot.startCwd || snapshot.cwd,
       shell: snapshot.shell,
       name: snapshot.name,
+      deckId: snapshot.deckId,
       startCwd: snapshot.startCwd || snapshot.cwd,
       startCommand: snapshot.startCommand || "",
       env: snapshot.env || {},
@@ -5690,6 +5744,7 @@ function tryCreateRestoredSession({
       cwd,
       shell,
       name: session.name,
+      deckId: session.deckId,
       startCwd,
       startCommand,
       replayOutput,
@@ -5956,7 +6011,23 @@ function tryCreateRestoredSession({
             trace: event.trace
           });
         } else if (eventName === "session.created" || eventName === "session.started" || eventName === "session.updated") {
-          await messagingRuntime.observeSessionLifecycle(eventName, apiEventSession, event.trace);
+          let messagingSession = apiEventSession;
+          const messagingSessionId =
+            typeof event.sessionId === "string" && event.sessionId.trim()
+              ? event.sessionId
+              : typeof eventSessionSnapshot?.id === "string" && eventSessionSnapshot.id.trim()
+                ? eventSessionSnapshot.id
+                : "";
+          if (messagingSessionId) {
+            try {
+              messagingSession = getApiSessionOrThrow(messagingSessionId);
+            } catch {
+              messagingSession = apiEventSession;
+            }
+          }
+          if (messagingSession) {
+            await messagingRuntime.observeSessionLifecycle(eventName, messagingSession, event.trace);
+          }
         } else if ((eventName === "session.exit" || eventName === "session.closed") && apiEventSession) {
           await messagingRuntime.observeSessionLifecycle(
             eventName,
@@ -6494,8 +6565,13 @@ function tryCreateRestoredSession({
         const mouseForwardingMode = normalizeSessionMouseForwardingMode(mergedBody?.mouseForwardingMode, { strict: true });
         const inputSafetyProfile = normalizeSessionInputSafetyProfile(mergedBody?.inputSafetyProfile, { strict: true });
         const tags = normalizeSessionTags(mergedBody?.tags, { strict: true });
+        const assignedDeckId = normalizeConnectionProfileDeckId(mergedBody?.deckId, {
+          strict: false,
+          hasKnownDeck: (deckId) => decks.has(deckId)
+        });
         const sessionId = crypto.randomUUID();
         const quickIdToken = assignSessionQuickIdToken(sessionId);
+        sessionDeckAssignments.set(sessionId, assignedDeckId);
         setSessionControlState(sessionId, {}, createDefaultSessionOwner(auth));
         let payload = null;
         try {
@@ -6509,6 +6585,7 @@ function tryCreateRestoredSession({
             cwd: startupConfig.startCwd,
             shell: mergedBody?.shell !== undefined ? mergedBody.shell : kind === SESSION_KIND_SSH ? DEFAULT_SSH_CLIENT : undefined,
             name: mergedBody?.name,
+            deckId: assignedDeckId,
             startCwd: startupConfig.startCwd,
             startCommand: startupConfig.startCommand,
             env: startupConfig.env,
@@ -6522,17 +6599,11 @@ function tryCreateRestoredSession({
             trace: requestTraceContext
           });
         } catch (error) {
+          sessionDeckAssignments.delete(sessionId);
           deleteSessionQuickIdToken(sessionId);
           deleteSessionControlState(sessionId);
           throw error;
         }
-        sessionDeckAssignments.set(
-          payload.id,
-          normalizeConnectionProfileDeckId(mergedBody?.deckId, {
-            strict: false,
-            hasKnownDeck: (deckId) => decks.has(deckId)
-          })
-        );
         reconcileSessionControllerForSession(payload.id);
         const apiPayload = toApiSession(payload);
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
@@ -7173,6 +7244,7 @@ function tryCreateRestoredSession({
     workspacePresets.clear();
     sshTrustEntries.clear();
     shareLinks.clear();
+    telegramTopicBindings.clear();
     sessionDeckAssignments.clear();
     sessionQuickIdAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
@@ -7272,6 +7344,10 @@ function tryCreateRestoredSession({
         revokedAt: Number.isInteger(persistedShareLink.revokedAt) ? persistedShareLink.revokedAt : null
       });
     }
+    for (const binding of normalizeMessagingTopicBindings(persistedState.messagingTelegramTopicBindings)) {
+      telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
+    }
+    messagingRuntime.replaceTelegramTopicBindings(Array.from(telegramTopicBindings.values()));
     await syncSshKnownHostsFile();
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {
