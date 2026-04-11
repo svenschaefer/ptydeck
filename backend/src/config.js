@@ -79,6 +79,20 @@ function parseBoolean(rawValue) {
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
+function parseCsvList(rawValue) {
+  const seen = new Set();
+  const normalized = [];
+  for (const entry of String(rawValue || "").split(",")) {
+    const candidate = entry.trim();
+    if (!candidate || seen.has(candidate)) {
+      continue;
+    }
+    seen.add(candidate);
+    normalized.push(candidate);
+  }
+  return normalized;
+}
+
 function parseAuthMode(rawValue) {
   const normalized = String(rawValue || "").trim().toLowerCase();
   if (!normalized) {
@@ -146,6 +160,12 @@ export function loadConfig(env = process.env) {
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
   const debugLogFile = String(env.BACKEND_DEBUG_LOG_FILE || "").trim();
+  const sessionStreamAnalysisCaptureFile = String(env.SESSION_STREAM_ANALYSIS_CAPTURE_FILE || "").trim();
+  const sessionStreamAnalysisCaptureAppLabels = parseCsvList(env.SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS || "codex");
+  const sessionStreamAnalysisCaptureMaxBytes = parsePositiveInt(
+    env.SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES || 32 * 1024 * 1024,
+    "SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES"
+  );
   const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
   const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
@@ -257,6 +277,9 @@ export function loadConfig(env = process.env) {
     sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,
+    sessionStreamAnalysisCaptureFile,
+    sessionStreamAnalysisCaptureAppLabels,
+    sessionStreamAnalysisCaptureMaxBytes,
     enforceTlsIngress,
     dataEncryptionProvider,
     trustedProxy,

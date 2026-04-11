@@ -86,12 +86,31 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 
 <p>One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later <code>Session idle.</code> event should still stay suppressed. The trace will show the skipped status attempt plus the later <code>idle_after_status_attempt</code> suppression instead of silently bumping the thread with low-value idle churn.</p>
 
-<p>For persisted local analysis, enable the existing backend debug log:</p>
+<p>For persisted lifecycle and adapter analysis, enable the existing backend debug log:</p>
 
 <pre><code class="language-env">BACKEND_DEBUG_LOGS=1
 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <p>With <code>BACKEND_DEBUG_LOG_FILE</code> configured, those backend debug traces are written to the file instead of flooding the interactive backend console.</p>
+
+<p>For persisted raw-stream analysis of coding-agent sessions such as Codex, enable the session-stream analysis capture as well:</p>
+
+<pre><code class="language-env">SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl
+SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex
+SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
+
+<p>That capture is analysis-only and independent of Telegram delivery. It records bounded JSONL entries with:</p>
+
+<ul>
+<li>raw PTY chunk bytes (base64)</li>
+<li>cleaned chunk bytes (base64)</li>
+<li>prompt-boundary offsets</li>
+<li>terminal-signal kinds</li>
+<li>session metadata</li>
+<li>app-identity metadata</li>
+</ul>
+
+<p>Use it when the question is about rendered Codex block structure, restart-time chunk boundaries, or later allowlist-/signal-first message selection, because the backend debug log remains metadata-oriented and the short replay tail can fall out of memory too quickly during restart churn.</p>
 
 <p>The Telegram adapter now also logs inbound discovery events before command filtering through <code>messaging.inbound.update</code>, so unsupported group/topic messages such as <code>@ptydeck_bot ping</code> still leave a diagnosable trail with:</p>
 
@@ -119,7 +138,13 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 <li>provisioning or validation errors</li>
 </ul>
 
-<p>Then inspect structured <code>messaging.event.trace</code> lines in that log file.</p>
+<p>Then inspect structured <code>messaging.event.trace</code>, <code>messaging.inbound.update</code>, and <code>messaging.target.update</code> lines in that debug log file.</p>
+
+<p>For Codex-style block analysis against the captured raw stream, use:</p>
+
+<pre><code class="language-bash">node scripts/analyze-codex-stream-blocks.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck</code></pre>
 
 <h2 id="what-it-can-do">What It Can Do</h2>
 

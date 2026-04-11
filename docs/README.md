@@ -169,6 +169,7 @@ Authoritative repository documents remain:
     - use it when reasoning about restart-phase flooding, control-change chatter, idle churn, prompt-ready timing, repeated target/topic validation during startup, and the difference between cold bootstrap, reconnect/remount, and restored-PTY-burst restart regimes
     - use the companion helper script `scripts/analyze-restart-streaming.mjs` to reproduce the same restart-window summaries from `/tmp/ptydeck-backend-debug.log`
     - use the companion helper script `scripts/analyze-terminal-dump-visuals.mjs` when reasoning about operator-visible Codex transcript structure such as prompts, action bullets, separator bars, worked-for banners, nested tails, and footer ribbons
+    - use the companion helper script `scripts/analyze-codex-stream-blocks.mjs` when reasoning about raw captured Codex chunk streams or when comparing the operator-visible block grammar against persisted JSONL stream capture data from `SESSION_STREAM_ANALYSIS_CAPTURE_FILE`
 
 ## Consolidation Outcome
 

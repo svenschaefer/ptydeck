@@ -24,6 +24,9 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.equal(config.sessionStreamAnalysisCaptureFile, "");
+  assert.deepEqual(config.sessionStreamAnalysisCaptureAppLabels, ["codex"]);
+  assert.equal(config.sessionStreamAnalysisCaptureMaxBytes, 32 * 1024 * 1024);
   assert.equal(config.enforceTlsIngress, false);
   assert.equal(config.dataEncryptionProvider, null);
   assert.deepEqual(config.trustedProxy, { mode: "off", ips: [] });
@@ -66,6 +69,9 @@ test("loadConfig maps environment values", () => {
     DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
+    SESSION_STREAM_ANALYSIS_CAPTURE_FILE: "/tmp/ptydeck-stream-analysis.jsonl",
+    SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS: "codex, gemini-cli , codex",
+    SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES: "65536",
     TRUST_PROXY: "loopback",
     AUTH_MODE: "dev",
     AUTH_DEV_SECRET: "custom-secret",
@@ -100,6 +106,9 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.dataEncryptionProvider?.getActiveKey().id, "key-a");
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+  assert.equal(config.sessionStreamAnalysisCaptureFile, "/tmp/ptydeck-stream-analysis.jsonl");
+  assert.deepEqual(config.sessionStreamAnalysisCaptureAppLabels, ["codex", "gemini-cli"]);
+  assert.equal(config.sessionStreamAnalysisCaptureMaxBytes, 65536);
   assert.equal(config.enforceTlsIngress, true);
   assert.deepEqual(config.trustedProxy, { mode: "loopback", ips: [] });
   assert.equal(config.authMode, "dev");
@@ -172,6 +181,10 @@ test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(
     () => loadConfig({ SESSION_ACTIVITY_QUIET_MS: "0" }),
     /SESSION_ACTIVITY_QUIET_MS must be a positive integer\./
+  );
+  assert.throws(
+    () => loadConfig({ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES: "0" }),
+    /SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES must be a positive integer\./
   );
   assert.throws(
     () => loadConfig({ RATE_LIMIT_REST_CREATE_MAX: "-1" }),

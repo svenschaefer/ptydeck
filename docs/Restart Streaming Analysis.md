@@ -17,7 +17,9 @@ The focus here is analytical only:
 The findings in this document are based on:
 
 - live backend debug log: `/tmp/ptydeck-backend-debug.log`
+- live raw-stream analysis capture: `/tmp/ptydeck-session-stream-analysis.jsonl`
 - live `/health` messaging summary and trace rings
+- authenticated session replay exports from `/api/v1/sessions/{sessionId}/replay-export`
 - source inspection of:
   - `backend/src/runtime.js`
   - `backend/src/session-manager.js`
@@ -49,6 +51,18 @@ Example usage:
 node scripts/analyze-restart-streaming.mjs \
   --start 2026-04-11T20:22:29.000Z \
   --end 2026-04-11T20:22:46.999Z
+```
+
+For Codex-oriented block analysis against the raw captured stream, the repository also includes:
+
+- `scripts/analyze-codex-stream-blocks.mjs`
+
+Example usage:
+
+```bash
+node scripts/analyze-codex-stream-blocks.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck
 ```
 
 The script parses the debug log, filters one window, and summarizes:
@@ -83,6 +97,54 @@ A second important fact is this:
 - the messaging path mostly operates on normalized visible text
 - ANSI formatting, color, bold emphasis, and other visual terminal cues are largely discarded before classification
 - for coding-agent CLIs such as Codex, that means the current classifier loses part of the semantic structure that operators actually see on screen
+
+## Evidence Layers and What They Are Good For
+
+The repository now has three different evidence layers for restart and streaming analysis. They are not interchangeable.
+
+### 1. Backend Debug Log
+
+`BACKEND_DEBUG_LOG_FILE` captures structured lifecycle and adapter metadata such as:
+
+- `http.request.*`
+- `runtime.ready`
+- `session.event`
+- `messaging.event.trace`
+- `messaging.inbound.update`
+- `messaging.target.update`
+
+Use it for:
+
+- restart sequencing
+- browser reconnect/remount timing
+- messaging classification and suppression reasons
+- Telegram target validation and topic provisioning
+
+Do not use it as the primary source for Codex block grammar. It does not retain the operator-visible block text.
+
+### 2. Session Replay Export
+
+`/api/v1/sessions/{sessionId}/replay-export` is the live raw stream source for one retained session tail. It preserves ANSI/CSI data and therefore still carries formatting and terminal-control semantics.
+
+Use it for:
+
+- proving that formatting still exists in the retained stream
+- validating that a visible dump really originated from terminal output
+- spot checks on one currently retained session tail
+
+Do not treat it as a durable dataset on its own. The default in-memory tail is small and non-persistent, so older restart-time blocks fall out of retention quickly.
+
+### 3. Session Stream Analysis Capture
+
+`SESSION_STREAM_ANALYSIS_CAPTURE_FILE` writes a bounded JSONL stream directly from the PTY `onData` path with both raw and cleaned chunk views plus prompt-boundary offsets and terminal-signal kinds.
+
+Use it for:
+
+- post-restart Codex chunk analysis
+- block-grammar experiments against real stream chunks
+- validating future allowlist-/signal-first message rules offline without re-enabling Telegram delivery
+
+This capture is the correct persisted source when the question is: "Which raw chunk and cleaned visible text produced this operator-visible Codex block?"
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 

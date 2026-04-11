@@ -668,6 +668,28 @@ test("SessionManager strips split cwd markers across chunks", () => {
   assert.deepEqual(chunks, ["", "echo ok\r\nok\r\n"]);
 });
 
+test("SessionManager can forward raw and cleaned stream chunks to analysis capture", () => {
+  const fakePty = createFakePty();
+  const captured = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    captureSessionStreamChunk: (event) => captured.push(event)
+  });
+  const created = manager.create({ cwd: "/tmp", name: "codex" });
+
+  fakePty.write("__CWD__/home/wsl__\r\n");
+  fakePty.write("• Done\r\n");
+
+  assert.equal(captured.length, 2);
+  assert.equal(captured[0].session.id, created.id);
+  assert.equal(captured[0].rawData, "__CWD__/home/wsl__\r\n");
+  assert.equal(captured[0].cleanedData, "");
+  assert.deepEqual(captured[0].promptBoundaries, [0]);
+  assert.equal(Array.isArray(captured[0].terminalSignalKinds), true);
+  assert.equal(captured[1].rawData, "• Done\r\n");
+  assert.equal(captured[1].cleanedData, "• Done\r\n");
+});
+
 test("SessionManager snapshot includes buffered terminal output", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({

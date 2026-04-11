@@ -598,7 +598,8 @@ export class SessionManager {
     clearTimeoutFn = clearTimeout,
     createTraceId = randomUUID,
     inspectTerminalForegroundProcess,
-    foregroundProcessRefreshDelayMs = DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS
+    foregroundProcessRefreshDelayMs = DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS,
+    captureSessionStreamChunk
   } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
@@ -644,6 +645,8 @@ export class SessionManager {
       Number.isInteger(foregroundProcessRefreshDelayMs) && foregroundProcessRefreshDelayMs >= 0
         ? foregroundProcessRefreshDelayMs
         : DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS;
+    this.captureSessionStreamChunk =
+      typeof captureSessionStreamChunk === "function" ? captureSessionStreamChunk : null;
     this.createPty =
       createPty ||
       (({ command, shell, args = [], cwd, cols, rows, env }) =>
@@ -904,6 +907,20 @@ export class SessionManager {
             appIdentityChanged: false,
             metaChanged: false
           };
+      if (this.captureSessionStreamChunk) {
+        this.captureSessionStreamChunk({
+          session: session.meta,
+          rawData: typeof data === "string" ? data : "",
+          cleanedData: cleaned,
+          promptBoundaries,
+          terminalSignalKinds: Array.isArray(signalResult?.signals)
+            ? signalResult.signals
+                .map((entry) => (typeof entry?.kind === "string" ? entry.kind : ""))
+                .filter(Boolean)
+            : [],
+          trace: getTrace()
+        });
+      }
       if (!cleaned && promptBoundaries.length > 0) {
         if (signalResult.metaChanged) {
           this.emitSessionUpdated(session, {

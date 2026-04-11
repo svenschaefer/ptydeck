@@ -393,6 +393,84 @@ test("runtime writes debug messaging traces to file without flooding stdout when
   }
 });
 
+test("runtime captures codex raw stream chunks to the analysis file and exposes capture health", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-stream-analysis-"));
+  const captureFile = join(dir, "session-stream-analysis.jsonl");
+  const { runtime, baseUrl } = await createStartedRuntime({
+    sessionStreamAnalysisCaptureFile: captureFile,
+    sessionStreamAnalysisCaptureAppLabels: ["codex"],
+    sessionStreamAnalysisCaptureMaxBytes: 65536,
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.appIdentity.label, "codex");
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "\u001b[1m• Hello from Codex\u001b[22m\r\n" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    await waitFor(async () => {
+      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+      const health = await healthRes.json();
+      return health.streamAnalysisCapture.capturedTotal >= 1;
+    }, 2000);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.streamAnalysisCapture.enabled, true);
+    assert.equal(health.streamAnalysisCapture.filePath, captureFile);
+    assert.deepEqual(health.streamAnalysisCapture.appLabels, ["codex"]);
+    assert.equal(health.streamAnalysisCapture.capturedTotal >= 1, true);
+
+    const readyRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/ready`);
+    assert.equal(readyRes.status, 200);
+    const ready = await readyRes.json();
+    assert.equal(ready.streamAnalysisCapture.enabled, true);
+    assert.equal(ready.streamAnalysisCapture.capturedTotal >= 1, true);
+
+    const captureContents = await readFile(captureFile, "utf8");
+    assert.match(captureContents, /session\.stream\.chunk/);
+    assert.match(captureContents, /"label":"codex"/);
+    assert.match(captureContents, /Hello from Codex/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime executes bounded inbound telegram actions end-to-end for mapped sessions", async () => {
   const sends = [];
   const edits = [];

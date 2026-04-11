@@ -50,7 +50,7 @@ The Telegram adapter status now also surfaces active outbound backoff state afte
 
 One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later `Session idle.` event should still stay suppressed. The trace will show the skipped status attempt plus the later `idle_after_status_attempt` suppression instead of silently bumping the thread with low-value idle churn.
 
-For persisted local analysis, enable the existing backend debug log:
+For persisted lifecycle and adapter analysis, enable the existing backend debug log:
 
 ```env
 BACKEND_DEBUG_LOGS=1
@@ -58,6 +58,25 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log
 ```
 
 With `BACKEND_DEBUG_LOG_FILE` configured, those backend debug traces are written to the file instead of flooding the interactive backend console.
+
+For persisted raw-stream analysis of coding-agent sessions such as Codex, enable the session-stream analysis capture as well:
+
+```env
+SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl
+SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex
+SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432
+```
+
+That capture is analysis-only and independent of Telegram delivery. It records bounded JSONL entries with:
+
+- raw PTY chunk bytes (base64)
+- cleaned chunk bytes (base64)
+- prompt-boundary offsets
+- terminal-signal kinds
+- session metadata
+- app-identity metadata
+
+Use it when the question is about rendered Codex block structure, restart-time chunk boundaries, or later allowlist-/signal-first message selection, because the backend debug log remains metadata-oriented and the short replay tail can fall out of memory too quickly during restart churn.
 
 The Telegram adapter now also logs inbound discovery events before command filtering through `messaging.inbound.update`, so unsupported group/topic messages such as `@ptydeck_bot ping` still leave a diagnosable trail with:
 
@@ -81,7 +100,15 @@ Forum-target validation and topic provisioning now also leave a diagnosable trai
 - create/reuse/rename phase
 - provisioning or validation errors
 
-Then inspect structured `messaging.event.trace` lines in that log file.
+Then inspect structured `messaging.event.trace`, `messaging.inbound.update`, and `messaging.target.update` lines in that debug log file.
+
+For Codex-style block analysis against the captured raw stream, use:
+
+```bash
+node scripts/analyze-codex-stream-blocks.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck
+```
 
 ## What It Can Do
 

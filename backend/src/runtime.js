@@ -11,6 +11,7 @@ import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
+import { createSessionStreamAnalysisCapture } from "./session-stream-analysis-capture.js";
 import {
   buildSessionControlStateView,
   createLocalOperatorPrincipal,
@@ -2569,6 +2570,11 @@ export function createRuntime(config) {
     Number.isInteger(config.sessionReplayPersistMaxChars) && config.sessionReplayPersistMaxChars >= 0
       ? config.sessionReplayPersistMaxChars
       : 0;
+  const sessionStreamAnalysisCapture = createSessionStreamAnalysisCapture({
+    filePath: config.sessionStreamAnalysisCaptureFile,
+    maxBytes: config.sessionStreamAnalysisCaptureMaxBytes,
+    appLabels: config.sessionStreamAnalysisCaptureAppLabels
+  });
   const manager = new SessionManager({
     defaultShell: config.shell,
     createPty: typeof config.createPty === "function" ? config.createPty : undefined,
@@ -2581,7 +2587,8 @@ export function createRuntime(config) {
     remoteReconnectDelayMs: config.remoteReconnectDelayMs,
     remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath,
-    createTraceId: () => createTraceId("mgr")
+    createTraceId: () => createTraceId("mgr"),
+    captureSessionStreamChunk: (event) => sessionStreamAnalysisCapture.captureChunk(event)
   });
   const persistence = new JsonPersistence(config.dataPath, {
     encryptionProvider: config.dataEncryptionProvider || null
@@ -2857,7 +2864,8 @@ export function createRuntime(config) {
   function buildHealthPayload() {
     return {
       status: "ok",
-      messaging: messagingRuntime.buildStatusSummary()
+      messaging: messagingRuntime.buildStatusSummary(),
+      streamAnalysisCapture: sessionStreamAnalysisCapture.buildStatusSummary()
     };
   }
 
@@ -2875,7 +2883,8 @@ export function createRuntime(config) {
             ? Math.max(0, startupWarmupQuietDeadlineAt - Date.now())
             : 0
       },
-      messaging: messagingRuntime.buildStatusSummary()
+      messaging: messagingRuntime.buildStatusSummary(),
+      streamAnalysisCapture: sessionStreamAnalysisCapture.buildStatusSummary()
     };
   }
 

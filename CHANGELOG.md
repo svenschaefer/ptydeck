@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-12
+
+- [x] `v0.4.0-H93` is now completed on `main`, adding a product-integrated raw session-stream analysis capture so restart and Codex block investigations no longer depend only on the short replay tail or the metadata-only backend debug log.
+- [x] The backend PTY data path now exposes a bounded analysis-only capture seam: `backend/src/session-manager.js` forwards raw chunk text, cleaned chunk text, prompt-boundary offsets, terminal-signal kinds, session metadata, and trace metadata into `backend/src/session-stream-analysis-capture.js`, while `backend/src/runtime.js` wires that capture from config and exposes its status through `/health.streamAnalysisCapture` and `/ready.streamAnalysisCapture`.
+- [x] Operator-configurable analysis capture is now part of the shipped backend config surface: `backend/src/config.js` now accepts `SESSION_STREAM_ANALYSIS_CAPTURE_FILE`, `SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS`, and `SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES`, and direct regression coverage in `backend/test/config.test.js`, `backend/test/session-manager.test.js`, `backend/test/session-stream-analysis-capture.test.js`, and `backend/test/runtime.integration.test.js` proves the bounded file capture contract plus runtime health exposure.
+- [x] The repository analysis tooling and docs now match that new evidence model: `scripts/analyze-codex-stream-blocks.mjs` can classify persisted Codex raw-stream captures into major separators and `•` block types, while `DEPLOYMENT.md`, `docs/manual/messaging-adapters.md`, `docs/Restart Streaming Analysis.md`, `docs/README.md`, and `CODEX_CONTEXT.md` now distinguish clearly between metadata-oriented backend debug logs, transient replay tails, and the new persisted raw-stream capture path used for restart-phase Codex analysis.
+
 ## 2026-04-11
 
 - [x] `v0.4.0-H92` is now completed on `main`, correcting the Telegram hard-break implementation so the shipped product path no longer exposes misleading outbound or inbound environment toggles.

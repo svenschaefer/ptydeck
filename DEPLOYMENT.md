@@ -65,10 +65,14 @@ Optional for troubleshooting:
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
 - When `BACKEND_DEBUG_LOG_FILE` is set, backend debug traces are written to that file instead of flooding the interactive backend stdout/stderr stream
+- Backend: `SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl` for persisted raw PTY chunk capture during analysis-only restart and Codex stream investigations
+- Backend (optional filter, comma-separated): `SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex`
+- Backend (optional bounded file size): `SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432`
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 - Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions
 - Messaging-specific note: Telegram inbound discovery now also emits structured `messaging.inbound.update` debug lines before ptydeck command filtering, so raw group/topic messages such as bot mentions can be inspected with `chatId`, `messageThreadId`, chat type/title, and parse outcome even when they are not supported commands
 - Messaging-specific note: forum-target validation and topic provisioning now also emit structured `messaging.target.update` debug lines, so forum mismatch errors, validated supergroup metadata, and topic create/reuse/rename outcomes are inspectable during the same restart cycle
+- Stream-analysis note: the new session-stream capture is analysis-only and independent of Telegram delivery. It writes bounded JSONL entries with raw PTY chunks, cleaned chunks, prompt-boundary offsets, terminal-signal kinds, session metadata, and app-identity metadata so Codex block rules can be evaluated after a restart without depending on the short replay tail or the metadata-only backend debug log
 
 Optional local auth baseline (development only):
 
@@ -211,6 +215,7 @@ When Telegram messaging is configured, verify additionally:
 - `/health.messaging.adapters[0].targetTrace` exposes a bounded recent Telegram target-validation and topic-provisioning ring with `chatId`, topic mode, session/topic identity, forum-validation outcome, and provisioning errors or reuse/create/rename results
 - `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
 - When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
+- `/health.streamAnalysisCapture` and `/ready.streamAnalysisCapture` expose the current raw-stream analysis capture status, including whether capture is enabled, the bounded file path, configured app-label filters, captured/skipped/rotated counts, and the last capture error
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 - `/metrics` now also exposes `ptydeck_messaging_inbound_total{adapter="telegram",outcome="observed"}` for raw inbound observations seen before command filtering
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
