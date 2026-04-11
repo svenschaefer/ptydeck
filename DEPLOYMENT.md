@@ -73,6 +73,7 @@ Optional for troubleshooting:
 - Messaging-specific note: Telegram inbound discovery now also emits structured `messaging.inbound.update` debug lines before ptydeck command filtering, so raw group/topic messages such as bot mentions can be inspected with `chatId`, `messageThreadId`, chat type/title, and parse outcome even when they are not supported commands
 - Messaging-specific note: forum-target validation and topic provisioning now also emit structured `messaging.target.update` debug lines, so forum mismatch errors, validated supergroup metadata, and topic create/reuse/rename outcomes are inspectable during the same restart cycle
 - Stream-analysis note: the new session-stream capture is analysis-only and independent of Telegram delivery. It writes bounded JSONL entries with raw PTY chunks, cleaned chunks, prompt-boundary offsets, terminal-signal kinds, session metadata, and app-identity metadata so Codex block rules can be evaluated after a restart without depending on the short replay tail or the metadata-only backend debug log
+- Local dev startup note: `npm run dev` and `npm --prefix backend run dev` now auto-source the gitignored repo-local file `local-config/ptydeck/backend.env.local` when it exists, so machine-specific debug and analysis settings can survive restarts without manually prefixing every dev command
 
 Optional local auth baseline (development only):
 

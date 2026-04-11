@@ -60,6 +60,16 @@ Start backend and frontend together:
 npm run dev
 ```
 
+When the gitignored local file `local-config/ptydeck/backend.env.local` exists, the backend dev startup path now loads it automatically. That is the intended place for machine-specific local analysis and debug settings such as:
+
+```env
+BACKEND_DEBUG_LOGS=1
+BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log
+SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl
+SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex
+SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432
+```
+
 Useful validation commands:
 
 ```bash
@@ -87,6 +97,8 @@ Backend only:
 npm --prefix backend run dev
 npm --prefix backend run test
 ```
+
+`npm --prefix backend run dev` uses the same local backend-env autoload behavior as the root `npm run dev` path.
 
 Frontend only:
 
@@ -204,6 +216,8 @@ Enable backend debug logging:
 ```bash
 BACKEND_DEBUG_LOGS=1 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log npm run dev
 ```
+
+For repeated local work, prefer storing those values in the gitignored `local-config/ptydeck/backend.env.local` file instead of prefixing every `npm run dev` command manually.
 
 Frontend/browser debug notes:
 
