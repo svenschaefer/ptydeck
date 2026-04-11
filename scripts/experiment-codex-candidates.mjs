@@ -154,6 +154,12 @@ function isTinyOverlayFragment(line) {
   if (/^[A-Za-z]+$/u.test(trimmed) && trimmed.length <= 4) {
     return true;
   }
+  if (/^[A-Za-z•◦\d ]+$/u.test(trimmed) && trimmed.length <= 8) {
+    const tokens = trimmed.split(/\s+/u).filter(Boolean);
+    if (tokens.length > 0 && tokens.length <= 2 && tokens.every((token) => token.length <= 4)) {
+      return true;
+    }
+  }
   if (/^[A-Za-z•◦\d]+$/u.test(trimmed) && !/\s/u.test(trimmed) && trimmed.length <= 12) {
     return true;
   }

@@ -171,6 +171,7 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/analyze-terminal-dump-visuals.mjs` when reasoning about operator-visible Codex transcript structure such as prompts, action bullets, separator bars, worked-for banners, nested tails, and footer ribbons
     - use the companion helper script `scripts/analyze-codex-stream-blocks.mjs` when reasoning about raw captured Codex chunk streams or when comparing the operator-visible block grammar against persisted JSONL stream capture data from `SESSION_STREAM_ANALYSIS_CAPTURE_FILE`
     - use the companion helper script `scripts/experiment-codex-candidates.mjs` when testing conservative allowlist-style Codex message rules offline against real capture windows and visual transcript examples before any Telegram outbound path is reconsidered
+    - use the companion helper script `scripts/experiment-codex-window-states.mjs` when classifying whether a real Codex capture tail is still `restart_remount`, only `overlay_churn`, already a `stable_section`, or in a mixed transition between those states
 
 ## Consolidation Outcome
 

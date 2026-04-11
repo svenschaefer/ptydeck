@@ -57,6 +57,7 @@ For Codex-oriented block analysis against the raw captured stream, the repositor
 
 - `scripts/analyze-codex-stream-blocks.mjs`
 - `scripts/experiment-codex-candidates.mjs`
+- `scripts/experiment-codex-window-states.mjs`
 
 Example usage:
 
@@ -71,6 +72,13 @@ node scripts/experiment-codex-candidates.mjs \
   --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
   --session-name ptydeck \
   --tail-entries 1200
+```
+
+```bash
+node scripts/experiment-codex-window-states.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck \
+  --window-sizes 60,120,300,600,1200
 ```
 
 The script parses the debug log, filters one window, and summarizes:
@@ -300,6 +308,109 @@ So the current analytical split is now clearer:
 - rendered block parsing and block typing are the right tools for message-shape extraction inside already-stable sections
 
 Both are necessary. Neither one is sufficient on its own.
+
+## Window-State Experiment
+
+The next analytical step makes the restart/remount problem explicit instead of collapsing it back into generic "noise":
+
+- first classify each captured entry as `blank`, `overlay_fragment`, `status_ribbon`, or `substantial`
+- then classify the whole capture tail as one of:
+  - `restart_remount`
+  - `overlay_churn`
+  - `stable_section`
+  - `mixed_transition`
+
+The helper for this is:
+
+- `scripts/experiment-codex-window-states.mjs`
+
+### Why the Earlier Chunk Filter Was Still Too Permissive
+
+The first candidate experiment already dropped many overlay fragments, but the live `ptydeck` capture still contained short redraw shards that looked superficially substantial because they contained small spaces:
+
+- `"d in"`
+- `"ai f"`
+- `"gr t"`
+- `"ouer"`
+
+Frequency sampling from the current live capture also shows repeated one-token and two-token redraw shards such as:
+
+- `"in"`
+- `"ki"`
+- `"rk"`
+- `"or"`
+- `"Wog"`
+- `"Wng"`
+- `"◦or"`
+
+Those are not meaningful terminal output. They are redraw/overlay residue, and treating them as substantial entries inflates the apparent stability of the window.
+
+The updated analysis helpers now classify those short spaced shards as `overlay_fragment` too.
+
+### Result 5: The Current Live `ptydeck` Tails Split Between `restart_remount` and `overlay_churn`
+
+Against the current live `ptydeck` capture, the window-state experiment now reports tails such as:
+
+- `60` entries
+  - `state = restart_remount`
+  - `37` blank
+  - `17` overlay fragments
+  - `3` status-ribbon
+  - `3` substantial
+  - keep ratio `0.0333`
+- `120` entries
+  - `state = restart_remount`
+  - `79` blank
+  - `35` overlay fragments
+  - `3` status-ribbon
+  - `3` substantial
+  - keep ratio `0.0167`
+- `300` entries
+  - `state = overlay_churn`
+  - `206` blank
+  - `79` overlay fragments
+  - `3` status-ribbon
+  - `12` substantial
+  - keep ratio `0.0367`
+
+The longer tails stay unstable as well, but they shift from a pure remount burst into a sustained churn regime:
+
+- `600` entries
+  - `state = overlay_churn`
+  - `417` blank
+  - `168` overlay fragments
+  - `3` status-ribbon
+  - `12` substantial
+- `1200` entries
+  - `state = overlay_churn`
+  - `835` blank
+  - `343` overlay fragments
+  - `3` status-ribbon
+  - `19` substantial
+
+The key structural signal is not only the blank ratio. It is the combination of:
+
+- high chunk rate (around `30` entries/sec in the current live tail)
+- dominant blank + overlay-fragment ratios
+- no prompt boundaries
+- no terminal signal kinds
+- only a few surviving kept entries and no strict message candidates after cleanup
+
+That split is useful. It means the stream does not jump directly from "remount burst" to "stable section". It first decays into an `overlay_churn` regime that is still not safe for delivery.
+
+### Practical Meaning
+
+This is the clean sequencing the later product path should follow:
+
+1. classify the live capture window
+2. if the window is `restart_remount` or `overlay_churn`, suppress the whole window
+3. only if the window is `stable_section`, run the Codex block parser
+4. only then decide whether an `info` block is message-worthy
+
+That is the real direction change after the hard break:
+
+- not "more clever line filtering"
+- but "window state first, section state second, message candidate last"
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 
