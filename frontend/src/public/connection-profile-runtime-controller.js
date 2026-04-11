@@ -1727,15 +1727,14 @@ export function createConnectionProfileRuntimeController(options = {}) {
       publicKey: selectedProbeCandidate.publicKey
     });
     const normalizedCreated = normalizeSshTrustEntry(created);
-    await refreshSshTrustEntries({ silent: true });
-    selectedSshTrustEntryId = normalizedCreated?.id || selectedSshTrustEntryId;
-    if (normalizedCreated) {
-      selectedSshProbeCandidateId = `${normalizedCreated.host}:${normalizedCreated.port}:${normalizedCreated.keyType}:${normalizedCreated.fingerprintSha256}`;
+    if (!normalizedCreated) {
+      throw new Error("SSH trust entry API returned an invalid trust entry.");
     }
+    await refreshSshTrustEntries({ silent: true });
+    selectedSshTrustEntryId = normalizedCreated.id;
+    selectedSshProbeCandidateId = `${normalizedCreated.host}:${normalizedCreated.port}:${normalizedCreated.keyType}:${normalizedCreated.fingerprintSha256}`;
     renderDraftComputedState();
-    const feedback = normalizedCreated
-      ? `Trusted SSH host key for ${formatSshTarget(target.host, target.port)} (${normalizedCreated.keyType} · ${normalizedCreated.fingerprintSha256}).`
-      : `Trusted SSH host key for ${formatSshTarget(target.host, target.port)}.`;
+    const feedback = `Trusted SSH host key for ${formatSshTarget(target.host, target.port)} (${normalizedCreated.keyType} · ${normalizedCreated.fingerprintSha256}).`;
     setCommandFeedback(feedback);
     setStatus(feedback);
     return feedback;

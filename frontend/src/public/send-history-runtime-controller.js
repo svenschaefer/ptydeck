@@ -206,6 +206,17 @@ function safeParseHistoryPayload(raw, nextEntryId, nowMs) {
   }
 }
 
+function readInitialHistoryPayload(localStorageRef, storageKey) {
+  if (!localStorageRef || typeof localStorageRef.getItem !== "function") {
+    return "";
+  }
+  try {
+    return localStorageRef.getItem(storageKey);
+  } catch {
+    return "";
+  }
+}
+
 function serializeHistoryState(historyBySession) {
   return JSON.stringify({ sessions: historyBySession });
 }
@@ -261,7 +272,7 @@ export function createSendHistoryRuntimeController(options = {}) {
     return `send-${nowMs().toString(36)}-${entryCounter.toString(36)}`;
   };
 
-  let historyBySession = pruneHistory(safeParseHistoryPayload(localStorageRef?.getItem?.(storageKey), nextEntryId, nowMs), {
+  let historyBySession = pruneHistory(safeParseHistoryPayload(readInitialHistoryPayload(localStorageRef, storageKey), nextEntryId, nowMs), {
     maxEntriesPerSession,
     maxTotalChars
   });

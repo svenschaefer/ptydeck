@@ -99,6 +99,38 @@ test("workflow source adapter resolves summary values from session artifacts", (
   assert.deepEqual(values, ["", "all green"]);
 });
 
+test("workflow source adapter resolves visible-line values from the mounted viewport window", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running", lifecycleState: "running", statusText: "" }]);
+  const terminal = createTerminal(["boot", "", "visible start", ""], { rows: 2, ydisp: 2 });
+  const adapter = createSlashWorkflowSourceAdapter({
+    store,
+    getTerminalEntry: () => ({ terminal })
+  });
+
+  const values = [];
+  const unsubscribe = adapter.resolveSubscription("s1", "visible-line")((value) => values.push(value));
+  terminal.buffer.active.ydisp = 3;
+  terminal.buffer.active.length = 5;
+  terminal.buffer.active.baseY = 3;
+  terminal.buffer.active.getLine = (index) => {
+    const lines = ["boot", "", "visible start", "", "visible end"];
+    const text = lines[index];
+    if (typeof text !== "string") {
+      return null;
+    }
+    return {
+      translateToString() {
+        return text;
+      }
+    };
+  };
+  store.markSessionActivity("s1", { timestamp: 10 });
+  unsubscribe();
+
+  assert.deepEqual(values, ["visible start", "visible end"]);
+});
+
 test("workflow source adapter reports missing terminal-backed sources explicitly", () => {
   const store = createStore();
   store.setSessions([{ id: "s1", state: "running", lifecycleState: "running" }]);

@@ -118,6 +118,12 @@ class FakeStorage {
   }
 }
 
+class ThrowingReadStorage extends FakeStorage {
+  getItem() {
+    throw new Error("storage read failed");
+  }
+}
+
 function createFakeWindow() {
   const timers = [];
   return {
@@ -397,4 +403,24 @@ test("send-history runtime controller ignores malformed persisted payloads and f
   const persisted = JSON.parse(localStorageRef.getItem(SEND_HISTORY_STORAGE_KEY));
   assert.equal(persisted.sessions.s1.length, 1);
   assert.equal(persisted.sessions.s1[0].text, "echo hi");
+});
+
+test("send-history runtime controller falls back cleanly when storage reads fail during startup", () => {
+  const windowRef = createFakeWindow();
+  const localStorageRef = new ThrowingReadStorage();
+
+  const controller = createSendHistoryRuntimeController({
+    windowRef,
+    documentRef: new FakeDocument(),
+    localStorageRef,
+    getActiveSession: () => ({ id: "s1", name: "ops" })
+  });
+
+  assert.deepEqual(controller.listEntriesForSession("s1"), []);
+  controller.recordSend("s1", "echo hi", { submittedAt: 10 });
+  flushTimers(windowRef);
+  assert.deepEqual(
+    controller.listEntriesForSession("s1").map((entry) => entry.text),
+    ["echo hi"]
+  );
 });

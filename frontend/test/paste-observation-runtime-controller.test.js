@@ -284,3 +284,41 @@ test("paste observation runtime controller leaves stalled observations actionabl
 
   controller.dispose();
 });
+
+test("paste observation runtime controller replaces prior observation state when a new paste starts for the same session", () => {
+  const windowRef = createFakeWindow();
+  const panelEl = new FakeTextNode();
+  const summaryEl = new FakeTextNode();
+  const detailEl = new FakeTextNode();
+  const continueBtn = new FakeButton();
+  const activeSession = { id: "s1", name: "alpha" };
+
+  const controller = createPasteObservationRuntimeController({
+    windowRef,
+    panelEl,
+    summaryEl,
+    detailEl,
+    continueBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: () => activeSession,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  controller.recordTerminalPaste("s1", "first payload", { autoContinueEnabled: true });
+  controller.observeSessionOutput("s1", "first");
+  const firstObservation = controller.getObservation("s1");
+  assert.equal(firstObservation.status, "partial");
+  assert.equal(firstObservation.echoedChars > 0, true);
+
+  controller.recordTerminalPaste("s1", "second payload", { autoContinueEnabled: false });
+  const secondObservation = controller.getObservation("s1");
+  assert.notEqual(secondObservation, firstObservation);
+  assert.equal(secondObservation.status, "watching");
+  assert.equal(secondObservation.echoedChars, 0);
+  assert.equal(secondObservation.autoContinueAttempts, 0);
+  assert.equal(secondObservation.autoContinueEnabled, false);
+  assert.equal(windowRef.timers.length, 1);
+
+  controller.dispose();
+});

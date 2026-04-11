@@ -281,3 +281,28 @@ test("slash-workflow runtime controller surfaces failed action-step feedback exp
   assert.equal(result.failure.code, "workflow.failed");
   assert.match(result.feedback, /Denied by policy/);
 });
+
+test("slash-workflow runtime controller recovers cleanly after a failed run and allows a later workflow", async () => {
+  const { controller, calls } = createControllerContext();
+
+  const failed = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until line /^done$/ timeout 1s"
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.failure.code, "workflow.source_unavailable");
+
+  const succeeded = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/list"
+  });
+  assert.equal(succeeded.ok, true);
+  assert.equal(succeeded.status, "succeeded");
+  assert.deepEqual(
+    calls.filter((entry) => entry[0] === "execute"),
+    [["execute", "/list"]]
+  );
+});

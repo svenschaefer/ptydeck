@@ -798,3 +798,52 @@ test("workspace preset runtime controller rejects malformed preset API payloads 
     /Workspace preset API returned an invalid preset record for workspace persistence/
   );
 });
+
+test("workspace preset runtime controller clears stale preset state when reload fails", async () => {
+  const errors = [];
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    api: {
+      async listWorkspacePresets() {
+        throw new Error("reload failed");
+      }
+    },
+    presetSelectEl: new FakeElement("select"),
+    groupSelectEl: new FakeElement("select"),
+    statusEl: new FakeElement("p"),
+    summaryEl: new FakeElement("p"),
+    detailEl: new FakeElement("pre"),
+    groupSummaryEl: new FakeElement("p"),
+    groupPersistenceEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }, { id: "ops" }],
+    getSessions: () => [{ id: "s1", deckId: "ops" }],
+    getActiveDeckId: () => "ops",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice(),
+    setError: (message) => errors.push(message),
+    getErrorMessage: (_, fallback) => fallback
+  });
+
+  controller.replacePresets([
+    {
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: {
+        activeDeckId: "ops",
+        layoutProfileId: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 185,
+        deckGroups: {},
+        deckSplitLayouts: {}
+      }
+    }
+  ]);
+
+  const loaded = await controller.loadPresets();
+  assert.deepEqual(loaded, []);
+  assert.equal(controller.listPresets().length, 0);
+  assert.equal(controller.getSelectedPreset(), null);
+  assert.equal(errors[0], "Failed to load workspace presets.");
+});

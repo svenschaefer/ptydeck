@@ -900,6 +900,78 @@ test("connection profile runtime controller supports guided SSH drafts, save-and
   assert.ok(calls.some((entry) => entry[0] === "delete-trust"));
 });
 
+test("connection profile runtime controller rejects malformed SSH trust create payloads deterministically", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    windowRef: {},
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-guided",
+            name: "Guided SSH",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: ["ssh"],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "ops-new.example", port: 22, username: "ops" },
+              remoteAuth: { method: "password" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [];
+      },
+      async probeSshHostKeys(payload) {
+        return [
+          {
+            host: payload.host,
+            port: payload.port,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAcreated",
+            fingerprintSha256: "SHA256:created"
+          }
+        ];
+      },
+      async createSshTrustEntry() {
+        return {
+          id: "",
+          host: "",
+          port: 0,
+          keyType: "",
+          publicKey: "",
+          fingerprintSha256: ""
+        };
+      }
+    },
+    getDecks: () => [{ id: "default", name: "Default" }, { id: "ops", name: "Ops" }],
+    getSessions: () => [],
+    getActiveSessionId: () => "",
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await controller.loadProfiles();
+  ui.selectEl.value = "ops-guided";
+  ui.selectEl.dispatch("change");
+  await assert.rejects(
+    () => controller.applyProfileById("ops-guided"),
+    /No trusted host key is stored/
+  );
+  await assert.rejects(
+    () => controller.saveTrustEntryFlow(),
+    /SSH trust entry API returned an invalid trust entry/
+  );
+});
+
 test("connection profile runtime controller rejects malformed create and update payloads deterministically", async () => {
   const ui = createConnectionProfileUiRefs();
   const session = {
