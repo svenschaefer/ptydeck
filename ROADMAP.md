@@ -19,6 +19,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - none currently
 - Queued next waves:
   - `v0.4.0-H83`
+  - `v0.4.0-H84`
 
 ## Active Wave Order
 
@@ -27,6 +28,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
   2. `MSG-021`
   3. `MSG-022`
   4. `MSG-023` after `MSG-020`, `MSG-021`, and `MSG-022`
+- `v0.4.0-H84`
+  1. `QLT-223` after `MSG-023`
+  2. `QLT-224` after `MSG-023`
+  3. `QLT-225` after `MSG-023`
+  4. `QLT-226` after `MSG-023`
+  5. `QLT-227` after `QLT-223`, `QLT-224`, `QLT-225`, and `QLT-226`
 
 ## Sequencing Rules
 
