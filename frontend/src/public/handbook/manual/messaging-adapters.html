@@ -91,6 +91,8 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 <pre><code class="language-env">BACKEND_DEBUG_LOGS=1
 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
+<p>With <code>BACKEND_DEBUG_LOG_FILE</code> configured, those backend debug traces are written to the file instead of flooding the interactive backend console.</p>
+
 <p>The Telegram adapter now also logs inbound discovery events before command filtering through <code>messaging.inbound.update</code>, so unsupported group/topic messages such as <code>@ptydeck_bot ping</code> still leave a diagnosable trail with:</p>
 
 <ul>

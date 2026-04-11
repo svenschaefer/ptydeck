@@ -2746,12 +2746,13 @@ export function createRuntime(config) {
       ...(normalizedTrace?.deckId ? { deckId: normalizedTrace.deckId } : {}),
       ...(normalizedTrace?.source ? { traceSource: normalizedTrace.source } : {})
     })}`;
-    console.log(line);
     if (config.debugLogFile) {
       appendFile(config.debugLogFile, `${line}\n`).catch(() => {
         // Ignore debug log write failures.
       });
+      return;
     }
+    console.log(line);
   }
 
   const messagingRuntime = createMessagingRuntime({

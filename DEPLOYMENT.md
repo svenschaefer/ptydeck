@@ -64,6 +64,7 @@ Optional for troubleshooting:
 
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
+- When `BACKEND_DEBUG_LOG_FILE` is set, backend debug traces are written to that file instead of flooding the interactive backend stdout/stderr stream
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 - Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions
 - Messaging-specific note: Telegram inbound discovery now also emits structured `messaging.inbound.update` debug lines before ptydeck command filtering, so raw group/topic messages such as bot mentions can be inspected with `chatId`, `messageThreadId`, chat type/title, and parse outcome even when they are not supported commands

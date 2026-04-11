@@ -57,6 +57,8 @@ BACKEND_DEBUG_LOGS=1
 BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log
 ```
 
+With `BACKEND_DEBUG_LOG_FILE` configured, those backend debug traces are written to the file instead of flooding the interactive backend console.
+
 The Telegram adapter now also logs inbound discovery events before command filtering through `messaging.inbound.update`, so unsupported group/topic messages such as `@ptydeck_bot ping` still leave a diagnosable trail with:
 
 - `chatId`

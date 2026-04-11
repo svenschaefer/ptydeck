@@ -314,6 +314,85 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
   }
 });
 
+test("runtime writes debug messaging traces to file without flooding stdout when a debug log file is configured", async () => {
+  const sends = [];
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-debug-file-"));
+  const debugLogFile = join(dir, "backend-debug.log");
+  const originalConsoleLog = console.log;
+  const consoleLines = [];
+  console.log = (...args) => {
+    consoleLines.push(args.map((entry) => String(entry)).join(" "));
+  };
+
+  const { runtime, baseUrl } = await createStartedRuntime({
+    debugLogs: true,
+    debugLogFile,
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 200 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 201 };
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", startCommand: "npm test" })
+    });
+    assert.equal(createRes.status, 201);
+
+    await waitFor(() => sends.length >= 1, 2000);
+    await waitFor(async () => {
+      try {
+        const contents = await readFile(debugLogFile, "utf8");
+        return contents.includes("messaging.event.trace") || contents.includes("messaging.target.update");
+      } catch {
+        return false;
+      }
+    }, 2000);
+
+    const debugContents = await readFile(debugLogFile, "utf8");
+    assert.match(debugContents, /messaging\.(event\.trace|target\.update)/);
+    assert.equal(consoleLines.some((line) => /messaging\.(event\.trace|target\.update|inbound\.)/.test(line)), false);
+  } finally {
+    console.log = originalConsoleLog;
+    await runtime.stop();
+  }
+});
+
 test("runtime executes bounded inbound telegram actions end-to-end for mapped sessions", async () => {
   const sends = [];
   const edits = [];
