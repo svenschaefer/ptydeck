@@ -187,6 +187,88 @@ test("deriveTerminalAppIdentityFromForegroundProcess falls back deterministicall
   assert.equal(tmuxIdentity.source, "foreground-process");
 });
 
+test("deriveTerminalAppIdentityFromForegroundProcess recognizes coding-agent processes from the full foreground group", () => {
+  const identity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 410,
+        ppid: 400,
+        executableName: "bash",
+        comm: "bash",
+        name: "bash",
+        executablePath: "/usr/bin/bash",
+        commandLine: ["bash"],
+        ttyPath: "/dev/pts/8"
+      },
+      foregroundProcesses: [
+        {
+          pid: 410,
+          ppid: 400,
+          executableName: "bash",
+          comm: "bash",
+          name: "bash",
+          executablePath: "/usr/bin/bash",
+          commandLine: ["bash"],
+          ttyPath: "/dev/pts/8"
+        },
+        {
+          pid: 411,
+          ppid: 410,
+          executableName: "codex",
+          comm: "codex",
+          name: "codex",
+          executablePath: "/usr/local/bin/codex",
+          commandLine: ["codex", "--json"],
+          ttyPath: "/dev/pts/8"
+        }
+      ],
+      ancestry: []
+    },
+    { updatedAt: 1710000000007 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.source, "foreground-process");
+  assert.equal(identity.details.foregroundHints.some((entry) => entry.relation === "foregroundProcess"), true);
+});
+
+test("deriveTerminalAppIdentityFromForegroundProcess recognizes wrapper command lines without losing shell fallback behavior", () => {
+  const identity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 420,
+        ppid: 1,
+        executableName: "node",
+        comm: "node",
+        name: "node",
+        executablePath: "/usr/bin/node",
+        commandLine: ["node", "/usr/local/lib/codex/dist/index.js", "--json"],
+        ttyPath: "/dev/pts/9"
+      },
+      foregroundProcesses: [],
+      ancestry: [
+        {
+          pid: 400,
+          ppid: 1,
+          executableName: "bash",
+          comm: "bash",
+          name: "bash",
+          executablePath: "/usr/bin/bash",
+          commandLine: ["bash"],
+          ttyPath: "/dev/pts/9"
+        }
+      ]
+    },
+    { updatedAt: 1710000000008 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.source, "foreground-process");
+  assert.equal(identity.details.foregroundHints.some((entry) => entry.type === "commandLine"), true);
+});
+
 test("deriveTerminalAppIdentityFromTerminalSignals promotes shell markers into shell identity", () => {
   const identity = deriveTerminalAppIdentityFromTerminalSignals(
     {

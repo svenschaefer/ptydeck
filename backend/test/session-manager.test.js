@@ -256,6 +256,71 @@ test("SessionManager schedules and applies foreground-process identity refresh f
   assert.equal(scheduled.length >= 1, true);
 });
 
+test("SessionManager detects codex from foreground group members and wrapper command lines", () => {
+  const fakePty = createFakePty({ pid: 5321, ptyPath: "/dev/pts/11" });
+  const scheduled = [];
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    inspectTerminalForegroundProcess(pid, details) {
+      assert.equal(pid, 5321);
+      assert.equal(details.ptyPath, "/dev/pts/11");
+      return {
+        terminalPid: 5321,
+        foregroundProcessGroupId: 6100,
+        representativeProcess: {
+          pid: 6100,
+          ppid: 5321,
+          executableName: "sh",
+          comm: "sh",
+          name: "sh",
+          executablePath: "/usr/bin/sh",
+          commandLine: ["sh", "-lc", "codex --json"],
+          ttyPath: "/dev/pts/11"
+        },
+        foregroundProcesses: [
+          {
+            pid: 6100,
+            ppid: 5321,
+            executableName: "sh",
+            comm: "sh",
+            name: "sh",
+            executablePath: "/usr/bin/sh",
+            commandLine: ["sh", "-lc", "codex --json"],
+            ttyPath: "/dev/pts/11"
+          },
+          {
+            pid: 6101,
+            ppid: 6100,
+            executableName: "codex",
+            comm: "codex",
+            name: "codex",
+            executablePath: "/usr/local/bin/codex",
+            commandLine: ["codex", "--json"],
+            ttyPath: "/dev/pts/11"
+          }
+        ],
+        ancestry: []
+      };
+    },
+    setTimeoutFn(fn) {
+      scheduled.push(fn);
+      return fn;
+    }
+  });
+
+  const created = manager.create({ cwd: "/tmp", shell: "bash", name: "shell-session" });
+  assert.equal(created.appIdentity.family, "shell");
+  assert.equal(scheduled.length, 1);
+
+  scheduled.shift()();
+
+  const refreshed = manager.get(created.id).meta.appIdentity;
+  assert.equal(refreshed.family, "coding-agent");
+  assert.equal(refreshed.label, "codex");
+  assert.equal(refreshed.source, "foreground-process");
+  assert.equal(refreshed.details.foregroundProcess.foregroundProcesses.length, 2);
+});
+
 test("SessionManager applies shell-marker and alternate-screen identity hints from PTY output", () => {
   const fakePty = createFakePty({ pid: 4322, ptyPath: "/dev/pts/10" });
   const scheduled = [];

@@ -31,6 +31,8 @@ const TERMINAL_APP_IDENTITY_FAMILY_SET = new Set(TERMINAL_APP_IDENTITY_FAMILY_VA
 const TERMINAL_APP_IDENTITY_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_SOURCE_VALUES);
 const TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_RUNTIME_SOURCE_VALUES);
 const SHELL_LABELS = new Set(["bash", "zsh", "fish", "sh"]);
+const FOREGROUND_PROCESS_WRAPPER_LABELS = new Set(["bash", "zsh", "fish", "sh", "node", "nodejs", "env", "timeout"]);
+const FOREGROUND_PROCESS_MULTIPLEXER_LABELS = new Set(["tmux", "screen"]);
 const BUILD_SUBCOMMAND_PATTERN = "(?:test|build|check|clippy|lint)";
 const OUTPUT_HEURISTIC_MAX_AGE_MS = 10_000;
 const RECENT_CANDIDATE_HISTORY_LIMIT = 12;
@@ -359,7 +361,7 @@ function mergeHintCandidates(candidates) {
 
 function scoreMergedCandidate(candidate) {
   const extraHints = Math.max(0, candidate.hints.length - 1);
-  return Math.min(0.95, roundConfidence(candidate.baseConfidence + extraHints * 0.08));
+  return roundConfidence(Math.min(0.95, candidate.baseConfidence + extraHints * 0.08));
 }
 
 function buildExplicitHintIdentity(session, updatedAt) {
@@ -432,6 +434,137 @@ function createForegroundProcessHint(type, value, extras = {}) {
   });
 }
 
+function collectForegroundInspectionProcesses(inspection) {
+  const entries = [];
+  const seen = new Set();
+  const append = (processSnapshot, relation) => {
+    if (!processSnapshot || typeof processSnapshot !== "object") {
+      return;
+    }
+    const pid = Number.isInteger(processSnapshot.pid) ? processSnapshot.pid : null;
+    const key =
+      pid !== null
+        ? `pid:${pid}`
+        : `${relation}:${normalizeLabel(processSnapshot.executableName || processSnapshot.comm || processSnapshot.name)}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    entries.push({
+      relation,
+      process: processSnapshot
+    });
+  };
+  append(inspection?.representativeProcess, "representativeProcess");
+  for (const processSnapshot of Array.isArray(inspection?.foregroundProcesses) ? inspection.foregroundProcesses : []) {
+    append(processSnapshot, "foregroundProcess");
+  }
+  for (const processSnapshot of Array.isArray(inspection?.ancestry) ? inspection.ancestry : []) {
+    append(processSnapshot, "ancestry");
+  }
+  return entries;
+}
+
+function getForegroundProcessCandidateBaseConfidence(relation, { viaCommandLine = false, wrapperMatch = false } = {}) {
+  if (relation === "representativeProcess") {
+    if (viaCommandLine) {
+      return wrapperMatch ? 0.92 : 0.89;
+    }
+    return 0.94;
+  }
+  if (relation === "foregroundProcess") {
+    if (viaCommandLine) {
+      return wrapperMatch ? 0.94 : 0.87;
+    }
+    return 0.92;
+  }
+  if (viaCommandLine) {
+    return wrapperMatch ? 0.86 : 0.81;
+  }
+  return 0.84;
+}
+
+function buildForegroundProcessCandidateEntries(inspection) {
+  const candidates = [];
+  for (const entry of collectForegroundInspectionProcesses(inspection)) {
+    const processSnapshot = entry.process;
+    const relation = entry.relation;
+    const processName =
+      normalizeLabel(processSnapshot?.executableName) ||
+      normalizeLabel(processSnapshot?.comm) ||
+      normalizeLabel(processSnapshot?.name);
+    const processCommandLine = Array.isArray(processSnapshot?.commandLine)
+      ? processSnapshot.commandLine.join(" ").trim()
+      : "";
+    const processNameHint = detectNamedHint(processName);
+    const processCommandLineHint = detectNamedHint(processCommandLine);
+    const shellLabel = normalizeShellLabel(processName);
+    const wrapperMatch = FOREGROUND_PROCESS_WRAPPER_LABELS.has(processName);
+    const multiplexerMatch = FOREGROUND_PROCESS_MULTIPLEXER_LABELS.has(processName);
+    const baseHintDetails = {
+      relation,
+      pid: Number.isInteger(processSnapshot?.pid) ? processSnapshot.pid : null
+    };
+
+    if (processNameHint) {
+      candidates.push({
+        family: processNameHint.family,
+        label: processNameHint.label,
+        baseConfidence: getForegroundProcessCandidateBaseConfidence(relation, {
+          viaCommandLine: false,
+          wrapperMatch
+        }),
+        hint: createForegroundProcessHint("processName", processName, {
+          ...baseHintDetails,
+          matchedLabel: processNameHint.label,
+          ...(processNameHint.subcommand ? { subcommand: processNameHint.subcommand } : {})
+        })
+      });
+    }
+
+    if (processCommandLineHint) {
+      candidates.push({
+        family: processCommandLineHint.family,
+        label: processCommandLineHint.label,
+        baseConfidence: getForegroundProcessCandidateBaseConfidence(relation, {
+          viaCommandLine: true,
+          wrapperMatch
+        }),
+        hint: createForegroundProcessHint("commandLine", processCommandLine, {
+          ...baseHintDetails,
+          matchedLabel: processCommandLineHint.label,
+          ...(processCommandLineHint.subcommand ? { subcommand: processCommandLineHint.subcommand } : {})
+        })
+      });
+    }
+
+    if (shellLabel) {
+      candidates.push({
+        family: "shell",
+        label: shellLabel,
+        baseConfidence: relation === "representativeProcess" ? 0.78 : relation === "foregroundProcess" ? 0.75 : 0.7,
+        hint: createForegroundProcessHint("processName", processName || shellLabel, {
+          ...baseHintDetails,
+          matchedLabel: shellLabel
+        })
+      });
+    }
+
+    if (multiplexerMatch) {
+      candidates.push({
+        family: "tui",
+        label: processName,
+        baseConfidence: relation === "representativeProcess" ? 0.76 : relation === "foregroundProcess" ? 0.72 : 0.66,
+        hint: createForegroundProcessHint("processName", processName, {
+          ...baseHintDetails,
+          matchedLabel: processName
+        })
+      });
+    }
+  }
+  return candidates;
+}
+
 function buildForegroundProcessIdentity(inspection, updatedAt) {
   if (!inspection || typeof inspection !== "object") {
     return buildUnknownTerminalAppIdentity(updatedAt);
@@ -446,60 +579,22 @@ function buildForegroundProcessIdentity(inspection, updatedAt) {
   const representativeCommandLine = Array.isArray(representative.commandLine)
     ? representative.commandLine.join(" ").trim()
     : "";
-  const representativeCommandLineHint = detectNamedHint(representativeCommandLine);
-  const representativeNameHint = detectNamedHint(representativeName);
-  const shellLabel = normalizeShellLabel(representativeName);
-
-  if (representativeNameHint) {
-    const subcommand = representativeNameHint.subcommand || representativeCommandLineHint?.subcommand || "";
+  const mergedCandidates = mergeHintCandidates(buildForegroundProcessCandidateEntries(inspection));
+  if (mergedCandidates.length) {
+    mergedCandidates.sort((left, right) => {
+      const confidenceDelta = scoreMergedCandidate(right) - scoreMergedCandidate(left);
+      if (confidenceDelta !== 0) {
+        return confidenceDelta;
+      }
+      return left.label.localeCompare(right.label, "en-US", { sensitivity: "base" });
+    });
+    const winner = mergedCandidates[0];
     return {
-      family: representativeNameHint.family,
-      label: representativeNameHint.label,
+      family: winner.family,
+      label: winner.label,
       source: "foreground-process",
-      confidence: representativeCommandLineHint ? 0.97 : 0.94,
-      details: buildForegroundProcessDetails(inspection, [
-        createForegroundProcessHint("representativeProcess", representativeName, {
-          matchedLabel: representativeNameHint.label,
-          ...(subcommand ? { subcommand } : {})
-        }),
-        representativeCommandLine
-          ? createForegroundProcessHint("commandLine", representativeCommandLine, {
-              ...(representativeCommandLineHint?.label ? { matchedLabel: representativeCommandLineHint.label } : {}),
-              ...(subcommand ? { subcommand } : {})
-            })
-          : null
-      ]),
-      updatedAt
-    };
-  }
-
-  if (representativeCommandLineHint) {
-    return {
-      family: representativeCommandLineHint.family,
-      label: representativeCommandLineHint.label,
-      source: "foreground-process",
-      confidence: 0.89,
-      details: buildForegroundProcessDetails(inspection, [
-        createForegroundProcessHint("commandLine", representativeCommandLine, {
-          matchedLabel: representativeCommandLineHint.label,
-          ...(representativeCommandLineHint.subcommand ? { subcommand: representativeCommandLineHint.subcommand } : {})
-        })
-      ]),
-      updatedAt
-    };
-  }
-
-  if (shellLabel) {
-    return {
-      family: "shell",
-      label: shellLabel,
-      source: "foreground-process",
-      confidence: 0.78,
-      details: buildForegroundProcessDetails(inspection, [
-        createForegroundProcessHint("representativeProcess", representativeName || shellLabel, {
-          matchedLabel: shellLabel
-        })
-      ]),
+      confidence: scoreMergedCandidate(winner),
+      details: buildForegroundProcessDetails(inspection, winner.hints),
       updatedAt
     };
   }
