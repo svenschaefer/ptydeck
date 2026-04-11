@@ -104,6 +104,19 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <p>This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API <code>getUpdates</code> inspection may then look empty while <code>inboundTrace</code> still shows what the live runtime actually observed.</p>
 
+<p>Forum-target validation and topic provisioning now also leave a diagnosable trail through <code>messaging.target.update</code> and <code>targetTrace</code>, including:</p>
+
+<ul>
+<li><code>chatId</code></li>
+<li><code>messageThreadId</code></li>
+<li><code>topicMode</code></li>
+<li><code>sessionId</code></li>
+<li><code>topicName</code></li>
+<li>forum validation outcome</li>
+<li>create/reuse/rename phase</li>
+<li>provisioning or validation errors</li>
+</ul>
+
 <p>Then inspect structured <code>messaging.event.trace</code> lines in that log file.</p>
 
 <h2 id="what-it-can-do">What It Can Do</h2>
@@ -411,6 +424,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
 <li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
 <li><code>/health.messaging.adapters[0].inboundTrace</code> and <code>/ready.messaging.adapters[0].inboundTrace</code> expose a bounded recent Telegram inbound observation ring, including unsupported messages that were seen but did not map to a ptydeck command.</li>
+<li><code>/health.messaging.adapters[0].targetTrace</code> and <code>/ready.messaging.adapters[0].targetTrace</code> expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.</li>
 <li><code>/health.messaging.deliveryEnabled</code> shows whether outbound Telegram delivery is currently allowed.</li>
 <li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>

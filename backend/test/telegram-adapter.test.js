@@ -417,6 +417,12 @@ test("telegram adapter provisions and reuses forum topics per terminal thread", 
   assert.equal(adapter.getStatus().renamedTopicTotal, 1);
   assert.equal(adapter.getStatus().activeTopicCount, 1);
   assert.equal(adapter.getStatus().validatedForumTargetTotal, 1);
+  assert.deepEqual(
+    adapter.getStatus().targetTrace.recent.map((entry) => entry.phase),
+    ["target_validated", "topic_provisioned", "target_validated_cached", "topic_renamed"]
+  );
+  assert.equal(adapter.getStatus().targetTrace.recent[1].messageThreadId, 44);
+  assert.equal(adapter.getStatus().targetTrace.recent[1].topicName, "Operations + codex");
 });
 
 test("telegram adapter can provision deck-session topics while delivery is disabled", async () => {
@@ -480,6 +486,11 @@ test("telegram adapter can provision deck-session topics while delivery is disab
   assert.deepEqual(calls.map((entry) => entry.method), ["getChat", "createTopic"]);
   assert.equal(adapter.getStatus().deliveryEnabled, false);
   assert.equal(adapter.getStatus().provisionedTopicTotal, 1);
+  assert.deepEqual(
+    adapter.getStatus().targetTrace.recent.map((entry) => entry.phase),
+    ["target_validated", "topic_provisioned", "target_validated_cached", "topic_reused"]
+  );
+  assert.equal(adapter.getStatus().targetTrace.recent[3].messageThreadId, 66);
 });
 
 test("telegram adapter rejects channel targets for deck-session provisioning with a clear error", async () => {
@@ -520,6 +531,11 @@ test("telegram adapter rejects channel targets for deck-session provisioning wit
   assert.equal(result.reason, "topic_provision_failed");
   assert.match(result.error, /forum-enabled supergroup/);
   assert.match(adapter.getStatus().lastTargetValidationError, /forum-enabled supergroup/);
+  assert.deepEqual(
+    adapter.getStatus().targetTrace.recent.map((entry) => entry.phase),
+    ["target_validation_failed", "topic_provision_failed"]
+  );
+  assert.equal(adapter.getStatus().targetTrace.recent[0].chatType, "channel");
 });
 
 test("telegram adapter records delivery failures without throwing them through the runtime", async () => {

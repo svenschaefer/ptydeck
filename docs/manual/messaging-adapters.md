@@ -68,6 +68,17 @@ The Telegram adapter now also logs inbound discovery events before command filte
 
 This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API `getUpdates` inspection may then look empty while `inboundTrace` still shows what the live runtime actually observed.
 
+Forum-target validation and topic provisioning now also leave a diagnosable trail through `messaging.target.update` and `targetTrace`, including:
+
+- `chatId`
+- `messageThreadId`
+- `topicMode`
+- `sessionId`
+- `topicName`
+- forum validation outcome
+- create/reuse/rename phase
+- provisioning or validation errors
+
 Then inspect structured `messaging.event.trace` lines in that log file.
 
 ## What It Can Do
@@ -353,6 +364,7 @@ Defaults and bounds:
 - Telegram outages must not make the ptydeck runtime unhealthy.
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
 - `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including unsupported messages that were seen but did not map to a ptydeck command.
+- `/health.messaging.adapters[0].targetTrace` and `/ready.messaging.adapters[0].targetTrace` expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.
 - `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.

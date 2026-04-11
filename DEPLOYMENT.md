@@ -67,6 +67,7 @@ Optional for troubleshooting:
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
 - Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions
 - Messaging-specific note: Telegram inbound discovery now also emits structured `messaging.inbound.update` debug lines before ptydeck command filtering, so raw group/topic messages such as bot mentions can be inspected with `chatId`, `messageThreadId`, chat type/title, and parse outcome even when they are not supported commands
+- Messaging-specific note: forum-target validation and topic provisioning now also emit structured `messaging.target.update` debug lines, so forum mismatch errors, validated supergroup metadata, and topic create/reuse/rename outcomes are inspectable during the same restart cycle
 
 Optional local auth baseline (development only):
 
@@ -207,6 +208,7 @@ When Telegram messaging is configured, verify additionally:
 - `/ready` returns the same `messaging` summary
 - `/health.messaging.trace` and `/ready.messaging.trace` expose a bounded recent trace ring for candidate, suppression, and delivery analysis
 - `/health.messaging.adapters[0].inboundTrace` exposes a bounded recent Telegram inbound observation ring with raw `chatId`, `messageThreadId`, chat metadata, preview text, and parse outcome, including unsupported group messages that never become ptydeck actions
+- `/health.messaging.adapters[0].targetTrace` exposes a bounded recent Telegram target-validation and topic-provisioning ring with `chatId`, topic mode, session/topic identity, forum-validation outcome, and provisioning errors or reuse/create/rename results
 - `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
 - When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics

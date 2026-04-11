@@ -6,6 +6,7 @@ const TELEGRAM_ALLOWED_UPDATES = Object.freeze(["message", "callback_query"]);
 const TELEGRAM_RATE_LIMIT_PATTERN = /\bretry after\s+(\d+)\b/i;
 const MAX_TELEGRAM_INBOUND_TRACE_ENTRIES = 25;
 const MAX_TELEGRAM_INBOUND_PREVIEW_LENGTH = 200;
+const MAX_TELEGRAM_TARGET_TRACE_ENTRIES = 25;
 
 function normalizeNonEmptyString(value) {
   if (typeof value !== "string") {
@@ -512,6 +513,8 @@ export function createTelegramAdapter(options = {}) {
   };
   const forumTopicState = new Map();
   const forumTargetValidationState = new Map();
+  const targetTraceEntries = [];
+  let targetTraceCapturedTotal = 0;
   for (const binding of Array.isArray(options.topicBindings) ? options.topicBindings : []) {
     const stateKey = buildForumTopicStateKey({
       chatId: binding?.chatId,
@@ -536,6 +539,17 @@ export function createTelegramAdapter(options = {}) {
     });
     if (inboundTraceEntries.length > MAX_TELEGRAM_INBOUND_TRACE_ENTRIES) {
       inboundTraceEntries.splice(0, inboundTraceEntries.length - MAX_TELEGRAM_INBOUND_TRACE_ENTRIES);
+    }
+  }
+
+  function appendTargetTraceEntry(entry) {
+    targetTraceCapturedTotal += 1;
+    targetTraceEntries.push({
+      recordedAt: nowFn(),
+      ...entry
+    });
+    if (targetTraceEntries.length > MAX_TELEGRAM_TARGET_TRACE_ENTRIES) {
+      targetTraceEntries.splice(0, targetTraceEntries.length - MAX_TELEGRAM_TARGET_TRACE_ENTRIES);
     }
   }
 
@@ -564,6 +578,32 @@ export function createTelegramAdapter(options = {}) {
     appendInboundTraceEntry(entry);
     if (logDebug) {
       logDebug("messaging.inbound.update", {
+        adapter: "telegram",
+        ...entry
+      });
+    }
+  }
+
+  function recordTargetObservation(target, phase, extra = {}) {
+    const entry = {
+      phase: normalizeNonEmptyString(phase),
+      chatId: normalizeChatId(target?.chatId) || null,
+      messageThreadId: Number.isInteger(target?.messageThreadId) ? target.messageThreadId : null,
+      topicMode: normalizeNonEmptyString(target?.topicMode),
+      sessionId: normalizeNonEmptyString(target?.sessionId),
+      topicName: normalizeNonEmptyString(target?.topicName),
+      stateKey: normalizeNonEmptyString(target?.stateKey),
+      error: normalizeNonEmptyString(extra?.error),
+      reason: normalizeNonEmptyString(extra?.reason),
+      chatType: normalizeNonEmptyString(extra?.chatType).toLowerCase(),
+      chatTitle: normalizeNonEmptyString(extra?.chatTitle),
+      chatIsForum: typeof extra?.chatIsForum === "boolean" ? extra.chatIsForum : null,
+      topicAction: normalizeNonEmptyString(extra?.topicAction),
+      validated: typeof extra?.validated === "boolean" ? extra.validated : null
+    };
+    appendTargetTraceEntry(entry);
+    if (logDebug) {
+      logDebug("messaging.target.update", {
         adapter: "telegram",
         ...entry
       });
@@ -605,6 +645,12 @@ export function createTelegramAdapter(options = {}) {
     const chatId = normalizeChatId(target?.chatId);
     const cached = forumTargetValidationState.get(chatId);
     if (cached?.valid === true) {
+      recordTargetObservation(target, "target_validated_cached", {
+        validated: true,
+        chatType: cached.type,
+        chatTitle: cached.title,
+        chatIsForum: cached.isForum
+      });
       return cached;
     }
     if (!transport || typeof transport.getChat !== "function") {
@@ -630,16 +676,29 @@ export function createTelegramAdapter(options = {}) {
       const error = `Telegram target ${chatId} must be a forum-enabled supergroup for topicMode deck-session; got ${kind}.`;
       metrics.lastTargetValidationErrorAt = metrics.lastTargetValidationAt;
       metrics.lastTargetValidationError = error;
+      recordTargetObservation(target, "target_validation_failed", {
+        validated: false,
+        error,
+        chatType: descriptor.type,
+        chatTitle: descriptor.title,
+        chatIsForum: descriptor.isForum
+      });
       throw new Error(error);
     }
     metrics.validatedForumTargetTotal += 1;
     metrics.lastTargetValidationErrorAt = null;
     metrics.lastTargetValidationError = "";
     forumTargetValidationState.set(chatId, descriptor);
+    recordTargetObservation(target, "target_validated", {
+      validated: true,
+      chatType: descriptor.type,
+      chatTitle: descriptor.title,
+      chatIsForum: descriptor.isForum
+    });
     return descriptor;
   }
 
-  function noteTargetFailure(error) {
+  function noteTargetFailure(target, error, extra = {}) {
     const message = error instanceof Error ? error.message : String(error || "Telegram topic provisioning failed.");
     metrics.topicProvisionFailedTotal += 1;
     metrics.lastTopicErrorAt = nowFn();
@@ -648,6 +707,10 @@ export function createTelegramAdapter(options = {}) {
       metrics.lastTargetValidationErrorAt = metrics.lastTopicErrorAt;
       metrics.lastTargetValidationError = message;
     }
+    recordTargetObservation(target, "topic_provision_failed", {
+      error: message,
+      ...extra
+    });
     return message;
   }
 
@@ -680,6 +743,22 @@ export function createTelegramAdapter(options = {}) {
       metrics.lastTopicProvisionAt = topicState.updatedAt;
       metrics.lastTopicErrorAt = null;
       metrics.lastTopicError = "";
+      recordTargetObservation(
+        {
+          ...target,
+          messageThreadId: topicState.messageThreadId,
+          topicName: topicState.topicName || desiredTopicName
+        },
+        "topic_provisioned",
+        {
+          validated: true,
+          topicAction: "create",
+          chatType: "supergroup",
+          chatIsForum: true,
+          chatTitle: "",
+          reason: "topic_created"
+        }
+      );
     } else if (desiredTopicName && desiredTopicName !== topicState.topicName) {
       await transport.editForumTopic({
         chatId: target.chatId,
@@ -692,6 +771,37 @@ export function createTelegramAdapter(options = {}) {
       metrics.lastTopicRenameAt = topicState.updatedAt;
       metrics.lastTopicErrorAt = null;
       metrics.lastTopicError = "";
+      recordTargetObservation(
+        {
+          ...target,
+          messageThreadId: topicState.messageThreadId,
+          topicName: desiredTopicName
+        },
+        "topic_renamed",
+        {
+          validated: true,
+          topicAction: "rename",
+          chatType: "supergroup",
+          chatIsForum: true,
+          reason: "topic_renamed"
+        }
+      );
+    } else {
+      recordTargetObservation(
+        {
+          ...target,
+          messageThreadId: topicState.messageThreadId,
+          topicName: topicState.topicName || desiredTopicName
+        },
+        "topic_reused",
+        {
+          validated: true,
+          topicAction: "reuse",
+          chatType: "supergroup",
+          chatIsForum: true,
+          reason: "topic_reused"
+        }
+      );
     }
     return {
       target: {
@@ -728,7 +838,7 @@ export function createTelegramAdapter(options = {}) {
         ok: false,
         skipped: true,
         reason: "topic_provision_failed",
-        error: noteTargetFailure(error)
+        error: noteTargetFailure(target, error)
       };
     }
   }
@@ -754,7 +864,7 @@ export function createTelegramAdapter(options = {}) {
         skipped: true,
         reason: "topic_provision_failed",
         action,
-        error: noteTargetFailure(error)
+        error: noteTargetFailure(target, error, { topicAction: action })
       };
     }
     if (!action || action === "suppress") {
@@ -1115,6 +1225,11 @@ export function createTelegramAdapter(options = {}) {
       lastTargetValidationAt: metrics.lastTargetValidationAt,
       lastTargetValidationErrorAt: metrics.lastTargetValidationErrorAt,
       lastTargetValidationError: metrics.lastTargetValidationError,
+      targetTrace: {
+        capacity: MAX_TELEGRAM_TARGET_TRACE_ENTRIES,
+        capturedTotal: targetTraceCapturedTotal,
+        recent: targetTraceEntries.slice(-MAX_TELEGRAM_TARGET_TRACE_ENTRIES)
+      },
       inboundTrace: {
         capacity: MAX_TELEGRAM_INBOUND_TRACE_ENTRIES,
         capturedTotal: inboundTraceCapturedTotal,
