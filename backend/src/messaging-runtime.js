@@ -70,6 +70,11 @@ const LOW_VALUE_FILTER_RULES = Object.freeze([
     pattern: /(?:\b[\w.-]+\.md\b(?:\s+|$)){2,}/i
   }),
   Object.freeze({
+    id: "git_commit_subject",
+    codingAgentOnly: true,
+    pattern: /^(?:[-└├│]\s*)?[0-9a-f]{7,12}\s+\S+/iu
+  }),
+  Object.freeze({
     id: "workflow_version_bullet",
     codingAgentOnly: true,
     pattern: /^(?:-\s+)?v\d+\.\d+\.\d+(?:-[\w-]+)?:\s+/i
@@ -127,9 +132,10 @@ const PROFILE_PATTERNS = Object.freeze({
       /\b(?:error|failed|failure|traceback|exception|panic|blocked|conflict|validation failed|lint failed|tests failed)\b/i
     ],
     summary: [
-      /\bplan updated\b/i,
-      /\b(?:applied?|generated|wrote|updated|restored|reclaimed|validated|pushed|committed)\b/i,
-      /\b(?:tests? passed|lint passed|coverage)\b/i
+      /^(?:[•*]\s*)?(?:updated plan|plan updated)\b/i,
+      /^(?:[•*]\s*)?(?:applied?|generated|wrote|updated|restored|reclaimed|validated|pushed|committed|completed)\b/i,
+      /^(?:[•*]\s*)?(?:tests? passed|lint passed)\b/i,
+      /^(?:[•*]\s*)?(?:coverage(?:\s*(?::|=)\s*\d|\s+(?:passed|report|summary|result(?:s)?|gate|verified|checked))|\d+(?:\.\d+)?%\s+coverage)\b/i
     ]
   }),
   "build-test": Object.freeze({
@@ -554,7 +560,8 @@ function createSessionStreamState() {
     pendingSummaryBlock: createPendingSummaryBlock(),
     lastControlSignature: CONTROL_EVENT_SIGNATURE_NONE,
     lastLifecycleType: "",
-    lastSuppressedStatusLikeAt: 0
+    lastSuppressedStatusLikeAt: 0,
+    lastNonMeaningfulActivityAt: 0
   };
 }
 
@@ -1425,6 +1432,9 @@ export function createMessagingRuntime(options = {}) {
         return;
       }
       if (isSeparatorHint(visibleLine, session, profile)) {
+        if (isCodingAgentContext(session, profile)) {
+          state.lastNonMeaningfulActivityAt = nowFn();
+        }
         await flushPendingSummaryBlock(session, profile, state, trace, "separator_hint");
         pushRecentLine(state, visibleLine);
         return;
@@ -1491,6 +1501,8 @@ export function createMessagingRuntime(options = {}) {
         );
       } else if (classified?.type === "session.output.summary") {
         queueSummaryFragment(session, profile, state, classified, trace);
+      } else if (visibleLine && isCodingAgentContext(session, profile)) {
+        state.lastNonMeaningfulActivityAt = nowFn();
       }
       pushRecentLine(state, visibleLine);
     }
@@ -1565,6 +1577,29 @@ export function createMessagingRuntime(options = {}) {
             trace,
             nowFn: () => idleOccurredAt,
             noiseClass: "idle_after_low_value_chatter"
+          })
+        );
+        return;
+      }
+    }
+    if (
+      isCodingAgentContext(session, profile) &&
+      state.pendingSummaryBlock.fragments.length === 0 &&
+      Number.isInteger(state.lastNonMeaningfulActivityAt) &&
+      state.lastNonMeaningfulActivityAt > 0
+    ) {
+      const idleOccurredAt = nowFn();
+      if (idleOccurredAt - state.lastNonMeaningfulActivityAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
+        await dispatchEvent(
+          createEvent({
+            session,
+            profile,
+            type: "session.activity.idle",
+            summary: "Session idle.",
+            threadKey: "status",
+            trace,
+            nowFn: () => idleOccurredAt,
+            noiseClass: "idle_after_unclassified_chatter"
           })
         );
         return;

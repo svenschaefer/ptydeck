@@ -962,6 +962,112 @@ test("messaging runtime suppresses low-value coding-agent plan updates and the f
   assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_idle_after_low_value_chatter"));
 });
 
+test("messaging runtime suppresses git-hash coding-agent commit subjects and their idle follow-on churn", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 1_730;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 88 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 89 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "git-subject-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "- 961f98a Plan remaining host window coverage hardening\n└ 961f98a Plan remaining host window coverage hardening\n",
+    promptBoundaries: [],
+    trace: { traceId: "git-subject-2" }
+  });
+  now += 10_000;
+  await runtime.observeSessionIdle({ session, trace: { traceId: "git-subject-3" } });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 0);
+  assert.match(sends[0].text, /Session created/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_low_value_git_commit_subject"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_idle_after_low_value_chatter"));
+});
+
+test("messaging runtime suppresses idle after unclassified coding-agent planning chatter", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 1_745;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "generic-shell" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 90 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 91 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.98
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "planning-fragment-1" });
+  await runtime.observeSessionData({
+    session,
+    data: "coverage hardening\nhost-window smoke coverage for OverlayWindow,\nhidden-host and startup-routing smoke coverage for\n",
+    promptBoundaries: [],
+    trace: { traceId: "planning-fragment-2" }
+  });
+  now += 10_000;
+  await runtime.observeSessionIdle({ session, trace: { traceId: "planning-fragment-3" } });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 0);
+  assert.match(sends[0].text, /Session created/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "noise_idle_after_unclassified_chatter"));
+  assert.ok(status.trace.recent.every((entry) => !/coverage hardening/i.test(entry.text || "")));
+});
+
 test("messaging runtime suppresses short low-value os error attention fragments", async () => {
   const sends = [];
   let now = 1_760;

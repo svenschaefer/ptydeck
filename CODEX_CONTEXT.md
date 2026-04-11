@@ -23,6 +23,7 @@ Documentation sync status: repository markdown files are aligned on 2026-04-11. 
 
 ## Current Delivery State
 
+- `H86` is now also fully delivered on `main` as the next live-trace Telegram tuning pass: hash-prefixed coding-agent commit or plan lines are now treated as low-value chatter, coding-agent summary detection now promotes only explicit result lines instead of any line that merely contains broad nouns such as `coverage`, and coding-agent `Session idle.` follow-ons are now also suppressed after recent unclassified chatter so wrapped roadmap or plan fragments do not simply reappear as status-thread bumps.
 - The multi-device feature branch is now accepted for merge and return to `main`, and `H74` is now also fully delivered on `main` as the post-merge single-user quality follow-up.
 - The H75 mainline handbook wave is now fully delivered: generated reference pages come from code-owned sources (`command-schema.js`, `openapi.yaml`, and delivered settings/runtime contracts), curated operator guides now live under `docs/manual/`, generated reference markdown lives under `docs/reference/`, and generated static in-app handbook pages are served from `frontend/src/public/handbook/`.
 - Handbook drift is now part of the normal quality contract instead of an honor system: `docs:generate` refreshes the generated artifacts, `docs:check` fails on drift, lint/build now run through that check, and `test/handbook-contract.test.js` verifies command-reference coverage, documented slash examples, and handbook entry/deep-link resolution.
