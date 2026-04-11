@@ -155,6 +155,8 @@ Documentation sync status: repository markdown files are aligned on 2026-04-11. 
   - the generated `theme-library.js` catalog now has dedicated integrity coverage for unique IDs, required color keys, and normalized hex payload shape;
   - `app-runtime-composition-controller.js` now uses an extracted DOM-ref collection seam (`app-runtime-dom-refs.js`) with direct contract coverage instead of keeping that selector contract buried only inside broad app tests.
 
+- Local Linux active-app detection is still intermittently weak for coding-agent CLIs launched through wrapper-heavy foreground groups because the delivered baseline derives the strongest runtime candidate from one chosen foreground representative plus weak fallback heuristics; the next follow-up must inspect the full foreground process group and preserve wrapper command-line evidence so sessions that are effectively running `codex` do not flap back to `shell`, `unknown`, or other weaker labels just because the visible representative is `bash`, `sh -lc`, `node`, or another launcher process.
+
 ## Quality and Operational Rules
 
 - Keep markdown content in US English.
