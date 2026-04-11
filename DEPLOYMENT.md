@@ -89,6 +89,11 @@ Target mapping payload format:
 ```json
 [
   {
+    "chatId": "-1001234567890",
+    "topicMode": "deck-session",
+    "profile": "coding-agent"
+  },
+  {
     "sessionName": "codex",
     "chatId": "123456789",
     "profile": "coding-agent"
@@ -98,19 +103,14 @@ Target mapping payload format:
     "chatId": "123456789",
     "messageThreadId": 12,
     "profile": "build-test"
-  },
-  {
-    "sessionName": "build-run",
-    "chatId": "-1001234567890",
-    "topicMode": "deck-session",
-    "profile": "coding-agent"
   }
 ]
 ```
 
 Notes:
 
-- At least one of `sessionId`, `quickIdToken`, or `sessionName` is required per mapping entry.
+- Static mappings require at least one of `sessionId`, `quickIdToken`, or `sessionName` per entry.
+- A selectorless target is now allowed only for `topicMode: "deck-session"` and means: route every live session dynamically into that forum-enabled supergroup, provisioning one topic per terminal/session in real time.
 - Messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
 - Hard-break default: Telegram outbound delivery is now off until `MESSAGING_TELEGRAM_OUTBOUND_ENABLED=1` is set explicitly.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
@@ -126,7 +126,7 @@ Notes:
 - Recommended live topology: use one forum-enabled Telegram supergroup for ptydeck and create one topic per mapped terminal/session. In that shape, all mappings share the same `chatId` and differ by `messageThreadId`. The direct 1:1 bot chat is useful only for bootstrap, smoke tests, and initial `chatId` discovery.
 - A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.
 - The currently referenced invite target `https://t.me/+J4MInwk9nSg1MWJi` presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics that `topicMode: "deck-session"` requires.
-- Automatic per-terminal topic provisioning is now available through `topicMode: "deck-session"`. When that mode is configured for a mapped session target, the adapter validates that the target chat is a forum-enabled supergroup, then creates or reuses one Telegram forum topic per terminal/session and persists the resulting `messageThreadId` binding. This provisioning path still runs while outbound delivery remains disabled.
+- Automatic per-terminal topic provisioning is now available through `topicMode: "deck-session"`. When that mode is configured for a forum target, the adapter validates that the target chat is a forum-enabled supergroup, then creates or reuses one Telegram forum topic per terminal/session and persists the resulting `messageThreadId` binding. This provisioning path still runs while outbound delivery remains disabled.
 - Delivered topic naming convention for that forum layout: `<deck name> + <terminal name>`.
 - To discover `chatId` and optional `messageThreadId`, send at least one message in the destination chat/topic and inspect:
 
@@ -139,7 +139,7 @@ Use:
 - `message.chat.id` -> `chatId`
 - `message.message_thread_id` -> `messageThreadId`
 
-- With `topicMode: "deck-session"`, `ptydeck` provisions the per-terminal `messageThreadId` automatically once the target `chatId` points at a forum-enabled supergroup. Manual `messageThreadId` discovery is still useful for validating an existing forum layout or for non-provisioned static mappings.
+- With `topicMode: "deck-session"`, `ptydeck` provisions the per-terminal `messageThreadId` automatically once the target `chatId` points at a forum-enabled supergroup. The recommended live config is now one selectorless `deck-session` target per Telegram forum supergroup, so session-to-topic mapping follows the live ptydeck session set dynamically instead of depending on a hard-coded `sessionName` list. Manual `messageThreadId` discovery is still useful for validating an existing forum layout or for non-provisioned static mappings.
 
 - The handbook guide [docs/manual/messaging-adapters.md](docs/manual/messaging-adapters.md) now includes the full operator setup and first-smoke sequence.
 

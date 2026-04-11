@@ -48,13 +48,15 @@ test("messaging runtime normalizes targets and resolves trigger profiles determi
     { chatId: "1001" },
     { chatId: "1002", sessionName: "build", profile: "build-test" },
     { chatId: 1003, quickId: "A1", profile: "coding-agent" },
-    { chatId: "1004", sessionName: "ops", topicMode: "deck-session", profile: "coding-agent" }
+    { chatId: "1004", sessionName: "ops", topicMode: "deck-session", profile: "coding-agent" },
+    { chatId: "1005", topicMode: "deck-session", profile: "coding-agent" }
   ]);
 
   assert.deepEqual(targets, [
     { chatId: "1002", sessionId: "", quickIdToken: "", sessionName: "build", profile: "build-test" },
     { chatId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" },
-    { chatId: "1004", sessionId: "", quickIdToken: "", sessionName: "ops", profile: "coding-agent", topicMode: "deck-session" }
+    { chatId: "1004", sessionId: "", quickIdToken: "", sessionName: "ops", profile: "coding-agent", topicMode: "deck-session" },
+    { chatId: "1005", sessionId: "", quickIdToken: "", sessionName: "", profile: "coding-agent", topicMode: "deck-session" }
   ]);
 
   const topicBindings = normalizeMessagingTopicBindings([
@@ -465,6 +467,105 @@ test("messaging runtime provisions forum topics per terminal using deck name plu
       updatedAt: topicBindings[0].updatedAt
     }
   ]);
+});
+
+test("messaging runtime dynamically maps selectorless deck-session forum targets to current sessions", async () => {
+  const sends = [];
+  const createdTopics = [];
+  let now = 460;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [{ chatId: "1001", topicMode: "deck-session", profile: "coding-agent" }],
+    resolveDeckNameForSession: () => "ptydeck",
+    createTelegramTransport() {
+      return {
+        async getChat() {
+          return { id: 1001, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
+        async createForumTopic({ chatId, name }) {
+          createdTopics.push({ chatId, name });
+          return { messageThreadId: 91, name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 90 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 91 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "ptydeck-session",
+    name: "ptydeck",
+    deckId: "ptydeck",
+    startCommand: "codex"
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "dynamic-topic-1" });
+
+  assert.deepEqual(createdTopics, [{ chatId: "1001", name: "ptydeck + ptydeck" }]);
+  assert.equal(sends.length, 1);
+  assert.equal(sends[0].messageThreadId, 91);
+  assert.match(sends[0].text, /Session created/);
+});
+
+test("messaging runtime prefers explicit session mappings over selectorless deck-session targets", async () => {
+  const sends = [];
+  const createdTopics = [];
+  let now = 480;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [
+      { chatId: "1001", topicMode: "deck-session", profile: "coding-agent" },
+      { chatId: "1002", sessionName: "codex", profile: "coding-agent" }
+    ],
+    resolveDeckNameForSession: () => "ops",
+    createTelegramTransport() {
+      return {
+        async getChat() {
+          return { id: 1001, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
+        async createForumTopic({ chatId, name }) {
+          createdTopics.push({ chatId, name });
+          return { messageThreadId: 93, name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 92 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 93 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "codex-session",
+    name: "codex",
+    deckId: "ops",
+    startCommand: "codex"
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "dynamic-topic-2" });
+
+  assert.equal(createdTopics.length, 0);
+  assert.equal(sends.length, 1);
+  assert.equal(sends[0].chatId, "1002");
+  assert.equal(sends[0].messageThreadId, undefined);
 });
 
 test("messaging runtime reuses persisted forum topic bindings instead of reprovisioning topics", async () => {

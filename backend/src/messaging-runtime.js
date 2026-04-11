@@ -513,7 +513,9 @@ function normalizeMessagingTargetEntry(entry) {
   const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
   const profile = normalizeMessagingProfile(entry.profile);
   const topicMode = normalizeNonEmptyString(entry.topicMode).toLowerCase() === "deck-session" ? "deck-session" : "";
-  if (!chatId || (!sessionId && !quickIdToken && !sessionName)) {
+  const hasSelector = Boolean(sessionId || quickIdToken || sessionName);
+  const allowDynamicDeckSessionTarget = topicMode === "deck-session" && !hasSelector;
+  if (!chatId || (!hasSelector && !allowDynamicDeckSessionTarget)) {
     return null;
   }
   return Object.freeze({

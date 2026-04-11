@@ -113,7 +113,10 @@ If you need the exact command or settings contract, use the generated reference 
 
 ## Session Mapping
 
-A Telegram target maps one ptydeck session to one chat destination.
+A Telegram target maps either:
+
+- one explicitly selected ptydeck session to one chat destination
+- or, for selectorless `topicMode: "deck-session"` targets, one forum-enabled supergroup to the live ptydeck session set, with one topic per terminal/session
 
 For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same `chatId` and gets its own `messageThreadId`. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.
 
@@ -128,7 +131,7 @@ Recommended topic naming convention:
 Each mapping entry needs:
 
 - `chatId`
-- at least one selector:
+- for static mappings, at least one selector:
   - `sessionId`
   - `quickIdToken`
   - `sessionName`
@@ -140,6 +143,8 @@ Optional fields:
 - `profile`
 
 When `topicMode` is set to `deck-session`, `ptydeck` provisions one Telegram forum topic per terminal/session automatically and persists the resulting `messageThreadId` binding for later reuse. In that mode, the configured `chatId` must point at a forum-enabled supergroup.
+
+A selectorless target is now allowed only for `topicMode: "deck-session"`. That is the recommended live operator shape because the mapping then follows the current ptydeck session set dynamically in real time instead of depending on hard-coded `sessionName`, `quickIdToken`, or `sessionId` values.
 
 ## Delivery Hard Break
 
@@ -199,7 +204,7 @@ Notes:
 
 ### 4. Choose the ptydeck Session Selector
 
-Each mapping entry must include at least one of:
+Each static mapping entry must include at least one of:
 
 - `sessionId`
 - `quickIdToken`
@@ -210,6 +215,7 @@ Practical guidance:
 - use `sessionId` when you want the narrowest exact mapping
 - use `quickIdToken` when you work from stable quick IDs in the UI
 - use `sessionName` only when names are intentionally unique enough for that role
+- use a selectorless `topicMode: "deck-session"` target when you want one forum-enabled supergroup to track all live sessions dynamically and create one topic per terminal/session automatically
 
 If the same Telegram chat/thread maps ambiguously to multiple sessions, bounded inbound actions are rejected until the mapping is narrowed.
 
@@ -223,15 +229,9 @@ Direct example:
 MESSAGING_TELEGRAM_BOT_TOKEN=123456:replace_with_real_token
 MESSAGING_TELEGRAM_TARGETS=[
   {
-    "sessionName": "codex",
-    "chatId": "123456789",
-    "profile": "coding-agent"
-  },
-  {
-    "quickIdToken": "4",
     "chatId": "-1001234567890",
-    "messageThreadId": 12,
-    "profile": "build-test"
+    "topicMode": "deck-session",
+    "profile": "coding-agent"
   }
 ]
 MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
@@ -254,12 +254,6 @@ Example `telegram-targets.json`:
 ```json
 [
   {
-    "sessionName": "codex",
-    "chatId": "123456789",
-    "profile": "coding-agent"
-  },
-  {
-    "sessionName": "build-run",
     "chatId": "-1001234567890",
     "topicMode": "deck-session",
     "profile": "coding-agent"

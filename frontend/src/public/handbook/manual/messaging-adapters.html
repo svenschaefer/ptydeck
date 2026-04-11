@@ -155,7 +155,12 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <h2 id="session-mapping">Session Mapping</h2>
 
-<p>A Telegram target maps one ptydeck session to one chat destination.</p>
+<p>A Telegram target maps either:</p>
+
+<ul>
+<li>one explicitly selected ptydeck session to one chat destination</li>
+<li>or, for selectorless <code>topicMode: &quot;deck-session&quot;</code> targets, one forum-enabled supergroup to the live ptydeck session set, with one topic per terminal/session</li>
+</ul>
 
 <p>For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same <code>chatId</code> and gets its own <code>messageThreadId</code>. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.</p>
 
@@ -173,7 +178,7 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <ul>
 <li><code>chatId</code></li>
-<li>at least one selector:</li>
+<li>for static mappings, at least one selector:</li>
 </ul>
 
 <p>- <code>sessionId</code> - <code>quickIdToken</code> - <code>sessionName</code></p>
@@ -187,6 +192,8 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 </ul>
 
 <p>When <code>topicMode</code> is set to <code>deck-session</code>, <code>ptydeck</code> provisions one Telegram forum topic per terminal/session automatically and persists the resulting <code>messageThreadId</code> binding for later reuse. In that mode, the configured <code>chatId</code> must point at a forum-enabled supergroup.</p>
+
+<p>A selectorless target is now allowed only for <code>topicMode: &quot;deck-session&quot;</code>. That is the recommended live operator shape because the mapping then follows the current ptydeck session set dynamically in real time instead of depending on hard-coded <code>sessionName</code>, <code>quickIdToken</code>, or <code>sessionId</code> values.</p>
 
 <h2 id="delivery-hard-break">Delivery Hard Break</h2>
 
@@ -254,7 +261,7 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 
 <h3 id="4-choose-the-ptydeck-session-selector">4. Choose the ptydeck Session Selector</h3>
 
-<p>Each mapping entry must include at least one of:</p>
+<p>Each static mapping entry must include at least one of:</p>
 
 <ul>
 <li><code>sessionId</code></li>
@@ -268,6 +275,7 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 <li>use <code>sessionId</code> when you want the narrowest exact mapping</li>
 <li>use <code>quickIdToken</code> when you work from stable quick IDs in the UI</li>
 <li>use <code>sessionName</code> only when names are intentionally unique enough for that role</li>
+<li>use a selectorless <code>topicMode: &quot;deck-session&quot;</code> target when you want one forum-enabled supergroup to track all live sessions dynamically and create one topic per terminal/session automatically</li>
 </ul>
 
 <p>If the same Telegram chat/thread maps ambiguously to multiple sessions, bounded inbound actions are rejected until the mapping is narrowed.</p>
@@ -281,15 +289,9 @@ BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
 <pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN=123456:replace_with_real_token
 MESSAGING_TELEGRAM_TARGETS=[
   {
-    &quot;sessionName&quot;: &quot;codex&quot;,
-    &quot;chatId&quot;: &quot;123456789&quot;,
-    &quot;profile&quot;: &quot;coding-agent&quot;
-  },
-  {
-    &quot;quickIdToken&quot;: &quot;4&quot;,
     &quot;chatId&quot;: &quot;-1001234567890&quot;,
-    &quot;messageThreadId&quot;: 12,
-    &quot;profile&quot;: &quot;build-test&quot;
+    &quot;topicMode&quot;: &quot;deck-session&quot;,
+    &quot;profile&quot;: &quot;coding-agent&quot;
   }
 ]
 MESSAGING_TELEGRAM_OUTBOUND_ENABLED=0
@@ -308,12 +310,6 @@ MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
 
 <pre><code class="language-json">[
   {
-    &quot;sessionName&quot;: &quot;codex&quot;,
-    &quot;chatId&quot;: &quot;123456789&quot;,
-    &quot;profile&quot;: &quot;coding-agent&quot;
-  },
-  {
-    &quot;sessionName&quot;: &quot;build-run&quot;,
     &quot;chatId&quot;: &quot;-1001234567890&quot;,
     &quot;topicMode&quot;: &quot;deck-session&quot;,
     &quot;profile&quot;: &quot;coding-agent&quot;
