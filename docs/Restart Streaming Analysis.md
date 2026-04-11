@@ -58,6 +58,7 @@ For Codex-oriented block analysis against the raw captured stream, the repositor
 - `scripts/analyze-codex-stream-blocks.mjs`
 - `scripts/experiment-codex-candidates.mjs`
 - `scripts/experiment-codex-window-states.mjs`
+- `scripts/experiment-codex-first-use-case.mjs`
 
 Example usage:
 
@@ -79,6 +80,13 @@ node scripts/experiment-codex-window-states.mjs \
   --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
   --session-name ptydeck \
   --window-sizes 60,120,300,600,1200
+```
+
+```bash
+node scripts/experiment-codex-first-use-case.mjs \
+  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
+  --session-name ptydeck \
+  --tail-entries 10000
 ```
 
 The script parses the debug log, filters one window, and summarizes:
@@ -400,17 +408,151 @@ That split is useful. It means the stream does not jump directly from "remount b
 
 ### Practical Meaning
 
-This is the clean sequencing the later product path should follow:
+The analysis now supports two distinct levels of gating:
+
+1. default window-level suppression
+2. a narrower high-confidence section-onset exception
+
+The default rule still stands:
 
 1. classify the live capture window
-2. if the window is `restart_remount` or `overlay_churn`, suppress the whole window
-3. only if the window is `stable_section`, run the Codex block parser
-4. only then decide whether an `info` block is message-worthy
+2. if the window is `restart_remount` or `overlay_churn`, do not try to forward generic line-level or whole-window summaries
 
-That is the real direction change after the hard break:
+But the raw capture now shows one useful exception for Codex:
+
+- even inside a churn-dominated tail, a real major separator entry can survive as its own substantial chunk
+- the next meaningful substantial bullet after that separator can also survive as its own chunk or chunk pair
+- the animation / overlay debris in between is mostly made of tiny redraw fragments and status-ribbon shards, not actual content
+
+So the later product path should no longer be modeled as:
+
+- "stable window or nothing"
+
+Instead, it should be modeled as:
+
+1. classify the window
+2. if the window is `stable_section`, use the broader block parser and block typing rules
+3. otherwise, allow only a much narrower Codex-specific exception:
+   - separator-anchored section onset
+   - next non-noise bullet must be `info`
+   - merge at most the immediate indented continuation line
+   - reject any inline contamination from anti-pattern bullets, prompt text, footer ribbons, or overlay fragments
+4. only then decide whether the normalized `info` text is message-worthy
+
+That is still the same architectural direction change after the hard break:
 
 - not "more clever line filtering"
-- but "window state first, section state second, message candidate last"
+- but "window state first, then a deliberately narrow section-onset exception, then message candidate extraction"
+
+## Entry-Anchored First-Use-Case Experiment
+
+The previous window-state and block-parser experiments were good enough to prove two things:
+
+- the current live `ptydeck` tails are usually not `stable_section`
+- the operator-visible Codex grammar is still separator plus `•` block based
+
+What they did not prove was whether a useful first outbound use case exists before the whole live tail becomes stable.
+
+That narrower question is now answered by:
+
+- `scripts/experiment-codex-first-use-case.mjs`
+
+The experiment works directly on persisted raw-stream capture entries instead of first concatenating a whole tail into one synthetic visible transcript.
+
+### Why Entry-Level Anchoring Was Needed
+
+The recent live `ptydeck` capture shows that the useful Codex section boundary survives as one substantial entry:
+
+- a pure major separator line
+
+But the entries immediately after that separator are often polluted by many small redraw shards such as:
+
+- `W`
+- `Wo`
+- `or`
+- `rk`
+- `ki`
+- `in`
+- `Wng`
+- `Wog`
+- `◦`
+
+Those are not semantic content. They are animation and redraw residue.
+
+The useful content then appears as one or two later substantial entries:
+
+- first `•` info line
+- optional immediate indented continuation line
+
+If the analysis concatenates the whole tail too early, those redraw shards and later prompt/footer text can leak into the candidate text. That is exactly what happened in the earlier `strict` candidate experiment.
+
+### Experiment Rule
+
+The first-use-case experiment now tests this narrower Codex-only rule:
+
+1. app label must be `codex`
+2. start only from a substantial entry that is exactly a major separator line
+3. from that anchor, scan only a bounded short horizon:
+   - at most `120` entries
+   - at most `2500ms`
+4. ignore:
+   - blank entries
+   - overlay fragments
+   - background-terminal status ribbon shards
+5. the first remaining substantial bullet must be:
+   - `type == info`
+   - not `ran`, `explored`, `waited`, `context_compacted`, or `updated_plan`
+6. merge only:
+   - the headline itself
+   - at most the immediate indented continuation line(s)
+7. reject if the normalized text contains inline contamination such as:
+   - embedded anti-pattern bullets
+   - prompt markers
+   - footer ribbon material
+   - interrupt/status overlays
+
+### Result 6: The Current `ptydeck` Capture Already Contains Clean First-Use-Case Candidates
+
+Against the current live `ptydeck` capture, the entry-anchored experiment finds two clean candidates:
+
+1. separator at `2026-04-11T23:51:45.445Z`
+   - candidate at `2026-04-11T23:51:46.608Z`
+   - gap `1163ms`
+   - extracted text:
+     - `Ich gehe jetzt noch eine Ebene tiefer in die reale ptydeck-Capture: welche konkreten Chunk-Folgen die Kandidaten verschmutzen. Daraus lässt sich der erste produktisierbare Use-Case erst sauber begrenzen.`
+
+2. separator at `2026-04-11T23:51:59.303Z`
+   - candidate at `2026-04-11T23:52:00.531Z`
+   - gap `1228ms`
+   - extracted text:
+     - `Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture, damit wir die echte Kontamination im Stream sehen und nicht aus Script-Ausgaben raten.`
+
+The same experiment also rejects a later separator with:
+
+- `gap_timeout`
+
+That rejection is useful. It means the narrower rule does not simply emit a message for every separator. It needs a timely clean `info` onset.
+
+### Product Consequence
+
+This is now the first productizable outbound use case for Codex:
+
+- not "all stable sections"
+- not "all info bullets"
+- not "all direct-after-separator blocks from a concatenated tail"
+
+But specifically:
+
+- `codex_separator_info`
+
+Meaning:
+
+- app label `codex`
+- major separator anchor survives as its own entry
+- next non-noise substantial bullet inside a short bounded horizon is `info`
+- normalized text stays clean after merging only the immediate continuation
+
+That is narrow enough to implement without re-opening the earlier Telegram flooding path, and concrete enough to express as an explicit near-term implementation wave.
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 

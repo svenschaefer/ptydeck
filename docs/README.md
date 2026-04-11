@@ -172,6 +172,7 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/analyze-codex-stream-blocks.mjs` when reasoning about raw captured Codex chunk streams or when comparing the operator-visible block grammar against persisted JSONL stream capture data from `SESSION_STREAM_ANALYSIS_CAPTURE_FILE`
     - use the companion helper script `scripts/experiment-codex-candidates.mjs` when testing conservative allowlist-style Codex message rules offline against real capture windows and visual transcript examples before any Telegram outbound path is reconsidered
     - use the companion helper script `scripts/experiment-codex-window-states.mjs` when classifying whether a real Codex capture tail is still `restart_remount`, only `overlay_churn`, already a `stable_section`, or in a mixed transition between those states
+    - use the companion helper script `scripts/experiment-codex-first-use-case.mjs` when testing the narrow Codex-only separator-anchored first outbound candidate rule directly against persisted entry-level raw-stream capture instead of a fully concatenated tail
 
 ## Consolidation Outcome
 
