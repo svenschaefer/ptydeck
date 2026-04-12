@@ -114,8 +114,9 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send normalized outbound status, summary, idle, attention, control, and share updates for mapped sessions
-- keep those updates compact through the shipped trigger profiles
+- send one narrow Codex-only outbound family, `codex_separator_info`, through deterministic thread update/reuse while generic outbound delivery remains hard-disabled
+- normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only the narrow `codex_separator_info` family
+- keep the active outbound families compact through the shipped trigger profiles
 - accept the bounded inbound bot command set:
   - `/status`
   - `/stop`
@@ -132,6 +133,7 @@ The Telegram reference adapter can:
 
 The adapter does not:
 
+- broadly reactivate generic Telegram outbound delivery; outside the narrow `codex_separator_info` allowlist family, the product path still treats outbound delivery as hard-disabled
 - bypass controller, read-only, share, or send-safety rules
 - parse open-ended free-text intent beyond direct text-to-input forwarding
 - execute Telegram text for unmapped chats/topics or for controller-denied sessions
@@ -179,14 +181,24 @@ A selectorless target is now allowed only for `topicMode: "deck-session"`. That 
 
 ## Delivery Hard Break
 
-Telegram outbound delivery is currently hard-disabled in the shipped product path.
+Generic Telegram outbound delivery is currently hard-disabled in the shipped product path.
 
 That hard break is intentional:
 
-- no new Telegram chat messages are sent while the operator topology is being rebuilt
+- no broad Telegram chat mirroring or generic status delivery is sent while the operator topology is being rebuilt
 - `topicMode: "deck-session"` can still validate the target chat and provision per-terminal forum topics
 - there is intentionally no environment-variable re-enable switch at this stage
 - inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path
+
+The first post-hard-break exception is now delivered as `v0.4.0-H99`:
+
+- one narrow internal allowlist family, `codex_separator_info`, can be delivered even while generic `deliveryEnabled` remains false
+- that family is Codex-only and entry-level stream driven:
+  - a major separator must survive as its own stream entry
+  - the next bounded substantial `•` block must classify as clean `info`
+  - at most one immediate indented continuation line is merged
+  - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as `Ran`, `Explored`, `Waited`, `Context compacted`, and `Updated Plan` reject the candidate
+- delivered candidates reuse the existing Telegram thread via deterministic `update` behavior instead of reopening broad new-message churn
 
 The shipped trigger profiles are:
 
@@ -405,8 +417,11 @@ Defaults and bounds:
 - `/health`, `/ready`, and `/metrics` expose adapter status and inbound polling counters.
 - `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including accepted `input_text` observations and unsupported/non-text messages that never become ptydeck actions.
 - `/health.messaging.adapters[0].targetTrace` and `/ready.messaging.adapters[0].targetTrace` expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.
-- `/health.messaging.deliveryEnabled` shows whether outbound Telegram delivery is currently allowed.
+- `/health.messaging.deliveryEnabled` shows whether generic outbound Telegram delivery is currently allowed.
+- `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether a narrow internal outbound allowlist path such as `codex_separator_info` is active while generic `deliveryEnabled` remains false.
+- `/health.messaging.allowlistDeliveryScopes` and `/ready.messaging.allowlistDeliveryScopes` enumerate those narrow delivered scopes.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
+- `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive` and `allowlistDeliveryScopes` for the Telegram adapter itself.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
 - `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
 - Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` and persists that binding instead of relying on manual topic naming discipline.

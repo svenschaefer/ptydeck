@@ -151,8 +151,9 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>The Telegram reference adapter can:</p>
 
 <ul>
-<li>send normalized outbound status, summary, idle, attention, control, and share updates for mapped sessions</li>
-<li>keep those updates compact through the shipped trigger profiles</li>
+<li>send one narrow Codex-only outbound family, <code>codex_separator_info</code>, through deterministic thread update/reuse while generic outbound delivery remains hard-disabled</li>
+<li>normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only the narrow <code>codex_separator_info</code> family</li>
+<li>keep the active outbound families compact through the shipped trigger profiles</li>
 <li>accept the bounded inbound bot command set:</li>
 </ul>
 
@@ -169,6 +170,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>The adapter does not:</p>
 
 <ul>
+<li>broadly reactivate generic Telegram outbound delivery; outside the narrow <code>codex_separator_info</code> allowlist family, the product path still treats outbound delivery as hard-disabled</li>
 <li>bypass controller, read-only, share, or send-safety rules</li>
 <li>parse open-ended free-text intent beyond direct text-to-input forwarding</li>
 <li>execute Telegram text for unmapped chats/topics or for controller-denied sessions</li>
@@ -226,15 +228,28 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 
 <h2 id="delivery-hard-break">Delivery Hard Break</h2>
 
-<p>Telegram outbound delivery is currently hard-disabled in the shipped product path.</p>
+<p>Generic Telegram outbound delivery is currently hard-disabled in the shipped product path.</p>
 
 <p>That hard break is intentional:</p>
 
 <ul>
-<li>no new Telegram chat messages are sent while the operator topology is being rebuilt</li>
+<li>no broad Telegram chat mirroring or generic status delivery is sent while the operator topology is being rebuilt</li>
 <li><code>topicMode: &quot;deck-session&quot;</code> can still validate the target chat and provision per-terminal forum topics</li>
 <li>there is intentionally no environment-variable re-enable switch at this stage</li>
 <li>inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path</li>
+</ul>
+
+<p>The first post-hard-break exception is now delivered as <code>v0.4.0-H99</code>:</p>
+
+<ul>
+<li>one narrow internal allowlist family, <code>codex_separator_info</code>, can be delivered even while generic <code>deliveryEnabled</code> remains false</li>
+<li>that family is Codex-only and entry-level stream driven:</li>
+</ul>
+
+<p>- a major separator must survive as its own stream entry - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - at most one immediate indented continuation line is merged - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as <code>Ran</code>, <code>Explored</code>, <code>Waited</code>, <code>Context compacted</code>, and <code>Updated Plan</code> reject the candidate</p>
+
+<ul>
+<li>delivered candidates reuse the existing Telegram thread via deterministic <code>update</code> behavior instead of reopening broad new-message churn</li>
 </ul>
 
 <p>The shipped trigger profiles are:</p>
@@ -467,8 +482,11 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
 <li><code>/health.messaging.adapters[0].inboundTrace</code> and <code>/ready.messaging.adapters[0].inboundTrace</code> expose a bounded recent Telegram inbound observation ring, including accepted <code>input_text</code> observations and unsupported/non-text messages that never become ptydeck actions.</li>
 <li><code>/health.messaging.adapters[0].targetTrace</code> and <code>/ready.messaging.adapters[0].targetTrace</code> expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.</li>
-<li><code>/health.messaging.deliveryEnabled</code> shows whether outbound Telegram delivery is currently allowed.</li>
+<li><code>/health.messaging.deliveryEnabled</code> shows whether generic outbound Telegram delivery is currently allowed.</li>
+<li><code>/health.messaging.allowlistDeliveryActive</code> and <code>/ready.messaging.allowlistDeliveryActive</code> show whether a narrow internal outbound allowlist path such as <code>codex_separator_info</code> is active while generic <code>deliveryEnabled</code> remains false.</li>
+<li><code>/health.messaging.allowlistDeliveryScopes</code> and <code>/ready.messaging.allowlistDeliveryScopes</code> enumerate those narrow delivered scopes.</li>
 <li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
+<li><code>/health.messaging.adapters[0]</code> and <code>/ready.messaging.adapters[0]</code> also expose <code>allowlistDeliveryActive</code> and <code>allowlistDeliveryScopes</code> for the Telegram adapter itself.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
 <li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.</li>
 <li>Forum-topic provisioning is also deterministic: for <code>topicMode: &quot;deck-session&quot;</code>, the adapter creates or reuses a topic named <code>&lt;deck name&gt; + &lt;terminal name&gt;</code> and persists that binding instead of relying on manual topic naming discipline.</li>

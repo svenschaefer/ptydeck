@@ -4,6 +4,8 @@
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
 
+It now also records the analysis path that led to the delivered `v0.4.0-H99` narrow outbound family, `codex_separator_info`, while generic Telegram outbound remains hard-disabled.
+
 The focus here is analytical only:
 
 - what a backend restart looks like from the perspective of restored PTY sessions
@@ -535,7 +537,7 @@ That rejection is useful. It means the narrower rule does not simply emit a mess
 
 ### Product Consequence
 
-This is now the first productizable outbound use case for Codex:
+This is now the first delivered outbound use case for Codex:
 
 - not "all stable sections"
 - not "all info bullets"
@@ -552,7 +554,7 @@ Meaning:
 - next non-noise substantial bullet inside a short bounded horizon is `info`
 - normalized text stays clean after merging only the immediate continuation
 
-That is narrow enough to implement without re-opening the earlier Telegram flooding path, and concrete enough to express as an explicit near-term implementation wave.
+That result was narrow enough to implement without re-opening the earlier Telegram flooding path, and `v0.4.0-H99` now ships exactly that one family through an internal allowlist path while leaving generic Telegram outbound hard-disabled.
 
 ## Core Architecture Fact: `server.listen()` Happens Before `runtime.ready`
 

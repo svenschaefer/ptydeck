@@ -239,6 +239,22 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastDeliveredAt: 3_000
     }
   );
+  const codexSeparatorInfo = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Der Commit ist gepusht.",
+      comparableText: "der commit ist gepusht",
+      aggregationReason: "codex_separator_info",
+      deliveryScope: "codex_separator_info",
+      occurredAt: 8_000
+    },
+    {
+      messageCreated: false,
+      lastEventType: "session.control.changed",
+      lastDeliveredAt: 7_000
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(started.action, "suppress");
@@ -267,6 +283,8 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(promptAfterLifecycle.reason, "prompt_after_lifecycle");
   assert.equal(startupControlChatter.action, "suppress");
   assert.equal(startupControlChatter.reason, "startup_control_chatter");
+  assert.equal(codexSeparatorInfo.action, "update");
+  assert.equal(codexSeparatorInfo.reason, "codex_separator_info");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -328,6 +346,181 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.ok(edits.some((entry) => /Share access created/.test(entry.text)));
   assert.ok(edits.some((entry) => /Session idle/.test(entry.text)));
   assert.equal(runtime.buildStatusSummary().enabled, true);
+});
+
+test("messaging runtime delivers only codex separator info candidates while generic delivery stays hard-disabled", async () => {
+  const sends = [];
+  const edits = [];
+  let now = 220;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 200 };
+        },
+        async editMessage(payload) {
+          edits.push(payload);
+          return { messageId: payload.messageId || 201 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h99-1" });
+  assert.equal(sends.length, 0);
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand,\n" +
+      "  damit der Analyse-Slice sauber abgeschlossen ist.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 0);
+  assert.match(sends[0].text, /Der Commit ist gepusht/);
+  assert.doesNotMatch(sends[0].text, /Session created/);
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e.\n" +
+      "  Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-5" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.deliveryEnabled, false);
+  assert.equal(status.deliveryHardBreakActive, true);
+  assert.equal(status.allowlistDeliveryActive, true);
+  assert.deepEqual(status.allowlistDeliveryScopes, ["codex_separator_info"]);
+  assert.equal(status.adapters[0].deliveryEnabled, false);
+  assert.equal(status.adapters[0].allowlistDeliveryActive, true);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info"));
+  assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
+});
+
+test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {
+  const sends = [];
+  let now = 260;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 210 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 211 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-2" }
+  });
+  await runtime.observeSessionIdle({ session, trace: { traceId: "h99-reject-3" } });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "",
+    promptBoundaries: [0],
+    trace: { traceId: "h99-reject-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-6" }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-7" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der Commit ist gepusht. gpt-5.4 · 100% left · /ps to view\n",
+    promptBoundaries: [],
+    trace: { traceId: "h99-reject-8" }
+  });
+  await runtime.observeSessionIdle({ session, trace: { traceId: "h99-reject-9" } });
+
+  assert.equal(sends.length, 0);
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_info" || entry.delivery.length === 0));
 });
 
 test("messaging runtime suppresses startup lifecycle, prompt, and initial control chatter after session creation", async () => {
