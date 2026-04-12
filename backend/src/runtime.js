@@ -5165,6 +5165,18 @@ export function createRuntime(config) {
     };
   }
 
+  function ensureMessagingSessionInputAccess(sessionId, actionLabel = "send terminal input through messaging") {
+    const controlView = getSessionControlViewOrThrow(sessionId, null);
+    const messagingPrincipal = createSessionControlPrincipal(null);
+    if (!sessionControlPrincipalsMatch(messagingPrincipal, controlView.owner)) {
+      throw new ApiError(403, "ControlDenied", `Only the session owner may ${actionLabel}.`);
+    }
+    return {
+      requestClient: null,
+      controlView
+    };
+  }
+
   function updateSessionControlStateAndBroadcast(sessionId, nextState, traceSeed = null) {
     sessionControlStates.set(sessionId, normalizeSessionControlState(nextState, {
       fallbackOwner: getSessionControlState(sessionId).owner
@@ -5572,7 +5584,7 @@ export function createRuntime(config) {
 
   function requestMessagingSendInput(sessionId, data, options = {}) {
     getApiSessionOrThrow(sessionId);
-    ensureSessionControllerAccess(sessionId, null, null, "send terminal input");
+    ensureMessagingSessionInputAccess(sessionId, "send terminal input");
     manager.sendInput(sessionId, data, {
       trace: {
         ...(options.trace && typeof options.trace === "object" ? options.trace : {}),

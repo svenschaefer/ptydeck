@@ -367,6 +367,7 @@ Or use the inline buttons:
 ### plain text input
 
 Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`.
+It keeps owner-boundary checks plus `lastInput` tracking, but it does not require an attached browser controller client header for Telegram-originated input.
 
 Behavior:
 

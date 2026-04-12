@@ -422,7 +422,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 
 <h3 id="plain-text-input">plain text input</h3>
 
-<p>Mapped plain Telegram text now follows the same backend session-input path as frontend <code>Send</code>.</p>
+<p>Mapped plain Telegram text now follows the same backend session-input path as frontend <code>Send</code>. It keeps owner-boundary checks plus <code>lastInput</code> tracking, but it does not require an attached browser controller client header for Telegram-originated input.</p>
 
 <p>Behavior:</p>
 

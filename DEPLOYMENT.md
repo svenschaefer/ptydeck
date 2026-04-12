@@ -129,7 +129,7 @@ Notes:
   - `/replay c:N`
   - `/replay sp:N`
 - Telegram button affordances map onto the same bounded action contract.
-- Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`, with one final `\r` terminator and the normal session-control checks still enforced.
+- Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`, with one final `\r` terminator; the runtime keeps owner boundaries and `lastInput` tracking, but it no longer requires an attached browser controller client header for Telegram-originated input.
 - Exact slash-prefixed literal terminal input can be forced with `//...` (for example `//status` -> `/status`), while the known bot commands remain reserved for adapter control.
 - Recommended live topology: use one forum-enabled Telegram supergroup for ptydeck and create one topic per mapped terminal/session. In that shape, all mappings share the same `chatId` and differ by `messageThreadId`. The direct 1:1 bot chat is useful only for bootstrap, smoke tests, and initial `chatId` discovery.
 - A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.

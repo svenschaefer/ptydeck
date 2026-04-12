@@ -4,6 +4,10 @@ Completed and validated release history belongs here.
 
 ## 2026-04-12
 
+- [x] `v0.4.0-H101` is now completed on `main`, correcting the live Telegram text-to-session-input path so mapped topic text no longer depends on an attached browser controller client to reach the target PTY.
+- [x] `backend/src/runtime.js` now treats Telegram inbound text as an owner-authorized messaging input path instead of reusing the browser-only controller-client header guard; mapped messaging input still records `lastInput`, reuses the normal PTY write flow, and preserves owner boundaries, but it no longer fails with `ControllerClientRequired` merely because no UI client header accompanied the Telegram message.
+- [x] Direct runtime regression coverage now proves the corrected live case in `backend/test/runtime.integration.test.js`: the Telegram inbound end-to-end test now runs with an active attached WebSocket controller present and still verifies that mapped topic text is accepted, written to the PTY, and recorded as a `local-operator` input with no synthetic browser client id.
+
 - [x] `v0.4.0-H100` is now completed on `main`, extracting the shipped `codex_separator_info` logic into one shared evaluator so runtime delivery and offline replay analysis no longer drift apart.
 - [x] `backend/src/codex-outbound-evaluator.js` now owns the separator-anchor, bounded lookahead, anti-pattern rejection, continuation-merge, and candidate-key semantics for `codex_separator_info`, while `backend/src/messaging-runtime.js` delegates candidate advancement to that shared module and keeps only runtime-owned deduplication plus delivery dispatch.
 - [x] `scripts/experiment-codex-first-use-case.mjs` now replays persisted JSONL capture through the same shipped evaluator instead of a parallel standalone implementation, producing deterministic candidate and rejection timelines with anchor/info timestamps, candidate keys, and the same reasons the runtime uses when deciding whether a Codex separator-info update is valid.

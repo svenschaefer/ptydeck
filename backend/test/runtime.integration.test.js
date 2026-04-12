@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { URL } from "node:url";
+import { WebSocket } from "ws";
 import { createRuntime } from "../src/runtime.js";
 
 function createFallbackAwarePtyFactory() {
@@ -96,7 +97,8 @@ async function createStartedRuntime(overrides = {}) {
   const { port } = runtime.getAddress();
   return {
     runtime,
-    baseUrl: `http://127.0.0.1:${port}/api/v1`
+    baseUrl: `http://127.0.0.1:${port}/api/v1`,
+    wsUrl: `ws://127.0.0.1:${port}/ws`
   };
 }
 
@@ -476,6 +478,7 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
   const edits = [];
   const callbackAnswers = [];
   const updateQueue = [];
+  const wsEvents = [];
   const telegramChat = {
     id: -100200300,
     type: "supergroup",
@@ -483,7 +486,7 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
     username: "ptydeck_group",
     is_forum: true
   };
-  const { runtime, baseUrl } = await createStartedRuntime({
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
     messagingTelegramBotToken: "telegram-token",
     messagingTelegramOutboundEnabled: true,
     messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200300" }],
@@ -536,8 +539,17 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
       };
     }
   });
+  let ws = null;
 
   try {
+    ws = new WebSocket(wsUrl);
+    ws.on("message", (buffer) => {
+      wsEvents.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => wsEvents.some((event) => event.type === "snapshot"));
+    const snapshot = wsEvents.find((event) => event.type === "snapshot");
+    assert.equal(typeof snapshot?.clientId, "string");
+
     const createRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -547,6 +559,14 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
     const created = await createRes.json();
 
     await waitFor(() => sends.some((entry) => /build-run: Session created\./.test(entry.text)), 2000);
+    await waitFor(async () => {
+      const sessionRes = await fetch(`${baseUrl}/sessions/${created.id}`);
+      if (sessionRes.status !== 200) {
+        return false;
+      }
+      const sessionPayload = await sessionRes.json();
+      return sessionPayload.controlState?.currentController?.clientId === snapshot.clientId;
+    }, 2000);
 
     updateQueue.push({
       update_id: 1,
@@ -574,7 +594,10 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
 
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-ptydeck-client-id": snapshot.clientId
+      },
       body: JSON.stringify({ data: "line 1\nline 2\n" })
     });
     assert.equal(inputRes.status, 204);
@@ -628,6 +651,7 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
     assert.match(metrics, /ptydeck_messaging_inbound_total\{adapter="telegram",outcome="observed"\}/);
     assert.match(metrics, /ptydeck_messaging_inbound_total\{adapter="telegram",outcome="handled"\}/);
   } finally {
+    ws?.close();
     await runtime.stop();
   }
 });
