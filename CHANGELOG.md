@@ -4,6 +4,9 @@ Completed and validated release history belongs here.
 
 ## 2026-04-12
 
+- [x] Script-based live messaging-runtime analysis tooling is now committed on `main`: `scripts/analyze-live-messaging-runtime.mjs` correlates `messaging.event.trace`, `messaging.inbound.*`, and `messaging.target.update` debug logs with persisted JSONL stream capture so current-process Telegram behavior can be inspected offline for accepted inputs, delivered narrow allowlist events, blocked `separator_hint` summary misses, blocked attention events, and duplicate delivered groups instead of relying on one-off `rg` output.
+- [x] The new root coverage in `test/analyze-live-messaging-runtime.test.js` proves both the basic live-summary contract and the topic-derived metadata fallback path, so deck/session summaries remain usable even when the JSONL capture file does not currently contain the relevant session metadata but `messaging.target.update` does.
+
 - [x] `v0.4.0-H107` is now completed on `main`, correcting the first live defects found after the `H106` restart by eliminating repeated duplicate Codex summary posts under Telegram backoff/retry conditions and by making mapped Telegram submit behavior independent of transient app-detection state.
 - [x] `backend/src/messaging-runtime.js` now gives `codex_separator_summary_sentence` a stable content-based block identity, returns explicit delivery outcomes from dispatch, and records the last delivered allowlist candidate only after actual Telegram delivery succeeds; identical summary retries can therefore wait out adapter backoff and re-attempt once without later fanning out into many duplicate new posts.
 - [x] `backend/src/runtime.js` now applies delayed-submit semantics on the messaging-input path whenever the normalized payload carries a trailing submit terminator, so Telegram text that should submit immediately no longer depends on the live app snapshot still being recognized as `codex`.
