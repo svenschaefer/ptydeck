@@ -91,7 +91,6 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, answer
   const answered = await transport.answerCallbackQuery({ callbackQueryId: "cb-1", text: "ok", showAlert: true });
   const synced = await transport.setMyCommands({
     commands: [
-      { command: "status", description: "Show status." },
       { command: "docu", description: "Project custom command; plain; /docu" }
     ]
   });
@@ -147,25 +146,22 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, answer
   });
   assert.deepEqual(JSON.parse(requests[7].options.body), {
     commands: [
-      { command: "status", description: "Show status." },
       { command: "docu", description: "Project custom command; plain; /docu" }
     ]
   });
 });
 
-test("telegram inbound command parsing stays deterministic for buttons and text fallbacks", () => {
+test("telegram inbound command parsing stays deterministic for catalog-backed commands and text fallbacks", () => {
   assert.deepEqual(parseTelegramInboundCommand({ callbackData: "ptydeck:status" }), { action: "status" });
   assert.deepEqual(parseTelegramInboundCommand({ callbackData: "ptydeck:replay:sp:2" }), { action: "replay", selector: "sp:2" });
-  assert.deepEqual(parseTelegramInboundCommand({ text: "/status" }), { action: "status" });
-  assert.deepEqual(parseTelegramInboundCommand({ text: "/retry@ptydeck_bot" }), { action: "retry" });
-  assert.deepEqual(parseTelegramInboundCommand({ text: "/replay l:40" }), { action: "replay", selector: "l:40" });
-  assert.equal(parseTelegramInboundCommand({ text: "/replay l:40 extra" }), null);
+  assert.equal(parseTelegramInboundCommand({ text: "/status" }), null);
+  assert.equal(parseTelegramInboundCommand({ text: "/retry@ptydeck_bot" }), null);
+  assert.equal(parseTelegramInboundCommand({ text: "/replay l:40" }), null);
   assert.equal(parseTelegramInboundCommand({ text: "status" }), null);
   assert.equal(parseTelegramInboundCommand({ text: "//status" }), null);
   assert.equal(parseTelegramInboundCommand({ callbackData: "other:status" }), null);
   const catalog = {
     entries: [
-      { telegramCommand: "status", action: "status", description: "Show status." },
       { telegramCommand: "doc_du", action: "custom", customCommandName: "doc-u", description: "Custom command." }
     ]
   };
@@ -217,11 +213,9 @@ test("telegram adapter syncs published commands and uses the synced catalog for 
 
   const syncResult = await adapter.syncCommands({
     entries: [
-      { telegramCommand: "status", action: "status", description: "Show status." },
       { telegramCommand: "doc_du", action: "custom", customCommandName: "doc-u", description: "Custom command." }
     ],
     publishedCommands: [
-      { command: "status", description: "Show status." },
       { command: "doc_du", description: "Custom command." }
     ],
     skippedCommands: []
@@ -230,7 +224,6 @@ test("telegram adapter syncs published commands and uses the synced catalog for 
   assert.equal(syncResult.synced, true);
   assert.deepEqual(commandSyncCalls[0], {
     commands: [
-      { command: "status", description: "Show status." },
       { command: "doc_du", description: "Custom command." }
     ]
   });
@@ -247,7 +240,7 @@ test("telegram adapter syncs published commands and uses the synced catalog for 
     assert.equal(inboundCalls[0].command.action, "custom");
     assert.equal(inboundCalls[0].command.customCommandName, "doc-u");
     assert.equal(inboundCalls[0].text, "/doc_du env=prod");
-    assert.equal(adapter.getStatus().publishedCommandCount, 2);
+    assert.equal(adapter.getStatus().publishedCommandCount, 1);
   } finally {
     await adapter.stop();
   }
@@ -268,8 +261,8 @@ test("telegram adapter surfaces command sync failures when the transport cannot 
   });
 
   const missingPublisher = await adapterWithoutPublisher.syncCommands({
-    entries: [{ telegramCommand: "status", action: "status", description: "Show status." }],
-    publishedCommands: [{ command: "status", description: "Show status." }],
+    entries: [{ telegramCommand: "docu", action: "custom", customCommandName: "docu", description: "Project custom command; plain; /docu" }],
+    publishedCommands: [{ command: "docu", description: "Project custom command; plain; /docu" }],
     skippedCommands: [{ commandName: "Docu", reason: "too_long_for_telegram" }]
   });
 
@@ -305,8 +298,8 @@ test("telegram adapter surfaces command sync failures when the transport cannot 
   });
 
   const failedPublisher = await adapterWithFailingPublisher.syncCommands({
-    entries: [{ telegramCommand: "status", action: "status", description: "Show status." }],
-    publishedCommands: [{ command: "status", description: "Show status." }],
+    entries: [{ telegramCommand: "docu", action: "custom", customCommandName: "docu", description: "Project custom command; plain; /docu" }],
+    publishedCommands: [{ command: "docu", description: "Project custom command; plain; /docu" }],
     skippedCommands: []
   });
 
@@ -576,7 +569,7 @@ test("telegram adapter preserves alert thread continuity across edit fallback se
   assert.equal(adapter.getStatus().updatedTotal, 2);
 });
 
-test("telegram adapter provisions and reuses forum topics per terminal thread", async () => {
+test("telegram adapter provisions and reuses forum topics per terminal thread without renaming existing topics", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
     configured: true,
@@ -639,19 +632,19 @@ test("telegram adapter provisions and reuses forum topics per terminal thread", 
 
   assert.equal(first.delivered, true);
   assert.equal(second.delivered, true);
-  assert.deepEqual(calls.map((entry) => entry.method), ["getChat", "createTopic", "send", "editTopic", "edit"]);
+  assert.deepEqual(calls.map((entry) => entry.method), ["getChat", "createTopic", "send", "edit"]);
   assert.equal(calls[2].payload.messageThreadId, 44);
-  assert.equal(calls[4].payload.messageThreadId, 44);
+  assert.equal(calls[3].payload.messageThreadId, 44);
   assert.equal(first.topicBinding.messageThreadId, 44);
   assert.equal(first.topicBinding.topicName, "Operations + codex");
-  assert.equal(second.topicBinding.topicName, "Operations Renamed + codex");
+  assert.equal(second.topicBinding.topicName, "Operations + codex");
   assert.equal(adapter.getStatus().provisionedTopicTotal, 1);
-  assert.equal(adapter.getStatus().renamedTopicTotal, 1);
+  assert.equal(adapter.getStatus().renamedTopicTotal, 0);
   assert.equal(adapter.getStatus().activeTopicCount, 1);
   assert.equal(adapter.getStatus().validatedForumTargetTotal, 1);
   assert.deepEqual(
     adapter.getStatus().targetTrace.recent.map((entry) => entry.phase),
-    ["target_validated", "topic_provisioned", "target_validated_cached", "topic_renamed"]
+    ["target_validated", "topic_provisioned", "target_validated_cached", "topic_reused"]
   );
   assert.equal(adapter.getStatus().targetTrace.recent[1].messageThreadId, 44);
   assert.equal(adapter.getStatus().targetTrace.recent[1].topicName, "Operations + codex");
@@ -940,6 +933,11 @@ test("telegram adapter drains multi-batch backlog before polling live inbound co
     deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 2,
+    commandCatalog: {
+      entries: [{ telegramCommand: "docu", action: "custom", customCommandName: "docu", description: "Project custom command; plain; /docu" }],
+      publishedCommands: [{ command: "docu", description: "Project custom command; plain; /docu" }],
+      skippedCommands: []
+    },
     nowFn: (() => {
       let current = 900;
       return () => ++current;
@@ -968,7 +966,7 @@ test("telegram adapter drains multi-batch backlog before polling live inbound co
         if (!livePollReleased) {
           livePollReleased = true;
           return [
-            { update_id: 104, message: { chat: { id: 1001 }, text: "/status" } },
+            { update_id: 104, message: { chat: { id: 1001 }, text: "/docu" } },
             { update_id: 105, message: { chat: { id: 1001 }, text: "ignored free text" } }
           ];
         }
@@ -983,13 +981,13 @@ test("telegram adapter drains multi-batch backlog before polling live inbound co
 
   await adapter.startInbound({
     async onCommand() {
-      return { ok: true, text: "Status for [4] backlog-run" };
+      return { ok: true, text: "Custom command /docu sent to [4] backlog-run" };
     }
   });
 
   try {
     await waitFor(() => sends.length >= 1, 1500);
-    assert.match(sends[0].text, /Status for \[4\] backlog-run/);
+    assert.match(sends[0].text, /Custom command \/docu sent to \[4\] backlog-run/);
     assert.equal(adapter.getStatus().inboundBacklogSkippedTotal, 103);
     assert.deepEqual(getUpdatesCalls.slice(0, 3), [0, 0, 1]);
   } finally {
@@ -1005,6 +1003,11 @@ test("telegram adapter records polling failures and recovers on a later inbound 
     deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 1,
+    commandCatalog: {
+      entries: [{ telegramCommand: "docu", action: "custom", customCommandName: "docu", description: "Project custom command; plain; /docu" }],
+      publishedCommands: [{ command: "docu", description: "Project custom command; plain; /docu" }],
+      skippedCommands: []
+    },
     nowFn: (() => {
       let current = 1_200;
       return () => ++current;
@@ -1027,7 +1030,7 @@ test("telegram adapter records polling failures and recovers on a later inbound 
           return [];
         }
         if (pollCalls === 3) {
-          return [{ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } }];
+          return [{ update_id: 1, message: { chat: { id: 1001 }, text: "/docu" } }];
         }
         await sleep(5);
         return [];
@@ -1040,7 +1043,7 @@ test("telegram adapter records polling failures and recovers on a later inbound 
 
   await adapter.startInbound({
     async onCommand() {
-      return { ok: true, text: "Status for [4] recovered-run" };
+      return { ok: true, text: "Custom command /docu sent to [4] recovered-run" };
     }
   });
 
@@ -1064,6 +1067,11 @@ test("telegram adapter swallows callback acknowledgement failures after command 
     deliveryEnabled: true,
     inboundEnabled: true,
     configuredTargets: 1,
+    commandCatalog: {
+      entries: [{ telegramCommand: "docu", action: "custom", customCommandName: "docu", description: "Project custom command; plain; /docu" }],
+      publishedCommands: [{ command: "docu", description: "Project custom command; plain; /docu" }],
+      skippedCommands: []
+    },
     nowFn: (() => {
       let current = 1_500;
       return () => ++current;
@@ -1162,13 +1170,13 @@ test("telegram adapter polls bounded inbound commands and records metrics", asyn
       if (command.source === "callback") {
         return { ok: true, callbackText: "Replay ready.", text: "Replay for [4] build-run" };
       }
-      return { ok: true, text: "Status for [4] build-run" };
+      return { ok: true, text: "Custom command /docu sent to [4] build-run" };
     }
   });
 
   try {
     updateQueue.push(
-      { update_id: 1, message: { chat: { id: 1001 }, text: "/status" } },
+      { update_id: 1, message: { chat: { id: 1001 }, text: "/docu" } },
       {
         update_id: 2,
         callback_query: {
@@ -1181,7 +1189,7 @@ test("telegram adapter polls bounded inbound commands and records metrics", asyn
 
     await waitFor(() => sends.length >= 2 && callbackAnswers.length >= 1, 1500);
 
-    assert.match(sends[0].text, /Status for \[4\] build-run/);
+    assert.match(sends[0].text, /Custom command \/docu sent to \[4\] build-run/);
     assert.match(sends[1].text, /Replay for \[4\] build-run/);
     assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
     assert.match(callbackAnswers[0].text, /Replay ready/);

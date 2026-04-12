@@ -473,7 +473,7 @@ test("runtime captures codex raw stream chunks to the analysis file and exposes 
   }
 });
 
-test("runtime executes bounded inbound telegram topic text and actions end-to-end for mapped sessions", async () => {
+test("runtime executes mapped telegram text and leaves unpublished slash commands as literal terminal input", async () => {
   const sends = [];
   const edits = [];
   const callbackAnswers = [];
@@ -590,51 +590,18 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
     assert.equal(afterTelegramInput.controlState.lastInput.clientId, null);
 
     updateQueue.push({ update_id: 2, message: { chat: telegramChat, text: "/status" } });
-    await waitFor(() => sends.some((entry) => /Status for \[[^\]]+\] build-run/.test(entry.text)), 2000);
-
-    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-ptydeck-client-id": snapshot.clientId
-      },
-      body: JSON.stringify({ data: "line 1\nline 2\n" })
-    });
-    assert.equal(inputRes.status, 204);
-
-    updateQueue.push({
-      update_id: 3,
-      callback_query: {
-        id: "cb-1",
-        data: "ptydeck:replay:l:1",
-        from: { id: 42, username: "sven" },
-        message: { chat: telegramChat }
-      }
-    });
-    await waitFor(() => sends.some((entry) => /build-run replay l:1/.test(entry.text)), 2000);
-    assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
-
-    updateQueue.push({ update_id: 4, message: { chat: telegramChat, text: "/stop" } });
     await waitFor(async () => {
-      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
-      return res.status === 404;
+      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+      const health = await healthRes.json();
+      return health.messaging.adapters[0].inboundTrace.capturedTotal >= 2;
     }, 2000);
-
-    updateQueue.push({ update_id: 5, message: { chat: telegramChat, text: "/retry" } });
-    await waitFor(async () => {
-      const res = await fetch(`${baseUrl}/sessions/${created.id}`);
-      if (res.status !== 200) {
-        return false;
-      }
-      const payload = await res.json();
-      return payload.state === "running" || payload.state === "starting";
-    }, 2000);
+    await waitFor(() => sends.filter((entry) => /Input sent to \[[^\]]+\] build-run/.test(entry.text)).length >= 2, 2000);
 
     const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
     const inboundTrace = health.messaging.adapters[0].inboundTrace;
-    assert.equal(inboundTrace.capturedTotal >= 5, true);
+    assert.equal(inboundTrace.capturedTotal >= 2, true);
     const inputText = inboundTrace.recent.find((entry) => entry.reason === "input_text" && entry.phase === "handled");
     assert.equal(Boolean(inputText), true);
     assert.equal(inputText.chatId, "-100200300");
@@ -643,6 +610,9 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
     assert.equal(inputText.chatIsForum, true);
     assert.equal(inputText.messageThreadId, null);
     assert.equal(inputText.preview, "echo TELEGRAM_OK");
+    const slashInput = inboundTrace.recent.find((entry) => entry.reason === "input_text" && entry.preview === "/status" && entry.phase === "handled");
+    assert.equal(Boolean(slashInput), true);
+    assert.equal(callbackAnswers.length, 0);
 
     const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
     assert.equal(metricsRes.status, 200);
@@ -842,10 +812,24 @@ test("runtime publishes telegram commands from the canonical surface and execute
       body: JSON.stringify({ content: "echo DOCU_FROM_TELEGRAM\n" })
     });
     assert.equal(putRes.status, 200);
+    const putGoRes = await fetch(`${baseUrl}/custom-commands/go`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo GO_FROM_TELEGRAM\n" })
+    });
+    assert.equal(putGoRes.status, 200);
 
     await waitFor(() => publishedCommands.length >= 2, 2000);
     assert.equal(
+      publishedCommands.at(-1).commands.every((entry) => !["status", "stop", "retry", "replay"].includes(entry.command)),
+      true
+    );
+    assert.equal(
       publishedCommands.at(-1).commands.some((entry) => entry.command === "doc_du" && /custom command/i.test(entry.description)),
+      true
+    );
+    assert.equal(
+      publishedCommands.at(-1).commands.some((entry) => entry.command === "go" && /custom command/i.test(entry.description)),
       true
     );
 
@@ -857,14 +841,24 @@ test("runtime publishes telegram commands from the canonical surface and execute
         text: "/doc_du"
       }
     });
+    updateQueue.push({
+      update_id: 2,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "/go"
+      }
+    });
 
     await waitFor(() => writeCalls.includes("echo DOCU_FROM_TELEGRAM") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => writeCalls.includes("echo GO_FROM_TELEGRAM"), 2000);
     await waitFor(() => sends.some((entry) => /Custom command \/doc-u sent to \[[^\]]+\] build-run/.test(entry.text)), 2000);
+    await waitFor(() => sends.some((entry) => /Custom command \/go sent to \[[^\]]+\] build-run/.test(entry.text)), 2000);
 
     const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
-    assert.equal(health.messaging.adapters[0].publishedCommandCount >= 5, true);
+    assert.equal(health.messaging.adapters[0].publishedCommandCount >= 2, true);
     assert.equal(health.messaging.adapters[0].lastCommandSyncError, "");
     assert.equal(created.id.length > 0, true);
   } finally {
@@ -980,6 +974,178 @@ test("runtime provisions telegram forum topics per terminal and persists the bin
     assert.equal(health.messaging.adapters[0].activeTopicCount, 1);
   } finally {
     await runtime.stop();
+  }
+});
+
+test("runtime restore preserves manual telegram forum topic names without renaming them back", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const createdTopicsA = [];
+  const runtimeA = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200301", topicMode: "deck-session" }],
+    createMessagingTelegramTransport() {
+      return {
+        async getChat() {
+          return { id: -100200301, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
+        async createForumTopic(payload) {
+          createdTopicsA.push(payload);
+          return { messageThreadId: 66, name: payload.name };
+        },
+        async editForumTopic() {
+          return { ok: true };
+        },
+        async sendMessage() {
+          throw new Error("sendMessage should stay unused while outbound delivery is disabled");
+        },
+        async editMessage() {
+          throw new Error("editMessage should stay unused while outbound delivery is disabled");
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  await runtimeA.start();
+  const { port: portA } = runtimeA.getAddress();
+  const baseUrlA = `http://127.0.0.1:${portA}/api/v1`;
+  let createdSessionId = "";
+
+  try {
+    const createDeckRes = await fetch(`${baseUrlA}/decks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "ops", name: "Operations" })
+    });
+    assert.equal(createDeckRes.status, 201);
+
+    const createRes = await fetch(`${baseUrlA}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", deckId: "ops", startCommand: "npm test" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    createdSessionId = created.id;
+
+    await waitFor(() => createdTopicsA.length >= 1, 2000);
+  } finally {
+    await runtimeA.stop();
+  }
+
+  const persistedState = JSON.parse(await readFile(dataPath, "utf8"));
+  persistedState.messagingTelegramTopicBindings[0].topicName = "Manual topic name";
+  await writeFile(dataPath, JSON.stringify(persistedState, null, 2));
+
+  const createdTopicsB = [];
+  const editedTopicsB = [];
+  const runtimeB = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath,
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    startupWarmupQuietMs: 20,
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200301", topicMode: "deck-session" }],
+    createMessagingTelegramTransport() {
+      return {
+        async getChat() {
+          return { id: -100200301, type: "supergroup", is_forum: true, title: "ptydeck" };
+        },
+        async createForumTopic(payload) {
+          createdTopicsB.push(payload);
+          return { messageThreadId: 67, name: payload.name };
+        },
+        async editForumTopic(payload) {
+          editedTopicsB.push(payload);
+          return { ok: true };
+        },
+        async sendMessage() {
+          throw new Error("sendMessage should stay unused while outbound delivery is disabled");
+        },
+        async editMessage() {
+          throw new Error("editMessage should stay unused while outbound delivery is disabled");
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  await runtimeB.start();
+  const { port: portB } = runtimeB.getAddress();
+  const baseUrlB = `http://127.0.0.1:${portB}/api/v1`;
+
+  try {
+    const restoredRes = await fetch(`${baseUrlB}/sessions/${createdSessionId}`);
+    assert.equal(restoredRes.status, 200);
+    const restored = await restoredRes.json();
+    assert.equal(restored.id, createdSessionId);
+    assert.equal(restored.name, "build-run");
+
+    assert.equal(createdTopicsB.length, 0);
+    assert.equal(editedTopicsB.length, 0);
+
+    const persistedReloaded = JSON.parse(await readFile(dataPath, "utf8"));
+    assert.equal(persistedReloaded.messagingTelegramTopicBindings[0].messageThreadId, 66);
+    assert.equal(persistedReloaded.messagingTelegramTopicBindings[0].topicName, "Manual topic name");
+  } finally {
+    await runtimeB.stop();
   }
 });
 

@@ -121,23 +121,17 @@ Notes:
 - Inbound observation/command handling is always enabled whenever a bot token and target mappings are configured; there is intentionally no separate environment toggle for that path.
 - Mapped Telegram text that carries a submit terminator now always uses delayed-submit semantics on the backend messaging-input path, so submit behavior no longer depends on the runtime still recognizing the target session as `codex` at that exact moment.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
-- The shipped bounded inbound command set is intentionally limited to:
-  - `/status`
-  - `/stop`
-  - `/retry`
-  - `/replay`
 - The Telegram bot command list is now published from the canonical ptydeck command surface through Telegram `setMyCommands`:
-  - built-in bounded commands remain `status`, `stop`, `retry`, and `replay`
-  - bounded replay selectors such as `/replay l:40` or `/replay c:1200` remain valid as arguments on `/replay`, but they are not separate published Telegram bot commands
   - eligible custom commands are published automatically with deterministic Telegram-safe names derived from the canonical ptydeck custom-command name
   - invalid, conflicting, or overflow commands are skipped deterministically instead of silently drifting into a second Telegram-only list
+  - concrete command names such as `/docu` or `/go` are examples only; the real Telegram bot-command surface is derived from the custom commands configured in ptydeck at runtime
 - Telegram inbound command handling now follows the published command catalog instead of a handwritten adapter-local parser:
   - published custom commands execute through the same custom-command resolution and shell-input path as the primary ptydeck command surface
   - Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the only allowed target authority
-  - unknown slash commands are not intercepted by the adapter and can still fall through to literal terminal input via the existing `//...` escape
-- Telegram button affordances map onto the same bounded action contract.
+  - unpublished slash-prefixed text is not intercepted and falls through to normal mapped terminal input
+- No new adapter-owned built-in Telegram action buttons are published; older legacy callback buttons can still be answered while old posts remain visible.
 - Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`, with one final `\r` terminator; the runtime keeps owner boundaries and `lastInput` tracking, but it no longer requires an attached browser controller client header for Telegram-originated input.
-- Exact slash-prefixed literal terminal input can be forced with `//...` (for example `//status` -> `/status`), while the known bot commands remain reserved for adapter control.
+- Exact slash-prefixed literal terminal input for a published Telegram custom command can be forced with `//...` (for example `//docu` -> `/docu`).
 - Recommended live topology: use one forum-enabled Telegram supergroup for ptydeck and create one topic per mapped terminal/session. In that shape, all mappings share the same `chatId` and differ by `messageThreadId`. The direct 1:1 bot chat is useful only for bootstrap, smoke tests, and initial `chatId` discovery.
 - A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.
 - The currently referenced invite target `https://t.me/+J4MInwk9nSg1MWJi` presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics that `topicMode: "deck-session"` requires.
@@ -230,12 +224,13 @@ When Telegram messaging is configured, verify additionally:
 - `/health.messaging.adapters[0]` also exposes `allowlistDeliveryActive` and `allowlistDeliveryScopes`, so the narrow `H99`/`H105`/`H106` Codex-only outbound exceptions can be distinguished from generic delivery state without digging through traces
 - `/health.messaging.adapters[0]` now also exposes Telegram command-publication state such as `publishedCommandCount`, `commandCatalogSize`, `commandSyncSkippedCount`, `lastCommandSyncAt`, and `lastCommandSyncError`
 - When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
+- After the initial `deck-session` topic binding is persisted, mapping remains keyed by `chatId + messageThreadId`; a manual Telegram topic rename therefore keeps routing intact and is no longer automatically snapped back by the normal reuse path
 - `/health.streamAnalysisCapture` and `/ready.streamAnalysisCapture` expose the current raw-stream analysis capture status, including whether capture is enabled, the bounded file path, configured app-label filters, captured/skipped/rotated counts, and the last capture error
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics
 - `/metrics` now also exposes `ptydeck_messaging_inbound_total{adapter="telegram",outcome="observed"}` for raw inbound observations seen before command filtering
 - If bounded inbound is enabled, `/health` / `/ready` show the adapter's inbound status fields and `/metrics` includes `ptydeck_messaging_inbound_*` lines
 - If bounded inbound is enabled, transient Telegram polling failures during startup backlog drain and later live polling should now increment the inbound failure counters while the adapter retries instead of leaving inbound permanently inactive after one startup transport error
-- A mapped Telegram chat can issue `status`, `stop`, `retry`, and `replay` through the bounded adapter action set, and plain text now reaches the mapped PTY only through the existing session-input path with the normal controller/access checks still enforced
+- A mapped Telegram chat now issues published ptydeck custom commands through the Telegram bot-command catalog, and all other plain text, including unpublished slash-prefixed text, reaches the mapped PTY through the existing session-input path with the normal controller/access checks still enforced
 - The shipped post-hard-break outbound path is still intentionally narrow: only `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence` are allowed through the internal allowlist, where `codex_separator_info` covers simple separator-anchored `• info` blocks with at most one immediate continuation line, `codex_separator_section` covers chrome-stripped separator-anchored narrative sections with subsection labels and list items, and `codex_separator_summary_sentence` covers strict separator-hint sentence summaries that remain too small for the section family but too meaningful for generic hard-break suppression
 - Repeated low-value agentic CLI chatter such as `Ran ...`, `Edited ...`, diff/update summaries, and separator-only fragments should now stay suppressed or coalesced into one evolving status thread instead of spraying many near-duplicate Telegram messages
 - Coding-agent planning chatter such as `next active block ...`, version bullets, `/review on my current changes` echoes, low-value `Updated Plan`-style summaries, and hash-prefixed commit or plan lines such as `- 961f98a ...` should now stay suppressed instead of surfacing as Telegram status

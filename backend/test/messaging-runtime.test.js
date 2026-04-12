@@ -1490,16 +1490,17 @@ test("messaging runtime prefers explicit session mappings over selectorless deck
   assert.equal(sends[0].messageThreadId, undefined);
 });
 
-test("messaging runtime reuses persisted forum topic bindings instead of reprovisioning topics", async () => {
+test("messaging runtime reuses persisted forum topic bindings without renaming manually named topics", async () => {
   const sends = [];
   const createdTopics = [];
+  const editedTopics = [];
   let now = 500;
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: true,
     telegramTargets: [{ chatId: "1001", sessionName: "codex", topicMode: "deck-session", profile: "coding-agent" }],
-    telegramTopicBindings: [{ chatId: "1001", sessionId: "codex-session", messageThreadId: 81, topicName: "Operations + codex" }],
+    telegramTopicBindings: [{ chatId: "1001", sessionId: "codex-session", messageThreadId: 81, topicName: "Manual topic name" }],
     resolveDeckNameForSession: () => "Operations",
     createTelegramTransport() {
       return {
@@ -1510,7 +1511,8 @@ test("messaging runtime reuses persisted forum topic bindings instead of reprovi
           createdTopics.push({ chatId, name });
           return { messageThreadId: 82, name };
         },
-        async editForumTopic() {
+        async editForumTopic(payload) {
+          editedTopics.push(payload);
           return { ok: true };
         },
         async sendMessage(payload) {
@@ -1534,6 +1536,7 @@ test("messaging runtime reuses persisted forum topic bindings instead of reprovi
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "topic-bind-1" });
 
   assert.equal(createdTopics.length, 0);
+  assert.equal(editedTopics.length, 0);
   assert.equal(sends[0].messageThreadId, 81);
 });
 
@@ -2496,13 +2499,9 @@ test("messaging runtime suppresses idle after a recent status attempt was skippe
   assert.ok(status.trace.recent.some((entry) => entry.reason === "idle_after_status_attempt"));
 });
 
-test("messaging runtime handles bounded inbound status input stop retry and replay actions", async () => {
+test("messaging runtime treats unpublished telegram slash commands as literal terminal input", async () => {
   const outboundMessages = [];
-  const callbackAnswers = [];
   const updateQueue = [];
-  const stopCalls = [];
-  const retryCalls = [];
-  const replaySelectors = [];
   const inputCalls = [];
   let session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
   const runtime = createMessagingRuntime({
@@ -2527,8 +2526,7 @@ test("messaging runtime handles bounded inbound status input stop retry and repl
           await sleep(5);
           return [];
         },
-        async answerCallbackQuery(payload) {
-          callbackAnswers.push(payload);
+        async answerCallbackQuery() {
           return true;
         }
       };
@@ -2536,29 +2534,9 @@ test("messaging runtime handles bounded inbound status input stop retry and repl
     resolveSessionForMessagingTarget() {
       return session;
     },
-    async requestMessagingStop(sessionId) {
-      stopCalls.push(sessionId);
-      session = { ...session, state: "exited" };
-    },
-    async requestMessagingRetry(sessionId) {
-      retryCalls.push(sessionId);
-      session = { ...session, state: "starting" };
-      return session;
-    },
     async requestMessagingSendInput(sessionId, data) {
       inputCalls.push({ sessionId, data });
       return session;
-    },
-    async requestMessagingReplayExcerpt(sessionId, selector) {
-      replaySelectors.push({ sessionId, selector });
-      return {
-        selector,
-        selectorKind: selector.startsWith("sp:") ? "shell_blocks" : "lines",
-        resolvedCount: 2,
-        availableCount: 2,
-        selectorSatisfied: true,
-        data: "prompt 1\nline 1\nprompt 2\nline 2"
-      };
     }
   });
 
@@ -2566,34 +2544,18 @@ test("messaging runtime handles bounded inbound status input stop retry and repl
   try {
     updateQueue.push(
       { update_id: 1, message: { chat: { id: 1001 }, text: "/status" } },
-      { update_id: 2, message: { chat: { id: 1001 }, text: "echo FROM_TELEGRAM" } },
-      {
-        update_id: 3,
-        callback_query: {
-          id: "cb-1",
-          data: "ptydeck:replay:sp:9",
-          message: { chat: { id: 1001 } }
-        }
-      },
-      { update_id: 4, message: { chat: { id: 1001 }, text: "/stop" } },
-      { update_id: 5, message: { chat: { id: 1001 }, text: "/retry" } }
+      { update_id: 2, message: { chat: { id: 1001 }, text: "echo FROM_TELEGRAM" } }
     );
 
-    await waitFor(() => outboundMessages.length >= 5 && callbackAnswers.length >= 1, 1500);
+    await waitFor(() => outboundMessages.length >= 2, 1500);
 
-    assert.match(outboundMessages[0].text, /Status for \[9\] codex/);
-    assert.match(outboundMessages[0].text, /State: running/);
+    assert.match(outboundMessages[0].text, /Input sent to \[9\] codex/);
     assert.match(outboundMessages[1].text, /Input sent to \[9\] codex/);
-    assert.match(outboundMessages[2].text, /\[9\] codex replay sp:3/);
-    assert.match(outboundMessages[3].text, /Stop requested for \[9\] codex/);
-    assert.match(outboundMessages[4].text, /Retry started for \[9\] codex/);
-    assert.deepEqual(stopCalls, ["s-codex"]);
-    assert.deepEqual(retryCalls, ["s-codex"]);
-    assert.deepEqual(inputCalls, [{ sessionId: "s-codex", data: "echo FROM_TELEGRAM\r" }]);
-    assert.deepEqual(replaySelectors, [{ sessionId: "s-codex", selector: "sp:3" }]);
-    assert.equal(callbackAnswers[0].callbackQueryId, "cb-1");
-    assert.match(callbackAnswers[0].text, /Replay sp:3/);
-    assert.equal(runtime.buildStatusSummary().adapters[0].inboundHandledTotal >= 5, true);
+    assert.deepEqual(inputCalls, [
+      { sessionId: "s-codex", data: "/status\r" },
+      { sessionId: "s-codex", data: "echo FROM_TELEGRAM\r" }
+    ]);
+    assert.equal(runtime.buildStatusSummary().adapters[0].inboundHandledTotal >= 2, true);
   } finally {
     await runtime.stop();
   }
@@ -2715,7 +2677,7 @@ test("messaging runtime executes published telegram custom commands against the 
     await waitFor(() => outboundMessages.length >= 1, 1500);
     assert.deepEqual(inputCalls, [{ sessionId: "s-codex", data: "echo deploy prod Ops\r" }]);
     assert.match(outboundMessages[0].text, /Custom command \/deploy-app sent to \[9\] codex/);
-    assert.equal(runtime.buildStatusSummary().adapters[0].publishedCommandCount >= 5, true);
+    assert.equal(runtime.buildStatusSummary().adapters[0].publishedCommandCount >= 1, true);
   } finally {
     await runtime.stop();
   }
@@ -2780,7 +2742,7 @@ test("messaging runtime rejects telegram custom-command target redirects", async
   }
 });
 
-test("messaging runtime rejects unmapped or unavailable inbound actions deterministically", async () => {
+test("messaging runtime rejects unmapped or unavailable callback fallback actions deterministically", async () => {
   const outboundMessages = [];
   const updateQueue = [];
   const runtime = createMessagingRuntime({
@@ -2818,8 +2780,8 @@ test("messaging runtime rejects unmapped or unavailable inbound actions determin
   await runtime.start();
   try {
     updateQueue.push(
-      { update_id: 1, message: { chat: { id: 9999 }, text: "/status" } },
-      { update_id: 2, message: { chat: { id: 1001 }, text: "/status" } }
+      { update_id: 1, callback_query: { id: "cb-1", data: "ptydeck:status", message: { chat: { id: 9999 } } } },
+      { update_id: 2, callback_query: { id: "cb-2", data: "ptydeck:status", message: { chat: { id: 1001 } } } }
     );
 
     await waitFor(() => outboundMessages.length >= 2, 1500);
@@ -2830,7 +2792,7 @@ test("messaging runtime rejects unmapped or unavailable inbound actions determin
   }
 });
 
-test("messaging runtime rejects ambiguous inbound mappings deterministically", async () => {
+test("messaging runtime rejects ambiguous callback fallback mappings deterministically", async () => {
   const outboundMessages = [];
   const updateQueue = [];
   const runtime = createMessagingRuntime({
@@ -2867,7 +2829,7 @@ test("messaging runtime rejects ambiguous inbound mappings deterministically", a
 
   await runtime.start();
   try {
-    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    updateQueue.push({ update_id: 1, callback_query: { id: "cb-1", data: "ptydeck:status", message: { chat: { id: 1001 } } } });
     await waitFor(() => outboundMessages.length >= 1, 1500);
     assert.match(outboundMessages[0].text, /matches multiple ptydeck messaging targets/i);
   } finally {
@@ -2875,7 +2837,7 @@ test("messaging runtime rejects ambiguous inbound mappings deterministically", a
   }
 });
 
-test("messaging runtime falls back to the cached session snapshot when live target resolution fails", async () => {
+test("messaging runtime falls back to the cached session snapshot for callback retry fallback actions", async () => {
   const outboundMessages = [];
   const updateQueue = [];
   const retryCalls = [];
@@ -2919,7 +2881,7 @@ test("messaging runtime falls back to the cached session snapshot when live targ
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "cached-1" });
   await runtime.start();
   try {
-    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/retry" } });
+    updateQueue.push({ update_id: 1, callback_query: { id: "cb-1", data: "ptydeck:retry", message: { chat: { id: 1001 } } } });
     await waitFor(() => outboundMessages.length >= 2, 1500);
     assert.match(outboundMessages[1].text, /Retry started for \[9\] codex/);
     assert.equal(retryCalls.length, 1);
@@ -2931,7 +2893,7 @@ test("messaging runtime falls back to the cached session snapshot when live targ
   }
 });
 
-test("messaging runtime rejects inbound actions when the mapped session payload is missing", async () => {
+test("messaging runtime rejects callback fallback actions when the mapped session payload is missing", async () => {
   const outboundMessages = [];
   const updateQueue = [];
   const runtime = createMessagingRuntime({
@@ -2968,7 +2930,7 @@ test("messaging runtime rejects inbound actions when the mapped session payload 
 
   await runtime.start();
   try {
-    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/status" } });
+    updateQueue.push({ update_id: 1, callback_query: { id: "cb-1", data: "ptydeck:status", message: { chat: { id: 1001 } } } });
     await waitFor(() => outboundMessages.length >= 1, 1500);
     assert.match(outboundMessages[0].text, /Mapped ptydeck session is unavailable/);
   } finally {
@@ -2976,7 +2938,7 @@ test("messaging runtime rejects inbound actions when the mapped session payload 
   }
 });
 
-test("messaging runtime rejects retry while a live mapped session is still running", async () => {
+test("messaging runtime rejects callback retry fallback while a live mapped session is still running", async () => {
   const outboundMessages = [];
   const updateQueue = [];
   const retryCalls = [];
@@ -3019,7 +2981,7 @@ test("messaging runtime rejects retry while a live mapped session is still runni
 
   await runtime.start();
   try {
-    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/retry" } });
+    updateQueue.push({ update_id: 1, callback_query: { id: "cb-1", data: "ptydeck:retry", message: { chat: { id: 1001 } } } });
     await waitFor(() => outboundMessages.length >= 1, 1500);
     assert.match(outboundMessages[0].text, /Retry is unavailable while \[9\] codex is running/);
     assert.deepEqual(retryCalls, []);

@@ -61,21 +61,6 @@ function normalizeForumTopicName(value, fallback = "ptydeck") {
   return normalized.slice(0, 128).trimEnd();
 }
 
-function buildTelegramReplyMarkup() {
-  return {
-    inline_keyboard: [
-      [
-        { text: "Status", callback_data: `${TELEGRAM_CALLBACK_PREFIX}status` },
-        { text: "Replay", callback_data: `${TELEGRAM_CALLBACK_PREFIX}replay` }
-      ],
-      [
-        { text: "Stop", callback_data: `${TELEGRAM_CALLBACK_PREFIX}stop` },
-        { text: "Retry", callback_data: `${TELEGRAM_CALLBACK_PREFIX}retry` }
-      ]
-    ]
-  };
-}
-
 function normalizeTelegramPollTimeoutSeconds(value) {
   if (Number.isInteger(value) && value > 0) {
     return value;
@@ -193,15 +178,6 @@ export function parseTelegramInboundCommand(input = {}, commandCatalog = null) {
   }
   const action = catalogEntry.action;
   const rawArg = normalizeNonEmptyString(match[2]);
-  if (action === "replay") {
-    if (!rawArg) {
-      return Object.freeze({ action });
-    }
-    if (/\s/.test(rawArg)) {
-      return null;
-    }
-    return Object.freeze({ action, selector: rawArg });
-  }
   if (action === "custom") {
     return Object.freeze({
       action,
@@ -525,7 +501,7 @@ export function createTelegramAdapter(options = {}) {
   const threadState = new Map();
   const inboundTraceEntries = [];
   let inboundTraceCapturedTotal = 0;
-  const replyMarkup = inboundEnabled ? buildTelegramReplyMarkup() : null;
+  const replyMarkup = null;
   let commandCatalog = normalizeTelegramCommandCatalog(options.commandCatalog || buildTelegramCommandCatalog());
   const metrics = {
     deliveredTotal: 0,
@@ -576,21 +552,26 @@ export function createTelegramAdapter(options = {}) {
   const forumTargetValidationState = new Map();
   const targetTraceEntries = [];
   let targetTraceCapturedTotal = 0;
-  for (const binding of Array.isArray(options.topicBindings) ? options.topicBindings : []) {
-    const stateKey = buildForumTopicStateKey({
-      chatId: binding?.chatId,
-      sessionId: binding?.sessionId
-    });
-    if (!stateKey || !Number.isInteger(binding?.messageThreadId)) {
-      continue;
+  function replaceTopicBindings(bindings = []) {
+    forumTopicState.clear();
+    for (const binding of Array.isArray(bindings) ? bindings : []) {
+      const stateKey = buildForumTopicStateKey({
+        chatId: binding?.chatId,
+        sessionId: binding?.sessionId
+      });
+      if (!stateKey || !Number.isInteger(binding?.messageThreadId)) {
+        continue;
+      }
+      forumTopicState.set(stateKey, {
+        messageThreadId: binding.messageThreadId,
+        topicName: normalizeNonEmptyString(binding?.topicName),
+        updatedAt: Number.isInteger(binding?.updatedAt) ? binding.updatedAt : null
+      });
     }
-    forumTopicState.set(stateKey, {
-      messageThreadId: binding.messageThreadId,
-      topicName: normalizeNonEmptyString(binding?.topicName),
-      updatedAt: Number.isInteger(binding?.updatedAt) ? binding.updatedAt : null
-    });
+    metrics.activeTopicCount = forumTopicState.size;
   }
-  metrics.activeTopicCount = forumTopicState.size;
+
+  replaceTopicBindings(options.topicBindings);
 
   function appendInboundTraceEntry(entry) {
     inboundTraceCapturedTotal += 1;
@@ -826,33 +807,6 @@ export function createTelegramAdapter(options = {}) {
           chatIsForum: true,
           chatTitle: "",
           reason: "topic_created"
-        }
-      );
-    } else if (desiredTopicName && desiredTopicName !== topicState.topicName) {
-      await transport.editForumTopic({
-        chatId: target.chatId,
-        messageThreadId: topicState.messageThreadId,
-        name: desiredTopicName
-      });
-      topicState.topicName = desiredTopicName;
-      topicState.updatedAt = nowFn();
-      metrics.renamedTopicTotal += 1;
-      metrics.lastTopicRenameAt = topicState.updatedAt;
-      metrics.lastTopicErrorAt = null;
-      metrics.lastTopicError = "";
-      recordTargetObservation(
-        {
-          ...target,
-          messageThreadId: topicState.messageThreadId,
-          topicName: desiredTopicName
-        },
-        "topic_renamed",
-        {
-          validated: true,
-          topicAction: "rename",
-          chatType: "supergroup",
-          chatIsForum: true,
-          reason: "topic_renamed"
         }
       );
     } else {
@@ -1385,6 +1339,7 @@ export function createTelegramAdapter(options = {}) {
     ensureTarget,
     handleEvent,
     syncCommands,
+    replaceTopicBindings,
     startInbound,
     stop,
     getStatus,

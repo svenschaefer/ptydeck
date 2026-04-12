@@ -1243,6 +1243,11 @@ export function createMessagingRuntime(options = {}) {
       telegramTopicBindings.set(buildTelegramTopicBindingKey(binding.chatId, binding.sessionId), binding);
     }
     rebuildConversationTargetIndex(normalizedBindings);
+    for (const adapter of adapters) {
+      if (typeof adapter.replaceTopicBindings === "function") {
+        adapter.replaceTopicBindings(normalizedBindings);
+      }
+    }
   }
 
   async function upsertTelegramTopicBinding(binding) {

@@ -8,8 +8,6 @@ const repoRoot = path.resolve(__dirname, '..');
 const indexHtmlPath = path.join(repoRoot, 'frontend/src/public/index.html');
 const commandReferencePath = path.join(repoRoot, 'docs/reference/commands.md');
 const manualDir = path.join(repoRoot, 'docs/manual');
-const EXTERNAL_MESSAGING_COMMAND_EXAMPLES = new Set(['/status', '/stop', '/retry']);
-
 async function loadModule(relativePath) {
   return import(pathToFileURL(path.join(repoRoot, relativePath)).href);
 }
@@ -18,14 +16,14 @@ function collectHandbookLinks(indexHtml) {
   return Array.from(indexHtml.matchAll(/href="([^"]*\/handbook[^"]*)"/g)).map((match) => match[1]);
 }
 
-function collectDocumentedSlashExamples(markdown) {
+function collectDocumentedSlashExamples(markdown, sourceFile) {
   const examples = [];
   for (const block of markdown.matchAll(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g)) {
     const lines = block[1]
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.startsWith('/'));
-    examples.push(...lines);
+    examples.push(...lines.map((line) => ({ sourceFile, example: line })));
   }
   return examples;
 }
@@ -50,13 +48,15 @@ test('documented slash-command examples resolve to known command topics', async 
   const { SYSTEM_SLASH_COMMANDS } = await loadModule('frontend/src/public/system-slash-commands.js');
   const registry = createSlashCommandRegistry(SYSTEM_SLASH_COMMANDS);
   const markdownFiles = fs.readdirSync(manualDir).filter((entry) => entry.endsWith('.md'));
-  const examples = markdownFiles.flatMap((entry) => collectDocumentedSlashExamples(fs.readFileSync(path.join(manualDir, entry), 'utf8')));
+  const examples = markdownFiles.flatMap((entry) =>
+    collectDocumentedSlashExamples(fs.readFileSync(path.join(manualDir, entry), 'utf8'), entry)
+  );
   assert.ok(examples.length > 0, 'Expected at least one documented slash-command example.');
-  for (const example of examples) {
-    if (EXTERNAL_MESSAGING_COMMAND_EXAMPLES.has(example)) {
+  for (const { sourceFile, example } of examples) {
+    const parsed = interpretComposerInput(example);
+    if (sourceFile === 'messaging-adapters.md' && (!parsed || parsed.kind !== 'control' || !registry.get(parsed.command))) {
       continue;
     }
-    const parsed = interpretComposerInput(example);
     assert.equal(parsed.kind, 'control', `Expected ${example} to resolve as a control command.`);
     assert.ok(registry.get(parsed.command), `Expected ${example} to resolve to a known slash command or alias.`);
   }

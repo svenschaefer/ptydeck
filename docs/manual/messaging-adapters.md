@@ -14,19 +14,16 @@ The adapter is intentionally not a remote shell.
 
 ## Telegram Command Surface
 
-The shipped Telegram bot command list is now derived from the canonical ptydeck command surface.
+The shipped Telegram bot command list is now derived from the operator-relevant ptydeck custom-command surface.
+
+The concrete command names shown below, such as `/docu` or `/go`, are only examples. The actual Telegram bot-command surface is derived from the custom commands configured in ptydeck at runtime.
 
 That means:
 
-- built-in bounded commands remain:
-  - `/status`
-  - `/stop`
-  - `/retry`
-  - `/replay`
-- bounded replay selectors such as `/replay l:40` or `/replay c:1200` remain valid as arguments on `/replay`, but they are not separate published Telegram bot commands
 - eligible custom commands are published automatically to Telegram with deterministic Telegram-safe names
 - scoped custom-command variants sharing the same canonical name collapse into one published Telegram command name; runtime resolution still picks the command that is valid for the mapped session
 - invalid, conflicting, or overflow custom commands are skipped deterministically instead of drifting into an undocumented Telegram-only surface
+- Telegram no longer publishes the earlier adapter-local built-in bot commands (`/status`, `/stop`, `/retry`, `/replay`) as part of the normal operator command surface
 
 Telegram-safe custom command naming currently follows this deterministic encoding:
 
@@ -45,8 +42,9 @@ Runtime behavior follows the published catalog:
 
 - a published Telegram custom command is resolved through the same custom-command model as the primary ptydeck slash-command surface
 - Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the authority
-- unknown slash commands are not intercepted as Telegram adapter actions
-- exact literal slash-prefixed terminal input remains available through the existing `//...` escape
+- unpublished slash-prefixed text is not intercepted as a Telegram adapter action and instead falls through to normal mapped terminal input
+- exact literal slash-prefixed terminal input for a published Telegram custom command remains available through the existing `//...` escape
+- no new adapter-owned built-in Telegram action buttons are attached to outbound messages; older legacy callback buttons may still be answered while old posts remain visible
 
 ## Noise Control and Diagnostics
 
@@ -163,17 +161,10 @@ The Telegram reference adapter can:
 - send three narrow Codex-only outbound families, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, and the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
-- accept the bounded inbound bot command set:
-  - `/status`
-  - `/stop`
-  - `/retry`
-  - `/replay`
-  - bounded replay selectors such as `/replay l:N`, `/replay c:N`, and `/replay sp:N`
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
 - route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
 - mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale
-- preserve literal slash-prefixed terminal input through a `//...` escape (`//status` -> `/status`)
-- expose the same bounded actions through Telegram buttons on adapter-owned messages
+- preserve literal slash-prefixed terminal input through a `//...` escape for published Telegram custom commands (`//docu` -> `/docu`)
 
 ## What It Cannot Do
 
@@ -406,25 +397,16 @@ Try:
 
 ```text
 echo TELEGRAM_OK
+/docu
+/go
 /status
-/replay
-/replay l:20
-/stop
-/retry
 ```
 
 Literal slash-prefixed terminal input example:
 
-`//status` -> `/status`
+`//docu` -> `/docu`
 
-Or use the inline buttons:
-
-- `Status`
-- `Replay`
-- `Stop`
-- `Retry`
-
-## Bounded Inbound Semantics
+## Inbound Semantics
 
 ### plain text input
 
@@ -433,45 +415,12 @@ It keeps owner-boundary checks plus `lastInput` tracking, but it does not requir
 
 Behavior:
 
-- known bot commands (`/status`, `/stop`, `/retry`, `/replay`) still take priority as adapter commands
-- other plain text is written to the mapped PTY as terminal input
+- published Telegram custom commands still take priority as adapter commands
+- other plain text, including unpublished slash-prefixed text such as `/status`, is written to the mapped PTY as terminal input
 - multiline payloads are normalized to one final `\r` terminator
-- exact slash-prefixed literal terminal input can be forced with `//...`
+- exact slash-prefixed literal terminal input for a published Telegram custom command can be forced with `//...`
 - whitespace-only payloads are rejected instead of writing meaningless PTY input
 - existing controller/access checks remain in force, so Telegram input does not bypass the normal single-writer control model
-
-### `status`
-
-Returns a compact session status summary for the mapped session.
-
-### `stop`
-
-Requests a bounded stop against the mapped session.
-
-Behavior:
-
-- if the session is still active, `ptydeck` issues the normal stop path
-- if the session is already gone, the command resolves idempotently as already stopped
-
-### `retry`
-
-Starts the mapped session again through the existing ptydeck restart/create path.
-
-Behavior:
-
-- if the session is still running, retry is rejected
-- if the session already exited, the adapter retries from the last known bounded session snapshot instead of inventing a second runtime model
-
-### `replay`
-
-Returns a visible-text replay excerpt from the mapped session.
-
-Defaults and bounds:
-
-- `/replay` defaults to `l:40`
-- `l:N` is bounded to a safe maximum
-- `c:N` is bounded to a safe maximum
-- `sp:N` is bounded and only works where shell-block tracking is actually available
 
 ## Operational Notes
 
@@ -488,7 +437,8 @@ Defaults and bounds:
 - `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive` and `allowlistDeliveryScopes` for the Telegram adapter itself.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
 - `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
-- Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` and persists that binding instead of relying on manual topic naming discipline.
+- Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` for the initial binding and persists the resulting `messageThreadId`.
+- After that first binding, routing continues by `chatId + messageThreadId`, not by topic title, so manual Telegram topic renames stay mapped correctly and are no longer snapped back automatically by the normal reuse path.
 
 ## Related Docs
 

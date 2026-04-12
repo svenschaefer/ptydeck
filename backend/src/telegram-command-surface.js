@@ -1,29 +1,9 @@
-import { createSlashCommandRegistry } from "../../frontend/src/public/command-schema.js";
 import { compareCustomCommandRecords, normalizeCustomCommandRecord } from "../../frontend/src/public/custom-command-model.js";
-import { SYSTEM_SLASH_COMMANDS } from "../../frontend/src/public/system-slash-commands.js";
 
 const TELEGRAM_COMMAND_MAX_COUNT = 100;
 const TELEGRAM_COMMAND_NAME_MAX_LENGTH = 32;
 const TELEGRAM_COMMAND_DESCRIPTION_MAX_LENGTH = 256;
 const TELEGRAM_COMMAND_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
-
-const TELEGRAM_BUILTIN_COMMANDS = Object.freeze([
-  Object.freeze({
-    telegramCommand: "status",
-    action: "status",
-    description: "Show the mapped session status."
-  }),
-  Object.freeze({
-    telegramCommand: "stop",
-    action: "stop",
-    description: "Stop the mapped session."
-  }),
-  Object.freeze({
-    telegramCommand: "retry",
-    action: "retry",
-    description: "Retry the mapped session."
-  })
-]);
 
 function normalizeNonEmptyString(value) {
   if (typeof value !== "string") {
@@ -74,16 +54,6 @@ function encodeTelegramCommandName(name) {
     return "";
   }
   return TELEGRAM_COMMAND_PATTERN.test(encoded) ? encoded : "";
-}
-
-function buildReplayBuiltinEntry() {
-  const registry = createSlashCommandRegistry(SYSTEM_SLASH_COMMANDS);
-  const replay = registry.resolve("replay")?.canonicalEntry || registry.get("replay");
-  return Object.freeze({
-    telegramCommand: "replay",
-    action: "replay",
-    description: truncateDescription(replay?.description || "View retained replay excerpts.")
-  });
 }
 
 function buildCustomCommandDescription(records, customName) {
@@ -177,16 +147,6 @@ export function buildTelegramCommandCatalog(options = {}) {
   const entries = [];
   const skippedCommands = [];
   const reservedNames = new Set();
-
-  const replayEntry = buildReplayBuiltinEntry();
-  for (const entry of [...TELEGRAM_BUILTIN_COMMANDS, replayEntry]) {
-    entries.push(
-      Object.freeze({
-        ...entry
-      })
-    );
-    reservedNames.add(entry.telegramCommand);
-  }
 
   const byCustomName = new Map();
   for (const rawCommand of customCommands) {
