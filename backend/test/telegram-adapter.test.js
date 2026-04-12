@@ -253,6 +253,129 @@ test("telegram adapter syncs published commands and uses the synced catalog for 
   }
 });
 
+test("telegram adapter surfaces command sync failures when the transport cannot publish commands", async () => {
+  const adapterWithoutPublisher = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      }
+    }
+  });
+
+  const missingPublisher = await adapterWithoutPublisher.syncCommands({
+    entries: [{ telegramCommand: "status", action: "status", description: "Show status." }],
+    publishedCommands: [{ command: "status", description: "Show status." }],
+    skippedCommands: [{ commandName: "Docu", reason: "too_long_for_telegram" }]
+  });
+
+  assert.deepEqual(missingPublisher, {
+    synced: false,
+    publishedCommandCount: 1,
+    skippedCommandCount: 1,
+    reason: "transport_missing_set_my_commands"
+  });
+  assert.equal(adapterWithoutPublisher.getStatus().publishedCommandCount, 1);
+  assert.equal(adapterWithoutPublisher.getStatus().commandCatalogSize, 1);
+  assert.equal(adapterWithoutPublisher.getStatus().commandSyncSkippedCount, 1);
+  assert.equal(
+    adapterWithoutPublisher.getStatus().lastCommandSyncError,
+    "Telegram transport does not support setMyCommands."
+  );
+  assert.equal(typeof adapterWithoutPublisher.getStatus().lastCommandSyncErrorAt, "number");
+
+  const adapterWithFailingPublisher = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async setMyCommands() {
+        throw new Error("setMyCommands failed");
+      }
+    }
+  });
+
+  const failedPublisher = await adapterWithFailingPublisher.syncCommands({
+    entries: [{ telegramCommand: "status", action: "status", description: "Show status." }],
+    publishedCommands: [{ command: "status", description: "Show status." }],
+    skippedCommands: []
+  });
+
+  assert.equal(failedPublisher.synced, false);
+  assert.equal(failedPublisher.error, "setMyCommands failed");
+  assert.equal(adapterWithFailingPublisher.getStatus().lastCommandSyncError, "setMyCommands failed");
+});
+
+test("telegram adapter records non-text inbound observations without dispatching a command", async () => {
+  let served = false;
+  let handledTotal = 0;
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!served) {
+          served = true;
+          return [
+            {
+              update_id: 41,
+              message: {
+                chat: { id: -100200300, type: "supergroup", title: "ptydeck" },
+                photo: [{ file_id: "p1" }]
+              }
+            }
+          ];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  await adapter.startInbound({
+    async onCommand() {
+      handledTotal += 1;
+      return { ok: true, text: "unexpected" };
+    }
+  });
+
+  try {
+    await waitFor(() => adapter.getStatus().inboundObservedTotal >= 1, 1500);
+    assert.equal(handledTotal, 0);
+    const status = adapter.getStatus();
+    assert.equal(status.inboundHandledTotal, 0);
+    assert.equal(status.inboundTrace.recent.length >= 1, true);
+    assert.equal(status.inboundTrace.recent.at(-1).reason, "non_text_message");
+    assert.equal(status.inboundTrace.recent.at(-1).phase, "ignored");
+  } finally {
+    await adapter.stop();
+  }
+});
+
 test("telegram adapter validates transport requirements and inbound start states deterministically", async () => {
   assert.throws(
     () => createTelegramAdapter({ configured: true, transport: { sendMessage: async () => ({ messageId: 1 }) } }),

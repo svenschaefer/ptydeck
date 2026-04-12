@@ -476,6 +476,59 @@ test("validateResponse accepts ssh session remote runtime metadata", () => {
   });
 });
 
+test("validateResponse rejects malformed terminal app identity details and remote runtime metadata", () => {
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "session",
+      body: createLocalSession({
+        appIdentity: {
+          ...SHELL_APP_IDENTITY,
+          details: {
+            foregroundProcess: {
+              pid: Number.POSITIVE_INFINITY
+            }
+          }
+        }
+      })
+    });
+  }, /Response does not match Session schema\./);
+
+  assert.throws(() => {
+    validateResponse({
+      statusCode: 200,
+      expect: "session",
+      body: createLocalSession({
+        kind: "ssh",
+        shell: "ssh",
+        cwd: "~/workspace",
+        remoteConnection: {
+          host: "example.internal",
+          port: 22,
+          username: "ops"
+        },
+        remoteAuth: {
+          method: "privateKey"
+        },
+        remoteRuntime: {
+          connectivityState: "degraded",
+          reconnectPolicy: {
+            maxAttempts: 3,
+            delayMs: 1500
+          },
+          reconnectAttempts: 1,
+          disconnectedAt: 10,
+          nextReconnectAt: "1510",
+          lastReconnectAt: null,
+          lastDisconnectReason: "ssh-transport-exit",
+          lastExitCode: 255,
+          lastExitSignal: ""
+        }
+      })
+    });
+  }, /Response does not match Session schema\./);
+});
+
 test("validateRequest rejects invalid session create body", () => {
   assert.throws(() => {
     validateRequest({

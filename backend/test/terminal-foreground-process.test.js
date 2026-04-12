@@ -56,6 +56,13 @@ test("parseLinuxProcStat extracts process-group and terminal fields", () => {
   });
 });
 
+test("parseLinuxProcStat rejects malformed proc stat payloads", () => {
+  assert.equal(parseLinuxProcStat(""), null);
+  assert.equal(parseLinuxProcStat("200 bash S 100 200 200 34821 210"), null);
+  assert.equal(parseLinuxProcStat("200 (bash S 100 200 200 34821 210"), null);
+  assert.equal(parseLinuxProcStat("200 (bash) S nope 200 200 34821 210"), null);
+});
+
 test("readLinuxProcessSnapshot normalizes proc payloads", () => {
   const fixtures = createProcFixtures({
     200: {
@@ -77,6 +84,22 @@ test("readLinuxProcessSnapshot normalizes proc payloads", () => {
   assert.equal(snapshot.executableName, "bash");
   assert.deepEqual(snapshot.commandLine, ["bash", "--login"]);
   assert.equal(snapshot.ttyPath, "/dev/pts/5");
+});
+
+test("readLinuxProcessSnapshot rejects invalid pids and malformed proc payloads", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "invalid",
+      status: "Name:\tbash\n",
+      cmdline: "bash\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  assert.equal(readLinuxProcessSnapshot(0, fixtures), null);
+  assert.equal(readLinuxProcessSnapshot("abc", fixtures), null);
+  assert.equal(readLinuxProcessSnapshot(200, fixtures), null);
 });
 
 test("inspectLinuxTerminalForegroundProcess resolves the foreground group representative and ancestry", () => {
@@ -125,4 +148,92 @@ test("inspectLinuxTerminalForegroundProcess resolves the foreground group repres
   assert.equal(inspection.ancestry.length, 1);
   assert.equal(inspection.ancestry[0].pid, 200);
   assert.equal(inspection.ancestry[0].executableName, "bash");
+});
+
+test("inspectLinuxTerminalForegroundProcess falls back to a foreground root when the process-group leader is absent", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    211: {
+      stat: "211 (codex) S 999 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tcodex\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "codex\u0000--json\u0000",
+      exe: "/usr/local/bin/codex",
+      tty: "/dev/pts/5"
+    },
+    212: {
+      stat: "212 (node) S 211 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tnode\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "node\u0000worker.js\u0000",
+      exe: "/usr/bin/node",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  const inspection = inspectLinuxTerminalForegroundProcess(200, fixtures);
+
+  assert.equal(inspection.representativeProcess.pid, 211);
+  assert.equal(inspection.representativeProcess.executableName, "codex");
+  assert.deepEqual(
+    inspection.foregroundProcesses.map((entry) => entry.pid),
+    [211, 212]
+  );
+});
+
+test("inspectLinuxTerminalForegroundProcess falls back to the lowest foreground pid when no leader or root exists", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    211: {
+      stat: "211 (node) S 212 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tnode\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "node\u0000worker.js\u0000",
+      exe: "/usr/bin/node",
+      tty: "/dev/pts/5"
+    },
+    212: {
+      stat: "212 (codex) S 211 210 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tcodex\nNSpgid:\t210\nNSsid:\t200\n",
+      cmdline: "codex\u0000--json\u0000",
+      exe: "/usr/local/bin/codex",
+      tty: "/dev/pts/5"
+    }
+  });
+
+  const inspection = inspectLinuxTerminalForegroundProcess(200, fixtures);
+
+  assert.equal(inspection.representativeProcess.pid, 211);
+  assert.equal(inspection.ancestry.length, 1);
+  assert.equal(inspection.ancestry[0].pid, 212);
+});
+
+test("inspectLinuxTerminalForegroundProcess returns null when the terminal has no active foreground group", () => {
+  const fixtures = createProcFixtures({
+    200: {
+      stat: "200 (bash) S 100 200 200 34821 210 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tbash\nNSpgid:\t200\nNSsid:\t200\n",
+      cmdline: "bash\u0000--login\u0000",
+      exe: "/usr/bin/bash",
+      tty: "/dev/pts/5"
+    },
+    300: {
+      stat: "300 (other) S 1 300 300 34822 300 0 0 0 0 0 0 0 0 20 0 1 0 0 0 0",
+      status: "Name:\tother\nNSpgid:\t300\nNSsid:\t300\n",
+      cmdline: "other\u0000",
+      exe: "/usr/bin/other",
+      tty: "/dev/pts/6"
+    }
+  });
+
+  assert.equal(inspectLinuxTerminalForegroundProcess(200, fixtures), null);
 });

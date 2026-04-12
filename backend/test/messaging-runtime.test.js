@@ -957,6 +957,65 @@ test("messaging runtime suppresses persisted summary-family restart history with
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
 });
 
+test("messaging runtime does not enter summary restart recovery for codex sessions created after runtime readiness", async () => {
+  const sends = [];
+  let now = 3_500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => now,
+    codexSummaryRestartRecoveryQuietMs: 25,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 395 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 396 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "post-ready-created-session",
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.markRuntimeReady();
+  now += 50;
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h110-post-ready-created" });
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h110-post-ready-summary-text" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h110-post-ready-summary-separator" }
+  });
+
+  assert.equal(sends.length, 1);
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.codexSummaryRestartRecovery.activeSessionCount, 0);
+  assert.equal(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"), false);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+});
+
 test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {
   const sends = [];
   let now = 260;

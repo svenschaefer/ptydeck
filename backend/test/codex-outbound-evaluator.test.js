@@ -213,3 +213,79 @@ test("codex summary evaluator rejects short or fragmented separator-hint summari
   assert.equal(fragmented.ok, false);
   assert.equal(fragmented.reason, "multi_fragment_summary");
 });
+
+test("codex summary evaluator rejects unsupported aggregation reasons and contaminated sentence candidates", () => {
+  const unsupported = evaluateCodexSeparatorSummaryCandidate(
+    "Der Restart ist sauber und die Allowlist bleibt eng genug für den nächsten Live-Check.",
+    {
+      aggregationReason: "lifecycle_exit"
+    }
+  );
+  const trailingColon = evaluateCodexSeparatorSummaryCandidate(
+    "Validated target apps for the next codex section:",
+    {
+      aggregationReason: "separator_hint"
+    }
+  );
+  const contaminated = evaluateCodexSeparatorSummaryCandidate(
+    "Updated Plan gpt-5.4 xhigh background terminal running while the next check is still open.",
+    {
+      aggregationReason: "separator_hint"
+    }
+  );
+  const missingBoundary = evaluateCodexSeparatorSummaryCandidate(
+    "This summary stays narrow enough for one check",
+    {
+      aggregationReason: "separator_hint"
+    }
+  );
+
+  assert.equal(unsupported.ok, false);
+  assert.equal(unsupported.reason, "unsupported_aggregation_reason");
+  assert.equal(trailingColon.ok, false);
+  assert.equal(trailingColon.reason, "summary_trailing_colon");
+  assert.equal(contaminated.ok, false);
+  assert.equal(contaminated.reason, "summary_inline_contamination");
+  assert.equal(missingBoundary.ok, false);
+  assert.equal(missingBoundary.reason, "summary_missing_sentence_boundary");
+});
+
+test("codex outbound evaluator rejects contaminated continuation entries after a valid info bullet", () => {
+  const state = createCodexAllowlistState();
+
+  feed(state, "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n", 11_000);
+  assert.deepEqual(
+    feed(state, "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-Zustand.\n", 11_100),
+    []
+  );
+  const decisions = feed(
+    state,
+    "  Damit der Analyse-Slice sauber abgeschlossen ist.\n  └ noisy tail that should not merge\n",
+    11_200
+  );
+
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].type, "rejection");
+  assert.equal(decisions[0].reason, "continuation_inline_contamination");
+});
+
+test("codex section evaluator finalizes a structured section before the next separator without poisoning the prior block", () => {
+  const state = createCodexAllowlistState();
+
+  feedSection(state, "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n", 12_000);
+  feedSection(state, "• Der Restart ist sauber.\n", 12_100);
+  feedSection(state, "  Live-Zustand\n", 12_200);
+  feedSection(state, "  - Backend: ok\n", 12_300);
+  const finalized = feedSection(
+    state,
+    "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    12_400
+  );
+
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].type, "candidate");
+  assert.equal(finalized[0].family, CODEX_SEPARATOR_SECTION_SCOPE);
+  assert.equal(finalized[0].reason, "section_closed_by_separator");
+  assert.match(finalized[0].text, /^Der Restart ist sauber\./);
+  assert.match(finalized[0].text, /\n\nLive-Zustand\n- Backend: ok/);
+});

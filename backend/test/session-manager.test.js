@@ -1582,6 +1582,55 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.deepEqual(secondPty.writes, ["echo START\n"]);
 });
 
+test("SessionManager restart preserves ssh auth context and secret-backed reconnect state", () => {
+  const firstPty = createFakePty();
+  const secondPty = createFakePty();
+  const spawnOptions = [];
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: (options) => {
+      spawnOptions.push(options);
+      spawnCount += 1;
+      return spawnCount === 1 ? firstPty : secondPty;
+    },
+    sshAskpassPath: "/tmp/ptydeck-test-askpass.sh",
+    sshKnownHostsPath: "/tmp/ptydeck-test-known_hosts"
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22,
+      username: "ops"
+    },
+    remoteAuth: {
+      method: "password"
+    },
+    remoteSecret: "super-secret",
+    startCwd: "~/workspace",
+    startCommand: "hostname"
+  });
+
+  const restarted = manager.restart(created.id);
+
+  assert.equal(firstPty.killed, true);
+  assert.equal(restarted.kind, "ssh");
+  assert.deepEqual(restarted.remoteConnection, {
+    host: "example.internal",
+    port: 22,
+    username: "ops"
+  });
+  assert.deepEqual(restarted.remoteAuth, { method: "password" });
+  assert.equal(restarted.remoteRuntime.connectivityState, "connected");
+  assert.equal(manager.get(created.id).remoteSecret, "super-secret");
+  assert.equal(spawnOptions.length, 2);
+  assert.equal(spawnOptions[1].env.SSH_ASKPASS, "/tmp/ptydeck-test-askpass.sh");
+  assert.equal(spawnOptions[1].env.PTYDECK_SSH_SECRET, "super-secret");
+  assert.equal(spawnOptions[1].args.includes("example.internal"), true);
+  assert.equal(manager.get(created.id).ptyProcess, secondPty);
+});
+
 test("SessionManager passes startup env overrides to PTY spawn", () => {
   const fakePty = createFakePty();
   let spawnOptions = null;
