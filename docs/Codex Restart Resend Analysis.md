@@ -15,6 +15,18 @@ As of `v0.4.0-H112`, the narrow product fix from this analysis is shipped in its
 - it stays suppressed until the first fresh post-restart input observed after that quiet window for the same session
 - delivered summary candidates are persisted in a resend ledger keyed by normalized summary content plus session/thread context
 
+The 2026-04-13 follow-up architecture review did not change that product direction:
+
+- for the currently evidenced bug, `H112` is still the right narrow strategy
+- simpler alternatives such as pre-ready-only suppression, prior-history-only suppression, or generic startup muting remain either disproven by the measured restart windows or too broad for the shipped allowlist model
+- the missing piece is live re-verification, not a different design
+
+That final live confirmation is still pending:
+
+- the currently running backend instance that was last audited for restart-resend behavior predates commit `11381a4`
+- therefore the existing restart-resend evidence still proves the pre-H112 leak, not the post-H112 runtime behavior
+- the next conclusive step is a backend restart on `11381a4` followed by fresh runs of `scripts/analyze-restart-resends.mjs` and `scripts/analyze-latest-restart-deliveries.mjs`
+
 The later live restart audit now shows that this first implementation is not yet sufficient in practice:
 
 - latest audited restart window: `readyAt 2026-04-12T17:54:10.724Z`
