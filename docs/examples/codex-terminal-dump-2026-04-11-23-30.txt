@@ -1,0 +1,509 @@
+› Bitte vertiefe deine Analyse, nimmt dir die Zeit und Analysetiefe die du benötigst, um alles relevanten Details zu
+
+• Updated Plan
+  └ Deepening the restart-streaming analysis as an analysis-only slice. I will expand the evidence base across more
+    restart windows, correlate it with the runtime code paths, and persist the findings in repository docs without
+    changing behavior.
+    □ Collect deeper restart evidence from logs and health traces across multiple windows and summarize recurring
+      patterns
+    □ Map the observed restart sequence to concrete backend/frontend code paths and identify structurally flood-prone
+      transitions
+    □ Expand the restart analysis documentation and persistent context, validate the analysis artifacts, then commit and
+      push
+
+• Ich sammele jetzt mehrere Restart-Fenster aus dem Debug-Log und korreliere sie mit runtime.ready, Startup-Warmup und
+  Session-/Messaging-Events. So sehen wir, was wirklich konsistent strukturell ist und was nur Einzelfall war.
+
+
+• Explored
+  └ Read runtime.js, session-manager.js
+    Search runtime\.ready|runtime\.startup_warmup\.(active|quiet_wait)|messaging\.event\.trace|session\.event|
+           messaging\.target\.update|http\.request\.(start|done) in ptydeck-backend-debug.log
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ziehe jetzt mehrere Restart-Fenster heraus und mappe die relevanten Codepfade gezielt: Warmup, Lifecycle-
+  Observation, Target-Resolution und Prompt/Idle-Klassifikation. Damit bekommen wir ein belastbares Restart-Modell statt
+  nur eines Einzelfensters.
+
+• Explored
+  └ Search ensureSessionTarget|observeSessionLifecycleInternal|observeSessionIdle|observePromptReady|
+observeControlChange|
+    … +1322 lines
+      }
+    }
+
+• Explored
+  └ Search runtime\.ready|runtime\.startup_warmup\.quiet_wait in ptydeck-backend-debug.log
+
+• Explored
+  └ Read runtime.js, telegram-adapter.js, messaging-runtime.js
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T20:08:00.000Z --end 2026-04-11T20:08:09.500Z --format
+  │ json | jq '{window, totals: {labels: .totals.labels, sessionEventTypes: .totals.sessionEventTypes,
+  │ messagingEventTypes: .totals.messagingEventTypes, messagingEventReasons: .totals.messagingEventReasons,
+  │ … +2 lines
+  └ {
+      "window": {
+    … +54 lines
+      ]
+    }
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+• Explored
+  └ Read ptydeck-backend-debug.log
+    Read ptydeck-backend-debug.log
+    Search messaging\.event\.trace|messaging\.target\.update|session\.event|runtime\.ready|
+  Traffic sauber verstehen: warum direkt nach dem Restart resize und teils input ausgelöst werden.
+
+• Explored
+  └ Search resize\(|/resize|/input|sendInput|fit\(|measure|mounted|attach|reattach|reconnect in public
+    Search session\.updated|session\.created|session\.started|session\.activity\.completed|session\.activity\.started|
+           observeSessionLifecycle\(|observeSessionData\(|observeSessionIdle\( in runtime.js
+
+• Ran curl -s http://127.0.0.1:18080/health | jq '{messaging: {enabled: .messaging.enabled, deliveryEnabled: .messaging.
+  │ deliveryEnabled, deliveryHardBreakActive: .messaging.deliveryHardBreakActive, adapters: [.messaging.adapters[] | {
+  │ adapter, enabled, deliveryEnabled, deliveryHardBreakActive, pollingActive, configuredTargets, activeTopicCount, va
+    … +19 lines
+      }
+    }
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich schaue mir jetzt gezielt die Terminal-Mount- und Resize-Pfade im Frontend an. Das ist wichtig, weil der Restart-
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich prüfe noch den Snapshot-Stabilisierungspfad. Die Mehrfach-Resize-Pässe nach einem Reconnect sehen nach einem
+  relevanten Restart-Treiber aus.
+
+  │ json | jq '{window, totals: {labels: .totals.labels, sessionEventTypes: .totals.sessionEventTypes,
+  │ messagingEventTypes: .totals.messagingEventTypes, messagingEventReasons: .totals.messagingEventReasons,
+  │ … +2 lines
+  └ {
+      "window": {
+
+• Waited for background terminal
+
+• Explored
+  └ Read session-runtime-controller.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich prüfe noch den Pfad hinter Control became unclaimed. Das ist wahrscheinlich kein PTY-Output-Thema, sondern eine
+  Seiteneffekt-Kette aus Browser-Reconnect und Session-Control-State. Das müssen wir im Restart-Modell sauber trennen.
+
+• Explored
+  └ Search Control became unclaimed|buildControlEventSummary|attached client|setSessionControllerClient|
+updateSessionControl|
+           normalizeSessionControlState|attachedClients|release control|unclaimed in backend
+    Read messaging-runtime.js, runtime.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich schaue noch einen Schritt tiefer in die Session-Control-Reconciliation. Wenn control became unclaimed bei Restarts
+  nur ein Reconnect-Nebeneffekt ist, muss das in der Analyse klar belegt sein.
+
+• Explored
+  └ Search broadcastSessionUpdated\(|sessionControl|clientId|attached client|connection closed|ws\.upgrade|
+ws\.connection|
+           socket in runtime.js
+    Read runtime.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ergänze noch die Data-Path-Seite: Prompt-Boundaries, Quiet-Window-Flush und warum ein Restart auch ohne echte neue
+  Arbeit schon Summary-/Idle-/Prompt-Kandidaten erzeugt.
+
+• Explored
+  └ Read messaging-runtime.js, session-terminal-runtime-controller.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ziehe noch die HTTP-Pfade pro Restart-Fenster heraus. Damit trennen wir sauber zwischen bloßem Terminal-Remount
+  (resize) und echten vom Browser ausgelösten Eingaben (input).
+
+    … +18 lines
+      }
+    }
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T20:22:29.000Z --end 2026-04-11T20:22:46.999Z --format
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T20:08:00.000Z --end 2026-04-11T20:08:09.500Z --format
+  │ json | jq '{window, httpPaths: .totals.httpPaths}'
+  └ {
+      "window": {
+• Waited for background terminal
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die zweite Restart-Klasse ist jetzt klar: manche Restarts sind browsergetrieben, andere werden fast vollständig von
+  bereits laufendem PTY-Output dominiert. Ich ziehe noch den /ready-Polling-Pfad aus dem Frontend, damit die Bootstrap-
+  Seite vollständig ist.
+
+• Explored
+  └ Search waitForServerWarmup|skipWait|/ready|ready poll|startupWarmup in public
+    Read startup-warmup-controller.js, app-lifecycle-controller.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Explored
+  └ Search onData\(|onTerminalData|handleSessionTerminalInput|sendInput\(|dispatchTerminalPaste|terminal\.onData|
+textarea|
+           paste in session-terminal-runtime-controller.js
+    Read session-terminal-runtime-controller.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ein wichtiger Unterschied zeichnet sich ab: Full page load und bestehender Browser mit WS-Reconnect verhalten sich beim
+  Restart unterschiedlich. Ich prüfe das jetzt im Log explizit gegen ws.upgrade.accepted und ws.snapshot.sent.
+
+• Explored
+
+• Context compacted
+
+• Ich vertiefe die Restart-Analyse jetzt entlang der realen Codepfade und mehrerer Restart-Fenster. Ziel ist ein
+  belastbares Modell, nicht nur weitere Beobachtungen.
+
+    □ Map observed restart sequences to concrete backend/frontend code paths and flood-prone transitions
+    □ Expand restart analysis docs/context, validate, commit, and push
+
+• Ran git status --short && printf '\n---\n' && sed -n '1,260p' docs/'Restart Streaming Analysis.md'
+  └ ?? docs/examples/
+
+    … +260 lines
+    That traffic is sufficient to stimulate PTY activity, session activity transitions, and updated session metadata
+    before the runtime is considered ready.
+
+• Explored
+  └ Read analyze-restart-streaming.mjs, CODEX_CONTEXT.md
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ziehe jetzt die zweite Ebene auf: Vergleich mehrerer Restart-Fenster und die exakten Backend-/Frontend-Pfade, die
+  diese Fenster erzeugen. Dabei will ich zwischen Browser-Remount, PTY-Restore und Warmup sauber trennen.
+
+• Explored
+  └ Read startup-warmup-controller.js, app-lifecycle-controller.js, ws-client.js, session-terminal-runtime-controller.js,
+         session-terminal-resize-controller.js, session-runtime-controller.js, runtime.js, session-manager.js, messaging-
+         runtime.js
+    Search runtime\.ready|runtime\.startup_warmup\.(active|quiet_wait)|ws\.upgrade\.accepted|ws\.snapshot\.sent
+in ptydeck-
+           backend-debug.log
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich habe jetzt den entscheidenden Architekturpunkt bestätigt: server.listen() passiert vor runtime.ready. Das erklärt,
+  warum Reconnect-/Remount-Traffic schon mitten in die Warmup-Phase hineinläuft. Als Nächstes ziehe ich die
+  Vergleichsfenster 19:55, 20:08 und 20:22 sauber auseinander.
+
+• Explored
+  └ Read ptydeck-backend-debug.log
+    Search session\.event|messaging\.event\.trace|messaging\.target\.update|runtime\.ready|http\.request\.(start|done)
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T19:55:20.000Z --end 2026-04-11T19:55:37.000Z --format
+  │ json | jq '{window, totals: {labels: .totals.labels, httpPaths: .totals.httpPaths,
+  │ sessionEventTypes: .totals.sessionEventTypes, messagingEventTypes: .totals.messagingEventTypes,
+  │ … +2 lines
+      ]
+    }
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T20:08:00.000Z --end 2026-04-11T20:08:09.500Z --format
+  │ json | jq '{window, totals: {labels: .totals.labels, httpPaths: .totals.httpPaths,
+  │ sessionEventTypes: .totals.sessionEventTypes, messagingEventTypes: .totals.messagingEventTypes,
+  │ … +2 lines
+  └ {
+      "window": {
+    … +56 lines
+      ]
+    }
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Das 20:08-Fenster bestätigt jetzt sauber eine zweite Flood-Klasse: dort kam der Druck fast vollständig aus einer
+  einzigen wiederhergestellten PTY-Session, nicht aus dem Browser. Ich hole jetzt die verdichteten Vergleichsdaten aus
+  allen drei Fenstern und schreibe sie dann in das Restart-Modell ein.
+           session\.activity\.completed|session\.activity\.started in runtime.js
+    Search waitForStartupWarmup|bootstrapDevAuthToken|startWsRuntime|scheduleSnapshotTerminalStabilization|
+           scheduleDeferredResizePasses|applyResizeForSession\( in public
+    Read app-lifecycle-controller.js, session-terminal-runtime-controller.js, runtime.js
+    Read ptydeck-backend-debug.log
+    Search ws\.upgrade\.accepted|ws\.snapshot\.sent|http\.request\.(start|done)|runtime\.startup_warmup\.active|
+• Waited for background terminal
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Der Punkt ist relevant. Für Codex reicht die reine Zeilenfolge nicht aus; ANSI-Styling und visuelle Marker tragen
+  semantische Information. Ich ziehe das noch in die Analyse rein und prüfe, an welcher Stelle der Messaging-Pfad diese
+  Signale heute verliert.
+  └ nl: backend/src/session-shell-adapter.js: No such file or directory
+
+    … +2 lines
+    backend/src/shell-adapter.js:162:    consumeOutput(session, chunk) {
+    backend/src/session-manager.js:895:      const streamResult = session.shellAdapter.consumeOutput(session, data);
+
+• Explored
+  └ Search consumeOutput\(|cleaned|stripAnsi|ansi|escape|OSC|CSI|promptBoundaries|alternate-screen|terminal signals|mouse
+           tracking in backend
+    Search sanitizeMessageCandidate|classifyTerminalLine|classifyNoiseSignature|createComparableText|strip in messaging-
+           runtime.js
+    Read shell-adapter.js, messaging-runtime.js, terminal-output-signals.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Explored
+  └ Read replay-excerpt.js
+    Search normalizeVisibleReplayText in backend
+    Read ptydeck-backend-debug.log
+    Search http.request.start|http.request.done|session.event|messaging.event.trace|runtime.ready|runtime.startup_warmup.
+           (active|quiet_wait)|ws.upgrade.accepted|ws.snapshot.sent
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich habe jetzt genug Material für ein belastbares Restart-Modell: drei unterschiedliche Restart-Regime, die genaue
+  Reihenfolge im Backend, die Frontend-Timer für Remount/Resize, und zusätzlich den Verlust von ANSI-/
+  Formatierungsinformation im Messaging-Pfad. Ich schreibe das jetzt in die Restart-Analyse-Doku und verdichte den Kern
+  noch in CODEX_CONTEXT.md.
+
+• Explored
+  └ Read README.md, Restart Streaming Analysis.md
+
+• Ran cat > docs/'Restart Streaming Analysis.md' <<'EOF'
+  │ # Restart Streaming Analysis
+  │
+  │ … +570 lines
+  └ diff --git a/docs/README.md b/docs/README.md
+    index 6958568..fdd48e6 100644
+    … +708 lines
+    +Any later messaging rebuild that wants clean, targeted delivery must start from this model rather than from more ad
+    hoc noise filters.
+
+─ Worked for 1m 47s ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die Doku ist jetzt auf dem tieferen Modellstand. Ich prüfe noch die eingefügten Kontextzeilen und validiere dann den
+  Slice sauber, damit kein schiefer Markdown-/Quote-Zustand drin bleibt.
+
+• Explored
+  └ Search Restart-time streaming is now understood|formatting-aware stream model|hard-break baseline in CODEX_CONTEXT.md
+    Read CODEX_CONTEXT.md
+
+• Ran git diff --check && printf '\n---\n' && git status --short
+  └
+    ---
+     M docs/README.md
+     M "docs/Restart Streaming Analysis.md"
+    ?? docs/examples/
+
+
+• CODEX_CONTEXT.md hatte den Restart-Stand noch nicht auf der vertieften Ebene. Ich ziehe das jetzt nach, damit die
+  Erkenntnisse persistent und nicht nur in der Spezialdoku verankert sind.
+
+  │ from pathlib import Path
+  │ p = Path('CODEX_CONTEXT.md')
+  │ … +30 lines
+  └ diff --git a/CODEX_CONTEXT.md b/CODEX_CONTEXT.md
+    index e8c7947..bbf2708 100644
+    … +33 lines
+    session before dispatching lifecycle, summary, and control/share events, preventing duplicate topic provisioning and
+    startup-order churn such as control chatter appearing before `Session created.`.
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die eigentliche Analyse ist jetzt in der Doku. Ich fahre noch den Validierungs- und Hygiene-Block, damit der Slice auf
+  einem sauberen Stand committed wird und kein halbfertiger Doku-Stand liegen bleibt.
+
+• Die Doku- und Lint-Kette läuft. Ich lasse sie seriell durch, damit keine hängenden Prüfprozesse gestapelt werden.
+
+• Ran npm run lint
+  └
+    > ptydeck@0.2.0 lint
+    … +28 lines
+    generated /home/wsl/workspace/code/ptydeck/frontend/src/public/api-types.d.ts
+
+• Waited for background terminal
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die Testkette läuft. Wenn sie sauber durch ist, fahre ich noch Coverage und prüfe anschließend explizit, dass keine
+  hängenden Prüfprozesse übrig geblieben sind.
+
+• Waited for background terminal · npm run test
+
+• Die Suite ist noch sauber am Laufen. Bis hier keine Regressionen, auch nicht in den Messaging-/Runtime-Integrationen,
+  die für diese Analyse relevant sind.
+
+• Waited for background terminal · npm run test
+
+• Ran npm run test
+  └
+    > ptydeck@0.2.0 test
+    … +4761 lines
+    # todo 0
+    # duration_ms 13070.151303
+
+─ Worked for 1m 38s ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Context compacted
+
+• Ich sichere jetzt den vertieften Analyse-Slice sauber ab: offene Test-Session prüfen, Coverage nachziehen, Doku-
+  Änderungen final verifizieren, dann committen und pushen.
+
+• Waited for background terminal
+
+• Die Test-Suite ist grün. Ich ziehe jetzt noch den Coverage-Gate durch und prüfe danach den Tree/Prozesszustand vor dem
+  Commit.
+
+• Waited for background terminal · npm run test:coverage:check
+    > ptydeck@0.2.0 test:coverage:check
+    … +4493 lines
+    [coverage-check] frontend: line coverage 93.93% (threshold 85%).
+    [coverage-check] all coverage thresholds passed.
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Coverage ist ebenfalls grün. Ich prüfe jetzt nur noch den Tree, die Diff-Hygiene und ob keine Validierungsprozesse mehr
+  hängen, dann committe ich den Analyse-Stand.
+
+• Ran git status --short
+  └  M CODEX_CONTEXT.md
+     M docs/README.md
+     M "docs/Restart Streaming Analysis.md"
+    ?? docs/examples/
+
+• Ran git diff --check
+  └ (no output)
+
+• Ran ps -ef | rg 'node --test|run-default-tests|run-coverage-tests|npm run lint|npm run test|npm run
+  │ test:coverage:check|generate-handbook\\.mjs' || true
+  └ wsl      10454 90274 99 22:52 ?        00:00:00 /bin/bash -c ps -ef | rg 'node --test|run-default-tests|
+    run-coverage-tests|npm run lint|npm run test|npm run test:coverage:check|generate-handbook\\.mjs' || true
+    wsl      10456 10454  0 22:52 ?        00:00:00 rg node --test|run-default-tests|run-coverage-tests|npm run lint|npm
+    run test|npm run test:coverage:check|generate-handbook\\.mjs
+
+• Ran git diff -- CODEX_CONTEXT.md docs/README.md "docs/Restart Streaming Analysis.md"
+  └ diff --git a/CODEX_CONTEXT.md b/CODEX_CONTEXT.md
+    index e8c7947..bbf2708 100644
+    … +729 lines
+    +Any later messaging rebuild that wants clean, targeted delivery must start from this model rather than from more ad
+    hoc noise filters.
+
+• Explored
+  └ List examples
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die vertiefte Analyse ist sauber im Tree. Ich committe jetzt nur die Doku-/Kontext-Dateien und lasse die untracked
+  docs/examples/... ausdrücklich unberührt.
+
+• Ran git add CODEX_CONTEXT.md docs/README.md "docs/Restart Streaming Analysis.md" && git commit -m "docs: deepen restart
+  │ streaming analysis"
+  └ [main c366c99] docs: deepen restart streaming analysis
+     3 files changed, 361 insertions(+), 197 deletions(-)
+
+• Ran git push
+  └ To github.com:svenschaefer/ptydeck.git
+       bfba56f..c366c99  main -> main
+
+• Waited for background terminal
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand, damit der Analyse-Slice sauber
+  abgeschlossen ist.
+
+• Ran git status --short
+  └ ?? docs/examples/
+
+• Ran ps -ef | rg 'node --test|run-default-tests|run-coverage-tests|npm run lint|npm run test|npm run
+  │ test:coverage:check|generate-handbook\\.mjs|git push' || true
+  └ wsl      10559 90274  0 22:52 ?        00:00:00 /bin/bash -c ps -ef | rg 'node --test|run-default-tests|
+    run-coverage-tests|npm run lint|npm run test|npm run test:coverage:check|generate-handbook\\.mjs|git push' || true
+    wsl      10561 10559  0 22:52 ?        00:00:00 rg node --test|run-default-tests|run-coverage-tests|npm run lint|npm
+    run test|npm run test:coverage:check|generate-handbook\\.mjs|git push
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Die vertiefte Restart-/Streaming-Analyse ist jetzt im Repo dokumentiert und gepusht.
+
+  Commit
+
+  - c366c99 docs: deepen restart streaming analysis
+
+  Neu/aktualisiert
+
+  - docs/Restart%20Streaming%20Analysis.md
+  - docs/README.md
+  - CODEX_CONTEXT.md
+
+  Wesentliche Erkenntnisse
+
+  1. Ein Restart ist nicht eine Phase, sondern drei verschiedene Regime:
+
+  - Cold bootstrap
+  - Browser reconnect/remount
+  - Restored PTY burst
+
+  2. runtime.ready kommt zu spät, um als „ab jetzt beginnt erst Streaming“ verstanden zu werden.
+
+  - Der Server akzeptiert bereits HTTP/WS-Traffic vorher.
+  - Deshalb entstehen schon vor runtime.ready:
+      - resize
+      - teils input
+      - session.updated
+      - session.control.changed
+      - session.activity.idle
+      - session.prompt.ready
+
+  3. Restart-Flooding ist strukturell, nicht nur Regex-/Text-Noise.
+
+  - Remount erzeugt Multi-Wave-Resize-Churn.
+  - session.updated -> session.control.changed ist ein eigener Restart-Noise-Pfad.
+  - session.activity.completed -> session.activity.idle ist ein weiterer struktureller Pfad.
+  - Restored PTY bursts können die Klassifikation auch ganz ohne Browser-Traffic fluten.
+
+  4. Wiederholte target_validated_cached / topic_reused-Zyklen sind eher Verstärker als Ursache.
+
+  - Sie machen die Trace dichter.
+  - Die eigentliche semantische Ursache liegt früher in der Event- und Streaming-Sequenz.
+
+  5. Dein neuer Hinweis zu Codex-Formatierung ist relevant und jetzt explizit aufgenommen.
+
+  - Der aktuelle Messaging-Pfad sieht größtenteils nur ANSI-bereinigten Text.
+  - Farb-/Bold-/visuelle Struktur geht weitgehend verloren.
+  - Für Coding-Agent-CLIs ist das eine reale semantische Einschränkung.
+
+  Was ich dafür zusätzlich gemacht habe
+
+  - Mehrere Restart-Fenster verglichen, nicht nur eins
+  - Frontend- und Backend-Codepfade gegen die Logs gemappt
+  - den vorhandenen Helper weiter als reproduzierbare Analysebasis genutzt:
+      - scripts/analyze-restart-streaming.mjs
+
+  Validierung
+
+  - npm run lint ✅
+  - npm run test ✅
+  - npm run test:coverage:check ✅
+  - git diff --check ✅
+
+  Planungsdocs
+
+  - TODO.md und ROADMAP.md bewusst unverändert
+  - Grund: reiner Analyse-/Verständnis-Slice, keine neue Delivery-Wave promoted
+
+  Repo-Zustand
+
+  - gepusht auf main
+  - kein hängender Validierungsprozess
+  - einzig verbleibend untracked:
+      - docs/examples/codex-terminal-dump-2026-04-11-22-41.txt
+  - Das habe ich bewusst nicht angefasst
+
+  Der nächste sinnvolle Schritt wäre jetzt nicht weiteres Fine-Tuning, sondern aus dieser Analyse ein explizites
+  Restart-/Remount-State-Modell für die spätere allowlist-/signal-first Weiterleitung abzuleiten.
+
+
+› Summarize recent commits
+
+  gpt-5.4 xhigh · 53% left · ~/workspace/code/ptydeck · gpt-5.4 · ptydeck · main · 47% used · 5h 96% · weekly 74% · 0.11…

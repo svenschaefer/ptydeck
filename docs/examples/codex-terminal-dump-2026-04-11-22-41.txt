@@ -1,0 +1,127 @@
+› Bitte vertiefe deine Analyse, nimmt dir die Zeit und Analysetiefe die du benötigst, um alles relevanten Details zu
+
+• Updated Plan
+  └ Deepening the restart-streaming analysis as an analysis-only slice. I will expand the evidence base across more
+    restart windows, correlate it with the runtime code paths, and persist the findings in repository docs without
+    changing behavior.
+    □ Collect deeper restart evidence from logs and health traces across multiple windows and summarize recurring
+      patterns
+    □ Map the observed restart sequence to concrete backend/frontend code paths and identify structurally flood-prone
+      transitions
+    □ Expand the restart analysis documentation and persistent context, validate the analysis artifacts, then commit and
+      push
+
+• Ich sammele jetzt mehrere Restart-Fenster aus dem Debug-Log und korreliere sie mit runtime.ready, Startup-Warmup und
+  Session-/Messaging-Events. So sehen wir, was wirklich konsistent strukturell ist und was nur Einzelfall war.
+
+
+• Explored
+  └ Read runtime.js, session-manager.js
+    Search runtime\.ready|runtime\.startup_warmup\.(active|quiet_wait)|messaging\.event\.trace|session\.event|
+           messaging\.target\.update|http\.request\.(start|done) in ptydeck-backend-debug.log
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ziehe jetzt mehrere Restart-Fenster heraus und mappe die relevanten Codepfade gezielt: Warmup, Lifecycle-
+  Observation, Target-Resolution und Prompt/Idle-Klassifikation. Damit bekommen wir ein belastbares Restart-Modell statt
+  nur eines Einzelfensters.
+
+• Explored
+  └ Search ensureSessionTarget|observeSessionLifecycleInternal|observeSessionIdle|observePromptReady|
+observeControlChange|
+    … +1322 lines
+      }
+    }
+
+• Explored
+  └ Search runtime\.ready|runtime\.startup_warmup\.quiet_wait in ptydeck-backend-debug.log
+
+• Explored
+  └ Read runtime.js, telegram-adapter.js, messaging-runtime.js
+
+• Ran node scripts/analyze-restart-streaming.mjs --start 2026-04-11T20:08:00.000Z --end 2026-04-11T20:08:09.500Z --format
+  │ json | jq '{window, totals: {labels: .totals.labels, sessionEventTypes: .totals.sessionEventTypes,
+  │ messagingEventTypes: .totals.messagingEventTypes, messagingEventReasons: .totals.messagingEventReasons,
+  │ … +2 lines
+  └ {
+      "window": {
+    … +54 lines
+      ]
+    }
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+• Explored
+  └ Read ptydeck-backend-debug.log
+    Read ptydeck-backend-debug.log
+    Search messaging\.event\.trace|messaging\.target\.update|session\.event|runtime\.ready|
+  Traffic sauber verstehen: warum direkt nach dem Restart resize und teils input ausgelöst werden.
+
+• Explored
+  └ Search resize\(|/resize|/input|sendInput|fit\(|measure|mounted|attach|reattach|reconnect in public
+    Search session\.updated|session\.created|session\.started|session\.activity\.completed|session\.activity\.started|
+           observeSessionLifecycle\(|observeSessionData\(|observeSessionIdle\( in runtime.js
+
+• Ran curl -s http://127.0.0.1:18080/health | jq '{messaging: {enabled: .messaging.enabled, deliveryEnabled: .messaging.
+  │ deliveryEnabled, deliveryHardBreakActive: .messaging.deliveryHardBreakActive, adapters: [.messaging.adapters[] | {
+  │ adapter, enabled, deliveryEnabled, deliveryHardBreakActive, pollingActive, configuredTargets, activeTopicCount, va
+    … +19 lines
+      }
+    }
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich schaue mir jetzt gezielt die Terminal-Mount- und Resize-Pfade im Frontend an. Das ist wichtig, weil der Restart-
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich prüfe noch den Snapshot-Stabilisierungspfad. Die Mehrfach-Resize-Pässe nach einem Reconnect sehen nach einem
+  relevanten Restart-Treiber aus.
+
+  │ json | jq '{window, totals: {labels: .totals.labels, sessionEventTypes: .totals.sessionEventTypes,
+  │ messagingEventTypes: .totals.messagingEventTypes, messagingEventReasons: .totals.messagingEventReasons,
+  │ … +2 lines
+  └ {
+      "window": {
+
+• Waited for background terminal
+
+• Explored
+  └ Read session-runtime-controller.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich prüfe noch den Pfad hinter Control became unclaimed. Das ist wahrscheinlich kein PTY-Output-Thema, sondern eine
+  Seiteneffekt-Kette aus Browser-Reconnect und Session-Control-State. Das müssen wir im Restart-Modell sauber trennen.
+
+• Explored
+  └ Search Control became unclaimed|buildControlEventSummary|attached client|setSessionControllerClient|
+updateSessionControl|
+           normalizeSessionControlState|attachedClients|release control|unclaimed in backend
+    Read messaging-runtime.js, runtime.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich schaue noch einen Schritt tiefer in die Session-Control-Reconciliation. Wenn control became unclaimed bei Restarts
+  nur ein Reconnect-Nebeneffekt ist, muss das in der Analyse klar belegt sein.
+
+• Explored
+  └ Search broadcastSessionUpdated\(|sessionControl|clientId|attached client|connection closed|ws\.upgrade|
+ws\.connection|
+           socket in runtime.js
+    Read runtime.js
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Ich ergänze noch die Data-Path-Seite: Prompt-Boundaries, Quiet-Window-Flush und warum ein Restart auch ohne echte neue
+  Arbeit schon Summary-/Idle-/Prompt-Kandidaten erzeugt.
+
+• Explored
+  └ Read messaging-runtime.js, session-terminal-runtime-controller.js
+
+◦ Working (2m 32s • esc to interrupt)
+
+
+› Summarize recent commits
+
+  gpt-5.4 xhigh · 21% left · ~/workspace/code/ptydeck · gpt-5.4 · ptydeck · main · 79% used · 5h 97% · weekly 74% · 0.11…
