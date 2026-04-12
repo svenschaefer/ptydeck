@@ -612,6 +612,21 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.match(sends[3].text, /Validated the allowlist remains narrow enough for the next live check\./);
   assert.doesNotMatch(sends[3].text, /committed\./);
 
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-6" }
+  });
+
+  assert.equal(sends.length, 4);
+
   const status = runtime.buildStatusSummary();
   assert.equal(status.deliveryEnabled, false);
   assert.equal(status.deliveryHardBreakActive, true);
@@ -627,6 +642,104 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
+});
+
+test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {
+  const sends = [];
+  let now = 1_000;
+  let firstSend = true;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          if (firstSend) {
+            firstSend = false;
+            throw new Error("Too Many Requests: retry after 1");
+          }
+          return { messageId: sends.length + 260 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 261 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-2" }
+  });
+  assert.equal(sends.length, 1);
+
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-4" }
+  });
+  assert.equal(sends.length, 1);
+
+  now += 2_000;
+
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-6" }
+  });
+  assert.equal(sends.length, 2);
+
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-7" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-retry-8" }
+  });
+  assert.equal(sends.length, 2);
 });
 
 test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {

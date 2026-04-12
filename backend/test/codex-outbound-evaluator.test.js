@@ -183,15 +183,14 @@ test("codex summary evaluator accepts separator-hint sentence summaries with sta
     "Der Restart ist sauber und die Allowlist bleibt eng genug für den nächsten Live-Check.",
     {
       aggregationReason: "separator_hint",
-      firstObservedAt: 9_000,
-      lastObservedAt: 9_400
+      blockKey: "der restart ist sauber und die allowlist bleibt eng genug für den nächsten live-check."
     }
   );
 
   assert.equal(evaluated.ok, true);
   assert.equal(evaluated.family, CODEX_SEPARATOR_SUMMARY_SCOPE);
-  assert.equal(evaluated.deliveryBlockKey, "9000:9400");
-  assert.match(evaluated.key, /^9000:9400:/);
+  assert.equal(evaluated.deliveryBlockKey, "der restart ist sauber und die allowlist bleibt eng genug für den nächsten live-check.");
+  assert.match(evaluated.key, /^der restart ist sauber und die allowlist bleibt eng genug für den nächsten live-check\.:/);
 });
 
 test("codex summary evaluator rejects short or fragmented separator-hint summaries", () => {

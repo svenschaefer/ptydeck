@@ -151,7 +151,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>The Telegram reference adapter can:</p>
 
 <ul>
-<li>send three narrow Codex-only outbound families, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code>, while generic outbound delivery remains hard-disabled; new block identities create new posts and only the same block identity is eligible for an edit</li>
+<li>send three narrow Codex-only outbound families, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code>, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, and the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts</li>
 <li>normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families</li>
 <li>keep the active outbound families compact through the shipped trigger profiles</li>
 <li>accept the bounded inbound bot command set:</li>
@@ -161,7 +161,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 
 <ul>
 <li>route mapped plain Telegram text into the same backend session-input path used by frontend <code>Send</code></li>
-<li>mirror the frontend-style delayed submit semantics for active <code>codex</code> sessions, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion</li>
+<li>mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale</li>
 <li>preserve literal slash-prefixed terminal input through a <code>//...</code> escape (<code>//status</code> -&gt; <code>/status</code>)</li>
 <li>expose the same bounded actions through Telegram buttons on adapter-owned messages</li>
 </ul>

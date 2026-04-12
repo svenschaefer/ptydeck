@@ -5591,8 +5591,7 @@ export function createRuntime(config) {
       sessionId
     };
     const normalizedData = typeof data === "string" ? data : "";
-    const appLabel = normalizeTerminalAppIdentity(options.sessionSnapshot?.appIdentity || sessionSnapshot.appIdentity).label;
-    const useDelayedSubmit = appLabel === "codex" && /\r$/.test(normalizedData);
+    const useDelayedSubmit = /\r$/.test(normalizedData);
     if (useDelayedSubmit) {
       const body = normalizedData.replace(/\r+$/g, "");
       if (body) {

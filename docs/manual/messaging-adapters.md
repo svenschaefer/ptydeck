@@ -114,7 +114,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send three narrow Codex-only outbound families, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts and only the same block identity is eligible for an edit
+- send three narrow Codex-only outbound families, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, and the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - accept the bounded inbound bot command set:
@@ -126,7 +126,7 @@ The Telegram reference adapter can:
   - `/replay c:N`
   - `/replay sp:N`
 - route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
-- mirror the frontend-style delayed submit semantics for active `codex` sessions, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion
+- mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale
 - preserve literal slash-prefixed terminal input through a `//...` escape (`//status` -> `/status`)
 - expose the same bounded actions through Telegram buttons on adapter-owned messages
 

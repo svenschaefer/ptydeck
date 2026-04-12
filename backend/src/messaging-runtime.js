@@ -1469,14 +1469,7 @@ export function createMessagingRuntime(options = {}) {
     if (!normalizedText || candidateKey === lastCandidateKey) {
       return null;
     }
-    if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
-      state.lastCodexSeparatorSectionCandidateKey = candidateKey;
-    } else if (deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-      state.lastCodexSeparatorSummaryCandidateKey = candidateKey;
-    } else {
-      state.lastCodexSeparatorCandidateKey = candidateKey;
-    }
-    return dispatchEvent(
+    const dispatchResult = await dispatchEvent(
       createEvent({
         session,
         profile,
@@ -1492,6 +1485,16 @@ export function createMessagingRuntime(options = {}) {
         comparableText: createComparableText(normalizedText)
       })
     );
+    if (dispatchResult?.delivered === true) {
+      if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
+        state.lastCodexSeparatorSectionCandidateKey = candidateKey;
+      } else if (deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE) {
+        state.lastCodexSeparatorSummaryCandidateKey = candidateKey;
+      } else {
+        state.lastCodexSeparatorCandidateKey = candidateKey;
+      }
+    }
+    return dispatchResult;
   }
 
   function buildCodexSummaryAllowlistDecision(session, profile, block, summary, aggregationReason) {
@@ -1500,6 +1503,7 @@ export function createMessagingRuntime(options = {}) {
     }
     const evaluated = evaluateCodexSeparatorSummaryCandidate(summary, {
       aggregationReason,
+      blockKey: Array.isArray(block?.signatures) ? block.signatures.filter(Boolean).join("|") : "",
       firstObservedAt: block?.firstObservedAt,
       lastObservedAt: block?.lastObservedAt
     });
@@ -1632,7 +1636,11 @@ export function createMessagingRuntime(options = {}) {
     bumpEventMetric(event.profile, event.type, decision.action);
     if (decision.action === "suppress") {
       recordDispatchTrace(event, decision, target, []);
-      return decision;
+      return Object.freeze({
+        ...decision,
+        delivered: false,
+        delivery: []
+      });
     }
     threadState.lastObservedEventType = event.type;
     threadState.lastObservedEventAt = event.occurredAt;
@@ -1679,7 +1687,11 @@ export function createMessagingRuntime(options = {}) {
     }
     rememberSessionForTarget(finalTarget, event.session);
     recordDispatchTrace(event, decision, finalTarget, deliveryResults);
-    return decision;
+    return Object.freeze({
+      ...decision,
+      delivered,
+      delivery: deliveryResults
+    });
   }
 
   function observeControlChange(session, profile, trace) {

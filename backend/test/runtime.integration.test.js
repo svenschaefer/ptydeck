@@ -656,7 +656,7 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
   }
 });
 
-test("runtime sends telegram text to codex sessions with delayed submit semantics", async () => {
+test("runtime sends telegram text with delayed submit semantics when messaging input carries a submit terminator", async () => {
   const sends = [];
   const updateQueue = [];
   const writeCalls = [];
@@ -725,11 +725,12 @@ test("runtime sends telegram text to codex sessions with delayed submit semantic
     const createRes = await fetch(`${baseUrl}/sessions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+      body: JSON.stringify({ shell: "bash", name: "ptydeck" })
     });
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
-    assert.equal(created.appIdentity.label, "codex");
+    assert.equal(created.appIdentity.family, "shell");
+    assert.equal(created.appIdentity.label, "bash");
 
     updateQueue.push({
       update_id: 1,
