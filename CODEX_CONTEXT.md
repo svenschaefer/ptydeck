@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-12 (`v0.4.0-H104` Codex outbound separator-tolerance follow-up delivered on `main`; `codex_separator_info` now tolerates tiny redraw-tail separator contamination and a slightly wider bounded anchor-to-info gap while still opening a new Telegram post per new block identity.)
+Last updated: 2026-04-12 (`v0.4.0-H104` Codex outbound separator-tolerance follow-up delivered on `main`; post-H104 analysis and new offline section-assembly experiments now show that the next structural step is not more raw-entry tolerance but Codex chrome stripping plus separator-anchored section assembly before delivery policy.)
 
 Documentation sync status: repository markdown files are aligned on 2026-04-12. `TODO.md` contains open concrete tasks only, `ROADMAP.md` contains only active and queued execution order plus dependencies, `CHANGELOG.md` contains completed and validated release history, and `TODO-OUTLOOK.md` contains only future epics plus deferred explicit backlog.
 
@@ -195,6 +195,8 @@ Documentation sync status: repository markdown files are aligned on 2026-04-12. 
   - `app-runtime-composition-controller.js` now uses an extracted DOM-ref collection seam (`app-runtime-dom-refs.js`) with direct contract coverage instead of keeping that selector contract buried only inside broad app tests.
 
 - Local Linux active-app detection is still intermittently weak for coding-agent CLIs launched through wrapper-heavy foreground groups because the delivered baseline derives the strongest runtime candidate from one chosen foreground representative plus weak fallback heuristics; the next follow-up must inspect the full foreground process group and preserve wrapper command-line evidence so sessions that are effectively running `codex` do not flap back to `shell`, `unknown`, or other weaker labels just because the visible representative is `bash`, `sh -lc`, `node`, or another launcher process.
+
+- The latest offline experiment path in `scripts/experiment-codex-sections.mjs` confirms the key post-H104 design conclusion: some operator-visible Codex messages fail not because Telegram routing or app detection is wrong, but because the current evaluator reasons on raw entries instead of reconstructed sections. The motivating restart-status example becomes recoverable once the parser strips prompt/footer chrome inside mixed entries and then assembles a separator-anchored section that can contain one narrative bullet plus subsection labels and indented list items.
 
 ## Quality and Operational Rules
 
