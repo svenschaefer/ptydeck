@@ -656,6 +656,106 @@ test("runtime executes bounded inbound telegram topic text and actions end-to-en
   }
 });
 
+test("runtime sends telegram text to codex sessions with delayed submit semantics", async () => {
+  const sends = [];
+  const updateQueue = [];
+  const writeCalls = [];
+  const telegramChat = {
+    id: -100200301,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group",
+    is_forum: true
+  };
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200301" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 160 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 160 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (dataHandler) {
+            dataHandler(normalized);
+          }
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.appIdentity.label, "codex");
+
+    updateQueue.push({
+      update_id: 1,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "restart done"
+      }
+    });
+
+    await waitFor(async () => {
+      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+      const health = await healthRes.json();
+      return health.messaging.adapters[0].inboundTrace.capturedTotal >= 1;
+    }, 2000);
+    await waitFor(() => writeCalls.includes("restart done") && writeCalls.includes("\r"), 2000);
+
+    const telegramInputIndex = writeCalls.lastIndexOf("restart done");
+    assert.notEqual(telegramInputIndex, -1);
+    assert.equal(writeCalls[telegramInputIndex + 1], "\r");
+    assert.match(sends.at(-1)?.text || "", /Input sent to \[[^\]]+\] ptydeck/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime provisions telegram forum topics per terminal and persists the binding", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

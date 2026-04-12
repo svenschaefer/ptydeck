@@ -126,6 +126,7 @@ The Telegram reference adapter can:
   - `/replay c:N`
   - `/replay sp:N`
 - route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
+- mirror the frontend-style delayed submit semantics for active `codex` sessions, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion
 - preserve literal slash-prefixed terminal input through a `//...` escape (`//status` -> `/status`)
 - expose the same bounded actions through Telegram buttons on adapter-owned messages
 

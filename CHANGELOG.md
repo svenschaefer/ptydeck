@@ -4,6 +4,10 @@ Completed and validated release history belongs here.
 
 ## 2026-04-12
 
+- [x] `v0.4.0-H102` is now completed on `main`, correcting the live Telegram text-to-Codex submit path so mapped topic text no longer stops at prompt insertion when the target session is running Codex.
+- [x] `backend/src/runtime.js` now applies Codex-specific delayed-submit semantics on the messaging-only input path: when Telegram text targets an active `codex` session, the runtime writes the normalized body first and sends the final `\r` as a short delayed follow-up instead of bundling both into one PTY write, matching the existing frontend `cr_delay` behavior that Codex prompt handling already tolerates.
+- [x] Direct runtime regression coverage now closes that live seam in `backend/test/runtime.integration.test.js`, proving that mapped Telegram text to a Codex session is written as two PTY writes (`text`, then delayed `\r`) while the existing mapped Telegram input end-to-end path for non-Codex sessions remains green.
+
 - [x] `v0.4.0-H101` is now completed on `main`, correcting the live Telegram text-to-session-input path so mapped topic text no longer depends on an attached browser controller client to reach the target PTY.
 - [x] `backend/src/runtime.js` now treats Telegram inbound text as an owner-authorized messaging input path instead of reusing the browser-only controller-client header guard; mapped messaging input still records `lastInput`, reuses the normal PTY write flow, and preserves owner boundaries, but it no longer fails with `ControllerClientRequired` merely because no UI client header accompanied the Telegram message.
 - [x] Direct runtime regression coverage now proves the corrected live case in `backend/test/runtime.integration.test.js`: the Telegram inbound end-to-end test now runs with an active attached WebSocket controller present and still verifies that mapped topic text is accepted, written to the PTY, and recorded as a `local-operator` input with no synthetic browser client id.

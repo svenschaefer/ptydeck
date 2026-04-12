@@ -161,6 +161,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 
 <ul>
 <li>route mapped plain Telegram text into the same backend session-input path used by frontend <code>Send</code></li>
+<li>mirror the frontend-style delayed submit semantics for active <code>codex</code> sessions, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion</li>
 <li>preserve literal slash-prefixed terminal input through a <code>//...</code> escape (<code>//status</code> -&gt; <code>/status</code>)</li>
 <li>expose the same bounded actions through Telegram buttons on adapter-owned messages</li>
 </ul>

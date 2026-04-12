@@ -109,6 +109,7 @@ const DEFAULT_DECK_ID = "default";
 const DEFAULT_DECK_NAME = "Default";
 const DEFAULT_AUTH_WS_TICKET_TTL_SECONDS = 30;
 const DEFAULT_STARTUP_WARMUP_QUIET_MS = 1000;
+const DEFAULT_MESSAGING_CODEX_SUBMIT_DELAY_MS = 90;
 const DECK_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const DECK_NAME_MAX_LENGTH = 64;
 const LAYOUT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -5583,14 +5584,30 @@ export function createRuntime(config) {
   }
 
   function requestMessagingSendInput(sessionId, data, options = {}) {
-    getApiSessionOrThrow(sessionId);
+    const sessionSnapshot = getApiSessionOrThrow(sessionId);
     ensureMessagingSessionInputAccess(sessionId, "send terminal input");
-    manager.sendInput(sessionId, data, {
-      trace: {
-        ...(options.trace && typeof options.trace === "object" ? options.trace : {}),
-        sessionId
+    const trace = {
+      ...(options.trace && typeof options.trace === "object" ? options.trace : {}),
+      sessionId
+    };
+    const normalizedData = typeof data === "string" ? data : "";
+    const appLabel = normalizeTerminalAppIdentity(options.sessionSnapshot?.appIdentity || sessionSnapshot.appIdentity).label;
+    const useDelayedSubmit = appLabel === "codex" && /\r$/.test(normalizedData);
+    if (useDelayedSubmit) {
+      const body = normalizedData.replace(/\r+$/g, "");
+      if (body) {
+        manager.sendInput(sessionId, body, { trace });
       }
-    });
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          manager.sendInput(sessionId, "\r", { trace });
+          recordSessionLastInput(sessionId, null, null);
+          broadcastSessionUpdated(sessionId, options.trace || null);
+          resolve(getApiSessionOrThrow(sessionId));
+        }, DEFAULT_MESSAGING_CODEX_SUBMIT_DELAY_MS);
+      });
+    }
+    manager.sendInput(sessionId, normalizedData, { trace });
     recordSessionLastInput(sessionId, null, null);
     broadcastSessionUpdated(sessionId, options.trace || null);
     return getApiSessionOrThrow(sessionId);
