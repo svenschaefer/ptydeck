@@ -20,6 +20,9 @@ The findings here are based on:
 - live backend debug log: `/tmp/ptydeck-backend-debug.log`
 - the analysis helper:
   - `scripts/analyze-restart-resends.mjs`
+- secondary corroboration only when useful:
+  - `/tmp/ptydeck-session-stream-analysis.jsonl`
+  - `/ready`
 
 The helper compares delivered Telegram events around recent `runtime.ready` markers against previously delivered events for the same session/thread/scope/text.
 
@@ -31,6 +34,19 @@ node scripts/analyze-restart-resends.mjs \
   --startup-lookback-seconds 180 \
   --post-ready-seconds 120
 ```
+
+## Source Reliability
+
+The evidence base is strong enough for restart-resend design work, but the sources are not equally trustworthy for this specific problem.
+
+- Primary source: `/tmp/ptydeck-backend-debug.log`
+  - This is the authoritative source for restart-resend analysis because it contains `runtime.ready`, `messaging.event.trace`, delivery outcomes, scopes, thread ids, and stable timestamps in one place.
+- Secondary source: `/tmp/ptydeck-session-stream-analysis.jsonl`
+  - This remains useful for block and section semantics, but it rotates and does not retain enough long-horizon history to prove restart resend bursts by itself.
+- Runtime health/readiness endpoints
+  - These are useful for current process state and counters, but not as the historical causality record for restart-resend bursts.
+
+The current restart-resend findings should therefore be treated as debug-log-driven, not raw-capture-driven.
 
 ## Current Measured Behavior
 
@@ -67,6 +83,14 @@ The immediately previous analyzed restart window showed another important fact:
 - prior-history matches: `0`
 
 This matters because it proves that a persisted prior-history check alone is not sufficient. The first restart after a live wave can still flood old content even when there is no earlier allowlist-delivery history to match against.
+
+The latest consistency check also narrowed the currently proven scope of the bug:
+
+- the observed restart resend bursts are evidenced on `codex_separator_summary_sentence`
+- they are not yet evidenced on `codex_separator_info`
+- they are not yet evidenced on `codex_separator_section`
+
+That matters because the first product fix should stay narrow and target only the summary-family path.
 
 ## What This Means
 
@@ -141,10 +165,8 @@ It should be a dedicated delivery-admission layer for restart recovery.
 
 ### 1. Add a Global Startup Quiet Phase
 
-For narrow Codex allowlist families:
+For the currently evidenced summary-family path:
 
-- `codex_separator_info`
-- `codex_separator_section`
 - `codex_separator_summary_sentence`
 
 do not deliver anything until:
@@ -211,7 +233,7 @@ This prevents restart-specific logic from contaminating the content-evaluator ru
 
 ## Recommended Fix Order
 
-1. global startup quiet-phase guard for all narrow Codex outbound families
+1. global startup quiet-phase guard for `codex_separator_summary_sentence`
 2. persisted resend ledger with stable content-based keys
 3. per-session restart-recovery admission state
 4. regression replay against real restart windows from the debug log
@@ -228,3 +250,9 @@ Anything weaker will either:
 
 - miss the first restart burst
 - or miss later replays after process memory resets
+
+The first implementation should stay narrow:
+
+- target only `codex_separator_summary_sentence`
+- leave `codex_separator_info` untouched until there is equally strong evidence that restart-time replay crosses its delivery boundary
+- leave `codex_separator_section` untouched until there is equally strong evidence that restart-time replay crosses its delivery boundary
