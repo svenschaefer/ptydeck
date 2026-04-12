@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   advanceCodexSeparatorInfoState,
+  CODEX_SEPARATOR_INFO_MAX_GAP_MS,
   createCodexAllowlistState,
   createCodexStreamEntry
 } from "../src/codex-outbound-evaluator.js";
@@ -82,4 +83,44 @@ test("codex outbound evaluator rejects prompt contamination before info", () => 
   assert.equal(decisions.length, 1);
   assert.equal(decisions[0].type, "rejection");
   assert.equal(decisions[0].reason, "marker_before_info");
+});
+
+test("codex outbound evaluator accepts a separator with only tiny redraw-tail contamination", () => {
+  const state = createCodexAllowlistState();
+
+  assert.deepEqual(
+    feed(state, "───────────────────────────────────────────────────────────ooor\n", 5_000),
+    []
+  );
+  const candidate = feed(
+    state,
+    "• Die .local-Runtime ist weiter sauber (runtime-contract, healthz, manage alle grün).\n",
+    5_300
+  );
+
+  assert.equal(candidate.length, 0);
+  const flushed = advanceCodexSeparatorInfoState(state, null, { flush: true });
+  assert.equal(flushed.length, 1);
+  assert.equal(flushed[0].type, "candidate");
+  assert.equal(flushed[0].reason, "flush_after_info");
+  assert.match(flushed[0].text, /Die \.local-Runtime ist weiter sauber/);
+});
+
+test("codex outbound evaluator allows the wider bounded separator-to-info gap for ai-playbooks-style timing", () => {
+  const state = createCodexAllowlistState();
+
+  feed(state, "───────────────────────────────────────────────────────────ooor\n", 6_000);
+  assert.ok(CODEX_SEPARATOR_INFO_MAX_GAP_MS >= 3_923);
+  const decisions = feed(
+    state,
+    "• Die .local-Runtime ist weiter sauber (runtime-contract, healthz, manage alle grün). Es fehlen jetzt noch der Diff-Whitespace-Check und der volle ci:check; danach committe und pushe ich.\n",
+    9_923
+  );
+
+  assert.deepEqual(decisions, []);
+  const flushed = advanceCodexSeparatorInfoState(state, null, { flush: true });
+  assert.equal(flushed.length, 1);
+  assert.equal(flushed[0].type, "candidate");
+  assert.equal(flushed[0].reason, "flush_after_info");
+  assert.match(flushed[0].text, /danach committe und pushe ich/);
 });

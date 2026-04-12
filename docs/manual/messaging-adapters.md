@@ -191,12 +191,13 @@ That hard break is intentional:
 - there is intentionally no environment-variable re-enable switch at this stage
 - inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path
 
-The first post-hard-break exception is now delivered as `v0.4.0-H99`:
+The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined by `v0.4.0-H104`:
 
 - one narrow internal allowlist family, `codex_separator_info`, can be delivered even while generic `deliveryEnabled` remains false
 - that family is Codex-only and entry-level stream driven:
-  - a major separator must survive as its own stream entry
+  - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination
   - the next bounded substantial `•` block must classify as clean `info`
+  - the separator-to-info horizon is still intentionally short, but now widened to roughly `4500ms` / `120` entries for real Codex timing
   - at most one immediate indented continuation line is merged
   - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as `Ran`, `Explored`, `Waited`, `Context compacted`, and `Updated Plan` reject the candidate
 - delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic `update`

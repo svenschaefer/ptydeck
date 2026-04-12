@@ -1,7 +1,7 @@
 import { normalizeVisibleReplayText } from "./replay-excerpt.js";
 
 export const CODEX_SEPARATOR_INFO_SCOPE = "codex_separator_info";
-export const CODEX_SEPARATOR_INFO_MAX_GAP_MS = 2500;
+export const CODEX_SEPARATOR_INFO_MAX_GAP_MS = 4500;
 export const CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES = 120;
 export const CODEX_SEPARATOR_INFO_CONTINUATION_GAP_MS = 500;
 export const CODEX_SEPARATOR_INFO_MIN_TEXT_LENGTH = 24;
@@ -77,8 +77,33 @@ function classifyCodexStreamEntryKind(visibleText) {
   return "substantial";
 }
 
+function analyzeMajorSeparatorEntry(visibleText) {
+  const meaningfulLines = normalizeLineBreaks(visibleText)
+    .split("\n")
+    .map((line) => normalizeWhitespace(line))
+    .filter(Boolean);
+  if (meaningfulLines.length === 0) {
+    return { ok: false, contaminated: false };
+  }
+  const firstLine = meaningfulLines[0];
+  if (/^─{40,}$/u.test(firstLine)) {
+    const contaminated = meaningfulLines.slice(1).some((line) => !isTinyOverlayFragment(line));
+    return { ok: !contaminated, contaminated: meaningfulLines.length > 1 && !contaminated };
+  }
+  const contaminatedMatch = /^(─{40,})(.+)$/u.exec(firstLine);
+  if (!contaminatedMatch) {
+    return { ok: false, contaminated: false };
+  }
+  const trailingNoise = normalizeWhitespace(contaminatedMatch[2] || "");
+  if (!trailingNoise || !isTinyOverlayFragment(trailingNoise)) {
+    return { ok: false, contaminated: false };
+  }
+  const contaminated = meaningfulLines.slice(1).some((line) => !isTinyOverlayFragment(line));
+  return { ok: !contaminated, contaminated: true };
+}
+
 function isMajorSeparatorVisible(visibleText) {
-  return /^─{40,}$/u.test(normalizeWhitespace(visibleText));
+  return analyzeMajorSeparatorEntry(visibleText).ok;
 }
 
 function firstVisibleLine(visibleText) {
@@ -226,13 +251,15 @@ export function createCodexStreamEntry(state, rawText, promptBoundaries = [], oc
   const visibleText = normalizeVisibleReplayText(normalizeLineBreaks(rawText));
   const compactText = normalizeWhitespace(visibleText);
   const firstLine = firstVisibleLine(visibleText);
+  const separator = analyzeMajorSeparatorEntry(visibleText);
   return {
     sequence: (state.codexStreamSequence = (state.codexStreamSequence || 0) + 1),
     occurredAt,
     visibleText,
     compactText,
     kind: classifyCodexStreamEntryKind(visibleText),
-    isMajorSeparator: isMajorSeparatorVisible(visibleText),
+    isMajorSeparator: separator.ok,
+    hasSeparatorTailContamination: separator.contaminated,
     firstLine,
     hasPromptMarker: (Array.isArray(promptBoundaries) && promptBoundaries.length > 0) || CODING_AGENT_PROMPT_LINE_PATTERN.test(firstLine),
     hasWorkedForMarker: CODING_AGENT_WORKED_FOR_PATTERN.test(compactText),

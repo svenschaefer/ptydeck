@@ -495,10 +495,10 @@ If the analysis concatenates the whole tail too early, those redraw shards and l
 The first-use-case experiment now tests this narrower Codex-only rule:
 
 1. app label must be `codex`
-2. start only from a substantial entry that is exactly a major separator line
+2. start only from a substantial entry that is a major separator line, or an otherwise clean major separator with only tiny redraw-tail contamination
 3. from that anchor, scan only a bounded short horizon:
    - at most `120` entries
-   - at most `2500ms`
+   - at most `4500ms`
 4. ignore:
    - blank entries
    - overlay fragments

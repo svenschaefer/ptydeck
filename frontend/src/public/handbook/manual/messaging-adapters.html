@@ -240,14 +240,14 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <li>inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path</li>
 </ul>
 
-<p>The first post-hard-break exception is now delivered as <code>v0.4.0-H99</code>:</p>
+<p>The first post-hard-break exception is now delivered as <code>v0.4.0-H99</code> and refined by <code>v0.4.0-H104</code>:</p>
 
 <ul>
 <li>one narrow internal allowlist family, <code>codex_separator_info</code>, can be delivered even while generic <code>deliveryEnabled</code> remains false</li>
 <li>that family is Codex-only and entry-level stream driven:</li>
 </ul>
 
-<p>- a major separator must survive as its own stream entry - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - at most one immediate indented continuation line is merged - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as <code>Ran</code>, <code>Explored</code>, <code>Waited</code>, <code>Context compacted</code>, and <code>Updated Plan</code> reject the candidate</p>
+<p>- a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - the separator-to-info horizon is still intentionally short, but now widened to roughly <code>4500ms</code> / <code>120</code> entries for real Codex timing - at most one immediate indented continuation line is merged - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as <code>Ran</code>, <code>Explored</code>, <code>Waited</code>, <code>Context compacted</code>, and <code>Updated Plan</code> reject the candidate</p>
 
 <ul>
 <li>delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic <code>update</code></li>

@@ -635,6 +635,63 @@ test("messaging runtime suppresses startup lifecycle, prompt, and initial contro
   assert.ok(status.trace.recent.some((entry) => entry.reason === "startup_control_chatter"));
 });
 
+test("messaging runtime delivers ai-playbooks-style separator candidates with tiny redraw-tail contamination", async () => {
+  const sends = [];
+  let now = 1_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ai-playbooks", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 320 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 321 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    name: "ai-playbooks",
+    quickIdToken: "A",
+    cwd: "/work/repo",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.95
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "───────────────────────────────────────────────────────────ooor\n",
+    promptBoundaries: [],
+    trace: { traceId: "h104-1" }
+  });
+  now += 3_923;
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Die .local-Runtime ist weiter sauber (runtime-contract, healthz, manage alle grün). " +
+      "Es fehlen jetzt noch der Diff-Whitespace-Check und der volle ci:check; danach committe und pushe ich.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h104-2" }
+  });
+  now += 10;
+  await runtime.observeSessionIdle({ session, trace: { traceId: "h104-3" } });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Die \.local-Runtime ist weiter sauber/);
+});
+
 test("messaging runtime provisions forum topics per terminal using deck name plus terminal name", async () => {
   const sends = [];
   const edits = [];
