@@ -18,7 +18,9 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active scoped tasks:
   - none currently
 - Queued next waves:
-  - none currently
+  - `v0.4.0-H112`
+    - `MSG-056`
+    - `MSG-057` after `MSG-056`
 
 ## Sequencing Rules
 

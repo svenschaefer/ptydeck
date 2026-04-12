@@ -14,7 +14,8 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- [ ] `MSG-056` Owner `BE`: Correct live restart-recovery enforcement for `codex_separator_summary_sentence` so summary-family deliveries that match prior restart history or arrive before the first fresh post-restart session input are actually suppressed in the live runtime, including the observed `2026-04-12T17:54:10.724Z` restart window across Telegram threads `7`, `8`, and `12`.
+- [ ] `MSG-057` Owner `QA`: Validate the `v0.4.0-H112` restart-resend correction end to end against the latest `52`-message restart burst fixture, including no-send assertions for pre-ready and immediate post-ready summary resends plus explicit non-regression coverage proving that fresh post-input `codex_separator_summary_sentence` delivery still works.
 
 ## Active Ownership Role
 

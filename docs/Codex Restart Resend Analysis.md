@@ -15,6 +15,18 @@ As of `v0.4.0-H109`, the first narrow product fix from this analysis is shipped:
 - it stays suppressed until the first fresh post-restart input for the same session
 - delivered summary candidates are persisted in a resend ledger keyed by normalized summary content plus session/thread context
 
+The later live restart audit now shows that this first implementation is not yet sufficient in practice:
+
+- latest audited restart window: `readyAt 2026-04-12T17:54:10.724Z`
+- delivered messages in that window: `52`
+- sensible deliveries in that window: `0`
+- all `52` delivered messages were `codex_separator_summary_sentence`
+- all `52` were classified as not sensible
+- all `52` arrived before the first fresh post-restart input in the affected sessions
+- `49` of the `52` also arrived before `runtime.ready`
+
+The detailed per-message review is captured in `docs/Codex Latest Restart Delivery Review.md`. That newer live audit is the reason `v0.4.0-H112` is now queued as a corrective follow-up instead of treating `H109` as behaviorally complete.
+
 The stronger analysis conclusions below still matter because they explain why this gate is deliberately narrow and why `codex_separator_info` / `codex_separator_section` remain outside the recovery layer until there is equally strong evidence for those families too.
 
 The focus here is analytical only:
