@@ -218,6 +218,19 @@ test("command-composer runtime controller previews rendered template custom comm
   assert.deepEqual(calls, [["preview", "echo prod from /srv/app"]]);
 });
 
+test("command-composer runtime controller clears preview for help-style control inputs", () => {
+  const previews = [];
+  const controller = createCommandComposerRuntimeController({
+    getCommandValue: () => "/help deck switch",
+    interpretComposerInput: () => ({ kind: "control", command: "help", args: ["deck", "switch"], raw: "/help deck switch" }),
+    getCustomCommandState: () => null,
+    setCommandPreview: (message) => previews.push(message)
+  });
+
+  controller.refreshCommandPreview();
+  assert.deepEqual(previews, [""]);
+});
+
 test("command-composer runtime controller sends command input via configured terminator", async () => {
   const calls = [];
   let value = "ls -al";

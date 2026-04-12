@@ -418,6 +418,14 @@ test("app-runtime composition controller preserves a specific initialization err
   assert.equal(harness.hooks.getInitializationErrorMessage(), "Specific runtime failure.");
 });
 
+test("app-runtime composition controller falls back to the generic initialization error when no specific message exists", () => {
+  const harness = createControllerHarness();
+
+  harness.controller.setInitializationError("");
+
+  assert.equal(harness.hooks.getInitializationErrorMessage(), "Failed to initialize application runtime.");
+});
+
 test("app-runtime composition controller exposes reclaim-and-retry state with the reconnect-specific label", () => {
   const harness = createControllerHarness();
   const feedbackMessages = [];

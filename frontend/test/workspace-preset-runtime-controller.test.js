@@ -5,6 +5,7 @@ import {
   createWorkspacePresetRuntimeController,
   formatWorkspacePresetDetail,
   normalizeWorkspacePresetRecord,
+  resolveWorkspacePresetToken,
   resolveWorkspaceGroupToken
 } from "../src/public/workspace-preset-runtime-controller.js";
 
@@ -547,6 +548,46 @@ test("workspace preset helpers normalize records and resolve ambiguous group sel
     { id: "build-a", name: "Build Alpha" },
     { id: "build-b", name: "Build Beta" }
   ], "build").error, /Ambiguous workspace group/);
+});
+
+test("workspace preset helpers report missing, unknown, and ambiguous preset selectors", () => {
+  const presets = [
+    {
+      id: "ops-east",
+      name: "Ops East",
+      workspace: {
+        activeDeckId: "ops"
+      }
+    },
+    {
+      id: "ops-west",
+      name: "Ops West",
+      workspace: {
+        activeDeckId: "ops"
+      }
+    }
+  ];
+
+  assert.equal(resolveWorkspacePresetToken(presets, "").error, "Workspace preset target is required.");
+  assert.equal(resolveWorkspacePresetToken(presets, "missing").error, "Unknown workspace preset: missing");
+  assert.equal(
+    resolveWorkspacePresetToken(presets, "ops").error,
+    "Ambiguous workspace preset 'ops': ops-east, ops-west"
+  );
+});
+
+test("workspace preset helpers handle malformed records and group selector failures defensively", () => {
+  assert.equal(normalizeWorkspacePresetRecord({ id: "", name: "Ops", workspace: {} }), null);
+  assert.equal(resolveWorkspaceGroupToken([], "").error, "Workspace group target is required.");
+  assert.equal(resolveWorkspaceGroupToken([], "missing").error, "Unknown workspace group: missing");
+  assert.equal(
+    formatWorkspacePresetDetail({
+      id: "ops",
+      name: "Ops Workspace",
+      workspace: null
+    }),
+    "[ops] Ops Workspace\nWhen applied, this preset opens deck [default].\nIt keeps whichever layout profile is already active.\nThe input pane becomes visible on bottom at 185px.\nIt does not restore any saved deck groups.\nIt does not restore any split-pane layout."
+  );
 });
 
 test("workspace preset runtime controller guards local-only group save and silent no-op rename paths", async () => {

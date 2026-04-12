@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStore } from "../src/public/store.js";
+import { createInitialRuntimeState, createStore, reduceRuntimeState } from "../src/public/store.js";
 
 test("store tracks sessions and active session", () => {
   const store = createStore();
@@ -269,6 +269,42 @@ test("store derives formal lifecycle transitions from runtime state and activity
   store.markSessionClosed("a");
   state = store.getState();
   assert.equal(state.sessions.find((session) => session.id === "a"), undefined);
+});
+
+test("store pure helpers normalize initial state and remove active sessions with deterministic fallback", () => {
+  const initial = createInitialRuntimeState({
+    connectionState: " connected ",
+    activeDeckId: " ops ",
+    sessionFilterText: "  tag:ops  "
+  });
+
+  assert.deepEqual(initial, {
+    sessions: [],
+    activeSessionId: null,
+    connectionState: "connected",
+    decks: [],
+    activeDeckId: "ops",
+    customCommands: [],
+    sessionFilterText: "tag:ops"
+  });
+
+  const next = reduceRuntimeState(
+    {
+      ...initial,
+      sessions: [
+        { id: "a", deckId: "default" },
+        { id: "b", deckId: "ops" }
+      ],
+      activeSessionId: "b"
+    },
+    { type: "session.remove", sessionId: "b" }
+  );
+
+  assert.deepEqual(
+    next.sessions.map((session) => session.id),
+    ["a"]
+  );
+  assert.equal(next.activeSessionId, "a");
 });
 
 test("store avoids repeated publishes for already-live session activity", () => {

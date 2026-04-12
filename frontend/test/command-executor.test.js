@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 
 import { createCommandExecutor } from "../src/public/command-executor.js";
 
-function createExecutor() {
+function createExecutor(overrides = {}) {
   return createCommandExecutor({
-    store: {
+    store: overrides.store || {
       getState() {
         return {
           sessions: [],
@@ -14,60 +14,62 @@ function createExecutor() {
         };
       }
     },
-    api: {
+    api: overrides.api || {
       async createSession(payload) {
         return { id: "s-new", name: payload?.shell || "Session", deckId: "default" };
       }
     },
-    systemSlashCommands: ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "custom", "help", "run"],
-    getActiveDeck: () => ({ id: "default", name: "Default" }),
-    getSessionCountForDeck: () => 0,
-    applyRuntimeEvent: () => {},
-    setActiveDeck: () => true,
-    resolveSessionDeckId: (session) => String(session?.deckId || "default"),
-    formatSessionToken: (id) => String(id || ""),
-    formatSessionDisplayName: (session) => String(session?.name || ""),
-    sortSessionsByQuickId: (sessions) => (Array.isArray(sessions) ? sessions.slice() : []),
-    swapSessionTokens: () => false,
-    getSessionRuntimeState: () => ({}),
-    isSessionExited: () => false,
-    isSessionActionBlocked: () => false,
-    getBlockedSessionActionMessage: () => "",
-    listCustomCommandState: () => [],
-    getCustomCommandState: () => null,
-    removeCustomCommandState: () => false,
-    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
-    upsertCustomCommandState: () => null,
-    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
-    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
-    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
-    applyTerminalSizeSettings: () => {},
-    setSessionFilterText: () => {},
-    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
-    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
-    normalizeSendTerminatorMode: () => "auto",
-    setSessionSendTerminator: () => {},
-    getSessionSendTerminator: () => "auto",
-    sendInputWithConfiguredTerminator: async () => {},
-    recordCommandSubmission: () => null,
-    normalizeCustomCommandPayloadForShell: (value) => value,
-    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
-    normalizeThemeProfile: (profile) => profile || {},
-    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
-    requestRender: () => {},
-    listWorkspacePresets: () => [],
-    resolveWorkspacePreset: () => ({ preset: null, error: "Unknown workspace preset." }),
-    createWorkspacePresetFromCurrent: async () => "",
-    applyWorkspacePreset: async () => "",
-    renameWorkspacePreset: async () => "",
-    deleteWorkspacePreset: async () => "",
-    getBroadcastStatus: () => "Broadcast: off.",
-    enableGroupBroadcast: async () => "",
-    disableBroadcast: async () => "Broadcast mode disabled.",
-    listShares: async () => [],
-    createShareLink: async () => null,
-    revokeShareLink: async () => null,
-    writeClipboardText: async () => false
+    systemSlashCommands:
+      overrides.systemSlashCommands ||
+      ["new", "deck", "move", "size", "filter", "close", "switch", "swap", "next", "prev", "list", "rename", "restart", "note", "connection", "layout", "workspace", "broadcast", "share", "replay", "transfer", "settings", "custom", "help", "run"],
+    getActiveDeck: overrides.getActiveDeck || (() => ({ id: "default", name: "Default" })),
+    getSessionCountForDeck: overrides.getSessionCountForDeck || (() => 0),
+    applyRuntimeEvent: overrides.applyRuntimeEvent || (() => {}),
+    setActiveDeck: overrides.setActiveDeck || (() => true),
+    resolveSessionDeckId: overrides.resolveSessionDeckId || ((session) => String(session?.deckId || "default")),
+    formatSessionToken: overrides.formatSessionToken || ((id) => String(id || "")),
+    formatSessionDisplayName: overrides.formatSessionDisplayName || ((session) => String(session?.name || "")),
+    sortSessionsByQuickId: overrides.sortSessionsByQuickId || ((sessions) => (Array.isArray(sessions) ? sessions.slice() : [])),
+    swapSessionTokens: overrides.swapSessionTokens || (() => false),
+    getSessionRuntimeState: overrides.getSessionRuntimeState || (() => ({})),
+    isSessionExited: overrides.isSessionExited || (() => false),
+    isSessionActionBlocked: overrides.isSessionActionBlocked || (() => false),
+    getBlockedSessionActionMessage: overrides.getBlockedSessionActionMessage || (() => ""),
+    listCustomCommandState: overrides.listCustomCommandState || (() => []),
+    getCustomCommandState: overrides.getCustomCommandState || (() => null),
+    removeCustomCommandState: overrides.removeCustomCommandState || (() => false),
+    parseCustomDefinition: overrides.parseCustomDefinition || (() => ({ ok: false, error: "unsupported" })),
+    upsertCustomCommandState: overrides.upsertCustomCommandState || (() => null),
+    resolveTargetSelectors: overrides.resolveTargetSelectors || (() => ({ sessions: [], error: "" })),
+    resolveDeckToken: overrides.resolveDeckToken || (() => ({ deck: null, error: "unknown deck" })),
+    parseSizeCommandArgs: overrides.parseSizeCommandArgs || (() => ({ ok: false, error: "bad size" })),
+    applyTerminalSizeSettings: overrides.applyTerminalSizeSettings || (() => {}),
+    setSessionFilterText: overrides.setSessionFilterText || (() => {}),
+    resolveSettingsTargets: overrides.resolveSettingsTargets || (() => ({ sessions: [], error: "" })),
+    parseSettingsPayload: overrides.parseSettingsPayload || (() => ({ ok: false, error: "bad json" })),
+    normalizeSendTerminatorMode: overrides.normalizeSendTerminatorMode || (() => "auto"),
+    setSessionSendTerminator: overrides.setSessionSendTerminator || (() => {}),
+    getSessionSendTerminator: overrides.getSessionSendTerminator || (() => "auto"),
+    sendInputWithConfiguredTerminator: overrides.sendInputWithConfiguredTerminator || (async () => {}),
+    recordCommandSubmission: overrides.recordCommandSubmission || (() => null),
+    normalizeCustomCommandPayloadForShell: overrides.normalizeCustomCommandPayloadForShell || ((value) => value),
+    normalizeSessionTags: overrides.normalizeSessionTags || ((tags) => (Array.isArray(tags) ? tags : [])),
+    normalizeThemeProfile: overrides.normalizeThemeProfile || ((profile) => profile || {}),
+    getTerminalSettings: overrides.getTerminalSettings || (() => ({ cols: 80, rows: 20 })),
+    requestRender: overrides.requestRender || (() => {}),
+    listWorkspacePresets: overrides.listWorkspacePresets || (() => []),
+    resolveWorkspacePreset: overrides.resolveWorkspacePreset || (() => ({ preset: null, error: "Unknown workspace preset." })),
+    createWorkspacePresetFromCurrent: overrides.createWorkspacePresetFromCurrent || (async () => ""),
+    applyWorkspacePreset: overrides.applyWorkspacePreset || (async () => ""),
+    renameWorkspacePreset: overrides.renameWorkspacePreset || (async () => ""),
+    deleteWorkspacePreset: overrides.deleteWorkspacePreset || (async () => ""),
+    getBroadcastStatus: overrides.getBroadcastStatus || (() => "Broadcast: off."),
+    enableGroupBroadcast: overrides.enableGroupBroadcast || (async () => ""),
+    disableBroadcast: overrides.disableBroadcast || (async () => "Broadcast mode disabled."),
+    listShares: overrides.listShares || (async () => []),
+    createShareLink: overrides.createShareLink || (async () => null),
+    revokeShareLink: overrides.revokeShareLink || (async () => null),
+    writeClipboardText: overrides.writeClipboardText || (async () => false)
   });
 }
 
@@ -168,6 +170,39 @@ test("command executor help and usage strings derive from declarative schema met
 
   const runUsage = await executor.execute({ command: "run", args: [], raw: "/run" });
   assert.equal(runUsage, "Usage: /run + newline-separated slash commands | /cmd1 + newline + /cmd2");
+});
+
+test("command executor reports ambiguous switch targets and missing replay sources explicitly", async () => {
+  const executor = createExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [
+            { id: "s-1", deckId: "default", name: "one" },
+            { id: "s-2", deckId: "default", name: "two" }
+          ],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: ""
+        };
+      }
+    },
+    resolveTargetSelectors: () => ({
+      sessions: [
+        { id: "s-1", name: "one" },
+        { id: "s-2", name: "two" }
+      ],
+      error: ""
+    })
+  });
+
+  assert.equal(
+    await executor.execute({ command: "switch", args: ["ops"], raw: "/switch ops" }),
+    "Switch selector must resolve to exactly one session."
+  );
+  assert.equal(
+    await executor.execute({ command: "replay", args: ["view"], raw: "/replay view" }),
+    "No active session for /replay."
+  );
 });
 
 test("command executor manages share links through shared runtime hooks", async () => {

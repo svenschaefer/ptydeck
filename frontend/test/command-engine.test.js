@@ -321,3 +321,76 @@ test("command engine suppresses autocomplete for multiline slash and quick-switc
   assert.equal(engine.parseAutocompleteContext("/help\ndeck"), null);
   assert.equal(engine.parseAutocompleteContext(">1\n2"), null);
 });
+
+test("custom command registry normalizes names, replaces state, and ignores invalid records", () => {
+  const registry = createCustomCommandRegistry();
+
+  assert.equal(registry.get(""), null);
+  assert.equal(registry.remove(""), false);
+  assert.equal(registry.upsert({ name: "   ", content: "ignored" }), null);
+
+  registry.upsert({ name: "Go", content: "echo first" });
+  registry.upsert({ name: "go", content: "echo second" });
+  assert.equal(registry.get("GO")?.content, "echo second");
+
+  registry.replace([
+    { name: "Beta", content: "echo beta" },
+    { name: "alpha", content: "echo alpha" },
+    { name: "", content: "ignored" }
+  ]);
+
+  assert.deepEqual(
+    registry.list().map((entry) => [entry.name, entry.content]),
+    [
+      ["alpha", "echo alpha"],
+      ["beta", "echo beta"]
+    ]
+  );
+  assert.equal(registry.remove("beta"), true);
+  assert.equal(registry.get("beta"), null);
+});
+
+test("command engine resolves cross-deck targets and active-session settings paths defensively", () => {
+  const engine = createEngineFixture();
+  const sessions = [
+    {
+      id: "sess-1-abcdef",
+      name: "alpha",
+      deckId: "default",
+      tags: ["ops"],
+      cwd: "~/alpha",
+      startCwd: "~/alpha",
+      env: { APP_ENV: "dev" }
+    },
+    {
+      id: "sess-2-fedcba",
+      name: "beta",
+      deckId: "ops",
+      tags: ["ops", "db"],
+      cwd: "~/ops",
+      startCwd: "~/ops",
+      env: { APP_ENV: "prod", DB_HOST: "db" }
+    }
+  ];
+
+  assert.deepEqual(engine.resolveTargetSelectors("ops::beta", sessions), {
+    sessions: [sessions[1]],
+    error: ""
+  });
+  assert.deepEqual(engine.resolveTargetSelectors("ops::", sessions), {
+    sessions: [],
+    error: "Cross-deck selector must be '<deckSelector>::<sessionSelector>'."
+  });
+  assert.deepEqual(engine.resolveTargetSelectors("beta", sessions, { scopeMode: "active-deck", activeDeckId: "default" }), {
+    sessions: [],
+    error: "Unknown session identifier: beta"
+  });
+  assert.deepEqual(engine.resolveSettingsTargets("", sessions, ""), {
+    sessions: [],
+    error: "No active session for settings command."
+  });
+  assert.deepEqual(engine.resolveSettingsTargets("", sessions, "sess-1-abcdef"), {
+    sessions: [sessions[0]],
+    error: ""
+  });
+});

@@ -4,7 +4,10 @@ import assert from "node:assert/strict";
 import {
   buildConnectionProfileLaunchFromSession,
   createConnectionProfileRuntimeController,
+  formatConnectionProfileReport,
   formatConnectionProfileSummary,
+  normalizeConnectionProfileLaunch,
+  normalizeConnectionProfileRecord,
   resolveConnectionProfileToken
 } from "../src/public/connection-profile-runtime-controller.js";
 
@@ -211,6 +214,70 @@ test("buildConnectionProfileLaunchFromSession captures reusable launch settings 
     remoteConnection: { host: "ops.example", port: 22, username: "ops" },
     remoteAuth: { method: "privateKey", privateKeyPath: "/home/ops/.ssh/id_ed25519" }
   });
+});
+
+test("connection profile helpers normalize launches and reject malformed records deterministically", () => {
+  const launch = normalizeConnectionProfileLaunch({
+    kind: "local",
+    deckId: " ops ",
+    shell: " bash ",
+    startCwd: " /srv/app ",
+    env: { NODE_ENV: "production" },
+    tags: ["ops", "prod"],
+    themeProfile: createThemeProfile("#111111")
+  });
+
+  assert.deepEqual(launch, {
+    kind: "local",
+    deckId: "ops",
+    shell: "bash",
+    startCwd: "/srv/app",
+    startCommand: "",
+    env: { NODE_ENV: "production" },
+    tags: ["ops", "prod"],
+    themeProfile: createThemeProfile("#111111"),
+    activeThemeProfile: createThemeProfile("#111111"),
+    inactiveThemeProfile: createThemeProfile("#111111")
+  });
+  assert.equal(normalizeConnectionProfileLaunch({ kind: "local", shell: "bash" }), null);
+  assert.equal(normalizeConnectionProfileRecord({ id: "ops", name: "", launch }), null);
+});
+
+test("connection profile helpers report missing and ambiguous selectors with stable local reports", () => {
+  const profiles = [
+    {
+      id: "ops-east",
+      name: "Ops East",
+      launch: {
+        kind: "local",
+        deckId: "default",
+        shell: "bash",
+        startCwd: "/srv/east",
+        activeThemeProfile: createThemeProfile("#101010"),
+        inactiveThemeProfile: createThemeProfile("#202020")
+      }
+    },
+    {
+      id: "ops-west",
+      name: "Ops West",
+      launch: {
+        kind: "local",
+        deckId: "default",
+        shell: "bash",
+        startCwd: "/srv/west",
+        activeThemeProfile: createThemeProfile("#303030"),
+        inactiveThemeProfile: createThemeProfile("#404040")
+      }
+    }
+  ];
+
+  assert.equal(resolveConnectionProfileToken(profiles, "").error, "Connection profile target is required.");
+  assert.equal(
+    resolveConnectionProfileToken(profiles, "ops").error,
+    "Ambiguous connection profile 'ops': ops-east, ops-west"
+  );
+  assert.match(formatConnectionProfileReport(profiles[0]), /^\[ops-east\] Ops East$/m);
+  assert.match(formatConnectionProfileReport(profiles[0]), /remoteConnection=null/);
 });
 
 test("connection profile runtime controller manages backend-backed lifecycle and launches sessions from profiles", async () => {

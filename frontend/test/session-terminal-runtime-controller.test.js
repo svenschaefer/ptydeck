@@ -388,6 +388,40 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(entry.terminal.options.fontSize, 16);
 });
 
+test("session-terminal-runtime controller mounts safely when helper textarea and viewport are unavailable", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {}
+  });
+  const refs = createTerminalCardRefs("minimal");
+  refs.mount.querySelector = () => null;
+  const terminals = new Map();
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers: new Map(),
+    resolveInitialTheme: () => ({ background: "#000000" }),
+    onSessionMounted() {},
+    onTerminalData() {},
+    onFirstTerminalMounted() {},
+    applyResizeForSession() {}
+  });
+
+  assert.equal(entry.terminal.textarea, null);
+  assert.equal(controller.refreshMountedTerminal("s1"), false);
+});
+
 test("session-terminal-runtime controller exposes manual refresh through the mounted entry stabilization path", () => {
   const calls = [];
   const terminals = new Map();

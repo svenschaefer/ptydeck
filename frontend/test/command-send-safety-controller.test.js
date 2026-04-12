@@ -255,3 +255,50 @@ test("command send safety controller returns an empty aggregate summary when no 
   assert.deepEqual(result.reasons, []);
   assert.deepEqual(result.flaggedTargets, []);
 });
+
+test("command send safety controller distinguishes prose, assignments, and path-like commands", () => {
+  assert.equal(isLikelyNaturalLanguageInput("I need you to inspect the current failure output"), true);
+  assert.equal(isLikelyNaturalLanguageInput("could you summarize what changed"), true);
+  assert.equal(isLikelyNaturalLanguageInput("APP_ENV=dev npm run test"), false);
+  assert.equal(isLikelyNaturalLanguageInput("./scripts/check.sh --help"), false);
+  assert.equal(isLikelyNaturalLanguageInput("../bin/run-task"), false);
+});
+
+test("command send safety controller detects additional destructive commands and bypasses target-switch grace on direct routes", () => {
+  assert.deepEqual(classifyDangerousShellCommand("sudo dd if=/dev/zero of=/dev/sda"), {
+    matched: true,
+    code: "dangerous_shell_command",
+    label: "Command writes raw disk data."
+  });
+  assert.deepEqual(classifyDangerousShellCommand("sudo reboot now"), {
+    matched: true,
+    code: "dangerous_shell_command",
+    label: "Command shuts down or reboots the machine."
+  });
+  assert.deepEqual(classifyDangerousShellCommand("sudo chown -R app:app /srv/app"), {
+    matched: true,
+    code: "dangerous_shell_command",
+    label: "Command changes ownership recursively."
+  });
+
+  const session = {
+    id: "s1",
+    name: "ops-shell",
+    inputSafetyProfile: normalizeSessionInputSafetyProfile({
+      confirmOnRecentTargetSwitch: true,
+      confirmOnMultilineInput: true,
+      pasteLengthConfirmThreshold: 999,
+      pasteLineConfirmThreshold: 99
+    })
+  };
+
+  const directRoute = evaluateSessionSendSafety({
+    session,
+    text: "echo one\necho two",
+    directRoute: true,
+    recentTargetSwitchAt: 9_950,
+    nowMs: 10_000
+  });
+
+  assert.deepEqual(directRoute.reasons.map((entry) => entry.code), ["multiline_input"]);
+});

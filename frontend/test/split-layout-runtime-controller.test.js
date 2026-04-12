@@ -225,6 +225,25 @@ test("split-layout runtime renders pane bodies and keeps idempotent card placeme
   assert.equal(secondBody.appendCalls.length, secondAppendCount);
 });
 
+test("split-layout runtime captures cloned layout snapshots without leaking internal mutation", () => {
+  const controller = createSplitLayoutRuntimeController();
+
+  controller.replaceDeckSplitLayouts({
+    ops: {
+      root: { type: "pane", paneId: "main" },
+      paneSessions: { main: ["s1"] }
+    }
+  });
+
+  const captured = controller.captureDeckSplitLayouts();
+  captured.ops.root.paneId = "mutated";
+  captured.ops.paneSessions.main.push("s2");
+
+  const current = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(current.root, { type: "pane", paneId: "main" });
+  assert.deepEqual(current.paneSessions.main, ["s1"]);
+});
+
 test("split-layout runtime orders pane contents by current quick-id session order", () => {
   const gridEl = new FakeElement("main");
   const controller = createSplitLayoutRuntimeController({
