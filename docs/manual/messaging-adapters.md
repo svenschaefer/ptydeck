@@ -8,7 +8,45 @@ Use it when you want:
 - bounded remote follow-up from a mapped Telegram chat
 - a stable session-to-chat mapping without opening a second terminal UI
 
+The adapter now also publishes its Telegram slash-command surface from the canonical ptydeck command model instead of a separate handwritten Telegram-only list.
+
 The adapter is intentionally not a remote shell.
+
+## Telegram Command Surface
+
+The shipped Telegram bot command list is now derived from the canonical ptydeck command surface.
+
+That means:
+
+- built-in bounded commands remain:
+  - `/status`
+  - `/stop`
+  - `/retry`
+  - `/replay`
+- bounded replay selectors such as `/replay l:40` or `/replay c:1200` remain valid as arguments on `/replay`, but they are not separate published Telegram bot commands
+- eligible custom commands are published automatically to Telegram with deterministic Telegram-safe names
+- scoped custom-command variants sharing the same canonical name collapse into one published Telegram command name; runtime resolution still picks the command that is valid for the mapped session
+- invalid, conflicting, or overflow custom commands are skipped deterministically instead of drifting into an undocumented Telegram-only surface
+
+Telegram-safe custom command naming currently follows this deterministic encoding:
+
+- lowercase letters and digits remain unchanged
+- `_` becomes `__`
+- `-` becomes `_d`
+- names that would start with a digit gain the prefix `c_`
+
+Examples:
+
+- ptydeck `/doc-u` -> Telegram `/doc_du`
+- ptydeck `/doc_u` -> Telegram `/doc__u`
+- ptydeck `/7zip` -> Telegram `/c_7zip`
+
+Runtime behavior follows the published catalog:
+
+- a published Telegram custom command is resolved through the same custom-command model as the primary ptydeck slash-command surface
+- Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the authority
+- unknown slash commands are not intercepted as Telegram adapter actions
+- exact literal slash-prefixed terminal input remains available through the existing `//...` escape
 
 ## Noise Control and Diagnostics
 
@@ -47,6 +85,14 @@ curl -s http://127.0.0.1:18080/ready | jq '.messaging.trace'
 That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.
 
 The Telegram adapter status now also surfaces active outbound backoff state after a Bot API `retry after` response, so repeated rate-limit failures can be distinguished from ordinary transport errors.
+
+The same adapter status payload now also exposes command-publication state:
+
+- `publishedCommandCount`
+- `commandCatalogSize`
+- `commandSyncSkippedCount`
+- `lastCommandSyncAt`
+- `lastCommandSyncError`
 
 One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later `Session idle.` event should still stay suppressed. The trace will show the skipped status attempt plus the later `idle_after_status_attempt` suppression instead of silently bumping the thread with low-value idle churn.
 
@@ -122,9 +168,8 @@ The Telegram reference adapter can:
   - `/stop`
   - `/retry`
   - `/replay`
-  - `/replay l:N`
-  - `/replay c:N`
-  - `/replay sp:N`
+  - bounded replay selectors such as `/replay l:N`, `/replay c:N`, and `/replay sp:N`
+- publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
 - route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
 - mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale
 - preserve literal slash-prefixed terminal input through a `//...` escape (`//status` -> `/status`)

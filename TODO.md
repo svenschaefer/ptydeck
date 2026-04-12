@@ -14,10 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-046` Owner `BE`
-  Make ptydeck custom slash commands available as Telegram slash commands from the canonical command surface, including deterministic command publication/update for the Telegram bot and runtime dispatch that keeps Telegram command handling aligned with the delivered ptydeck slash-command definitions instead of a separate handwritten Telegram-only list.
-- `MSG-047` Owner `QA`
-  Validate the Telegram slash-command publication and dispatch wave end to end, including regression coverage for command-schema synchronization, Telegram-safe command filtering and naming, inbound command routing, and updated operator documentation for the published Telegram slash-command surface.
 - `MSG-050` Owner `BE`
   Add focused backend regression coverage for the highest-risk branch hotspots from the 2026-04-12 repo-wide audit: `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/codex-outbound-evaluator.js`, and `backend/src/session-stream-analysis-capture.js`, with direct tests for retry/backoff suppression, restart-recovery/state-reset edges, capture rotation/error handling, and the remaining allowlist-family rejection branches that are still only partially exercised.
 - `MSG-051` Owner `BE`

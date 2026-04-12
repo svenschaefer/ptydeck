@@ -1,3 +1,9 @@
+import {
+  buildTelegramCommandCatalog,
+  normalizeTelegramCommandCatalog,
+  resolveTelegramCommandCatalogEntry
+} from "./telegram-command-surface.js";
+
 const DEFAULT_TELEGRAM_API_BASE_URL = "https://api.telegram.org";
 const TELEGRAM_CALLBACK_PREFIX = "ptydeck:";
 const DEFAULT_POLL_TIMEOUT_SECONDS = 3;
@@ -151,7 +157,8 @@ function parseTelegramRateLimitMetadata(error) {
   };
 }
 
-export function parseTelegramInboundCommand(input = {}) {
+export function parseTelegramInboundCommand(input = {}, commandCatalog = null) {
+  const normalizedCatalog = commandCatalog ? normalizeTelegramCommandCatalog(commandCatalog) : buildTelegramCommandCatalog();
   const callbackData = normalizeNonEmptyString(input.callbackData);
   if (callbackData) {
     if (!callbackData.startsWith(TELEGRAM_CALLBACK_PREFIX)) {
@@ -175,11 +182,16 @@ export function parseTelegramInboundCommand(input = {}) {
   if (!text) {
     return null;
   }
-  const match = text.match(/^\/(status|stop|retry|replay)(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?$/i);
+  const match = text.match(/^\/([A-Za-z0-9_]+)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S]+))?$/i);
   if (!match) {
     return null;
   }
-  const action = String(match[1] || "").toLowerCase();
+  const commandName = String(match[1] || "").toLowerCase();
+  const catalogEntry = resolveTelegramCommandCatalogEntry(normalizedCatalog, commandName);
+  if (!catalogEntry) {
+    return null;
+  }
+  const action = catalogEntry.action;
   const rawArg = normalizeNonEmptyString(match[2]);
   if (action === "replay") {
     if (!rawArg) {
@@ -189,6 +201,13 @@ export function parseTelegramInboundCommand(input = {}) {
       return null;
     }
     return Object.freeze({ action, selector: rawArg });
+  }
+  if (action === "custom") {
+    return Object.freeze({
+      action,
+      customCommandName: catalogEntry.customCommandName,
+      telegramCommand: catalogEntry.telegramCommand
+    });
   }
   if (rawArg) {
     return null;
@@ -233,13 +252,13 @@ function summarizeTelegramChat(chat) {
   };
 }
 
-function inspectTelegramInboundUpdate(update = {}) {
+function inspectTelegramInboundUpdate(update = {}, commandCatalog = null) {
   const updateId = Number.isInteger(update?.update_id) ? update.update_id : null;
   const callbackQuery = update?.callback_query;
   if (callbackQuery && typeof callbackQuery === "object") {
     const message = callbackQuery.message && typeof callbackQuery.message === "object" ? callbackQuery.message : null;
     const chat = summarizeTelegramChat(message?.chat);
-    const command = parseTelegramInboundCommand({ callbackData: callbackQuery.data });
+    const command = parseTelegramInboundCommand({ callbackData: callbackQuery.data }, commandCatalog);
     const observation = {
       updateId,
       source: "callback",
@@ -288,7 +307,7 @@ function inspectTelegramInboundUpdate(update = {}) {
   if (message && typeof message === "object") {
     const chat = summarizeTelegramChat(message?.chat);
     const rawText = typeof message?.text === "string" ? message.text : "";
-    const command = parseTelegramInboundCommand({ text: rawText });
+    const command = parseTelegramInboundCommand({ text: rawText }, commandCatalog);
     const inputText = command ? "" : normalizeTelegramInboundTextPayload(rawText);
     const hasText = rawText.length > 0;
     const observation = {
@@ -330,7 +349,7 @@ function inspectTelegramInboundUpdate(update = {}) {
           ...(Number.isInteger(message?.message_thread_id) ? { messageThreadId: message.message_thread_id } : {})
         },
         command: command || { action: "input" },
-        ...(inputText ? { text: inputText } : {})
+        ...(inputText ? { text: inputText } : command?.action === "custom" ? { text: rawText } : {})
       }
     };
   }
@@ -463,6 +482,17 @@ export function createTelegramTransport(options = {}) {
         ok: result === true,
         raw: result
       };
+    },
+    async setMyCommands({ commands = [] } = {}) {
+      const result = await request("setMyCommands", {
+        commands: Array.isArray(commands)
+          ? commands.map((entry) => ({
+              command: normalizeNonEmptyString(entry?.command).toLowerCase(),
+              description: normalizeNonEmptyString(entry?.description)
+            }))
+          : []
+      });
+      return result === true;
     }
   };
 }
@@ -496,6 +526,7 @@ export function createTelegramAdapter(options = {}) {
   const inboundTraceEntries = [];
   let inboundTraceCapturedTotal = 0;
   const replyMarkup = inboundEnabled ? buildTelegramReplyMarkup() : null;
+  let commandCatalog = normalizeTelegramCommandCatalog(options.commandCatalog || buildTelegramCommandCatalog());
   const metrics = {
     deliveredTotal: 0,
     updatedTotal: 0,
@@ -527,7 +558,13 @@ export function createTelegramAdapter(options = {}) {
     validatedForumTargetTotal: 0,
     lastTargetValidationAt: null,
     lastTargetValidationErrorAt: null,
-    lastTargetValidationError: ""
+    lastTargetValidationError: "",
+    publishedCommandCount: commandCatalog.publishedCommands.length,
+    commandCatalogSize: commandCatalog.entries.length,
+    commandSyncSkippedCount: commandCatalog.skippedCommands.length,
+    lastCommandSyncAt: null,
+    lastCommandSyncErrorAt: null,
+    lastCommandSyncError: ""
   };
   const pollState = {
     stopRequested: false,
@@ -1034,6 +1071,43 @@ export function createTelegramAdapter(options = {}) {
     }
   }
 
+  async function syncCommands(nextCatalog) {
+    commandCatalog = normalizeTelegramCommandCatalog(nextCatalog || buildTelegramCommandCatalog());
+    metrics.commandCatalogSize = commandCatalog.entries.length;
+    metrics.commandSyncSkippedCount = commandCatalog.skippedCommands.length;
+    metrics.publishedCommandCount = commandCatalog.publishedCommands.length;
+    metrics.lastCommandSyncAt = nowFn();
+    if (!transport || typeof transport.setMyCommands !== "function") {
+      metrics.lastCommandSyncErrorAt = metrics.lastCommandSyncAt;
+      metrics.lastCommandSyncError = "Telegram transport does not support setMyCommands.";
+      return {
+        synced: false,
+        publishedCommandCount: commandCatalog.publishedCommands.length,
+        skippedCommandCount: commandCatalog.skippedCommands.length,
+        reason: "transport_missing_set_my_commands"
+      };
+    }
+    try {
+      await transport.setMyCommands({ commands: commandCatalog.publishedCommands });
+      metrics.lastCommandSyncErrorAt = null;
+      metrics.lastCommandSyncError = "";
+      return {
+        synced: true,
+        publishedCommandCount: commandCatalog.publishedCommands.length,
+        skippedCommandCount: commandCatalog.skippedCommands.length
+      };
+    } catch (error) {
+      metrics.lastCommandSyncErrorAt = metrics.lastCommandSyncAt;
+      metrics.lastCommandSyncError = error instanceof Error ? error.message : String(error || "Telegram command sync failed.");
+      return {
+        synced: false,
+        publishedCommandCount: commandCatalog.publishedCommands.length,
+        skippedCommandCount: commandCatalog.skippedCommands.length,
+        error: metrics.lastCommandSyncError
+      };
+    }
+  }
+
   function updateNextOffset(updates) {
     for (const update of Array.isArray(updates) ? updates : []) {
       if (!Number.isInteger(update?.update_id)) {
@@ -1153,7 +1227,7 @@ export function createTelegramAdapter(options = {}) {
               if (pollState.stopRequested) {
                 break;
               }
-              const inspected = inspectTelegramInboundUpdate(update);
+              const inspected = inspectTelegramInboundUpdate(update, commandCatalog);
               const observation = inspected?.observation || null;
               const inbound = inspected?.inbound || null;
               if (observation) {
@@ -1260,6 +1334,12 @@ export function createTelegramAdapter(options = {}) {
       lastTargetValidationAt: metrics.lastTargetValidationAt,
       lastTargetValidationErrorAt: metrics.lastTargetValidationErrorAt,
       lastTargetValidationError: metrics.lastTargetValidationError,
+      publishedCommandCount: metrics.publishedCommandCount,
+      commandCatalogSize: metrics.commandCatalogSize,
+      commandSyncSkippedCount: metrics.commandSyncSkippedCount,
+      lastCommandSyncAt: metrics.lastCommandSyncAt,
+      lastCommandSyncErrorAt: metrics.lastCommandSyncErrorAt,
+      lastCommandSyncError: metrics.lastCommandSyncError,
       targetTrace: {
         capacity: MAX_TELEGRAM_TARGET_TRACE_ENTRIES,
         capturedTotal: targetTraceCapturedTotal,
@@ -1304,6 +1384,7 @@ export function createTelegramAdapter(options = {}) {
   return {
     ensureTarget,
     handleEvent,
+    syncCommands,
     startInbound,
     stop,
     getStatus,

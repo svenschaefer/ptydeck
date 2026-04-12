@@ -2507,6 +2507,135 @@ test("messaging runtime returns telegram input control failures without suppress
   }
 });
 
+test("messaging runtime executes published telegram custom commands against the mapped session", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const inputCalls = [];
+  const session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex", deckId: "ops" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    listCustomCommands() {
+      return [
+        {
+          name: "deploy-app",
+          kind: "template",
+          scope: "project",
+          content: "echo deploy {{param:env}} {{var:deck.name}}",
+          templateVariables: ["deck.name"]
+        }
+      ];
+    },
+    resolveDeckForSession() {
+      return { id: "ops", name: "Ops" };
+    },
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 280 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 280 };
+        },
+        async setMyCommands() {
+          return true;
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    },
+    async requestMessagingSendInput(sessionId, data) {
+      inputCalls.push({ sessionId, data });
+      return session;
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/deploy_dapp env=prod" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.deepEqual(inputCalls, [{ sessionId: "s-codex", data: "echo deploy prod Ops\r" }]);
+    assert.match(outboundMessages[0].text, /Custom command \/deploy-app sent to \[9\] codex/);
+    assert.equal(runtime.buildStatusSummary().adapters[0].publishedCommandCount >= 5, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("messaging runtime rejects telegram custom-command target redirects", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    listCustomCommands() {
+      return [
+        {
+          name: "docu",
+          kind: "plain",
+          scope: "project",
+          content: "echo DOCU"
+        }
+      ];
+    },
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 290 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 290 };
+        },
+        async setMyCommands() {
+          return true;
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 1, message: { chat: { id: 1001 }, text: "/docu other-target" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.match(outboundMessages[0].text, /cannot redirect to another target/i);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("messaging runtime rejects unmapped or unavailable inbound actions deterministically", async () => {
   const outboundMessages = [];
   const updateQueue = [];

@@ -757,6 +757,121 @@ test("runtime sends telegram text with delayed submit semantics when messaging i
   }
 });
 
+test("runtime publishes telegram commands from the canonical surface and executes mapped custom commands end to end", async () => {
+  const sends = [];
+  const publishedCommands = [];
+  const updateQueue = [];
+  const writeCalls = [];
+  const telegramChat = {
+    id: -100200302,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group",
+    is_forum: true
+  };
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
+    messagingTelegramTargets: [{ sessionName: "build-run", chatId: "-100200302" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 170 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 170 };
+        },
+        async setMyCommands(payload) {
+          publishedCommands.push(payload);
+          return true;
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (dataHandler) {
+            dataHandler(normalized);
+          }
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "build-run", deckId: "ops" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const putRes = await fetch(`${baseUrl}/custom-commands/doc-u`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo DOCU_FROM_TELEGRAM\n" })
+    });
+    assert.equal(putRes.status, 200);
+
+    await waitFor(() => publishedCommands.length >= 2, 2000);
+    assert.equal(
+      publishedCommands.at(-1).commands.some((entry) => entry.command === "doc_du" && /custom command/i.test(entry.description)),
+      true
+    );
+
+    updateQueue.push({
+      update_id: 1,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "/doc_du"
+      }
+    });
+
+    await waitFor(() => writeCalls.includes("echo DOCU_FROM_TELEGRAM") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => sends.some((entry) => /Custom command \/doc-u sent to \[[^\]]+\] build-run/.test(entry.text)), 2000);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.adapters[0].publishedCommandCount >= 5, true);
+    assert.equal(health.messaging.adapters[0].lastCommandSyncError, "");
+    assert.equal(created.id.length > 0, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime provisions telegram forum topics per terminal and persists the binding", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");

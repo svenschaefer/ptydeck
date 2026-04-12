@@ -17,7 +17,7 @@ async function waitFor(predicate, timeoutMs = 1500) {
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-test("telegram transport sends edits forum-topic calls polls, gets chats, and answers through the Telegram Bot API shape", async () => {
+test("telegram transport sends edits forum-topic calls polls, gets chats, answers, and publishes commands through the Telegram Bot API shape", async () => {
   const requests = [];
   const transport = createTelegramTransport({
     botToken: "bot-token",
@@ -34,6 +34,12 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, and an
             };
           }
           if (url.endsWith("/answerCallbackQuery")) {
+            return {
+              ok: true,
+              result: true
+            };
+          }
+          if (url.endsWith("/setMyCommands")) {
             return {
               ok: true,
               result: true
@@ -83,6 +89,12 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, and an
   const chat = await transport.getChat({ chatId: "-1001" });
   const updates = await transport.getUpdates({ offset: 8, timeoutSeconds: 5, limit: 50, allowedUpdates: ["message"] });
   const answered = await transport.answerCallbackQuery({ callbackQueryId: "cb-1", text: "ok", showAlert: true });
+  const synced = await transport.setMyCommands({
+    commands: [
+      { command: "status", description: "Show status." },
+      { command: "docu", description: "Project custom command; plain; /docu" }
+    ]
+  });
 
   assert.equal(sent.messageId, 1);
   assert.equal(edited.messageId, 2);
@@ -92,6 +104,7 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, and an
   assert.equal(chat.is_forum, true);
   assert.deepEqual(updates, [{ update_id: 7 }]);
   assert.equal(answered, true);
+  assert.equal(synced, true);
   assert.equal(requests[0].url, "https://telegram.example.test/botbot-token/sendMessage");
   assert.equal(requests[1].url, "https://telegram.example.test/botbot-token/editMessageText");
   assert.equal(requests[2].url, "https://telegram.example.test/botbot-token/createForumTopic");
@@ -99,6 +112,7 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, and an
   assert.equal(requests[4].url, "https://telegram.example.test/botbot-token/getChat");
   assert.equal(requests[5].url, "https://telegram.example.test/botbot-token/getUpdates");
   assert.equal(requests[6].url, "https://telegram.example.test/botbot-token/answerCallbackQuery");
+  assert.equal(requests[7].url, "https://telegram.example.test/botbot-token/setMyCommands");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     chat_id: "1001",
     text: "hello"
@@ -131,6 +145,12 @@ test("telegram transport sends edits forum-topic calls polls, gets chats, and an
     text: "ok",
     show_alert: true
   });
+  assert.deepEqual(JSON.parse(requests[7].options.body), {
+    commands: [
+      { command: "status", description: "Show status." },
+      { command: "docu", description: "Project custom command; plain; /docu" }
+    ]
+  });
 });
 
 test("telegram inbound command parsing stays deterministic for buttons and text fallbacks", () => {
@@ -143,6 +163,94 @@ test("telegram inbound command parsing stays deterministic for buttons and text 
   assert.equal(parseTelegramInboundCommand({ text: "status" }), null);
   assert.equal(parseTelegramInboundCommand({ text: "//status" }), null);
   assert.equal(parseTelegramInboundCommand({ callbackData: "other:status" }), null);
+  const catalog = {
+    entries: [
+      { telegramCommand: "status", action: "status", description: "Show status." },
+      { telegramCommand: "doc_du", action: "custom", customCommandName: "doc-u", description: "Custom command." }
+    ]
+  };
+  assert.deepEqual(parseTelegramInboundCommand({ text: "/doc_du env=prod" }, catalog), {
+    action: "custom",
+    customCommandName: "doc-u",
+    telegramCommand: "doc_du"
+  });
+  assert.equal(parseTelegramInboundCommand({ text: "/unknown" }, catalog), null);
+});
+
+test("telegram adapter syncs published commands and uses the synced catalog for inbound parsing", async () => {
+  const commandSyncCalls = [];
+  const inboundCalls = [];
+  let served = false;
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    inboundEnabled: true,
+    configuredTargets: 1,
+    pollTimeoutSeconds: 1,
+    transport: {
+      async sendMessage() {
+        return { messageId: 1 };
+      },
+      async editMessage(payload) {
+        return { messageId: payload.messageId || 1 };
+      },
+      async setMyCommands(payload) {
+        commandSyncCalls.push(payload);
+        return true;
+      },
+      async getUpdates({ timeoutSeconds }) {
+        if (timeoutSeconds === 0) {
+          return [];
+        }
+        if (!served) {
+          served = true;
+          return [{ update_id: 1, message: { chat: { id: -100200300, type: "supergroup" }, text: "/doc_du env=prod" } }];
+        }
+        await sleep(5);
+        return [];
+      },
+      async answerCallbackQuery() {
+        return true;
+      }
+    }
+  });
+
+  const syncResult = await adapter.syncCommands({
+    entries: [
+      { telegramCommand: "status", action: "status", description: "Show status." },
+      { telegramCommand: "doc_du", action: "custom", customCommandName: "doc-u", description: "Custom command." }
+    ],
+    publishedCommands: [
+      { command: "status", description: "Show status." },
+      { command: "doc_du", description: "Custom command." }
+    ],
+    skippedCommands: []
+  });
+
+  assert.equal(syncResult.synced, true);
+  assert.deepEqual(commandSyncCalls[0], {
+    commands: [
+      { command: "status", description: "Show status." },
+      { command: "doc_du", description: "Custom command." }
+    ]
+  });
+
+  await adapter.startInbound({
+    async onCommand(command) {
+      inboundCalls.push(command);
+      return { ok: true, text: "Custom command sent." };
+    }
+  });
+
+  try {
+    await waitFor(() => inboundCalls.length >= 1, 1500);
+    assert.equal(inboundCalls[0].command.action, "custom");
+    assert.equal(inboundCalls[0].command.customCommandName, "doc-u");
+    assert.equal(inboundCalls[0].text, "/doc_du env=prod");
+    assert.equal(adapter.getStatus().publishedCommandCount, 2);
+  } finally {
+    await adapter.stop();
+  }
 });
 
 test("telegram adapter validates transport requirements and inbound start states deterministically", async () => {

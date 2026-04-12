@@ -44,7 +44,54 @@
 <li>a stable session-to-chat mapping without opening a second terminal UI</li>
 </ul>
 
+<p>The adapter now also publishes its Telegram slash-command surface from the canonical ptydeck command model instead of a separate handwritten Telegram-only list.</p>
+
 <p>The adapter is intentionally not a remote shell.</p>
+
+<h2 id="telegram-command-surface">Telegram Command Surface</h2>
+
+<p>The shipped Telegram bot command list is now derived from the canonical ptydeck command surface.</p>
+
+<p>That means:</p>
+
+<ul>
+<li>built-in bounded commands remain:</li>
+</ul>
+
+<p>- <code>/status</code> - <code>/stop</code> - <code>/retry</code> - <code>/replay</code></p>
+
+<ul>
+<li>bounded replay selectors such as <code>/replay l:40</code> or <code>/replay c:1200</code> remain valid as arguments on <code>/replay</code>, but they are not separate published Telegram bot commands</li>
+<li>eligible custom commands are published automatically to Telegram with deterministic Telegram-safe names</li>
+<li>scoped custom-command variants sharing the same canonical name collapse into one published Telegram command name; runtime resolution still picks the command that is valid for the mapped session</li>
+<li>invalid, conflicting, or overflow custom commands are skipped deterministically instead of drifting into an undocumented Telegram-only surface</li>
+</ul>
+
+<p>Telegram-safe custom command naming currently follows this deterministic encoding:</p>
+
+<ul>
+<li>lowercase letters and digits remain unchanged</li>
+<li><code>_</code> becomes <code>__</code></li>
+<li><code>-</code> becomes <code>_d</code></li>
+<li>names that would start with a digit gain the prefix <code>c_</code></li>
+</ul>
+
+<p>Examples:</p>
+
+<ul>
+<li>ptydeck <code>/doc-u</code> -&gt; Telegram <code>/doc_du</code></li>
+<li>ptydeck <code>/doc_u</code> -&gt; Telegram <code>/doc__u</code></li>
+<li>ptydeck <code>/7zip</code> -&gt; Telegram <code>/c_7zip</code></li>
+</ul>
+
+<p>Runtime behavior follows the published catalog:</p>
+
+<ul>
+<li>a published Telegram custom command is resolved through the same custom-command model as the primary ptydeck slash-command surface</li>
+<li>Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the authority</li>
+<li>unknown slash commands are not intercepted as Telegram adapter actions</li>
+<li>exact literal slash-prefixed terminal input remains available through the existing <code>//...</code> escape</li>
+</ul>
 
 <h2 id="noise-control-and-diagnostics">Noise Control and Diagnostics</h2>
 
@@ -83,6 +130,16 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 <p>That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.</p>
 
 <p>The Telegram adapter status now also surfaces active outbound backoff state after a Bot API <code>retry after</code> response, so repeated rate-limit failures can be distinguished from ordinary transport errors.</p>
+
+<p>The same adapter status payload now also exposes command-publication state:</p>
+
+<ul>
+<li><code>publishedCommandCount</code></li>
+<li><code>commandCatalogSize</code></li>
+<li><code>commandSyncSkippedCount</code></li>
+<li><code>lastCommandSyncAt</code></li>
+<li><code>lastCommandSyncError</code></li>
+</ul>
 
 <p>One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later <code>Session idle.</code> event should still stay suppressed. The trace will show the skipped status attempt plus the later <code>idle_after_status_attempt</code> suppression instead of silently bumping the thread with low-value idle churn.</p>
 
@@ -157,9 +214,10 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <li>accept the bounded inbound bot command set:</li>
 </ul>
 
-<p>- <code>/status</code> - <code>/stop</code> - <code>/retry</code> - <code>/replay</code> - <code>/replay l:N</code> - <code>/replay c:N</code> - <code>/replay sp:N</code></p>
+<p>- <code>/status</code> - <code>/stop</code> - <code>/retry</code> - <code>/replay</code> - bounded replay selectors such as <code>/replay l:N</code>, <code>/replay c:N</code>, and <code>/replay sp:N</code></p>
 
 <ul>
+<li>publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck</li>
 <li>route mapped plain Telegram text into the same backend session-input path used by frontend <code>Send</code></li>
 <li>mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale</li>
 <li>preserve literal slash-prefixed terminal input through a <code>//...</code> escape (<code>//status</code> -&gt; <code>/status</code>)</li>
@@ -510,6 +568,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
       <aside class="handbook-page-toc">
         <p class="handbook-page-toc-title">On This Page</p>
         <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#telegram-command-surface">Telegram Command Surface</a></li>
 <li><a class="handbook-page-toc-link" href="#noise-control-and-diagnostics">Noise Control and Diagnostics</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
 <li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>

@@ -2780,6 +2780,15 @@ export function createRuntime(config) {
       const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
       return decks.get(deckId)?.name || deckId || "Default";
     },
+    resolveDeckForSession: (session) => {
+      const deckId = typeof session?.deckId === "string" && session.deckId.trim() ? session.deckId.trim() : DEFAULT_DECK_ID;
+      const deck = decks.get(deckId) || null;
+      return {
+        id: deck?.id || deckId,
+        name: deck?.name || deckId || "Default"
+      };
+    },
+    listCustomCommands,
     onTelegramTopicBindingUpsert: async (binding) => {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
       await persistNow("messaging.telegram.topic_binding");
@@ -6368,6 +6377,7 @@ function tryCreateRestoredSession({
           command: payload
         }, requestTraceContext);
         await persistNow("custom-command.upsert");
+        await messagingRuntime.syncTelegramCommandCatalog(requestTraceContext);
         writeJsonResponse( 200, payload);
         return;
       }
@@ -6384,6 +6394,7 @@ function tryCreateRestoredSession({
           command: deletedCommand
         }, requestTraceContext);
         await persistNow("custom-command.delete");
+        await messagingRuntime.syncTelegramCommandCatalog(requestTraceContext);
         writeJsonResponse( 204);
         return;
       }
@@ -6739,6 +6750,10 @@ function tryCreateRestoredSession({
         cleanupLayoutProfiles();
         cleanupWorkspacePresets();
         await persistNow("session.delete");
+        await messagingRuntime.syncTelegramCommandCatalog({
+          ...requestTraceContext,
+          sessionId: match.params.sessionId
+        });
         writeJsonResponse( 204);
         return;
       }

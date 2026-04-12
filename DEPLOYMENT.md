@@ -126,9 +126,15 @@ Notes:
   - `/stop`
   - `/retry`
   - `/replay`
-  - `/replay l:N`
-  - `/replay c:N`
-  - `/replay sp:N`
+- The Telegram bot command list is now published from the canonical ptydeck command surface through Telegram `setMyCommands`:
+  - built-in bounded commands remain `status`, `stop`, `retry`, and `replay`
+  - bounded replay selectors such as `/replay l:40` or `/replay c:1200` remain valid as arguments on `/replay`, but they are not separate published Telegram bot commands
+  - eligible custom commands are published automatically with deterministic Telegram-safe names derived from the canonical ptydeck custom-command name
+  - invalid, conflicting, or overflow commands are skipped deterministically instead of silently drifting into a second Telegram-only list
+- Telegram inbound command handling now follows the published command catalog instead of a handwritten adapter-local parser:
+  - published custom commands execute through the same custom-command resolution and shell-input path as the primary ptydeck command surface
+  - Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the only allowed target authority
+  - unknown slash commands are not intercepted by the adapter and can still fall through to literal terminal input via the existing `//...` escape
 - Telegram button affordances map onto the same bounded action contract.
 - Mapped plain Telegram text now follows the same backend session-input path as frontend `Send`, with one final `\r` terminator; the runtime keeps owner boundaries and `lastInput` tracking, but it no longer requires an attached browser controller client header for Telegram-originated input.
 - Exact slash-prefixed literal terminal input can be forced with `//...` (for example `//status` -> `/status`), while the known bot commands remain reserved for adapter control.
@@ -222,6 +228,7 @@ When Telegram messaging is configured, verify additionally:
 - `/health.messaging.adapters[0].targetTrace` exposes a bounded recent Telegram target-validation and topic-provisioning ring with `chatId`, topic mode, session/topic identity, forum-validation outcome, and provisioning errors or reuse/create/rename results
 - `/health.messaging.adapters[0]` exposes Telegram backoff fields such as `backoffActive`, `backoffUntil`, and `backoffRemainingMs` after Bot API `retry after` responses
 - `/health.messaging.adapters[0]` also exposes `allowlistDeliveryActive` and `allowlistDeliveryScopes`, so the narrow `H99`/`H105`/`H106` Codex-only outbound exceptions can be distinguished from generic delivery state without digging through traces
+- `/health.messaging.adapters[0]` now also exposes Telegram command-publication state such as `publishedCommandCount`, `commandCatalogSize`, `commandSyncSkippedCount`, `lastCommandSyncAt`, and `lastCommandSyncError`
 - When `topicMode: "deck-session"` is configured, `/health.messaging.adapters[0]` also exposes Telegram topic-provisioning counters, target-validation errors, delivery-enable state, and the active topic-binding count so forum-topic creation or rename failures are visible without digging through raw logs
 - `/health.streamAnalysisCapture` and `/ready.streamAnalysisCapture` expose the current raw-stream analysis capture status, including whether capture is enabled, the bounded file path, configured app-label filters, captured/skipped/rotated counts, and the last capture error
 - `/metrics` exposes `ptydeck_messaging_*` lines alongside the existing runtime metrics

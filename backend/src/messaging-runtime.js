@@ -14,7 +14,14 @@ import {
 } from "./codex-outbound-evaluator.js";
 import { ApiError } from "./errors.js";
 import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-excerpt.js";
+import { buildTelegramCommandCatalog } from "./telegram-command-surface.js";
 import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapter.js";
+import {
+  parseCustomCommandInvocation,
+  resolveCustomCommandForSession,
+  renderCustomCommandForSession
+} from "../../frontend/src/public/custom-command-model.js";
+import { normalizeCustomCommandPayloadForShell } from "../../frontend/src/public/terminal-stream.js";
 
 export const MESSAGING_TRIGGER_PROFILES = Object.freeze(["generic-shell", "coding-agent", "build-test"]);
 const MESSAGING_TRIGGER_PROFILE_SET = new Set(MESSAGING_TRIGGER_PROFILES);
@@ -1085,6 +1092,19 @@ function buildReplayResponseText(session, excerpt) {
   return truncateResponseText(text);
 }
 
+function normalizeInboundCustomInvocationText(rawText, customCommandName) {
+  const normalizedName = normalizeNonEmptyString(customCommandName);
+  const normalizedText = normalizeNonEmptyString(rawText);
+  if (!normalizedName) {
+    return normalizedText;
+  }
+  const match = normalizedText.match(/^\/([A-Za-z0-9_]+)(?:@[A-Za-z0-9_]+)?([\s\S]*)$/);
+  if (!match) {
+    return `/${normalizedName}`;
+  }
+  return `/${normalizedName}${match[2] || ""}`;
+}
+
 async function defaultNoop() {
   return null;
 }
@@ -1125,6 +1145,14 @@ export function createMessagingRuntime(options = {}) {
     typeof options.resolveDeckNameForSession === "function"
       ? options.resolveDeckNameForSession
       : (session) => normalizeNonEmptyString(session?.deckId) || "Default";
+  const resolveDeckForSession =
+    typeof options.resolveDeckForSession === "function"
+      ? options.resolveDeckForSession
+      : (session) => ({
+          id: normalizeNonEmptyString(session?.deckId),
+          name: resolveDeckNameForSession(session)
+        });
+  const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
   const onTelegramTopicBindingUpsert =
     typeof options.onTelegramTopicBindingUpsert === "function" ? options.onTelegramTopicBindingUpsert : defaultNoop;
   const onCodexRestartResendLedgerUpsert =
@@ -1168,6 +1196,9 @@ export function createMessagingRuntime(options = {}) {
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
     transport: telegramTransport,
     topicBindings: normalizeMessagingTopicBindings(options.telegramTopicBindings),
+    commandCatalog: buildTelegramCommandCatalog({
+      customCommands: listCustomCommands()
+    }),
     nowFn,
     logDebug
   });
@@ -1256,6 +1287,44 @@ export function createMessagingRuntime(options = {}) {
       codexRestartResendLedger.set(entry.key, entry);
     }
     pruneCodexRestartResendLedger();
+  }
+
+  async function syncTelegramCommandCatalog(trace = null) {
+    if (!telegramConfigured || typeof telegramAdapter.syncCommands !== "function") {
+      return {
+        synced: false,
+        reason: "disabled"
+      };
+    }
+    const result = await telegramAdapter.syncCommands(
+      buildTelegramCommandCatalog({
+        customCommands: listCustomCommands()
+      })
+    );
+    if (!result?.synced && result?.error) {
+      logDebug(
+        "messaging.telegram.command_sync",
+        {
+          ok: false,
+          error: result.error,
+          publishedCommandCount: result.publishedCommandCount || 0,
+          skippedCommandCount: result.skippedCommandCount || 0
+        },
+        trace
+      );
+    } else {
+      logDebug(
+        "messaging.telegram.command_sync",
+        {
+          ok: result?.synced === true,
+          publishedCommandCount: result?.publishedCommandCount || 0,
+          skippedCommandCount: result?.skippedCommandCount || 0,
+          reason: normalizeNonEmptyString(result?.reason)
+        },
+        trace
+      );
+    }
+    return result;
   }
 
   async function upsertCodexRestartResendLedgerEntry(entry) {
@@ -2503,10 +2572,113 @@ export function createMessagingRuntime(options = {}) {
         return result;
       }
 
+      if (action === "custom") {
+        const customCommandName = normalizeNonEmptyString(request.command?.customCommandName);
+        const customCommand = resolveCustomCommandForSession(listCustomCommands(), customCommandName, session.id);
+        if (!customCommand) {
+          const result = {
+            ok: false,
+            callbackText: "Custom command unavailable.",
+            text: truncateResponseText(`Custom command /${customCommandName || "unknown"} is unavailable for ${buildSessionLabel(session)}.`)
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "custom_command_missing" }),
+            trace
+          );
+          return result;
+        }
+        const invocation = parseCustomCommandInvocation(
+          normalizeInboundCustomInvocationText(
+            normalizeNonEmptyString(request.text) || `/${request.command?.telegramCommand || customCommand.name}`,
+            customCommand.name
+          ),
+          customCommand
+        );
+        if (!invocation?.ok) {
+          const result = {
+            ok: false,
+            callbackText: "Custom command rejected.",
+            text: truncateResponseText(invocation?.error || `Custom command /${customCommand.name} is invalid.`)
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "custom_command_invalid" }),
+            trace
+          );
+          return result;
+        }
+        if (normalizeNonEmptyString(invocation.targetSelector)) {
+          const result = {
+            ok: false,
+            callbackText: "Target redirect rejected.",
+            text: truncateResponseText(
+              `Telegram custom commands cannot redirect to another target. Use the mapped topic for /${customCommand.name}.`
+            )
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "custom_command_target_redirect" }),
+            trace
+          );
+          return result;
+        }
+        const rendered = renderCustomCommandForSession(
+          customCommand,
+          session,
+          resolveDeckForSession(session),
+          invocation.parameterAssignments || {}
+        );
+        if (!rendered?.ok) {
+          const result = {
+            ok: false,
+            callbackText: "Custom command rejected.",
+            text: truncateResponseText(rendered?.error || `Custom command /${customCommand.name} is invalid.`)
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "custom_command_render_failed" }),
+            trace
+          );
+          return result;
+        }
+        const payload = normalizeMessagingInboundInputPayload(normalizeCustomCommandPayloadForShell(rendered.text));
+        if (!payload) {
+          const result = {
+            ok: false,
+            callbackText: "Custom command rejected.",
+            text: truncateResponseText(`Custom command /${customCommand.name} resolved to empty terminal input.`)
+          };
+          logDebug(
+            "messaging.inbound.action",
+            buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "custom_command_empty" }),
+            trace
+          );
+          return result;
+        }
+        await requestMessagingSendInput(session.id, payload, {
+          trace,
+          sessionSnapshot: session,
+          target,
+          preview: request.preview || request.text || ""
+        });
+        const result = {
+          ok: true,
+          callbackText: "Custom command sent.",
+          text: truncateResponseText(`Custom command /${customCommand.name} sent to ${buildSessionLabel(session)}.`)
+        };
+        logDebug(
+          "messaging.inbound.action",
+          buildInboundLogDetails(request, { sessionId: session.id, ok: true, customCommandName: customCommand.name }),
+          trace
+        );
+        return result;
+      }
+
       const result = {
         ok: false,
         callbackText: "Unsupported action.",
-        text: "Unsupported messaging action. Use status, stop, retry, or replay."
+        text: "Unsupported messaging action. Use status, stop, retry, replay, or a published custom command."
       };
       logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: false, reason: "unsupported" }), trace);
       return result;
@@ -2529,6 +2701,7 @@ export function createMessagingRuntime(options = {}) {
   }
 
   async function start() {
+    await syncTelegramCommandCatalog();
     for (const adapter of adapters) {
       if (typeof adapter.startInbound === "function") {
         await adapter.startInbound({
@@ -2613,6 +2786,7 @@ export function createMessagingRuntime(options = {}) {
   return {
     start,
     stop,
+    syncTelegramCommandCatalog,
     prepareForRuntimeStart,
     markRuntimeReady,
     replaceCodexRestartResendLedger,
