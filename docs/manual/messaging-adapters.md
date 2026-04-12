@@ -114,7 +114,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send one narrow Codex-only outbound family, `codex_separator_info`, through deterministic thread update/reuse while generic outbound delivery remains hard-disabled
+- send one narrow Codex-only outbound family, `codex_separator_info`, while generic outbound delivery remains hard-disabled; new separator-anchored info blocks create new posts and only the same block identity is eligible for an edit
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only the narrow `codex_separator_info` family
 - keep the active outbound families compact through the shipped trigger profiles
 - accept the bounded inbound bot command set:
@@ -199,7 +199,7 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99`:
   - the next bounded substantial `•` block must classify as clean `info`
   - at most one immediate indented continuation line is merged
   - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as `Ran`, `Explored`, `Waited`, `Context compacted`, and `Updated Plan` reject the candidate
-- delivered candidates reuse the existing Telegram thread via deterministic `update` behavior instead of reopening broad new-message churn
+- delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic `update`
 
 The shipped trigger profiles are:
 

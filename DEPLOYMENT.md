@@ -117,7 +117,7 @@ Notes:
 - A selectorless target is now allowed only for `topicMode: "deck-session"` and means: route every live session dynamically into that forum-enabled supergroup, provisioning one topic per terminal/session in real time.
 - Messaging remains optional; if no bot token or no targets are configured, the runtime stays healthy and messaging remains disabled.
 - Hard-break baseline: generic Telegram outbound delivery remains hard-disabled in the shipped product path while the forum topology and later allowlist-/signal-first rebuild are being established. There is intentionally no environment-variable re-enable switch at this stage.
-- Delivered `H99` exception: one narrow internal allowlist family, `codex_separator_info`, may now be delivered for Codex sessions even while generic outbound remains hard-disabled. That path is entry-level separator anchored, update/reuse only, and does not reopen broad line-by-line Telegram status delivery.
+- Delivered `H99`/`H103` exception: one narrow internal allowlist family, `codex_separator_info`, may now be delivered for Codex sessions even while generic outbound remains hard-disabled. That path is entry-level separator anchored, opens a new Telegram post for each new separator-anchored info block, and reserves edits only for the same block identity instead of reopening broad line-by-line Telegram status delivery.
 - Inbound observation/command handling is always enabled whenever a bot token and target mappings are configured; there is intentionally no separate environment toggle for that path.
 - The shipped trigger profiles are `generic-shell`, `coding-agent`, and `build-test`.
 - The shipped bounded inbound command set is intentionally limited to:

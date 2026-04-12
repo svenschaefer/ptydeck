@@ -640,6 +640,13 @@ function createSessionStreamState() {
   };
 }
 
+function buildCodexSeparatorDeliveryBlockKey(decision) {
+  if (!Number.isInteger(decision?.anchorSequence) || !Number.isInteger(decision?.infoSequence)) {
+    return "";
+  }
+  return `${decision.anchorSequence}:${decision.infoSequence}`;
+}
+
 function pushRecentLine(state, line) {
   state.recentLines.push(line);
   if (state.recentLines.length > MAX_RECENT_LINES) {
@@ -660,7 +667,8 @@ function createEvent({
   aggregationReason = "",
   noiseClass = "",
   comparableText = "",
-  deliveryScope = ""
+  deliveryScope = "",
+  deliveryBlockKey = ""
 }) {
   const textSummary = truncateSummary(summary);
   const label = buildSessionLabel(session);
@@ -681,6 +689,7 @@ function createEvent({
     trace,
     aggregationReason: normalizeNonEmptyString(aggregationReason),
     deliveryScope: normalizeNonEmptyString(deliveryScope),
+    deliveryBlockKey: normalizeNonEmptyString(deliveryBlockKey),
     noiseClass: normalizeNonEmptyString(noiseClass),
     comparableText: normalizedComparableText
   });
@@ -733,8 +742,10 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   }
   const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
   const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
+  const deliveryBlockKey = normalizeNonEmptyString(event?.deliveryBlockKey);
   const comparableText = normalizeNonEmptyString(event?.comparableText);
   const lastComparableText = normalizeNonEmptyString(threadState.lastComparableText);
+  const lastDeliveryBlockKey = normalizeNonEmptyString(threadState.lastDeliveryBlockKey);
   const lastEventType = normalizeNonEmptyString(threadState.lastEventType);
   const lastDeliveredAt = Number.isInteger(threadState.lastDeliveredAt) ? threadState.lastDeliveredAt : 0;
   const occurredAt = Number.isInteger(event?.occurredAt) ? event.occurredAt : 0;
@@ -802,14 +813,22 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     }
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
   }
+  if (deliveryScope === CODEX_SEPARATOR_INFO_SCOPE) {
+    if (
+      threadState.messageCreated === true &&
+      deliveryBlockKey &&
+      lastDeliveryBlockKey &&
+      deliveryBlockKey === lastDeliveryBlockKey
+    ) {
+      return Object.freeze({ action: "update", messageKey, reason: "codex_separator_info_block_update" });
+    }
+    return Object.freeze({ action: "new", messageKey, reason: "codex_separator_info_new_block" });
+  }
   if (threadState.lastText === text) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });
   }
   if (comparableText && lastComparableText && isSubsetComparableText(comparableText, lastComparableText)) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate_signature" });
-  }
-  if (deliveryScope === CODEX_SEPARATOR_INFO_SCOPE) {
-    return Object.freeze({ action: "update", messageKey, reason: CODEX_SEPARATOR_INFO_SCOPE });
   }
   if (type === "session.prompt.ready") {
     if ((lastEventType === "session.lifecycle.created" || lastEventType === "session.lifecycle.started") && withinStartupChatterWindow) {
@@ -1112,6 +1131,7 @@ export function createMessagingRuntime(options = {}) {
       messageCreated: false,
       lastText: "",
       lastComparableText: "",
+      lastDeliveryBlockKey: "",
       lastPromptAt: 0,
       lastAction: "",
       lastEventType: "",
@@ -1255,6 +1275,7 @@ export function createMessagingRuntime(options = {}) {
         noiseClass: normalizeNonEmptyString(entry?.noiseClass),
         aggregationReason: normalizeNonEmptyString(entry?.aggregationReason),
         deliveryScope: normalizeNonEmptyString(entry?.deliveryScope),
+        deliveryBlockKey: normalizeNonEmptyString(entry?.deliveryBlockKey),
         traceId: normalizeNonEmptyString(entry?.traceId),
         correlationId: normalizeNonEmptyString(entry?.correlationId),
         traceSource: normalizeNonEmptyString(entry?.traceSource),
@@ -1314,6 +1335,7 @@ export function createMessagingRuntime(options = {}) {
       normalizeNonEmptyString(event?.sessionId),
       normalizeNonEmptyString(decision?.messageKey || event?.threadKey || "status"),
       normalizeNonEmptyString(event?.type),
+      normalizeNonEmptyString(event?.deliveryBlockKey),
       normalizeNonEmptyString(event?.comparableText || event?.summary || event?.text)
     ]
       .filter(Boolean)
@@ -1374,6 +1396,7 @@ export function createMessagingRuntime(options = {}) {
       noiseClass: event?.noiseClass,
       aggregationReason: event?.aggregationReason,
       deliveryScope: event?.deliveryScope,
+      deliveryBlockKey: event?.deliveryBlockKey,
       traceId: event?.trace?.traceId,
       correlationId: event?.trace?.correlationId,
       traceSource: event?.trace?.source,
@@ -1392,6 +1415,7 @@ export function createMessagingRuntime(options = {}) {
         comparableText: event?.comparableText || "",
         aggregationReason: event?.aggregationReason || "",
         deliveryScope: event?.deliveryScope || "",
+        deliveryBlockKey: event?.deliveryBlockKey || "",
         noiseClass: event?.noiseClass || "",
         targetChatId: target?.chatId || null,
         targetThreadId: Number.isInteger(target?.messageThreadId) ? target.messageThreadId : null,
@@ -1401,8 +1425,10 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  async function dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, text, candidateKey) {
-    const normalizedText = truncateSummary(text, CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH);
+  async function dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, decision) {
+    const normalizedText = truncateSummary(decision?.text, CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH);
+    const candidateKey = normalizeNonEmptyString(decision?.key);
+    const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
     if (!normalizedText || candidateKey === state.lastCodexSeparatorCandidateKey) {
       return null;
     }
@@ -1419,6 +1445,7 @@ export function createMessagingRuntime(options = {}) {
         nowFn,
         aggregationReason: CODEX_SEPARATOR_INFO_SCOPE,
         deliveryScope: CODEX_SEPARATOR_INFO_SCOPE,
+        deliveryBlockKey,
         comparableText: createComparableText(normalizedText)
       })
     );
@@ -1434,7 +1461,7 @@ export function createMessagingRuntime(options = {}) {
       if (decision?.type !== "candidate" || !decision.text || !decision.key) {
         continue;
       }
-      return dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, decision.text, decision.key);
+      return dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, decision);
     }
     return null;
   }
@@ -1579,6 +1606,7 @@ export function createMessagingRuntime(options = {}) {
           : threadState.messageCreated;
       threadState.lastText = event.text;
       threadState.lastComparableText = event.comparableText || "";
+      threadState.lastDeliveryBlockKey = event.deliveryBlockKey || "";
       threadState.lastAction = decision.action;
       threadState.lastEventType = event.type;
       threadState.lastDeliveredAt = event.occurredAt;

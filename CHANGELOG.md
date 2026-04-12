@@ -4,6 +4,10 @@ Completed and validated release history belongs here.
 
 ## 2026-04-12
 
+- [x] `v0.4.0-H103` is now completed on `main`, correcting the first Codex-only Telegram outbound family so new separator-anchored info blocks no longer collapse into one endlessly edited post.
+- [x] `backend/src/messaging-runtime.js` now carries explicit block identity for `codex_separator_info` (`anchorSequence:infoSequence`) from the shared evaluator into delivery policy, gives the Codex allowlist path precedence over generic duplicate suppression, opens a new Telegram message for each new block identity, and reserves `update` only for true same-block follow-up delivery.
+- [x] Direct regression coverage now proves the corrected delivery semantics in `backend/test/messaging-runtime.test.js`, including same-block updates, same-text new-block sends, and allowlist delivery through the still-hard-disabled generic outbound baseline; the full local quality gate for this slice passed with `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, `npm run docs:check`, and `git diff --check`.
+
 - [x] `v0.4.0-H102` is now completed on `main`, correcting the live Telegram text-to-Codex submit path so mapped topic text no longer stops at prompt insertion when the target session is running Codex.
 - [x] `backend/src/runtime.js` now applies Codex-specific delayed-submit semantics on the messaging-only input path: when Telegram text targets an active `codex` session, the runtime writes the normalized body first and sends the final `\r` as a short delayed follow-up instead of bundling both into one PTY write, matching the existing frontend `cr_delay` behavior that Codex prompt handling already tolerates.
 - [x] Direct runtime regression coverage now closes that live seam in `backend/test/runtime.integration.test.js`, proving that mapped Telegram text to a Codex session is written as two PTY writes (`text`, then delayed `\r`) while the existing mapped Telegram input end-to-end path for non-Codex sessions remains green.

@@ -151,7 +151,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>The Telegram reference adapter can:</p>
 
 <ul>
-<li>send one narrow Codex-only outbound family, <code>codex_separator_info</code>, through deterministic thread update/reuse while generic outbound delivery remains hard-disabled</li>
+<li>send one narrow Codex-only outbound family, <code>codex_separator_info</code>, while generic outbound delivery remains hard-disabled; new separator-anchored info blocks create new posts and only the same block identity is eligible for an edit</li>
 <li>normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only the narrow <code>codex_separator_info</code> family</li>
 <li>keep the active outbound families compact through the shipped trigger profiles</li>
 <li>accept the bounded inbound bot command set:</li>
@@ -250,7 +250,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>- a major separator must survive as its own stream entry - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - at most one immediate indented continuation line is merged - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as <code>Ran</code>, <code>Explored</code>, <code>Waited</code>, <code>Context compacted</code>, and <code>Updated Plan</code> reject the candidate</p>
 
 <ul>
-<li>delivered candidates reuse the existing Telegram thread via deterministic <code>update</code> behavior instead of reopening broad new-message churn</li>
+<li>delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic <code>update</code></li>
 </ul>
 
 <p>The shipped trigger profiles are:</p>

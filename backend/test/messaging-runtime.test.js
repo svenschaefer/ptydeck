@@ -247,12 +247,53 @@ test("messaging message policy returns explicit new update alert and suppress de
       comparableText: "der commit ist gepusht",
       aggregationReason: "codex_separator_info",
       deliveryScope: "codex_separator_info",
+      deliveryBlockKey: "1:2",
       occurredAt: 8_000
     },
     {
       messageCreated: false,
       lastEventType: "session.control.changed",
       lastDeliveredAt: 7_000
+    }
+  );
+  const codexSeparatorInfoSameBlockUpdate = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Der Commit ist gepusht.",
+      comparableText: "der commit ist gepusht",
+      aggregationReason: "codex_separator_info",
+      deliveryScope: "codex_separator_info",
+      deliveryBlockKey: "1:2",
+      occurredAt: 8_200
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Vorheriger Inhalt",
+      lastComparableText: "vorheriger inhalt",
+      lastDeliveryBlockKey: "1:2",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 8_000
+    }
+  );
+  const codexSeparatorInfoSameTextNewBlock = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Der Commit ist gepusht.",
+      comparableText: "der commit ist gepusht",
+      aggregationReason: "codex_separator_info",
+      deliveryScope: "codex_separator_info",
+      deliveryBlockKey: "3:4",
+      occurredAt: 8_400
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Der Commit ist gepusht.",
+      lastComparableText: "der commit ist gepusht",
+      lastDeliveryBlockKey: "1:2",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 8_200
     }
   );
 
@@ -283,8 +324,12 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(promptAfterLifecycle.reason, "prompt_after_lifecycle");
   assert.equal(startupControlChatter.action, "suppress");
   assert.equal(startupControlChatter.reason, "startup_control_chatter");
-  assert.equal(codexSeparatorInfo.action, "update");
-  assert.equal(codexSeparatorInfo.reason, "codex_separator_info");
+  assert.equal(codexSeparatorInfo.action, "new");
+  assert.equal(codexSeparatorInfo.reason, "codex_separator_info_new_block");
+  assert.equal(codexSeparatorInfoSameBlockUpdate.action, "update");
+  assert.equal(codexSeparatorInfoSameBlockUpdate.reason, "codex_separator_info_block_update");
+  assert.equal(codexSeparatorInfoSameTextNewBlock.action, "new");
+  assert.equal(codexSeparatorInfoSameTextNewBlock.reason, "codex_separator_info_new_block");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -422,9 +467,9 @@ test("messaging runtime delivers only codex separator info candidates while gene
     trace: { traceId: "h99-5" }
   });
 
-  assert.equal(sends.length, 1);
-  assert.equal(edits.length, 1);
-  assert.match(edits[0].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
+  assert.equal(sends.length, 2);
+  assert.equal(edits.length, 0);
+  assert.match(sends[1].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
 
   const status = runtime.buildStatusSummary();
   assert.equal(status.deliveryEnabled, false);
@@ -433,7 +478,7 @@ test("messaging runtime delivers only codex separator info candidates while gene
   assert.deepEqual(status.allowlistDeliveryScopes, ["codex_separator_info"]);
   assert.equal(status.adapters[0].deliveryEnabled, false);
   assert.equal(status.adapters[0].allowlistDeliveryActive, true);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
 });
 
