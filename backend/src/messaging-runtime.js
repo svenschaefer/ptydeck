@@ -36,6 +36,9 @@ const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
 const STARTUP_CHATTER_SUPPRESSION_WINDOW_MS = 15_000;
 const TELEGRAM_TOPIC_NAME_MAX_LENGTH = 128;
+const CODEX_SUMMARY_RESTART_RECOVERY_QUIET_MS = STARTUP_CHATTER_SUPPRESSION_WINDOW_MS;
+const CODEX_SUMMARY_RESTART_RESEND_LEDGER_TTL_MS = 24 * 60 * 60 * 1000;
+const CODEX_SUMMARY_RESTART_RESEND_LEDGER_MAX_ENTRIES = 1000;
 const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([
   CODEX_SEPARATOR_INFO_SCOPE,
   CODEX_SEPARATOR_SECTION_SCOPE,
@@ -594,6 +597,73 @@ export function normalizeMessagingTopicBindings(entries = []) {
   return entries.map((entry) => normalizeMessagingTopicBindingEntry(entry)).filter(Boolean);
 }
 
+function buildCodexRestartResendTargetStateKey(target, sessionId) {
+  const explicitStateKey = normalizeNonEmptyString(target?.stateKey || target?.topicStateKey);
+  if (explicitStateKey) {
+    return explicitStateKey;
+  }
+  return [
+    normalizeNonEmptyString(target?.chatId),
+    Number.isInteger(target?.messageThreadId) ? target.messageThreadId : 0,
+    normalizeNonEmptyString(sessionId)
+  ].join(":");
+}
+
+function buildCodexRestartResendLedgerKey({ deliveryScope, sessionId, target, comparableText }) {
+  const normalizedScope = normalizeNonEmptyString(deliveryScope);
+  const normalizedComparableText = normalizeNonEmptyString(comparableText);
+  const targetStateKey = buildCodexRestartResendTargetStateKey(target, sessionId);
+  if (!normalizedScope || !normalizedComparableText || !targetStateKey) {
+    return "";
+  }
+  return `${normalizedScope}:${targetStateKey}:${normalizedComparableText}`;
+}
+
+function normalizeCodexRestartResendLedgerEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const deliveryScope = normalizeNonEmptyString(entry.deliveryScope);
+  const sessionId = normalizeNonEmptyString(entry.sessionId);
+  const chatId = normalizeNonEmptyString(entry.chatId) || String(entry.chatId ?? "").trim();
+  const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
+  const targetStateKey = normalizeNonEmptyString(entry.targetStateKey);
+  const comparableText = normalizeNonEmptyString(entry.comparableText);
+  const deliveredAt = Number.isInteger(entry.deliveredAt) && entry.deliveredAt > 0 ? entry.deliveredAt : 0;
+  const key =
+    normalizeNonEmptyString(entry.key) ||
+    buildCodexRestartResendLedgerKey({
+      deliveryScope,
+      sessionId,
+      target: {
+        chatId,
+        ...(Number.isInteger(messageThreadId) ? { messageThreadId } : {}),
+        ...(targetStateKey ? { stateKey: targetStateKey } : {})
+      },
+      comparableText
+    });
+  if (!key || !deliveryScope || !sessionId || !chatId || !comparableText || !deliveredAt) {
+    return null;
+  }
+  return Object.freeze({
+    key,
+    deliveryScope,
+    sessionId,
+    chatId,
+    ...(Number.isInteger(messageThreadId) ? { messageThreadId } : {}),
+    targetStateKey: targetStateKey || buildCodexRestartResendTargetStateKey({ chatId, messageThreadId }, sessionId),
+    comparableText,
+    deliveredAt
+  });
+}
+
+function normalizeCodexRestartResendLedgerEntries(entries = []) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+  return entries.map((entry) => normalizeCodexRestartResendLedgerEntry(entry)).filter(Boolean);
+}
+
 export function resolveMessagingTriggerProfile(session, target = null) {
   const targetProfile = normalizeMessagingProfile(target?.profile);
   if (targetProfile) {
@@ -649,6 +719,14 @@ function createSessionStreamState() {
     lastCodexSeparatorCandidateKey: "",
     lastCodexSeparatorSectionCandidateKey: "",
     lastCodexSeparatorSummaryCandidateKey: ""
+  };
+}
+
+function createCodexSummaryRestartRecoveryState(now) {
+  return {
+    active: true,
+    activatedAt: now,
+    firstInputAt: 0
   };
 }
 
@@ -1029,18 +1107,30 @@ export function createMessagingRuntime(options = {}) {
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
   const targetMappings = normalizeMessagingTargets(options.telegramTargets);
   const sessionStates = new Map();
+  const codexSummaryRestartRecoveryStates = new Map();
   const threadStates = new Map();
   const eventMetrics = new Map();
   const recentSessionByConversationKey = new Map();
+  const codexRestartResendLedger = new Map();
   const traceEntries = [];
   let traceCapturedTotal = 0;
+  let runtimeReadyAt = 0;
+  let codexSummaryRestartRecoveryQuietUntil = 0;
   const logDebug = typeof options.logDebug === "function" ? options.logDebug : () => {};
+  const codexSummaryRestartRecoveryQuietMs =
+    Number.isInteger(options.codexSummaryRestartRecoveryQuietMs) && options.codexSummaryRestartRecoveryQuietMs > 0
+      ? options.codexSummaryRestartRecoveryQuietMs
+      : CODEX_SUMMARY_RESTART_RECOVERY_QUIET_MS;
   const resolveDeckNameForSession =
     typeof options.resolveDeckNameForSession === "function"
       ? options.resolveDeckNameForSession
       : (session) => normalizeNonEmptyString(session?.deckId) || "Default";
   const onTelegramTopicBindingUpsert =
     typeof options.onTelegramTopicBindingUpsert === "function" ? options.onTelegramTopicBindingUpsert : defaultNoop;
+  const onCodexRestartResendLedgerUpsert =
+    typeof options.onCodexRestartResendLedgerUpsert === "function"
+      ? options.onCodexRestartResendLedgerUpsert
+      : defaultNoop;
   const resolveSessionForMessagingTarget =
     typeof options.resolveSessionForMessagingTarget === "function" ? options.resolveSessionForMessagingTarget : () => null;
   const requestMessagingStop = typeof options.requestMessagingStop === "function" ? options.requestMessagingStop : defaultNoop;
@@ -1139,6 +1229,95 @@ export function createMessagingRuntime(options = {}) {
   }
 
   replaceTelegramTopicBindings(options.telegramTopicBindings);
+  replaceCodexRestartResendLedger(options.codexRestartResendLedger);
+
+  function pruneCodexRestartResendLedger() {
+    const cutoff = nowFn() - CODEX_SUMMARY_RESTART_RESEND_LEDGER_TTL_MS;
+    const orderedEntries = Array.from(codexRestartResendLedger.values()).sort((left, right) => left.deliveredAt - right.deliveredAt);
+    for (const entry of orderedEntries) {
+      if (entry.deliveredAt >= cutoff) {
+        break;
+      }
+      codexRestartResendLedger.delete(entry.key);
+    }
+    const remainingEntries = Array.from(codexRestartResendLedger.values()).sort((left, right) => left.deliveredAt - right.deliveredAt);
+    if (remainingEntries.length <= CODEX_SUMMARY_RESTART_RESEND_LEDGER_MAX_ENTRIES) {
+      return;
+    }
+    const removeCount = remainingEntries.length - CODEX_SUMMARY_RESTART_RESEND_LEDGER_MAX_ENTRIES;
+    for (let index = 0; index < removeCount; index += 1) {
+      codexRestartResendLedger.delete(remainingEntries[index].key);
+    }
+  }
+
+  function replaceCodexRestartResendLedger(entries = []) {
+    codexRestartResendLedger.clear();
+    for (const entry of normalizeCodexRestartResendLedgerEntries(entries)) {
+      codexRestartResendLedger.set(entry.key, entry);
+    }
+    pruneCodexRestartResendLedger();
+  }
+
+  async function upsertCodexRestartResendLedgerEntry(entry) {
+    const normalizedEntry = normalizeCodexRestartResendLedgerEntry(entry);
+    if (!normalizedEntry) {
+      return;
+    }
+    const existingEntry = codexRestartResendLedger.get(normalizedEntry.key) || null;
+    if (
+      existingEntry &&
+      existingEntry.deliveredAt === normalizedEntry.deliveredAt &&
+      existingEntry.comparableText === normalizedEntry.comparableText
+    ) {
+      return;
+    }
+    codexRestartResendLedger.set(normalizedEntry.key, normalizedEntry);
+    pruneCodexRestartResendLedger();
+    await onCodexRestartResendLedgerUpsert(normalizedEntry);
+  }
+
+  function getOrCreateCodexSummaryRestartRecoveryState(sessionId) {
+    const normalizedSessionId = normalizeNonEmptyString(sessionId);
+    let state = codexSummaryRestartRecoveryStates.get(normalizedSessionId);
+    if (state) {
+      return state;
+    }
+    state = createCodexSummaryRestartRecoveryState(nowFn());
+    codexSummaryRestartRecoveryStates.set(normalizedSessionId, state);
+    return state;
+  }
+
+  function markSessionCodexSummaryRestartRecovery(sessionId) {
+    const normalizedSessionId = normalizeNonEmptyString(sessionId);
+    if (!normalizedSessionId) {
+      return;
+    }
+    codexSummaryRestartRecoveryStates.set(normalizedSessionId, createCodexSummaryRestartRecoveryState(nowFn()));
+  }
+
+  function observeSessionInput(sessionId, trace = null) {
+    const normalizedSessionId = normalizeNonEmptyString(sessionId);
+    if (!normalizedSessionId) {
+      return;
+    }
+    const state = codexSummaryRestartRecoveryStates.get(normalizedSessionId);
+    if (!state || Number.isInteger(state.firstInputAt) && state.firstInputAt > 0) {
+      return;
+    }
+    state.firstInputAt = nowFn();
+    logDebug("messaging.summary_restart_recovery.input_observed", { sessionId: normalizedSessionId }, trace);
+  }
+
+  function prepareForRuntimeStart() {
+    runtimeReadyAt = 0;
+    codexSummaryRestartRecoveryQuietUntil = 0;
+    codexSummaryRestartRecoveryStates.clear();
+  }
+
+  function markRuntimeReady() {
+    runtimeReadyAt = nowFn();
+    codexSummaryRestartRecoveryQuietUntil = runtimeReadyAt + codexSummaryRestartRecoveryQuietMs;
+  }
 
   function bumpEventMetric(profile, type, action) {
     const key = `${profile}:${type}:${action}`;
@@ -1449,6 +1628,54 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
+  function buildCodexSummaryRestartResendLedgerEntry(event, target) {
+    const key = buildCodexRestartResendLedgerKey({
+      deliveryScope: event?.deliveryScope,
+      sessionId: event?.sessionId,
+      target,
+      comparableText: event?.comparableText
+    });
+    if (!key) {
+      return null;
+    }
+    return {
+      key,
+      deliveryScope: normalizeNonEmptyString(event?.deliveryScope),
+      sessionId: normalizeNonEmptyString(event?.sessionId),
+      chatId: normalizeNonEmptyString(target?.chatId),
+      ...(Number.isInteger(target?.messageThreadId) ? { messageThreadId: target.messageThreadId } : {}),
+      targetStateKey: buildCodexRestartResendTargetStateKey(target, event?.sessionId),
+      comparableText: normalizeNonEmptyString(event?.comparableText),
+      deliveredAt: Number.isInteger(event?.occurredAt) ? event.occurredAt : nowFn()
+    };
+  }
+
+  function buildCodexSummaryRestartRecoveryDecision(event, target) {
+    if (normalizeNonEmptyString(event?.deliveryScope) !== CODEX_SEPARATOR_SUMMARY_SCOPE) {
+      return null;
+    }
+    const recoveryState = codexSummaryRestartRecoveryStates.get(normalizeNonEmptyString(event?.sessionId)) || null;
+    if (!recoveryState?.active) {
+      return null;
+    }
+    const occurredAt = Number.isInteger(event?.occurredAt) ? event.occurredAt : nowFn();
+    if (!runtimeReadyAt || occurredAt < runtimeReadyAt) {
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_pre_ready" });
+    }
+    if (codexSummaryRestartRecoveryQuietUntil > occurredAt) {
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_quiet_window" });
+    }
+    if (!Number.isInteger(recoveryState.firstInputAt) || recoveryState.firstInputAt <= 0) {
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_waiting_for_input" });
+    }
+    const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, target);
+    if (ledgerEntry && codexRestartResendLedger.has(ledgerEntry.key)) {
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_prior_history" });
+    }
+    recoveryState.active = false;
+    return null;
+  }
+
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
     const deliveryScope = normalizeNonEmptyString(decision?.family);
     const maxLength =
@@ -1469,22 +1696,32 @@ export function createMessagingRuntime(options = {}) {
     if (!normalizedText || candidateKey === lastCandidateKey) {
       return null;
     }
-    const dispatchResult = await dispatchEvent(
-      createEvent({
-        session,
-        profile,
-        type: "session.output.summary",
-        summary: normalizedText,
-        severity: "info",
-        threadKey: "status",
-        trace,
-        nowFn,
-        aggregationReason: deliveryScope,
-        deliveryScope,
-        deliveryBlockKey,
-        comparableText: createComparableText(normalizedText)
-      })
-    );
+    const event = createEvent({
+      session,
+      profile,
+      type: "session.output.summary",
+      summary: normalizedText,
+      severity: "info",
+      threadKey: "status",
+      trace,
+      nowFn,
+      aggregationReason: deliveryScope,
+      deliveryScope,
+      deliveryBlockKey,
+      comparableText: createComparableText(normalizedText)
+    });
+    const target = resolveTarget(session);
+    const restartRecoveryDecision = buildCodexSummaryRestartRecoveryDecision(event, target);
+    if (restartRecoveryDecision) {
+      bumpEventMetric(event.profile, event.type, restartRecoveryDecision.action);
+      recordDispatchTrace(event, restartRecoveryDecision, target, []);
+      return Object.freeze({
+        ...restartRecoveryDecision,
+        delivered: false,
+        delivery: []
+      });
+    }
+    const dispatchResult = await dispatchEvent(event);
     if (dispatchResult?.delivered === true) {
       if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
         state.lastCodexSeparatorSectionCandidateKey = candidateKey;
@@ -1684,6 +1921,12 @@ export function createMessagingRuntime(options = {}) {
       if (event.type === "session.prompt.ready") {
         threadState.lastPromptAt = event.occurredAt;
       }
+      if (normalizeNonEmptyString(event?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
+        const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, finalTarget);
+        if (ledgerEntry) {
+          await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+        }
+      }
     }
     rememberSessionForTarget(finalTarget, event.session);
     recordDispatchTrace(event, decision, finalTarget, deliveryResults);
@@ -1723,6 +1966,9 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     if (type === "session.created") {
+      if (!runtimeReadyAt && isCodexAppIdentity(session) && isCodingAgentContext(session, profile)) {
+        markSessionCodexSummaryRestartRecovery(session.id);
+      }
       state.lastControlSignature = buildControlEventSignature(session);
       state.lastLifecycleType = type;
       return dispatchEvent(
@@ -1756,6 +2002,7 @@ export function createMessagingRuntime(options = {}) {
       return null;
     }
     if (type === "session.exit") {
+      codexSummaryRestartRecoveryStates.delete(normalizeNonEmptyString(session?.id));
       state.lastLifecycleType = type;
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_exit");
@@ -1778,6 +2025,7 @@ export function createMessagingRuntime(options = {}) {
       );
     }
     if (type === "session.closed") {
+      codexSummaryRestartRecoveryStates.delete(normalizeNonEmptyString(session?.id));
       state.lastLifecycleType = type;
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_closed");
@@ -2302,12 +2550,23 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function buildStatusSummary() {
+    const recoveringSessionCount = Array.from(codexSummaryRestartRecoveryStates.values()).filter((entry) => entry?.active).length;
     return {
       enabled: telegramConfigured,
       deliveryEnabled: telegramOutboundEnabled,
       deliveryHardBreakActive: telegramOutboundHardBreakActive,
       allowlistDeliveryActive: telegramAllowlistDeliveryActive,
       allowlistDeliveryScopes: telegramAllowlistDeliveryScopes.slice(),
+      codexSummaryRestartRecovery: {
+        quietPeriodMs: codexSummaryRestartRecoveryQuietMs,
+        quietMsRemaining:
+          runtimeReadyAt > 0 && codexSummaryRestartRecoveryQuietUntil > 0
+            ? Math.max(0, codexSummaryRestartRecoveryQuietUntil - nowFn())
+            : 0,
+        runtimeReadyAt,
+        activeSessionCount: recoveringSessionCount,
+        ledgerSize: codexRestartResendLedger.size
+      },
       adapters: adapters.map((adapter) => adapter.getStatus()),
       trace: {
         capacity: MAX_MESSAGING_TRACE_ENTRIES,
@@ -2354,6 +2613,10 @@ export function createMessagingRuntime(options = {}) {
   return {
     start,
     stop,
+    prepareForRuntimeStart,
+    markRuntimeReady,
+    replaceCodexRestartResendLedger,
+    observeSessionInput,
     replaceTelegramTopicBindings,
     ensureSessionTarget,
     observeSessionLifecycle,

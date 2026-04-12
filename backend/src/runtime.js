@@ -2616,6 +2616,7 @@ export function createRuntime(config) {
   const sshTrustEntries = new Map();
   const shareLinks = new Map();
   const telegramTopicBindings = new Map();
+  const codexRestartResendLedger = new Map();
   const sessionControlStaleClientTtlMs =
     Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
       ? config.sessionControlStaleClientTtlMs
@@ -2767,6 +2768,7 @@ export function createRuntime(config) {
     telegramBotToken: config.messagingTelegramBotToken,
     telegramTargets: config.messagingTelegramTargets,
     telegramTopicBindings: Array.from(telegramTopicBindings.values()),
+    codexRestartResendLedger: Array.from(codexRestartResendLedger.values()),
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
     telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
     telegramOutboundHardBreakActive: config.messagingTelegramOutboundHardBreakActive,
@@ -2781,6 +2783,10 @@ export function createRuntime(config) {
     onTelegramTopicBindingUpsert: async (binding) => {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
       await persistNow("messaging.telegram.topic_binding");
+    },
+    onCodexRestartResendLedgerUpsert: async (entry) => {
+      codexRestartResendLedger.set(entry.key, { ...entry });
+      await persistNow("messaging.codex_restart_resend_ledger");
     },
     resolveSessionForMessagingTarget,
     requestMessagingStop,
@@ -2895,6 +2901,7 @@ export function createRuntime(config) {
       return;
     }
     clearStartupWarmupQuietTimer();
+    messagingRuntime.markRuntimeReady();
     isReady = true;
     if (typeof startupWarmupResolve === "function") {
       startupWarmupResolve();
@@ -5362,6 +5369,13 @@ export function createRuntime(config) {
       shareLinks: Array.from(shareLinks.values())
         .sort(compareShareLinkEntries)
         .map((entry) => ({ ...entry })),
+      messagingCodexRestartResendLedger: Array.from(codexRestartResendLedger.values())
+        .sort((left, right) => {
+          const leftTime = Number.isInteger(left.deliveredAt) ? left.deliveredAt : 0;
+          const rightTime = Number.isInteger(right.deliveredAt) ? right.deliveredAt : 0;
+          return leftTime - rightTime;
+        })
+        .map((entry) => ({ ...entry })),
       messagingTelegramTopicBindings: Array.from(telegramTopicBindings.values())
         .sort((left, right) => `${left.chatId}:${left.sessionId}`.localeCompare(`${right.chatId}:${right.sessionId}`))
         .map((entry) => ({ ...entry }))
@@ -5597,6 +5611,7 @@ export function createRuntime(config) {
       if (body) {
         manager.sendInput(sessionId, body, { trace });
       }
+      messagingRuntime.observeSessionInput(sessionId, trace);
       return new Promise((resolve) => {
         setTimeout(() => {
           manager.sendInput(sessionId, "\r", { trace });
@@ -5607,6 +5622,7 @@ export function createRuntime(config) {
       });
     }
     manager.sendInput(sessionId, normalizedData, { trace });
+    messagingRuntime.observeSessionInput(sessionId, trace);
     recordSessionLastInput(sessionId, null, null);
     broadcastSessionUpdated(sessionId, options.trace || null);
     return getApiSessionOrThrow(sessionId);
@@ -6867,6 +6883,7 @@ function tryCreateRestoredSession({
             sessionId: match.params.sessionId
           }
         });
+        messagingRuntime.observeSessionInput(match.params.sessionId, requestTraceContext);
         recordSessionLastInput(match.params.sessionId, auth, req);
         broadcastSessionUpdated(match.params.sessionId, {
           ...requestTraceContext,
@@ -7263,6 +7280,7 @@ function tryCreateRestoredSession({
     isStopped = false;
     isStopping = false;
     isReady = false;
+    messagingRuntime.prepareForRuntimeStart();
     startupWarmupEnabled = false;
     startupWarmupGateReleased = false;
     clearStartupWarmupQuietTimer();
@@ -7300,6 +7318,7 @@ function tryCreateRestoredSession({
     sshTrustEntries.clear();
     shareLinks.clear();
     telegramTopicBindings.clear();
+    codexRestartResendLedger.clear();
     sessionDeckAssignments.clear();
     sessionQuickIdAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
@@ -7402,7 +7421,17 @@ function tryCreateRestoredSession({
     for (const binding of normalizeMessagingTopicBindings(persistedState.messagingTelegramTopicBindings)) {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
     }
+    for (const entry of Array.isArray(persistedState.messagingCodexRestartResendLedger) ? persistedState.messagingCodexRestartResendLedger : []) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        continue;
+      }
+      if (typeof entry.key !== "string" || !entry.key.trim()) {
+        continue;
+      }
+      codexRestartResendLedger.set(entry.key, { ...entry });
+    }
     messagingRuntime.replaceTelegramTopicBindings(Array.from(telegramTopicBindings.values()));
+    messagingRuntime.replaceCodexRestartResendLedger(Array.from(codexRestartResendLedger.values()));
     await syncSshKnownHostsFile();
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {

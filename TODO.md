@@ -14,10 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-048` Owner `BE`
-  Add restart-recovery suppression for `codex_separator_summary_sentence` only: introduce a per-session startup recovery mode that combines a short post-ready quiet window, persisted resend-memory keyed by normalized summary content plus session/thread context, and suppression until the first fresh post-restart session input so Codex startup-history replays cannot resend old Telegram summary posts after backend restarts.
-- `MSG-049` Owner `QA`
-  Validate the restart-recovery summary suppression wave end to end, including regression coverage for pre-ready and immediate post-ready restart resends, the first-restart case with no prior-history match, persisted-history suppression on later restarts, and explicit no-regression coverage proving that `codex_separator_info` and `codex_separator_section` remain unaffected by the summary-family gating.
 - `MSG-046` Owner `BE`
   Make ptydeck custom slash commands available as Telegram slash commands from the canonical command surface, including deterministic command publication/update for the Telegram bot and runtime dispatch that keeps Telegram command handling aligned with the delivered ptydeck slash-command definitions instead of a separate handwritten Telegram-only list.
 - `MSG-047` Owner `QA`

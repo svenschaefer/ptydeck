@@ -13,7 +13,8 @@ function createEmptyState(sessions = []) {
     workspacePresets: [],
     sshTrustEntries: [],
     shareLinks: [],
-    messagingTelegramTopicBindings: []
+    messagingTelegramTopicBindings: [],
+    messagingCodexRestartResendLedger: []
   };
 }
 
@@ -32,7 +33,10 @@ function normalizePersistedState(value) {
         workspacePresets: Array.isArray(value.workspacePresets) ? value.workspacePresets : [],
         sshTrustEntries: Array.isArray(value.sshTrustEntries) ? value.sshTrustEntries : [],
         shareLinks: Array.isArray(value.shareLinks) ? value.shareLinks : [],
-        messagingTelegramTopicBindings: Array.isArray(value.messagingTelegramTopicBindings) ? value.messagingTelegramTopicBindings : []
+        messagingTelegramTopicBindings: Array.isArray(value.messagingTelegramTopicBindings) ? value.messagingTelegramTopicBindings : [],
+        messagingCodexRestartResendLedger: Array.isArray(value.messagingCodexRestartResendLedger)
+          ? value.messagingCodexRestartResendLedger
+          : []
       };
   }
   return null;
@@ -151,7 +155,8 @@ export class JsonPersistence {
       workspacePresets: [],
       sshTrustEntries: [],
       shareLinks: [],
-      messagingTelegramTopicBindings: []
+      messagingTelegramTopicBindings: [],
+      messagingCodexRestartResendLedger: []
     });
   }
 
@@ -165,7 +170,8 @@ export class JsonPersistence {
     workspacePresets,
     sshTrustEntries,
     shareLinks,
-    messagingTelegramTopicBindings
+    messagingTelegramTopicBindings,
+    messagingCodexRestartResendLedger
   }) {
     await this.mkdirFn(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -180,7 +186,10 @@ export class JsonPersistence {
         workspacePresets: Array.isArray(workspacePresets) ? workspacePresets : [],
         sshTrustEntries: Array.isArray(sshTrustEntries) ? sshTrustEntries : [],
         shareLinks: Array.isArray(shareLinks) ? shareLinks : [],
-        messagingTelegramTopicBindings: Array.isArray(messagingTelegramTopicBindings) ? messagingTelegramTopicBindings : []
+        messagingTelegramTopicBindings: Array.isArray(messagingTelegramTopicBindings) ? messagingTelegramTopicBindings : [],
+        messagingCodexRestartResendLedger: Array.isArray(messagingCodexRestartResendLedger)
+          ? messagingCodexRestartResendLedger
+          : []
       },
       null,
       2

@@ -392,6 +392,18 @@ test("JsonPersistence loads and saves runtime state with custom commands", async
         topicName: "Operations + build-run",
         updatedAt: 14
       }
+    ],
+    messagingCodexRestartResendLedger: [
+      {
+        key: "codex_separator_summary_sentence:-100123456:55:a:validated the allowlist remains narrow enough for the next live check.",
+        deliveryScope: "codex_separator_summary_sentence",
+        sessionId: "a",
+        chatId: "-100123456",
+        messageThreadId: 55,
+        targetStateKey: "-100123456:55:a",
+        comparableText: "validated the allowlist remains narrow enough for the next live check.",
+        deliveredAt: 15
+      }
     ]
   };
 
@@ -421,7 +433,8 @@ test("JsonPersistence loadState supports legacy array payload format", async () 
     workspacePresets: [],
     sshTrustEntries: [],
     shareLinks: [],
-    messagingTelegramTopicBindings: []
+    messagingTelegramTopicBindings: [],
+    messagingCodexRestartResendLedger: []
   });
 });
 
@@ -450,7 +463,8 @@ test("JsonPersistence loadState supports encrypted legacy array payload format",
     workspacePresets: [],
     sshTrustEntries: [],
     shareLinks: [],
-    messagingTelegramTopicBindings: []
+    messagingTelegramTopicBindings: [],
+    messagingCodexRestartResendLedger: []
   });
 });
 

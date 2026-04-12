@@ -209,6 +209,11 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
     - separator-hint summary flushes may pass only when they collapse to one sentence-like Codex update
     - short stubs such as `committed.` and colon-headed fragments such as `validated target apps:` stay rejected
     - prompt/footer/background-terminal contamination and multi-fragment `|` summaries stay rejected
+- that summary family now also runs behind a restart-recovery admission layer:
+  - summary-family delivery is suppressed before `runtime.ready`
+  - it remains suppressed through a bounded post-ready quiet window
+  - it remains suppressed until the first fresh post-restart input for the same session
+  - a persisted resend ledger keyed by normalized summary content plus session/thread context prevents old already-delivered summary posts from reappearing on later restarts
 - delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic `update`
 
 The shipped trigger profiles are:
@@ -432,6 +437,7 @@ Defaults and bounds:
 - `/health.messaging.deliveryEnabled` shows whether generic outbound Telegram delivery is currently allowed.
 - `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether narrow internal outbound allowlist paths such as `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence` are active while generic `deliveryEnabled` remains false.
 - `/health.messaging.allowlistDeliveryScopes` and `/ready.messaging.allowlistDeliveryScopes` enumerate those narrow delivered scopes.
+- `/health.messaging.codexSummaryRestartRecovery` and `/ready.messaging.codexSummaryRestartRecovery` expose the narrow summary-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
 - `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive` and `allowlistDeliveryScopes` for the Telegram adapter itself.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.

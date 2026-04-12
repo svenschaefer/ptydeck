@@ -250,6 +250,12 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <p>- a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination - <code>codex_separator_info</code> keeps the narrow simple case: - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - the separator-to-info horizon is still intentionally short, but now widened to roughly <code>4500ms</code> / <code>120</code> entries for real Codex timing - at most one immediate indented continuation line is merged - <code>codex_separator_section</code> now covers the next narrow structural case: - prompt/footer/background-terminal chrome is stripped from mixed entries before section assembly - the resulting separator-anchored section can retain one narrative <code>•</code> headline plus subsection labels and indented list items - simple one-bullet cases stay on <code>codex_separator_info</code>; the section family is reserved for the richer narrative shape - explicit section boundaries and window-state gating still reject anti-pattern bullets, prompt/footer markers, diff/output fragments, and overlay-churn windows - <code>codex_separator_summary_sentence</code> now covers the next narrow aggregated case: - separator-hint summary flushes may pass only when they collapse to one sentence-like Codex update - short stubs such as <code>committed.</code> and colon-headed fragments such as <code>validated target apps:</code> stay rejected - prompt/footer/background-terminal contamination and multi-fragment <code>|</code> summaries stay rejected</p>
 
 <ul>
+<li>that summary family now also runs behind a restart-recovery admission layer:</li>
+</ul>
+
+<p>- summary-family delivery is suppressed before <code>runtime.ready</code> - it remains suppressed through a bounded post-ready quiet window - it remains suppressed until the first fresh post-restart input for the same session - a persisted resend ledger keyed by normalized summary content plus session/thread context prevents old already-delivered summary posts from reappearing on later restarts</p>
+
+<ul>
 <li>delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic <code>update</code></li>
 </ul>
 
@@ -486,6 +492,7 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li><code>/health.messaging.deliveryEnabled</code> shows whether generic outbound Telegram delivery is currently allowed.</li>
 <li><code>/health.messaging.allowlistDeliveryActive</code> and <code>/ready.messaging.allowlistDeliveryActive</code> show whether narrow internal outbound allowlist paths such as <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code> are active while generic <code>deliveryEnabled</code> remains false.</li>
 <li><code>/health.messaging.allowlistDeliveryScopes</code> and <code>/ready.messaging.allowlistDeliveryScopes</code> enumerate those narrow delivered scopes.</li>
+<li><code>/health.messaging.codexSummaryRestartRecovery</code> and <code>/ready.messaging.codexSummaryRestartRecovery</code> expose the narrow summary-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.</li>
 <li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
 <li><code>/health.messaging.adapters[0]</code> and <code>/ready.messaging.adapters[0]</code> also expose <code>allowlistDeliveryActive</code> and <code>allowlistDeliveryScopes</code> for the Telegram adapter itself.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>

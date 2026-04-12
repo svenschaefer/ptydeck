@@ -4,6 +4,19 @@
 
 This note captures the currently observed restart-resend behavior on the narrow Codex Telegram outbound path and turns it into concrete product constraints for a future fix.
 
+## Current Product Status
+
+As of `v0.4.0-H109`, the first narrow product fix from this analysis is shipped:
+
+- only `codex_separator_summary_sentence` is restart-gated
+- Codex sessions created before runtime readiness enter per-session recovery mode
+- that summary family is suppressed before `runtime.ready`
+- it also stays suppressed through a bounded post-ready quiet window
+- it stays suppressed until the first fresh post-restart input for the same session
+- delivered summary candidates are persisted in a resend ledger keyed by normalized summary content plus session/thread context
+
+The stronger analysis conclusions below still matter because they explain why this gate is deliberately narrow and why `codex_separator_info` / `codex_separator_section` remain outside the recovery layer until there is equally strong evidence for those families too.
+
 The focus here is analytical only:
 
 - what actually gets resent around backend restart

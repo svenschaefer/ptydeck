@@ -583,6 +583,10 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.match(sends[2].text, /Live-Zustand/);
   assert.match(sends[2].text, /Die Delivery-Counter sind nach dem Restart wieder bei 0/);
 
+  runtime.markRuntimeReady();
+  now += 20_000;
+  runtime.observeSessionInput(session.id, { traceId: "h106-input" });
+
   await runtime.observeSessionData({
     session,
     data: "Validated the allowlist remains narrow enough for the next live check.\n",
@@ -740,6 +744,217 @@ test("messaging runtime retries the same codex summary sentence after telegram b
     trace: { traceId: "h106-retry-8" }
   });
   assert.equal(sends.length, 2);
+});
+
+test("messaging runtime suppresses codex summary sentence restart resends until ready quiet period and first fresh input, then persists the delivered summary ledger", async () => {
+  const sends = [];
+  const persistedLedgerEntries = [];
+  let now = 2_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => now,
+    codexSummaryRestartRecoveryQuietMs: 50,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    async onCodexRestartResendLedgerUpsert(entry) {
+      persistedLedgerEntries.push(entry);
+    },
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 360 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 361 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "restart-summary-session",
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  async function emitSummaryCandidate(traceId, text = "Validated the allowlist remains narrow enough for the next live check.") {
+    await runtime.observeSessionData({
+      session,
+      data: `${text}\n`,
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-text` }
+    });
+    await runtime.observeSessionData({
+      session,
+      data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-separator` }
+    });
+  }
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h109-created" });
+  await emitSummaryCandidate("h109-pre-ready");
+  assert.equal(sends.length, 0);
+
+  runtime.markRuntimeReady();
+  now += 10;
+  await emitSummaryCandidate("h109-quiet");
+  assert.equal(sends.length, 0);
+
+  now += 100;
+  await emitSummaryCandidate("h109-waiting-input");
+  assert.equal(sends.length, 0);
+
+  runtime.observeSessionInput(session.id, { traceId: "h109-input" });
+  now += 10;
+  await emitSummaryCandidate("h109-allowed");
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Validated the allowlist remains narrow enough for the next live check/);
+  assert.equal(persistedLedgerEntries.length, 1);
+  assert.equal(persistedLedgerEntries[0].deliveryScope, "codex_separator_summary_sentence");
+  assert.equal(persistedLedgerEntries[0].sessionId, session.id);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.codexSummaryRestartRecovery.activeSessionCount, 0);
+  assert.equal(status.codexSummaryRestartRecovery.ledgerSize, 1);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_pre_ready"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_quiet_window"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+});
+
+test("messaging runtime suppresses persisted summary-family restart history without affecting info and section families", async () => {
+  const sends = [];
+  let now = 3_000;
+  const session = createSession({
+    id: "persisted-summary-session",
+    name: "codex",
+    quickIdToken: "C",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+  const runtime = createMessagingRuntime({
+    nowFn: () => now,
+    codexSummaryRestartRecoveryQuietMs: 20,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    codexRestartResendLedger: [
+      {
+        deliveryScope: "codex_separator_summary_sentence",
+        sessionId: session.id,
+        chatId: "1001",
+        targetStateKey: `1001:0:${session.id}`,
+        comparableText: "validated the allowlist remains narrow enough for the next live check.",
+        deliveredAt: now - 100
+      }
+    ],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 380 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 381 };
+        }
+      };
+    }
+  });
+
+  async function emitSummaryCandidate(traceId, text) {
+    await runtime.observeSessionData({
+      session,
+      data: `${text}\n`,
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-text` }
+    });
+    await runtime.observeSessionData({
+      session,
+      data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-separator` }
+    });
+  }
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h109-persisted-created" });
+  runtime.markRuntimeReady();
+  now += 30;
+  runtime.observeSessionInput(session.id, { traceId: "h109-persisted-input" });
+
+  await emitSummaryCandidate("h109-persisted-summary", "Validated the allowlist remains narrow enough for the next live check.");
+  assert.equal(sends.length, 0);
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-info-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand,\n" +
+      "  damit der Analyse-Slice sauber abgeschlossen ist.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-info-2" }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-section-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der Restart ist sauber.›Find and fix a bug in @filename gpt-5.4 xhigh · 43% left · ~/workspace/code/ptydeck\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-section-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  Live-Zustand\n  - Backend: ok\n  - Ready: ready\n  Wichtig\n  - Die Delivery-Counter sind nach dem Restart wieder bei 0.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-section-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-section-4" }
+  });
+
+  await emitSummaryCandidate(
+    "h109-summary-new",
+    "Validated the section assembly remains narrow enough for the next live check."
+  );
+
+  assert.equal(sends.length, 3);
+  assert.match(sends[0].text, /Der Commit ist gepusht/);
+  assert.match(sends[1].text, /Der Restart ist sauber/);
+  assert.match(sends[2].text, /Validated the section assembly remains narrow enough for the next live check/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_prior_history"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
 });
 
 test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {
