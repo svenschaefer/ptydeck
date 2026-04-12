@@ -4,7 +4,7 @@
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
 
-It now also records the analysis path that led to the delivered `v0.4.0-H99` narrow outbound family, `codex_separator_info`, while generic Telegram outbound remains hard-disabled.
+It now also records the analysis path that led to the delivered narrow outbound families `codex_separator_info` and `codex_separator_section`, while generic Telegram outbound remains hard-disabled.
 
 The focus here is analytical only:
 
@@ -91,7 +91,7 @@ node scripts/experiment-codex-first-use-case.mjs \
   --tail-entries 10000
 ```
 
-After `v0.4.0-H100`, that helper no longer carries a private approximation of the first-use-case rule. It now replays persisted JSONL capture through the same shared `backend/src/codex-outbound-evaluator.js` module that the shipped runtime uses for `codex_separator_info`, so offline candidate/rejection timelines and live runtime delivery stay aligned on separator anchors, bounded lookahead, contamination rejection, continuation merge, and candidate keys.
+After `v0.4.0-H100` and `v0.4.0-H105`, those helpers no longer carry private approximations of the shipped Codex rules. They now replay persisted JSONL capture through the same shared `backend/src/codex-outbound-evaluator.js` module that the runtime uses for both `codex_separator_info` and `codex_separator_section`, so offline candidate/rejection timelines and live runtime delivery stay aligned on separator anchors, bounded lookahead, chrome stripping, section boundaries, window-state gating, contamination rejection, continuation merge, and candidate keys.
 
 The script parses the debug log, filters one window, and summarizes:
 

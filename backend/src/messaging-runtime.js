@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import {
   CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH,
   CODEX_SEPARATOR_INFO_SCOPE,
+  CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH,
+  CODEX_SEPARATOR_SECTION_SCOPE,
+  advanceCodexSeparatorSectionState,
   createCodexAllowlistState,
   createCodexStreamEntry,
   advanceCodexSeparatorInfoState
@@ -30,7 +33,7 @@ const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
 const STARTUP_CHATTER_SUPPRESSION_WINDOW_MS = 15_000;
 const TELEGRAM_TOPIC_NAME_MAX_LENGTH = 128;
-const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([CODEX_SEPARATOR_INFO_SCOPE]);
+const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([CODEX_SEPARATOR_INFO_SCOPE, CODEX_SEPARATOR_SECTION_SCOPE]);
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
@@ -636,7 +639,8 @@ function createSessionStreamState() {
     lastSuppressedStatusLikeAt: 0,
     lastNonMeaningfulActivityAt: 0,
     ...createCodexAllowlistState(),
-    lastCodexSeparatorCandidateKey: ""
+    lastCodexSeparatorCandidateKey: "",
+    lastCodexSeparatorSectionCandidateKey: ""
   };
 }
 
@@ -645,6 +649,10 @@ function buildCodexSeparatorDeliveryBlockKey(decision) {
     return "";
   }
   return `${decision.anchorSequence}:${decision.infoSequence}`;
+}
+
+function isCodexAllowlistScope(deliveryScope) {
+  return deliveryScope === CODEX_SEPARATOR_INFO_SCOPE || deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE;
 }
 
 function pushRecentLine(state, line) {
@@ -813,16 +821,16 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     }
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
   }
-  if (deliveryScope === CODEX_SEPARATOR_INFO_SCOPE) {
+  if (isCodexAllowlistScope(deliveryScope)) {
     if (
       threadState.messageCreated === true &&
       deliveryBlockKey &&
       lastDeliveryBlockKey &&
       deliveryBlockKey === lastDeliveryBlockKey
     ) {
-      return Object.freeze({ action: "update", messageKey, reason: "codex_separator_info_block_update" });
+      return Object.freeze({ action: "update", messageKey, reason: `${deliveryScope}_block_update` });
     }
-    return Object.freeze({ action: "new", messageKey, reason: "codex_separator_info_new_block" });
+    return Object.freeze({ action: "new", messageKey, reason: `${deliveryScope}_new_block` });
   }
   if (threadState.lastText === text) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });
@@ -1425,14 +1433,25 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  async function dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, decision) {
-    const normalizedText = truncateSummary(decision?.text, CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH);
+  async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
+    const deliveryScope = normalizeNonEmptyString(decision?.family);
+    const maxLength = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+      ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH
+      : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
+    const normalizedText = truncateSummary(decision?.text, maxLength);
     const candidateKey = normalizeNonEmptyString(decision?.key);
     const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
-    if (!normalizedText || candidateKey === state.lastCodexSeparatorCandidateKey) {
+    const lastCandidateKey = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+      ? state.lastCodexSeparatorSectionCandidateKey
+      : state.lastCodexSeparatorCandidateKey;
+    if (!normalizedText || candidateKey === lastCandidateKey) {
       return null;
     }
-    state.lastCodexSeparatorCandidateKey = candidateKey;
+    if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
+      state.lastCodexSeparatorSectionCandidateKey = candidateKey;
+    } else {
+      state.lastCodexSeparatorCandidateKey = candidateKey;
+    }
     return dispatchEvent(
       createEvent({
         session,
@@ -1443,25 +1462,29 @@ export function createMessagingRuntime(options = {}) {
         threadKey: "status",
         trace,
         nowFn,
-        aggregationReason: CODEX_SEPARATOR_INFO_SCOPE,
-        deliveryScope: CODEX_SEPARATOR_INFO_SCOPE,
+        aggregationReason: deliveryScope,
+        deliveryScope,
         deliveryBlockKey,
         comparableText: createComparableText(normalizedText)
       })
     );
   }
 
-  async function advanceCodexSeparatorCandidate(session, profile, state, trace, entry, { flush = false } = {}) {
+  async function advanceCodexAllowlistCandidate(session, profile, state, trace, entry, { flush = false } = {}) {
     if (!isCodexAppIdentity(session) || !isCodingAgentContext(session, profile)) {
       state.codexSeparatorCandidate = null;
+      state.codexSeparatorSectionCandidate = null;
       return null;
     }
-    const decisions = advanceCodexSeparatorInfoState(state, entry, { flush });
+    const decisions = [
+      ...advanceCodexSeparatorSectionState(state, entry, { flush }),
+      ...advanceCodexSeparatorInfoState(state, entry, { flush })
+    ];
     for (const decision of decisions) {
       if (decision?.type !== "candidate" || !decision.text || !decision.key) {
         continue;
       }
-      return dispatchCodexSeparatorInfoCandidate(session, profile, state, trace, decision);
+      await dispatchCodexAllowlistCandidate(session, profile, state, trace, decision);
     }
     return null;
   }
@@ -1682,7 +1705,7 @@ export function createMessagingRuntime(options = {}) {
     }
     if (type === "session.exit") {
       state.lastLifecycleType = type;
-      await advanceCodexSeparatorCandidate(session, profile, state, trace, null, { flush: true });
+      await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_exit");
       return dispatchEvent(
         createEvent({
@@ -1704,7 +1727,7 @@ export function createMessagingRuntime(options = {}) {
     }
     if (type === "session.closed") {
       state.lastLifecycleType = type;
-      await advanceCodexSeparatorCandidate(session, profile, state, trace, null, { flush: true });
+      await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_closed");
       return dispatchEvent(
         createEvent({
@@ -1737,7 +1760,6 @@ export function createMessagingRuntime(options = {}) {
       )
     ).sort((left, right) => left - right);
     async function dispatchPromptReady() {
-      state.codexSeparatorCandidate = null;
       await flushPendingSummaryBlock(session, profile, state, trace, "prompt_boundary");
       await dispatchEvent(
         createEvent({
@@ -1895,7 +1917,7 @@ export function createMessagingRuntime(options = {}) {
     }
     if (!chunk) {
       if (normalizedPromptBoundaries.length > 0 && isCodexAppIdentity(session)) {
-        await advanceCodexSeparatorCandidate(
+        await advanceCodexAllowlistCandidate(
           session,
           profile,
           state,
@@ -1909,7 +1931,7 @@ export function createMessagingRuntime(options = {}) {
       return;
     }
     if (isCodexAppIdentity(session)) {
-      await advanceCodexSeparatorCandidate(
+      await advanceCodexAllowlistCandidate(
         session,
         profile,
         state,
@@ -1938,7 +1960,7 @@ export function createMessagingRuntime(options = {}) {
     }
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
-    await advanceCodexSeparatorCandidate(session, profile, state, trace, null, { flush: true });
+    await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
     await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
     if (
       isCodingAgentContext(session, profile) &&

@@ -1,14 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  advanceCodexSeparatorSectionState,
   advanceCodexSeparatorInfoState,
   CODEX_SEPARATOR_INFO_MAX_GAP_MS,
+  CODEX_SEPARATOR_SECTION_SCOPE,
   createCodexAllowlistState,
   createCodexStreamEntry
 } from "../src/codex-outbound-evaluator.js";
 
 function feed(state, text, occurredAt, promptBoundaries = []) {
   return advanceCodexSeparatorInfoState(
+    state,
+    createCodexStreamEntry(state, text, promptBoundaries, occurredAt)
+  );
+}
+
+function feedSection(state, text, occurredAt, promptBoundaries = []) {
+  return advanceCodexSeparatorSectionState(
     state,
     createCodexStreamEntry(state, text, promptBoundaries, occurredAt)
   );
@@ -123,4 +132,46 @@ test("codex outbound evaluator allows the wider bounded separator-to-info gap fo
   assert.equal(flushed[0].type, "candidate");
   assert.equal(flushed[0].reason, "flush_after_info");
   assert.match(flushed[0].text, /danach committe und pushe ich/);
+});
+
+test("codex section evaluator assembles a structured restart section from mixed entries", () => {
+  const state = createCodexAllowlistState();
+
+  assert.deepEqual(
+    feedSection(state, "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n", 7_000),
+    []
+  );
+  assert.deepEqual(
+    feedSection(state, "• Der Restart ist sauber.›Find and fix a bug in @filename gpt-5.4 xhigh · 43% left · ~/workspace/code/ptydeck\n", 7_100),
+    []
+  );
+  assert.deepEqual(feedSection(state, "  Live-Zustand\n", 7_200), []);
+  assert.deepEqual(feedSection(state, "  - Backend: ok\n", 7_300), []);
+  assert.deepEqual(feedSection(state, "  - Ready: ready\n", 7_400), []);
+  assert.deepEqual(feedSection(state, "  Wichtig\n", 7_500), []);
+  assert.deepEqual(feedSection(state, "  - Die Delivery-Counter sind nach dem Restart wieder bei 0.\n", 7_600), []);
+
+  const finalized = feedSection(state, "• Ran git status --short\n", 7_700);
+
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].type, "candidate");
+  assert.equal(finalized[0].family, CODEX_SEPARATOR_SECTION_SCOPE);
+  assert.equal(finalized[0].reason, "section_closed_by_anti_bullet");
+  assert.equal(finalized[0].windowState, "stable_section");
+  assert.match(finalized[0].text, /^Der Restart ist sauber\./);
+  assert.match(finalized[0].text, /\n\nLive-Zustand\n- Backend: ok\n- Ready: ready/);
+  assert.match(finalized[0].text, /\n\nWichtig\n- Die Delivery-Counter sind nach dem Restart wieder bei 0\./);
+});
+
+test("codex section evaluator keeps single-bullet simple cases on the info-only path", () => {
+  const state = createCodexAllowlistState();
+
+  feedSection(state, "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n", 8_000);
+  feedSection(state, "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-Zustand.\n", 8_100);
+  feedSection(state, "  Damit der Analyse-Slice sauber abgeschlossen ist.\n", 8_200);
+  const finalized = advanceCodexSeparatorSectionState(state, null, { flush: true });
+
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].type, "rejection");
+  assert.equal(finalized[0].reason, "section_too_shallow");
 });

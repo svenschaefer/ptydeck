@@ -3,9 +3,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { logScriptStart } from "./lib/script-log.mjs";
-import { normalizeVisibleReplayText } from "../backend/src/replay-excerpt.js";
-
 logScriptStart("scripts/experiment-codex-sections.mjs");
+
+import {
+  CODEX_SEPARATOR_SECTION_MAX_GAP_MS,
+  CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES,
+  CODEX_SEPARATOR_SECTION_SCOPE,
+  advanceCodexSeparatorSectionState,
+  createCodexAllowlistState,
+  createCodexStreamEntry
+} from "../backend/src/codex-outbound-evaluator.js";
 
 function usage() {
   console.error(
@@ -57,26 +64,17 @@ for (let index = 0; index < args.length; index += 1) {
   usage();
 }
 
-if (!captureFile || !Number.isFinite(tailEntries) || tailEntries <= 0 || !["json", "text"].includes(format)) {
+if (
+  !captureFile ||
+  !["json", "text"].includes(format) ||
+  !Number.isFinite(tailEntries) ||
+  tailEntries <= 0
+) {
   usage();
 }
 
-const MAJOR_SEPARATOR_PATTERN = /^─{40,}$/u;
-const BULLET_PATTERN = /^•\s+/u;
-const ANTI_PATTERN_BULLET_PATTERN = /^•\s+(?:Ran\b|Explored\b|Waited\b|Context compacted\b|Updated Plan\b)/u;
-const PROMPT_PATTERN = /›/u;
-const STATUS_RIBBON_PATTERN = /(?:\bgpt-[\w.-]+\b|\b\d{1,3}%\s+(?:left|used|remaining)\b|\/ps to view|\/stop to close|background terminal running|weekly\s+\d{1,3}%)/iu;
-const OVERLAY_PATTERN = /(?:esc to interrupt|interrupt to stop|background terminal running)/iu;
-const WORKED_FOR_PATTERN = /^─+\s*Worked for\b/iu;
-const LIST_ITEM_PATTERN = /^-\s+/u;
-const SUBSECTION_PATTERN = /^[A-ZÄÖÜ][\p{L}\p{N}\- ]{2,80}$/u;
-
 function normalizeLineBreaks(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
-
-function normalizeWhitespace(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
 }
 
 function decodeBase64Text(encoded) {
@@ -88,6 +86,13 @@ function decodeBase64Text(encoded) {
   } catch {
     return "";
   }
+}
+
+function formatTimestamp(timestampMs, fallback = "") {
+  if (Number.isFinite(timestampMs) && timestampMs > 0) {
+    return new Date(timestampMs).toISOString();
+  }
+  return fallback;
 }
 
 function loadEntries(filePath, filters = {}) {
@@ -115,193 +120,98 @@ function loadEntries(filePath, filters = {}) {
     if (filters.appLabel && filters.appLabel !== entryAppLabel) {
       continue;
     }
-    const cleanedText = decodeBase64Text(parsed?.cleaned?.base64 || parsed?.raw?.base64 || "");
-    const visibleText = normalizeVisibleReplayText(cleanedText);
+    const decoded = decodeBase64Text(parsed?.cleaned?.base64 || parsed?.raw?.base64 || "");
     entries.push({
       timestamp: typeof parsed?.timestamp === "string" ? parsed.timestamp : "",
       timestampMs: Number.parseInt(String(Date.parse(parsed?.timestamp || "")), 10) || 0,
+      sessionId: typeof parsed?.session?.id === "string" ? parsed.session.id : "",
       sessionName: entrySessionName,
       deckId: entryDeckId,
       appLabel: entryAppLabel,
-      visibleText,
-      visiblePreview: typeof parsed?.cleaned?.visiblePreview === "string"
-        ? parsed.cleaned.visiblePreview
-        : typeof parsed?.raw?.visiblePreview === "string"
-          ? parsed.raw.visiblePreview
-          : ""
+      cleanedText: decoded,
+      promptBoundaries: Array.isArray(parsed?.promptBoundaries) ? parsed.promptBoundaries.filter(Number.isInteger) : []
     });
   }
   return entries;
 }
 
-function splitVisibleLines(visibleText) {
-  return normalizeLineBreaks(visibleText)
-    .split("\n")
-    .map((line) => normalizeWhitespace(line))
-    .filter(Boolean);
+function normalizeDecision(decision, entryIndex) {
+  return {
+    index: entryIndex,
+    type: decision?.type || "",
+    family: decision?.family || CODEX_SEPARATOR_SECTION_SCOPE,
+    reason: typeof decision?.reason === "string" ? decision.reason : "",
+    key: typeof decision?.key === "string" ? decision.key : "",
+    text: typeof decision?.text === "string" ? decision.text : "",
+    anchorSequence: Number.isInteger(decision?.anchorSequence) ? decision.anchorSequence : 0,
+    anchorOccurredAt: Number.isFinite(decision?.anchorOccurredAt) ? decision.anchorOccurredAt : 0,
+    anchorTimestamp: formatTimestamp(decision?.anchorOccurredAt),
+    infoSequence: Number.isInteger(decision?.infoSequence) ? decision.infoSequence : 0,
+    infoOccurredAt: Number.isFinite(decision?.infoOccurredAt) ? decision.infoOccurredAt : 0,
+    infoTimestamp: formatTimestamp(decision?.infoOccurredAt),
+    entrySequence: Number.isInteger(decision?.entrySequence) ? decision.entrySequence : 0,
+    entryOccurredAt: Number.isFinite(decision?.entryOccurredAt) ? decision.entryOccurredAt : 0,
+    entryTimestamp: formatTimestamp(decision?.entryOccurredAt),
+    windowState: typeof decision?.windowState === "string" ? decision.windowState : ""
+  };
 }
 
-function scrubLine(line) {
-  let value = normalizeWhitespace(line);
-  if (!value) {
-    return "";
-  }
-  const promptMatch = value.search(PROMPT_PATTERN);
-  if (promptMatch >= 0) {
-    value = normalizeWhitespace(value.slice(0, promptMatch));
-  }
-  if (!value) {
-    return "";
-  }
-  if (OVERLAY_PATTERN.test(value) || WORKED_FOR_PATTERN.test(value)) {
-    return "";
-  }
-  if (STATUS_RIBBON_PATTERN.test(value) && !BULLET_PATTERN.test(value) && !LIST_ITEM_PATTERN.test(value)) {
-    return "";
-  }
-  return value;
-}
-
-function classifyLine(line) {
-  if (!line) {
-    return "blank";
-  }
-  if (MAJOR_SEPARATOR_PATTERN.test(line)) {
-    return "separator";
-  }
-  if (ANTI_PATTERN_BULLET_PATTERN.test(line)) {
-    return "anti_bullet";
-  }
-  if (BULLET_PATTERN.test(line)) {
-    return "info_bullet";
-  }
-  if (LIST_ITEM_PATTERN.test(line)) {
-    return "list_item";
-  }
-  if (SUBSECTION_PATTERN.test(line)) {
-    return "subsection";
-  }
-  return "text";
-}
-
-function isSectionBoundary(kind) {
-  return kind === "separator" || kind === "anti_bullet";
-}
-
-function analyzeSections(entries) {
+function extractSectionCandidates(entries) {
   const scoped = entries.slice(-tailEntries);
-  const candidates = [];
-  const rejections = [];
-  for (let index = 0; index < scoped.length; index += 1) {
-    const entry = scoped[index];
-    const lines = splitVisibleLines(entry.visibleText).map(scrubLine).filter(Boolean);
-    if (lines.length === 0) {
-      continue;
+  const state = createCodexAllowlistState();
+  const decisions = [];
+  let decisionIndex = 0;
+
+  const recordDecisions = (events) => {
+    for (const decision of events || []) {
+      decisions.push(normalizeDecision(decision, decisionIndex));
+      decisionIndex += 1;
     }
-    const firstKind = classifyLine(lines[0]);
-    if (firstKind !== "separator") {
-      continue;
-    }
-    const sectionLines = [];
-    let opened = false;
-    let rejected = "";
-    let consumedEntries = 0;
-    for (let lookahead = index + 1; lookahead < scoped.length && lookahead < index + 80; lookahead += 1) {
-      const next = scoped[lookahead];
-      const nextLines = splitVisibleLines(next.visibleText).map(scrubLine).filter(Boolean);
-      if (nextLines.length === 0) {
-        continue;
-      }
-      consumedEntries += 1;
-      for (const line of nextLines) {
-        const kind = classifyLine(line);
-        if (!opened) {
-          if (kind === "info_bullet") {
-            opened = true;
-            sectionLines.push(line);
-            continue;
-          }
-          if (kind === "separator") {
-            rejected = "empty_between_separators";
-            break;
-          }
-          if (kind === "anti_bullet") {
-            rejected = "first_bullet_anti_pattern";
-            break;
-          }
-          continue;
-        }
-        if (isSectionBoundary(kind)) {
-          break;
-        }
-        if (kind === "subsection" || kind === "list_item" || kind === "text") {
-          sectionLines.push(line);
-          continue;
-        }
-      }
-      const lastKind = nextLines.length ? classifyLine(scrubLine(nextLines[nextLines.length - 1])) : "blank";
-      if (rejected) {
-        break;
-      }
-      if (opened && isSectionBoundary(lastKind)) {
-        break;
-      }
-      if (opened && consumedEntries >= 12) {
-        break;
-      }
-    }
-    if (!opened) {
-      rejections.push({ anchorTimestamp: entry.timestamp, reason: rejected || "no_info_bullet" });
-      continue;
-    }
-    const bulletLine = sectionLines[0] || "";
-    const text = normalizeWhitespace(bulletLine.replace(BULLET_PATTERN, ""));
-    if (!text) {
-      rejections.push({ anchorTimestamp: entry.timestamp, reason: rejected || "empty_text" });
-      continue;
-    }
-    const normalizedLines = [];
-    normalizedLines.push(text);
-    let currentSubsection = "";
-    for (const line of sectionLines.slice(1)) {
-      const kind = classifyLine(line);
-      if (kind === "subsection") {
-        currentSubsection = line;
-        normalizedLines.push("");
-        normalizedLines.push(line);
-        continue;
-      }
-      if (kind === "list_item") {
-        if (!currentSubsection && normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
-          normalizedLines.push("");
-        }
-        normalizedLines.push(line);
-        continue;
-      }
-      if (kind === "text") {
-        if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
-          normalizedLines[normalizedLines.length - 1] = `${normalizedLines[normalizedLines.length - 1]} ${line}`.trim();
-        } else {
-          normalizedLines.push(line);
-        }
-      }
-    }
-    const compactText = normalizedLines.filter((line, lineIndex, arr) => !(line === "" && arr[lineIndex - 1] === "")).join("\n").trim();
-    if (!compactText || STATUS_RIBBON_PATTERN.test(compactText) || PROMPT_PATTERN.test(compactText)) {
-      rejections.push({ anchorTimestamp: entry.timestamp, reason: rejected || "normalized_contamination" });
-      continue;
-    }
-    candidates.push({
-      anchorTimestamp: entry.timestamp,
-      text: compactText,
-      rawSectionLines: sectionLines.slice()
-    });
+  };
+
+  for (const entry of scoped) {
+    const streamEntry = createCodexStreamEntry(
+      state,
+      entry.cleanedText,
+      entry.promptBoundaries,
+      entry.timestampMs || Date.now()
+    );
+    recordDecisions(advanceCodexSeparatorSectionState(state, streamEntry));
   }
-  return { scopedEntries: scoped.length, candidates, rejections };
+  recordDecisions(advanceCodexSeparatorSectionState(state, null, { flush: true }));
+
+  const candidates = decisions
+    .filter((decision) => decision.type === "candidate")
+    .map((decision) => ({
+      anchorSequence: decision.anchorSequence,
+      anchorTimestamp: decision.anchorTimestamp,
+      candidateSequence: decision.infoSequence,
+      candidateTimestamp: decision.infoTimestamp,
+      windowState: decision.windowState,
+      reason: decision.reason,
+      key: decision.key,
+      text: decision.text
+    }));
+  const rejections = decisions
+    .filter((decision) => decision.type === "rejection")
+    .map((decision) => ({
+      anchorSequence: decision.anchorSequence,
+      anchorTimestamp: decision.anchorTimestamp,
+      entrySequence: decision.entrySequence,
+      entryTimestamp: decision.entryTimestamp,
+      reason: decision.reason
+    }));
+
+  return {
+    scopedEntries: scoped.length,
+    decisions,
+    candidates,
+    rejections
+  };
 }
 
 const entries = loadEntries(captureFile, { sessionName, deckId, appLabel });
-const analysis = analyzeSections(entries);
+const analysis = extractSectionCandidates(entries);
 
 if (format === "json") {
   console.log(JSON.stringify({
@@ -310,6 +220,9 @@ if (format === "json") {
     deckId,
     appLabel,
     tailEntries,
+    maxGapMs: CODEX_SEPARATOR_SECTION_MAX_GAP_MS,
+    maxLookahead: CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES,
+    totalFilteredEntries: entries.length,
     analysis
   }, null, 2));
   process.exit(0);
@@ -320,6 +233,9 @@ console.log(`sessionName: ${sessionName || "(all)"}`);
 console.log(`deckId: ${deckId || "(all)"}`);
 console.log(`appLabel: ${appLabel || "(all)"}`);
 console.log(`tailEntries: ${tailEntries}`);
+console.log(`maxGapMs: ${CODEX_SEPARATOR_SECTION_MAX_GAP_MS}`);
+console.log(`maxLookahead: ${CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES}`);
+console.log(`totalFilteredEntries: ${entries.length}`);
 console.log(`scopedEntries: ${analysis.scopedEntries}`);
 console.log("");
 console.log("candidates:");
@@ -327,7 +243,7 @@ if (analysis.candidates.length === 0) {
   console.log("- none");
 } else {
   for (const candidate of analysis.candidates) {
-    console.log(`- ${candidate.anchorTimestamp}`);
+    console.log(`- ${candidate.anchorTimestamp} -> ${candidate.candidateTimestamp} [${candidate.reason}] (${candidate.windowState})`);
     console.log(candidate.text.split("\n").map((line) => `  ${line}`).join("\n"));
   }
 }

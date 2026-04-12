@@ -1,19 +1,29 @@
 import { normalizeVisibleReplayText } from "./replay-excerpt.js";
 
 export const CODEX_SEPARATOR_INFO_SCOPE = "codex_separator_info";
+export const CODEX_SEPARATOR_SECTION_SCOPE = "codex_separator_section";
 export const CODEX_SEPARATOR_INFO_MAX_GAP_MS = 4500;
 export const CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES = 120;
 export const CODEX_SEPARATOR_INFO_CONTINUATION_GAP_MS = 500;
 export const CODEX_SEPARATOR_INFO_MIN_TEXT_LENGTH = 24;
 export const CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH = 400;
+export const CODEX_SEPARATOR_SECTION_MAX_GAP_MS = 4500;
+export const CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES = 160;
+export const CODEX_SEPARATOR_SECTION_MIN_TEXT_LENGTH = 24;
+export const CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH = 1200;
+export const CODEX_SEPARATOR_SECTION_MAX_LINES = 20;
 
 const CODING_AGENT_BULLET_PREFIX_PATTERN = /^•\s+/u;
 const CODING_AGENT_PROMPT_LINE_PATTERN = /^›\s+/u;
 const CODING_AGENT_CONTINUATION_LINE_PATTERN = /^  /u;
 const CODING_AGENT_TAIL_LINE_PATTERN = /^  (?:└|│|□)\s/u;
+const CODING_AGENT_NORMALIZED_TAIL_LINE_PATTERN = /^(?:└|│|□)\s/u;
 const CODING_AGENT_DIFF_LINE_PATTERN = /^(?:@@|\+\+\+|---|\+ |- |\d+\s*[+-])/u;
 const CODING_AGENT_WORKED_FOR_PATTERN = /^─+\s*Worked for\b/iu;
 const CODING_AGENT_INTERRUPT_OVERLAY_PATTERN = /\b(?:esc to interrupt|interrupt to stop|background terminal running|\/ps to view|\/stop to close)\b/iu;
+const CODING_AGENT_MAJOR_SEPARATOR_PATTERN = /^─{40,}$/u;
+const CODING_AGENT_SECTION_LIST_ITEM_PATTERN = /^-\s+/u;
+const CODING_AGENT_SECTION_SUBSECTION_PATTERN = /^[A-ZÄÖÜ][\p{L}\p{N}\- ]{2,80}$/u;
 
 function normalizeLineBreaks(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -21,6 +31,13 @@ function normalizeLineBreaks(value) {
 
 function normalizeWhitespace(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function splitNormalizedMeaningfulLines(value) {
+  return normalizeLineBreaks(value)
+    .split("\n")
+    .map((line) => normalizeWhitespace(line))
+    .filter(Boolean);
 }
 
 function isStatusRibbon(value) {
@@ -33,7 +50,7 @@ function isTinyOverlayFragment(value) {
   if (!trimmed) {
     return true;
   }
-  if (CODING_AGENT_BULLET_PREFIX_PATTERN.test(trimmed) || CODING_AGENT_PROMPT_LINE_PATTERN.test(trimmed) || /^─{40,}$/u.test(trimmed)) {
+  if (CODING_AGENT_BULLET_PREFIX_PATTERN.test(trimmed) || CODING_AGENT_PROMPT_LINE_PATTERN.test(trimmed) || CODING_AGENT_MAJOR_SEPARATOR_PATTERN.test(trimmed)) {
     return false;
   }
   if (trimmed.length > 24) {
@@ -54,13 +71,34 @@ function isTinyOverlayFragment(value) {
       return true;
     }
   }
-  if (/^[A-Za-z•◦\d]+$/u.test(trimmed) && !/\s/u.test(trimmed) && trimmed.length <= 12) {
+  if (/^[a-z•◦\d]+$/u.test(trimmed) && !/\s/u.test(trimmed) && trimmed.length <= 12) {
     return true;
   }
   if (/^W(?:o|or|rk|ki|in|ng|g|ait|ork|orking|aiting)+$/iu.test(trimmed)) {
     return true;
   }
   return false;
+}
+
+function scrubCodexSectionLine(line) {
+  let value = normalizeWhitespace(line);
+  if (!value) {
+    return "";
+  }
+  const promptIndex = value.search(/›/u);
+  if (promptIndex >= 0) {
+    value = normalizeWhitespace(value.slice(0, promptIndex));
+  }
+  if (!value) {
+    return "";
+  }
+  if (CODING_AGENT_INTERRUPT_OVERLAY_PATTERN.test(value) || CODING_AGENT_WORKED_FOR_PATTERN.test(value)) {
+    return "";
+  }
+  if (isStatusRibbon(value) && !CODING_AGENT_BULLET_PREFIX_PATTERN.test(value) && !CODING_AGENT_SECTION_LIST_ITEM_PATTERN.test(value)) {
+    return "";
+  }
+  return value;
 }
 
 function classifyCodexStreamEntryKind(visibleText) {
@@ -78,15 +116,12 @@ function classifyCodexStreamEntryKind(visibleText) {
 }
 
 function analyzeMajorSeparatorEntry(visibleText) {
-  const meaningfulLines = normalizeLineBreaks(visibleText)
-    .split("\n")
-    .map((line) => normalizeWhitespace(line))
-    .filter(Boolean);
+  const meaningfulLines = splitNormalizedMeaningfulLines(visibleText);
   if (meaningfulLines.length === 0) {
     return { ok: false, contaminated: false };
   }
   const firstLine = meaningfulLines[0];
-  if (/^─{40,}$/u.test(firstLine)) {
+  if (CODING_AGENT_MAJOR_SEPARATOR_PATTERN.test(firstLine)) {
     const contaminated = meaningfulLines.slice(1).some((line) => !isTinyOverlayFragment(line));
     return { ok: !contaminated, contaminated: meaningfulLines.length > 1 && !contaminated };
   }
@@ -240,10 +275,390 @@ function analyzeCodexContinuationEntry(visibleText) {
   return { ok: true, text: firstLine };
 }
 
+function classifyCodexSectionLine(line) {
+  const normalized = normalizeWhitespace(line);
+  if (!normalized) {
+    return "blank";
+  }
+  if (isTinyOverlayFragment(normalized)) {
+    return "overlay_fragment";
+  }
+  if (isMajorSeparatorVisible(normalized)) {
+    return "separator";
+  }
+  if (CODING_AGENT_PROMPT_LINE_PATTERN.test(normalized)) {
+    return "prompt";
+  }
+  if (
+    CODING_AGENT_NORMALIZED_TAIL_LINE_PATTERN.test(normalized) ||
+    CODING_AGENT_WORKED_FOR_PATTERN.test(normalized) ||
+    CODING_AGENT_INTERRUPT_OVERLAY_PATTERN.test(normalized) ||
+    isStatusRibbon(normalized)
+  ) {
+    return "chrome";
+  }
+  if (CODING_AGENT_BULLET_PREFIX_PATTERN.test(normalized)) {
+    return classifyCodexBullet(normalized) === "info" ? "info_bullet" : "anti_bullet";
+  }
+  if (CODING_AGENT_SECTION_LIST_ITEM_PATTERN.test(normalized)) {
+    return "list_item";
+  }
+  if (CODING_AGENT_SECTION_SUBSECTION_PATTERN.test(normalized)) {
+    return "subsection";
+  }
+  if (CODING_AGENT_DIFF_LINE_PATTERN.test(normalized)) {
+    return "diff_or_output";
+  }
+  return "text";
+}
+
+function buildCodexSectionEntryAnalysis(entry) {
+  const acceptedLines = [];
+  let discardedNoiseLines = 0;
+  for (const rawLine of splitNormalizedMeaningfulLines(entry?.visibleText || "")) {
+    const scrubbed = scrubCodexSectionLine(rawLine);
+    if (!scrubbed) {
+      discardedNoiseLines += 1;
+      continue;
+    }
+    const kind = classifyCodexSectionLine(scrubbed);
+    if (kind === "blank" || kind === "overlay_fragment" || kind === "chrome") {
+      discardedNoiseLines += 1;
+      continue;
+    }
+    acceptedLines.push({
+      line: scrubbed,
+      kind
+    });
+  }
+  return {
+    lines: acceptedLines,
+    discardedNoiseLines
+  };
+}
+
+function beginCodexSectionCandidate(entry) {
+  return {
+    anchorSequence: entry.sequence,
+    anchorOccurredAt: entry.occurredAt,
+    observedEntries: 0,
+    phase: "awaiting_headline",
+    headlineSequence: 0,
+    headlineOccurredAt: 0,
+    normalizedLines: [],
+    hasSubsection: false,
+    hasListItem: false,
+    continuationLineCount: 0,
+    contentEntryCount: 0,
+    discardedNoiseLines: 0,
+    lastContentAt: 0
+  };
+}
+
+function createSectionDecision(type, candidate, extra = {}) {
+  return Object.freeze({
+    type,
+    family: CODEX_SEPARATOR_SECTION_SCOPE,
+    anchorSequence: candidate?.anchorSequence || 0,
+    anchorOccurredAt: candidate?.anchorOccurredAt || 0,
+    infoSequence: candidate?.headlineSequence || 0,
+    infoOccurredAt: candidate?.headlineOccurredAt || 0,
+    ...extra
+  });
+}
+
+function normalizeCodexSectionLines(lines = []) {
+  const normalizedLines = [];
+  let previousKind = "";
+  for (const entry of lines) {
+    const line = normalizeWhitespace(entry?.line || "");
+    if (!line) {
+      continue;
+    }
+    const kind = entry?.kind || classifyCodexSectionLine(line);
+    if (kind === "info_bullet") {
+      normalizedLines.push(line.replace(CODING_AGENT_BULLET_PREFIX_PATTERN, "").trim());
+      previousKind = "info_bullet";
+      continue;
+    }
+    if (kind === "subsection") {
+      if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
+        normalizedLines.push("");
+      }
+      normalizedLines.push(line);
+      previousKind = "subsection";
+      continue;
+    }
+    if (kind === "list_item") {
+      if (
+        normalizedLines.length > 0 &&
+        normalizedLines[normalizedLines.length - 1] !== "" &&
+        (previousKind === "info_bullet" || previousKind === "text")
+      ) {
+        normalizedLines.push("");
+      }
+      normalizedLines.push(line);
+      previousKind = "list_item";
+      continue;
+    }
+    if (kind === "text") {
+      if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "" && previousKind !== "subsection") {
+        normalizedLines[normalizedLines.length - 1] = `${normalizedLines[normalizedLines.length - 1]} ${line}`.trim();
+      } else {
+        normalizedLines.push(line);
+      }
+      previousKind = "text";
+    }
+  }
+  return normalizedLines.filter((line, index, values) => !(line === "" && values[index - 1] === ""));
+}
+
+function classifyCodexSectionWindowState(candidate) {
+  const contentEntryCount = Number.isInteger(candidate?.contentEntryCount) ? candidate.contentEntryCount : 0;
+  const discardedNoiseLines = Number.isInteger(candidate?.discardedNoiseLines) ? candidate.discardedNoiseLines : 0;
+  const continuationLineCount = Number.isInteger(candidate?.continuationLineCount) ? candidate.continuationLineCount : 0;
+  if (contentEntryCount <= 1 && discardedNoiseLines >= 4) {
+    return "restart_remount";
+  }
+  if (discardedNoiseLines > Math.max(6, continuationLineCount * 2)) {
+    return "overlay_churn";
+  }
+  return "stable_section";
+}
+
+function maybeFinalizeCodexSectionCandidate(candidate, extra = {}) {
+  if (!candidate || candidate.phase !== "collecting_section" || !Array.isArray(candidate.normalizedLines) || candidate.normalizedLines.length === 0) {
+    return null;
+  }
+  const windowState = classifyCodexSectionWindowState(candidate);
+  const { reason: triggerReason = "", ...restExtra } = extra || {};
+  if (windowState !== "stable_section") {
+    return createSectionDecision("rejection", candidate, {
+      ...restExtra,
+      triggerReason,
+      reason: `window_${windowState}`
+    });
+  }
+  if (!candidate.hasSubsection && !candidate.hasListItem && candidate.continuationLineCount < 2) {
+    return createSectionDecision("rejection", candidate, {
+      ...restExtra,
+      triggerReason,
+      reason: "section_too_shallow"
+    });
+  }
+  const lines = normalizeCodexSectionLines(candidate.normalizedLines).slice(0, CODEX_SEPARATOR_SECTION_MAX_LINES);
+  const text = lines.join("\n").trim();
+  if (!text) {
+    return createSectionDecision("rejection", candidate, {
+      ...restExtra,
+      triggerReason,
+      reason: "empty_normalized_section"
+    });
+  }
+  if (text.length < CODEX_SEPARATOR_SECTION_MIN_TEXT_LENGTH || text.length > CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH) {
+    return createSectionDecision("rejection", candidate, {
+      ...restExtra,
+      triggerReason,
+      reason: "section_length_out_of_range"
+    });
+  }
+  if (hasCodexInlineContamination(text)) {
+    return createSectionDecision("rejection", candidate, {
+      ...restExtra,
+      triggerReason,
+      reason: "section_inline_contamination"
+    });
+  }
+  return createSectionDecision("candidate", candidate, {
+    key: `${candidate.anchorSequence}:${candidate.headlineSequence}:${text}`,
+    text,
+    windowState,
+    ...restExtra,
+    reason: triggerReason || "section_completed"
+  });
+}
+
+function appendCodexSectionLine(candidate, line, kind, occurredAt) {
+  if (!candidate || !line) {
+    return;
+  }
+  candidate.phase = "collecting_section";
+  candidate.normalizedLines.push({ line, kind });
+  candidate.lastContentAt = occurredAt;
+  if (kind === "subsection") {
+    candidate.hasSubsection = true;
+  } else if (kind === "list_item") {
+    candidate.hasListItem = true;
+  } else if (kind === "text") {
+    candidate.continuationLineCount += 1;
+  }
+}
+
+export function advanceCodexSeparatorSectionState(state, entry, { flush = false } = {}) {
+  const events = [];
+  let candidate = state?.codexSeparatorSectionCandidate || null;
+
+  const clearCandidate = (decision) => {
+    candidate = null;
+    state.codexSeparatorSectionCandidate = null;
+    if (decision) {
+      events.push(decision);
+    }
+  };
+
+  const maybeStartAnchor = (currentEntry) => {
+    if (
+      currentEntry &&
+      currentEntry.kind === "substantial" &&
+      currentEntry.isMajorSeparator &&
+      !currentEntry.hasWorkedForMarker &&
+      !currentEntry.hasInterruptOverlay
+    ) {
+      candidate = beginCodexSectionCandidate(currentEntry);
+      state.codexSeparatorSectionCandidate = candidate;
+    }
+  };
+
+  const processEntry = (currentEntry) => {
+    if (!currentEntry) {
+      return;
+    }
+    if (!candidate) {
+      maybeStartAnchor(currentEntry);
+      return;
+    }
+
+    if (currentEntry.sequence !== candidate.anchorSequence) {
+      if ((currentEntry.occurredAt - candidate.anchorOccurredAt) > CODEX_SEPARATOR_SECTION_MAX_GAP_MS) {
+        clearCandidate(createSectionDecision("rejection", candidate, {
+          reason: "gap_timeout",
+          entrySequence: currentEntry.sequence,
+          entryOccurredAt: currentEntry.occurredAt
+        }));
+        maybeStartAnchor(currentEntry);
+        return;
+      }
+      if (candidate.observedEntries >= CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES) {
+        clearCandidate(createSectionDecision("rejection", candidate, {
+          reason: "lookahead_exhausted",
+          entrySequence: currentEntry.sequence,
+          entryOccurredAt: currentEntry.occurredAt
+        }));
+        maybeStartAnchor(currentEntry);
+        return;
+      }
+      candidate.observedEntries += 1;
+    }
+
+    const analysis = buildCodexSectionEntryAnalysis(currentEntry);
+    candidate.discardedNoiseLines += analysis.discardedNoiseLines;
+    if (analysis.lines.length === 0) {
+      if (
+        candidate.phase === "awaiting_headline" &&
+        (currentEntry.hasPromptMarker || currentEntry.hasWorkedForMarker || currentEntry.hasInterruptOverlay)
+      ) {
+        clearCandidate(createSectionDecision("rejection", candidate, {
+          reason: "marker_before_info",
+          entrySequence: currentEntry.sequence,
+          entryOccurredAt: currentEntry.occurredAt
+        }));
+        return;
+      }
+      if (
+        candidate.phase === "collecting_section" &&
+        (
+          currentEntry.hasPromptMarker ||
+          currentEntry.hasWorkedForMarker ||
+          currentEntry.hasInterruptOverlay ||
+          currentEntry.kind === "status_ribbon"
+        )
+      ) {
+        clearCandidate(maybeFinalizeCodexSectionCandidate(candidate, {
+          reason: "section_closed_by_marker",
+          entrySequence: currentEntry.sequence,
+          entryOccurredAt: currentEntry.occurredAt
+        }));
+        return;
+      }
+      return;
+    }
+    candidate.contentEntryCount += 1;
+
+    for (const sectionLine of analysis.lines) {
+      if (candidate.phase === "awaiting_headline") {
+        if (sectionLine.kind === "separator") {
+          clearCandidate(createSectionDecision("rejection", candidate, {
+            reason: "next_separator_before_info",
+            entrySequence: currentEntry.sequence,
+            entryOccurredAt: currentEntry.occurredAt
+          }));
+          maybeStartAnchor(currentEntry);
+          return;
+        }
+        if (sectionLine.kind === "anti_bullet") {
+          clearCandidate(createSectionDecision("rejection", candidate, {
+            reason: `first_bullet_${classifyCodexBullet(sectionLine.line)}`,
+            entrySequence: currentEntry.sequence,
+            entryOccurredAt: currentEntry.occurredAt
+          }));
+          return;
+        }
+        if (sectionLine.kind !== "info_bullet") {
+          continue;
+        }
+        candidate.headlineSequence = currentEntry.sequence;
+        candidate.headlineOccurredAt = currentEntry.occurredAt;
+        appendCodexSectionLine(candidate, sectionLine.line, sectionLine.kind, currentEntry.occurredAt);
+        continue;
+      }
+
+      if (
+        sectionLine.kind === "separator" ||
+        sectionLine.kind === "anti_bullet" ||
+        sectionLine.kind === "info_bullet" ||
+        sectionLine.kind === "diff_or_output" ||
+        sectionLine.kind === "prompt" ||
+        sectionLine.kind === "chrome"
+      ) {
+        clearCandidate(maybeFinalizeCodexSectionCandidate(candidate, {
+          reason:
+            sectionLine.kind === "separator"
+              ? "section_closed_by_separator"
+              : sectionLine.kind === "anti_bullet"
+                ? "section_closed_by_anti_bullet"
+                : sectionLine.kind === "info_bullet"
+                  ? "section_closed_by_next_bullet"
+                  : "section_closed_by_marker",
+          entrySequence: currentEntry.sequence,
+          entryOccurredAt: currentEntry.occurredAt
+        }));
+        if (sectionLine.kind === "separator") {
+          maybeStartAnchor(currentEntry);
+        }
+        return;
+      }
+
+      appendCodexSectionLine(candidate, sectionLine.line, sectionLine.kind, currentEntry.occurredAt);
+    }
+  };
+
+  if (flush && !entry) {
+    const finalized = maybeFinalizeCodexSectionCandidate(candidate, { reason: "flush_after_section" });
+    if (finalized) {
+      clearCandidate(finalized);
+    }
+    return events;
+  }
+
+  processEntry(entry);
+  return events;
+}
+
 export function createCodexAllowlistState() {
   return {
     codexStreamSequence: 0,
-    codexSeparatorCandidate: null
+    codexSeparatorCandidate: null,
+    codexSeparatorSectionCandidate: null
   };
 }
 

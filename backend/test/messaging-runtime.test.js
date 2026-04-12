@@ -296,6 +296,43 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastDeliveredAt: 8_200
     }
   );
+  const codexSeparatorSection = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Der Restart ist sauber.\n\nLive-Zustand\n- Backend: ok",
+      comparableText: "der restart ist sauber live zustand backend ok",
+      aggregationReason: "codex_separator_section",
+      deliveryScope: "codex_separator_section",
+      deliveryBlockKey: "7:8",
+      occurredAt: 8_600
+    },
+    {
+      messageCreated: false,
+      lastEventType: "session.control.changed",
+      lastDeliveredAt: 7_000
+    }
+  );
+  const codexSeparatorSectionSameBlockUpdate = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Der Restart ist sauber.\n\nLive-Zustand\n- Backend: ok",
+      comparableText: "der restart ist sauber live zustand backend ok",
+      aggregationReason: "codex_separator_section",
+      deliveryScope: "codex_separator_section",
+      deliveryBlockKey: "7:8",
+      occurredAt: 8_800
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Vorheriger Abschnitt",
+      lastComparableText: "vorheriger abschnitt",
+      lastDeliveryBlockKey: "7:8",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 8_600
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(started.action, "suppress");
@@ -330,6 +367,10 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(codexSeparatorInfoSameBlockUpdate.reason, "codex_separator_info_block_update");
   assert.equal(codexSeparatorInfoSameTextNewBlock.action, "new");
   assert.equal(codexSeparatorInfoSameTextNewBlock.reason, "codex_separator_info_new_block");
+  assert.equal(codexSeparatorSection.action, "new");
+  assert.equal(codexSeparatorSection.reason, "codex_separator_section_new_block");
+  assert.equal(codexSeparatorSectionSameBlockUpdate.action, "update");
+  assert.equal(codexSeparatorSectionSameBlockUpdate.reason, "codex_separator_section_block_update");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -393,7 +434,7 @@ test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, 
   assert.equal(runtime.buildStatusSummary().enabled, true);
 });
 
-test("messaging runtime delivers only codex separator info candidates while generic delivery stays hard-disabled", async () => {
+test("messaging runtime delivers only codex allowlist candidates while generic delivery stays hard-disabled", async () => {
   const sends = [];
   const edits = [];
   let now = 220;
@@ -471,14 +512,45 @@ test("messaging runtime delivers only codex separator info candidates while gene
   assert.equal(edits.length, 0);
   assert.match(sends[1].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
 
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h105-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der Restart ist sauber.›Find and fix a bug in @filename gpt-5.4 xhigh · 43% left · ~/workspace/code/ptydeck\n",
+    promptBoundaries: [],
+    trace: { traceId: "h105-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  Live-Zustand\n  - Backend: ok\n  - Ready: ready\n  Wichtig\n  - Die Delivery-Counter sind nach dem Restart wieder bei 0.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h105-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "h105-4" }
+  });
+
+  assert.equal(sends.length, 3);
+  assert.match(sends[2].text, /Der Restart ist sauber\./);
+  assert.match(sends[2].text, /Live-Zustand/);
+  assert.match(sends[2].text, /Die Delivery-Counter sind nach dem Restart wieder bei 0/);
+
   const status = runtime.buildStatusSummary();
   assert.equal(status.deliveryEnabled, false);
   assert.equal(status.deliveryHardBreakActive, true);
   assert.equal(status.allowlistDeliveryActive, true);
-  assert.deepEqual(status.allowlistDeliveryScopes, ["codex_separator_info"]);
+  assert.deepEqual(status.allowlistDeliveryScopes, ["codex_separator_info", "codex_separator_section"]);
   assert.equal(status.adapters[0].deliveryEnabled, false);
   assert.equal(status.adapters[0].allowlistDeliveryActive, true);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
 });
 

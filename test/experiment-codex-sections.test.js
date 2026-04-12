@@ -138,5 +138,5 @@ test("experiment-codex-sections still rejects separator without info bullet", as
   const parsed = JSON.parse(stdout);
   assert.equal(parsed.analysis.candidates.length, 0);
   assert.equal(parsed.analysis.rejections.length, 1);
-  assert.equal(parsed.analysis.rejections[0].reason, "no_info_bullet");
+  assert.equal(parsed.analysis.rejections[0].reason, "marker_before_info");
 });

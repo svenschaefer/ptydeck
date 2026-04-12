@@ -114,8 +114,8 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send one narrow Codex-only outbound family, `codex_separator_info`, while generic outbound delivery remains hard-disabled; new separator-anchored info blocks create new posts and only the same block identity is eligible for an edit
-- normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only the narrow `codex_separator_info` family
+- send two narrow Codex-only outbound families, `codex_separator_info` and `codex_separator_section`, while generic outbound delivery remains hard-disabled; new block identities create new posts and only the same block identity is eligible for an edit
+- normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - accept the bounded inbound bot command set:
   - `/status`
@@ -134,7 +134,7 @@ The Telegram reference adapter can:
 
 The adapter does not:
 
-- broadly reactivate generic Telegram outbound delivery; outside the narrow `codex_separator_info` allowlist family, the product path still treats outbound delivery as hard-disabled
+- broadly reactivate generic Telegram outbound delivery; outside the narrow `codex_separator_info` / `codex_separator_section` allowlist families, the product path still treats outbound delivery as hard-disabled
 - bypass controller, read-only, share, or send-safety rules
 - parse open-ended free-text intent beyond direct text-to-input forwarding
 - execute Telegram text for unmapped chats/topics or for controller-denied sessions
@@ -191,15 +191,20 @@ That hard break is intentional:
 - there is intentionally no environment-variable re-enable switch at this stage
 - inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path
 
-The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined by `v0.4.0-H104`:
+The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined through `v0.4.0-H105`:
 
-- one narrow internal allowlist family, `codex_separator_info`, can be delivered even while generic `deliveryEnabled` remains false
-- that family is Codex-only and entry-level stream driven:
+- two narrow internal allowlist families, `codex_separator_info` and `codex_separator_section`, can be delivered even while generic `deliveryEnabled` remains false
+- both families are Codex-only and block-aware:
   - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination
-  - the next bounded substantial `•` block must classify as clean `info`
-  - the separator-to-info horizon is still intentionally short, but now widened to roughly `4500ms` / `120` entries for real Codex timing
-  - at most one immediate indented continuation line is merged
-  - prompt markers, footer ribbons, interrupt overlays, and anti-pattern bullets such as `Ran`, `Explored`, `Waited`, `Context compacted`, and `Updated Plan` reject the candidate
+  - `codex_separator_info` keeps the narrow simple case:
+    - the next bounded substantial `•` block must classify as clean `info`
+    - the separator-to-info horizon is still intentionally short, but now widened to roughly `4500ms` / `120` entries for real Codex timing
+    - at most one immediate indented continuation line is merged
+  - `codex_separator_section` now covers the next narrow structural case:
+    - prompt/footer/background-terminal chrome is stripped from mixed entries before section assembly
+    - the resulting separator-anchored section can retain one narrative `•` headline plus subsection labels and indented list items
+    - simple one-bullet cases stay on `codex_separator_info`; the section family is reserved for the richer narrative shape
+    - explicit section boundaries and window-state gating still reject anti-pattern bullets, prompt/footer markers, diff/output fragments, and overlay-churn windows
 - delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic `update`
 
 The shipped trigger profiles are:
@@ -421,7 +426,7 @@ Defaults and bounds:
 - `/health.messaging.adapters[0].inboundTrace` and `/ready.messaging.adapters[0].inboundTrace` expose a bounded recent Telegram inbound observation ring, including accepted `input_text` observations and unsupported/non-text messages that never become ptydeck actions.
 - `/health.messaging.adapters[0].targetTrace` and `/ready.messaging.adapters[0].targetTrace` expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.
 - `/health.messaging.deliveryEnabled` shows whether generic outbound Telegram delivery is currently allowed.
-- `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether a narrow internal outbound allowlist path such as `codex_separator_info` is active while generic `deliveryEnabled` remains false.
+- `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether narrow internal outbound allowlist paths such as `codex_separator_info` and `codex_separator_section` are active while generic `deliveryEnabled` remains false.
 - `/health.messaging.allowlistDeliveryScopes` and `/ready.messaging.allowlistDeliveryScopes` enumerate those narrow delivered scopes.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
 - `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive` and `allowlistDeliveryScopes` for the Telegram adapter itself.
