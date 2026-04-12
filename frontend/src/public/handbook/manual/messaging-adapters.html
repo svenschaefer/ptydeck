@@ -311,7 +311,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <li>that summary family now also runs behind a restart-recovery admission layer:</li>
 </ul>
 
-<p>- summary-family delivery is suppressed before <code>runtime.ready</code> - it remains suppressed through a bounded post-ready quiet window - it remains suppressed until the first fresh post-restart input for the same session - a persisted resend ledger keyed by normalized summary content plus session/thread context prevents old already-delivered summary posts from reappearing on later restarts</p>
+<p>- summary-family delivery is suppressed before <code>runtime.ready</code> - it remains suppressed through a bounded post-ready quiet window - it remains suppressed until the first fresh post-restart input observed after that quiet window for the same session - a persisted resend ledger keyed by normalized summary content plus session/thread context prevents old already-delivered summary posts from reappearing on later restarts - startup <code>coding-agent</code> restore sessions are covered even when their initial restore hint still looks like a wrapper launch such as <code>cody</code> instead of explicit <code>codex</code></p>
 
 <ul>
 <li>delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic <code>update</code></li>

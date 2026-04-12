@@ -810,7 +810,12 @@ test("messaging runtime suppresses codex summary sentence restart resends until 
   await emitSummaryCandidate("h109-quiet");
   assert.equal(sends.length, 0);
 
-  now += 100;
+  runtime.observeSessionInput(session.id, { traceId: "h112-pre-quiet-input" });
+  now += 30;
+  await emitSummaryCandidate("h112-still-waiting-after-pre-quiet-input");
+  assert.equal(sends.length, 0);
+
+  now += 70;
   await emitSummaryCandidate("h109-waiting-input");
   assert.equal(sends.length, 0);
 
@@ -828,6 +833,86 @@ test("messaging runtime suppresses codex summary sentence restart resends until 
   assert.equal(status.codexSummaryRestartRecovery.ledgerSize, 1);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_pre_ready"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_quiet_window"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+});
+
+test("messaging runtime activates summary restart recovery for coding-agent restore sessions before codex identity is confirmed", async () => {
+  const sends = [];
+  let now = 5_000;
+  const session = createSession({
+    id: "delayed-codex-session",
+    name: "infra-gcp",
+    quickIdToken: "I",
+    startCommand: "cody",
+    appIdentity: {
+      family: "unknown",
+      label: "",
+      source: "session-hints",
+      confidence: 0.2
+    }
+  });
+  const runtime = createMessagingRuntime({
+    nowFn: () => now,
+    codexSummaryRestartRecoveryQuietMs: 20,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "infra-gcp", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 480 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 481 };
+        }
+      };
+    }
+  });
+
+  async function emitSummaryCandidate(traceId, text) {
+    await runtime.observeSessionData({
+      session,
+      data: `${text}\n`,
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-text` }
+    });
+    await runtime.observeSessionData({
+      session,
+      data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+      promptBoundaries: [],
+      trace: { traceId: `${traceId}-separator` }
+    });
+  }
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h112-delayed-created" });
+  runtime.markRuntimeReady();
+  now += 25;
+  session.appIdentity = {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.99
+  };
+
+  await emitSummaryCandidate(
+    "h112-delayed-waiting",
+    "Completed and pushed multiple cycles on main with full local validation after"
+  );
+  assert.equal(sends.length, 0);
+
+  runtime.observeSessionInput(session.id, { traceId: "h112-delayed-input" });
+  now += 10;
+  await emitSummaryCandidate(
+    "h112-delayed-allowed",
+    "Completed and pushed multiple cycles on main with full local validation after"
+  );
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Completed and pushed multiple cycles on main with full local validation after/);
+
+  const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
 });

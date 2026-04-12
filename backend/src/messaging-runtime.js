@@ -733,7 +733,8 @@ function createCodexSummaryRestartRecoveryState(now) {
   return {
     active: true,
     activatedAt: now,
-    firstInputAt: 0
+    firstInputAt: 0,
+    lastInputAt: 0
   };
 }
 
@@ -1370,11 +1371,15 @@ export function createMessagingRuntime(options = {}) {
       return;
     }
     const state = codexSummaryRestartRecoveryStates.get(normalizedSessionId);
-    if (!state || Number.isInteger(state.firstInputAt) && state.firstInputAt > 0) {
+    if (!state) {
       return;
     }
-    state.firstInputAt = nowFn();
-    logDebug("messaging.summary_restart_recovery.input_observed", { sessionId: normalizedSessionId }, trace);
+    const observedAt = nowFn();
+    state.lastInputAt = observedAt;
+    if (!Number.isInteger(state.firstInputAt) || state.firstInputAt <= 0) {
+      state.firstInputAt = observedAt;
+      logDebug("messaging.summary_restart_recovery.input_observed", { sessionId: normalizedSessionId }, trace);
+    }
   }
 
   function prepareForRuntimeStart() {
@@ -1734,7 +1739,11 @@ export function createMessagingRuntime(options = {}) {
     if (codexSummaryRestartRecoveryQuietUntil > occurredAt) {
       return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_quiet_window" });
     }
-    if (!Number.isInteger(recoveryState.firstInputAt) || recoveryState.firstInputAt <= 0) {
+    if (
+      !Number.isInteger(recoveryState.lastInputAt) ||
+      recoveryState.lastInputAt <= 0 ||
+      recoveryState.lastInputAt < codexSummaryRestartRecoveryQuietUntil
+    ) {
       return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_waiting_for_input" });
     }
     const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, target);
@@ -2035,7 +2044,7 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     if (type === "session.created") {
-      if (!runtimeReadyAt && isCodexAppIdentity(session) && isCodingAgentContext(session, profile)) {
+      if (!runtimeReadyAt && isCodingAgentContext(session, profile)) {
         markSessionCodexSummaryRestartRecovery(session.id);
       }
       state.lastControlSignature = buildControlEventSignature(session);

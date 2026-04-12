@@ -6,13 +6,13 @@ This note captures the currently observed restart-resend behavior on the narrow 
 
 ## Current Product Status
 
-As of `v0.4.0-H109`, the first narrow product fix from this analysis is shipped:
+As of `v0.4.0-H112`, the narrow product fix from this analysis is shipped in its corrected live form:
 
 - only `codex_separator_summary_sentence` is restart-gated
-- Codex sessions created before runtime readiness enter per-session recovery mode
+- startup `coding-agent` sessions created before runtime readiness enter per-session recovery mode, even when their initial restore hints are wrapper commands such as `cody` and explicit `codex` identity is only confirmed later by runtime detection
 - that summary family is suppressed before `runtime.ready`
 - it also stays suppressed through a bounded post-ready quiet window
-- it stays suppressed until the first fresh post-restart input for the same session
+- it stays suppressed until the first fresh post-restart input observed after that quiet window for the same session
 - delivered summary candidates are persisted in a resend ledger keyed by normalized summary content plus session/thread context
 
 The later live restart audit now shows that this first implementation is not yet sufficient in practice:
@@ -25,7 +25,7 @@ The later live restart audit now shows that this first implementation is not yet
 - all `52` arrived before the first fresh post-restart input in the affected sessions
 - `49` of the `52` also arrived before `runtime.ready`
 
-The detailed per-message review is captured in `docs/Codex Latest Restart Delivery Review.md`. That newer live audit is the reason `v0.4.0-H112` is now queued as a corrective follow-up instead of treating `H109` as behaviorally complete.
+The detailed per-message review is captured in `docs/Codex Latest Restart Delivery Review.md`. That newer live audit was the reason `v0.4.0-H112` had to correct the first `H109` implementation instead of treating it as behaviorally complete.
 
 The stronger analysis conclusions below still matter because they explain why this gate is deliberately narrow and why `codex_separator_info` / `codex_separator_section` remain outside the recovery layer until there is equally strong evidence for those families too.
 
@@ -132,6 +132,23 @@ It is specifically:
 So the real failure mode is:
 
 - restart-time replay is crossing the delivery boundary as if it were fresh live progress
+
+## Root Causes Isolated by the 2026-04-12 Live Audit
+
+The later live audit and follow-up code inspection isolated two concrete causes for the summary-family leak:
+
+1. Some restored sessions that later emit `codex_separator_summary_sentence` do not present an explicit `codex` hint at `session.created`.
+   - Example live pattern:
+     - restore metadata such as `startCommand: "cody"`
+     - later foreground-process detection confirms `codex`
+   - A recovery activator keyed only to immediate `codex` identity will miss those sessions entirely.
+
+2. Frontend reconnect traffic can emit `POST /api/v1/sessions/{sessionId}/input` during startup before the operator has actually resumed work.
+   - That traffic is real input from the runtime's perspective.
+   - But it is not a safe signal that restart-history replay has ended.
+   - Treating any first input inside the quiet window as permission to deliver old summaries reopens the leak.
+
+Those two causes are exactly what `H112` corrects.
 
 ## Why Single-Point Fixes Are Not Enough
 

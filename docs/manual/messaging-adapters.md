@@ -257,8 +257,9 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
 - that summary family now also runs behind a restart-recovery admission layer:
   - summary-family delivery is suppressed before `runtime.ready`
   - it remains suppressed through a bounded post-ready quiet window
-  - it remains suppressed until the first fresh post-restart input for the same session
+  - it remains suppressed until the first fresh post-restart input observed after that quiet window for the same session
   - a persisted resend ledger keyed by normalized summary content plus session/thread context prevents old already-delivered summary posts from reappearing on later restarts
+  - startup `coding-agent` restore sessions are covered even when their initial restore hint still looks like a wrapper launch such as `cody` instead of explicit `codex`
 - delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic `update`
 
 The shipped trigger profiles are:
