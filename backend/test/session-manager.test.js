@@ -65,6 +65,17 @@ function createQueuedFakePtyFactory() {
   };
 }
 
+async function waitFor(predicate, timeoutMs = 200) {
+  const startedAt = Date.now();
+  while ((Date.now() - startedAt) < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms waiting for condition.`);
+}
+
 test("SessionManager create/list/get/delete lifecycle", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({
@@ -499,7 +510,7 @@ test("SessionManager marks ssh sessions offline after bounded reconnect failures
     createPty: () => queued.createPty(),
     remoteReconnectMaxAttempts: 2,
     remoteReconnectDelayMs: 5,
-    remoteReconnectStableMs: 5
+    remoteReconnectStableMs: 50
   });
 
   const created = manager.create({
@@ -514,13 +525,13 @@ test("SessionManager marks ssh sessions offline after bounded reconnect failures
   });
 
   queued.ptys[0].kill();
-  await new Promise((resolve) => setTimeout(resolve, 8));
+  await waitFor(() => queued.ptys.length === 2);
   assert.equal(queued.ptys.length, 2);
   queued.ptys[1].kill();
-  await new Promise((resolve) => setTimeout(resolve, 8));
+  await waitFor(() => queued.ptys.length === 3);
   assert.equal(queued.ptys.length, 3);
   queued.ptys[2].kill();
-  await new Promise((resolve) => setTimeout(resolve, 8));
+  await waitFor(() => manager.get(created.id).meta.remoteRuntime.connectivityState === "offline");
 
   const offline = manager.get(created.id).meta;
   assert.equal(offline.remoteRuntime.connectivityState, "offline");

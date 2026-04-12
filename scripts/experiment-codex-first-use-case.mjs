@@ -3,13 +3,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { logScriptStart } from "./lib/script-log.mjs";
-import { normalizeVisibleReplayText } from "../backend/src/replay-excerpt.js";
+import { CODEX_SEPARATOR_INFO_MAX_GAP_MS, CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES, CODEX_SEPARATOR_INFO_SCOPE, advanceCodexSeparatorInfoState, createCodexAllowlistState, createCodexStreamEntry } from "../backend/src/codex-outbound-evaluator.js";
 
 logScriptStart("scripts/experiment-codex-first-use-case.mjs");
 
 function usage() {
   console.error(
-    "Usage: node scripts/experiment-codex-first-use-case.mjs --capture-file <jsonl> [--session-name <name>] [--deck-id <deck>] [--app-label codex] [--tail-entries <count>] [--max-gap-ms 2500] [--max-lookahead 120] [--format json|text]"
+    "Usage: node scripts/experiment-codex-first-use-case.mjs --capture-file <jsonl> [--session-name <name>] [--deck-id <deck>] [--app-label codex] [--tail-entries <count>] [--format json|text]"
   );
   process.exit(1);
 }
@@ -20,8 +20,6 @@ let sessionName = "";
 let deckId = "";
 let appLabel = "codex";
 let tailEntries = 1200;
-let maxGapMs = 2500;
-let maxLookahead = 120;
 let format = "text";
 
 for (let index = 0; index < args.length; index += 1) {
@@ -51,16 +49,6 @@ for (let index = 0; index < args.length; index += 1) {
     index += 1;
     continue;
   }
-  if (value === "--max-gap-ms") {
-    maxGapMs = Number.parseInt(args[index + 1] || "", 10);
-    index += 1;
-    continue;
-  }
-  if (value === "--max-lookahead") {
-    maxLookahead = Number.parseInt(args[index + 1] || "", 10);
-    index += 1;
-    continue;
-  }
   if (value === "--format") {
     format = args[index + 1] || "";
     index += 1;
@@ -74,20 +62,12 @@ if (
   || !["json", "text"].includes(format)
   || !Number.isFinite(tailEntries)
   || tailEntries <= 0
-  || !Number.isFinite(maxGapMs)
-  || maxGapMs <= 0
-  || !Number.isFinite(maxLookahead)
-  || maxLookahead <= 0
 ) {
   usage();
 }
 
 function normalizeLineBreaks(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
-
-function normalizeWhitespace(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
 }
 
 function decodeBase64Text(encoded) {
@@ -101,141 +81,11 @@ function decodeBase64Text(encoded) {
   }
 }
 
-function isStatusRibbon(line) {
-  return /background terminal running/u.test(line) || /\/ps to view/u.test(line) || /\/stop to close/u.test(line);
-}
-
-function isTinyOverlayFragment(line) {
-  const trimmed = normalizeWhitespace(line);
-  if (!trimmed) {
-    return true;
+function formatTimestamp(timestampMs, fallback = "") {
+  if (Number.isFinite(timestampMs) && timestampMs > 0) {
+    return new Date(timestampMs).toISOString();
   }
-  if (/^•\s+\S/u.test(trimmed) || /^›\s+\S/u.test(trimmed) || /^─{40,}$/u.test(trimmed)) {
-    return false;
-  }
-  if (trimmed.length > 24) {
-    return false;
-  }
-  if (/\n/u.test(trimmed)) {
-    return false;
-  }
-  if (/^[•◦\d]+$/u.test(trimmed)) {
-    return true;
-  }
-  if (/^[A-Za-z]+$/u.test(trimmed) && trimmed.length <= 4) {
-    return true;
-  }
-  if (/^[A-Za-z•◦\d ]+$/u.test(trimmed) && trimmed.length <= 8) {
-    const tokens = trimmed.split(/\s+/u).filter(Boolean);
-    if (tokens.length > 0 && tokens.length <= 2 && tokens.every((token) => token.length <= 4)) {
-      return true;
-    }
-  }
-  if (/^[A-Za-z•◦\d]+$/u.test(trimmed) && !/\s/u.test(trimmed) && trimmed.length <= 12) {
-    return true;
-  }
-  if (/^W(?:o|or|rk|ki|in|ng|g|ait|ork|orking|aiting)+$/iu.test(trimmed)) {
-    return true;
-  }
-  return false;
-}
-
-function classifyEntryKind(visibleText) {
-  const compact = normalizeWhitespace(visibleText);
-  if (!compact) {
-    return "blank";
-  }
-  if (isStatusRibbon(compact)) {
-    return "status_ribbon";
-  }
-  if (isTinyOverlayFragment(compact)) {
-    return "overlay_fragment";
-  }
-  return "substantial";
-}
-
-function classifyBullet(headline) {
-  if (/^• Updated Plan$/u.test(headline)) {
-    return "updated_plan";
-  }
-  if (/^• Ran /u.test(headline)) {
-    return "ran";
-  }
-  if (/^• Explored$/u.test(headline)) {
-    return "explored";
-  }
-  if (/^• Waited(?: for background terminal)?/u.test(headline)) {
-    return "waited";
-  }
-  if (/^• Context compacted$/u.test(headline)) {
-    return "context_compacted";
-  }
-  return "info";
-}
-
-function isMajorSeparatorVisible(visibleText) {
-  return /^─{40,}$/u.test(normalizeWhitespace(visibleText));
-}
-
-function startsBullet(visibleText) {
-  const lines = normalizeLineBreaks(visibleText).split("\n");
-  for (const line of lines) {
-    if (!line.trim()) {
-      continue;
-    }
-    if (/^• /u.test(line)) {
-      return line;
-    }
-    return "";
-  }
-  return "";
-}
-
-function startsContinuation(visibleText) {
-  const lines = normalizeLineBreaks(visibleText).split("\n");
-  for (const line of lines) {
-    if (!line.trim()) {
-      continue;
-    }
-    return /^  /u.test(line);
-  }
-  return false;
-}
-
-function hasInlineContamination(text) {
-  const compact = normalizeWhitespace(text);
-  if (!compact) {
-    return true;
-  }
-  return (
-    /•(?:Ran|Explored|Waited|Context compacted|Updated Plan)/u.test(compact)
-    || /› /u.test(compact)
-    || /gpt-5\.4/u.test(compact)
-    || /weekly \d+%/u.test(compact)
-    || /background terminal running/u.test(compact)
-    || /esc to interrupt/u.test(compact)
-    || /\/ps to view/u.test(compact)
-    || /\/stop to close/u.test(compact)
-  );
-}
-
-function normalizeInfoPieces(headline, continuationLines) {
-  const parts = [];
-  const cleanedHeadline = String(headline || "").replace(/^•\s+/u, "").trim();
-  if (cleanedHeadline) {
-    parts.push(cleanedHeadline);
-  }
-  for (const line of continuationLines) {
-    const normalized = normalizeWhitespace(String(line || "").replace(/^  /u, ""));
-    if (!normalized) {
-      continue;
-    }
-    if (/^(?:└|│|□)\s/u.test(normalized)) {
-      continue;
-    }
-    parts.push(normalized);
-  }
-  return parts.join(" ").replace(/\s+/g, " ").trim();
+  return fallback;
 }
 
 function loadEntries(filePath, filters = {}) {
@@ -264,7 +114,6 @@ function loadEntries(filePath, filters = {}) {
       continue;
     }
     const decoded = decodeBase64Text(parsed?.cleaned?.base64 || parsed?.raw?.base64 || "");
-    const visibleText = normalizeVisibleReplayText(normalizeLineBreaks(decoded));
     entries.push({
       timestamp: typeof parsed?.timestamp === "string" ? parsed.timestamp : "",
       timestampMs: Number.parseInt(String(Date.parse(parsed?.timestamp || "")), 10) || 0,
@@ -272,114 +121,87 @@ function loadEntries(filePath, filters = {}) {
       sessionName: entrySessionName,
       deckId: entryDeckId,
       appLabel: entryAppLabel,
-      visibleText,
-      kind: classifyEntryKind(visibleText)
+      cleanedText: decoded,
+      promptBoundaries: Array.isArray(parsed?.promptBoundaries) ? parsed.promptBoundaries.filter(Number.isInteger) : []
     });
   }
   return entries;
 }
 
+function normalizeDecision(decision, entryIndex) {
+  return {
+    index: entryIndex,
+    type: decision?.type || "",
+    family: decision?.family || CODEX_SEPARATOR_INFO_SCOPE,
+    reason: typeof decision?.reason === "string" ? decision.reason : "",
+    key: typeof decision?.key === "string" ? decision.key : "",
+    text: typeof decision?.text === "string" ? decision.text : "",
+    anchorSequence: Number.isInteger(decision?.anchorSequence) ? decision.anchorSequence : 0,
+    anchorOccurredAt: Number.isFinite(decision?.anchorOccurredAt) ? decision.anchorOccurredAt : 0,
+    anchorTimestamp: formatTimestamp(decision?.anchorOccurredAt),
+    infoSequence: Number.isInteger(decision?.infoSequence) ? decision.infoSequence : 0,
+    infoOccurredAt: Number.isFinite(decision?.infoOccurredAt) ? decision.infoOccurredAt : 0,
+    infoTimestamp: formatTimestamp(decision?.infoOccurredAt),
+    entrySequence: Number.isInteger(decision?.entrySequence) ? decision.entrySequence : 0,
+    entryOccurredAt: Number.isFinite(decision?.entryOccurredAt) ? decision.entryOccurredAt : 0,
+    entryTimestamp: formatTimestamp(decision?.entryOccurredAt),
+    gapMs:
+      Number.isFinite(decision?.anchorOccurredAt) && Number.isFinite(decision?.infoOccurredAt)
+        ? Math.max(0, decision.infoOccurredAt - decision.anchorOccurredAt)
+        : null
+  };
+}
+
 function extractFirstUseCaseCandidates(entries) {
   const scoped = entries.slice(-tailEntries);
-  const candidates = [];
-  const rejections = [];
-  const antiPatternTypes = new Set(["ran", "explored", "waited", "context_compacted", "updated_plan"]);
+  const state = createCodexAllowlistState();
+  const decisions = [];
+  let decisionIndex = 0;
 
-  for (let index = 0; index < scoped.length; index += 1) {
-    const anchor = scoped[index];
-    if (anchor.kind !== "substantial" || !isMajorSeparatorVisible(anchor.visibleText)) {
-      continue;
+  const recordDecisions = (events) => {
+    for (const decision of events || []) {
+      decisions.push(normalizeDecision(decision, decisionIndex));
+      decisionIndex += 1;
     }
+  };
 
-    const anchorWindowEndMs = anchor.timestampMs + maxGapMs;
-    let chosen = null;
-    let rejectionReason = "no_following_info_block";
-
-    for (let lookahead = index + 1; lookahead < scoped.length && lookahead <= index + maxLookahead; lookahead += 1) {
-      const entry = scoped[lookahead];
-      if ((entry.timestampMs - anchor.timestampMs) > maxGapMs) {
-        rejectionReason = "gap_timeout";
-        break;
-      }
-      if (entry.kind === "blank" || entry.kind === "overlay_fragment" || entry.kind === "status_ribbon") {
-        continue;
-      }
-      if (isMajorSeparatorVisible(entry.visibleText)) {
-        rejectionReason = "next_separator_before_info";
-        break;
-      }
-      const bulletHeadline = startsBullet(entry.visibleText);
-      if (!bulletHeadline) {
-        rejectionReason = "non_bullet_substantial_before_info";
-        break;
-      }
-      const bulletType = classifyBullet(bulletHeadline);
-      if (antiPatternTypes.has(bulletType)) {
-        rejectionReason = `first_bullet_${bulletType}`;
-        break;
-      }
-      if (bulletType !== "info") {
-        rejectionReason = `first_bullet_${bulletType}`;
-        break;
-      }
-
-      const continuationLines = [];
-      for (let follow = lookahead + 1; follow < scoped.length && follow <= lookahead + 4; follow += 1) {
-        const next = scoped[follow];
-        if ((next.timestampMs - entry.timestampMs) > 500) {
-          break;
-        }
-        if (next.kind === "blank" || next.kind === "overlay_fragment" || next.kind === "status_ribbon") {
-          continue;
-        }
-        if (startsContinuation(next.visibleText)) {
-          continuationLines.push(...normalizeLineBreaks(next.visibleText).split("\n").filter((line) => line.trim()));
-          continue;
-        }
-        break;
-      }
-
-      const text = normalizeInfoPieces(
-        bulletHeadline,
-        continuationLines
-      );
-      if (!text) {
-        rejectionReason = "empty_normalized_info";
-        break;
-      }
-      if (text.length < 24 || text.length > 400) {
-        rejectionReason = "info_length_out_of_range";
-        break;
-      }
-      if (hasInlineContamination(text)) {
-        rejectionReason = "inline_contamination";
-        break;
-      }
-      chosen = {
-        anchorIndex: index,
-        anchorTimestamp: anchor.timestamp,
-        candidateIndex: lookahead,
-        candidateTimestamp: entry.timestamp,
-        gapMs: Math.max(0, entry.timestampMs - anchor.timestampMs),
-        text
-      };
-      break;
-    }
-
-    if (chosen) {
-      candidates.push(chosen);
-    } else {
-      rejections.push({
-        anchorIndex: index,
-        anchorTimestamp: anchor.timestamp,
-        reason: rejectionReason
-      });
-    }
+  for (const entry of scoped) {
+    const streamEntry = createCodexStreamEntry(
+      state,
+      entry.cleanedText,
+      entry.promptBoundaries,
+      entry.timestampMs || Date.now()
+    );
+    recordDecisions(advanceCodexSeparatorInfoState(state, streamEntry));
   }
+  recordDecisions(advanceCodexSeparatorInfoState(state, null, { flush: true }));
+
+  const candidates = decisions
+    .filter((decision) => decision.type === "candidate")
+    .map((decision) => ({
+      anchorSequence: decision.anchorSequence,
+      anchorTimestamp: decision.anchorTimestamp,
+      candidateSequence: decision.infoSequence,
+      candidateTimestamp: decision.infoTimestamp,
+      gapMs: decision.gapMs,
+      reason: decision.reason,
+      key: decision.key,
+      text: decision.text
+    }));
+  const rejections = decisions
+    .filter((decision) => decision.type === "rejection")
+    .map((decision) => ({
+      anchorSequence: decision.anchorSequence,
+      anchorTimestamp: decision.anchorTimestamp,
+      entrySequence: decision.entrySequence,
+      entryTimestamp: decision.entryTimestamp,
+      reason: decision.reason
+    }));
 
   return {
     scopedEntries: scoped.length,
-    separatorAnchors: candidates.length + rejections.length,
+    separatorAnchors: decisions.length,
+    decisions,
     candidates,
     rejections
   };
@@ -399,8 +221,8 @@ if (format === "json") {
     deckId,
     appLabel,
     tailEntries,
-    maxGapMs,
-    maxLookahead,
+    maxGapMs: CODEX_SEPARATOR_INFO_MAX_GAP_MS,
+    maxLookahead: CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES,
     totalFilteredEntries: entries.length,
     analysis
   }, null, 2));
@@ -412,8 +234,8 @@ console.log(`sessionName: ${sessionName || "(all)"}`);
 console.log(`deckId: ${deckId || "(all)"}`);
 console.log(`appLabel: ${appLabel || "(all)"}`);
 console.log(`tailEntries: ${tailEntries}`);
-console.log(`maxGapMs: ${maxGapMs}`);
-console.log(`maxLookahead: ${maxLookahead}`);
+console.log(`maxGapMs: ${CODEX_SEPARATOR_INFO_MAX_GAP_MS}`);
+console.log(`maxLookahead: ${CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES}`);
 console.log(`totalFilteredEntries: ${entries.length}`);
 console.log(`scopedEntries: ${analysis.scopedEntries}`);
 console.log(`separatorAnchors: ${analysis.separatorAnchors}`);
@@ -423,7 +245,7 @@ if (analysis.candidates.length === 0) {
   console.log("- none");
 } else {
   for (const candidate of analysis.candidates) {
-    console.log(`- ${candidate.anchorTimestamp} -> ${candidate.candidateTimestamp} (${candidate.gapMs}ms)`);
+    console.log(`- ${candidate.anchorTimestamp} -> ${candidate.candidateTimestamp} (${candidate.gapMs}ms) [${candidate.reason}]`);
     console.log(`  ${candidate.text}`);
   }
 }

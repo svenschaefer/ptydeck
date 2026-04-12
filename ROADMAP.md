@@ -20,10 +20,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Queued next waves:
   - none currently
 
-## Active Wave Order
-
-- none currently
-
 ## Sequencing Rules
 
 - Promote only explicit, concrete tasks from `TODO-OUTLOOK.md` into `TODO.md` before implementation.

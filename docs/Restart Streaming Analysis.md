@@ -91,6 +91,8 @@ node scripts/experiment-codex-first-use-case.mjs \
   --tail-entries 10000
 ```
 
+After `v0.4.0-H100`, that helper no longer carries a private approximation of the first-use-case rule. It now replays persisted JSONL capture through the same shared `backend/src/codex-outbound-evaluator.js` module that the shipped runtime uses for `codex_separator_info`, so offline candidate/rejection timelines and live runtime delivery stay aligned on separator anchors, bounded lookahead, contamination rejection, continuation merge, and candidate keys.
+
 The script parses the debug log, filters one window, and summarizes:
 
 - HTTP request volume
