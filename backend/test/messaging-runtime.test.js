@@ -333,6 +333,43 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastDeliveredAt: 8_600
     }
   );
+  const codexSeparatorSummarySentence = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Validated the allowlist remains narrow enough for the next live check.",
+      comparableText: "validated the allowlist remains narrow enough for the next live check",
+      aggregationReason: "codex_separator_summary_sentence",
+      deliveryScope: "codex_separator_summary_sentence",
+      deliveryBlockKey: "9000:9400",
+      occurredAt: 9_000
+    },
+    {
+      messageCreated: false,
+      lastEventType: "session.control.changed",
+      lastDeliveredAt: 7_000
+    }
+  );
+  const codexSeparatorSummarySentenceSameBlockUpdate = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Validated the allowlist remains narrow enough for the next live check.",
+      comparableText: "validated the allowlist remains narrow enough for the next live check",
+      aggregationReason: "codex_separator_summary_sentence",
+      deliveryScope: "codex_separator_summary_sentence",
+      deliveryBlockKey: "9000:9400",
+      occurredAt: 9_200
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Vorheriger Summary-Block",
+      lastComparableText: "vorheriger summary-block",
+      lastDeliveryBlockKey: "9000:9400",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 9_000
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(started.action, "suppress");
@@ -371,6 +408,10 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(codexSeparatorSection.reason, "codex_separator_section_new_block");
   assert.equal(codexSeparatorSectionSameBlockUpdate.action, "update");
   assert.equal(codexSeparatorSectionSameBlockUpdate.reason, "codex_separator_section_block_update");
+  assert.equal(codexSeparatorSummarySentence.action, "new");
+  assert.equal(codexSeparatorSummarySentence.reason, "codex_separator_summary_sentence_new_block");
+  assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.action, "update");
+  assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.reason, "codex_separator_summary_sentence_block_update");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -542,15 +583,49 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.match(sends[2].text, /Live-Zustand/);
   assert.match(sends[2].text, /Die Delivery-Counter sind nach dem Restart wieder bei 0/);
 
+  await runtime.observeSessionData({
+    session,
+    data: "Validated the allowlist remains narrow enough for the next live check.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "committed.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h106-4" }
+  });
+
+  assert.equal(sends.length, 4);
+  assert.match(sends[3].text, /Validated the allowlist remains narrow enough for the next live check\./);
+  assert.doesNotMatch(sends[3].text, /committed\./);
+
   const status = runtime.buildStatusSummary();
   assert.equal(status.deliveryEnabled, false);
   assert.equal(status.deliveryHardBreakActive, true);
   assert.equal(status.allowlistDeliveryActive, true);
-  assert.deepEqual(status.allowlistDeliveryScopes, ["codex_separator_info", "codex_separator_section"]);
+  assert.deepEqual(status.allowlistDeliveryScopes, [
+    "codex_separator_info",
+    "codex_separator_section",
+    "codex_separator_summary_sentence"
+  ]);
   assert.equal(status.adapters[0].deliveryEnabled, false);
   assert.equal(status.adapters[0].allowlistDeliveryActive, true);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
 });
 

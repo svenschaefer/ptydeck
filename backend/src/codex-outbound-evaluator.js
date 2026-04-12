@@ -2,6 +2,7 @@ import { normalizeVisibleReplayText } from "./replay-excerpt.js";
 
 export const CODEX_SEPARATOR_INFO_SCOPE = "codex_separator_info";
 export const CODEX_SEPARATOR_SECTION_SCOPE = "codex_separator_section";
+export const CODEX_SEPARATOR_SUMMARY_SCOPE = "codex_separator_summary_sentence";
 export const CODEX_SEPARATOR_INFO_MAX_GAP_MS = 4500;
 export const CODEX_SEPARATOR_INFO_MAX_LOOKAHEAD_ENTRIES = 120;
 export const CODEX_SEPARATOR_INFO_CONTINUATION_GAP_MS = 500;
@@ -12,6 +13,9 @@ export const CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES = 160;
 export const CODEX_SEPARATOR_SECTION_MIN_TEXT_LENGTH = 24;
 export const CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH = 1200;
 export const CODEX_SEPARATOR_SECTION_MAX_LINES = 20;
+export const CODEX_SEPARATOR_SUMMARY_MIN_TEXT_LENGTH = 40;
+export const CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH = 400;
+export const CODEX_SEPARATOR_SUMMARY_MIN_WORDS = 7;
 
 const CODING_AGENT_BULLET_PREFIX_PATTERN = /^•\s+/u;
 const CODING_AGENT_PROMPT_LINE_PATTERN = /^›\s+/u;
@@ -184,6 +188,51 @@ function hasCodexInlineContamination(text) {
     /\b(?:background terminal running|\/ps to view|\/stop to close|esc to interrupt)\b/iu.test(compact) ||
     CODING_AGENT_WORKED_FOR_PATTERN.test(compact)
   );
+}
+
+function normalizeCodexSummaryText(value) {
+  return normalizeWhitespace(normalizeLineBreaks(value).replace(/\s+\|\s+/g, " | "));
+}
+
+export function evaluateCodexSeparatorSummaryCandidate(summary, options = {}) {
+  const text = normalizeCodexSummaryText(summary);
+  const aggregationReason = normalizeWhitespace(options.aggregationReason || "");
+  const blockKey = normalizeWhitespace(options.blockKey || "");
+  const firstObservedAt = Number.isInteger(options.firstObservedAt) ? options.firstObservedAt : 0;
+  const lastObservedAt = Number.isInteger(options.lastObservedAt) ? options.lastObservedAt : 0;
+  if (aggregationReason && aggregationReason !== "separator_hint") {
+    return { ok: false, reason: "unsupported_aggregation_reason" };
+  }
+  if (!text) {
+    return { ok: false, reason: "empty_summary" };
+  }
+  if (text.includes(" | ")) {
+    return { ok: false, reason: "multi_fragment_summary" };
+  }
+  if (text.length < CODEX_SEPARATOR_SUMMARY_MIN_TEXT_LENGTH || text.length > CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH) {
+    return { ok: false, reason: "summary_length_out_of_range" };
+  }
+  const wordCount = text.split(/\s+/u).filter(Boolean).length;
+  if (wordCount < CODEX_SEPARATOR_SUMMARY_MIN_WORDS) {
+    return { ok: false, reason: "summary_too_short" };
+  }
+  if (/:$/u.test(text)) {
+    return { ok: false, reason: "summary_trailing_colon" };
+  }
+  if (hasCodexInlineContamination(text) || CODING_AGENT_DIFF_LINE_PATTERN.test(text)) {
+    return { ok: false, reason: "summary_inline_contamination" };
+  }
+  if (!/[.!?]$/u.test(text) && wordCount < CODEX_SEPARATOR_SUMMARY_MIN_WORDS + 2) {
+    return { ok: false, reason: "summary_missing_sentence_boundary" };
+  }
+  const effectiveBlockKey = blockKey || [firstObservedAt, lastObservedAt].filter(Boolean).join(":");
+  return {
+    ok: true,
+    family: CODEX_SEPARATOR_SUMMARY_SCOPE,
+    text,
+    key: `${effectiveBlockKey || "summary"}:${text}`,
+    deliveryBlockKey: effectiveBlockKey
+  };
 }
 
 function normalizeCodexInfoText(headline, continuationLine = "") {

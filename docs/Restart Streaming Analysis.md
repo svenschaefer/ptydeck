@@ -4,7 +4,7 @@
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
 
-It now also records the analysis path that led to the delivered narrow outbound families `codex_separator_info` and `codex_separator_section`, while generic Telegram outbound remains hard-disabled.
+It now also records the analysis path that led to the delivered narrow outbound families `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic Telegram outbound remains hard-disabled.
 
 The focus here is analytical only:
 

@@ -20,7 +20,7 @@ This example currently fails even though it is operator-visible and semantically
 
 The current `codex_separator_info` path is too close to raw chunk boundaries.
 
-That specific gap is now partially closed in the shipped `v0.4.0-H105` follow-up: the product now also includes the narrow `codex_separator_section` family, which applies chrome stripping plus bounded separator-anchored section assembly before delivery. The remaining value of this concept document is the broader architectural direction beyond those two shipped narrow Codex families.
+That specific gap is now partially closed in the shipped `v0.4.0-H105` and `v0.4.0-H106` follow-ups: the product now also includes the narrow `codex_separator_section` and `codex_separator_summary_sentence` families, which add chrome-stripped separator-anchored section assembly and strict separator-hint sentence-summary delivery before broader outbound activation. The remaining value of this concept document is the broader architectural direction beyond those shipped narrow Codex families.
 
 It assumes:
 

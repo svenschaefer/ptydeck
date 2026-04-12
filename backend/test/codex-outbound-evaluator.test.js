@@ -5,8 +5,10 @@ import {
   advanceCodexSeparatorInfoState,
   CODEX_SEPARATOR_INFO_MAX_GAP_MS,
   CODEX_SEPARATOR_SECTION_SCOPE,
+  CODEX_SEPARATOR_SUMMARY_SCOPE,
   createCodexAllowlistState,
-  createCodexStreamEntry
+  createCodexStreamEntry,
+  evaluateCodexSeparatorSummaryCandidate
 } from "../src/codex-outbound-evaluator.js";
 
 function feed(state, text, occurredAt, promptBoundaries = []) {
@@ -174,4 +176,41 @@ test("codex section evaluator keeps single-bullet simple cases on the info-only 
   assert.equal(finalized.length, 1);
   assert.equal(finalized[0].type, "rejection");
   assert.equal(finalized[0].reason, "section_too_shallow");
+});
+
+test("codex summary evaluator accepts separator-hint sentence summaries with stable block identity", () => {
+  const evaluated = evaluateCodexSeparatorSummaryCandidate(
+    "Der Restart ist sauber und die Allowlist bleibt eng genug für den nächsten Live-Check.",
+    {
+      aggregationReason: "separator_hint",
+      firstObservedAt: 9_000,
+      lastObservedAt: 9_400
+    }
+  );
+
+  assert.equal(evaluated.ok, true);
+  assert.equal(evaluated.family, CODEX_SEPARATOR_SUMMARY_SCOPE);
+  assert.equal(evaluated.deliveryBlockKey, "9000:9400");
+  assert.match(evaluated.key, /^9000:9400:/);
+});
+
+test("codex summary evaluator rejects short or fragmented separator-hint summaries", () => {
+  const short = evaluateCodexSeparatorSummaryCandidate("committed.", {
+    aggregationReason: "separator_hint",
+    firstObservedAt: 10_000,
+    lastObservedAt: 10_200
+  });
+  const fragmented = evaluateCodexSeparatorSummaryCandidate(
+    "Validated target apps: | committed.",
+    {
+      aggregationReason: "separator_hint",
+      firstObservedAt: 10_300,
+      lastObservedAt: 10_500
+    }
+  );
+
+  assert.equal(short.ok, false);
+  assert.equal(short.reason, "summary_length_out_of_range");
+  assert.equal(fragmented.ok, false);
+  assert.equal(fragmented.reason, "multi_fragment_summary");
 });

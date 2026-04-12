@@ -499,7 +499,11 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
   const adapter = createTelegramAdapter({
     configured: true,
     deliveryEnabled: false,
-    allowlistDeliveryScopes: ["codex_separator_info", "codex_separator_section"],
+    allowlistDeliveryScopes: [
+      "codex_separator_info",
+      "codex_separator_section",
+      "codex_separator_summary_sentence"
+    ],
     configuredTargets: 1,
     nowFn: () => 886,
     transport: {
@@ -518,16 +522,20 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
     target: { chatId: "-1001" },
     decision: { action: "update", messageKey: "status" },
     threadKey: "status",
-    text: "codex separator section candidate",
-    aggregationReason: "codex_separator_section",
-    deliveryScope: "codex_separator_section"
+    text: "codex separator summary candidate",
+    aggregationReason: "codex_separator_summary_sentence",
+    deliveryScope: "codex_separator_summary_sentence"
   });
 
   assert.equal(result.delivered, true);
   assert.deepEqual(calls.map((entry) => entry.method), ["send"]);
   assert.equal(adapter.getStatus().deliveryEnabled, false);
   assert.equal(adapter.getStatus().allowlistDeliveryActive, true);
-  assert.deepEqual(adapter.getStatus().allowlistDeliveryScopes, ["codex_separator_info", "codex_separator_section"]);
+  assert.deepEqual(adapter.getStatus().allowlistDeliveryScopes, [
+    "codex_separator_info",
+    "codex_separator_section",
+    "codex_separator_summary_sentence"
+  ]);
 });
 
 test("telegram adapter rejects channel targets for deck-session provisioning with a clear error", async () => {

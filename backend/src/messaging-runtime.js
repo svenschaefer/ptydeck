@@ -4,10 +4,13 @@ import {
   CODEX_SEPARATOR_INFO_SCOPE,
   CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH,
   CODEX_SEPARATOR_SECTION_SCOPE,
+  CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH,
+  CODEX_SEPARATOR_SUMMARY_SCOPE,
   advanceCodexSeparatorSectionState,
   createCodexAllowlistState,
   createCodexStreamEntry,
-  advanceCodexSeparatorInfoState
+  advanceCodexSeparatorInfoState,
+  evaluateCodexSeparatorSummaryCandidate
 } from "./codex-outbound-evaluator.js";
 import { ApiError } from "./errors.js";
 import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-excerpt.js";
@@ -33,7 +36,11 @@ const ATTENTION_DUPLICATE_SUPPRESSION_WINDOW_MS = 10_000;
 const REPEATED_IDLE_SUPPRESSION_WINDOW_MS = 60_000;
 const STARTUP_CHATTER_SUPPRESSION_WINDOW_MS = 15_000;
 const TELEGRAM_TOPIC_NAME_MAX_LENGTH = 128;
-const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([CODEX_SEPARATOR_INFO_SCOPE, CODEX_SEPARATOR_SECTION_SCOPE]);
+const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([
+  CODEX_SEPARATOR_INFO_SCOPE,
+  CODEX_SEPARATOR_SECTION_SCOPE,
+  CODEX_SEPARATOR_SUMMARY_SCOPE
+]);
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
@@ -640,11 +647,16 @@ function createSessionStreamState() {
     lastNonMeaningfulActivityAt: 0,
     ...createCodexAllowlistState(),
     lastCodexSeparatorCandidateKey: "",
-    lastCodexSeparatorSectionCandidateKey: ""
+    lastCodexSeparatorSectionCandidateKey: "",
+    lastCodexSeparatorSummaryCandidateKey: ""
   };
 }
 
 function buildCodexSeparatorDeliveryBlockKey(decision) {
+  const explicitBlockKey = normalizeNonEmptyString(decision?.deliveryBlockKey);
+  if (explicitBlockKey) {
+    return explicitBlockKey;
+  }
   if (!Number.isInteger(decision?.anchorSequence) || !Number.isInteger(decision?.infoSequence)) {
     return "";
   }
@@ -652,7 +664,11 @@ function buildCodexSeparatorDeliveryBlockKey(decision) {
 }
 
 function isCodexAllowlistScope(deliveryScope) {
-  return deliveryScope === CODEX_SEPARATOR_INFO_SCOPE || deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE;
+  return (
+    deliveryScope === CODEX_SEPARATOR_INFO_SCOPE ||
+    deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE ||
+    deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
+  );
 }
 
 function pushRecentLine(state, line) {
@@ -1435,20 +1451,28 @@ export function createMessagingRuntime(options = {}) {
 
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
     const deliveryScope = normalizeNonEmptyString(decision?.family);
-    const maxLength = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-      ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH
-      : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
+    const maxLength =
+      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+        ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH
+        : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
+          ? CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH
+          : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
     const normalizedText = truncateSummary(decision?.text, maxLength);
     const candidateKey = normalizeNonEmptyString(decision?.key);
     const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
-    const lastCandidateKey = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-      ? state.lastCodexSeparatorSectionCandidateKey
-      : state.lastCodexSeparatorCandidateKey;
+    const lastCandidateKey =
+      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+        ? state.lastCodexSeparatorSectionCandidateKey
+        : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
+          ? state.lastCodexSeparatorSummaryCandidateKey
+          : state.lastCodexSeparatorCandidateKey;
     if (!normalizedText || candidateKey === lastCandidateKey) {
       return null;
     }
     if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
       state.lastCodexSeparatorSectionCandidateKey = candidateKey;
+    } else if (deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE) {
+      state.lastCodexSeparatorSummaryCandidateKey = candidateKey;
     } else {
       state.lastCodexSeparatorCandidateKey = candidateKey;
     }
@@ -1468,6 +1492,18 @@ export function createMessagingRuntime(options = {}) {
         comparableText: createComparableText(normalizedText)
       })
     );
+  }
+
+  function buildCodexSummaryAllowlistDecision(session, profile, block, summary, aggregationReason) {
+    if (aggregationReason !== "separator_hint" || !isCodexAppIdentity(session) || !isCodingAgentContext(session, profile)) {
+      return null;
+    }
+    const evaluated = evaluateCodexSeparatorSummaryCandidate(summary, {
+      aggregationReason,
+      firstObservedAt: block?.firstObservedAt,
+      lastObservedAt: block?.lastObservedAt
+    });
+    return evaluated?.ok ? evaluated : null;
   }
 
   async function advanceCodexAllowlistCandidate(session, profile, state, trace, entry, { flush = false } = {}) {
@@ -1495,10 +1531,14 @@ export function createMessagingRuntime(options = {}) {
       return null;
     }
     const summary = truncateSummary(block.fragments.join(" | "));
+    const codexAllowlistDecision = buildCodexSummaryAllowlistDecision(session, profile, block, summary, aggregationReason);
     state.pendingSummaryBlock = createPendingSummaryBlock();
     state.recentLines = [];
     if (!summary) {
       return null;
+    }
+    if (codexAllowlistDecision) {
+      return dispatchCodexAllowlistCandidate(session, profile, state, trace, codexAllowlistDecision);
     }
     const noise = classifyNoiseSignature(summary, session, profile);
     return dispatchEvent(
