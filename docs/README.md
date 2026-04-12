@@ -175,6 +175,7 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/experiment-codex-window-states.mjs` when classifying whether a real Codex capture tail is still `restart_remount`, only `overlay_churn`, already a `stable_section`, or in a mixed transition between those states
     - use the companion helper script `scripts/experiment-codex-first-use-case.mjs` when validating or refining the delivered `H99`/`H104` narrow Codex-only separator-anchored outbound candidate rule directly against persisted entry-level raw-stream capture; after `H100`, that script now replays capture through the same shared evaluator the runtime uses for `codex_separator_info`
     - use the companion helper script `scripts/experiment-codex-sections.mjs` when validating or refining the delivered `H105` section family against persisted capture; it now replays through the same shared evaluator the runtime uses for `codex_separator_section`
+    - use the companion helper script `scripts/analyze-restart-resends.mjs` together with `docs/Codex Restart Resend Analysis.md` when analyzing whether old Codex Telegram posts were replayed during backend startup and when comparing startup-quiet versus persisted-history suppression strategies before changing the runtime
     - use `docs/examples/codex-terminal-dump-*.txt` as tracked operator-visible transcript fixtures for offline analysis of rendered Codex block grammar; they are visual dump references, not implementation-status documents and not raw PTY capture
 
 ## Consolidation Outcome
