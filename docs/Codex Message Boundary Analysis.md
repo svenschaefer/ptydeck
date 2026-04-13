@@ -318,6 +318,35 @@ In practical terms, the correct end criteria for the larger message unit are:
 - next separator
 - prompt/chrome boundary
 - explicit flush
+
+## 2026-04-13 Follow-up: Boundary Rules Are Not Sufficient for Telegram Replies
+
+The later live Telegram case `Wie geht’s weiter?` proved that message-boundary refinement alone is not enough.
+
+What happened in that window:
+
+- Telegram input was received correctly in the mapped `ptydeck + ptydeck` topic
+- the message was accepted and written into the mapped session
+- Codex emitted a meaningful answer sentence into the PTY stream
+- that answer still did not become a Telegram message
+
+The reason was not a failed boundary close on a separator-anchored block.
+The reason was that the answer was not separator-anchored at all.
+It appeared inside ongoing plan/list output, so it matched none of the currently shipped narrow families:
+
+- not `codex_separator_info`
+- not `codex_separator_section`
+- not `codex_separator_summary_sentence`
+
+This means the product currently has two distinct outbound problems:
+
+1. separator-anchored multi-line closing comments need better ownership between `info` and `section`
+2. Telegram free-text questions need a bounded reply-correlated outbound path that does not depend on separator anchoring
+
+So the current next-step ordering is:
+
+1. add a Telegram-input-correlated reply candidate path for bounded free-text questions
+2. then continue with the narrower separator-boundary refinement work
 - bounded gap/lookahead exhaustion only as fallback
 
 That is the message boundary model that best matches the current transcript evidence.
