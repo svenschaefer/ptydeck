@@ -161,8 +161,8 @@ test("codex section evaluator assembles a structured restart section from mixed 
   assert.equal(finalized[0].reason, "section_closed_by_anti_bullet");
   assert.equal(finalized[0].windowState, "stable_section");
   assert.match(finalized[0].text, /^Der Restart ist sauber\./);
-  assert.match(finalized[0].text, /\n\nLive-Zustand\n- Backend: ok\n- Ready: ready/);
-  assert.match(finalized[0].text, /\n\nWichtig\n- Die Delivery-Counter sind nach dem Restart wieder bei 0\./);
+  assert.match(finalized[0].text, /\n\nLive-Zustand\n\n- Backend: ok\n- Ready: ready/);
+  assert.match(finalized[0].text, /\n\nWichtig\n\n- Die Delivery-Counter sind nach dem Restart wieder bei 0\./);
 });
 
 test("codex section evaluator assembles a deep multiline section from an implicit contaminated bullet start", () => {
@@ -194,8 +194,8 @@ test("codex section evaluator assembles a deep multiline section from an implici
   assert.equal(finalized[0].family, CODEX_SEPARATOR_SECTION_SCOPE);
   assert.equal(finalized[0].reason, "section_closed_by_marker");
   assert.match(finalized[0].text, /^H118 is delivered and pushed\./);
-  assert.match(finalized[0].text, /\n\nCommit\n- d394e92 feat: add messaging policy replay harness/);
-  assert.match(finalized[0].text, /\n\nWhat changed\n- Added shared thread-policy-state helpers/);
+  assert.match(finalized[0].text, /\n\nCommit\n\n- d394e92 feat: add messaging policy replay harness/);
+  assert.match(finalized[0].text, /\n\nWhat changed\n\n- Added shared thread-policy-state helpers/);
 });
 
 test("codex section evaluator keeps single-bullet simple cases on the info-only path", () => {
@@ -320,5 +320,5 @@ test("codex section evaluator finalizes a structured section before the next sep
   assert.equal(finalized[0].family, CODEX_SEPARATOR_SECTION_SCOPE);
   assert.equal(finalized[0].reason, "section_closed_by_separator");
   assert.match(finalized[0].text, /^Der Restart ist sauber\./);
-  assert.match(finalized[0].text, /\n\nLive-Zustand\n- Backend: ok/);
+  assert.match(finalized[0].text, /\n\nLive-Zustand\n\n- Backend: ok/);
 });

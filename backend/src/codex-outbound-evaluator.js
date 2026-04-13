@@ -26,8 +26,8 @@ const CODING_AGENT_DIFF_LINE_PATTERN = /^(?:@@|\+\+\+|---|\+ |- |\d+\s*[+-])/u;
 const CODING_AGENT_WORKED_FOR_PATTERN = /^─+\s*Worked for\b/iu;
 const CODING_AGENT_INTERRUPT_OVERLAY_PATTERN = /\b(?:esc to interrupt|interrupt to stop|background terminal running|\/ps to view|\/stop to close)\b/iu;
 const CODING_AGENT_MAJOR_SEPARATOR_PATTERN = /^─{40,}$/u;
-const CODING_AGENT_SECTION_LIST_ITEM_PATTERN = /^-\s+/u;
-const CODING_AGENT_SECTION_SUBSECTION_PATTERN = /^[A-ZÄÖÜ][\p{L}\p{N}\- ]{2,80}$/u;
+const CODING_AGENT_SECTION_LIST_ITEM_PATTERN = /^(?:-\s+|\d+\.\s+)/u;
+const CODING_AGENT_SECTION_SUBSECTION_PATTERN = /^[A-ZÄÖÜ][\p{L}\p{N}\- ]{2,80}:?$/u;
 
 function normalizeLineBreaks(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -442,7 +442,7 @@ function normalizeCodexSectionLines(lines = []) {
       if (
         normalizedLines.length > 0 &&
         normalizedLines[normalizedLines.length - 1] !== "" &&
-        (previousKind === "info_bullet" || previousKind === "text")
+        (previousKind === "info_bullet" || previousKind === "text" || previousKind === "subsection")
       ) {
         normalizedLines.push("");
       }
@@ -451,9 +451,17 @@ function normalizeCodexSectionLines(lines = []) {
       continue;
     }
     if (kind === "text") {
-      if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "" && previousKind !== "subsection") {
+      if (
+        normalizedLines.length > 0 &&
+        normalizedLines[normalizedLines.length - 1] !== "" &&
+        previousKind !== "subsection" &&
+        previousKind !== "list_item"
+      ) {
         normalizedLines[normalizedLines.length - 1] = `${normalizedLines[normalizedLines.length - 1]} ${line}`.trim();
       } else {
+        if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "" && previousKind === "list_item") {
+          normalizedLines.push("");
+        }
         normalizedLines.push(line);
       }
       previousKind = "text";

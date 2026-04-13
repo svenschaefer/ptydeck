@@ -903,14 +903,200 @@ test("messaging runtime assembles a multiline codex closing block from an implic
 
   assert.equal(sends.length, 1);
   assert.match(sends[0].text, /^\[7\] ptydeck: H118 is delivered and pushed\./);
-  assert.match(sends[0].text, /\n\nCommit\n- d394e92 feat: add messaging policy replay harness/);
-  assert.match(sends[0].text, /\n\nWhat changed\n- Added shared thread-policy-state helpers/);
+  assert.match(sends[0].text, /\n\nCommit\n\n- d394e92 feat: add messaging policy replay harness/);
+  assert.match(sends[0].text, /\n\nWhat changed\n\n- Added shared thread-policy-state helpers/);
   assert.match(sends[0].text, /- Supports strict f/u);
+  assert.ok(sends[0].text.length > 250);
+  assert.doesNotMatch(sends[0].text, /ein…$/u);
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_required"));
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "status_update"));
+});
+
+test("messaging runtime keeps multiline section formatting and family length instead of generic 280-char truncation", async () => {
+  const sends = [];
+  let now = 11_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 880 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 881 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "section-format-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Die H120-Änderungen sind damit live.›Use /skills to list available skills gpt-5.4 xhigh · 54% left\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\nDie nächsten sinnvollen Feldchecks sind:\n\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "1. der frühere 15:51/16:03-Fall: kein stale Reply mehr aus Alt-Residue oder Input-Echo\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "2. ein normaler freier Reply nach lokalem/REST-Submit: erste echte Codex-Antwort sollte nach Telegram gehen\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "3. ein größerer mehrzeiliger Abschlussblock: weiter als codex_separator_section, nicht fragmentiert\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-6" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\nWenn der nächste auffällige Telegram- oder Terminal-Fall kommt, analysiere ich ihn direkt gegen die Live-Logs.\n",
+    promptBoundaries: [],
+    trace: { traceId: "section-format-7" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\n",
+    promptBoundaries: [0],
+    trace: { traceId: "section-format-8" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /^\[7\] ptydeck: Die H120-Änderungen sind damit live\./);
+  assert.match(sends[0].text, /\n\nDie nächsten sinnvollen Feldchecks sind:\n\n1\. der frühere 15:51\/16:03-Fall/u);
+  assert.match(sends[0].text, /\n2\. ein normaler freier Reply nach lokalem\/REST-Submit/u);
+  assert.match(sends[0].text, /\n3\. ein größerer mehrzeiliger Abschlussblock: weiter als codex_separator_section, nicht fragmentiert/u);
+  assert.match(sends[0].text, /\n\nWenn der nächste auffällige Telegram- oder Terminal-Fall kommt, analysiere ich ihn direkt gegen die Live-Logs\./u);
+  assert.ok(sends[0].text.length > 450);
+  assert.doesNotMatch(sends[0].text, /Use \/skills/u);
+});
+
+test("messaging runtime truncates oversized codex replies in the middle so both start and end remain visible", async () => {
+  const sends = [];
+  let now = 12_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 920 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 921 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "reply-middle-truncation-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "reply-middle-open",
+    correlationId: "req-reply-middle",
+    replyPromotionEligible: true
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• Beginn des großen Reply-Blocks.›Use /skills to list available skills gpt-5.4 xhigh · 54% left\n",
+    promptBoundaries: [],
+    trace: { traceId: "reply-middle-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Status\n",
+    promptBoundaries: [],
+    trace: { traceId: "reply-middle-2" }
+  });
+  for (let index = 1; index <= 3; index += 1) {
+    await runtime.observeSessionData({
+      session,
+      data: `${index}. Dieser Listenpunkt erweitert den Telegram-Text bewusst über die Familiengrenze hinaus und hält den Mittelteil stabil für den Trunkierungstest.\n`,
+      promptBoundaries: [],
+      trace: { traceId: `reply-middle-list-${index}` }
+    });
+  }
+  await runtime.observeSessionData({
+    session,
+    data:
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Dieser abschließende Absatz liefert zusätzlichen Fülltext für die Telegram-Kürzung und hält das Ende stabil. " +
+      "Der abschließende Endmarker bleibt sichtbar und muss trotz Kürzung erhalten bleiben.\n",
+    promptBoundaries: [],
+    trace: { traceId: "reply-middle-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\n",
+    promptBoundaries: [],
+    trace: { traceId: "reply-middle-4" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /^\[7\] ptydeck: Beginn des großen Reply-Blocks\./);
+  assert.match(sends[0].text, /Der abschließende Endmarker bleibt sichtbar und muss trotz Kürzung erhalten bleiben\.$/u);
+  assert.match(sends[0].text, /…/u);
+  assert.ok(sends[0].text.length <= 1_220);
+  assert.doesNotMatch(sends[0].text, /Use \/skills/u);
 });
 
 test("messaging runtime correlates the next substantial telegram question reply before later codex workflow chatter", async () => {

@@ -240,30 +240,41 @@ function truncateSummary(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+function truncateMiddleNormalizedText(normalized, maxLength) {
+  if (!normalized) {
+    return "";
+  }
+  if (!Number.isInteger(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
+    return normalized;
+  }
+  if (maxLength <= 5) {
+    return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+  }
+  const available = maxLength - 1;
+  const headLength = Math.max(1, Math.ceil(available * 0.6));
+  const tailLength = Math.max(1, available - headLength);
+  const head = normalized.slice(0, headLength).trimEnd();
+  const tail = normalized.slice(Math.max(headLength, normalized.length - tailLength)).trimStart();
+  return tail ? `${head}…${tail}` : `${head}…`;
+}
+
 function truncateStructuredMessageText(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
   const normalized = normalizeLineBreaks(value)
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
-  if (!normalized) {
-    return "";
-  }
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+  return truncateMiddleNormalizedText(normalized, maxLength);
+}
+
+function truncateDisplayText(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
+  const normalized = normalizeVisibleReplayText(value).replace(/\s+/g, " ").trim();
+  return truncateMiddleNormalizedText(normalized, maxLength);
 }
 
 function truncateResponseText(value, maxLength = MAX_INBOUND_RESPONSE_TEXT_LENGTH) {
   const normalized = typeof value === "string" ? value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() : "";
-  if (!normalized) {
-    return "";
-  }
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+  return truncateMiddleNormalizedText(normalized, maxLength);
 }
 
 function truncateTraceText(value, maxLength = 240) {
@@ -583,6 +594,18 @@ function sanitizeMessageCandidate(value, session, profile) {
     return "";
   }
   return truncateSummary(trimCodingAgentLowValueTail(stripTerminalNoiseFragments(normalized), session, profile));
+}
+
+function sanitizeCodexTelegramReplyLineCandidate(value, session, profile) {
+  const normalized = normalizeWhitespace(String(value || ""));
+  if (!normalized) {
+    return "";
+  }
+  const trimmed = trimCodingAgentLowValueTail(stripTerminalNoiseFragments(normalized), session, profile);
+  if (!trimmed) {
+    return "";
+  }
+  return truncateMiddleNormalizedText(trimmed, CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH * 2);
 }
 
 function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profile) {
@@ -1115,13 +1138,15 @@ function createEvent({
   noiseClass = "",
   comparableText = "",
   deliveryScope = "",
-  deliveryBlockKey = ""
+  deliveryBlockKey = "",
+  summaryMaxLength = MAX_EVENT_SUMMARY_LENGTH,
+  preserveStructuredSummary = false
 }) {
   const normalizedDeliveryScope = normalizeNonEmptyString(deliveryScope);
   const textSummary =
-    normalizedDeliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-      ? truncateStructuredMessageText(summary)
-      : truncateSummary(summary);
+    preserveStructuredSummary || normalizedDeliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+      ? truncateStructuredMessageText(summary, summaryMaxLength)
+      : truncateSummary(summary, summaryMaxLength);
   const label = buildSessionLabel(session);
   const text = textSummary ? `${label}: ${textSummary}` : label;
   const normalizedComparableText = comparableText || createComparableText(textSummary || text);
@@ -2225,7 +2250,7 @@ export function createMessagingRuntime(options = {}) {
         : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
           ? CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH
           : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
-    const normalizedText = truncateSummary(decision?.text, maxLength);
+    const normalizedText = truncateDisplayText(decision?.text, maxLength);
     const deliveredText =
       deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
         ? truncateStructuredMessageText(decision?.text, maxLength)
@@ -2255,7 +2280,9 @@ export function createMessagingRuntime(options = {}) {
       aggregationReason: deliveryScope,
       deliveryScope,
       deliveryBlockKey,
-      comparableText: createComparableText(deliveredText)
+      comparableText: createComparableText(deliveredText),
+      summaryMaxLength: maxLength,
+      preserveStructuredSummary: deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText)
     });
     const target = resolveTarget(session);
     if (
@@ -2684,9 +2711,13 @@ export function createMessagingRuntime(options = {}) {
       );
     }
     async function consumeCompletedLine(line) {
+      const replyVisibleLine = sanitizeCodexTelegramReplyLineCandidate(line, session, profile);
+      if (await observeCodexTelegramReplyLine(session, profile, state, trace, replyVisibleLine)) {
+        pushRecentLine(state, replyVisibleLine);
+        return;
+      }
       const visibleLine = sanitizeMessageCandidate(line, session, profile);
-      if (await observeCodexTelegramReplyLine(session, profile, state, trace, visibleLine)) {
-        pushRecentLine(state, visibleLine);
+      if (!visibleLine) {
         return;
       }
       if (shouldDeferLineClassificationToCodexSectionAssembly(session, profile, state, visibleLine)) {
