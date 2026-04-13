@@ -5614,18 +5614,23 @@ export function createRuntime(config) {
       sessionId
     };
     const normalizedData = typeof data === "string" ? data : "";
+    const replyInputText = normalizedData.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+$/g, "").trim();
     const useDelayedSubmit = /\r$/.test(normalizedData);
     const replyPromotionEligible = /[\r\n]/.test(normalizedData);
     if (useDelayedSubmit) {
       const body = normalizedData.replace(/\r+$/g, "");
       if (body) {
-        manager.sendInput(sessionId, body, { trace });
+        messagingRuntime.observeSessionInput(sessionId, replyInputText ? { ...trace, replyInputText } : trace);
+        manager.sendInput(sessionId, body, {
+          trace: replyInputText ? { ...trace, replyInputText } : trace
+        });
       }
       return new Promise((resolve) => {
         setTimeout(() => {
           const submitTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
-          manager.sendInput(sessionId, "\r", { trace: submitTrace });
-          messagingRuntime.observeSessionInput(sessionId, submitTrace);
+          const enrichedSubmitTrace = replyInputText ? { ...submitTrace, replyInputText } : submitTrace;
+          messagingRuntime.observeSessionInput(sessionId, enrichedSubmitTrace);
+          manager.sendInput(sessionId, "\r", { trace: enrichedSubmitTrace });
           recordSessionLastInput(sessionId, null, null);
           broadcastSessionUpdated(sessionId, options.trace || null);
           resolve(getApiSessionOrThrow(sessionId));
@@ -5633,8 +5638,9 @@ export function createRuntime(config) {
       });
     }
     const inputTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
-    manager.sendInput(sessionId, normalizedData, { trace: inputTrace });
-    messagingRuntime.observeSessionInput(sessionId, inputTrace);
+    const enrichedInputTrace = replyInputText ? { ...inputTrace, replyInputText } : inputTrace;
+    messagingRuntime.observeSessionInput(sessionId, enrichedInputTrace);
+    manager.sendInput(sessionId, normalizedData, { trace: enrichedInputTrace });
     recordSessionLastInput(sessionId, null, null);
     broadcastSessionUpdated(sessionId, options.trace || null);
     return getApiSessionOrThrow(sessionId);
@@ -6895,15 +6901,18 @@ function tryCreateRestoredSession({
       if (match.kind === "input") {
         getApiSessionOrThrow(match.params.sessionId, auth);
         ensureSessionControllerAccess(match.params.sessionId, auth, req, "send terminal input");
+        const normalizedReplyInputText =
+          typeof body.data === "string" ? body.data.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+$/g, "").trim() : "";
         const inputTrace = {
           ...requestTraceContext,
           sessionId: match.params.sessionId,
-          ...(typeof body.data === "string" && /[\r\n]/.test(body.data) ? { replyPromotionEligible: true } : {})
+          ...(typeof body.data === "string" && /[\r\n]/.test(body.data) ? { replyPromotionEligible: true } : {}),
+          ...(normalizedReplyInputText ? { replyInputText: normalizedReplyInputText } : {})
         };
+        messagingRuntime.observeSessionInput(match.params.sessionId, inputTrace);
         manager.sendInput(match.params.sessionId, body.data, {
           trace: inputTrace
         });
-        messagingRuntime.observeSessionInput(match.params.sessionId, inputTrace);
         recordSessionLastInput(match.params.sessionId, auth, req);
         broadcastSessionUpdated(match.params.sessionId, {
           ...requestTraceContext,

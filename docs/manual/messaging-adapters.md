@@ -158,7 +158,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, and larger Codex closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals
+- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger Codex closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals, and submitted-input reply promotion now rejects stale PTY carryover plus echoed operator input before the first real Codex answer line is delivered
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
@@ -236,6 +236,7 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
     - the runtime assembles the next substantial Codex answer block directly from the PTY line stream instead of waiting for a separator anchor
     - structural planning/meta fragments such as `MSG-063 Owner QA` or `In ROADMAP.md:` are skipped until the first real answer appears
     - observed inline prompt chrome such as `›Explain this codebase ...` is stripped from the first captured answer line before delivery
+    - stale pre-submit PTY carryover, pure input echo, and prompt-echo tails such as `› ok, was machen wir dann jetzt da Find and fix a bug in @filename` are now rejected before the reply block starts, so delayed-submit local or REST flows cannot consume leftover terminal residue as the first Telegram-visible reply
     - later separator-family chatter cannot jump ahead of that first reply while the reply window is still active
   - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination
   - `codex_separator_info` keeps the narrow simple case:

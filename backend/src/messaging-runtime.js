@@ -48,6 +48,7 @@ const CODEX_SUMMARY_RESTART_RESEND_LEDGER_TTL_MS = 24 * 60 * 60 * 1000;
 const CODEX_SUMMARY_RESTART_RESEND_LEDGER_MAX_ENTRIES = 1000;
 const CODEX_TELEGRAM_REPLY_SCOPE = "codex_input_reply";
 const CODEX_TELEGRAM_REPLY_WINDOW_MS = 45_000;
+const CODEX_TELEGRAM_REPLY_INPUT_CARRYOVER_WINDOW_MS = 2_000;
 const CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH = 24;
 const CODEX_TELEGRAM_REPLY_MIN_WORDS = 5;
 const CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH = 1200;
@@ -65,6 +66,8 @@ const WINDOWS_OR_POSIX_PATH_PATTERN = /(?:[A-Za-z]:\\|\/)[^\s|·•]+/g;
 const MODEL_TOKEN_PATTERN = /\b(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b/gi;
 const BUDGET_TOKEN_PATTERN = /\b\d{1,3}%\s+(?:left|used|remaining)\b/gi;
 const EFFORT_TOKEN_PATTERN = /\b(?:xhigh|high|medium|low)\b/gi;
+const CODEX_REPLY_PROMPT_ECHO_TAIL_PATTERN =
+  /(?:@filename|\b(?:find and fix a bug|explain this codebase|review on my current changes)\b|\b(?:gpt-[\w.-]+|claude(?:-[\w.-]+)?|gemini(?:-[\w.-]+)?)\b|\b(?:xhigh|high|medium|low)\b|\b\d{1,3}%\s+(?:left|used|remaining)\b)/i;
 const LOW_INFORMATION_FRAGMENT_PATTERN =
   /^(?:<(?:path|model|budget|effort|agent)>|\b(?:left|remaining|context|cwd|dir|session|thread)\b|\||·|•)+$/i;
 const PARTIAL_TERMINAL_CONTROL_PATTERN =
@@ -207,6 +210,14 @@ function normalizeWhitespace(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeReplyPromotionInputText(value) {
+  return normalizeWhitespace(normalizeLineBreaks(value));
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function normalizePositiveInteger(value) {
   if (Number.isInteger(value) && value > 0) {
     return value;
@@ -331,6 +342,8 @@ function createPendingCodexTelegramReply() {
     correlationId: "",
     source: "",
     replyPreferred: false,
+    inputText: "",
+    preInputPendingLine: "",
     started: false,
     firstLineAt: 0,
     lastLineAt: 0,
@@ -376,6 +389,48 @@ function stripCodexReplyLinePrefix(value) {
   return stripCodexReplyInlineTail(String(value || "").replace(/^[•*]\s+/u, ""));
 }
 
+function sanitizeCodexTelegramReplyStartLine(line, replyState) {
+  let normalized = normalizeWhitespace(String(line || ""));
+  if (!normalized) {
+    return "";
+  }
+  const inputText = normalizeReplyPromotionInputText(replyState?.inputText);
+  if (inputText) {
+    const promptEchoPattern = new RegExp(`^[›>]+\\s*${escapeRegExp(inputText)}(?:\\s+.*)?$`, "u");
+    if (promptEchoPattern.test(normalized)) {
+      return "";
+    }
+  }
+  normalized = stripCodexReplyLinePrefix(normalized);
+  const preInputPendingLine = stripCodexReplyInlineTail(normalizeWhitespace(replyState?.preInputPendingLine));
+  let removedCarryoverPrefix = false;
+  if (preInputPendingLine && normalized.startsWith(preInputPendingLine)) {
+    normalized = normalizeWhitespace(normalized.slice(preInputPendingLine.length));
+    removedCarryoverPrefix = true;
+  }
+  if (!normalized) {
+    return "";
+  }
+  if (inputText) {
+    if (normalized === inputText) {
+      return "";
+    }
+    if (normalized.startsWith(inputText)) {
+      const remainder = normalizeWhitespace(normalized.slice(inputText.length));
+      if (!remainder) {
+        return "";
+      }
+      if (removedCarryoverPrefix || CODEX_REPLY_PROMPT_ECHO_TAIL_PATTERN.test(remainder)) {
+        normalized = remainder;
+        if (!normalized || CODEX_REPLY_PROMPT_ECHO_TAIL_PATTERN.test(normalized)) {
+          return "";
+        }
+      }
+    }
+  }
+  return normalized;
+}
+
 function isCodexTelegramReplyMetaLine(value) {
   const normalized = normalizeWhitespace(value);
   if (!normalized) {
@@ -391,6 +446,9 @@ function isCodexTelegramReplyMetaLine(value) {
 function shouldIgnoreCodexTelegramReplyStart(line, session, profile) {
   const normalized = stripCodexReplyLinePrefix(line);
   if (!normalized) {
+    return true;
+  }
+  if (/^[›>]/u.test(normalized)) {
     return true;
   }
   if (CODING_AGENT_ANTI_BULLET_PATTERN.test(normalized)) {
@@ -413,6 +471,9 @@ function shouldIgnoreCodexTelegramReplyStart(line, session, profile) {
 function isCodexTelegramReplyBoundaryLine(line, session, profile) {
   const normalized = stripCodexReplyLinePrefix(line);
   if (!normalized) {
+    return true;
+  }
+  if (/^[›>]/u.test(normalized)) {
     return true;
   }
   if (CODING_AGENT_ANTI_BULLET_PATTERN.test(normalized)) {
@@ -915,6 +976,8 @@ function createSessionStreamState() {
     recentLines: [],
     pendingSummaryBlock: createPendingSummaryBlock(),
     pendingCodexTelegramReply: createPendingCodexTelegramReply(),
+    lastObservedInputText: "",
+    lastObservedInputAt: 0,
     pendingCodexSeparatorInfoDecision: null,
     lastControlSignature: CONTROL_EVENT_SIGNATURE_NONE,
     lastLifecycleType: "",
@@ -1654,14 +1717,27 @@ export function createMessagingRuntime(options = {}) {
       return;
     }
     const streamState = getOrCreateSessionState(normalizedSessionId);
+    const observedAt = nowFn();
+    const normalizedInputText = normalizeReplyPromotionInputText(trace?.replyInputText);
+    if (normalizedInputText) {
+      streamState.lastObservedInputText = normalizedInputText;
+      streamState.lastObservedInputAt = observedAt;
+    }
     if (isReplyPromotionEligibleTrace(trace)) {
+      const carriedInputText =
+        normalizedInputText ||
+        (observedAt - streamState.lastObservedInputAt <= CODEX_TELEGRAM_REPLY_INPUT_CARRYOVER_WINDOW_MS
+          ? streamState.lastObservedInputText
+          : "");
       streamState.pendingCodexTelegramReply = {
         active: true,
-        triggeredAt: nowFn(),
+        triggeredAt: observedAt,
         traceId: normalizeNonEmptyString(trace?.traceId),
         correlationId: normalizeNonEmptyString(trace?.correlationId),
         source: normalizeNonEmptyString(trace?.source),
         replyPreferred: isReplyPreferredTelegramTrace(trace),
+        inputText: carriedInputText,
+        preInputPendingLine: normalizeWhitespace(streamState.pendingLine),
         started: false,
         firstLineAt: 0,
         lastLineAt: 0,
@@ -1684,7 +1760,6 @@ export function createMessagingRuntime(options = {}) {
     if (!state) {
       return;
     }
-    const observedAt = nowFn();
     state.lastInputAt = observedAt;
     if (!Number.isInteger(state.firstInputAt) || state.firstInputAt <= 0) {
       state.firstInputAt = observedAt;
@@ -2114,13 +2189,14 @@ export function createMessagingRuntime(options = {}) {
       return false;
     }
     if (!replyState.started) {
-      if (shouldIgnoreCodexTelegramReplyStart(visibleLine, session, profile)) {
+      const sanitizedStartLine = sanitizeCodexTelegramReplyStartLine(visibleLine, replyState);
+      if (shouldIgnoreCodexTelegramReplyStart(sanitizedStartLine, session, profile)) {
         return false;
       }
       replyState.started = true;
       replyState.firstLineAt = observedAt;
       replyState.lastLineAt = observedAt;
-      replyState.lines = [visibleLine];
+      replyState.lines = [sanitizedStartLine];
       return true;
     }
     if (isCodexTelegramReplyBoundaryLine(visibleLine, session, profile)) {

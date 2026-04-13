@@ -1101,6 +1101,118 @@ test("messaging runtime promotes the next substantial submitted codex reply even
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
 });
 
+test("messaging runtime ignores stale carryover and input echo before starting a submitted codex reply block", async () => {
+  const sends = [];
+  let now = 9_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 760 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 761 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "rest-reply-stale-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Keine Produktänderung in diesem Schritt.",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "155",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-2" }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "rest-reply-stale-text",
+    correlationId: "req-rest-stale-text",
+    replyInputText: "ok, was machen wir dann jetzt da"
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "ok, was machen wir dann jetzt da",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-echo" }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "rest-reply-stale-open",
+    correlationId: "req-rest-stale-open",
+    replyPromotionEligible: true
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-flush" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "› ok, was machen wir dann jetzt da Find and fix a bug in @filename\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-prompt-echo" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Jetzt nicht breit umbauen. Ein enger Korrektur-Slice reicht.›Find and fix a bug in @filename gpt-5.4 xhigh · 15% left\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-answer-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Was wir als Nächstes tun sollten\n1. codex_input_reply härten\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-answer-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-stale-answer-end" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./);
+  assert.match(sends[0].text, /Was wir als Nächstes tun sollten/);
+  assert.doesNotMatch(sends[0].text, /Keine Produktänderung in diesem Schritt/i);
+  assert.doesNotMatch(sends[0].text, /\b155\b/);
+  assert.doesNotMatch(sends[0].text, /ok, was machen wir dann jetzt da/i);
+  assert.doesNotMatch(sends[0].text, /Find and fix a bug/i);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+});
+
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {
   const sends = [];
   let now = 1_000;

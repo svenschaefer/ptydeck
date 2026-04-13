@@ -962,6 +962,121 @@ test("runtime promotes the next substantial codex reply after submitted REST inp
   }
 });
 
+test("runtime ignores stale carryover and input echo before promoting a submitted REST codex reply", async () => {
+  const sends = [];
+  const writeCalls = [];
+  let pendingQuestion = "";
+  let dataHandler = null;
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200305", profile: "coding-agent" }],
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 390 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 391 };
+        },
+        async getUpdates() {
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized !== "\r") {
+            pendingQuestion += normalized;
+            if (dataHandler) {
+              dataHandler(normalized);
+            }
+            return;
+          }
+          if (!dataHandler) {
+            return;
+          }
+          dataHandler("\n");
+          dataHandler(`› ${pendingQuestion} Find and fix a bug in @filename\n`);
+          dataHandler("• Jetzt nicht breit umbauen. Ein enger Korrektur-Slice reicht.›Find and fix a bug in @filename gpt-5.4 xhigh · 15% left\n");
+          dataHandler("Was wir als Nächstes tun sollten\n");
+          dataHandler("1. codex_input_reply härten\n");
+          dataHandler("\n");
+          pendingQuestion = "";
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    dataHandler?.("Keine Produktänderung in diesem Schritt.");
+    dataHandler?.("155");
+
+    const textRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "ok, was machen wir dann jetzt da" })
+    });
+    assert.equal(textRes.status, 204);
+    assert.equal(sends.length, 0);
+
+    const submitRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "\r" })
+    });
+    assert.equal(submitRes.status, 204);
+
+    await waitFor(() => writeCalls.includes("ok, was machen wir dann jetzt da") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => sends.some((entry) => /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./.test(entry.text)), 2000);
+
+    assert.equal(sends.length, 1);
+    assert.match(sends[0].text, /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./);
+    assert.match(sends[0].text, /Was wir als Nächstes tun sollten/);
+    assert.doesNotMatch(sends[0].text, /Keine Produktänderung in diesem Schritt/i);
+    assert.doesNotMatch(sends[0].text, /\b155\b/);
+    assert.doesNotMatch(sends[0].text, /ok, was machen wir dann jetzt da/i);
+    assert.doesNotMatch(sends[0].text, /Find and fix a bug/i);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
+    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime publishes telegram commands from the canonical surface and executes mapped custom commands end to end", async () => {
   const sends = [];
   const publishedCommands = [];
