@@ -372,6 +372,33 @@ After `H115`, `H116`, and `H117`, the product has both:
 
 That is the message boundary model that best matches the current transcript evidence.
 
+## 2026-04-13 Follow-up: Remaining Gap Is Block Assembly, Not More Family Tuning
+
+The later post-13:00 CEST `H118 is delivered and pushed.` field case showed that the remaining gap is now earlier than family selection.
+
+What happened in that window:
+
+- the large closing block was visibly structured in the terminal
+- the first chunk already contained inline prompt/footer chrome
+- the following lines then fragmented into transient `attention_required` and degraded `status_update` traces
+- no stable assembled block survived long enough for `codex_separator_info`, `codex_separator_section`, or `codex_separator_summary_sentence` to promote it as one message
+
+This means the current outbound model is still too dependent on:
+
+- a clean first chunk
+- a perfect separator start
+- line-local termination rules
+
+The next architectural step is therefore not another narrow family tweak.
+It is a pre-classification block-assembly layer with:
+
+- provisional start instead of first-chunk gating
+- bounded multi-chunk assembly before classification
+- soft end instead of immediate prompt/boundary termination
+- block-level classification after assembly instead of line-local classification during assembly
+
+That is the explicit focus of queued `H119`.
+
 ## Analysis Artifacts
 
 - `scripts/analyze-codex-message-boundaries.mjs`
