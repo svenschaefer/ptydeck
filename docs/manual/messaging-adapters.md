@@ -133,6 +133,25 @@ The Telegram adapter now also logs inbound discovery events before and during co
 
 This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API `getUpdates` inspection may then look empty while `inboundTrace` still shows what the live runtime actually observed.
 
+After `v0.4.0-H122`, the write path behind a mapped Telegram input is now observable end to end instead of disappearing between `handled ok = true` and the next PTY-side event. The backend debug log now includes:
+
+- `messaging.input.write_attempt`
+- `messaging.input.write_ok`
+- `messaging.input.write_failed`
+- `messaging.input.delayed_submit_scheduled`
+- `messaging.input.delayed_submit_fired`
+- `session.input.write`
+
+Those records share stable `traceId`, `requestId`, and `correlationId` metadata derived from the inbound adapter update, so one Telegram input can be followed deterministically through:
+
+- inbound handling
+- body write
+- delayed submit firing
+- PTY write attempt/ok/failure
+- later PTY activity or reply promotion
+
+For delayed-submit messaging input, only the actual submit-bearing phase now opens the bounded `codex_input_reply` window. The pre-submit body write still records input text for later correlation, but it no longer arms reply promotion early.
+
 Forum-target validation and topic provisioning now also leave a diagnosable trail through `messaging.target.update` and `targetTrace`, including:
 
 - `chatId`
@@ -163,7 +182,7 @@ The Telegram reference adapter can:
 - keep the active outbound families compact through the shipped trigger profiles
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
 - route mapped plain Telegram text into the same backend session-input path used by frontend `Send`
-- mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale
+- mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit `\r` follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale; after `H122`, only that submit-bearing phase can arm the bounded `codex_input_reply` window
 - preserve literal slash-prefixed terminal input through a `//...` escape for published Telegram custom commands (`//docu` -> `/docu`)
 
 ## What It Cannot Do

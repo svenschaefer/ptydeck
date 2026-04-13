@@ -140,6 +140,97 @@ test("SessionManager emits explicit created and started lifecycle events", () =>
   ]);
 });
 
+test("SessionManager emits input write attempt and ok events with trace correlation", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  const events = [];
+  manager.on("session.input.write", (event) => events.push(event));
+
+  manager.sendInput(created.id, "pwd\r", {
+    writeKind: "submit_cr",
+    trace: {
+      traceId: "msg-1",
+      correlationId: "msg-telegram-99",
+      requestId: "msg-1",
+      source: "messaging:telegram"
+    }
+  });
+
+  assert.equal(events.length, 2);
+  assert.deepEqual(
+    events.map((event) => ({
+      phase: event.phase,
+      writeKind: event.writeKind,
+      bytes: event.bytes,
+      traceId: event.trace.traceId,
+      correlationId: event.trace.correlationId,
+      requestId: event.trace.requestId,
+      source: event.trace.source
+    })),
+    [
+      {
+        phase: "attempt",
+        writeKind: "submit_cr",
+        bytes: Buffer.byteLength("pwd\r", "utf8"),
+        traceId: events[0].trace.traceId,
+        correlationId: "msg-telegram-99",
+        requestId: "msg-1",
+        source: "messaging:telegram"
+      },
+      {
+        phase: "ok",
+        writeKind: "submit_cr",
+        bytes: Buffer.byteLength("pwd\r", "utf8"),
+        traceId: events[1].trace.traceId,
+        correlationId: "msg-telegram-99",
+        requestId: "msg-1",
+        source: "messaging:telegram"
+      }
+    ]
+  );
+  assert.match(events[0].trace.traceId, /^[a-f0-9-]{36}$/i);
+  assert.equal(events[0].trace.traceId, events[1].trace.traceId);
+});
+
+test("SessionManager emits input write failed events when the PTY write throws", () => {
+  const fakePty = createFakePty();
+  fakePty.write = () => {
+    throw new Error("PTY write failed.");
+  };
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  const events = [];
+  manager.on("session.input.write", (event) => events.push(event));
+
+  assert.throws(
+    () =>
+      manager.sendInput(created.id, "pwd\r", {
+        writeKind: "submit_cr",
+        trace: {
+          traceId: "msg-2",
+          correlationId: "msg-telegram-100",
+          requestId: "msg-2",
+          source: "messaging:telegram"
+        }
+      }),
+    /PTY write failed\./
+  );
+
+  assert.equal(events.length, 2);
+  assert.equal(events[0].phase, "attempt");
+  assert.equal(events[1].phase, "failed");
+  assert.equal(events[1].writeKind, "submit_cr");
+  assert.match(events[1].trace.traceId, /^[a-f0-9-]{36}$/i);
+  assert.equal(events[1].trace.correlationId, "msg-telegram-100");
+  assert.equal(events[1].trace.requestId, "msg-2");
+  assert.match(events[1].error, /PTY write failed\./);
+});
+
 test("SessionManager refreshes explicit app identity when startup hints change", () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({

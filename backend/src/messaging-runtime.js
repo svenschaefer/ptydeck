@@ -1410,8 +1410,16 @@ function buildTelegramTopicName(deckName, session) {
 }
 
 function buildInboundTrace(request, sessionId) {
+  const adapter = normalizeNonEmptyString(request?.adapter) || "adapter";
+  const updateId =
+    Number.isInteger(request?.updateId) && request.updateId >= 0 ? String(request.updateId) : normalizeNonEmptyString(request?.updateId);
+  const requestId = `msg-${randomUUID()}`;
+  const correlationId = updateId ? `msg-${adapter}-${updateId}` : requestId;
   return {
-    source: `messaging:${normalizeNonEmptyString(request?.adapter) || "adapter"}`,
+    traceId: requestId,
+    requestId,
+    correlationId,
+    source: `messaging:${adapter}`,
     sessionId: normalizeNonEmptyString(sessionId)
   };
 }

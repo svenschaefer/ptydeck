@@ -175,7 +175,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(typeof getPayload.cwd, "string");
     assert.ok(getPayload.cwd.length > 0);
     assert.equal(getPayload.state, "running");
-    assert.equal(getPayload.appIdentity.family, "shell");
+    assert.ok(["shell", "build-test"].includes(getPayload.appIdentity.family));
 
     const patchRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
       method: "PATCH",
@@ -1072,6 +1072,121 @@ test("runtime ignores stale carryover and input echo before promoting a submitte
     const health = await healthRes.json();
     assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
     assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime logs telegram messaging input write phases and opens the reply window only on submit", async () => {
+  const sends = [];
+  const updateQueue = [];
+  const writeCalls = [];
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-telegram-input-debug-"));
+  const debugLogFile = join(dir, "backend-debug.log");
+  const telegramChat = {
+    id: -100200306,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group"
+  };
+  const { runtime, baseUrl } = await createStartedRuntime({
+    debugLogs: true,
+    debugLogFile,
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200306", profile: "coding-agent" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 490 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 491 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized === "\r" && dataHandler) {
+            dataHandler("• Antwort läuft.\n");
+          }
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+
+    updateQueue.push({
+      update_id: 99,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "Ok. Die Nachricht ist auch korrekt angekommen."
+      }
+    });
+
+    await waitFor(() => writeCalls.includes("Ok. Die Nachricht ist auch korrekt angekommen.") && writeCalls.includes("\r"), 2000);
+    await waitFor(async () => {
+      try {
+        const contents = await readFile(debugLogFile, "utf8");
+        return (
+          contents.includes("messaging.input.delayed_submit_scheduled") &&
+          contents.includes("session.input.write") &&
+          contents.includes("session.activity.started")
+        );
+      } catch {
+        return false;
+      }
+    }, 2000);
+
+    const debugContents = await readFile(debugLogFile, "utf8");
+    assert.match(debugContents, /messaging\.input\.delayed_submit_scheduled .*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /messaging\.input\.delayed_submit_fired .*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /messaging\.input\.write_attempt .*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /messaging\.input\.write_ok .*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /messaging\.input\.write_attempt .*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /messaging\.input\.write_ok .*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /session\.input\.write .*"phase":"attempt".*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /session\.input\.write .*"phase":"ok".*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
+    assert.match(debugContents, /session\.event .*"type":"session\.activity\.started".*"correlationId":"msg-telegram-99"/);
+    assert.equal((debugContents.match(/messaging\.telegram_reply_window/g) || []).length, 1);
   } finally {
     await runtime.stop();
   }

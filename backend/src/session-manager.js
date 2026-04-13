@@ -1799,7 +1799,39 @@ export class SessionManager {
       sessionId,
       source: options.trace?.source || "rest"
     });
-    session.ptyProcess.write(data);
+    const eventTrace = createTraceEnvelope(this.createTraceId, session.traceSeed, {
+      sessionId,
+      source: options.trace?.source || session.traceSeed?.source || "rest"
+    });
+    const writeKind = typeof options.writeKind === "string" && options.writeKind.trim() ? options.writeKind.trim() : "direct";
+    const bytes = Buffer.byteLength(String(data || ""), "utf8");
+    this.events.emit("session.input.write", {
+      sessionId,
+      phase: "attempt",
+      writeKind,
+      bytes,
+      trace: eventTrace
+    });
+    try {
+      session.ptyProcess.write(data);
+    } catch (error) {
+      this.events.emit("session.input.write", {
+        sessionId,
+        phase: "failed",
+        writeKind,
+        bytes,
+        error: error instanceof Error ? error.message : String(error || "write failed"),
+        trace: eventTrace
+      });
+      throw error;
+    }
+    this.events.emit("session.input.write", {
+      sessionId,
+      phase: "ok",
+      writeKind,
+      bytes,
+      trace: eventTrace
+    });
     const timestamp = this.nowFn();
     session.lastActivityAt = timestamp;
     session.meta.updatedAt = timestamp;

@@ -179,6 +179,29 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 
 <p>This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API <code>getUpdates</code> inspection may then look empty while <code>inboundTrace</code> still shows what the live runtime actually observed.</p>
 
+<p>After <code>v0.4.0-H122</code>, the write path behind a mapped Telegram input is now observable end to end instead of disappearing between <code>handled ok = true</code> and the next PTY-side event. The backend debug log now includes:</p>
+
+<ul>
+<li><code>messaging.input.write_attempt</code></li>
+<li><code>messaging.input.write_ok</code></li>
+<li><code>messaging.input.write_failed</code></li>
+<li><code>messaging.input.delayed_submit_scheduled</code></li>
+<li><code>messaging.input.delayed_submit_fired</code></li>
+<li><code>session.input.write</code></li>
+</ul>
+
+<p>Those records share stable <code>traceId</code>, <code>requestId</code>, and <code>correlationId</code> metadata derived from the inbound adapter update, so one Telegram input can be followed deterministically through:</p>
+
+<ul>
+<li>inbound handling</li>
+<li>body write</li>
+<li>delayed submit firing</li>
+<li>PTY write attempt/ok/failure</li>
+<li>later PTY activity or reply promotion</li>
+</ul>
+
+<p>For delayed-submit messaging input, only the actual submit-bearing phase now opens the bounded <code>codex_input_reply</code> window. The pre-submit body write still records input text for later correlation, but it no longer arms reply promotion early.</p>
+
 <p>Forum-target validation and topic provisioning now also leave a diagnosable trail through <code>messaging.target.update</code> and <code>targetTrace</code>, including:</p>
 
 <ul>
@@ -210,7 +233,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <li>keep the active outbound families compact through the shipped trigger profiles</li>
 <li>publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck</li>
 <li>route mapped plain Telegram text into the same backend session-input path used by frontend <code>Send</code></li>
-<li>mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale</li>
+<li>mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale; after <code>H122</code>, only that submit-bearing phase can arm the bounded <code>codex_input_reply</code> window</li>
 <li>preserve literal slash-prefixed terminal input through a <code>//...</code> escape for published Telegram custom commands (<code>//docu</code> -&gt; <code>/docu</code>)</li>
 </ul>
 

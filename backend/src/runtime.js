@@ -5617,30 +5617,124 @@ export function createRuntime(config) {
     const replyInputText = normalizedData.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+$/g, "").trim();
     const useDelayedSubmit = /\r$/.test(normalizedData);
     const replyPromotionEligible = /[\r\n]/.test(normalizedData);
+    const baseWriteDetails = {
+      sessionId,
+      source: normalizeTraceSeed(trace)?.source || "",
+      useDelayedSubmit,
+      replyPromotionEligible,
+      payloadBytes: Buffer.byteLength(normalizedData, "utf8")
+    };
+    const preSubmitObservationTrace = {
+      ...trace,
+      ...(replyInputText ? { replyInputText } : {})
+    };
+    delete preSubmitObservationTrace.replyEligible;
+    delete preSubmitObservationTrace.replyPromotionEligible;
+    const directInputTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
+    const enrichedDirectInputTrace = replyInputText ? { ...directInputTrace, replyInputText } : directInputTrace;
+
+    function logMessagingInputWrite(event, details = {}, traceContext = null) {
+      logDebug(
+        event,
+        {
+          ...baseWriteDetails,
+          ...details
+        },
+        traceContext || trace
+      );
+    }
+
     if (useDelayedSubmit) {
       const body = normalizedData.replace(/\r+$/g, "");
       if (body) {
-        messagingRuntime.observeSessionInput(sessionId, replyInputText ? { ...trace, replyInputText } : trace);
-        manager.sendInput(sessionId, body, {
-          trace: replyInputText ? { ...trace, replyInputText } : trace
-        });
+        messagingRuntime.observeSessionInput(sessionId, preSubmitObservationTrace);
+        const bodyTrace = replyInputText ? { ...trace, replyInputText } : trace;
+        logMessagingInputWrite("messaging.input.write_attempt", {
+          writeKind: "body",
+          bytes: Buffer.byteLength(body, "utf8")
+        }, bodyTrace);
+        try {
+          manager.sendInput(sessionId, body, {
+            trace: bodyTrace,
+            writeKind: "body"
+          });
+          logMessagingInputWrite("messaging.input.write_ok", {
+            writeKind: "body",
+            bytes: Buffer.byteLength(body, "utf8")
+          }, bodyTrace);
+        } catch (error) {
+          logMessagingInputWrite("messaging.input.write_failed", {
+            writeKind: "body",
+            bytes: Buffer.byteLength(body, "utf8"),
+            error: error instanceof Error ? error.message : String(error || "write failed")
+          }, bodyTrace);
+          throw error;
+        }
       }
-      return new Promise((resolve) => {
+      logMessagingInputWrite("messaging.input.delayed_submit_scheduled", {
+        writeKind: "submit_cr",
+        delayMs: DEFAULT_MESSAGING_CODEX_SUBMIT_DELAY_MS,
+        bodyBytes: Buffer.byteLength(body, "utf8"),
+        submitBytes: 1
+      });
+      return new Promise((resolve, reject) => {
         setTimeout(() => {
           const submitTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
           const enrichedSubmitTrace = replyInputText ? { ...submitTrace, replyInputText } : submitTrace;
+          logMessagingInputWrite("messaging.input.delayed_submit_fired", {
+            writeKind: "submit_cr",
+            bytes: 1
+          }, enrichedSubmitTrace);
           messagingRuntime.observeSessionInput(sessionId, enrichedSubmitTrace);
-          manager.sendInput(sessionId, "\r", { trace: enrichedSubmitTrace });
-          recordSessionLastInput(sessionId, null, null);
-          broadcastSessionUpdated(sessionId, options.trace || null);
-          resolve(getApiSessionOrThrow(sessionId));
+          logMessagingInputWrite("messaging.input.write_attempt", {
+            writeKind: "submit_cr",
+            bytes: 1
+          }, enrichedSubmitTrace);
+          try {
+            manager.sendInput(sessionId, "\r", {
+              trace: enrichedSubmitTrace,
+              writeKind: "submit_cr"
+            });
+            logMessagingInputWrite("messaging.input.write_ok", {
+              writeKind: "submit_cr",
+              bytes: 1
+            }, enrichedSubmitTrace);
+            recordSessionLastInput(sessionId, null, null);
+            broadcastSessionUpdated(sessionId, options.trace || null);
+            resolve(getApiSessionOrThrow(sessionId));
+          } catch (error) {
+            logMessagingInputWrite("messaging.input.write_failed", {
+              writeKind: "submit_cr",
+              bytes: 1,
+              error: error instanceof Error ? error.message : String(error || "write failed")
+            }, enrichedSubmitTrace);
+            reject(error);
+          }
         }, DEFAULT_MESSAGING_CODEX_SUBMIT_DELAY_MS);
       });
     }
-    const inputTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
-    const enrichedInputTrace = replyInputText ? { ...inputTrace, replyInputText } : inputTrace;
-    messagingRuntime.observeSessionInput(sessionId, enrichedInputTrace);
-    manager.sendInput(sessionId, normalizedData, { trace: enrichedInputTrace });
+    messagingRuntime.observeSessionInput(sessionId, enrichedDirectInputTrace);
+    logMessagingInputWrite("messaging.input.write_attempt", {
+      writeKind: "direct",
+      bytes: Buffer.byteLength(normalizedData, "utf8")
+    }, enrichedDirectInputTrace);
+    try {
+      manager.sendInput(sessionId, normalizedData, {
+        trace: enrichedDirectInputTrace,
+        writeKind: "direct"
+      });
+      logMessagingInputWrite("messaging.input.write_ok", {
+        writeKind: "direct",
+        bytes: Buffer.byteLength(normalizedData, "utf8")
+      }, enrichedDirectInputTrace);
+    } catch (error) {
+      logMessagingInputWrite("messaging.input.write_failed", {
+        writeKind: "direct",
+        bytes: Buffer.byteLength(normalizedData, "utf8"),
+        error: error instanceof Error ? error.message : String(error || "write failed")
+      }, enrichedDirectInputTrace);
+      throw error;
+    }
     recordSessionLastInput(sessionId, null, null);
     broadcastSessionUpdated(sessionId, options.trace || null);
     return getApiSessionOrThrow(sessionId);
@@ -6034,6 +6128,20 @@ function tryCreateRestoredSession({
     logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null }, event.trace);
     reconcileStartupWarmup();
     persistSoon();
+  });
+
+  manager.on("session.input.write", (event) => {
+    logDebug(
+      "session.input.write",
+      {
+        sessionId: event.sessionId || null,
+        phase: event.phase || "",
+        writeKind: event.writeKind || "",
+        bytes: Number.isInteger(event.bytes) ? event.bytes : 0,
+        ...(event.error ? { error: event.error } : {})
+      },
+      event.trace
+    );
   });
 
   manager.on("session.activity.completed", async (event) => {

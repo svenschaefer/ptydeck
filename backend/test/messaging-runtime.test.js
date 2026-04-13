@@ -3312,6 +3312,63 @@ test("messaging runtime treats unpublished telegram slash commands as literal te
   }
 });
 
+test("messaging runtime passes stable trace identifiers into telegram inbound input writes", async () => {
+  const outboundMessages = [];
+  const updateQueue = [];
+  const inputCalls = [];
+  const session = createSession({ id: "s-codex", name: "codex", quickIdToken: "9", startCommand: "codex" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "codex", profile: "coding-agent" }],
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          outboundMessages.push(payload);
+          return { messageId: outboundMessages.length + 240 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 240 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(5);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    resolveSessionForMessagingTarget() {
+      return session;
+    },
+    async requestMessagingSendInput(sessionId, data, options = {}) {
+      inputCalls.push({ sessionId, data, trace: options.trace });
+      return session;
+    }
+  });
+
+  await runtime.start();
+  try {
+    updateQueue.push({ update_id: 99, message: { chat: { id: 1001 }, text: "echo FROM_TELEGRAM" } });
+    await waitFor(() => outboundMessages.length >= 1, 1500);
+    assert.equal(inputCalls.length, 1);
+    assert.equal(inputCalls[0].sessionId, "s-codex");
+    assert.equal(inputCalls[0].data, "echo FROM_TELEGRAM\r");
+    assert.match(inputCalls[0].trace.traceId, /^msg-/);
+    assert.equal(inputCalls[0].trace.requestId, inputCalls[0].trace.traceId);
+    assert.equal(inputCalls[0].trace.correlationId, "msg-telegram-99");
+    assert.equal(inputCalls[0].trace.source, "messaging:telegram");
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("messaging runtime returns telegram input control failures without suppressing the rejection", async () => {
   const outboundMessages = [];
   const updateQueue = [];
