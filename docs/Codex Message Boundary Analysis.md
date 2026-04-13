@@ -5,6 +5,7 @@ The concrete trigger for this analysis was the observation that many delivered T
 
 The original analysis in this note led directly to delivered `v0.4.0-H115`.
 The historical evidence and option comparison remain relevant because they explain why the shipped fix uses ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
+The later 2026-04-13 architecture review also showed that message-boundary refinement alone is not the full answer for free-form replies: the current `codex_input_reply` path still gates eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks can also arise from REST or frontend input and should still be promotable as Telegram-visible messages once they are recognized as relevant stream content.
 
 ## Scope
 
@@ -223,6 +224,12 @@ The problem is:
 
 - the currently dominant live family for many `ptydeck` messages is still the narrow one
 - while the operator-visible terminal grammar for Codex closing comments often wants the richer section boundary model
+
+There is also a separate architectural issue above pure boundaries:
+
+- the free-form reply path currently treats Telegram origin as an eligibility condition
+- but the correct long-term model is stream-first and content-first
+- origin should only influence routing or reply-thread preference after a relevant block already exists
 
 ## Option Comparison
 
