@@ -5615,23 +5615,26 @@ export function createRuntime(config) {
     };
     const normalizedData = typeof data === "string" ? data : "";
     const useDelayedSubmit = /\r$/.test(normalizedData);
+    const replyPromotionEligible = /[\r\n]/.test(normalizedData);
     if (useDelayedSubmit) {
       const body = normalizedData.replace(/\r+$/g, "");
       if (body) {
         manager.sendInput(sessionId, body, { trace });
       }
-      messagingRuntime.observeSessionInput(sessionId, trace);
       return new Promise((resolve) => {
         setTimeout(() => {
-          manager.sendInput(sessionId, "\r", { trace });
+          const submitTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
+          manager.sendInput(sessionId, "\r", { trace: submitTrace });
+          messagingRuntime.observeSessionInput(sessionId, submitTrace);
           recordSessionLastInput(sessionId, null, null);
           broadcastSessionUpdated(sessionId, options.trace || null);
           resolve(getApiSessionOrThrow(sessionId));
         }, DEFAULT_MESSAGING_CODEX_SUBMIT_DELAY_MS);
       });
     }
-    manager.sendInput(sessionId, normalizedData, { trace });
-    messagingRuntime.observeSessionInput(sessionId, trace);
+    const inputTrace = replyPromotionEligible ? { ...trace, replyPromotionEligible: true } : trace;
+    manager.sendInput(sessionId, normalizedData, { trace: inputTrace });
+    messagingRuntime.observeSessionInput(sessionId, inputTrace);
     recordSessionLastInput(sessionId, null, null);
     broadcastSessionUpdated(sessionId, options.trace || null);
     return getApiSessionOrThrow(sessionId);
@@ -6892,13 +6895,15 @@ function tryCreateRestoredSession({
       if (match.kind === "input") {
         getApiSessionOrThrow(match.params.sessionId, auth);
         ensureSessionControllerAccess(match.params.sessionId, auth, req, "send terminal input");
+        const inputTrace = {
+          ...requestTraceContext,
+          sessionId: match.params.sessionId,
+          ...(typeof body.data === "string" && /[\r\n]/.test(body.data) ? { replyPromotionEligible: true } : {})
+        };
         manager.sendInput(match.params.sessionId, body.data, {
-          trace: {
-            ...requestTraceContext,
-            sessionId: match.params.sessionId
-          }
+          trace: inputTrace
         });
-        messagingRuntime.observeSessionInput(match.params.sessionId, requestTraceContext);
+        messagingRuntime.observeSessionInput(match.params.sessionId, inputTrace);
         recordSessionLastInput(match.params.sessionId, auth, req);
         broadcastSessionUpdated(match.params.sessionId, {
           ...requestTraceContext,

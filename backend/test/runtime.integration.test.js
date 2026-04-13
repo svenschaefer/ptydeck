@@ -850,6 +850,118 @@ test("runtime correlates a mapped telegram free-text question to the next codex 
   }
 });
 
+test("runtime promotes the next substantial codex reply after submitted REST input without requiring telegram origin", async () => {
+  const sends = [];
+  const writeCalls = [];
+  let pendingQuestion = "";
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200304", profile: "coding-agent" }],
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 290 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 291 };
+        },
+        async getUpdates() {
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized !== "\r") {
+            pendingQuestion += normalized;
+            return;
+          }
+          if (!dataHandler) {
+            return;
+          }
+          if (/Wie geht.s weiter\?/u.test(pendingQuestion)) {
+            dataHandler("4. MSG-063 Owner QA\n");
+            dataHandler("In ROADMAP.md:\n");
+            dataHandler("• Ja. Der Fall ist jetzt sauber eingegrenzt.›Explain this codebase gpt-5.4 xhigh · 37% left\n");
+            dataHandler("Kurzurteil\n");
+            dataHandler("Die neue Reply-Logik greift grundsätzlich.\n");
+            dataHandler("─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");
+            dataHandler("• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n");
+          } else {
+            dataHandler(normalized);
+          }
+          pendingQuestion = "";
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const textRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "Wie geht’s weiter?" })
+    });
+    assert.equal(textRes.status, 204);
+    assert.equal(sends.length, 0);
+
+    const submitRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "\r" })
+    });
+    assert.equal(submitRes.status, 204);
+
+    await waitFor(() => writeCalls.includes("Wie geht’s weiter?") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => sends.some((entry) => /Ja\. Der Fall ist jetzt sauber eingegrenzt\./.test(entry.text)), 2000);
+
+    const replyIndex = sends.findIndex((entry) => /Ja\. Der Fall ist jetzt sauber eingegrenzt\./.test(entry.text));
+    const metaIndex = sends.findIndex((entry) => /shell-quoting/i.test(entry.text));
+    assert.notEqual(replyIndex, -1);
+    assert.equal(metaIndex, -1);
+    assert.doesNotMatch(sends[replyIndex].text, /Explain this codebase/i);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
+    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime publishes telegram commands from the canonical surface and executes mapped custom commands end to end", async () => {
   const sends = [];
   const publishedCommands = [];

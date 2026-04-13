@@ -227,14 +227,15 @@ That hard break is intentional:
 - there is intentionally no environment-variable re-enable switch at this stage
 - inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path
 
-The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined through `v0.4.0-H116`:
+The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined through `v0.4.0-H117`:
 
 - four narrow internal allowlist families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, can be delivered even while generic `deliveryEnabled` remains false
 - all four families are Codex-only and block-aware:
   - `codex_input_reply` covers the non-separator case:
-    - only Telegram free-text input opens this bounded reply window
+    - submitted Codex session input can open this bounded reply window even when the originating input path was Telegram, REST, or frontend `Send`
     - the runtime assembles the next substantial Codex answer block directly from the PTY line stream instead of waiting for a separator anchor
     - structural planning/meta fragments such as `MSG-063 Owner QA` or `In ROADMAP.md:` are skipped until the first real answer appears
+    - observed inline prompt chrome such as `›Explain this codebase ...` is stripped from the first captured answer line before delivery
     - later separator-family chatter cannot jump ahead of that first reply while the reply window is still active
   - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination
   - `codex_separator_info` keeps the narrow simple case:
@@ -438,7 +439,7 @@ Behavior:
 - `/health.messaging.adapters[0].targetTrace` and `/ready.messaging.adapters[0].targetTrace` expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.
 - `/health.messaging.deliveryEnabled` shows whether generic outbound Telegram delivery is currently allowed.
 - `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether narrow internal outbound allowlist paths such as `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence` are active while generic `deliveryEnabled` remains false.
-- `/health.messaging.codexTelegramReplyCorrelation` and `/ready.messaging.codexTelegramReplyCorrelation` show the bounded Telegram reply-correlation state, including the reply-window duration and the number of sessions currently waiting for the first correlated Codex answer block.
+- `/health.messaging.codexTelegramReplyCorrelation` and `/ready.messaging.codexTelegramReplyCorrelation` show the bounded Codex reply-block promotion state under its historical field name, including the reply-window duration and the number of sessions currently waiting for the first correlated Codex answer block after an eligible submitted input.
 - `/health.messaging.allowlistDeliveryScopes` and `/ready.messaging.allowlistDeliveryScopes` enumerate those narrow delivered scopes.
 - `/health.messaging.codexSummaryRestartRecovery` and `/ready.messaging.codexSummaryRestartRecovery` expose the narrow summary-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.

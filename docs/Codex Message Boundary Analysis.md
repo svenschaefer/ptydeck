@@ -5,7 +5,7 @@ The concrete trigger for this analysis was the observation that many delivered T
 
 The original analysis in this note led directly to delivered `v0.4.0-H115`.
 The historical evidence and option comparison remain relevant because they explain why the shipped fix uses ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
-The later 2026-04-13 architecture review also showed that message-boundary refinement alone is not the full answer for free-form replies: the current `codex_input_reply` path still gates eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks can also arise from REST or frontend input and should still be promotable as Telegram-visible messages once they are recognized as relevant stream content.
+The later 2026-04-13 architecture review also showed that message-boundary refinement alone is not the full answer for free-form replies: the original `codex_input_reply` path still gated eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks can also arise from REST or frontend input and should still be promotable as Telegram-visible messages once they are recognized as relevant stream content.
 
 ## Scope
 
@@ -359,14 +359,15 @@ This means the product currently has two distinct outbound problems:
 1. separator-anchored multi-line closing comments need better ownership between `info` and `section`
 2. Telegram free-text questions need a bounded reply-correlated outbound path that does not depend on separator anchoring
 
-That gap is now closed by delivered `H116`:
+That gap was first narrowed by delivered `H116` and then completed by delivered `H117`:
 
-1. a bounded Telegram-input-correlated reply path now covers free-text questions even when the answer is not separator-anchored
-2. the remaining boundary-refinement work identified here was then closed by delivered `H115`
+1. `H116` added a bounded reply-block path for free-text questions even when the answer is not separator-anchored
+2. `H117` moved that reply-block path to a stream-first, source-agnostic promotion model so the same relevant answer block can be promoted after Telegram, REST, or frontend submit input instead of only after Telegram-origin input
+3. the remaining boundary-refinement work identified here was then closed by delivered `H115`
 
-After `H115` and `H116`, the product has both:
+After `H115`, `H116`, and `H117`, the product has both:
 
-- reply-correlation for non-separator Telegram question/answer cases
+- reply-block promotion for non-separator Codex question/answer cases without requiring Telegram as the eligibility gate
 - ownership handoff from `info` to `section` for separator-anchored multi-line closing comments
 
 That is the message boundary model that best matches the current transcript evidence.

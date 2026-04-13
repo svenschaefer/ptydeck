@@ -314,6 +314,8 @@ function createPendingCodexTelegramReply() {
     triggeredAt: 0,
     traceId: "",
     correlationId: "",
+    source: "",
+    replyPreferred: false,
     started: false,
     firstLineAt: 0,
     lastLineAt: 0,
@@ -321,8 +323,12 @@ function createPendingCodexTelegramReply() {
   };
 }
 
-function isReplyEligibleTelegramTrace(trace = null) {
+function isReplyPreferredTelegramTrace(trace = null) {
   return normalizeNonEmptyString(trace?.source) === "messaging:telegram" && trace?.replyEligible === true;
+}
+
+function isReplyPromotionEligibleTrace(trace = null) {
+  return trace?.replyPromotionEligible === true || isReplyPreferredTelegramTrace(trace);
 }
 
 function isCodexTelegramReplyActive(replyState, observedAt = 0) {
@@ -335,8 +341,24 @@ function isCodexTelegramReplyActive(replyState, observedAt = 0) {
   return observedAt - replyState.triggeredAt <= CODEX_TELEGRAM_REPLY_WINDOW_MS;
 }
 
+function stripCodexReplyInlineTail(value) {
+  const normalized = normalizeWhitespace(String(value || ""));
+  if (!normalized) {
+    return "";
+  }
+  const promptMarkerIndex = normalized.indexOf("›");
+  if (promptMarkerIndex > 0) {
+    const prefix = normalizeWhitespace(normalized.slice(0, promptMarkerIndex));
+    const prefixWordCount = prefix.split(/\s+/u).filter(Boolean).length;
+    if (prefix && (prefix.length >= CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH || prefixWordCount >= CODEX_TELEGRAM_REPLY_MIN_WORDS)) {
+      return prefix;
+    }
+  }
+  return normalized;
+}
+
 function stripCodexReplyLinePrefix(value) {
-  return normalizeWhitespace(String(value || "").replace(/^[•*]\s+/u, ""));
+  return stripCodexReplyInlineTail(String(value || "").replace(/^[•*]\s+/u, ""));
 }
 
 function isCodexTelegramReplyMetaLine(value) {
@@ -1541,12 +1563,14 @@ export function createMessagingRuntime(options = {}) {
       return;
     }
     const streamState = getOrCreateSessionState(normalizedSessionId);
-    if (isReplyEligibleTelegramTrace(trace)) {
+    if (isReplyPromotionEligibleTrace(trace)) {
       streamState.pendingCodexTelegramReply = {
         active: true,
         triggeredAt: nowFn(),
         traceId: normalizeNonEmptyString(trace?.traceId),
         correlationId: normalizeNonEmptyString(trace?.correlationId),
+        source: normalizeNonEmptyString(trace?.source),
+        replyPreferred: isReplyPreferredTelegramTrace(trace),
         started: false,
         firstLineAt: 0,
         lastLineAt: 0,
@@ -1558,7 +1582,9 @@ export function createMessagingRuntime(options = {}) {
           sessionId: normalizedSessionId,
           active: true,
           traceId: normalizeNonEmptyString(trace?.traceId),
-          correlationId: normalizeNonEmptyString(trace?.correlationId)
+          correlationId: normalizeNonEmptyString(trace?.correlationId),
+          traceSource: normalizeNonEmptyString(trace?.source),
+          replyPreferred: isReplyPreferredTelegramTrace(trace)
         },
         trace
       );

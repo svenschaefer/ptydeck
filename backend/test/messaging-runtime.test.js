@@ -917,6 +917,104 @@ test("messaging runtime correlates the next substantial telegram question reply 
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
 });
 
+test("messaging runtime promotes the next substantial submitted codex reply even without telegram origin", async () => {
+  const sends = [];
+  let now = 5_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 560 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 561 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "rest-reply-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "rest-reply-char",
+    correlationId: "req-rest-char"
+  });
+  assert.equal(runtime.buildStatusSummary().codexTelegramReplyCorrelation.activeSessionCount, 0);
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "rest-reply-open",
+    correlationId: "req-rest-reply",
+    replyPromotionEligible: true
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "4. MSG-063 Owner QA\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "In ROADMAP.md:\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ja. Der Fall ist jetzt sauber eingegrenzt.›Explain this codebase gpt-5.4 xhigh · 37% left\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Kurzurteil\nDie neue Reply-Logik greift grundsätzlich.\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
+    promptBoundaries: [],
+    trace: { traceId: "rest-reply-6" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ja\. Der Fall ist jetzt sauber eingegrenzt\./);
+  assert.match(sends[0].text, /Kurzurteil/);
+  assert.doesNotMatch(sends[0].text, /Explain this codebase/i);
+  assert.doesNotMatch(sends[0].text, /shell-quoting/i);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+});
+
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {
   const sends = [];
   let now = 1_000;
