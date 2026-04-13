@@ -370,6 +370,43 @@ test("messaging message policy returns explicit new update alert and suppress de
       lastDeliveredAt: 9_000
     }
   );
+  const codexTelegramReply = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end.",
+      comparableText: "wenn kein neuer blocker auftaucht gehe ich direkt in h115 und liefere den slice end-to-end",
+      aggregationReason: "codex_input_reply",
+      deliveryScope: "codex_input_reply",
+      deliveryBlockKey: "reply:req-123",
+      occurredAt: 9_400
+    },
+    {
+      messageCreated: false,
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 9_200
+    }
+  );
+  const codexTelegramReplySameBlockUpdate = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end.",
+      comparableText: "wenn kein neuer blocker auftaucht gehe ich direkt in h115 und liefere den slice end-to-end",
+      aggregationReason: "codex_input_reply",
+      deliveryScope: "codex_input_reply",
+      deliveryBlockKey: "reply:req-123",
+      occurredAt: 9_500
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Vorheriger Reply-Block",
+      lastComparableText: "vorheriger reply-block",
+      lastDeliveryBlockKey: "reply:req-123",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 9_400
+    }
+  );
 
   assert.equal(created.action, "new");
   assert.equal(started.action, "suppress");
@@ -412,6 +449,10 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(codexSeparatorSummarySentence.reason, "codex_separator_summary_sentence_new_block");
   assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.action, "update");
   assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.reason, "codex_separator_summary_sentence_block_update");
+  assert.equal(codexTelegramReply.action, "new");
+  assert.equal(codexTelegramReply.reason, "codex_input_reply_new_block");
+  assert.equal(codexTelegramReplySameBlockUpdate.action, "update");
+  assert.equal(codexTelegramReplySameBlockUpdate.reason, "codex_input_reply_block_update");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
@@ -636,6 +677,7 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.equal(status.deliveryHardBreakActive, true);
   assert.equal(status.allowlistDeliveryActive, true);
   assert.deepEqual(status.allowlistDeliveryScopes, [
+    "codex_input_reply",
     "codex_separator_info",
     "codex_separator_section",
     "codex_separator_summary_sentence"
@@ -646,6 +688,96 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
+});
+
+test("messaging runtime correlates the next substantial telegram question reply before later codex workflow chatter", async () => {
+  const sends = [];
+  let now = 4_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 520 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 521 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "telegram-reply-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "messaging:telegram",
+    traceId: "telegram-reply-open",
+    correlationId: "req-telegram-reply",
+    replyEligible: true
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "4. MSG-063 Owner QA\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "In ROADMAP.md:\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end.\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-3" }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-5" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end\./);
+  assert.doesNotMatch(sends[0].text, /shell-quoting/i);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
+  assert.deepEqual(status.allowlistDeliveryScopes, [
+    "codex_input_reply",
+    "codex_separator_info",
+    "codex_separator_section",
+    "codex_separator_summary_sentence"
+  ]);
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
 });
 
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {

@@ -343,10 +343,10 @@ This means the product currently has two distinct outbound problems:
 1. separator-anchored multi-line closing comments need better ownership between `info` and `section`
 2. Telegram free-text questions need a bounded reply-correlated outbound path that does not depend on separator anchoring
 
-So the current next-step ordering is:
+That gap is now closed by delivered `H116`:
 
-1. add a Telegram-input-correlated reply candidate path for bounded free-text questions
-2. then continue with the narrower separator-boundary refinement work
+1. a bounded Telegram-input-correlated reply path now covers free-text questions even when the answer is not separator-anchored
+2. the remaining next step is therefore the narrower separator-boundary refinement work in `H115`
 - bounded gap/lookahead exhaustion only as fallback
 
 That is the message boundary model that best matches the current transcript evidence.

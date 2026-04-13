@@ -727,6 +727,129 @@ test("runtime sends telegram text with delayed submit semantics when messaging i
   }
 });
 
+test("runtime correlates a mapped telegram free-text question to the next codex reply before later workflow chatter", async () => {
+  const sends = [];
+  const updateQueue = [];
+  const writeCalls = [];
+  let pendingQuestion = "";
+  const telegramChat = {
+    id: -100200304,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group",
+    is_forum: true
+  };
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: false,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200304", profile: "coding-agent" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 190 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 190 };
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized !== "\r") {
+            pendingQuestion += normalized;
+            return;
+          }
+          if (!dataHandler) {
+            return;
+          }
+          if (/Wie geht.s weiter\?/u.test(pendingQuestion)) {
+            dataHandler("4. MSG-063 Owner QA\n");
+            dataHandler("In ROADMAP.md:\n");
+            dataHandler("Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end.\n");
+            dataHandler("─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");
+            dataHandler("• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n");
+          } else {
+            dataHandler(normalized);
+          }
+          pendingQuestion = "";
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+
+    updateQueue.push({
+      update_id: 1,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "Wie geht’s weiter?"
+      }
+    });
+
+    await waitFor(async () => {
+      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+      const health = await healthRes.json();
+      return health.messaging.adapters[0].inboundTrace.capturedTotal >= 1;
+    }, 2000);
+    await waitFor(() => writeCalls.includes("Wie geht’s weiter?") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => sends.some((entry) => /Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115/.test(entry.text)), 2000);
+
+    const replyIndex = sends.findIndex((entry) => /Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115/.test(entry.text));
+    const metaIndex = sends.findIndex((entry) => /shell-quoting/i.test(entry.text));
+    assert.notEqual(replyIndex, -1);
+    assert.equal(metaIndex, -1);
+    assert.ok(replyIndex >= 0);
+    assert.equal(writeCalls.includes("Wie geht’s weiter?"), true);
+    assert.equal(writeCalls.includes("\r"), true);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
+    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime publishes telegram commands from the canonical surface and executes mapped custom commands end to end", async () => {
   const sends = [];
   const publishedCommands = [];

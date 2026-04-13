@@ -724,6 +724,7 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
     configured: true,
     deliveryEnabled: false,
     allowlistDeliveryScopes: [
+      "codex_input_reply",
       "codex_separator_info",
       "codex_separator_section",
       "codex_separator_summary_sentence"
@@ -756,6 +757,7 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
   assert.equal(adapter.getStatus().deliveryEnabled, false);
   assert.equal(adapter.getStatus().allowlistDeliveryActive, true);
   assert.deepEqual(adapter.getStatus().allowlistDeliveryScopes, [
+    "codex_input_reply",
     "codex_separator_info",
     "codex_separator_section",
     "codex_separator_summary_sentence"
