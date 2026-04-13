@@ -158,7 +158,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, and the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts
+- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, and a growing separator-anchored closing comment now stays on the richer `codex_separator_section` path instead of escaping early as a short `codex_separator_info` paragraph
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
@@ -241,10 +241,12 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
     - the next bounded substantial `•` block must classify as clean `info`
     - the separator-to-info horizon is still intentionally short, but now widened to roughly `4500ms` / `120` entries for real Codex timing
     - at most one immediate indented continuation line is merged
+    - if the same separator/headline pair is still owned by an active section candidate, the runtime now defers this narrow `info` delivery until the section path either wins or explicitly rejects the block as too shallow
   - `codex_separator_section` now covers the next narrow structural case:
     - prompt/footer/background-terminal chrome is stripped from mixed entries before section assembly
     - the resulting separator-anchored section can retain one narrative `•` headline plus subsection labels and indented list items
     - simple one-bullet cases stay on `codex_separator_info`; the section family is reserved for the richer narrative shape
+    - separator-anchored multi-line closing comments with still-growing continuation text now stay on this section path instead of being emitted first as `codex_separator_info`
     - explicit section boundaries and window-state gating still reject anti-pattern bullets, prompt/footer markers, diff/output fragments, and overlay-churn windows
   - `codex_separator_summary_sentence` now covers the next narrow aggregated case:
     - separator-hint summary flushes may pass only when they collapse to one sentence-like Codex update

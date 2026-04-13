@@ -13,11 +13,7 @@ Completed work belongs in `CHANGELOG.md`.
 - `QA`: Test automation owner
 
 ## Active Open Tasks (Current)
-
-- `MSG-062` Owner `BE`
-  Refine Codex outbound message-boundary ownership so larger separator-anchored closing comments are not prematurely emitted through the narrow `codex_separator_info` family when the same anchored block is still growing toward a stable section boundary; keep `codex_separator_info` for truly short paragraph bullets, keep `codex_separator_summary_sentence` sentence-like, and promote qualifying multi-line closing-comment blocks onto the `codex_separator_section` path instead.
-- `MSG-063` Owner `QA`
-  Validate the Codex message-boundary refinement wave end to end, including transcript-fixture regressions for multi-line closing comments, no-regression coverage for short `codex_separator_info` bullets, no-regression coverage proving `codex_separator_summary_sentence` stays sentence-like, and fresh live-log analysis after restart to confirm the richer closing-comment blocks are grouped and closed by the intended top-level boundaries.
+- none currently
 
 ## Active Ownership Role
 

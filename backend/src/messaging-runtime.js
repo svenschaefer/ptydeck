@@ -830,6 +830,7 @@ function createSessionStreamState() {
     recentLines: [],
     pendingSummaryBlock: createPendingSummaryBlock(),
     pendingCodexTelegramReply: createPendingCodexTelegramReply(),
+    pendingCodexSeparatorInfoDecision: null,
     lastControlSignature: CONTROL_EVENT_SIGNATURE_NONE,
     lastLifecycleType: "",
     lastSuppressedStatusLikeAt: 0,
@@ -860,6 +861,44 @@ function buildCodexSeparatorDeliveryBlockKey(decision) {
     return "";
   }
   return `${decision.anchorSequence}:${decision.infoSequence}`;
+}
+
+function getCodexAllowlistDecisionBlockKey(decision) {
+  return buildCodexSeparatorDeliveryBlockKey(decision) || normalizeNonEmptyString(decision?.key);
+}
+
+function clearPendingCodexSeparatorInfoDecision(state) {
+  if (!state || !state.pendingCodexSeparatorInfoDecision) {
+    return null;
+  }
+  const pending = state.pendingCodexSeparatorInfoDecision;
+  state.pendingCodexSeparatorInfoDecision = null;
+  return pending;
+}
+
+function shouldDispatchPendingCodexInfoAfterSectionRejection(reason) {
+  return (
+    reason === "section_too_shallow" ||
+    reason === "gap_timeout" ||
+    reason === "lookahead_exhausted" ||
+    reason === "flush_after_section"
+  );
+}
+
+function hasActiveSectionOwnershipForInfoDecision(state, decision) {
+  if (!state || !decision || normalizeNonEmptyString(decision?.family) !== CODEX_SEPARATOR_INFO_SCOPE) {
+    return false;
+  }
+  const candidate = state.codexSeparatorSectionCandidate;
+  if (!candidate || candidate.phase !== "collecting_section") {
+    return false;
+  }
+  return (
+    Number.isInteger(candidate.anchorSequence) &&
+    Number.isInteger(candidate.headlineSequence) &&
+    candidate.anchorSequence === decision.anchorSequence &&
+    candidate.headlineSequence === decision.infoSequence
+  );
 }
 
 function buildCodexTelegramReplyDeliveryBlockKey(replyState) {
@@ -2097,13 +2136,62 @@ export function createMessagingRuntime(options = {}) {
     if (!isCodexAppIdentity(session) || !isCodingAgentContext(session, profile)) {
       state.codexSeparatorCandidate = null;
       state.codexSeparatorSectionCandidate = null;
+      clearPendingCodexSeparatorInfoDecision(state);
       return null;
     }
     const decisions = [
       ...advanceCodexSeparatorSectionState(state, entry, { flush }),
       ...advanceCodexSeparatorInfoState(state, entry, { flush })
     ];
+    const sectionResolutions = new Map();
     for (const decision of decisions) {
+      if (!decision) {
+        continue;
+      }
+      const family = normalizeNonEmptyString(decision.family);
+      const blockKey = getCodexAllowlistDecisionBlockKey(decision);
+
+      if (family === CODEX_SEPARATOR_SECTION_SCOPE && decision.type === "rejection") {
+        if (blockKey) {
+          sectionResolutions.set(blockKey, normalizeNonEmptyString(decision.reason));
+        }
+        const pending = state.pendingCodexSeparatorInfoDecision;
+        if (pending && getCodexAllowlistDecisionBlockKey(pending) === blockKey) {
+          clearPendingCodexSeparatorInfoDecision(state);
+          if (shouldDispatchPendingCodexInfoAfterSectionRejection(decision.reason)) {
+            await dispatchCodexAllowlistCandidate(session, profile, state, trace, pending);
+          }
+        }
+        continue;
+      }
+
+      if (family === CODEX_SEPARATOR_SECTION_SCOPE && decision.type === "candidate") {
+        if (blockKey) {
+          sectionResolutions.set(blockKey, "section_candidate");
+        }
+        const pending = state.pendingCodexSeparatorInfoDecision;
+        if (pending && getCodexAllowlistDecisionBlockKey(pending) === blockKey) {
+          clearPendingCodexSeparatorInfoDecision(state);
+        }
+      }
+
+      if (family === CODEX_SEPARATOR_INFO_SCOPE && decision.type === "candidate") {
+        const sectionResolution = blockKey ? sectionResolutions.get(blockKey) : "";
+        if (sectionResolution === "section_candidate") {
+          continue;
+        }
+        if (sectionResolution) {
+          if (shouldDispatchPendingCodexInfoAfterSectionRejection(sectionResolution)) {
+            await dispatchCodexAllowlistCandidate(session, profile, state, trace, decision);
+          }
+          continue;
+        }
+        if (hasActiveSectionOwnershipForInfoDecision(state, decision)) {
+          state.pendingCodexSeparatorInfoDecision = decision;
+          continue;
+        }
+      }
+
       if (decision?.type !== "candidate" || !decision.text || !decision.key) {
         continue;
       }

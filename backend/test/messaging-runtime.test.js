@@ -570,10 +570,8 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
     trace: { traceId: "h99-3" }
   });
 
-  assert.equal(sends.length, 1);
+  assert.equal(sends.length, 0);
   assert.equal(edits.length, 0);
-  assert.match(sends[0].text, /Der Commit ist gepusht/);
-  assert.doesNotMatch(sends[0].text, /Session created/);
 
   await runtime.observeSessionData({
     session,
@@ -590,9 +588,10 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
     trace: { traceId: "h99-5" }
   });
 
-  assert.equal(sends.length, 2);
+  assert.equal(sends.length, 1);
   assert.equal(edits.length, 0);
-  assert.match(sends[1].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
+  assert.match(sends[0].text, /Der Commit ist gepusht/);
+  assert.doesNotMatch(sends[0].text, /Session created/);
 
   await runtime.observeSessionData({
     session,
@@ -620,6 +619,7 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   });
 
   assert.equal(sends.length, 3);
+  assert.match(sends[1].text, /Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e/);
   assert.match(sends[2].text, /Der Restart ist sauber\./);
   assert.match(sends[2].text, /Live-Zustand/);
   assert.match(sends[2].text, /Die Delivery-Counter sind nach dem Restart wieder bei 0/);
@@ -688,6 +688,143 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
+});
+
+test("messaging runtime promotes growing separator-anchored closing comments onto the section family instead of emitting early info", async () => {
+  const sends = [];
+  let now = 8_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 620 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 621 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "h115-section-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-section-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der Scope ist sauber. Ich prüfe jetzt die letzten Validatoren.\n" +
+      "  Die Docs sind konsistent und der Slice ist fast fertig.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-section-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  Danach pushe ich den finalen Stand.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-section-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-section-4" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Der Scope ist sauber\. Ich prüfe jetzt die letzten Validatoren\./);
+  assert.match(sends[0].text, /Die Docs sind konsistent und der Slice ist fast fertig\./);
+  assert.match(sends[0].text, /Danach pushe ich den finalen Stand\./);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_info_new_block"));
+});
+
+test("messaging runtime still delivers short separator-anchored bullets through the info family after shallow section rejection", async () => {
+  const sends = [];
+  let now = 9_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 720 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 721 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "h115-info-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-info-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-Zustand.\n" +
+      "  Damit der Analyse-Slice sauber abgeschlossen ist.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-info-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "h115-info-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Der Commit ist gepusht\. Ich prüfe noch einmal kurz den finalen Repo-Zustand\./);
+  assert.match(sends[0].text, /Damit der Analyse-Slice sauber abgeschlossen ist\./);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_section_new_block"));
 });
 
 test("messaging runtime correlates the next substantial telegram question reply before later codex workflow chatter", async () => {

@@ -1,7 +1,10 @@
 # Codex Message Boundary Analysis
 
-This note analyzes the end criteria that currently decide how Codex stream fragments become Telegram messages.
+This note analyzes the end criteria that decide how Codex stream fragments become Telegram messages.
 The concrete trigger for this analysis was the observation that many delivered Telegram messages appear to contain only the first line or first short paragraph of a larger Codex closing comment, even when the operator-visible terminal block clearly spans multiple visual lines.
+
+The original analysis in this note led directly to delivered `v0.4.0-H115`.
+The historical evidence and option comparison remain relevant because they explain why the shipped fix uses ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
 
 ## Scope
 
@@ -311,6 +314,12 @@ The clean generic direction is:
 3. Treat `codex_separator_section` as the authoritative family for larger separator-anchored closing comments.
 4. Refine the family-selection and finalization logic so multi-line closing comments are not prematurely emitted by the `info` path when the same anchored block is still visibly growing toward a stable section boundary.
 
+That is now the shipped behavior after `H115`:
+
+- `codex_separator_info` is deferred while the same separator/headline pair is still owned by an active section candidate
+- `codex_separator_section` wins when the block keeps growing into a stable multi-line closing comment
+- short paragraph bullets still fall back to `codex_separator_info` after an explicit shallow-section rejection
+
 In practical terms, the correct end criteria for the larger message unit are:
 
 - next top-level bullet
@@ -346,8 +355,12 @@ This means the product currently has two distinct outbound problems:
 That gap is now closed by delivered `H116`:
 
 1. a bounded Telegram-input-correlated reply path now covers free-text questions even when the answer is not separator-anchored
-2. the remaining next step is therefore the narrower separator-boundary refinement work in `H115`
-- bounded gap/lookahead exhaustion only as fallback
+2. the remaining boundary-refinement work identified here was then closed by delivered `H115`
+
+After `H115` and `H116`, the product has both:
+
+- reply-correlation for non-separator Telegram question/answer cases
+- ownership handoff from `info` to `section` for separator-anchored multi-line closing comments
 
 That is the message boundary model that best matches the current transcript evidence.
 
