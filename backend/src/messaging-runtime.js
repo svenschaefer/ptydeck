@@ -627,6 +627,54 @@ function isSubsetComparableText(currentComparableText, previousComparableText) {
   return currentComparableText.length >= 12 && previousComparableText.includes(currentComparableText);
 }
 
+export function createMessagingThreadPolicyState() {
+  return {
+    messageCreated: false,
+    lastText: "",
+    lastComparableText: "",
+    lastDeliveryBlockKey: "",
+    lastPromptAt: 0,
+    lastAction: "",
+    lastEventType: "",
+    lastDeliveredAt: 0,
+    lastObservedEventType: "",
+    lastObservedEventAt: 0
+  };
+}
+
+export function advanceMessagingThreadPolicyState(threadState, event, decision, { delivered = false } = {}) {
+  const state = threadState && typeof threadState === "object"
+    ? threadState
+    : createMessagingThreadPolicyState();
+  const normalizedAction = normalizeNonEmptyString(decision?.action);
+  const normalizedType = normalizeNonEmptyString(event?.type);
+  const occurredAt = Number.isInteger(event?.occurredAt) ? event.occurredAt : 0;
+  if (normalizedAction && normalizedAction !== "suppress") {
+    state.lastObservedEventType = normalizedType;
+    if (occurredAt > 0) {
+      state.lastObservedEventAt = occurredAt;
+    }
+  }
+  if (!delivered) {
+    return state;
+  }
+  if (normalizedAction === "new" || normalizedAction === "update" || normalizedAction === "alert") {
+    state.messageCreated = true;
+  }
+  state.lastText = String(event?.text || "");
+  state.lastComparableText = String(event?.comparableText || "");
+  state.lastDeliveryBlockKey = String(event?.deliveryBlockKey || "");
+  state.lastAction = normalizedAction;
+  state.lastEventType = normalizedType;
+  if (occurredAt > 0) {
+    state.lastDeliveredAt = occurredAt;
+    if (normalizedType === "session.prompt.ready") {
+      state.lastPromptAt = occurredAt;
+    }
+  }
+  return state;
+}
+
 function sanitizeSummaryFragment(summary, session, profile) {
   const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
   if (!normalizedSummary) {
@@ -1623,16 +1671,7 @@ export function createMessagingRuntime(options = {}) {
     if (state) {
       return state;
     }
-    state = {
-      messageCreated: false,
-      lastText: "",
-      lastComparableText: "",
-      lastDeliveryBlockKey: "",
-      lastPromptAt: 0,
-      lastAction: "",
-      lastEventType: "",
-      lastDeliveredAt: 0
-    };
+    state = createMessagingThreadPolicyState();
     threadStates.set(key, state);
     return state;
   }
@@ -2339,8 +2378,7 @@ export function createMessagingRuntime(options = {}) {
         delivery: []
       });
     }
-    threadState.lastObservedEventType = event.type;
-    threadState.lastObservedEventAt = event.occurredAt;
+    advanceMessagingThreadPolicyState(threadState, event, decision, { delivered: false });
     let delivered = false;
     const deliveryResults = [];
     let finalTarget = target;
@@ -2368,19 +2406,7 @@ export function createMessagingRuntime(options = {}) {
       delivered = delivered || result?.delivered === true;
     }
     if (delivered) {
-      threadState.messageCreated =
-        decision.action === "new" || decision.action === "update" || decision.action === "alert"
-          ? true
-          : threadState.messageCreated;
-      threadState.lastText = event.text;
-      threadState.lastComparableText = event.comparableText || "";
-      threadState.lastDeliveryBlockKey = event.deliveryBlockKey || "";
-      threadState.lastAction = decision.action;
-      threadState.lastEventType = event.type;
-      threadState.lastDeliveredAt = event.occurredAt;
-      if (event.type === "session.prompt.ready") {
-        threadState.lastPromptAt = event.occurredAt;
-      }
+      advanceMessagingThreadPolicyState(threadState, event, decision, { delivered: true });
       if (normalizeNonEmptyString(event?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
         const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, finalTarget);
         if (ledgerEntry) {
