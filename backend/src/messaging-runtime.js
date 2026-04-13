@@ -229,6 +229,21 @@ function truncateSummary(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+function truncateStructuredMessageText(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
+  const normalized = normalizeLineBreaks(value)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
 function truncateResponseText(value, maxLength = MAX_INBOUND_RESPONSE_TEXT_LENGTH) {
   const normalized = typeof value === "string" ? value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() : "";
   if (!normalized) {
@@ -971,6 +986,30 @@ function hasActiveSectionOwnershipForInfoDecision(state, decision) {
   );
 }
 
+function shouldDeferLineClassificationToCodexSectionAssembly(session, profile, state, visibleLine) {
+  if (!isCodexAppIdentity(session) || !isCodingAgentContext(session, profile)) {
+    return false;
+  }
+  const candidate = state?.codexSeparatorSectionCandidate;
+  if (!candidate || candidate.phase !== "collecting_section") {
+    return false;
+  }
+  const normalized = normalizeWhitespace(visibleLine);
+  if (!normalized) {
+    return false;
+  }
+  if (isSeparatorHint(normalized, session, profile)) {
+    return false;
+  }
+  if (CODING_AGENT_ANTI_BULLET_PATTERN.test(normalized)) {
+    return false;
+  }
+  if (/^›\s+/u.test(normalized)) {
+    return false;
+  }
+  return true;
+}
+
 function buildCodexTelegramReplyDeliveryBlockKey(replyState) {
   const correlationId = normalizeNonEmptyString(replyState?.correlationId);
   if (correlationId) {
@@ -1015,7 +1054,11 @@ function createEvent({
   deliveryScope = "",
   deliveryBlockKey = ""
 }) {
-  const textSummary = truncateSummary(summary);
+  const normalizedDeliveryScope = normalizeNonEmptyString(deliveryScope);
+  const textSummary =
+    normalizedDeliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+      ? truncateStructuredMessageText(summary)
+      : truncateSummary(summary);
   const label = buildSessionLabel(session);
   const text = textSummary ? `${label}: ${textSummary}` : label;
   const normalizedComparableText = comparableText || createComparableText(textSummary || text);
@@ -1033,7 +1076,7 @@ function createEvent({
     text,
     trace,
     aggregationReason: normalizeNonEmptyString(aggregationReason),
-    deliveryScope: normalizeNonEmptyString(deliveryScope),
+    deliveryScope: normalizedDeliveryScope,
     deliveryBlockKey: normalizeNonEmptyString(deliveryBlockKey),
     noiseClass: normalizeNonEmptyString(noiseClass),
     comparableText: normalizedComparableText
@@ -2107,6 +2150,10 @@ export function createMessagingRuntime(options = {}) {
           ? CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH
           : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
     const normalizedText = truncateSummary(decision?.text, maxLength);
+    const deliveredText =
+      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+        ? truncateStructuredMessageText(decision?.text, maxLength)
+        : normalizedText;
     const candidateKey = normalizeNonEmptyString(decision?.key);
     const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
     const lastCandidateKey =
@@ -2117,14 +2164,14 @@ export function createMessagingRuntime(options = {}) {
           : deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE
             ? state.lastCodexTelegramReplyCandidateKey
           : state.lastCodexSeparatorCandidateKey;
-    if (!normalizedText || candidateKey === lastCandidateKey) {
+    if (!deliveredText || candidateKey === lastCandidateKey) {
       return null;
     }
     const event = createEvent({
       session,
       profile,
       type: "session.output.summary",
-      summary: normalizedText,
+      summary: deliveredText,
       severity: "info",
       threadKey: "status",
       trace,
@@ -2132,7 +2179,7 @@ export function createMessagingRuntime(options = {}) {
       aggregationReason: deliveryScope,
       deliveryScope,
       deliveryBlockKey,
-      comparableText: createComparableText(normalizedText)
+      comparableText: createComparableText(deliveredText)
     });
     const target = resolveTarget(session);
     if (
@@ -2563,6 +2610,10 @@ export function createMessagingRuntime(options = {}) {
     async function consumeCompletedLine(line) {
       const visibleLine = sanitizeMessageCandidate(line, session, profile);
       if (await observeCodexTelegramReplyLine(session, profile, state, trace, visibleLine)) {
+        pushRecentLine(state, visibleLine);
+        return;
+      }
+      if (shouldDeferLineClassificationToCodexSectionAssembly(session, profile, state, visibleLine)) {
         pushRecentLine(state, visibleLine);
         return;
       }

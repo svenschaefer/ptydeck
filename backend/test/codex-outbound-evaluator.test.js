@@ -165,6 +165,39 @@ test("codex section evaluator assembles a structured restart section from mixed 
   assert.match(finalized[0].text, /\n\nWichtig\n- Die Delivery-Counter sind nach dem Restart wieder bei 0\./);
 });
 
+test("codex section evaluator assembles a deep multiline section from an implicit contaminated bullet start", () => {
+  const state = createCodexAllowlistState();
+
+  assert.deepEqual(
+    feedSection(
+      state,
+      "• H118 is delivered and pushed.›Explain this codebase gpt-5.4 xhigh · 58% left · ~/workspace/code/ptydeck\n",
+      7_800
+    ),
+    []
+  );
+  assert.deepEqual(feedSection(state, "  Commit\n", 7_900), []);
+  assert.deepEqual(feedSection(state, "  - d394e92 feat: add messaging policy replay harness\n", 8_000), []);
+  assert.deepEqual(feedSection(state, "  What changed\n", 8_100), []);
+  assert.deepEqual(
+    feedSection(
+      state,
+      "  - Added shared thread-policy-state helpers in backend/src/messaging-runtime.js so live runtime state transitions and offline replay use the same semantics.\n",
+      8_200
+    ),
+    []
+  );
+  const finalized = feedSection(state, "", 8_300, [0]);
+
+  assert.equal(finalized.length, 1);
+  assert.equal(finalized[0].type, "candidate");
+  assert.equal(finalized[0].family, CODEX_SEPARATOR_SECTION_SCOPE);
+  assert.equal(finalized[0].reason, "section_closed_by_marker");
+  assert.match(finalized[0].text, /^H118 is delivered and pushed\./);
+  assert.match(finalized[0].text, /\n\nCommit\n- d394e92 feat: add messaging policy replay harness/);
+  assert.match(finalized[0].text, /\n\nWhat changed\n- Added shared thread-policy-state helpers/);
+});
+
 test("codex section evaluator keeps single-bullet simple cases on the info-only path", () => {
   const state = createCodexAllowlistState();
 

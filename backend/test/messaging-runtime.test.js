@@ -827,6 +827,92 @@ test("messaging runtime still delivers short separator-anchored bullets through 
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_section_new_block"));
 });
 
+test("messaging runtime assembles a multiline codex closing block from an implicit contaminated start without leaking attention or status fragments", async () => {
+  const sends = [];
+  let now = 9_500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 735 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 736 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "h119-implicit-section-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• H118 is delivered and pushed.›Explain this codebase gpt-5.4 xhigh · 58% left · ~/workspace/code/ptydeck\n",
+    promptBoundaries: [],
+    trace: { traceId: "h119-implicit-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  Commit\n",
+    promptBoundaries: [],
+    trace: { traceId: "h119-implicit-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  - d394e92 feat: add messaging policy replay harness\n",
+    promptBoundaries: [],
+    trace: { traceId: "h119-implicit-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  What changed\n",
+    promptBoundaries: [],
+    trace: { traceId: "h119-implicit-4" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "  - Added shared thread-policy-state helpers in backend/src/messaging-runtime.js so live runtime state transitions and offline replay use the same semantics.\n" +
+      "  - Supports strict failure mode for drift detection.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h119-implicit-5" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "",
+    promptBoundaries: [0],
+    trace: { traceId: "h119-implicit-6" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /^\[7\] ptydeck: H118 is delivered and pushed\./);
+  assert.match(sends[0].text, /\n\nCommit\n- d394e92 feat: add messaging policy replay harness/);
+  assert.match(sends[0].text, /\n\nWhat changed\n- Added shared thread-policy-state helpers/);
+  assert.match(sends[0].text, /- Supports strict f/u);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_required"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "status_update"));
+});
+
 test("messaging runtime correlates the next substantial telegram question reply before later codex workflow chatter", async () => {
   const sends = [];
   let now = 4_000;

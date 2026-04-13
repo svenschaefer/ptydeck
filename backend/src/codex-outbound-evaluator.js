@@ -543,6 +543,23 @@ function appendCodexSectionLine(candidate, line, kind, occurredAt) {
   }
 }
 
+function maybeStartImplicitCodexSectionCandidate(state, entry, analysis) {
+  if (!state || !entry || !analysis || !Array.isArray(analysis.lines) || analysis.lines.length === 0) {
+    return null;
+  }
+  const headlineIndex = analysis.lines.findIndex((sectionLine) => sectionLine.kind === "info_bullet");
+  if (headlineIndex < 0) {
+    return null;
+  }
+  const prelude = analysis.lines.slice(0, headlineIndex);
+  if (prelude.some((sectionLine) => sectionLine.kind === "anti_bullet" || sectionLine.kind === "separator" || sectionLine.kind === "diff_or_output")) {
+    return null;
+  }
+  const candidate = beginCodexSectionCandidate(entry);
+  state.codexSeparatorSectionCandidate = candidate;
+  return candidate;
+}
+
 export function advanceCodexSeparatorSectionState(state, entry, { flush = false } = {}) {
   const events = [];
   let candidate = state?.codexSeparatorSectionCandidate || null;
@@ -572,9 +589,17 @@ export function advanceCodexSeparatorSectionState(state, entry, { flush = false 
     if (!currentEntry) {
       return;
     }
+    let analysis = null;
     if (!candidate) {
       maybeStartAnchor(currentEntry);
-      return;
+      if (candidate) {
+        return;
+      }
+      analysis = buildCodexSectionEntryAnalysis(currentEntry);
+      candidate = maybeStartImplicitCodexSectionCandidate(state, currentEntry, analysis);
+      if (!candidate) {
+        return;
+      }
     }
 
     if (currentEntry.sequence !== candidate.anchorSequence) {
@@ -585,7 +610,14 @@ export function advanceCodexSeparatorSectionState(state, entry, { flush = false 
           entryOccurredAt: currentEntry.occurredAt
         }));
         maybeStartAnchor(currentEntry);
-        return;
+        if (candidate) {
+          return;
+        }
+        analysis = buildCodexSectionEntryAnalysis(currentEntry);
+        candidate = maybeStartImplicitCodexSectionCandidate(state, currentEntry, analysis);
+        if (!candidate) {
+          return;
+        }
       }
       if (candidate.observedEntries >= CODEX_SEPARATOR_SECTION_MAX_LOOKAHEAD_ENTRIES) {
         clearCandidate(createSectionDecision("rejection", candidate, {
@@ -594,12 +626,21 @@ export function advanceCodexSeparatorSectionState(state, entry, { flush = false 
           entryOccurredAt: currentEntry.occurredAt
         }));
         maybeStartAnchor(currentEntry);
-        return;
+        if (candidate) {
+          return;
+        }
+        analysis = analysis || buildCodexSectionEntryAnalysis(currentEntry);
+        candidate = maybeStartImplicitCodexSectionCandidate(state, currentEntry, analysis);
+        if (!candidate) {
+          return;
+        }
       }
-      candidate.observedEntries += 1;
+      if (candidate && currentEntry.sequence !== candidate.anchorSequence) {
+        candidate.observedEntries += 1;
+      }
     }
 
-    const analysis = buildCodexSectionEntryAnalysis(currentEntry);
+    analysis = analysis || buildCodexSectionEntryAnalysis(currentEntry);
     candidate.discardedNoiseLines += analysis.discardedNoiseLines;
     if (analysis.lines.length === 0) {
       if (
@@ -661,11 +702,11 @@ export function advanceCodexSeparatorSectionState(state, entry, { flush = false 
         continue;
       }
 
-      if (
-        sectionLine.kind === "separator" ||
-        sectionLine.kind === "anti_bullet" ||
-        sectionLine.kind === "info_bullet" ||
-        sectionLine.kind === "diff_or_output" ||
+        if (
+          sectionLine.kind === "separator" ||
+          sectionLine.kind === "anti_bullet" ||
+          sectionLine.kind === "info_bullet" ||
+          sectionLine.kind === "diff_or_output" ||
         sectionLine.kind === "prompt" ||
         sectionLine.kind === "chrome"
       ) {

@@ -6,11 +6,12 @@ The concrete trigger for this analysis was the observation that many delivered T
 The original analysis in this note led directly to delivered `v0.4.0-H115`.
 The historical evidence and option comparison remain relevant because they explain why the shipped fix uses ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
 The later 2026-04-13 architecture review also showed that message-boundary refinement alone is not the full answer for free-form replies: the original `codex_input_reply` path still gated eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks can also arise from REST or frontend input and should still be promotable as Telegram-visible messages once they are recognized as relevant stream content.
+The later post-13:00 `H118 is delivered and pushed.` field case then showed that family-local tuning still was not enough for larger multiline closing blocks when the first chunk was already contaminated and later lines fragmented before a stable family candidate existed. Delivered `v0.4.0-H119` therefore added a block-first assembly layer ahead of the existing narrow families instead of widening those families yet again.
 
 ## Scope
 
-This is analysis only.
-It does not change product behavior.
+This note began as analysis only.
+It now also records the delivered follow-up behavior that the analysis directly motivated.
 
 The evidence base in this note comes from three sources:
 
@@ -397,7 +398,13 @@ It is a pre-classification block-assembly layer with:
 - soft end instead of immediate prompt/boundary termination
 - block-level classification after assembly instead of line-local classification during assembly
 
-That is the explicit focus of queued `H119`.
+That is now the delivered `H119` behavior:
+
+- section assembly opens provisionally instead of requiring a perfectly clean first chunk
+- a substantial implicit `•` headline can now start a section candidate even when no clean separator survived the raw stream
+- prompt/footer/background chrome is stripped or isolated during assembly instead of poisoning the whole block immediately
+- line-local `attention_required` and degraded `status_update` side signals are deferred while a coherent section is still assembling
+- the winning multiline section now keeps its structured text at delivery time instead of collapsing back to one summary line
 
 ## Analysis Artifacts
 
