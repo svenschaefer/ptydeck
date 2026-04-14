@@ -3322,6 +3322,16 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {},
     stopPropagation() {}
   });
+  reopenedSecondTerminal.mount.dispatchEvent({
+    type: "keydown",
+    key: "e",
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    preventDefault() {},
+    stopPropagation() {}
+  });
   reopenedSecondTerminal.dataHandler("echo blocked-terminal");
   await tick();
   assert.match(fixture.elements.statusMessage.textContent, /Session \[1\] two has exited/i);

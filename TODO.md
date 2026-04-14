@@ -14,10 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-081` Owner `FE`
-  Eliminate the remaining browser-originated session `/input` writes that still fire on first frontend attach after a backend-only restart despite `H125`. Use the live 2026-04-14 field case where `ws.snapshot.sent` at `2026-04-14T15:59:46.833Z` was followed by repeated browser `POST /api/v1/sessions/.../input` writes on session `b24c99aa-5152-41cc-8f69-32cfe8caa5ad` (`bytes=62` then `bytes=1` at `2026-04-14T16:00:06Z`, then the same pair again at `2026-04-14T16:00:21Z`). Isolate the exact remaining frontend bootstrap path that still emits those writes and ensure first frontend open stays passive until explicit operator interaction.
-- `MSG-082` Owner `QA`
-  Reproduce and validate the residual frontend-bootstrap input-write regression after `H125`: prove that first frontend open after a backend-only restart still produces snapshot and resize behavior as intended, but no unintended session `/input` writes, reply-window arming, or PTY activity occur before explicit operator interaction once the corrective follow-up lands.
 - `MSG-089` Owner `BE`
   Correct the unsafe PTY `EINTR` write path identified in `v0.4.0-H126`. Replace the current async queue-drop behavior inherited from the installed `node-pty` write queue with bounded retry handling for retryable PTY write interruptions such as `EINTR`, keep queued write data intact across retryable interruptions, and surface a structured ptydeck runtime failure only if retry exhaustion or a genuinely non-retryable async PTY write error occurs.
 - `MSG-090` Owner `QA`

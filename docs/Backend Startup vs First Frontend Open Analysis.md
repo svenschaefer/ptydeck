@@ -163,7 +163,7 @@ That unresolved detail does **not** change the main product conclusion.
 
 ## Delivered Follow-Up
 
-The product-side correction for this bootstrap side effect is now delivered as `v0.4.0-H125`.
+The product-side correction for this bootstrap side effect is now delivered across `v0.4.0-H125` and `v0.4.0-H127`.
 
 The practical fix does **not** depend on proving the exact historical browser sub-trigger byte-for-byte. Instead, the terminal mount path now enforces the intended contract directly:
 
@@ -171,15 +171,16 @@ The practical fix does **not** depend on proving the exact historical browser su
 - passive frontend bootstrap may **not** forward browser-side terminal `onData(...)` into backend session input
 - browser-side terminal input forwarding is armed only after explicit local operator interaction
 
-In the shipped code, `frontend/src/public/ui/session-terminal-runtime-controller.js` now suppresses terminal-originated `onData(...)` while a mounted terminal is still in the passive bootstrap state and only begins forwarding after explicit interaction such as:
+In the shipped code, `frontend/src/public/ui/session-terminal-runtime-controller.js` now suppresses terminal-originated `onData(...)` while a mounted terminal is still in the passive bootstrap state and only begins forwarding after explicit write-intent interaction such as:
 
-- terminal mouse interaction
 - keyboard interaction
 - paste handling
 - middle-click paste
-- focus-button interaction
+- mouse interaction when the session is explicitly in application mouse-forwarding mode
 
-This means the backend-only restart contract remains what the original analysis proved:
+The earlier broader arming rules from `H125` were intentionally tightened in `H127` after the 2026-04-14 follow-up live repro proved that plain focus/click behavior could still arm forwarding too early. Plain left-click focus and focus-button interaction now focus the terminal surface without arming forwarding by themselves.
+
+This means the backend-only restart contract now remains what the original analysis proved:
 
 - backend restore completes without the frontend
 - the first frontend open can still cause visible replay/resizing churn
@@ -193,9 +194,9 @@ The current runtime contract is therefore:
 - first frontend open is **not** required to finish restore
 - first frontend open **does** trigger additional terminal-surface bootstrap work
 - part of that bootstrap work is expected and local/visual
-- part of that bootstrap work currently includes real browser-originated session input writes, which can look like deferred startup
+- passive frontend bootstrap should no longer include real browser-originated session input writes before explicit operator interaction
 
-So the observed late activity was **not** evidence that backend startup was still waiting for the frontend. It was evidence that frontend bootstrap currently has meaningful side effects beyond passive viewing.
+So the observed late activity was **not** evidence that backend startup was still waiting for the frontend. It was evidence that frontend bootstrap previously had meaningful side effects beyond passive viewing, and the shipped `H125`/`H127` corrections now narrow that bootstrap contract back to passive replay plus stabilization until the operator actually interacts.
 
 ## Practical Outcome
 
@@ -205,7 +206,7 @@ For future investigation or correction work, the product should distinguish at l
 2. backend startup gate released (`runtime.ready`)
 3. first frontend attached and terminal surfaces bootstrapped
 
-At the moment, phase `3` is still active enough to be mistaken for "startup only finishes when the frontend opens".
+At the moment, phase `3` can still produce visible replay/resizing churn, but it should no longer generate backend session input before explicit operator interaction.
 
 ## Reproduction Helper
 

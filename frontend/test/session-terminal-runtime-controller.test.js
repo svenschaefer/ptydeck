@@ -377,6 +377,7 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.equal(entry.terminal.scrollToBottomCalls, 1);
   entry.terminal.emitData("\u001b[I\u001b[O");
   refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
+  refs.mount.helperTextarea.dispatchEvent(createKeyEvent("l"));
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [
     "debug:terminal.created:s1",
@@ -1397,16 +1398,18 @@ test("session-terminal-runtime controller suppresses terminal onData until expli
 
   entry.terminal.emitData("\u001b[I\u001b[O");
   entry.terminal.emitData("\u001b[I");
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
+  entry.terminal.emitData("pwd\n");
 
   assert.deepEqual(terminalWrites, []);
 
-  refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
+  refs.mount.helperTextarea.dispatchEvent(createKeyEvent("p"));
   entry.terminal.emitData("pwd\n");
 
   assert.deepEqual(terminalWrites, [["s1", "pwd\n"]]);
 });
 
-test("session-terminal-runtime controller arms terminal input forwarding from focus button interaction", () => {
+test("session-terminal-runtime controller focuses but does not arm terminal input forwarding from focus button interaction", () => {
   const terminalWrites = [];
   const refs = createTerminalCardRefs("focus-button-intent");
   refs.focusBtn = new FakeEventTarget("focus-button");
@@ -1433,8 +1436,42 @@ test("session-terminal-runtime controller arms terminal input forwarding from fo
   entry.terminal.emitData("\u001b[I");
   refs.focusBtn.dispatchEvent({ type: "mousedown" });
   entry.terminal.emitData("ls\n");
+  refs.mount.helperTextarea.dispatchEvent(createKeyEvent("l"));
+  entry.terminal.emitData("ls\n");
 
+  assert.equal(entry.terminal.focusCalls, 1);
   assert.deepEqual(terminalWrites, [["s1", "ls\n"]]);
+});
+
+test("session-terminal-runtime controller arms terminal input forwarding from mouse interaction only when mouse forwarding is enabled", () => {
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    getSessionById: () => ({ id: "s1", mouseForwardingMode: "application" })
+  });
+  const refs = createTerminalCardRefs("mouse-forwarding-intent");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1", mouseForwardingMode: "application" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.emitData("\u001b[I");
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
+  entry.terminal.emitData("\u001b[M");
+
+  assert.deepEqual(terminalWrites, [["s1", "\u001b[M"]]);
 });
 
 test("session-terminal-runtime controller prompts for Ctrl-C intent when terminal selection makes copy ambiguous", async () => {

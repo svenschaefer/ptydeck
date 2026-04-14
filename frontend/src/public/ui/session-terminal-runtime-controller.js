@@ -98,13 +98,13 @@ export function createSessionTerminalRuntimeController(options = {}) {
     return getTerminalSelection(terminal).length > 0;
   }
 
-  function bindTerminalFocusIntent(refs, armTerminalDataForwarding) {
+  function bindTerminalFocusIntent(refs, focusTerminalSurface) {
     const focusBtn = refs?.focusBtn;
     if (!focusBtn || typeof focusBtn.addEventListener !== "function") {
       return () => {};
     }
     const handleFocusIntent = () => {
-      armTerminalDataForwarding("focus_button");
+      focusTerminalSurface?.();
     };
     focusBtn.addEventListener("mousedown", handleFocusIntent, true);
     focusBtn.addEventListener("click", handleFocusIntent, true);
@@ -577,7 +577,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button === 1) {
         return;
       }
-      armTerminalDataForwarding("mouse");
+      if (isMouseForwardingEnabled()) {
+        armTerminalDataForwarding("mouse");
+      }
       if (tryStartViewportScrollbarDrag(event)) {
         return;
       }
@@ -585,7 +587,9 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     const handleContextMenu = () => {
-      armTerminalDataForwarding("contextmenu");
+      if (isMouseForwardingEnabled()) {
+        armTerminalDataForwarding("contextmenu");
+      }
       focusTerminalSurface();
     };
 
@@ -696,6 +700,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
       }
       onTerminalData(session.id, data);
     });
+    const focusTerminalSurface = () => {
+      terminal.focus?.();
+      terminal.textarea?.focus?.();
+    };
     const disposeClipboardBindings = bindTerminalClipboardInteractions({
       session,
       mount: refs.mount,
@@ -704,7 +712,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       onTerminalPaste,
       armTerminalDataForwarding
     });
-    const disposeFocusIntentBinding = bindTerminalFocusIntent(refs, armTerminalDataForwarding);
+    const disposeFocusIntentBinding = bindTerminalFocusIntent(refs, focusTerminalSurface);
 
     const entry = {
       terminal,
