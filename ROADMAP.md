@@ -19,10 +19,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `MSG-079`
   - `MSG-080` after `MSG-079`
 - Queued next waves:
-  - none currently
+  - `v0.4.0-H127`
 
 ## Queued Wave Order
 - `v0.4.0-H126`
+- `v0.4.0-H127`
 
 ## Sequencing Rules
 
