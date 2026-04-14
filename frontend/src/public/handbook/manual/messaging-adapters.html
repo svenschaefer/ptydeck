@@ -152,6 +152,23 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 
 <p>The Telegram adapter status now also surfaces active outbound backoff state after a Bot API <code>retry after</code> response, so repeated rate-limit failures can be distinguished from ordinary transport errors.</p>
 
+<p>The runtime-level allowlist status now also exposes both compatibility scopes and neutral intent categories:</p>
+
+<ul>
+<li><code>/health.messaging.allowlistDeliveryScopes</code></li>
+<li><code>/ready.messaging.allowlistDeliveryScopes</code></li>
+<li><code>/health.messaging.allowlistDeliverySignals</code></li>
+<li><code>/ready.messaging.allowlistDeliverySignals</code></li>
+</ul>
+
+<p>The adapter-level status now mirrors the same split:</p>
+
+<ul>
+<li><code>allowlistDeliveryActive</code></li>
+<li><code>allowlistDeliveryScopes</code></li>
+<li><code>allowlistDeliverySignals</code></li>
+</ul>
+
 <p>The same adapter status payload now also exposes command-publication state:</p>
 
 <ul>
@@ -258,6 +275,7 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <ul>
 <li>send the currently shipped narrow coding-agent outbound families, still named <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code> for compatibility while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger coding-agent closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured <code>codex_separator_section</code> message instead of fragmenting back into short <code>info</code> paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover, repeated short-tail residue, and echoed operator input before the first real coding-agent answer line is delivered, commentary/progress chatter about repo/docs/runtime inspection work is suppressed across the narrow outbound families, turn replies now derive their primary semantic text from the shipped projection-backed <code>Turn</code> transcript/diff seam instead of the former first-hit line heuristic, short but correct replies no longer depend on the earlier minimum-length/minimum-word gate, autonomous coding-agent output can fall back to one projection-backed multiline section/info delivery at quiet completion, generic coding-agent adapters can normalize non-Codex markers such as Gemini-style <code>✦</code> through the same semantic registry seam, and unavoidable Telegram-visible truncation now keeps both the beginning and end of a long message via middle truncation instead of clipping only the tail</li>
 <li>consume adapter-neutral <code>MessageIntent</code> delivery directly inside the Telegram adapter, applying per-thread policy decisions, session labeling, structured-text preservation, and bounded middle truncation at the <code>DeliveryAdapter</code> seam instead of relying on runtime-owned Telegram formatting shortcuts</li>
+<li>allowlist narrow-delivery decisions through either legacy <code>allowlistDeliveryScopes</code> or the newer neutral <code>allowlistDeliverySignals</code>, so the shipped transport can already gate on adapter-neutral intent categories without breaking current trace and compatibility metadata</li>
 <li>run the shipped terminal-semantic migration surface in either <code>projection</code> or <code>legacy</code> primary mode while optionally keeping the other pipeline in shadow mode, exposing bounded parity/cutover diagnostics through the runtime status and trace path instead of requiring an all-at-once stream-to-message cutover</li>
 <li>expose the currently registered semantic-adapter ids through <code>messaging.terminalMessagingCore.semanticAdapterIds</code>, with the shipped registry now including both the Codex semantic adapter and a second generic coding-agent semantic adapter resolved by app identity</li>
 <li>normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families</li>
@@ -346,6 +364,12 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 
 <ul>
 <li>four narrow internal allowlist families, <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code>, can be delivered even while generic <code>deliveryEnabled</code> remains false</li>
+<li>those legacy family names now also map to neutral allowlist delivery signals so the shipped narrow gate is no longer modeled only through Codex-specific scope strings:</li>
+</ul>
+
+<p>- <code>codex_input_reply</code> -&gt; <code>turn-primary-reply</code> - <code>codex_separator_info</code> -&gt; <code>output-episode-info</code> - <code>codex_separator_section</code> -&gt; <code>output-episode-section</code> - <code>codex_separator_summary_sentence</code> -&gt; <code>output-episode-summary</code></p>
+
+<ul>
 <li>all four families are Codex-only and block-aware:</li>
 </ul>
 
@@ -545,9 +569,10 @@ curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
 <li><code>/health.messaging.allowlistDeliveryActive</code> and <code>/ready.messaging.allowlistDeliveryActive</code> show whether narrow internal outbound allowlist paths such as <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code> are active while generic <code>deliveryEnabled</code> remains false.</li>
 <li><code>/health.messaging.codexTelegramReplyCorrelation</code> and <code>/ready.messaging.codexTelegramReplyCorrelation</code> show the bounded Codex reply-block promotion state under its historical field name, including the reply-window duration and the number of sessions currently waiting for the first correlated Codex answer block after an eligible submitted input.</li>
 <li><code>/health.messaging.allowlistDeliveryScopes</code> and <code>/ready.messaging.allowlistDeliveryScopes</code> enumerate those narrow delivered scopes.</li>
+<li><code>/health.messaging.allowlistDeliverySignals</code> and <code>/ready.messaging.allowlistDeliverySignals</code> enumerate the corresponding neutral narrow-delivery signals.</li>
 <li><code>/health.messaging.codexSummaryRestartRecovery</code> and <code>/ready.messaging.codexSummaryRestartRecovery</code> expose the narrow summary-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.</li>
 <li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
-<li><code>/health.messaging.adapters[0]</code> and <code>/ready.messaging.adapters[0]</code> also expose <code>allowlistDeliveryActive</code> and <code>allowlistDeliveryScopes</code> for the Telegram adapter itself.</li>
+<li><code>/health.messaging.adapters[0]</code> and <code>/ready.messaging.adapters[0]</code> also expose <code>allowlistDeliveryActive</code>, <code>allowlistDeliveryScopes</code>, and <code>allowlistDeliverySignals</code> for the Telegram adapter itself.</li>
 <li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
 <li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.</li>
 <li>Forum-topic provisioning is also deterministic: for <code>topicMode: &quot;deck-session&quot;</code>, the adapter creates or reuses a topic named <code>&lt;deck name&gt; + &lt;terminal name&gt;</code> for the initial binding and persists the resulting <code>messageThreadId</code>.</li>

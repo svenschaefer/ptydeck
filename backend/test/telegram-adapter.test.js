@@ -770,6 +770,89 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
     "codex_separator_section",
     "codex_separator_summary_sentence"
   ]);
+  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, []);
+});
+
+test("telegram adapter allows neutral delivery-signal intents through the allowlist while legacy scopes are absent", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    allowlistDeliverySignals: ["turn-primary-reply"],
+    configuredTargets: 1,
+    nowFn: () => 990,
+    formatSessionLabel: (session) => `[${session.quickIdToken}] ${session.name}`,
+    transport: {
+      async sendMessage(payload) {
+        calls.push(payload);
+        return { messageId: 77 };
+      },
+      async editMessage(payload) {
+        calls.push(payload);
+        return { messageId: payload.messageId || 77 };
+      }
+    }
+  });
+  const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
+  const projection = createTerminalProjection({
+    projectionId: "proj-signal",
+    sessionId: "s1",
+    sourceRevision: "7",
+    appFamily: "coding-agent",
+    appLabel: "codex",
+    profile: "coding-agent"
+  });
+  const turn = createTurn({
+    turnId: "turn-signal",
+    sessionId: "s1",
+    correlationId: "corr-signal",
+    baselineProjectionId: "proj-signal",
+    openedAt: 1_000,
+    closedAt: 1_100,
+    status: "completed"
+  });
+  const semanticAdapter = createAppSemanticAdapterDescriptor({
+    adapterId: "codex-semantic-adapter",
+    appFamily: "coding-agent",
+    appLabels: ["codex"],
+    strategy: "projection"
+  });
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: "telegram",
+    channel: "telegram"
+  });
+  const intent = createMessageIntent({
+    intentId: "intent-signal",
+    sessionId: "s1",
+    intentKind: "turn-primary-reply",
+    eventType: "session.output.summary",
+    severity: "info",
+    threadKey: "status",
+    text: "Ok, signal delivered",
+    comparableText: "ok signal delivered",
+    projection,
+    turn,
+    semanticAdapter,
+    deliveryAdapters: [deliveryAdapter],
+    routing: { threadKey: "status", priority: "primary" },
+    metadata: {
+      deliverySignal: "turn-primary-reply",
+      summaryMaxLength: 280
+    }
+  });
+
+  const result = await adapter.handleMessageIntent({
+    target: { chatId: "-1001" },
+    session,
+    profile: "coding-agent",
+    trace: { traceId: "trace-signal" },
+    intent
+  });
+
+  assert.equal(result.delivered, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].text, "[7] ptydeck: Ok, signal delivered");
+  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, ["turn-primary-reply"]);
 });
 
 test("telegram adapter applies thread policy directly on adapter-neutral message intents", async () => {

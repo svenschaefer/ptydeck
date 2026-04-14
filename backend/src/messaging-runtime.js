@@ -67,6 +67,10 @@ const CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH = 24;
 const CODEX_TELEGRAM_REPLY_MIN_WORDS = 5;
 const CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH = 1200;
 const CODEX_TELEGRAM_REPLY_MAX_LINES = 8;
+const TURN_PRIMARY_REPLY_DELIVERY_SIGNAL = "turn-primary-reply";
+const OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL = "output-episode-info";
+const OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL = "output-episode-section";
+const OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL = "output-episode-summary";
 const TERMINAL_SEMANTIC_PRIMARY_MODES = Object.freeze(["legacy", "projection"]);
 const DEFAULT_TERMINAL_SEMANTIC_PRIMARY_MODE = "projection";
 const DEFAULT_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED = true;
@@ -77,6 +81,12 @@ const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([
   CODEX_SEPARATOR_INFO_SCOPE,
   CODEX_SEPARATOR_SECTION_SCOPE,
   CODEX_SEPARATOR_SUMMARY_SCOPE
+]);
+const ALLOWLIST_DELIVERY_SIGNALS = Object.freeze([
+  TURN_PRIMARY_REPLY_DELIVERY_SIGNAL,
+  OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL,
+  OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL,
+  OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL
 ]);
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
@@ -1432,6 +1442,26 @@ function isCodexAllowlistScope(deliveryScope) {
   );
 }
 
+function getAllowlistDeliverySignalForScope(deliveryScope) {
+  switch (normalizeNonEmptyString(deliveryScope)) {
+    case CODEX_TELEGRAM_REPLY_SCOPE:
+      return TURN_PRIMARY_REPLY_DELIVERY_SIGNAL;
+    case CODEX_SEPARATOR_INFO_SCOPE:
+      return OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL;
+    case CODEX_SEPARATOR_SECTION_SCOPE:
+      return OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL;
+    case CODEX_SEPARATOR_SUMMARY_SCOPE:
+      return OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL;
+    default:
+      return "";
+  }
+}
+
+function isAllowlistDeliverySignal(deliverySignal) {
+  const normalizedDeliverySignal = normalizeNonEmptyString(deliverySignal);
+  return Boolean(normalizedDeliverySignal && ALLOWLIST_DELIVERY_SIGNALS.includes(normalizedDeliverySignal));
+}
+
 function pushRecentLine(state, line) {
   state.recentLines.push(line);
   if (state.recentLines.length > MAX_RECENT_LINES) {
@@ -1453,6 +1483,7 @@ function createEvent({
   noiseClass = "",
   comparableText = "",
   deliveryScope = "",
+  deliverySignal = "",
   deliveryBlockKey = "",
   summaryMaxLength = MAX_EVENT_SUMMARY_LENGTH,
   preserveStructuredSummary = false,
@@ -1481,6 +1512,7 @@ function createEvent({
     trace,
     aggregationReason: normalizeNonEmptyString(aggregationReason),
     deliveryScope: normalizedDeliveryScope,
+    deliverySignal: normalizeNonEmptyString(deliverySignal),
     deliveryBlockKey: normalizeNonEmptyString(deliveryBlockKey),
     noiseClass: normalizeNonEmptyString(noiseClass),
     comparableText: normalizedComparableText,
@@ -1535,6 +1567,9 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   }
   const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
   const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
+  const deliverySignal = normalizeNonEmptyString(
+    event?.deliverySignal || event?.messageIntent?.metadata?.deliverySignal || event?.messageIntent?.intentKind
+  );
   const deliveryBlockKey = normalizeNonEmptyString(event?.deliveryBlockKey);
   const comparableText = normalizeNonEmptyString(event?.comparableText);
   const lastComparableText = normalizeNonEmptyString(threadState.lastComparableText);
@@ -1606,16 +1641,17 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     }
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
   }
-  if (isCodexAllowlistScope(deliveryScope)) {
+  if (isCodexAllowlistScope(deliveryScope) || isAllowlistDeliverySignal(deliverySignal)) {
+    const reasonPrefix = deliveryScope || deliverySignal || "allowlist_delivery";
     if (
       threadState.messageCreated === true &&
       deliveryBlockKey &&
       lastDeliveryBlockKey &&
       deliveryBlockKey === lastDeliveryBlockKey
     ) {
-      return Object.freeze({ action: "update", messageKey, reason: `${deliveryScope}_block_update` });
+      return Object.freeze({ action: "update", messageKey, reason: `${reasonPrefix}_block_update` });
     }
-    return Object.freeze({ action: "new", messageKey, reason: `${deliveryScope}_new_block` });
+    return Object.freeze({ action: "new", messageKey, reason: `${reasonPrefix}_new_block` });
   }
   if (threadState.lastText === text) {
     return Object.freeze({ action: "suppress", messageKey, reason: "duplicate" });
@@ -1880,7 +1916,9 @@ export function createMessagingRuntime(options = {}) {
   const telegramConfigured = Boolean(options.telegramBotToken && telegramTargetMappings.length > 0);
   const telegramOutboundHardBreakActive = options.telegramOutboundHardBreakActive === true;
   const telegramAllowlistDeliveryScopes = telegramConfigured ? CODEX_ALLOWLIST_DELIVERY_SCOPES.slice() : [];
-  const telegramAllowlistDeliveryActive = telegramAllowlistDeliveryScopes.length > 0;
+  const telegramAllowlistDeliverySignals = telegramConfigured ? ALLOWLIST_DELIVERY_SIGNALS.slice() : [];
+  const telegramAllowlistDeliveryActive =
+    telegramAllowlistDeliveryScopes.length > 0 || telegramAllowlistDeliverySignals.length > 0;
   const telegramOutboundEnabled =
     telegramConfigured && !telegramOutboundHardBreakActive && options.telegramOutboundEnabled === true;
   const telegramInboundEnabled = telegramConfigured && options.telegramInboundEnabled === true;
@@ -1932,6 +1970,7 @@ export function createMessagingRuntime(options = {}) {
     deliveryEnabled: telegramOutboundEnabled,
     deliveryHardBreakActive: telegramOutboundHardBreakActive,
     allowlistDeliveryScopes: telegramAllowlistDeliveryScopes,
+    allowlistDeliverySignals: telegramAllowlistDeliverySignals,
     inboundEnabled: telegramInboundEnabled,
     configuredTargets: telegramTargetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
@@ -1949,6 +1988,7 @@ export function createMessagingRuntime(options = {}) {
   const discordAdapter = createDiscordAdapter({
     configured: discordConfigured,
     deliveryEnabled: discordOutboundEnabled,
+    allowlistDeliverySignals: ALLOWLIST_DELIVERY_SIGNALS,
     configuredTargets: discordTargetMappings.length,
     transport: discordTransport,
     nowFn,
@@ -2079,6 +2119,7 @@ export function createMessagingRuntime(options = {}) {
     maxLength
   }) {
     const traceId = normalizeNonEmptyString(trace?.traceId);
+    const deliverySignal = getAllowlistDeliverySignalForScope(deliveryScope);
     const projection = buildMessageIntentProjection(state, session, profile, {
       deliveryScope,
       candidateKey,
@@ -2100,7 +2141,7 @@ export function createMessagingRuntime(options = {}) {
           normalizeNonEmptyString(turn?.traceId) ||
           traceId,
         sessionId: session.id,
-        intentKind: "reply",
+        intentKind: deliverySignal || "reply",
         eventType: "session.output.summary",
         severity: "info",
         threadKey: "status",
@@ -2118,6 +2159,7 @@ export function createMessagingRuntime(options = {}) {
         metadata: {
           aggregationReason: deliveryScope,
           legacyDeliveryScope: deliveryScope,
+          deliverySignal,
           summaryMaxLength: maxLength,
           preserveStructuredSummary: structuredText
         }
@@ -2127,7 +2169,7 @@ export function createMessagingRuntime(options = {}) {
     return createMessageIntent({
       intentId: deliveryBlockKey || candidateKey || traceId,
       sessionId: session.id,
-      intentKind: "autonomous-update",
+      intentKind: deliverySignal || "autonomous-update",
       eventType: "session.output.summary",
       severity: "info",
       threadKey: "status",
@@ -2145,6 +2187,7 @@ export function createMessagingRuntime(options = {}) {
       metadata: {
         aggregationReason: deliveryScope,
         legacyDeliveryScope: deliveryScope,
+        deliverySignal,
         summaryMaxLength: maxLength,
         preserveStructuredSummary: structuredText
       }
@@ -2169,6 +2212,8 @@ export function createMessagingRuntime(options = {}) {
       nowFn,
       aggregationReason: normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
       deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
+      deliverySignal:
+        normalizeNonEmptyString(intent?.metadata?.deliverySignal) || normalizeNonEmptyString(intent?.intentKind),
       comparableText: normalizeNonEmptyString(intent?.comparableText) || createComparableText(intent?.text || ""),
       deliveryBlockKey:
         normalizeNonEmptyString(intent?.turn?.turnId) ||
@@ -3910,6 +3955,7 @@ export function createMessagingRuntime(options = {}) {
     if (!semanticDecision?.text) {
       return null;
     }
+    const deliverySignal = getAllowlistDeliverySignalForScope(semanticDecision.deliveryScope);
     const projection = buildMessageIntentProjection(state, session, profile, {
       deliveryScope: normalizeNonEmptyString(semanticDecision.deliveryScope),
       deliveryBlockKey: normalizeNonEmptyString(semanticDecision.deliveryBlockKey),
@@ -3926,7 +3972,7 @@ export function createMessagingRuntime(options = {}) {
           normalizeNonEmptyString(trace?.correlationId) ||
           normalizeNonEmptyString(trace?.traceId),
         sessionId: session.id,
-        intentKind: "reply",
+        intentKind: deliverySignal || "reply",
         eventType: "session.output.summary",
         severity: "info",
         threadKey: "status",
@@ -3942,6 +3988,11 @@ export function createMessagingRuntime(options = {}) {
           priority: "primary"
         },
         metadata: semanticDecision.metadata
+          ? {
+              ...semanticDecision.metadata,
+              deliverySignal
+            }
+          : { deliverySignal }
       });
     }
     return createMessageIntent({
@@ -3949,7 +4000,7 @@ export function createMessagingRuntime(options = {}) {
         normalizeNonEmptyString(runtimeSnapshot?.outputEpisode?.episodeId) ||
         normalizeNonEmptyString(trace?.traceId),
       sessionId: session.id,
-      intentKind: "autonomous-update",
+      intentKind: deliverySignal || "autonomous-update",
       eventType: "session.output.summary",
       severity: "info",
       threadKey: "status",
@@ -3965,6 +4016,11 @@ export function createMessagingRuntime(options = {}) {
         priority: "secondary"
       },
       metadata: semanticDecision.metadata
+        ? {
+            ...semanticDecision.metadata,
+            deliverySignal
+          }
+        : { deliverySignal }
     });
   }
 
@@ -5138,6 +5194,7 @@ export function createMessagingRuntime(options = {}) {
       deliveryHardBreakActive: telegramOutboundHardBreakActive,
       allowlistDeliveryActive: telegramAllowlistDeliveryActive,
       allowlistDeliveryScopes: telegramAllowlistDeliveryScopes.slice(),
+      allowlistDeliverySignals: telegramAllowlistDeliverySignals.slice(),
       codexTelegramReplyCorrelation: {
         windowMs: CODEX_TELEGRAM_REPLY_WINDOW_MS,
         activeSessionCount: activeReplySessionCount

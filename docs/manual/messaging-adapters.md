@@ -102,6 +102,19 @@ Those fields make the current legacy-versus-projection comparison state visible 
 
 The Telegram adapter status now also surfaces active outbound backoff state after a Bot API `retry after` response, so repeated rate-limit failures can be distinguished from ordinary transport errors.
 
+The runtime-level allowlist status now also exposes both compatibility scopes and neutral intent categories:
+
+- `/health.messaging.allowlistDeliveryScopes`
+- `/ready.messaging.allowlistDeliveryScopes`
+- `/health.messaging.allowlistDeliverySignals`
+- `/ready.messaging.allowlistDeliverySignals`
+
+The adapter-level status now mirrors the same split:
+
+- `allowlistDeliveryActive`
+- `allowlistDeliveryScopes`
+- `allowlistDeliverySignals`
+
 The same adapter status payload now also exposes command-publication state:
 
 - `publishedCommandCount`
@@ -201,6 +214,7 @@ The Telegram reference adapter can:
 
 - send the currently shipped narrow coding-agent outbound families, still named `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence` for compatibility while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger coding-agent closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover, repeated short-tail residue, and echoed operator input before the first real coding-agent answer line is delivered, commentary/progress chatter about repo/docs/runtime inspection work is suppressed across the narrow outbound families, turn replies now derive their primary semantic text from the shipped projection-backed `Turn` transcript/diff seam instead of the former first-hit line heuristic, short but correct replies no longer depend on the earlier minimum-length/minimum-word gate, autonomous coding-agent output can fall back to one projection-backed multiline section/info delivery at quiet completion, generic coding-agent adapters can normalize non-Codex markers such as Gemini-style `✦` through the same semantic registry seam, and unavoidable Telegram-visible truncation now keeps both the beginning and end of a long message via middle truncation instead of clipping only the tail
 - consume adapter-neutral `MessageIntent` delivery directly inside the Telegram adapter, applying per-thread policy decisions, session labeling, structured-text preservation, and bounded middle truncation at the `DeliveryAdapter` seam instead of relying on runtime-owned Telegram formatting shortcuts
+- allowlist narrow-delivery decisions through either legacy `allowlistDeliveryScopes` or the newer neutral `allowlistDeliverySignals`, so the shipped transport can already gate on adapter-neutral intent categories without breaking current trace and compatibility metadata
 - run the shipped terminal-semantic migration surface in either `projection` or `legacy` primary mode while optionally keeping the other pipeline in shadow mode, exposing bounded parity/cutover diagnostics through the runtime status and trace path instead of requiring an all-at-once stream-to-message cutover
 - expose the currently registered semantic-adapter ids through `messaging.terminalMessagingCore.semanticAdapterIds`, with the shipped registry now including both the Codex semantic adapter and a second generic coding-agent semantic adapter resolved by app identity
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
@@ -274,6 +288,11 @@ That hard break is intentional:
 The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined through `v0.4.0-H119`:
 
 - four narrow internal allowlist families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, can be delivered even while generic `deliveryEnabled` remains false
+- those legacy family names now also map to neutral allowlist delivery signals so the shipped narrow gate is no longer modeled only through Codex-specific scope strings:
+  - `codex_input_reply` -> `turn-primary-reply`
+  - `codex_separator_info` -> `output-episode-info`
+  - `codex_separator_section` -> `output-episode-section`
+  - `codex_separator_summary_sentence` -> `output-episode-summary`
 - all four families are Codex-only and block-aware:
   - `codex_input_reply` covers the non-separator case:
     - submitted Codex session input can open this bounded reply window even when the originating input path was Telegram, REST, or frontend `Send`
@@ -491,9 +510,10 @@ Behavior:
 - `/health.messaging.allowlistDeliveryActive` and `/ready.messaging.allowlistDeliveryActive` show whether narrow internal outbound allowlist paths such as `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence` are active while generic `deliveryEnabled` remains false.
 - `/health.messaging.codexTelegramReplyCorrelation` and `/ready.messaging.codexTelegramReplyCorrelation` show the bounded Codex reply-block promotion state under its historical field name, including the reply-window duration and the number of sessions currently waiting for the first correlated Codex answer block after an eligible submitted input.
 - `/health.messaging.allowlistDeliveryScopes` and `/ready.messaging.allowlistDeliveryScopes` enumerate those narrow delivered scopes.
+- `/health.messaging.allowlistDeliverySignals` and `/ready.messaging.allowlistDeliverySignals` enumerate the corresponding neutral narrow-delivery signals.
 - `/health.messaging.codexSummaryRestartRecovery` and `/ready.messaging.codexSummaryRestartRecovery` expose the narrow summary-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.
 - When `topicMode: "deck-session"` is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.
-- `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive` and `allowlistDeliveryScopes` for the Telegram adapter itself.
+- `/health.messaging.adapters[0]` and `/ready.messaging.adapters[0]` also expose `allowlistDeliveryActive`, `allowlistDeliveryScopes`, and `allowlistDeliverySignals` for the Telegram adapter itself.
 - Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.
 - `reply`/`edit` behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.
 - Forum-topic provisioning is also deterministic: for `topicMode: "deck-session"`, the adapter creates or reuses a topic named `<deck name> + <terminal name>` for the initial binding and persists the resulting `messageThreadId`.

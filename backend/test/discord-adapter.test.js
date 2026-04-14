@@ -175,3 +175,86 @@ test("discord adapter consumes adapter-neutral message intents with the same bou
   assert.equal(status.deliveredTotal, 2);
   assert.equal(status.updatedTotal, 1);
 });
+
+test("discord adapter allows neutral delivery-signal intents when legacy scopes are absent", async () => {
+  const sends = [];
+  const adapter = createDiscordAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    allowlistDeliverySignals: ["turn-primary-reply"],
+    configuredTargets: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        return { messageId: "m-allowlist" };
+      },
+      async editMessage(payload) {
+        sends.push(payload);
+        return { messageId: payload.messageId || "m-allowlist" };
+      }
+    },
+    nowFn: () => 400
+  });
+  const session = { id: "session-allowlist", name: "codex", quickIdToken: "7" };
+  const projection = createTerminalProjection({
+    sessionId: session.id,
+    sourceRevision: "1",
+    appFamily: "coding-agent",
+    appLabel: "codex",
+    profile: "coding-agent"
+  });
+  const turn = createTurn({
+    sessionId: session.id,
+    openedAt: 100,
+    closedAt: 120,
+    status: "completed"
+  });
+  const semanticAdapter = createAppSemanticAdapterDescriptor({
+    adapterId: "codex-semantic-adapter",
+    appFamily: "coding-agent",
+    appLabels: ["codex"],
+    strategy: "projection"
+  });
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: "discord",
+    channel: "discord",
+    capabilities: ["send_message"]
+  });
+  const intent = createMessageIntent({
+    sessionId: session.id,
+    intentKind: "turn-primary-reply",
+    eventType: "session.output.summary",
+    severity: "info",
+    threadKey: "status",
+    text: "Ok, Discord signal delivered",
+    comparableText: "ok discord signal delivered",
+    projection,
+    turn,
+    semanticAdapter,
+    deliveryAdapters: [deliveryAdapter],
+    metadata: {
+      deliverySignal: "turn-primary-reply"
+    }
+  });
+
+  const result = await adapter.handleMessageIntent({
+    target: {
+      adapterId: "discord",
+      channelId: "ops-room",
+      chatId: "ops-room",
+      threadId: 77,
+      messageThreadId: 77,
+      webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+      stateKey: "ops-room:77"
+    },
+    session,
+    profile: "coding-agent",
+    trace: { traceId: "discord-signal" },
+    intent
+  });
+
+  assert.equal(result.delivered, true);
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /\[7\] codex: Ok, Discord signal delivered/u);
+  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, ["turn-primary-reply"]);
+});

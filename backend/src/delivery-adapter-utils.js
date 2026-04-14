@@ -90,6 +90,8 @@ export function buildDeliveryEventFromMessageIntent(
   const label =
     typeof formatSessionLabel === "function" ? formatSessionLabel(session) : buildFallbackSessionLabel(session);
   const text = summary ? `${label}: ${summary}` : label;
+  const deliverySignal =
+    normalizeNonEmptyString(intent?.metadata?.deliverySignal) || normalizeNonEmptyString(intent?.intentKind);
   return Object.freeze({
     id: normalizeNonEmptyString(intent?.intentId) || "",
     occurredAt: nowFn(),
@@ -106,6 +108,7 @@ export function buildDeliveryEventFromMessageIntent(
     aggregationReason:
       normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
     deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
+    deliverySignal,
     deliveryBlockKey:
       normalizeNonEmptyString(intent?.turn?.turnId) ||
       normalizeNonEmptyString(intent?.outputEpisode?.episodeId) ||

@@ -487,7 +487,12 @@ export function createTelegramAdapter(options = {}) {
         .map((entry) => normalizeNonEmptyString(entry))
         .filter(Boolean)
     : [];
-  const allowlistDeliveryActive = configured && allowlistDeliveryScopes.length > 0;
+  const allowlistDeliverySignals = Array.isArray(options.allowlistDeliverySignals)
+    ? options.allowlistDeliverySignals
+        .map((entry) => normalizeNonEmptyString(entry))
+        .filter(Boolean)
+    : [];
+  const allowlistDeliveryActive = configured && (allowlistDeliveryScopes.length > 0 || allowlistDeliverySignals.length > 0);
   const inboundEnabled = configured && options.inboundEnabled === true;
   const transport = configured ? options.transport : null;
   if (configured && (!transport || typeof transport.sendMessage !== "function" || typeof transport.editMessage !== "function")) {
@@ -678,10 +683,14 @@ export function createTelegramAdapter(options = {}) {
 
   function canDeliverEvent(event) {
     const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
+    const deliverySignal = normalizeNonEmptyString(event?.deliverySignal || event?.messageIntent?.metadata?.deliverySignal || event?.messageIntent?.intentKind);
     if (deliveryEnabled) {
       return true;
     }
-    return Boolean(deliveryScope && allowlistDeliveryScopes.includes(deliveryScope));
+    return Boolean(
+      (deliveryScope && allowlistDeliveryScopes.includes(deliveryScope)) ||
+        (deliverySignal && allowlistDeliverySignals.includes(deliverySignal))
+    );
   }
 
   function getForumTopicState(target) {
@@ -1342,6 +1351,7 @@ export function createTelegramAdapter(options = {}) {
       deliveryHardBreakActive,
       allowlistDeliveryActive,
       allowlistDeliveryScopes: allowlistDeliveryScopes.slice(),
+      allowlistDeliverySignals: allowlistDeliverySignals.slice(),
       inboundEnabled,
       configuredTargets,
       deliveredTotal: metrics.deliveredTotal,

@@ -4,7 +4,7 @@ Last updated: 2026-04-15
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, shadow-mode migration surface, and overlapping-output turn-ownership correction for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-ups.
+This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, shadow-mode migration surface, overlapping-output turn-ownership correction, and the first neutral allowlist-delivery-signal bridge for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-ups.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,7 +34,7 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps, and `MSG-097` through `MSG-099` are now delivered as the first overlapping-output ownership correction on top of that baseline.
+`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps, `MSG-097` through `MSG-099` are now delivered as the first overlapping-output ownership correction on top of that baseline, and `v0.4.0-H135 / MSG-029` now ships the first signal-first outbound follow-up on top of the same neutral `MessageIntent` seam.
 
 They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly, move the shipped Codex semantic interpretation behind a real `AppSemanticAdapter` registry seam instead of leaving it embedded in the runtime core, move Telegram delivery behind the real `DeliveryAdapter` seam so thread-policy and formatting decisions are no longer runtime-owned Telegram shortcuts, prove the same semantic registry against a second generic coding-agent baseline that covers Claude-/Gemini-style transcript differences without changing the core, prove the delivery seam itself across both Telegram and a Discord-style reference adapter, and now harden the runtime against overlapping-output ownership leaks by introducing immediate turn-ownership barriers plus delayed quiet-boundary settlement.
 
@@ -44,6 +44,7 @@ Current bridge behavior:
 2. that candidate is now first converted into a neutral `MessageIntent`
 3. Telegram and Discord delivery now consume that `MessageIntent` directly through `handleMessageIntent(...)`
 4. runtime-owned event bridging remains only as compatibility/tracing support around adapter results, not as the primary delivery seam for either adapter
+5. narrow allowlist gating is no longer modeled only through legacy `codex_*` scope names; the runtime now also carries neutral delivery signals (`turn-primary-reply`, `output-episode-info`, `output-episode-section`, `output-episode-summary`) alongside legacy scopes so adapters and delivery policy can operate on transport-neutral intent categories without losing compatibility with the shipped trace surface
 
 Current semantic extraction behavior:
 
@@ -98,7 +99,14 @@ The currently shipped delivery descriptors are:
 - `telegram`
 - `discord`
 
-This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, `MSG-086` moved the first shipped semantic extraction onto those boundaries, `MSG-087` plus `MSG-088` complete the migration/cutover surface by adding shadow-mode comparison and explicit parity validation, `MSG-089` plus `MSG-090` move the shipped Codex semantic logic behind the first real `AppSemanticAdapter` registry seam, `MSG-091` plus `MSG-092` move the shipped Telegram delivery behavior behind the first real `DeliveryAdapter` seam, `MSG-093` plus `MSG-094` prove the same semantic registry with a second generic coding-agent baseline for non-Codex coding-agent sessions, and `MSG-095` plus `MSG-096` now prove the same delivery seam with a second concrete transport adapter without changing the runtime core.
+The currently shipped narrow allowlist delivery signals are:
+
+- `turn-primary-reply`
+- `output-episode-info`
+- `output-episode-section`
+- `output-episode-summary`
+
+This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, `MSG-086` moved the first shipped semantic extraction onto those boundaries, `MSG-087` plus `MSG-088` complete the migration/cutover surface by adding shadow-mode comparison and explicit parity validation, `MSG-089` plus `MSG-090` move the shipped Codex semantic logic behind the first real `AppSemanticAdapter` registry seam, `MSG-091` plus `MSG-092` move the shipped Telegram delivery behavior behind the first real `DeliveryAdapter` seam, `MSG-093` plus `MSG-094` prove the same semantic registry with a second generic coding-agent baseline for non-Codex coding-agent sessions, `MSG-095` plus `MSG-096` prove the same delivery seam with a second concrete transport adapter without changing the runtime core, and `H135` now begins moving the shipped narrow allowlist itself from legacy family-name gating toward neutral signal-first delivery categories.
 
 ## Shadow Mode and Cutover Status
 
@@ -208,7 +216,7 @@ This means the most failure-prone reply path is no longer driven primarily by fi
 
 ## Resulting Baseline
 
-After `MSG-083` through `MSG-088`, ptydeck now has:
+After `MSG-083` through `MSG-088` plus the shipped post-baseline follow-ups through `H135`, ptydeck now has:
 
 1. a neutral transport/app-independent messaging core
 2. a shipped backend terminal-state projection
@@ -219,5 +227,7 @@ After `MSG-083` through `MSG-088`, ptydeck now has:
 7. cross-adapter parity proof that the same `MessageIntent` output can drive more than one transport
 8. a shadow-mode and cutover-readiness surface for migration control
 9. explicit turn-ownership barriers and boundary-settlement semantics for overlapping-output cases
+
+The same baseline now also exposes neutral allowlist delivery signals through runtime and adapter status (`allowlistDeliverySignals`) in addition to the historic compatibility scopes (`allowlistDeliveryScopes`).
 
 That is the stable architectural baseline future adapter and app-specific follow-ups should extend, with both a concrete Codex semantic adapter and a second generic coding-agent adapter already proving that the registry can grow without reopening the core.

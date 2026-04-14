@@ -148,6 +148,41 @@ test("messaging message policy returns explicit new update alert and suppress de
     { type: "session.output.summary", threadKey: "status", text: "summary", comparableText: "summary" },
     { lastComparableText: "summary", messageCreated: true }
   );
+  const signalAllowlistCreated = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Ok, delivered",
+      comparableText: "ok delivered",
+      deliverySignal: "turn-primary-reply",
+      deliveryBlockKey: "turn:1",
+      occurredAt: 4_500
+    },
+    {
+      messageCreated: false,
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 4_000
+    }
+  );
+  const signalAllowlistUpdated = applyMessagingMessagePolicy(
+    {
+      type: "session.output.summary",
+      threadKey: "status",
+      text: "ptydeck: Ok, delivered with more detail",
+      comparableText: "ok delivered with more detail",
+      deliverySignal: "turn-primary-reply",
+      deliveryBlockKey: "turn:1",
+      occurredAt: 4_700
+    },
+    {
+      messageCreated: true,
+      lastText: "ptydeck: Ok, delivered",
+      lastComparableText: "ok delivered",
+      lastDeliveryBlockKey: "turn:1",
+      lastEventType: "session.output.summary",
+      lastDeliveredAt: 4_500
+    }
+  );
   const noisy = applyMessagingMessagePolicy(
     { type: "session.output.summary", threadKey: "status", text: "tail", noiseClass: "status_tail" },
     { messageCreated: true }
@@ -451,6 +486,10 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(alerted.action, "alert");
   assert.equal(suppressed.action, "suppress");
   assert.equal(suppressed.reason, "duplicate_signature");
+  assert.equal(signalAllowlistCreated.action, "new");
+  assert.equal(signalAllowlistCreated.reason, "turn-primary-reply_new_block");
+  assert.equal(signalAllowlistUpdated.action, "update");
+  assert.equal(signalAllowlistUpdated.reason, "turn-primary-reply_block_update");
   assert.equal(noisy.action, "suppress");
   assert.equal(noisy.reason, "noise_status_tail");
   assert.equal(attentionChurn.action, "suppress");
@@ -1782,6 +1821,12 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
     "codex_separator_section",
     "codex_separator_summary_sentence"
   ]);
+  assert.deepEqual(status.allowlistDeliverySignals, [
+    "turn-primary-reply",
+    "output-episode-info",
+    "output-episode-section",
+    "output-episode-summary"
+  ]);
   assert.equal(status.adapters[0].deliveryEnabled, false);
   assert.equal(status.adapters[0].allowlistDeliveryActive, true);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
@@ -2299,6 +2344,12 @@ test("messaging runtime correlates the next substantial telegram question reply 
     "codex_separator_info",
     "codex_separator_section",
     "codex_separator_summary_sentence"
+  ]);
+  assert.deepEqual(status.allowlistDeliverySignals, [
+    "turn-primary-reply",
+    "output-episode-info",
+    "output-episode-section",
+    "output-episode-summary"
   ]);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
 });

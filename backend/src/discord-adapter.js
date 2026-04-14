@@ -139,6 +139,7 @@ export function createDiscordAdapter({
   configured = false,
   deliveryEnabled = false,
   allowlistDeliveryScopes = [],
+  allowlistDeliverySignals = [],
   configuredTargets = 0,
   transport = null,
   nowFn = () => Date.now(),
@@ -147,6 +148,12 @@ export function createDiscordAdapter({
   applyMessagePolicy = null,
   advanceThreadPolicyState = null
 } = {}) {
+  const normalizedAllowlistDeliveryScopes = Array.isArray(allowlistDeliveryScopes)
+    ? allowlistDeliveryScopes.map((entry) => normalizeNonEmptyString(entry)).filter(Boolean)
+    : [];
+  const normalizedAllowlistDeliverySignals = Array.isArray(allowlistDeliverySignals)
+    ? allowlistDeliverySignals.map((entry) => normalizeNonEmptyString(entry)).filter(Boolean)
+    : [];
   const threadStates = new Map();
   const targetTraceEntries = [];
   let targetTraceCapturedTotal = 0;
@@ -195,10 +202,14 @@ export function createDiscordAdapter({
 
   function canDeliverEvent(event) {
     const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
+    const deliverySignal = normalizeNonEmptyString(event?.deliverySignal || event?.messageIntent?.metadata?.deliverySignal || event?.messageIntent?.intentKind);
     if (deliveryEnabled) {
       return true;
     }
-    return Boolean(deliveryScope && allowlistDeliveryScopes.includes(deliveryScope));
+    return Boolean(
+      (deliveryScope && normalizedAllowlistDeliveryScopes.includes(deliveryScope)) ||
+        (deliverySignal && normalizedAllowlistDeliverySignals.includes(deliverySignal))
+    );
   }
 
   async function ensureTarget(target) {
@@ -369,8 +380,10 @@ export function createDiscordAdapter({
       adapter: "discord",
       enabled: configured,
       deliveryEnabled,
-      allowlistDeliveryActive: !deliveryEnabled && allowlistDeliveryScopes.length > 0,
-      allowlistDeliveryScopes: allowlistDeliveryScopes.slice(),
+      allowlistDeliveryActive:
+        !deliveryEnabled && (normalizedAllowlistDeliveryScopes.length > 0 || normalizedAllowlistDeliverySignals.length > 0),
+      allowlistDeliveryScopes: normalizedAllowlistDeliveryScopes.slice(),
+      allowlistDeliverySignals: normalizedAllowlistDeliverySignals.slice(),
       configuredTargets,
       deliveredTotal: metrics.deliveredTotal,
       updatedTotal: metrics.updatedTotal,
@@ -390,7 +403,10 @@ export function createDiscordAdapter({
   function renderMetricLines() {
     const enabledValue = configured ? 1 : 0;
     const deliveryEnabledValue = deliveryEnabled ? 1 : 0;
-    const allowlistDeliveryValue = !deliveryEnabled && allowlistDeliveryScopes.length > 0 ? 1 : 0;
+    const allowlistDeliveryValue =
+      !deliveryEnabled && (normalizedAllowlistDeliveryScopes.length > 0 || normalizedAllowlistDeliverySignals.length > 0)
+        ? 1
+        : 0;
     return [
       `ptydeck_messaging_adapter_enabled{adapter="discord"} ${enabledValue}`,
       `ptydeck_messaging_delivery_enabled{adapter="discord"} ${deliveryEnabledValue}`,
