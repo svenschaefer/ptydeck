@@ -14,14 +14,15 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - none currently
+  - `v0.4.0-H124`
 - Active scoped tasks:
-  - none currently
+  - `MSG-077`
+  - `MSG-078` after `MSG-077`
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
-- none currently
+- `v0.4.0-H124`
 
 ## Sequencing Rules
 
