@@ -40,6 +40,8 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `MSG-084` after `MSG-083`
   - `MSG-085` after `MSG-083` and `MSG-084`
   - `MSG-086` after `MSG-083`, `MSG-084`, and `MSG-085`
+  - `MSG-087` after `MSG-084`, `MSG-085`, and `MSG-086`
+  - `MSG-088` after `MSG-083`, `MSG-084`, `MSG-085`, `MSG-086`, and `MSG-087`
 
 ## Sequencing Rules
 
