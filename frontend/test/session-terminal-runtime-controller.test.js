@@ -375,6 +375,8 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
   assert.deepEqual(timers, [120, 400, 900]);
   assert.deepEqual(entry.terminal.refreshCalls, [[0, 23]]);
   assert.equal(entry.terminal.scrollToBottomCalls, 1);
+  entry.terminal.emitData("\u001b[I\u001b[O");
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
   entry.terminal.emitData("ls\n");
   assert.deepEqual(calls, [
     "debug:terminal.created:s1",
@@ -383,8 +385,11 @@ test("session-terminal-runtime controller mounts terminal, registers entry, and 
     "first-mounted",
     "resize:s1:false:false",
     "resize:s1:true:true",
+    "debug:terminal.input.bootstrap_suppressed:s1",
+    "debug:terminal.input.forwarding_armed:s1",
     "data:s1:ls\n"
   ]);
+  assert.equal(entry.terminal.focusCalls, 1);
   assert.equal(entry.terminal.options.fontSize, 16);
 });
 
@@ -1365,6 +1370,71 @@ test("session-terminal-runtime controller focuses the terminal surface on direct
   refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
 
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller suppresses terminal onData until explicit operator interaction", () => {
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("bootstrap-input-guard");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.emitData("\u001b[I\u001b[O");
+  entry.terminal.emitData("\u001b[I");
+
+  assert.deepEqual(terminalWrites, []);
+
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 0));
+  entry.terminal.emitData("pwd\n");
+
+  assert.deepEqual(terminalWrites, [["s1", "pwd\n"]]);
+});
+
+test("session-terminal-runtime controller arms terminal input forwarding from focus button interaction", () => {
+  const terminalWrites = [];
+  const refs = createTerminalCardRefs("focus-button-intent");
+  refs.focusBtn = new FakeEventTarget("focus-button");
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.emitData("\u001b[I");
+  refs.focusBtn.dispatchEvent({ type: "mousedown" });
+  entry.terminal.emitData("ls\n");
+
+  assert.deepEqual(terminalWrites, [["s1", "ls\n"]]);
 });
 
 test("session-terminal-runtime controller prompts for Ctrl-C intent when terminal selection makes copy ambiguous", async () => {

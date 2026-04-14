@@ -3316,6 +3316,12 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
   assert.equal(fixture.elements.commandFeedback.textContent, "Command send blocked for exited session [1] two.");
   assert.equal(inputPayloads.length, inputPayloadsBeforeExit);
 
+  reopenedSecondTerminal.mount.dispatchEvent({
+    type: "mousedown",
+    button: 0,
+    preventDefault() {},
+    stopPropagation() {}
+  });
   reopenedSecondTerminal.dataHandler("echo blocked-terminal");
   await tick();
   assert.match(fixture.elements.statusMessage.textContent, /Session \[1\] two has exited/i);

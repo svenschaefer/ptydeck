@@ -161,6 +161,30 @@ But the exact frontend-side trigger for the observed startup `/input` requests r
 
 That unresolved detail does **not** change the main product conclusion.
 
+## Delivered Follow-Up
+
+The product-side correction for this bootstrap side effect is now delivered as `v0.4.0-H125`.
+
+The practical fix does **not** depend on proving the exact historical browser sub-trigger byte-for-byte. Instead, the terminal mount path now enforces the intended contract directly:
+
+- passive frontend bootstrap may replay output and run local/remote resize stabilization
+- passive frontend bootstrap may **not** forward browser-side terminal `onData(...)` into backend session input
+- browser-side terminal input forwarding is armed only after explicit local operator interaction
+
+In the shipped code, `frontend/src/public/ui/session-terminal-runtime-controller.js` now suppresses terminal-originated `onData(...)` while a mounted terminal is still in the passive bootstrap state and only begins forwarding after explicit interaction such as:
+
+- terminal mouse interaction
+- keyboard interaction
+- paste handling
+- middle-click paste
+- focus-button interaction
+
+This means the backend-only restart contract remains what the original analysis proved:
+
+- backend restore completes without the frontend
+- the first frontend open can still cause visible replay/resizing churn
+- but passive bootstrap should no longer create unintended session `/input` writes before the operator actually interacts with a terminal
+
 ## Product Interpretation
 
 The current runtime contract is therefore:

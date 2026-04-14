@@ -98,7 +98,33 @@ export function createSessionTerminalRuntimeController(options = {}) {
     return getTerminalSelection(terminal).length > 0;
   }
 
-  function bindTerminalClipboardInteractions({ session, mount, terminal, onTerminalData, onTerminalPaste }) {
+  function bindTerminalFocusIntent(refs, armTerminalDataForwarding) {
+    const focusBtn = refs?.focusBtn;
+    if (!focusBtn || typeof focusBtn.addEventListener !== "function") {
+      return () => {};
+    }
+    const handleFocusIntent = () => {
+      armTerminalDataForwarding("focus_button");
+    };
+    focusBtn.addEventListener("mousedown", handleFocusIntent, true);
+    focusBtn.addEventListener("click", handleFocusIntent, true);
+    return () => {
+      if (typeof focusBtn.removeEventListener !== "function") {
+        return;
+      }
+      focusBtn.removeEventListener("mousedown", handleFocusIntent, true);
+      focusBtn.removeEventListener("click", handleFocusIntent, true);
+    };
+  }
+
+  function bindTerminalClipboardInteractions({
+    session,
+    mount,
+    terminal,
+    onTerminalData,
+    onTerminalPaste,
+    armTerminalDataForwarding
+  }) {
     if (!mount || typeof mount.addEventListener !== "function") {
       return () => {};
     }
@@ -403,6 +429,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     }
 
     const handleKeydown = (event) => {
+      armTerminalDataForwarding("keydown");
       const isCtrlC =
         event &&
         String(event.key || "").toLowerCase() === "c" &&
@@ -468,6 +495,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button !== 1) {
         return;
       }
+      armTerminalDataForwarding("middle_mouse");
       focusTerminalSurface();
       if (isMouseForwardingEnabled()) {
         suppressNextPaste = true;
@@ -492,6 +520,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.inputType !== "insertFromPaste") {
         return;
       }
+      armTerminalDataForwarding("beforeinput");
       if (shouldIgnoreDuplicateClipboardEvent(event)) {
         return;
       }
@@ -513,6 +542,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     const handlePaste = (event) => {
+      armTerminalDataForwarding("paste");
       if (shouldIgnoreDuplicateClipboardEvent(event)) {
         return;
       }
@@ -547,6 +577,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
       if (!event || event.button === 1) {
         return;
       }
+      armTerminalDataForwarding("mouse");
       if (tryStartViewportScrollbarDrag(event)) {
         return;
       }
@@ -554,6 +585,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
     };
 
     const handleContextMenu = () => {
+      armTerminalDataForwarding("contextmenu");
       focusTerminalSurface();
     };
 
@@ -573,6 +605,7 @@ export function createSessionTerminalRuntimeController(options = {}) {
         if (!pasteShortcutSource) {
           return true;
         }
+        armTerminalDataForwarding("paste_shortcut");
         armPendingKeyboardPasteSource(pasteShortcutSource);
         return false;
       });
@@ -617,6 +650,22 @@ export function createSessionTerminalRuntimeController(options = {}) {
     const afterEntryRegistered = args.afterEntryRegistered || (() => {});
     const onFirstTerminalMounted = args.onFirstTerminalMounted || (() => {});
     const applyResizeForSession = args.applyResizeForSession || (() => {});
+    const terminalInputGuard = {
+      armed: false,
+      suppressedCount: 0
+    };
+
+    function armTerminalDataForwarding(source = "unknown") {
+      if (terminalInputGuard.armed) {
+        return false;
+      }
+      terminalInputGuard.armed = true;
+      debugLog("terminal.input.forwarding_armed", {
+        sessionId: session.id,
+        source
+      });
+      return true;
+    }
 
     function stabilizeMountedTerminal(entry) {
       return stabilizeMountedTerminalEntry(entry, session.id, applyResizeForSession);
@@ -636,6 +685,15 @@ export function createSessionTerminalRuntimeController(options = {}) {
     containerEl.appendChild(refs.node);
     terminal.open(refs.mount);
     terminal.onData((data) => {
+      if (!terminalInputGuard.armed) {
+        terminalInputGuard.suppressedCount += 1;
+        debugLog("terminal.input.bootstrap_suppressed", {
+          sessionId: session.id,
+          bytes: typeof data === "string" ? data.length : 0,
+          count: terminalInputGuard.suppressedCount
+        });
+        return;
+      }
       onTerminalData(session.id, data);
     });
     const disposeClipboardBindings = bindTerminalClipboardInteractions({
@@ -643,8 +701,10 @@ export function createSessionTerminalRuntimeController(options = {}) {
       mount: refs.mount,
       terminal,
       onTerminalData,
-      onTerminalPaste
+      onTerminalPaste,
+      armTerminalDataForwarding
     });
+    const disposeFocusIntentBinding = bindTerminalFocusIntent(refs, armTerminalDataForwarding);
 
     const entry = {
       terminal,
@@ -694,7 +754,11 @@ export function createSessionTerminalRuntimeController(options = {}) {
       followOnShow: true,
       searchRevision: 0,
       mouseForwardingOutputPending: "",
-      disposeClipboardBindings
+      terminalInputGuard,
+      disposeClipboardBindings() {
+        disposeClipboardBindings();
+        disposeFocusIntentBinding();
+      }
     };
     terminals.set(session.id, entry);
     afterEntryRegistered(entry, session);
