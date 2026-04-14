@@ -549,7 +549,10 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   assert.equal(status.terminalMessagingCore.active, true);
   assert.equal(status.terminalMessagingCore.bridgeMode, "projection-turn-episode-bridge");
   assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram"]);
-  assert.deepEqual(status.terminalMessagingCore.semanticAdapterIds, ["codex-semantic-adapter"]);
+  assert.deepEqual(status.terminalMessagingCore.semanticAdapterIds, [
+    "codex-semantic-adapter",
+    "generic-coding-agent-semantic-adapter"
+  ]);
   assert.equal(status.terminalMessagingCore.activeProjectionSessionCount, 1);
   assert.equal(status.terminalMessagingCore.activeOutputEpisodeSessionCount, 1);
   assert.equal(status.terminalMessagingCore.activeTurnSessionCount, 0);
@@ -726,6 +729,79 @@ test("messaging runtime delivers short correct turn replies from projection sema
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+});
+
+test("messaging runtime delivers short correct turn replies through the generic coding-agent semantic adapter", async () => {
+  const sends = [];
+  let now = 8_560;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "claude", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 786 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 787 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-generic-short-reply-session",
+    name: "claude",
+    quickIdToken: "8",
+    startCommand: "claude",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "claude",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-generic-short-reply-open",
+    correlationId: "projection-generic-short-reply-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: 'Reply only with "Ok, acknowledged".'
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Ok, acknowledged\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-generic-short-reply-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-generic-short-reply-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ok, acknowledged/u);
+
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText, "Ok, acknowledged");
+
+  const status = runtime.buildStatusSummary();
+  assert.deepEqual(status.terminalMessagingCore.semanticAdapterIds, [
+    "codex-semantic-adapter",
+    "generic-coding-agent-semantic-adapter"
+  ]);
 });
 
 test("messaging runtime records projection-primary shadow comparisons for short turn replies", async () => {
@@ -1021,6 +1097,66 @@ test("messaging runtime emits autonomous multiline coding-agent episodes from pr
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+});
+
+test("messaging runtime emits gemini-style multiline coding-agent episodes through the generic semantic adapter", async () => {
+  const sends = [];
+  let now = 9_180;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "gemini", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 804 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 805 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-generic-output-episode-session",
+    name: "gemini",
+    quickIdToken: "9",
+    startCommand: "gemini",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "gemini",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "✦ Summary:\n- First result\n- Second result\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-generic-episode-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-generic-episode-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Summary:/u);
+  assert.match(sends[0].text, /First result/u);
+  assert.doesNotMatch(sends[0].text, /✦/u);
+
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedOutputEpisode?.primaryIntentScope, "codex_separator_section");
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {

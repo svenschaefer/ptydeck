@@ -6,6 +6,9 @@ import {
 } from "./codex-outbound-evaluator.js";
 import { createAppSemanticAdapterDescriptor } from "./terminal-messaging-core.js";
 
+const DEFAULT_SEMANTIC_LEADING_MARKER_PATTERN = /^[•*]\s+/u;
+const GENERIC_CODING_AGENT_LEADING_MARKER_PATTERN = /^[•*✦]\s+/u;
+
 function normalizeNonEmptyString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -31,6 +34,21 @@ function getFallbackSessionAppIdentity(session) {
 function isFallbackCodingAgentContext(session, profile = "") {
   const appIdentity = getFallbackSessionAppIdentity(session);
   return appIdentity.family === "coding-agent" || appIdentity.label === "codex" || profile === "coding-agent";
+}
+
+function matchesCodexLikeSession(session, profile, getSessionAppIdentity, isCodingAgentContext) {
+  const appIdentity = getSessionAppIdentity(session);
+  const label = normalizeNonEmptyString(appIdentity.label).toLowerCase();
+  const family = normalizeNonEmptyString(appIdentity.family).toLowerCase();
+  const startCommand = normalizeNonEmptyString(session?.startCommand).toLowerCase();
+  const sessionName = normalizeNonEmptyString(session?.name).toLowerCase();
+  if (label === "codex") {
+    return true;
+  }
+  if (family === "coding-agent" && /\bcodex\b/u.test(`${startCommand} ${sessionName}`)) {
+    return true;
+  }
+  return isCodingAgentContext(session, profile) && /\bcodex\b/u.test(`${startCommand} ${sessionName}`);
 }
 
 function appendProjectionSemanticSourceLines(target, rawText, source, normalizeLineBreaks) {
@@ -86,12 +104,13 @@ function buildProjectionSemanticMessageText(lines = [], normalizeWhitespace, nor
     .trim();
 }
 
-function buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers) {
+function buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers, options = {}) {
   const snapshot = runtimeSnapshot?.baseline?.snapshot || null;
   const lines = [
     ...(Array.isArray(snapshot?.activeVisibleLines) ? snapshot.activeVisibleLines : []),
     ...(Array.isArray(snapshot?.activeTailLines) ? snapshot.activeTailLines : [])
   ];
+  const leadingMarkerPattern = options.leadingMarkerPattern || DEFAULT_SEMANTIC_LEADING_MARKER_PATTERN;
   const comparableTexts = new Set();
   for (const line of lines) {
     const normalized = helpers
@@ -102,7 +121,7 @@ function buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, 
           profile
         )
       )
-      .replace(/^[•*]\s+/u, "");
+      .replace(leadingMarkerPattern, "");
     const comparableText = helpers.createComparableText(normalized);
     if (comparableText) {
       comparableTexts.add(comparableText);
@@ -116,7 +135,8 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
   if (!original) {
     return null;
   }
-  const startsBullet = /^[•*]\s+/u.test(original);
+  const leadingMarkerPattern = options?.leadingMarkerPattern || DEFAULT_SEMANTIC_LEADING_MARKER_PATTERN;
+  const startsBullet = leadingMarkerPattern.test(original);
   const startsList = /^(?:[-*]\s+|\d+\.\s+)/u.test(original);
   const inputText = normalizeNonEmptyString(options?.inputText);
   const promptEchoPattern = inputText ? new RegExp(`^[›>]+\\s*${helpers.escapeRegExp(inputText)}(?:\\s+.*)?$`, "u") : null;
@@ -130,7 +150,7 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
   if (!normalized) {
     return null;
   }
-  normalized = normalized.replace(/^[•*]\s+/u, "");
+  normalized = normalized.replace(leadingMarkerPattern, "");
   if (!normalized) {
     return null;
   }
@@ -174,7 +194,9 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
 }
 
 function extractProjectionSemanticLines(runtimeSnapshot, session, profile, options, helpers) {
-  const baselineComparableTexts = buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers);
+  const baselineComparableTexts = buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers, {
+    leadingMarkerPattern: options?.leadingMarkerPattern
+  });
   const collected = collectProjectionSemanticSourceLines(runtimeSnapshot, helpers.normalizeLineBreaks);
   function normalizeSourceLines(sourceLines = []) {
     const lines = [];
@@ -199,7 +221,8 @@ function extractProjectionSemanticLines(runtimeSnapshot, session, profile, optio
         profile,
         {
           inputText: options?.inputText || "",
-          baselineComparableTexts
+          baselineComparableTexts,
+          leadingMarkerPattern: options?.leadingMarkerPattern
         },
         helpers
       );
@@ -226,18 +249,7 @@ function createCodexSemanticAdapter(helpers = {}) {
   const adapterId = "codex-semantic-adapter";
 
   function matches(session, profile = "") {
-    const appIdentity = getSessionAppIdentity(session);
-    const label = normalizeNonEmptyString(appIdentity.label).toLowerCase();
-    const family = normalizeNonEmptyString(appIdentity.family).toLowerCase();
-    const startCommand = normalizeNonEmptyString(session?.startCommand).toLowerCase();
-    const sessionName = normalizeNonEmptyString(session?.name).toLowerCase();
-    if (label === "codex") {
-      return true;
-    }
-    if (family === "coding-agent" && /\bcodex\b/u.test(`${startCommand} ${sessionName}`)) {
-      return true;
-    }
-    return isCodingAgentContext(session, profile) && /\bcodex\b/u.test(`${startCommand} ${sessionName}`);
+    return matchesCodexLikeSession(session, profile, getSessionAppIdentity, isCodingAgentContext);
   }
 
   function createDescriptor(session, profile, strategy = "") {
@@ -331,8 +343,122 @@ function createCodexSemanticAdapter(helpers = {}) {
   });
 }
 
+function createGenericCodingAgentSemanticAdapter(helpers = {}) {
+  const getSessionAppIdentity =
+    typeof helpers.getSessionAppIdentity === "function" ? helpers.getSessionAppIdentity : getFallbackSessionAppIdentity;
+  const isCodingAgentContext =
+    typeof helpers.isCodingAgentContext === "function" ? helpers.isCodingAgentContext : isFallbackCodingAgentContext;
+  const adapterId = "generic-coding-agent-semantic-adapter";
+
+  function matches(session, profile = "") {
+    if (!isCodingAgentContext(session, profile)) {
+      return false;
+    }
+    return !matchesCodexLikeSession(session, profile, getSessionAppIdentity, isCodingAgentContext);
+  }
+
+  function createDescriptor(session, profile, strategy = "") {
+    const appIdentity = getSessionAppIdentity(session);
+    const appFamily = normalizeNonEmptyString(appIdentity.family) || "coding-agent";
+    const appLabel = normalizeNonEmptyString(appIdentity.label).toLowerCase();
+    return createAppSemanticAdapterDescriptor({
+      adapterId,
+      appFamily,
+      appLabels: appLabel ? [appLabel] : [],
+      strategy,
+      metadata: {
+        profile,
+        identitySource: normalizeNonEmptyString(appIdentity.source),
+        identityConfidence: Number.isFinite(appIdentity.confidence) ? Number(appIdentity.confidence) : 0
+      }
+    });
+  }
+
+  function buildTurnSemanticDecision(runtimeSnapshot, session, profile) {
+    const lines = extractProjectionSemanticLines(
+      runtimeSnapshot,
+      session,
+      profile,
+      {
+        inputText: helpers.normalizeReplyPromotionInputText(runtimeSnapshot?.inputText),
+        leadingMarkerPattern: GENERIC_CODING_AGENT_LEADING_MARKER_PATTERN
+      },
+      helpers
+    );
+    const text = buildProjectionSemanticMessageText(lines, helpers.normalizeWhitespace, helpers.normalizeLineBreaks);
+    if (!text) {
+      return null;
+    }
+    return Object.freeze({
+      deliveryScope: helpers.codexTelegramReplyScope,
+      text,
+      format: /\n/u.test(text) ? "structured_text" : "plain_text",
+      comparableText: helpers.createComparableText(text),
+      deliveryBlockKey:
+        normalizeNonEmptyString(runtimeSnapshot?.turn?.turnId) ||
+        normalizeNonEmptyString(runtimeSnapshot?.turn?.correlationId) ||
+        normalizeNonEmptyString(runtimeSnapshot?.turn?.traceId),
+      metadata: {
+        aggregationReason: helpers.codexTelegramReplyScope,
+        legacyDeliveryScope: helpers.codexTelegramReplyScope,
+        summaryMaxLength: helpers.codexTelegramReplyMaxTextLength,
+        preserveStructuredSummary: /\n/u.test(text),
+        semanticExtractionSource: "generic-turn-transcript-diff"
+      }
+    });
+  }
+
+  function buildOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile) {
+    const lines = extractProjectionSemanticLines(
+      runtimeSnapshot,
+      session,
+      profile,
+      {
+        leadingMarkerPattern: GENERIC_CODING_AGENT_LEADING_MARKER_PATTERN
+      },
+      helpers
+    );
+    const text = buildProjectionSemanticMessageText(lines, helpers.normalizeWhitespace, helpers.normalizeLineBreaks);
+    if (!text) {
+      return null;
+    }
+    const lineCount = lines.length;
+    const structured =
+      lineCount > 1 || lines.some((line) => line.structured === true) || /\n/u.test(text);
+    if (!structured) {
+      const wordCount = text.split(/\s+/u).filter(Boolean).length;
+      if (text.length < helpers.codexTelegramReplyMinTextLength && wordCount < helpers.codexTelegramReplyMinWords) {
+        return null;
+      }
+    }
+    const deliveryScope = structured ? CODEX_SEPARATOR_SECTION_SCOPE : CODEX_SEPARATOR_INFO_SCOPE;
+    return Object.freeze({
+      deliveryScope,
+      text,
+      format: structured ? "structured_text" : "plain_text",
+      comparableText: helpers.createComparableText(text),
+      deliveryBlockKey: normalizeNonEmptyString(runtimeSnapshot?.outputEpisode?.episodeId),
+      metadata: {
+        aggregationReason: deliveryScope,
+        legacyDeliveryScope: deliveryScope,
+        summaryMaxLength: structured ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH,
+        preserveStructuredSummary: structured,
+        semanticExtractionSource: "generic-output-episode-transcript-diff"
+      }
+    });
+  }
+
+  return Object.freeze({
+    adapterId,
+    matches,
+    createDescriptor,
+    buildTurnSemanticDecision,
+    buildOutputEpisodeSemanticDecision
+  });
+}
+
 export function createAppSemanticAdapterRegistry(helpers = {}) {
-  const adapters = Object.freeze([createCodexSemanticAdapter(helpers)]);
+  const adapters = Object.freeze([createCodexSemanticAdapter(helpers), createGenericCodingAgentSemanticAdapter(helpers)]);
   return Object.freeze({
     adapters,
     resolveForSession(session, profile = "") {
