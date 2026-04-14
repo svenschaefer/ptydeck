@@ -16,6 +16,7 @@ import { ApiError } from "./errors.js";
 import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { buildTelegramCommandCatalog } from "./telegram-command-surface.js";
 import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapter.js";
+import { createAppSemanticAdapterRegistry } from "./app-semantic-adapters.js";
 import {
   DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
   createTerminalProjectionTracker
@@ -27,7 +28,6 @@ import {
 } from "../../frontend/src/public/custom-command-model.js";
 import { normalizeCustomCommandPayloadForShell } from "../../frontend/src/public/terminal-stream.js";
 import {
-  createAppSemanticAdapterDescriptor,
   createDeliveryAdapterDescriptor,
   createMessageIntent,
   createOutputEpisode,
@@ -1883,6 +1883,31 @@ export function createMessagingRuntime(options = {}) {
         })
       ])
     : Object.freeze([]);
+  const appSemanticAdapterRegistry = createAppSemanticAdapterRegistry({
+    getSessionAppIdentity,
+    isCodingAgentContext,
+    normalizeNonEmptyString,
+    normalizeLineBreaks,
+    normalizeWhitespace,
+    normalizeReplyPromotionInputText,
+    trimCodingAgentLowValueTail,
+    stripTerminalNoiseFragments,
+    stripSemanticInlinePromptTail,
+    classifyNoiseSignature,
+    isSeparatorHint,
+    isCommentaryLikeCodexOutboundText,
+    isCodexTelegramReplyMetaLine,
+    createComparableText,
+    escapeRegExp,
+    noiseSeparatorOnlyPattern: NOISE_SEPARATOR_ONLY_PATTERN,
+    codingAgentAntiBulletPattern: CODING_AGENT_ANTI_BULLET_PATTERN,
+    codingAgentWorkingOverlayPattern: CODING_AGENT_WORKING_OVERLAY_PATTERN,
+    replyPromptEchoTailPattern: CODEX_REPLY_PROMPT_ECHO_TAIL_PATTERN,
+    codexTelegramReplyScope: CODEX_TELEGRAM_REPLY_SCOPE,
+    codexTelegramReplyMinTextLength: CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH,
+    codexTelegramReplyMinWords: CODEX_TELEGRAM_REPLY_MIN_WORDS,
+    codexTelegramReplyMaxTextLength: CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH
+  });
 
   const conversationTargetIndex = new Map();
   const ambiguousConversationKeys = new Set();
@@ -1929,26 +1954,13 @@ export function createMessagingRuntime(options = {}) {
     }
   }
 
+  function resolveAppSemanticAdapter(session, profile) {
+    return appSemanticAdapterRegistry.resolveForSession(session, profile);
+  }
+
   function buildAppSemanticAdapterDescriptorForSession(session, profile, strategy = "") {
-    const appIdentity = session?.appIdentity || null;
-    const appFamily =
-      normalizeNonEmptyString(appIdentity?.family) ||
-      (isCodingAgentContext(session, profile) ? "coding-agent" : "terminal-app");
-    const appLabel =
-      normalizeNonEmptyString(appIdentity?.label) ||
-      normalizeNonEmptyString(session?.name) ||
-      normalizeNonEmptyString(profile);
-    return createAppSemanticAdapterDescriptor({
-      adapterId: `${appFamily}-semantic-adapter`,
-      appFamily,
-      appLabels: appLabel ? [appLabel] : [],
-      strategy,
-      metadata: {
-        profile,
-        identitySource: normalizeNonEmptyString(appIdentity?.source),
-        identityConfidence: Number.isFinite(appIdentity?.confidence) ? Number(appIdentity.confidence) : 0
-      }
-    });
+    const semanticAdapter = resolveAppSemanticAdapter(session, profile);
+    return semanticAdapter ? semanticAdapter.createDescriptor(session, profile, strategy) : null;
   }
 
   function buildLegacyCodexMessageIntent({
@@ -3151,11 +3163,12 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function buildProjectionTurnSemanticCandidate(session, profile, state) {
-    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
+    const semanticAdapter = resolveAppSemanticAdapter(session, profile);
+    if (!semanticAdapter || !shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
       return null;
     }
     const runtimeSnapshot = buildTurnRuntimeSnapshot(state, state.activeTerminalTurn);
-    const semanticDecision = buildProjectionTurnSemanticDecision(runtimeSnapshot, session, profile);
+    const semanticDecision = semanticAdapter.buildTurnSemanticDecision(runtimeSnapshot, session, profile);
     if (!semanticDecision?.text) {
       return null;
     }
@@ -3166,11 +3179,12 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function buildProjectionOutputEpisodeSemanticCandidate(session, profile, state) {
-    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
+    const semanticAdapter = resolveAppSemanticAdapter(session, profile);
+    if (!semanticAdapter || !shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
       return null;
     }
     const runtimeSnapshot = buildOutputEpisodeRuntimeSnapshot(state, state.activeOutputEpisode);
-    const semanticDecision = buildProjectionOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile);
+    const semanticDecision = semanticAdapter.buildOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile);
     if (!semanticDecision?.text) {
       return null;
     }
@@ -3452,236 +3466,7 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function shouldUseProjectionSemanticExtraction(session, profile) {
-    return telegramOutboundHardBreakActive === true && telegramAllowlistDeliveryActive && isCodingAgentContext(session, profile);
-  }
-
-  function buildProjectionSemanticBaselineComparableSet(baseline, session, profile) {
-    const snapshot = baseline?.snapshot || null;
-    const lines = [
-      ...(Array.isArray(snapshot?.activeVisibleLines) ? snapshot.activeVisibleLines : []),
-      ...(Array.isArray(snapshot?.activeTailLines) ? snapshot.activeTailLines : [])
-    ];
-    const comparableTexts = new Set();
-    for (const line of lines) {
-      const normalized = normalizeWhitespace(
-        trimCodingAgentLowValueTail(stripTerminalNoiseFragments(stripSemanticInlinePromptTail(line)), session, profile)
-      ).replace(/^[•*]\s+/u, "");
-      const comparableText = createComparableText(normalized);
-      if (comparableText) {
-        comparableTexts.add(comparableText);
-      }
-    }
-    return comparableTexts;
-  }
-
-  function normalizeProjectionSemanticSourceLine(rawLine, session, profile, { inputText = "", baselineComparableTexts = null } = {}) {
-    const original = normalizeWhitespace(String(rawLine || ""));
-    if (!original) {
-      return null;
-    }
-    const startsBullet = /^[•*]\s+/u.test(original);
-    const startsList = /^(?:[-*]\s+|\d+\.\s+)/u.test(original);
-    const promptEchoPattern = inputText ? new RegExp(`^[›>]+\\s*${escapeRegExp(inputText)}(?:\\s+.*)?$`, "u") : null;
-    if (promptEchoPattern?.test(original)) {
-      return null;
-    }
-    let normalized = stripSemanticInlinePromptTail(original);
-    normalized = normalizeWhitespace(trimCodingAgentLowValueTail(stripTerminalNoiseFragments(normalized), session, profile));
-    if (!normalized) {
-      return null;
-    }
-    normalized = normalized.replace(/^[•*]\s+/u, "");
-    if (!normalized) {
-      return null;
-    }
-    if (inputText) {
-      if (normalized === inputText) {
-        return null;
-      }
-      if (normalized.startsWith(inputText)) {
-        const remainder = normalizeWhitespace(normalized.slice(inputText.length));
-        if (!remainder || CODEX_REPLY_PROMPT_ECHO_TAIL_PATTERN.test(remainder)) {
-          return null;
-        }
-        normalized = remainder;
-      }
-    }
-    if (!normalized || /^[›>]/u.test(normalized)) {
-      return null;
-    }
-    if (
-      NOISE_SEPARATOR_ONLY_PATTERN.test(normalized) ||
-      CODING_AGENT_ANTI_BULLET_PATTERN.test(normalized) ||
-      isSeparatorHint(normalized, session, profile) ||
-      isCodexTelegramReplyMetaLine(normalized) ||
-      isCommentaryLikeCodexOutboundText(normalized, session, profile) ||
-      CODING_AGENT_WORKING_OVERLAY_PATTERN.test(normalized)
-    ) {
-      return null;
-    }
-    const noise = classifyNoiseSignature(normalized, session, profile);
-    if (noise.lowInformation) {
-      return null;
-    }
-    if (baselineComparableTexts instanceof Set && noise.comparableText && baselineComparableTexts.has(noise.comparableText)) {
-      return null;
-    }
-    return Object.freeze({
-      text: normalized,
-      comparableText: noise.comparableText,
-      structured: startsBullet || startsList || /:$/u.test(normalized)
-    });
-  }
-
-  function appendProjectionSemanticSourceLines(target, rawText, source) {
-    const normalized = normalizeLineBreaks(rawText);
-    if (!normalized) {
-      return;
-    }
-    for (const line of normalized.split("\n")) {
-      target.push({ source, raw: line });
-    }
-  }
-
-  function collectProjectionSemanticSourceLines(runtimeSnapshot) {
-    const transcriptEntries = Array.isArray(runtimeSnapshot?.transcriptDelta?.entries) ? runtimeSnapshot.transcriptDelta.entries : [];
-    const transcriptLines = [];
-    for (const entry of transcriptEntries) {
-      if (!entry?.visibleText || entry.type === "resize" || entry.type === "empty") {
-        continue;
-      }
-      appendProjectionSemanticSourceLines(transcriptLines, entry.visibleText, "transcript");
-    }
-    const diffLines = [];
-    const diffGroups = [
-      ...(Array.isArray(runtimeSnapshot?.diff?.activeTailLines?.lines) ? runtimeSnapshot.diff.activeTailLines.lines : []),
-      ...(Array.isArray(runtimeSnapshot?.diff?.activeVisibleLines?.lines) ? runtimeSnapshot.diff.activeVisibleLines.lines : [])
-    ];
-    for (const entry of diffGroups) {
-      if (!entry?.after || entry.after === entry.before) {
-        continue;
-      }
-      appendProjectionSemanticSourceLines(diffLines, entry.after, "diff");
-    }
-    return Object.freeze({
-      transcriptLines: Object.freeze(transcriptLines),
-      diffLines: Object.freeze(diffLines)
-    });
-  }
-
-  function buildProjectionSemanticMessageText(lines = []) {
-    const normalizedLines = lines
-      .map((line) => normalizeWhitespace(typeof line === "string" ? line : line?.text))
-      .filter(Boolean);
-    if (normalizedLines.length === 0) {
-      return "";
-    }
-    const structured =
-      normalizedLines.length > 1 || normalizedLines.some((line) => /^(?:[-*]\s+|\d+\.\s+)|:$/u.test(line));
-    const text = structured ? normalizedLines.join("\n") : normalizedLines.join(" ");
-    return normalizeLineBreaks(text)
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .replace(/[ \t]{2,}/g, " ")
-      .trim();
-  }
-
-  function extractProjectionSemanticLines(runtimeSnapshot, session, profile, { inputText = "" } = {}) {
-    const baselineComparableTexts = buildProjectionSemanticBaselineComparableSet(runtimeSnapshot?.baseline, session, profile);
-    const collected = collectProjectionSemanticSourceLines(runtimeSnapshot);
-    function normalizeSourceLines(sourceLines = []) {
-      const lines = [];
-      const seenComparableTexts = new Set();
-      for (const sourceLine of sourceLines) {
-        const rawNormalized = normalizeWhitespace(sourceLine?.raw);
-        const strippedRaw = stripSemanticInlinePromptTail(rawNormalized).replace(/^[•*]\s+/u, "");
-        if (
-          lines.length > 0 &&
-          rawNormalized &&
-          (
-            NOISE_SEPARATOR_ONLY_PATTERN.test(rawNormalized) ||
-            isCodexTelegramReplyMetaLine(strippedRaw) ||
-            isCommentaryLikeCodexOutboundText(strippedRaw, session, profile)
-          )
-        ) {
-          break;
-        }
-        const normalized = normalizeProjectionSemanticSourceLine(sourceLine.raw, session, profile, {
-          inputText,
-          baselineComparableTexts
-        });
-        if (!normalized?.text || !normalized.comparableText || seenComparableTexts.has(normalized.comparableText)) {
-          continue;
-        }
-        seenComparableTexts.add(normalized.comparableText);
-        lines.push(normalized);
-      }
-      return Object.freeze(lines);
-    }
-    const transcriptLines = normalizeSourceLines(collected.transcriptLines);
-    if (transcriptLines.length > 0) {
-      return transcriptLines;
-    }
-    return normalizeSourceLines(collected.diffLines);
-  }
-
-  function buildProjectionTurnSemanticDecision(runtimeSnapshot, session, profile) {
-    const lines = extractProjectionSemanticLines(runtimeSnapshot, session, profile, {
-      inputText: normalizeReplyPromotionInputText(runtimeSnapshot?.inputText)
-    });
-    const text = buildProjectionSemanticMessageText(lines);
-    if (!text) {
-      return null;
-    }
-    return Object.freeze({
-      deliveryScope: CODEX_TELEGRAM_REPLY_SCOPE,
-      text,
-      format: /\n/u.test(text) ? "structured_text" : "plain_text",
-      comparableText: createComparableText(text),
-      deliveryBlockKey:
-        normalizeNonEmptyString(runtimeSnapshot?.turn?.turnId) ||
-        normalizeNonEmptyString(runtimeSnapshot?.turn?.correlationId) ||
-        normalizeNonEmptyString(runtimeSnapshot?.turn?.traceId),
-      metadata: {
-        aggregationReason: CODEX_TELEGRAM_REPLY_SCOPE,
-        legacyDeliveryScope: CODEX_TELEGRAM_REPLY_SCOPE,
-        summaryMaxLength: CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH,
-        preserveStructuredSummary: /\n/u.test(text),
-        semanticExtractionSource: "turn-transcript-diff"
-      }
-    });
-  }
-
-  function buildProjectionOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile) {
-    const lines = extractProjectionSemanticLines(runtimeSnapshot, session, profile);
-    const text = buildProjectionSemanticMessageText(lines);
-    if (!text) {
-      return null;
-    }
-    const lineCount = lines.length;
-    const structured =
-      lineCount > 1 || lines.some((line) => line.structured === true) || /\n/u.test(text);
-    if (!structured) {
-      const wordCount = text.split(/\s+/u).filter(Boolean).length;
-      if (text.length < CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH && wordCount < CODEX_TELEGRAM_REPLY_MIN_WORDS) {
-        return null;
-      }
-    }
-    const deliveryScope = structured ? CODEX_SEPARATOR_SECTION_SCOPE : CODEX_SEPARATOR_INFO_SCOPE;
-    return Object.freeze({
-      deliveryScope,
-      text,
-      format: structured ? "structured_text" : "plain_text",
-      comparableText: createComparableText(text),
-      deliveryBlockKey: normalizeNonEmptyString(runtimeSnapshot?.outputEpisode?.episodeId),
-      metadata: {
-        aggregationReason: deliveryScope,
-        legacyDeliveryScope: deliveryScope,
-        summaryMaxLength: structured ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH,
-        preserveStructuredSummary: structured,
-        semanticExtractionSource: "output-episode-transcript-diff"
-      }
-    });
+    return telegramOutboundHardBreakActive === true && telegramAllowlistDeliveryActive && Boolean(resolveAppSemanticAdapter(session, profile));
   }
 
   function buildProjectionSemanticMessageIntent({
@@ -4933,6 +4718,7 @@ export function createMessagingRuntime(options = {}) {
         active: true,
         bridgeMode: "projection-turn-episode-bridge",
         deliveryAdapters: deliveryAdapterDescriptors.map((descriptor) => descriptor.adapterId),
+        semanticAdapterIds: appSemanticAdapterRegistry.listAdapterIds(),
         activeProjectionSessionCount,
         activeTurnSessionCount,
         completedTurnSessionCount,

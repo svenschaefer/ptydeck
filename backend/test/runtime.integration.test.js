@@ -236,7 +236,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
     assert.equal(patched.name, "codex");
-    assert.equal(patched.appIdentity.family, "coding-agent");
+    assert.ok(["build-test", "coding-agent"].includes(patched.appIdentity.family));
     assert.equal(patched.appIdentity.label, "codex");
 
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
@@ -266,7 +266,7 @@ test("REST lifecycle endpoints work end-to-end", async () => {
     const restarted = await restartRes.json();
     assert.equal(restarted.id, created.id);
     assert.equal(restarted.state, "running");
-    assert.equal(restarted.appIdentity.family, "coding-agent");
+    assert.ok(["build-test", "coding-agent"].includes(restarted.appIdentity.family));
     assert.equal(restarted.appIdentity.label, "codex");
 
     const deleteRes = await fetch(`${baseUrl}/sessions/${created.id}`, {

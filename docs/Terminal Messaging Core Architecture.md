@@ -4,7 +4,7 @@ Last updated: 2026-04-14
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, and shadow-mode migration surface for the `v0.4.0-H128` stream-to-message refactor.
+This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, and shadow-mode migration surface for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-up.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,9 +34,9 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline.
+`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` and `MSG-090` are now also delivered as the first post-`H128` baseline-extension step.
 
-They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, and add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly.
+They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly, and then move the shipped Codex semantic interpretation behind a real `AppSemanticAdapter` registry seam instead of leaving it embedded in the runtime core.
 
 Current bridge behavior:
 
@@ -79,15 +79,16 @@ The current bridge in `backend/src/messaging-runtime.js` models:
 - autonomous allowlist candidates as:
   - `TerminalProjection` + `OutputEpisode` + `MessageIntent`
 
-The first shipped semantic bridge still uses a Codex-specific strategy label:
+The first shipped semantic bridge now resolves through a real semantic-adapter registry and still uses a Codex-specific strategy label:
 
 - `legacy-codex-allowlist`
+- semantic adapter id: `codex-semantic-adapter`
 
 The first shipped delivery descriptor is:
 
 - `telegram`
 
-This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, `MSG-086` moved the first shipped semantic extraction onto those boundaries, and `MSG-087` plus `MSG-088` complete the migration/cutover surface by adding shadow-mode comparison and explicit parity validation.
+This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, `MSG-086` moved the first shipped semantic extraction onto those boundaries, `MSG-087` plus `MSG-088` complete the migration/cutover surface by adding shadow-mode comparison and explicit parity validation, and `MSG-089` plus `MSG-090` move the shipped Codex semantic logic behind the first real `AppSemanticAdapter` registry seam.
 
 ## Shadow Mode and Cutover Status
 
@@ -111,6 +112,7 @@ Current shipped behavior:
    - comparison totals
    - mismatch rate
    - cutover readiness
+6. `buildStatusSummary().terminalMessagingCore.semanticAdapterIds` now reports the currently registered semantic-adapter ids
 
 ## Why This Matters
 
@@ -137,8 +139,8 @@ This architecture does not claim that the stream-to-message problem is solved fo
 It does not yet:
 
 - eliminate every remaining legacy separator-family dependency for autonomous narrow allowlist delivery
-- provide one app-semantic adapter per future terminal app
-- provide one delivery adapter per future channel
+- provide one app-semantic adapter per future terminal app beyond the shipped Codex adapter
+- provide one delivery adapter per future channel beyond the shipped Telegram adapter
 
 Those are future extension points on top of the shipped `H128` baseline, not missing prerequisites for the core architecture itself.
 
@@ -200,6 +202,7 @@ After `MSG-083` through `MSG-088`, ptydeck now has:
 2. a shipped backend terminal-state projection
 3. explicit turn and autonomous-output orchestration
 4. projection-backed semantic extraction for the narrow shipped path
-5. a shadow-mode and cutover-readiness surface for migration control
+5. a real semantic-adapter registry with the first shipped Codex adapter
+6. a shadow-mode and cutover-readiness surface for migration control
 
 That is the stable architectural baseline future adapter and app-specific follow-ups should extend.

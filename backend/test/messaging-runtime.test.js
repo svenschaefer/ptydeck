@@ -549,6 +549,7 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   assert.equal(status.terminalMessagingCore.active, true);
   assert.equal(status.terminalMessagingCore.bridgeMode, "projection-turn-episode-bridge");
   assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram"]);
+  assert.deepEqual(status.terminalMessagingCore.semanticAdapterIds, ["codex-semantic-adapter"]);
   assert.equal(status.terminalMessagingCore.activeProjectionSessionCount, 1);
   assert.equal(status.terminalMessagingCore.activeOutputEpisodeSessionCount, 1);
   assert.equal(status.terminalMessagingCore.activeTurnSessionCount, 0);
