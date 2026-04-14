@@ -523,6 +523,7 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   const baseline = runtime.createTerminalProjectionBaseline(session.id, "after-delivery");
   const transcriptDelta = runtime.getTerminalProjectionTranscriptDelta(session.id, 0);
   const diff = runtime.diffTerminalProjectionBaseline(session.id, baseline, { maxLines: 5 });
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
 
   assert.equal(snapshot?.entityType, "TerminalProjectionSnapshot");
   assert.equal(snapshot?.sessionId, session.id);
@@ -538,12 +539,19 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   assert.equal(diff?.fromRevision, baseline.revision);
   assert.equal(diff?.toRevision, snapshot.revision);
   assert.equal(diff?.activeTailLines.totalChangedLines, 0);
+  assert.equal(orchestration?.entityType, "TerminalOrchestrationState");
+  assert.equal(orchestration?.activeTurn, null);
+  assert.equal(orchestration?.activeOutputEpisode?.entityType, "OutputEpisodeRuntimeState");
+  assert.equal(orchestration?.activeOutputEpisode?.transcriptDelta?.entityType, "TerminalProjectionTranscriptDelta");
+  assert.equal(orchestration?.activeOutputEpisode?.diff?.entityType, "TerminalProjectionDiff");
 
   const status = runtime.buildStatusSummary();
   assert.equal(status.terminalMessagingCore.active, true);
-  assert.equal(status.terminalMessagingCore.bridgeMode, "legacy-candidate-to-message-intent");
+  assert.equal(status.terminalMessagingCore.bridgeMode, "projection-turn-episode-bridge");
   assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram"]);
   assert.equal(status.terminalMessagingCore.activeProjectionSessionCount, 1);
+  assert.equal(status.terminalMessagingCore.activeOutputEpisodeSessionCount, 1);
+  assert.equal(status.terminalMessagingCore.activeTurnSessionCount, 0);
   assert.equal(status.terminalMessagingCore.projectionResourceLimits.cols > 0, true);
   assert.deepEqual(status.terminalMessagingCore.boundaryContracts, [
     "TerminalProjection",
@@ -553,6 +561,99 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
     "DeliveryAdapter",
     "AppSemanticAdapter"
   ]);
+});
+
+test("messaging runtime tracks turn baselines transcript deltas and quiet-window completion on the terminal projection", async () => {
+  const sends = [];
+  let now = 8_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 700 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 701 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "turn-orchestration-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "turn-open-trace",
+    correlationId: "turn-open-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "Please reply with a full sentence."
+  });
+
+  let orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.activeTurn?.entityType, "TurnRuntimeState");
+  assert.equal(orchestration?.activeTurn?.turn?.status, "open");
+  assert.equal(orchestration?.activeTurn?.baseline?.entityType, "TerminalProjectionBaseline");
+  assert.equal(orchestration?.activeOutputEpisode, null);
+
+  await runtime.observeSessionData({
+    session,
+    data: "• This is the first stable reply line.\n",
+    promptBoundaries: [],
+    trace: { traceId: "turn-data-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  This follow-up line should stay in the same turn.\n",
+    promptBoundaries: [],
+    trace: { traceId: "turn-data-2" }
+  });
+
+  orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.activeTurn?.transcriptDelta?.entityType, "TerminalProjectionTranscriptDelta");
+  assert.equal(orchestration?.activeTurn?.transcriptDelta?.entries.length >= 2, true);
+  assert.equal(orchestration?.activeTurn?.diff?.entityType, "TerminalProjectionDiff");
+  assert.equal(orchestration?.activeTurn?.diff?.activeVisibleLines.totalChangedLines > 0, true);
+  assert.equal(orchestration?.activeTurn?.primaryReplyCandidateKey, "");
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "turn-idle" }
+  });
+
+  orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.activeTurn, null);
+  assert.equal(orchestration?.lastCompletedTurn?.entityType, "TurnRuntimeState");
+  assert.equal(orchestration?.lastCompletedTurn?.turn?.status, "completed");
+  assert.equal(orchestration?.lastCompletedTurn?.quietWindowSettledAt > 0, true);
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyCandidateKey.length > 0, true);
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText.includes("stable reply line"), true);
+  assert.equal(orchestration?.lastCompletedOutputEpisode, null);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.activeTurnSessionCount, 0);
+  assert.equal(status.terminalMessagingCore.completedTurnSessionCount, 1);
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {

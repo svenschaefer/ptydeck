@@ -215,8 +215,8 @@ Authoritative repository documents remain:
   - Current interpretation:
     - use it when reasoning about the neutral boundary contracts (`TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, `AppSemanticAdapter`)
     - use it to understand the currently shipped bridge where the narrow Codex allowlist still decides candidate worthiness but now routes through neutral `MessageIntent` objects before adapter-facing delivery
-    - use it together with `backend/src/terminal-projection.js` when reasoning about the newly shipped `@xterm/headless`-backed projection seam and its runtime-exposed snapshot/baseline/transcript/diff primitives
-    - start `H128` follow-up work from the documented fact that the neutral contract layer and the first live terminal projection now both exist in code; the remaining work is turn/episode orchestration, semantic extraction, and shadow-mode migration
+    - use it together with `backend/src/terminal-projection.js` and `backend/src/messaging-runtime.js` when reasoning about the shipped `@xterm/headless`-backed projection seam plus the runtime-owned `Turn` / `OutputEpisode` orchestration that now sits on top of it
+    - start `H128` follow-up work from the documented fact that the neutral contract layer, the first live terminal projection, and the first live turn/output-episode orchestration all now exist in code; the remaining work is semantic extraction and shadow-mode migration
 
 ## Consolidation Outcome
 

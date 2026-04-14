@@ -16,10 +16,9 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active release waves:
   - `v0.4.0-H128`
 - Active scoped tasks:
-  - `MSG-085`
-  - `MSG-086` after `MSG-085`
-  - `MSG-087` after `MSG-085` and `MSG-086`
-  - `MSG-088` after `MSG-085`, `MSG-086`, and `MSG-087`
+  - `MSG-086`
+  - `MSG-087` after `MSG-086`
+  - `MSG-088` after `MSG-086` and `MSG-087`
 - Queued next waves:
   - none currently
 
@@ -29,10 +28,9 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Wave Dependencies
 
 - `v0.4.0-H128`
-  - `MSG-085`
-  - `MSG-086` after `MSG-085`
-  - `MSG-087` after `MSG-085` and `MSG-086`
-  - `MSG-088` after `MSG-085`, `MSG-086`, and `MSG-087`
+  - `MSG-086`
+  - `MSG-087` after `MSG-086`
+  - `MSG-088` after `MSG-086` and `MSG-087`
 
 ## Sequencing Rules
 

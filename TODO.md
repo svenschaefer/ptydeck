@@ -14,8 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-085` Owner `BE`
-  Introduce turn-first and episode-first orchestration on top of the terminal-state projection so submit-bearing input opens a bounded `Turn` with a pre-turn baseline snapshot, stable completion on `session.activity.completed` plus a quiet window, and exactly one primary reply candidate by default, while autonomous output is modeled explicitly as `OutputEpisode` instead of being left to legacy separator heuristics. Message extraction must consume both turn-final stable screen diffs and bounded transcript/scrollback deltas so transient but relevant output is not lost, and input echo, prompt/footer chrome, working overlays, redraw churn, and stale pre-turn residue are treated as transport noise rather than direct message candidates.
 - `MSG-086` Owner `BE`
   Refactor outbound semantic extraction to emit adapter-neutral `MessageIntent` objects from turns and autonomous episodes instead of Telegram/Codex-specific first-hit chunk or line heuristics. The first shipped semantic adapter may target Codex, but the architecture must make app-specific interpretation pluggable for Claude Code CLI, Gemini Code CLI, and future terminal apps, while delivery adapters map the same intents into Telegram, Discord, Slack, and future outbound channels. Preserve existing restart-recovery, duplicate suppression, and delivery-policy guarantees while removing the current dependency on minimum-length/minimum-word heuristics for short but correct replies.
 - `MSG-087` Owner `PLAT`

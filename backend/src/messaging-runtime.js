@@ -1078,6 +1078,10 @@ function createSessionStreamState() {
     pendingLine: "",
     recentLines: [],
     terminalProjection: null,
+    activeTerminalTurn: null,
+    lastCompletedTerminalTurn: null,
+    activeOutputEpisode: null,
+    lastCompletedOutputEpisode: null,
     pendingSummaryBlock: createPendingSummaryBlock(),
     pendingCodexTelegramReply: createPendingCodexTelegramReply(),
     lastObservedInputText: "",
@@ -1092,6 +1096,108 @@ function createSessionStreamState() {
     lastCodexSeparatorSectionCandidateKey: "",
     lastCodexSeparatorSummaryCandidateKey: "",
     lastCodexTelegramReplyCandidateKey: ""
+  };
+}
+
+function createTerminalTurnRuntimeState({
+  sessionId,
+  observedAt,
+  trace = null,
+  inputText = "",
+  replyPreferred = false,
+  baseline = null
+}) {
+  const correlationId = normalizeNonEmptyString(trace?.correlationId);
+  const traceId = normalizeNonEmptyString(trace?.traceId);
+  const source = normalizeNonEmptyString(trace?.source);
+  const turnId = correlationId || traceId || `turn:${sessionId}:${observedAt || Date.now()}`;
+  const transcriptStartRevision = Number.isInteger(baseline?.revision) ? baseline.revision : 0;
+  return {
+    entityType: "TurnRuntimeState",
+    turn: createTurn({
+      turnId,
+      sessionId,
+      triggerKind: "submitted-input",
+      inputSource: source,
+      correlationId,
+      traceId,
+      baselineProjectionId: normalizeNonEmptyString(baseline?.baselineId),
+      openedAt: Number.isInteger(observedAt) && observedAt > 0 ? observedAt : 0,
+      status: "open",
+      metadata: {
+        inputText,
+        replyPreferred,
+        transcriptStartRevision
+      }
+    }),
+    baseline,
+    transcriptStartRevision,
+    inputText,
+    replyPreferred,
+    activityCompletedAt: 0,
+    quietWindowSettledAt: 0,
+    lastObservedProjectionRevision: transcriptStartRevision,
+    primaryReplyCandidateKey: "",
+    primaryReplyComparableText: "",
+    primaryReplyText: "",
+    primaryReplyScope: "",
+    primaryReplyOccurredAt: 0
+  };
+}
+
+function createOutputEpisodeRuntimeState({
+  sessionId,
+  observedAt,
+  baseline = null
+}) {
+  const episodeId =
+    normalizeNonEmptyString(baseline?.baselineId) ||
+    `episode:${sessionId}:${Number.isInteger(observedAt) && observedAt > 0 ? observedAt : Date.now()}`;
+  const transcriptStartRevision = Number.isInteger(baseline?.revision) ? baseline.revision : 0;
+  return {
+    entityType: "OutputEpisodeRuntimeState",
+    outputEpisode: createOutputEpisode({
+      episodeId,
+      sessionId,
+      episodeKind: "autonomous-output",
+      sourceProjectionId: normalizeNonEmptyString(baseline?.baselineId),
+      startedAt: Number.isInteger(observedAt) && observedAt > 0 ? observedAt : 0,
+      status: "open",
+      metadata: {
+        transcriptStartRevision
+      }
+    }),
+    baseline,
+    transcriptStartRevision,
+    activityCompletedAt: 0,
+    quietWindowSettledAt: 0,
+    lastObservedProjectionRevision: transcriptStartRevision
+  };
+}
+
+function rebuildTurnRuntimeDescriptor(runtimeState, overrides = {}) {
+  if (!runtimeState?.turn) {
+    return runtimeState;
+  }
+  return {
+    ...runtimeState,
+    turn: createTurn({
+      ...runtimeState.turn,
+      ...overrides
+    })
+  };
+}
+
+function rebuildOutputEpisodeRuntimeDescriptor(runtimeState, overrides = {}) {
+  if (!runtimeState?.outputEpisode) {
+    return runtimeState;
+  }
+  return {
+    ...runtimeState,
+    outputEpisode: createOutputEpisode({
+      ...runtimeState.outputEpisode,
+      ...overrides
+    })
   };
 }
 
@@ -1767,30 +1873,14 @@ export function createMessagingRuntime(options = {}) {
     const semanticAdapter = buildAppSemanticAdapterDescriptorForSession(session, profile, "legacy-codex-allowlist");
     const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText);
     if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
-      const replyState = state?.pendingCodexTelegramReply || null;
-      const turn = createTurn({
-        turnId: deliveryBlockKey || candidateKey || normalizeNonEmptyString(replyState?.correlationId) || traceId,
-        sessionId: session.id,
-        triggerKind: "submitted-input",
-        inputSource: normalizeNonEmptyString(replyState?.source) || "legacy-reply-window",
-        correlationId: normalizeNonEmptyString(replyState?.correlationId),
-        traceId: normalizeNonEmptyString(replyState?.traceId) || traceId,
-        openedAt:
-          (Number.isInteger(replyState?.triggeredAt) && replyState.triggeredAt > 0
-            ? replyState.triggeredAt
-            : Number.isInteger(decision?.firstObservedAt) && decision.firstObservedAt > 0
-              ? decision.firstObservedAt
-              : nowFn()),
-        closedAt:
-          (Number.isInteger(decision?.lastObservedAt) && decision.lastObservedAt > 0 ? decision.lastObservedAt : nowFn()),
-        status: "completed",
-        metadata: {
-          replyWindowMs: CODEX_TELEGRAM_REPLY_WINDOW_MS,
-          legacyDeliveryScope: deliveryScope
-        }
-      });
+      const turn = resolveLegacyMessageIntentTurn(state, session, decision, trace);
       return createMessageIntent({
-        intentId: deliveryBlockKey || candidateKey || normalizeNonEmptyString(replyState?.correlationId) || traceId,
+        intentId:
+          deliveryBlockKey ||
+          candidateKey ||
+          normalizeNonEmptyString(turn?.correlationId) ||
+          normalizeNonEmptyString(turn?.traceId) ||
+          traceId,
         sessionId: session.id,
         intentKind: "reply",
         eventType: "session.output.summary",
@@ -1815,21 +1905,7 @@ export function createMessagingRuntime(options = {}) {
         }
       });
     }
-    const outputEpisode = createOutputEpisode({
-      episodeId: deliveryBlockKey || candidateKey || traceId,
-      sessionId: session.id,
-      episodeKind: "autonomous-output",
-      sourceProjectionId: projection.projectionId,
-      startedAt:
-        (Number.isInteger(decision?.firstObservedAt) && decision.firstObservedAt > 0 ? decision.firstObservedAt : nowFn()),
-      completedAt:
-        (Number.isInteger(decision?.lastObservedAt) && decision.lastObservedAt > 0 ? decision.lastObservedAt : nowFn()),
-      status: "completed",
-      metadata: {
-        legacyDeliveryScope: deliveryScope,
-        candidateKey
-      }
-    });
+    const outputEpisode = resolveLegacyMessageIntentOutputEpisode(state, session, decision, trace);
     return createMessageIntent({
       intentId: deliveryBlockKey || candidateKey || traceId,
       sessionId: session.id,
@@ -2024,6 +2100,22 @@ export function createMessagingRuntime(options = {}) {
         (observedAt - streamState.lastObservedInputAt <= CODEX_TELEGRAM_REPLY_INPUT_CARRYOVER_WINDOW_MS
           ? streamState.lastObservedInputText
           : "");
+      if (streamState.activeOutputEpisode?.outputEpisode) {
+        closeActiveOutputEpisode(streamState, observedAt, "superseded_by_turn");
+      }
+      if (streamState.activeTerminalTurn?.turn) {
+        closeActiveTurn(streamState, observedAt, "superseded_by_new_input");
+      }
+      ensureTerminalProjection(streamState, { id: normalizedSessionId });
+      const baseline = captureProjectionBaseline(streamState, `turn:${normalizedSessionId}:${observedAt}`);
+      streamState.activeTerminalTurn = createTerminalTurnRuntimeState({
+        sessionId: normalizedSessionId,
+        observedAt,
+        trace,
+        inputText: carriedInputText,
+        replyPreferred: isReplyPreferredTelegramTrace(trace),
+        baseline
+      });
       streamState.pendingCodexTelegramReply = {
         active: true,
         triggeredAt: observedAt,
@@ -2047,6 +2139,19 @@ export function createMessagingRuntime(options = {}) {
           traceId: normalizeNonEmptyString(trace?.traceId),
           correlationId: normalizeNonEmptyString(trace?.correlationId),
           traceSource: normalizeNonEmptyString(trace?.source),
+          replyPreferred: isReplyPreferredTelegramTrace(trace)
+        },
+        trace
+      );
+      logDebug(
+        "terminal.orchestration.turn_opened",
+        {
+          sessionId: normalizedSessionId,
+          turnId: streamState.activeTerminalTurn.turn.turnId,
+          baselineRevision: Number.isInteger(streamState.activeTerminalTurn.baseline?.revision)
+            ? streamState.activeTerminalTurn.baseline.revision
+            : 0,
+          inputText: carriedInputText,
           replyPreferred: isReplyPreferredTelegramTrace(trace)
         },
         trace
@@ -2208,6 +2313,203 @@ export function createMessagingRuntime(options = {}) {
   function diffTerminalProjectionBaselineForSession(sessionId, baseline, options = {}) {
     const state = sessionStates.get(normalizeNonEmptyString(sessionId));
     return state?.terminalProjection?.diffFromBaseline(baseline, options) || null;
+  }
+
+  function captureProjectionBaseline(state, label = "") {
+    return state?.terminalProjection?.createBaseline(label) || null;
+  }
+
+  function getTerminalProjectionRevision(state) {
+    const revision = state?.terminalProjection?.captureSnapshot()?.revision;
+    return Number.isInteger(revision) ? revision : 0;
+  }
+
+  function buildTurnRuntimeSnapshot(state, runtimeState) {
+    if (!runtimeState?.turn) {
+      return null;
+    }
+    const transcriptDelta = state?.terminalProjection?.getTranscriptDelta(runtimeState.transcriptStartRevision) || null;
+    const diff =
+      runtimeState.baseline && state?.terminalProjection
+        ? state.terminalProjection.diffFromBaseline(runtimeState.baseline)
+        : null;
+    return Object.freeze({
+      entityType: "TurnRuntimeState",
+      turn: runtimeState.turn,
+      baseline: runtimeState.baseline || null,
+      transcriptDelta,
+      diff,
+      inputText: runtimeState.inputText || "",
+      replyPreferred: runtimeState.replyPreferred === true,
+      activityCompletedAt: runtimeState.activityCompletedAt || 0,
+      quietWindowSettledAt: runtimeState.quietWindowSettledAt || 0,
+      lastObservedProjectionRevision: runtimeState.lastObservedProjectionRevision || 0,
+      primaryReplyCandidateKey: runtimeState.primaryReplyCandidateKey || "",
+      primaryReplyComparableText: runtimeState.primaryReplyComparableText || "",
+      primaryReplyText: runtimeState.primaryReplyText || "",
+      primaryReplyScope: runtimeState.primaryReplyScope || "",
+      primaryReplyOccurredAt: runtimeState.primaryReplyOccurredAt || 0
+    });
+  }
+
+  function buildOutputEpisodeRuntimeSnapshot(state, runtimeState) {
+    if (!runtimeState?.outputEpisode) {
+      return null;
+    }
+    const transcriptDelta = state?.terminalProjection?.getTranscriptDelta(runtimeState.transcriptStartRevision) || null;
+    const diff =
+      runtimeState.baseline && state?.terminalProjection
+        ? state.terminalProjection.diffFromBaseline(runtimeState.baseline)
+        : null;
+    return Object.freeze({
+      entityType: "OutputEpisodeRuntimeState",
+      outputEpisode: runtimeState.outputEpisode,
+      baseline: runtimeState.baseline || null,
+      transcriptDelta,
+      diff,
+      activityCompletedAt: runtimeState.activityCompletedAt || 0,
+      quietWindowSettledAt: runtimeState.quietWindowSettledAt || 0,
+      lastObservedProjectionRevision: runtimeState.lastObservedProjectionRevision || 0
+    });
+  }
+
+  function captureTerminalOrchestrationState(sessionId) {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    if (!state) {
+      return null;
+    }
+    return Object.freeze({
+      entityType: "TerminalOrchestrationState",
+      sessionId: normalizeNonEmptyString(sessionId),
+      activeTurn: buildTurnRuntimeSnapshot(state, state.activeTerminalTurn),
+      lastCompletedTurn: buildTurnRuntimeSnapshot(state, state.lastCompletedTerminalTurn),
+      activeOutputEpisode: buildOutputEpisodeRuntimeSnapshot(state, state.activeOutputEpisode),
+      lastCompletedOutputEpisode: buildOutputEpisodeRuntimeSnapshot(state, state.lastCompletedOutputEpisode)
+    });
+  }
+
+  function closeActiveOutputEpisode(state, completedAt, status = "completed") {
+    if (!state?.activeOutputEpisode?.outputEpisode) {
+      return;
+    }
+    const settledAt = Number.isInteger(completedAt) && completedAt > 0 ? completedAt : nowFn();
+    state.lastCompletedOutputEpisode = rebuildOutputEpisodeRuntimeDescriptor(
+      {
+        ...state.activeOutputEpisode,
+        activityCompletedAt: state.activeOutputEpisode.activityCompletedAt || settledAt,
+        quietWindowSettledAt: settledAt
+      },
+      {
+        completedAt: settledAt,
+        status
+      }
+    );
+    state.activeOutputEpisode = null;
+  }
+
+  function closeActiveTurn(state, completedAt, status = "completed") {
+    if (!state?.activeTerminalTurn?.turn) {
+      return;
+    }
+    const settledAt = Number.isInteger(completedAt) && completedAt > 0 ? completedAt : nowFn();
+    state.lastCompletedTerminalTurn = rebuildTurnRuntimeDescriptor(
+      {
+        ...state.activeTerminalTurn,
+        activityCompletedAt: state.activeTerminalTurn.activityCompletedAt || settledAt,
+        quietWindowSettledAt: settledAt
+      },
+      {
+        closedAt: settledAt,
+        status
+      }
+    );
+    state.activeTerminalTurn = null;
+  }
+
+  function recordProjectionRevisionObservation(state) {
+    const revision = getTerminalProjectionRevision(state);
+    if (state?.activeTerminalTurn?.turn) {
+      state.activeTerminalTurn.lastObservedProjectionRevision = revision;
+    }
+    if (state?.activeOutputEpisode?.outputEpisode) {
+      state.activeOutputEpisode.lastObservedProjectionRevision = revision;
+    }
+  }
+
+  function ensureActiveTurnBaseline(state) {
+    if (!state?.activeTerminalTurn?.turn || state.activeTerminalTurn.baseline) {
+      return;
+    }
+    const baseline = captureProjectionBaseline(
+      state,
+      `turn:${normalizeNonEmptyString(state.activeTerminalTurn.turn.turnId)}`
+    );
+    const transcriptStartRevision = Number.isInteger(baseline?.revision) ? baseline.revision : 0;
+    state.activeTerminalTurn = rebuildTurnRuntimeDescriptor(
+      {
+        ...state.activeTerminalTurn,
+        baseline,
+        transcriptStartRevision,
+        lastObservedProjectionRevision: transcriptStartRevision
+      },
+      {
+        baselineProjectionId: normalizeNonEmptyString(baseline?.baselineId),
+        metadata: {
+          ...state.activeTerminalTurn.turn.metadata,
+          transcriptStartRevision
+        }
+      }
+    );
+  }
+
+  function ensureAutonomousOutputEpisode(state, session, trace, hasVisibleChunk) {
+    if (!hasVisibleChunk || state?.activeTerminalTurn?.turn || state?.activeOutputEpisode?.outputEpisode) {
+      return;
+    }
+    const observedAt = nowFn();
+    const baseline = captureProjectionBaseline(state, `episode:${normalizeNonEmptyString(session?.id)}`);
+    state.activeOutputEpisode = createOutputEpisodeRuntimeState({
+      sessionId: normalizeNonEmptyString(session?.id),
+      observedAt,
+      baseline
+    });
+    state.activeOutputEpisode.lastObservedProjectionRevision = Number.isInteger(baseline?.revision) ? baseline.revision : 0;
+    logDebug(
+      "terminal.orchestration.output_episode_opened",
+      {
+        sessionId: normalizeNonEmptyString(session?.id),
+        episodeId: state.activeOutputEpisode.outputEpisode.episodeId,
+        baselineRevision: Number.isInteger(baseline?.revision) ? baseline.revision : 0
+      },
+      trace
+    );
+  }
+
+  function observeTurnCompletionBoundary(state, session, trace) {
+    const settledAt =
+      (Number.isInteger(session?.activityCompletedAt) && session.activityCompletedAt > 0 ? session.activityCompletedAt : 0) || nowFn();
+    if (state?.activeTerminalTurn?.turn) {
+      state.activeTerminalTurn.activityCompletedAt = settledAt;
+      state.activeTerminalTurn = rebuildTurnRuntimeDescriptor(state.activeTerminalTurn, {
+        status: "quieting"
+      });
+    }
+    if (state?.activeOutputEpisode?.outputEpisode) {
+      state.activeOutputEpisode.activityCompletedAt = settledAt;
+      state.activeOutputEpisode = rebuildOutputEpisodeRuntimeDescriptor(state.activeOutputEpisode, {
+        status: "quieting"
+      });
+    }
+    logDebug(
+      "terminal.orchestration.quiet_boundary",
+      {
+        sessionId: normalizeNonEmptyString(session?.id),
+        activeTurnId: normalizeNonEmptyString(state?.activeTerminalTurn?.turn?.turnId),
+        activeEpisodeId: normalizeNonEmptyString(state?.activeOutputEpisode?.outputEpisode?.episodeId),
+        settledAt
+      },
+      trace
+    );
   }
 
   async function ensureSessionTargetInternal(session, trace, resolvedTarget = null) {
@@ -2577,6 +2879,95 @@ export function createMessagingRuntime(options = {}) {
     });
   }
 
+  function resolveLegacyMessageIntentTurn(state, session, decision, trace) {
+    const activeTurn = state?.activeTerminalTurn;
+    const lastCompletedTurn = state?.lastCompletedTerminalTurn;
+    if (activeTurn?.turn) {
+      return activeTurn.turn;
+    }
+    if (
+      lastCompletedTurn?.turn &&
+      Number.isInteger(lastCompletedTurn.turn.closedAt) &&
+      Number.isInteger(decision?.lastObservedAt) &&
+      lastCompletedTurn.turn.closedAt >= decision.lastObservedAt
+    ) {
+      return lastCompletedTurn.turn;
+    }
+    if (lastCompletedTurn?.turn) {
+      return lastCompletedTurn.turn;
+    }
+    return createTurn({
+      turnId:
+        normalizeNonEmptyString(decision?.deliveryBlockKey) ||
+        normalizeNonEmptyString(decision?.key) ||
+        normalizeNonEmptyString(trace?.correlationId) ||
+        normalizeNonEmptyString(trace?.traceId),
+      sessionId: normalizeNonEmptyString(session?.id),
+      triggerKind: "submitted-input",
+      inputSource: normalizeNonEmptyString(trace?.source),
+      correlationId: normalizeNonEmptyString(trace?.correlationId),
+      traceId: normalizeNonEmptyString(trace?.traceId),
+      openedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : nowFn(),
+      closedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : nowFn(),
+      status: "completed"
+    });
+  }
+
+  function resolveLegacyMessageIntentOutputEpisode(state, session, decision, trace) {
+    const activeEpisode = state?.activeOutputEpisode;
+    const lastCompletedEpisode = state?.lastCompletedOutputEpisode;
+    const runtimeEpisode = activeEpisode?.outputEpisode || lastCompletedEpisode?.outputEpisode || null;
+    return createOutputEpisode({
+      episodeId:
+        normalizeNonEmptyString(decision?.deliveryBlockKey) ||
+        normalizeNonEmptyString(decision?.key) ||
+        normalizeNonEmptyString(trace?.traceId),
+      sessionId: normalizeNonEmptyString(session?.id),
+      episodeKind: "autonomous-output",
+      sourceProjectionId: normalizeNonEmptyString(runtimeEpisode?.sourceProjectionId),
+      completedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : nowFn(),
+      startedAt:
+        Number.isInteger(runtimeEpisode?.startedAt) && runtimeEpisode.startedAt > 0
+          ? runtimeEpisode.startedAt
+          : Number.isInteger(decision?.firstObservedAt)
+            ? decision.firstObservedAt
+            : nowFn(),
+      status:
+        normalizeNonEmptyString(runtimeEpisode?.status) ||
+        (activeEpisode?.outputEpisode ? "open" : "completed"),
+      metadata: {
+        runtimeEpisodeId: normalizeNonEmptyString(runtimeEpisode?.episodeId),
+        transcriptStartRevision:
+          Number.isInteger(activeEpisode?.transcriptStartRevision) && activeEpisode.transcriptStartRevision >= 0
+            ? activeEpisode.transcriptStartRevision
+            : Number.isInteger(lastCompletedEpisode?.transcriptStartRevision) && lastCompletedEpisode.transcriptStartRevision >= 0
+              ? lastCompletedEpisode.transcriptStartRevision
+              : 0
+      }
+    });
+  }
+
+  function recordTurnPrimaryReplyCandidate(state, messageIntent) {
+    const turnState = state?.activeTerminalTurn || state?.lastCompletedTerminalTurn;
+    if (!turnState?.turn || !messageIntent?.turn) {
+      return;
+    }
+    if (turnState.primaryReplyCandidateKey) {
+      return;
+    }
+    const turnId = normalizeNonEmptyString(turnState.turn.turnId);
+    if (turnId && turnId !== normalizeNonEmptyString(messageIntent.turn.turnId)) {
+      return;
+    }
+    turnState.primaryReplyCandidateKey =
+      normalizeNonEmptyString(messageIntent.intentId) ||
+      normalizeNonEmptyString(messageIntent.comparableText);
+    turnState.primaryReplyComparableText = normalizeNonEmptyString(messageIntent.comparableText);
+    turnState.primaryReplyText = normalizeNonEmptyString(messageIntent.text);
+    turnState.primaryReplyScope = normalizeNonEmptyString(messageIntent.metadata?.legacyDeliveryScope);
+    turnState.primaryReplyOccurredAt = nowFn();
+  }
+
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
     const deliveryScope = normalizeNonEmptyString(decision?.family);
     const maxLength =
@@ -2619,6 +3010,9 @@ export function createMessagingRuntime(options = {}) {
       deliveryBlockKey,
       maxLength
     });
+    if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
+      recordTurnPrimaryReplyCandidate(state, messageIntent);
+    }
     const event = createEventFromMessageIntent({
       session,
       profile,
@@ -2994,6 +3388,8 @@ export function createMessagingRuntime(options = {}) {
     if (type === "session.exit") {
       codexSummaryRestartRecoveryStates.delete(normalizeNonEmptyString(session?.id));
       state.lastLifecycleType = type;
+      closeActiveTurn(state, nowFn(), "terminated");
+      closeActiveOutputEpisode(state, nowFn(), "terminated");
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_exit");
       state.terminalProjection = null;
@@ -3018,6 +3414,8 @@ export function createMessagingRuntime(options = {}) {
     if (type === "session.closed") {
       codexSummaryRestartRecoveryStates.delete(normalizeNonEmptyString(session?.id));
       state.lastLifecycleType = type;
+      closeActiveTurn(state, nowFn(), "closed");
+      closeActiveOutputEpisode(state, nowFn(), "closed");
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_closed");
       state.terminalProjection = null;
@@ -3052,6 +3450,12 @@ export function createMessagingRuntime(options = {}) {
           .filter((entry) => entry !== null)
       )
     ).sort((left, right) => left - right);
+    const hasVisibleChunk = Boolean(normalizeVisibleReplayText(chunk).trim());
+    if (state?.activeTerminalTurn?.turn) {
+      ensureActiveTurnBaseline(state);
+    } else {
+      ensureAutonomousOutputEpisode(state, session, trace, hasVisibleChunk);
+    }
     if (chunk || normalizedPromptBoundaries.length > 0) {
       const geometry = getSessionGeometry(session);
       await terminalProjection.observeData(chunk, {
@@ -3060,6 +3464,7 @@ export function createMessagingRuntime(options = {}) {
         cols: geometry.cols,
         rows: geometry.rows
       });
+      recordProjectionRevisionObservation(state);
     }
     async function dispatchPromptReady() {
       await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
@@ -3275,9 +3680,12 @@ export function createMessagingRuntime(options = {}) {
     }
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
+    observeTurnCompletionBoundary(state, session, trace);
     await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
     await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
     await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
+    closeActiveTurn(state, session?.activityCompletedAt || nowFn(), "completed");
+    closeActiveOutputEpisode(state, session?.activityCompletedAt || nowFn(), "completed");
     if (
       isCodingAgentContext(session, profile) &&
       state.pendingSummaryBlock.fragments.length === 0 &&
@@ -3676,6 +4084,10 @@ export function createMessagingRuntime(options = {}) {
     const recoveringSessionCount = Array.from(codexSummaryRestartRecoveryStates.values()).filter((entry) => entry?.active).length;
     const activeReplySessionCount = Array.from(sessionStates.values()).filter((entry) => isCodexTelegramReplyActive(entry?.pendingCodexTelegramReply, nowFn())).length;
     const activeProjectionSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.terminalProjection).length;
+    const activeTurnSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.activeTerminalTurn?.turn).length;
+    const completedTurnSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.lastCompletedTerminalTurn?.turn).length;
+    const activeOutputEpisodeSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.activeOutputEpisode?.outputEpisode).length;
+    const completedOutputEpisodeSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.lastCompletedOutputEpisode?.outputEpisode).length;
     return {
       enabled: telegramConfigured,
       deliveryEnabled: telegramOutboundEnabled,
@@ -3688,9 +4100,13 @@ export function createMessagingRuntime(options = {}) {
       },
       terminalMessagingCore: {
         active: true,
-        bridgeMode: "legacy-candidate-to-message-intent",
+        bridgeMode: "projection-turn-episode-bridge",
         deliveryAdapters: deliveryAdapterDescriptors.map((descriptor) => descriptor.adapterId),
         activeProjectionSessionCount,
+        activeTurnSessionCount,
+        completedTurnSessionCount,
+        activeOutputEpisodeSessionCount,
+        completedOutputEpisodeSessionCount,
         projectionResourceLimits: DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
         boundaryContracts: [
           "TerminalProjection",
@@ -3769,6 +4185,7 @@ export function createMessagingRuntime(options = {}) {
     observeSessionIdle,
     observeShareChange,
     captureTerminalProjectionSnapshot,
+    captureTerminalOrchestrationState,
     createTerminalProjectionBaseline: createTerminalProjectionBaselineForSession,
     getTerminalProjectionTranscriptDelta,
     diffTerminalProjectionBaseline: diffTerminalProjectionBaselineForSession,

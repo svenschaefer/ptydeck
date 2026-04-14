@@ -4,7 +4,7 @@ Last updated: 2026-04-14
 
 ## Purpose
 
-This note records the delivered neutral-core and terminal-projection foundation for the `v0.4.0-H128` stream-to-message refactor.
+This note records the delivered neutral core, terminal projection, and runtime orchestration foundation for the `v0.4.0-H128` stream-to-message refactor.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,9 +34,9 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` and `MSG-084` still do not replace the old stream parser.
+`MSG-083`, `MSG-084`, and `MSG-085` still do not replace the old stream parser.
 
-They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, and add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics.
+They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, and move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam.
 
 Current bridge behavior:
 
@@ -81,19 +81,23 @@ The first shipped delivery descriptor is:
 
 - `telegram`
 
-This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, and `MSG-085` through `MSG-086` will move more of the runtime onto those boundaries.
+This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, and `MSG-086` through `MSG-087` will move semantic extraction and migration onto those boundaries.
 
 ## Why This Matters
 
 Before this slice, `dispatchCodexAllowlistCandidate(...)` effectively jumped straight from a Codex-specific legacy candidate to an adapter-facing event.
 
-After this slice, the runtime has an explicit adapter-neutral semantic object in the middle.
+After these slices, the runtime has:
+
+- an explicit adapter-neutral semantic object in the middle
+- a backend-owned terminal projection seam
+- a runtime-owned `Turn` / `OutputEpisode` orchestration seam on top of that projection
 
 That is the minimum necessary step before the larger refactor can safely move toward:
 
 - backend terminal projection
-- turn-first orchestration
-- output-episode modeling
+- semantic extraction from real turns
+- semantic extraction from real output episodes
 - stable diff plus bounded transcript extraction
 - shadow-mode dual-run comparison
 
@@ -104,8 +108,7 @@ This slice does not yet solve the central stream-to-message correctness problem.
 It does not yet:
 
 - replace chunk-first interpretation
-- make turn replies or autonomous output depend on the projection
-- replace current delivery decisions with projection-derived semantics
+- replace current delivery decisions with projection-derived turn/episode semantics
 - replace the current primary Codex allowlist heuristics
 
 Those remain the next steps in `H128`.
@@ -131,17 +134,33 @@ The runtime currently exposes those primitives through:
 - `getTerminalProjectionTranscriptDelta(sessionId, sinceRevision)`
 - `diffTerminalProjectionBaseline(sessionId, baseline, options)`
 
-This is the stable backend-owned state seam that later `Turn` and `OutputEpisode` orchestration can build on.
+This is the stable backend-owned state seam that the shipped `Turn` and `OutputEpisode` orchestration now builds on.
+
+## Runtime Orchestration Now Shipped
+
+`backend/src/messaging-runtime.js` now also owns explicit runtime orchestration state on top of the projection:
+
+- submit-bearing input opens a bounded `Turn`
+- the turn captures a pre-turn projection baseline
+- autonomous visible output without an active turn opens a bounded `OutputEpisode`
+- both keep bounded transcript-delta and snapshot-diff context through the live projection seam
+- both settle only once the runtime reaches `session.activity.completed` and the corresponding quiet-window callback path
+
+The runtime currently exposes that orchestration seam through:
+
+- `captureTerminalOrchestrationState(sessionId)`
+- `buildStatusSummary().terminalMessagingCore.activeTurnSessionCount`
+- `buildStatusSummary().terminalMessagingCore.completedTurnSessionCount`
+- `buildStatusSummary().terminalMessagingCore.activeOutputEpisodeSessionCount`
+- `buildStatusSummary().terminalMessagingCore.completedOutputEpisodeSessionCount`
 
 ## Next Steps
 
 The next implementation slices are now:
 
-1. `MSG-085`
-   - turn-first and output-episode orchestration on top of that projection
-2. `MSG-086`
+1. `MSG-086`
    - adapter-neutral semantic extraction from turns and episodes
-3. `MSG-087`
+2. `MSG-087`
    - shadow mode and feature-flagged cutover
-4. `MSG-088`
+3. `MSG-088`
    - full end-to-end validation against known field failures
