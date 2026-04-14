@@ -130,6 +130,29 @@ function buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, 
   return comparableTexts;
 }
 
+function buildPreTurnComparableSet(runtimeSnapshot, helpers) {
+  const comparableTexts = new Set();
+  const pendingLine = helpers.normalizeWhitespace(runtimeSnapshot?.preInputPendingLine);
+  if (pendingLine) {
+    const comparableText = helpers.createComparableText(pendingLine);
+    if (comparableText) {
+      comparableTexts.add(comparableText);
+    }
+  }
+  const recentLines = Array.isArray(runtimeSnapshot?.preInputRecentLines) ? runtimeSnapshot.preInputRecentLines : [];
+  for (const line of recentLines) {
+    const normalized = helpers.normalizeWhitespace(line);
+    if (!normalized) {
+      continue;
+    }
+    const comparableText = helpers.createComparableText(normalized);
+    if (comparableText) {
+      comparableTexts.add(comparableText);
+    }
+  }
+  return comparableTexts;
+}
+
 function normalizeProjectionSemanticSourceLine(rawLine, session, profile, options, helpers) {
   const original = helpers.normalizeWhitespace(String(rawLine || ""));
   if (!original) {
@@ -186,6 +209,9 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
   if (options?.baselineComparableTexts instanceof Set && noise.comparableText && options.baselineComparableTexts.has(noise.comparableText)) {
     return null;
   }
+  if (options?.preTurnComparableTexts instanceof Set && noise.comparableText && options.preTurnComparableTexts.has(noise.comparableText)) {
+    return null;
+  }
   return Object.freeze({
     text: normalized,
     comparableText: noise.comparableText,
@@ -197,6 +223,7 @@ function extractProjectionSemanticLines(runtimeSnapshot, session, profile, optio
   const baselineComparableTexts = buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers, {
     leadingMarkerPattern: options?.leadingMarkerPattern
   });
+  const preTurnComparableTexts = buildPreTurnComparableSet(runtimeSnapshot, helpers);
   const collected = collectProjectionSemanticSourceLines(runtimeSnapshot, helpers.normalizeLineBreaks);
   function normalizeSourceLines(sourceLines = []) {
     const lines = [];
@@ -222,6 +249,7 @@ function extractProjectionSemanticLines(runtimeSnapshot, session, profile, optio
         {
           inputText: options?.inputText || "",
           baselineComparableTexts,
+          preTurnComparableTexts,
           leadingMarkerPattern: options?.leadingMarkerPattern
         },
         helpers

@@ -2,6 +2,14 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-15
+
+- [x] `v0.4.0-H134 / MSG-099` is now completed on `main`, closing the validation slice for overlapping-output turn ownership and final-boundary correctness after the delivered projection-backed core.
+- [x] Closeout validation now proves the post-restart overlap regressions are addressed end to end. `backend/test/messaging-runtime.test.js` now locks down both the ownership-barrier case where a fresh turn must not inherit prior running output and the delayed final-boundary case where resumed same-correlation activity must cancel the first quiet-boundary settlement, while `backend/test/runtime.integration.test.js` proves the previously failing stale-carryover REST reply and leaked-tail Telegram custom-command flows now stay green through the runtime seam. The full local quality gate passed with `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, `npm run docs:check`, and `git diff --check`.
+
+- [x] `v0.4.0-H134 / MSG-097` and `v0.4.0-H134 / MSG-098` are now completed on `main`, closing the next structural gap in the projection-backed orchestration core instead of reopening chunk-first parsing heuristics.
+- [x] `backend/src/messaging-runtime.js` now introduces an explicit turn-ownership barrier whenever a submit-bearing input arrives while a prior turn or autonomous output episode is still active, so newly opened turns start from a fresh projection baseline instead of inheriting already-running semantic output. The same runtime now also defers quiet-boundary finalization through a bounded settlement window that is cancelled if `session.activity.started` resumes before the boundary is semantically stable, preventing the first quiet window from prematurely finalizing and delivering a reply when the same turn correlation continues emitting fresh output immediately afterward. `backend/src/runtime.js` now feeds real `session.activity.started` events into that boundary-settlement seam, `backend/src/app-semantic-adapters.js` now filters projection semantic lines against pre-turn stale carryover snapshots, and the runtime keeps stale reply correlation and prior summary fragments from leaking across the new ownership barrier.
+
 ## 2026-04-14
 
 - [x] `v0.4.0-H133 / MSG-096` is now completed on `main`, closing the first cross-adapter parity validation slice for the post-`H128` neutral delivery seam instead of leaving Discord as an unvalidated transport proof.

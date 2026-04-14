@@ -2793,6 +2793,7 @@ export function createRuntime(config) {
     terminalSemanticShadowModeEnabled: config.messagingTerminalSemanticShadowModeEnabled,
     terminalSemanticCutoverMinComparisons: config.messagingTerminalSemanticCutoverMinComparisons,
     terminalSemanticCutoverMaxMismatchRate: config.messagingTerminalSemanticCutoverMaxMismatchRate,
+    terminalOrchestrationBoundarySettleMs: 350,
     createTelegramTransport: config.createMessagingTelegramTransport,
     fetchImpl: config.fetchImpl,
     resolveDeckNameForSession: (session) => {
@@ -6145,6 +6146,10 @@ function tryCreateRestoredSession({
 
   manager.on("session.activity.started", (event) => {
     logDebug("session.event", { type: "session.activity.started", sessionId: event.sessionId || null }, event.trace);
+    void messagingRuntime.observeSessionActivityStarted({
+      sessionId: event.sessionId,
+      trace: event.trace
+    });
     reconcileStartupWarmup();
     persistSoon();
   });

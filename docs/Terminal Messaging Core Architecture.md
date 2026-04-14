@@ -1,10 +1,10 @@
 # Terminal Messaging Core Architecture
 
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, and shadow-mode migration surface for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-ups.
+This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, shadow-mode migration surface, and overlapping-output turn-ownership correction for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-ups.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,9 +34,9 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps.
+`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps, and `MSG-097` through `MSG-099` are now delivered as the first overlapping-output ownership correction on top of that baseline.
 
-They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly, move the shipped Codex semantic interpretation behind a real `AppSemanticAdapter` registry seam instead of leaving it embedded in the runtime core, move Telegram delivery behind the real `DeliveryAdapter` seam so thread-policy and formatting decisions are no longer runtime-owned Telegram shortcuts, prove the same semantic registry against a second generic coding-agent baseline that covers Claude-/Gemini-style transcript differences without changing the core, and now prove the delivery seam itself across both Telegram and a Discord-style reference adapter.
+They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly, move the shipped Codex semantic interpretation behind a real `AppSemanticAdapter` registry seam instead of leaving it embedded in the runtime core, move Telegram delivery behind the real `DeliveryAdapter` seam so thread-policy and formatting decisions are no longer runtime-owned Telegram shortcuts, prove the same semantic registry against a second generic coding-agent baseline that covers Claude-/Gemini-style transcript differences without changing the core, prove the delivery seam itself across both Telegram and a Discord-style reference adapter, and now harden the runtime against overlapping-output ownership leaks by introducing immediate turn-ownership barriers plus delayed quiet-boundary settlement.
 
 Current bridge behavior:
 
@@ -57,6 +57,13 @@ Current terminal projection behavior:
 2. the runtime keeps one bounded projection tracker per active session stream
 3. the tracker exposes deterministic snapshot, baseline, bounded transcript-delta, and snapshot-diff primitives
 4. the current `MessageIntent` bridge now derives its `TerminalProjection` descriptor from the live projection snapshot instead of from a purely synthetic legacy candidate stub
+
+Current overlapping-output ownership behavior:
+
+1. a submit-bearing input now opens an explicit ownership barrier if an earlier turn or autonomous episode is still active
+2. the barrier closes the earlier ownership range immediately and opens the new turn from a fresh projection baseline
+3. stale pre-turn pending/recent lines are carried into the new turn snapshot only for filtering, not for semantic ownership
+4. quiet-boundary completion now settles through a bounded grace window and is cancelled if fresh activity resumes before the boundary is semantically stable
 
 This means the runtime now has a first-class semantic seam between:
 
@@ -177,6 +184,8 @@ This is the stable backend-owned state seam that the shipped `Turn` and `OutputE
 - autonomous visible output without an active turn opens a bounded `OutputEpisode`
 - both keep bounded transcript-delta and snapshot-diff context through the live projection seam
 - both settle only once the runtime reaches `session.activity.completed` and the corresponding quiet-window callback path
+- overlapping-output cases now install an ownership barrier so a newly submitted turn cannot inherit already-running output from the prior turn or episode
+- quiet-boundary completion now waits through a bounded settlement window and is cancelled if `session.activity.started` resumes before the boundary is semantically final
 
 The runtime currently exposes that orchestration seam through:
 
@@ -209,5 +218,6 @@ After `MSG-083` through `MSG-088`, ptydeck now has:
 6. real Telegram and Discord `DeliveryAdapter` seams that consume adapter-neutral `MessageIntent` objects directly
 7. cross-adapter parity proof that the same `MessageIntent` output can drive more than one transport
 8. a shadow-mode and cutover-readiness surface for migration control
+9. explicit turn-ownership barriers and boundary-settlement semantics for overlapping-output cases
 
 That is the stable architectural baseline future adapter and app-specific follow-ups should extend, with both a concrete Codex semantic adapter and a second generic coding-agent adapter already proving that the registry can grow without reopening the core.

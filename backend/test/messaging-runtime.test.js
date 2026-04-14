@@ -838,6 +838,193 @@ test("messaging runtime delivers short correct turn replies through the generic 
   ]);
 });
 
+test("messaging runtime opens a fresh turn behind an ownership barrier instead of inheriting overlapping prior output", async () => {
+  const sends = [];
+  let now = 8_620;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    terminalOrchestrationBoundarySettleMs: 5,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 786 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 787 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-overlap-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-overlap-old-open",
+    correlationId: "projection-overlap-old-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "Earlier question"
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• Prior analysis line still running\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-overlap-old-data" }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-overlap-new-open",
+    correlationId: "projection-overlap-new-correlation",
+    source: "rest",
+    replyPromotionEligible: true,
+    replyInputText: "ja"
+  });
+
+  let orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.activeTurn?.inputText, "ja");
+  assert.equal(orchestration?.activeTurn?.turn?.correlationId, "projection-overlap-new-correlation");
+  assert.equal(orchestration?.lastCompletedTurn?.turn?.correlationId, "projection-overlap-old-correlation");
+  assert.equal(orchestration?.lastCompletedTurn?.turn?.status, "ownership_barrier");
+
+  await runtime.observeSessionData({
+    session,
+    data: "• Fresh reply owned by ja\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-overlap-new-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-overlap-new-idle" }
+  });
+
+  await waitFor(() => sends.length === 1);
+  assert.match(sends[0].text, /Fresh reply owned by ja/u);
+  assert.doesNotMatch(sends[0].text, /Prior analysis line/u);
+
+  orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedTurn?.turn?.correlationId, "projection-overlap-new-correlation");
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText, "Fresh reply owned by ja");
+});
+
+test("messaging runtime cancels quiet-boundary finalization when activity resumes before settlement", async () => {
+  const sends = [];
+  let now = 8_700;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    terminalOrchestrationBoundarySettleMs: 20,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 788 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 789 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-boundary-resume-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-boundary-open",
+    correlationId: "projection-boundary-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "Reply with two lines."
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• First stable line\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-boundary-data-1" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-boundary-idle-1" }
+  });
+
+  await runtime.observeSessionActivityStarted({
+    sessionId: session.id,
+    trace: {
+      traceId: "projection-boundary-started",
+      correlationId: "projection-boundary-correlation",
+      source: "pty"
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Second line after resumed activity\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-boundary-data-2" }
+  });
+
+  await sleep(25);
+  assert.equal(sends.length, 0);
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-boundary-idle-2" }
+  });
+
+  await waitFor(() => sends.length === 1);
+  assert.match(sends[0].text, /First stable line/u);
+  assert.match(sends[0].text, /Second line after resumed activity/u);
+
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText.includes("Second line after resumed activity"), true);
+});
+
 test("messaging runtime records projection-primary shadow comparisons for short turn replies", async () => {
   const sends = [];
   let now = 8_650;

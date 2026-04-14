@@ -62,6 +62,7 @@ const CODEX_SUMMARY_RESTART_RESEND_LEDGER_MAX_ENTRIES = 1000;
 const CODEX_TELEGRAM_REPLY_SCOPE = "codex_input_reply";
 const CODEX_TELEGRAM_REPLY_WINDOW_MS = 45_000;
 const CODEX_TELEGRAM_REPLY_INPUT_CARRYOVER_WINDOW_MS = 2_000;
+const DEFAULT_TERMINAL_ORCHESTRATION_BOUNDARY_SETTLE_MS = 350;
 const CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH = 24;
 const CODEX_TELEGRAM_REPLY_MIN_WORDS = 5;
 const CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH = 1200;
@@ -393,6 +394,24 @@ function createPendingCodexTelegramReply() {
     firstLineAt: 0,
     lastLineAt: 0,
     lines: []
+  };
+}
+
+function createPendingTerminalTurnAdmission({
+  sessionId = "",
+  observedAt = 0,
+  trace = null,
+  inputText = "",
+  replyPreferred = false
+} = {}) {
+  return {
+    sessionId: normalizeNonEmptyString(sessionId),
+    observedAt: Number.isInteger(observedAt) && observedAt > 0 ? observedAt : 0,
+    traceId: normalizeNonEmptyString(trace?.traceId),
+    correlationId: normalizeNonEmptyString(trace?.correlationId),
+    source: normalizeNonEmptyString(trace?.source),
+    inputText: normalizeReplyPromotionInputText(inputText),
+    replyPreferred: replyPreferred === true
   };
 }
 
@@ -1175,6 +1194,7 @@ function createSessionStreamState() {
     lastCompletedTerminalTurn: null,
     activeOutputEpisode: null,
     lastCompletedOutputEpisode: null,
+    pendingBoundarySettlement: null,
     pendingSummaryBlock: createPendingSummaryBlock(),
     pendingCodexTelegramReply: createPendingCodexTelegramReply(),
     lastObservedInputText: "",
@@ -1198,7 +1218,9 @@ function createTerminalTurnRuntimeState({
   trace = null,
   inputText = "",
   replyPreferred = false,
-  baseline = null
+  baseline = null,
+  preInputPendingLine = "",
+  preInputRecentLines = []
 }) {
   const correlationId = normalizeNonEmptyString(trace?.correlationId);
   const traceId = normalizeNonEmptyString(trace?.traceId);
@@ -1220,13 +1242,21 @@ function createTerminalTurnRuntimeState({
       metadata: {
         inputText,
         replyPreferred,
-        transcriptStartRevision
+        transcriptStartRevision,
+        preInputPendingLine: normalizeWhitespace(preInputPendingLine),
+        preInputRecentLines: Array.isArray(preInputRecentLines)
+          ? preInputRecentLines.map((line) => normalizeWhitespace(line)).filter(Boolean).slice(-MAX_RECENT_LINES)
+          : []
       }
     }),
     baseline,
     transcriptStartRevision,
     inputText,
     replyPreferred,
+    preInputPendingLine: normalizeWhitespace(preInputPendingLine),
+    preInputRecentLines: Array.isArray(preInputRecentLines)
+      ? preInputRecentLines.map((line) => normalizeWhitespace(line)).filter(Boolean).slice(-MAX_RECENT_LINES)
+      : [],
     activityCompletedAt: 0,
     quietWindowSettledAt: 0,
     lastObservedProjectionRevision: transcriptStartRevision,
@@ -1787,6 +1817,10 @@ export function normalizeMessagingInboundInputPayload(value) {
 
 export function createMessagingRuntime(options = {}) {
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
+  const setTimeoutFn =
+    typeof options.setTimeoutFn === "function" ? options.setTimeoutFn : globalThis.setTimeout.bind(globalThis);
+  const clearTimeoutFn =
+    typeof options.clearTimeoutFn === "function" ? options.clearTimeoutFn : globalThis.clearTimeout.bind(globalThis);
   const telegramTargetMappings = normalizeMessagingTargets(options.telegramTargets, {
     adapterId: "telegram",
     includeAdapterId: true
@@ -1866,6 +1900,10 @@ export function createMessagingRuntime(options = {}) {
     options.terminalSemanticCutoverMaxMismatchRate,
     DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE
   );
+  const terminalOrchestrationBoundarySettleMs =
+    Number.isInteger(options.terminalOrchestrationBoundarySettleMs) && options.terminalOrchestrationBoundarySettleMs >= 0
+      ? options.terminalOrchestrationBoundarySettleMs
+      : 0;
   const terminalSemanticShadowState = createTerminalSemanticShadowState({
     primaryMode: terminalSemanticPrimaryMode,
     shadowModeEnabled: terminalSemanticShadowModeEnabled,
@@ -2280,62 +2318,19 @@ export function createMessagingRuntime(options = {}) {
         (observedAt - streamState.lastObservedInputAt <= CODEX_TELEGRAM_REPLY_INPUT_CARRYOVER_WINDOW_MS
           ? streamState.lastObservedInputText
           : "");
-      if (streamState.activeOutputEpisode?.outputEpisode) {
-        closeActiveOutputEpisode(streamState, observedAt, "superseded_by_turn");
-      }
-      if (streamState.activeTerminalTurn?.turn) {
-        closeActiveTurn(streamState, observedAt, "superseded_by_new_input");
-      }
-      ensureTerminalProjection(streamState, { id: normalizedSessionId });
-      const baseline = captureProjectionBaseline(streamState, `turn:${normalizedSessionId}:${observedAt}`);
-      streamState.activeTerminalTurn = createTerminalTurnRuntimeState({
+      const admission = createPendingTerminalTurnAdmission({
         sessionId: normalizedSessionId,
         observedAt,
         trace,
         inputText: carriedInputText,
-        replyPreferred: isReplyPreferredTelegramTrace(trace),
-        baseline
+        replyPreferred: isReplyPreferredTelegramTrace(trace)
       });
-      streamState.pendingCodexTelegramReply = {
-        active: true,
-        triggeredAt: observedAt,
-        traceId: normalizeNonEmptyString(trace?.traceId),
-        correlationId: normalizeNonEmptyString(trace?.correlationId),
-        source: normalizeNonEmptyString(trace?.source),
-        replyPreferred: isReplyPreferredTelegramTrace(trace),
-        inputText: carriedInputText,
-        preInputPendingLine: normalizeWhitespace(streamState.pendingLine),
-        preInputRecentLines: streamState.recentLines.slice(-MAX_RECENT_LINES),
-        started: false,
-        firstLineAt: 0,
-        lastLineAt: 0,
-        lines: []
-      };
-      logDebug(
-        "messaging.telegram_reply_window",
-        {
-          sessionId: normalizedSessionId,
-          active: true,
-          traceId: normalizeNonEmptyString(trace?.traceId),
-          correlationId: normalizeNonEmptyString(trace?.correlationId),
-          traceSource: normalizeNonEmptyString(trace?.source),
-          replyPreferred: isReplyPreferredTelegramTrace(trace)
-        },
-        trace
-      );
-      logDebug(
-        "terminal.orchestration.turn_opened",
-        {
-          sessionId: normalizedSessionId,
-          turnId: streamState.activeTerminalTurn.turn.turnId,
-          baselineRevision: Number.isInteger(streamState.activeTerminalTurn.baseline?.revision)
-            ? streamState.activeTerminalTurn.baseline.revision
-            : 0,
-          inputText: carriedInputText,
-          replyPreferred: isReplyPreferredTelegramTrace(trace)
-        },
-        trace
-      );
+      if (hasActiveTerminalOwnership(streamState) || streamState?.pendingBoundarySettlement) {
+        applyTurnOwnershipBarrier(streamState, { id: normalizedSessionId }, trace);
+        activateTurnAdmission(streamState, { id: normalizedSessionId }, admission, trace, "ownership_barrier");
+        return;
+      }
+      activateTurnAdmission(streamState, { id: normalizedSessionId }, admission, trace, "immediate");
     }
     const state = codexSummaryRestartRecoveryStates.get(normalizedSessionId);
     if (!state) {
@@ -2460,6 +2455,64 @@ export function createMessagingRuntime(options = {}) {
     return state;
   }
 
+  function hasActiveTerminalOwnership(state) {
+    return Boolean(state?.activeTerminalTurn?.turn || state?.activeOutputEpisode?.outputEpisode);
+  }
+
+  function clearPendingBoundarySettlement(state) {
+    const settlement = state?.pendingBoundarySettlement;
+    if (settlement?.timer) {
+      clearTimeoutFn(settlement.timer);
+    }
+    if (state && typeof state === "object") {
+      state.pendingBoundarySettlement = null;
+    }
+  }
+
+  function reopenQuietingTerminalOwnership(state) {
+    if (state?.activeTerminalTurn?.turn && normalizeNonEmptyString(state.activeTerminalTurn.turn.status) === "quieting") {
+      state.activeTerminalTurn.activityCompletedAt = 0;
+      state.activeTerminalTurn.quietWindowSettledAt = 0;
+      state.activeTerminalTurn = rebuildTurnRuntimeDescriptor(state.activeTerminalTurn, {
+        status: "open"
+      });
+    }
+    if (
+      state?.activeOutputEpisode?.outputEpisode &&
+      normalizeNonEmptyString(state.activeOutputEpisode.outputEpisode.status) === "quieting"
+    ) {
+      state.activeOutputEpisode.activityCompletedAt = 0;
+      state.activeOutputEpisode.quietWindowSettledAt = 0;
+      state.activeOutputEpisode = rebuildOutputEpisodeRuntimeDescriptor(state.activeOutputEpisode, {
+        status: "open"
+      });
+    }
+  }
+
+  function applyTurnOwnershipBarrier(state, session, trace = null) {
+    if (!state) {
+      return;
+    }
+    clearPendingBoundarySettlement(state);
+    const completedAt = nowFn();
+    const activeTurnId = normalizeNonEmptyString(state?.activeTerminalTurn?.turn?.turnId);
+    const activeEpisodeId = normalizeNonEmptyString(state?.activeOutputEpisode?.outputEpisode?.episodeId);
+    clearPendingCodexTelegramReply(state);
+    state.pendingSummaryBlock = createPendingSummaryBlock();
+    closeActiveTurn(state, completedAt, "ownership_barrier");
+    closeActiveOutputEpisode(state, completedAt, "ownership_barrier");
+    logDebug(
+      "terminal.orchestration.turn_ownership_barrier",
+      {
+        sessionId: normalizeNonEmptyString(session?.id),
+        activeTurnId,
+        activeEpisodeId,
+        completedAt
+      },
+      trace || null
+    );
+  }
+
   function getSessionGeometry(session) {
     return Object.freeze({
       cols: Number.isInteger(session?.cols) && session.cols > 0 ? session.cols : 80,
@@ -2507,6 +2560,75 @@ export function createMessagingRuntime(options = {}) {
     return state?.terminalProjection?.createBaseline(label) || null;
   }
 
+  function activateTurnAdmission(state, session, admission, trace = null, activationReason = "immediate") {
+    const normalizedSessionId = normalizeNonEmptyString(session?.id || admission?.sessionId);
+    if (!state || !normalizedSessionId || !admission) {
+      return false;
+    }
+    ensureTerminalProjection(state, session || { id: normalizedSessionId });
+    const observedAt = nowFn();
+    const baseline = captureProjectionBaseline(state, `turn:${normalizedSessionId}:${observedAt}`);
+    state.activeTerminalTurn = createTerminalTurnRuntimeState({
+      sessionId: normalizedSessionId,
+      observedAt,
+      trace: {
+        traceId: admission.traceId,
+        correlationId: admission.correlationId,
+        source: admission.source
+      },
+      inputText: admission.inputText,
+      replyPreferred: admission.replyPreferred,
+      baseline,
+      preInputPendingLine: normalizeWhitespace(state.pendingLine),
+      preInputRecentLines: state.recentLines.slice(-MAX_RECENT_LINES)
+    });
+    state.pendingCodexTelegramReply = {
+      active: true,
+      triggeredAt: observedAt,
+      traceId: admission.traceId,
+      correlationId: admission.correlationId,
+      source: admission.source,
+      replyPreferred: admission.replyPreferred,
+      inputText: admission.inputText,
+      preInputPendingLine: state.activeTerminalTurn.preInputPendingLine,
+      preInputRecentLines: state.activeTerminalTurn.preInputRecentLines.slice(-MAX_RECENT_LINES),
+      started: false,
+      firstLineAt: 0,
+      lastLineAt: 0,
+      lines: []
+    };
+    state.pendingTerminalTurnAdmission = null;
+    logDebug(
+      "messaging.telegram_reply_window",
+      {
+        sessionId: normalizedSessionId,
+        active: true,
+        traceId: admission.traceId,
+        correlationId: admission.correlationId,
+        traceSource: admission.source,
+        replyPreferred: admission.replyPreferred,
+        admissionReason: activationReason
+      },
+      trace || null
+    );
+    logDebug(
+      "terminal.orchestration.turn_opened",
+      {
+        sessionId: normalizedSessionId,
+        turnId: state.activeTerminalTurn.turn.turnId,
+        baselineRevision: Number.isInteger(state.activeTerminalTurn.baseline?.revision)
+          ? state.activeTerminalTurn.baseline.revision
+          : 0,
+        inputText: admission.inputText,
+        replyPreferred: admission.replyPreferred,
+        admissionReason: activationReason,
+        inputObservedAt: admission.observedAt
+      },
+      trace || null
+    );
+    return true;
+  }
+
   function getTerminalProjectionRevision(state) {
     const revision = state?.terminalProjection?.captureSnapshot()?.revision;
     return Number.isInteger(revision) ? revision : 0;
@@ -2529,6 +2651,8 @@ export function createMessagingRuntime(options = {}) {
       diff,
       inputText: runtimeState.inputText || "",
       replyPreferred: runtimeState.replyPreferred === true,
+      preInputPendingLine: runtimeState.preInputPendingLine || "",
+      preInputRecentLines: Array.isArray(runtimeState.preInputRecentLines) ? runtimeState.preInputRecentLines.slice() : [],
       activityCompletedAt: runtimeState.activityCompletedAt || 0,
       quietWindowSettledAt: runtimeState.quietWindowSettledAt || 0,
       lastObservedProjectionRevision: runtimeState.lastObservedProjectionRevision || 0,
@@ -2702,6 +2826,115 @@ export function createMessagingRuntime(options = {}) {
         settledAt
       },
       trace
+    );
+  }
+
+  function scheduleBoundarySettlement(session, profile, state, trace) {
+    if (!state?.pendingBoundarySettlement || terminalOrchestrationBoundarySettleMs <= 0) {
+      return;
+    }
+    const settlementId = state.pendingBoundarySettlement.settlementId;
+    state.pendingBoundarySettlement.timer = setTimeoutFn(() => {
+      void runSessionWork(session?.id, async () => {
+        const activeState = getOrCreateSessionState(normalizeNonEmptyString(session?.id));
+        if (activeState?.pendingBoundarySettlement?.settlementId !== settlementId) {
+          return;
+        }
+        clearPendingBoundarySettlement(activeState);
+        await finalizeSettledBoundary(session, profile, activeState, trace);
+      });
+    }, terminalOrchestrationBoundarySettleMs);
+  }
+
+  async function finalizeSettledBoundary(session, profile, state, trace) {
+    const projectionSemanticTurnActive =
+      shouldUseProjectionSemanticExtraction(session, profile) && Boolean(state?.activeTerminalTurn?.turn);
+    if (projectionSemanticTurnActive) {
+      await maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace);
+    } else {
+      await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
+      await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
+    }
+    await maybeFinalizeOutputEpisodeSemanticShadow(session, profile, state, trace);
+    await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
+    const completedAt =
+      (Number.isInteger(session?.activityCompletedAt) && session.activityCompletedAt > 0 ? session.activityCompletedAt : 0) || nowFn();
+    closeActiveTurn(state, completedAt, "completed");
+    closeActiveOutputEpisode(state, completedAt, "completed");
+    if (
+      isCodingAgentContext(session, profile) &&
+      state.pendingSummaryBlock.fragments.length === 0 &&
+      Number.isInteger(state.lastSuppressedStatusLikeAt) &&
+      state.lastSuppressedStatusLikeAt > 0
+    ) {
+      const idleOccurredAt = nowFn();
+      if (idleOccurredAt - state.lastSuppressedStatusLikeAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
+        await dispatchEvent(
+          createEvent({
+            session,
+            profile,
+            type: "session.activity.idle",
+            summary: "Session idle.",
+            threadKey: "status",
+            trace,
+            nowFn: () => idleOccurredAt,
+            noiseClass: "idle_after_low_value_chatter"
+          })
+        );
+        return;
+      }
+    }
+    if (
+      isCodingAgentContext(session, profile) &&
+      state.pendingSummaryBlock.fragments.length === 0 &&
+      Number.isInteger(state.lastNonMeaningfulActivityAt) &&
+      state.lastNonMeaningfulActivityAt > 0
+    ) {
+      const idleOccurredAt = nowFn();
+      if (idleOccurredAt - state.lastNonMeaningfulActivityAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
+        await dispatchEvent(
+          createEvent({
+            session,
+            profile,
+            type: "session.activity.idle",
+            summary: "Session idle.",
+            threadKey: "status",
+            trace,
+            nowFn: () => idleOccurredAt,
+            noiseClass: "idle_after_unclassified_chatter"
+          })
+        );
+        return;
+      }
+    }
+    await dispatchEvent(
+      createEvent({
+        session,
+        profile,
+        type: "session.activity.idle",
+        summary: "Session idle.",
+        threadKey: "status",
+        trace,
+        nowFn
+      })
+    );
+  }
+
+  function observeSessionActivityStartedInternal({ sessionId, trace }) {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    if (!state?.pendingBoundarySettlement) {
+      return;
+    }
+    clearPendingBoundarySettlement(state);
+    reopenQuietingTerminalOwnership(state);
+    logDebug(
+      "terminal.orchestration.quiet_boundary_cancelled",
+      {
+        sessionId: normalizeNonEmptyString(sessionId),
+        activeTurnId: normalizeNonEmptyString(state?.activeTerminalTurn?.turn?.turnId),
+        activeEpisodeId: normalizeNonEmptyString(state?.activeOutputEpisode?.outputEpisode?.episodeId)
+      },
+      trace || null
     );
   }
 
@@ -4245,6 +4478,19 @@ export function createMessagingRuntime(options = {}) {
       )
     ).sort((left, right) => left - right);
     const hasVisibleChunk = Boolean(normalizeVisibleReplayText(chunk).trim());
+    if (state?.pendingBoundarySettlement && (chunk || normalizedPromptBoundaries.length > 0)) {
+      clearPendingBoundarySettlement(state);
+      reopenQuietingTerminalOwnership(state);
+      logDebug(
+        "terminal.orchestration.quiet_boundary_cancelled",
+        {
+          sessionId: normalizeNonEmptyString(session?.id),
+          activeTurnId: normalizeNonEmptyString(state?.activeTerminalTurn?.turn?.turnId),
+          activeEpisodeId: normalizeNonEmptyString(state?.activeOutputEpisode?.outputEpisode?.episodeId)
+        },
+        trace
+      );
+    }
     if (state?.activeTerminalTurn?.turn) {
       ensureActiveTurnBaseline(state);
     } else {
@@ -4487,75 +4733,36 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     observeTurnCompletionBoundary(state, session, trace);
-    const projectionSemanticTurnActive =
-      shouldUseProjectionSemanticExtraction(session, profile) && Boolean(state?.activeTerminalTurn?.turn);
-    if (projectionSemanticTurnActive) {
-      await maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace);
-    } else {
-      await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
-      await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
-    }
-    await maybeFinalizeOutputEpisodeSemanticShadow(session, profile, state, trace);
-    await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
-    closeActiveTurn(state, session?.activityCompletedAt || nowFn(), "completed");
-    closeActiveOutputEpisode(state, session?.activityCompletedAt || nowFn(), "completed");
-    if (
-      isCodingAgentContext(session, profile) &&
-      state.pendingSummaryBlock.fragments.length === 0 &&
-      Number.isInteger(state.lastSuppressedStatusLikeAt) &&
-      state.lastSuppressedStatusLikeAt > 0
-    ) {
-      const idleOccurredAt = nowFn();
-      if (idleOccurredAt - state.lastSuppressedStatusLikeAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
-        await dispatchEvent(
-          createEvent({
-            session,
-            profile,
-            type: "session.activity.idle",
-            summary: "Session idle.",
-            threadKey: "status",
-            trace,
-            nowFn: () => idleOccurredAt,
-            noiseClass: "idle_after_low_value_chatter"
-          })
-        );
+    if (hasActiveTerminalOwnership(state)) {
+      clearPendingBoundarySettlement(state);
+      state.pendingBoundarySettlement = {
+        settlementId: `settlement:${session.id}:${nowFn()}`,
+        settledAt:
+          (Number.isInteger(session?.activityCompletedAt) && session.activityCompletedAt > 0
+            ? session.activityCompletedAt
+            : 0) || nowFn(),
+        timer: null
+      };
+      logDebug(
+        "terminal.orchestration.quiet_boundary_pending",
+        {
+          sessionId: normalizeNonEmptyString(session?.id),
+          activeTurnId: normalizeNonEmptyString(state?.activeTerminalTurn?.turn?.turnId),
+          activeEpisodeId: normalizeNonEmptyString(state?.activeOutputEpisode?.outputEpisode?.episodeId),
+          pendingTurnAdmission: Boolean(state?.pendingTerminalTurnAdmission),
+          settleDelayMs: terminalOrchestrationBoundarySettleMs
+        },
+        trace
+      );
+      if (terminalOrchestrationBoundarySettleMs <= 0) {
+        clearPendingBoundarySettlement(state);
+        await finalizeSettledBoundary(session, profile, state, trace);
         return;
       }
+      scheduleBoundarySettlement(session, profile, state, trace);
+      return;
     }
-    if (
-      isCodingAgentContext(session, profile) &&
-      state.pendingSummaryBlock.fragments.length === 0 &&
-      Number.isInteger(state.lastNonMeaningfulActivityAt) &&
-      state.lastNonMeaningfulActivityAt > 0
-    ) {
-      const idleOccurredAt = nowFn();
-      if (idleOccurredAt - state.lastNonMeaningfulActivityAt < CODING_AGENT_IDLE_STATUS_SUPPRESSION_WINDOW_MS) {
-        await dispatchEvent(
-          createEvent({
-            session,
-            profile,
-            type: "session.activity.idle",
-            summary: "Session idle.",
-            threadKey: "status",
-            trace,
-            nowFn: () => idleOccurredAt,
-            noiseClass: "idle_after_unclassified_chatter"
-          })
-        );
-        return;
-      }
-    }
-    await dispatchEvent(
-      createEvent({
-        session,
-        profile,
-        type: "session.activity.idle",
-        summary: "Session idle.",
-        threadKey: "status",
-        trace,
-        nowFn
-      })
-    );
+    await finalizeSettledBoundary(session, profile, state, trace);
   }
 
   async function observeShareChangeInternal({ action, shareLink, session, trace }) {
@@ -4886,6 +5093,9 @@ export function createMessagingRuntime(options = {}) {
   }
 
   async function stop() {
+    for (const state of sessionStates.values()) {
+      clearPendingBoundarySettlement(state);
+    }
     for (const adapter of adapters) {
       if (typeof adapter.stop === "function") {
         await adapter.stop();
@@ -5006,6 +5216,10 @@ export function createMessagingRuntime(options = {}) {
     return runSessionWork(session?.id, () => observeSessionLifecycleInternal(type, session, trace, extra));
   }
 
+  function observeSessionActivityStarted({ sessionId, trace }) {
+    return runSessionWork(sessionId, () => observeSessionActivityStartedInternal({ sessionId, trace }));
+  }
+
   function observeSessionData({ session, data, promptBoundaries = [], trace }) {
     return runSessionWork(session?.id, () => observeSessionDataInternal({ session, data, promptBoundaries, trace }));
   }
@@ -5033,6 +5247,7 @@ export function createMessagingRuntime(options = {}) {
     replaceTelegramTopicBindings,
     ensureSessionTarget,
     observeSessionLifecycle,
+    observeSessionActivityStarted,
     observeSessionData,
     observeSessionIdle,
     observeShareChange,
