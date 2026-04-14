@@ -2780,6 +2780,10 @@ export function createRuntime(config) {
     telegramOutboundHardBreakActive: config.messagingTelegramOutboundHardBreakActive,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
+    terminalSemanticPrimaryMode: config.messagingTerminalSemanticPrimaryMode,
+    terminalSemanticShadowModeEnabled: config.messagingTerminalSemanticShadowModeEnabled,
+    terminalSemanticCutoverMinComparisons: config.messagingTerminalSemanticCutoverMinComparisons,
+    terminalSemanticCutoverMaxMismatchRate: config.messagingTerminalSemanticCutoverMaxMismatchRate,
     createTelegramTransport: config.createMessagingTelegramTransport,
     fetchImpl: config.fetchImpl,
     resolveDeckNameForSession: (session) => {

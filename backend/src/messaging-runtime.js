@@ -65,6 +65,11 @@ const CODEX_TELEGRAM_REPLY_MIN_TEXT_LENGTH = 24;
 const CODEX_TELEGRAM_REPLY_MIN_WORDS = 5;
 const CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH = 1200;
 const CODEX_TELEGRAM_REPLY_MAX_LINES = 8;
+const TERMINAL_SEMANTIC_PRIMARY_MODES = Object.freeze(["legacy", "projection"]);
+const DEFAULT_TERMINAL_SEMANTIC_PRIMARY_MODE = "projection";
+const DEFAULT_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED = true;
+const DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS = 20;
+const DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE = 0.1;
 const CODEX_ALLOWLIST_DELIVERY_SCOPES = Object.freeze([
   CODEX_TELEGRAM_REPLY_SCOPE,
   CODEX_SEPARATOR_INFO_SCOPE,
@@ -241,6 +246,19 @@ function normalizePositiveInteger(value) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
   return null;
+}
+
+function normalizeUnitInterval(value, fallback) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+      return parsed;
+    }
+  }
+  return fallback;
 }
 
 function truncateSummary(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
@@ -1101,6 +1119,39 @@ function buildControlEventSummary(session) {
   return `Control became unclaimed (${attachedCount} attached client${attachedCount === 1 ? "" : "s"}).`;
 }
 
+function normalizeTerminalSemanticPrimaryMode(value) {
+  const normalized = normalizeNonEmptyString(value).toLowerCase();
+  return TERMINAL_SEMANTIC_PRIMARY_MODES.includes(normalized)
+    ? normalized
+    : DEFAULT_TERMINAL_SEMANTIC_PRIMARY_MODE;
+}
+
+function createTerminalSemanticShadowState({
+  primaryMode = DEFAULT_TERMINAL_SEMANTIC_PRIMARY_MODE,
+  shadowModeEnabled = DEFAULT_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED,
+  cutoverMinComparisons = DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS,
+  cutoverMaxMismatchRate = DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE
+} = {}) {
+  return {
+    primaryMode: normalizeTerminalSemanticPrimaryMode(primaryMode),
+    shadowModeEnabled: shadowModeEnabled === true,
+    cutoverMinComparisons:
+      Number.isInteger(cutoverMinComparisons) && cutoverMinComparisons > 0
+        ? cutoverMinComparisons
+        : DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS,
+    cutoverMaxMismatchRate: normalizeUnitInterval(
+      cutoverMaxMismatchRate,
+      DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE
+    ),
+    comparisonTotal: 0,
+    matchedTotal: 0,
+    mismatchedTotal: 0,
+    primaryOnlyTotal: 0,
+    shadowOnlyTotal: 0,
+    lastComparedAt: 0
+  };
+}
+
 function createSessionStreamState() {
   return {
     pendingLine: "",
@@ -1774,6 +1825,25 @@ export function createMessagingRuntime(options = {}) {
   const telegramOutboundEnabled =
     telegramConfigured && !telegramOutboundHardBreakActive && options.telegramOutboundEnabled === true;
   const telegramInboundEnabled = telegramConfigured && options.telegramInboundEnabled === true;
+  const terminalSemanticPrimaryMode = normalizeTerminalSemanticPrimaryMode(options.terminalSemanticPrimaryMode);
+  const terminalSemanticShadowModeEnabled =
+    options.terminalSemanticShadowModeEnabled === undefined
+      ? DEFAULT_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED
+      : options.terminalSemanticShadowModeEnabled === true;
+  const terminalSemanticCutoverMinComparisons =
+    Number.isInteger(options.terminalSemanticCutoverMinComparisons) && options.terminalSemanticCutoverMinComparisons > 0
+      ? options.terminalSemanticCutoverMinComparisons
+      : DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS;
+  const terminalSemanticCutoverMaxMismatchRate = normalizeUnitInterval(
+    options.terminalSemanticCutoverMaxMismatchRate,
+    DEFAULT_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE
+  );
+  const terminalSemanticShadowState = createTerminalSemanticShadowState({
+    primaryMode: terminalSemanticPrimaryMode,
+    shadowModeEnabled: terminalSemanticShadowModeEnabled,
+    cutoverMinComparisons: terminalSemanticCutoverMinComparisons,
+    cutoverMaxMismatchRate: terminalSemanticCutoverMaxMismatchRate
+  });
   const telegramTransportFactory =
     typeof options.createTelegramTransport === "function" ? options.createTelegramTransport : createTelegramTransport;
   const telegramTransport = telegramConfigured
@@ -2608,6 +2678,11 @@ export function createMessagingRuntime(options = {}) {
         aggregationReason: normalizeNonEmptyString(entry?.aggregationReason),
         deliveryScope: normalizeNonEmptyString(entry?.deliveryScope),
         deliveryBlockKey: normalizeNonEmptyString(entry?.deliveryBlockKey),
+        comparisonResult: normalizeNonEmptyString(entry?.comparisonResult),
+        primaryMode: normalizeNonEmptyString(entry?.primaryMode),
+        shadowMode: normalizeNonEmptyString(entry?.shadowMode),
+        primaryDeliveryScope: normalizeNonEmptyString(entry?.primaryDeliveryScope),
+        shadowDeliveryScope: normalizeNonEmptyString(entry?.shadowDeliveryScope),
         traceId: normalizeNonEmptyString(entry?.traceId),
         correlationId: normalizeNonEmptyString(entry?.correlationId),
         traceSource: normalizeNonEmptyString(entry?.traceSource),
@@ -2847,7 +2922,7 @@ export function createMessagingRuntime(options = {}) {
     return dispatchCodexAllowlistCandidate(session, profile, state, trace, decision);
   }
 
-  async function observeCodexTelegramReplyLine(session, profile, state, trace, visibleLine) {
+  async function observeCodexTelegramReplyLine(session, profile, state, trace, visibleLine, { dispatchEnabled = true } = {}) {
     const replyState = state?.pendingCodexTelegramReply;
     if (!replyState?.active) {
       return false;
@@ -2862,7 +2937,7 @@ export function createMessagingRuntime(options = {}) {
       return false;
     }
     if (!visibleLine) {
-      if (replyState.started) {
+      if (replyState.started && dispatchEnabled) {
         await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
       }
       return false;
@@ -2882,8 +2957,20 @@ export function createMessagingRuntime(options = {}) {
       return true;
     }
     if (isCodexTelegramReplyBoundaryLine(visibleLine, session, profile)) {
-      await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
+      if (dispatchEnabled) {
+        await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
+      }
       return false;
+    }
+    if (
+      !dispatchEnabled &&
+      (
+        replyState.lines.length >= CODEX_TELEGRAM_REPLY_MAX_LINES ||
+        normalizeCodexTelegramReplyText(replyState.lines).length >= CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH
+      )
+    ) {
+      replyState.lastLineAt = observedAt;
+      return true;
     }
     replyState.lines.push(visibleLine);
     replyState.lastLineAt = observedAt;
@@ -2891,7 +2978,9 @@ export function createMessagingRuntime(options = {}) {
       replyState.lines.length >= CODEX_TELEGRAM_REPLY_MAX_LINES ||
       normalizeCodexTelegramReplyText(replyState.lines).length >= CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH
     ) {
-      await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
+      if (dispatchEnabled) {
+        await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
+      }
     }
     return true;
   }
@@ -3027,6 +3116,339 @@ export function createMessagingRuntime(options = {}) {
     episodeState.primaryIntentText = normalizeNonEmptyString(messageIntent.text);
     episodeState.primaryIntentScope = normalizeNonEmptyString(messageIntent.metadata?.legacyDeliveryScope);
     episodeState.primaryIntentOccurredAt = nowFn();
+  }
+
+  function normalizeTerminalSemanticComparisonCandidate(candidate, source = "") {
+    if (!candidate || typeof candidate !== "object") {
+      return null;
+    }
+    const deliveryScope = normalizeNonEmptyString(
+      candidate.deliveryScope || candidate.family || candidate.primaryIntentScope || candidate.primaryReplyScope
+    );
+    const text = normalizeNonEmptyString(candidate.text || candidate.primaryIntentText || candidate.primaryReplyText);
+    const comparableText = normalizeNonEmptyString(
+      candidate.comparableText ||
+        candidate.primaryIntentComparableText ||
+        candidate.primaryReplyComparableText ||
+        createComparableText(text)
+    );
+    const deliveryBlockKey = normalizeNonEmptyString(
+      candidate.deliveryBlockKey ||
+        candidate.key ||
+        candidate.primaryIntentKey ||
+        candidate.primaryReplyCandidateKey
+    );
+    if (!deliveryScope || !text || !comparableText) {
+      return null;
+    }
+    return Object.freeze({
+      source: normalizeNonEmptyString(source),
+      deliveryScope,
+      text,
+      comparableText,
+      deliveryBlockKey
+    });
+  }
+
+  function buildProjectionTurnSemanticCandidate(session, profile, state) {
+    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
+      return null;
+    }
+    const runtimeSnapshot = buildTurnRuntimeSnapshot(state, state.activeTerminalTurn);
+    const semanticDecision = buildProjectionTurnSemanticDecision(runtimeSnapshot, session, profile);
+    if (!semanticDecision?.text) {
+      return null;
+    }
+    return Object.freeze({
+      runtimeSnapshot,
+      semanticDecision
+    });
+  }
+
+  function buildProjectionOutputEpisodeSemanticCandidate(session, profile, state) {
+    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
+      return null;
+    }
+    const runtimeSnapshot = buildOutputEpisodeRuntimeSnapshot(state, state.activeOutputEpisode);
+    const semanticDecision = buildProjectionOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile);
+    if (!semanticDecision?.text) {
+      return null;
+    }
+    return Object.freeze({
+      runtimeSnapshot,
+      semanticDecision
+    });
+  }
+
+  function buildProjectionTurnSemanticDispatchCandidate(session, profile, state, trace) {
+    const projectionCandidate = buildProjectionTurnSemanticCandidate(session, profile, state);
+    if (!projectionCandidate) {
+      return null;
+    }
+    const messageIntent = buildProjectionSemanticMessageIntent({
+      session,
+      profile,
+      state,
+      runtimeSnapshot: projectionCandidate.runtimeSnapshot,
+      semanticDecision: projectionCandidate.semanticDecision,
+      strategy: "coding-agent-turn-projection",
+      trace
+    });
+    if (!messageIntent) {
+      return null;
+    }
+    return Object.freeze({
+      messageIntent,
+      normalizedCandidate: normalizeTerminalSemanticComparisonCandidate(
+        {
+          deliveryScope: projectionCandidate.semanticDecision.deliveryScope,
+          text: projectionCandidate.semanticDecision.text,
+          comparableText: projectionCandidate.semanticDecision.comparableText,
+          deliveryBlockKey: projectionCandidate.semanticDecision.deliveryBlockKey
+        },
+        "projection"
+      )
+    });
+  }
+
+  function buildProjectionOutputEpisodeSemanticDispatchCandidate(session, profile, state, trace) {
+    const projectionCandidate = buildProjectionOutputEpisodeSemanticCandidate(session, profile, state);
+    if (!projectionCandidate) {
+      return null;
+    }
+    const messageIntent = buildProjectionSemanticMessageIntent({
+      session,
+      profile,
+      state,
+      runtimeSnapshot: projectionCandidate.runtimeSnapshot,
+      semanticDecision: projectionCandidate.semanticDecision,
+      strategy: "coding-agent-output-episode-projection",
+      trace
+    });
+    if (!messageIntent) {
+      return null;
+    }
+    return Object.freeze({
+      messageIntent,
+      normalizedCandidate: normalizeTerminalSemanticComparisonCandidate(
+        {
+          deliveryScope: projectionCandidate.semanticDecision.deliveryScope,
+          text: projectionCandidate.semanticDecision.text,
+          comparableText: projectionCandidate.semanticDecision.comparableText,
+          deliveryBlockKey: projectionCandidate.semanticDecision.deliveryBlockKey
+        },
+        "projection"
+      )
+    });
+  }
+
+  function buildLegacyTurnSemanticCandidate(state) {
+    return normalizeTerminalSemanticComparisonCandidate(buildCodexTelegramReplyDecision(state), "legacy");
+  }
+
+  function buildRecordedOutputEpisodePrimaryCandidate(state) {
+    const episodeState = state?.activeOutputEpisode || state?.lastCompletedOutputEpisode;
+    return normalizeTerminalSemanticComparisonCandidate(episodeState, "legacy");
+  }
+
+  function calculateTerminalSemanticComparisonResult(primaryCandidate, shadowCandidate) {
+    if (primaryCandidate && shadowCandidate) {
+      if (
+        primaryCandidate.deliveryScope === shadowCandidate.deliveryScope &&
+        primaryCandidate.comparableText === shadowCandidate.comparableText
+      ) {
+        return "matched";
+      }
+      return "mismatched";
+    }
+    if (primaryCandidate) {
+      return "primary_only";
+    }
+    if (shadowCandidate) {
+      return "shadow_only";
+    }
+    return "";
+  }
+
+  function recordTerminalSemanticComparison({
+    session,
+    profile,
+    trace,
+    entityKind,
+    phase,
+    primaryCandidate,
+    shadowCandidate
+  }) {
+    const comparisonResult = calculateTerminalSemanticComparisonResult(primaryCandidate, shadowCandidate);
+    if (!comparisonResult) {
+      return;
+    }
+    terminalSemanticShadowState.comparisonTotal += 1;
+    terminalSemanticShadowState.lastComparedAt = nowFn();
+    if (comparisonResult === "matched") {
+      terminalSemanticShadowState.matchedTotal += 1;
+    } else if (comparisonResult === "mismatched") {
+      terminalSemanticShadowState.mismatchedTotal += 1;
+    } else if (comparisonResult === "primary_only") {
+      terminalSemanticShadowState.primaryOnlyTotal += 1;
+    } else if (comparisonResult === "shadow_only") {
+      terminalSemanticShadowState.shadowOnlyTotal += 1;
+    }
+    appendTraceEntry({
+      recordedAt: nowFn(),
+      sessionId: session?.id,
+      sessionLabel: buildSessionLabel(session),
+      profile,
+      type: "terminal.semantic.compare",
+      severity: comparisonResult === "matched" ? "info" : "warning",
+      threadKey: "status",
+      messageKey: "semantic_shadow",
+      decision: comparisonResult,
+      reason: normalizeNonEmptyString(phase) || "comparison",
+      summary: `${entityKind || "entity"} ${comparisonResult}`,
+      text: primaryCandidate?.text || shadowCandidate?.text || "",
+      comparableText: primaryCandidate?.comparableText || shadowCandidate?.comparableText || "",
+      comparisonResult,
+      primaryMode: terminalSemanticShadowState.primaryMode,
+      shadowMode:
+        terminalSemanticShadowState.shadowModeEnabled
+          ? terminalSemanticShadowState.primaryMode === "projection"
+            ? "legacy"
+            : "projection"
+          : "disabled",
+      primaryDeliveryScope: primaryCandidate?.deliveryScope || "",
+      shadowDeliveryScope: shadowCandidate?.deliveryScope || "",
+      traceId: trace?.traceId,
+      correlationId: trace?.correlationId,
+      traceSource: trace?.source,
+      appIdentity: getSessionAppIdentity(session)
+    });
+    logDebug(
+      "messaging.semantic.shadow",
+      {
+        sessionId: session?.id || null,
+        entityKind: normalizeNonEmptyString(entityKind),
+        phase: normalizeNonEmptyString(phase),
+        primaryMode: terminalSemanticShadowState.primaryMode,
+        shadowModeEnabled: terminalSemanticShadowState.shadowModeEnabled,
+        comparisonResult,
+        primaryDeliveryScope: primaryCandidate?.deliveryScope || "",
+        primaryComparableText: primaryCandidate?.comparableText || "",
+        shadowDeliveryScope: shadowCandidate?.deliveryScope || "",
+        shadowComparableText: shadowCandidate?.comparableText || ""
+      },
+      trace || null
+    );
+  }
+
+  async function dispatchProjectionSemanticIntent(session, profile, state, trace, messageIntent, recordPrimaryCandidate) {
+    if (!messageIntent) {
+      return null;
+    }
+    if (typeof recordPrimaryCandidate === "function") {
+      recordPrimaryCandidate(state, messageIntent);
+    }
+    return dispatchEvent(
+      createEventFromMessageIntent({
+        session,
+        profile,
+        trace,
+        intent: messageIntent
+      })
+    );
+  }
+
+  async function maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace) {
+    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
+      return null;
+    }
+    const projectionDispatchCandidate = buildProjectionTurnSemanticDispatchCandidate(session, profile, state, trace);
+    const legacyDecision = buildCodexTelegramReplyDecision(state);
+    const legacyCandidate = normalizeTerminalSemanticComparisonCandidate(legacyDecision, "legacy");
+    const projectionCandidate = projectionDispatchCandidate?.normalizedCandidate || null;
+    if (terminalSemanticShadowState.shadowModeEnabled) {
+      recordTerminalSemanticComparison({
+        session,
+        profile,
+        trace,
+        entityKind: "turn",
+        phase: "turn_completion",
+        primaryCandidate:
+          terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+        shadowCandidate:
+          terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+      });
+    }
+    const turnState = state?.activeTerminalTurn;
+    const primaryAlreadyRecorded = Number.isInteger(turnState?.primaryReplyOccurredAt) && turnState.primaryReplyOccurredAt > 0;
+    let dispatchResult = null;
+    if (!primaryAlreadyRecorded) {
+      if (terminalSemanticShadowState.primaryMode === "projection") {
+        if (projectionDispatchCandidate?.messageIntent) {
+          dispatchResult = await dispatchProjectionSemanticIntent(
+            session,
+            profile,
+            state,
+            trace,
+            projectionDispatchCandidate.messageIntent,
+            recordTurnPrimaryReplyCandidate
+          );
+        } else if (legacyDecision) {
+          dispatchResult = await dispatchCodexAllowlistCandidate(session, profile, state, trace, legacyDecision);
+        }
+      } else if (legacyDecision) {
+        dispatchResult = await dispatchCodexAllowlistCandidate(session, profile, state, trace, legacyDecision);
+      } else if (projectionDispatchCandidate?.messageIntent) {
+        dispatchResult = await dispatchProjectionSemanticIntent(
+          session,
+          profile,
+          state,
+          trace,
+          projectionDispatchCandidate.messageIntent,
+          recordTurnPrimaryReplyCandidate
+        );
+      }
+    }
+    clearPendingCodexTelegramReply(state);
+    return dispatchResult;
+  }
+
+  async function maybeFinalizeOutputEpisodeSemanticShadow(session, profile, state, trace) {
+    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
+      return null;
+    }
+    const projectionDispatchCandidate = buildProjectionOutputEpisodeSemanticDispatchCandidate(session, profile, state, trace);
+    const projectionCandidate = projectionDispatchCandidate?.normalizedCandidate || null;
+    const legacyCandidate = buildRecordedOutputEpisodePrimaryCandidate(state);
+    if (terminalSemanticShadowState.shadowModeEnabled) {
+      recordTerminalSemanticComparison({
+        session,
+        profile,
+        trace,
+        entityKind: "output_episode",
+        phase: "quiet_window",
+        primaryCandidate:
+          terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+        shadowCandidate:
+          terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+      });
+    }
+    const episodeState = state?.activeOutputEpisode;
+    const primaryAlreadyRecorded = Number.isInteger(episodeState?.primaryIntentOccurredAt) && episodeState.primaryIntentOccurredAt > 0;
+    if (primaryAlreadyRecorded || !projectionDispatchCandidate?.messageIntent) {
+      return null;
+    }
+    if (terminalSemanticShadowState.primaryMode === "projection" || !legacyCandidate) {
+      return dispatchProjectionSemanticIntent(
+        session,
+        profile,
+        state,
+        trace,
+        projectionDispatchCandidate.messageIntent,
+        recordOutputEpisodePrimaryIntentCandidate
+      );
+    }
+    return null;
   }
 
   function shouldUseProjectionSemanticExtraction(session, profile) {
@@ -3330,77 +3752,6 @@ export function createMessagingRuntime(options = {}) {
       },
       metadata: semanticDecision.metadata
     });
-  }
-
-  async function maybeDispatchProjectionSemanticTurnIntent(session, profile, state, trace) {
-    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
-      return null;
-    }
-    if (state.activeTerminalTurn.primaryReplyOccurredAt) {
-      return null;
-    }
-    const runtimeSnapshot = buildTurnRuntimeSnapshot(state, state.activeTerminalTurn);
-    const semanticDecision = buildProjectionTurnSemanticDecision(runtimeSnapshot, session, profile);
-    if (!semanticDecision) {
-      return null;
-    }
-    const messageIntent = buildProjectionSemanticMessageIntent({
-      session,
-      profile,
-      state,
-      runtimeSnapshot,
-      semanticDecision,
-      strategy: "coding-agent-turn-projection",
-      trace
-    });
-    if (!messageIntent) {
-      return null;
-    }
-    recordTurnPrimaryReplyCandidate(state, messageIntent);
-    clearPendingCodexTelegramReply(state);
-    return dispatchEvent(
-      createEventFromMessageIntent({
-        session,
-        profile,
-        trace,
-        intent: messageIntent
-      })
-    );
-  }
-
-  async function maybeDispatchProjectionSemanticOutputEpisodeIntent(session, profile, state, trace) {
-    if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
-      return null;
-    }
-    if (state.activeOutputEpisode.primaryIntentOccurredAt) {
-      return null;
-    }
-    const runtimeSnapshot = buildOutputEpisodeRuntimeSnapshot(state, state.activeOutputEpisode);
-    const semanticDecision = buildProjectionOutputEpisodeSemanticDecision(runtimeSnapshot, session, profile);
-    if (!semanticDecision) {
-      return null;
-    }
-    const messageIntent = buildProjectionSemanticMessageIntent({
-      session,
-      profile,
-      state,
-      runtimeSnapshot,
-      semanticDecision,
-      strategy: "coding-agent-output-episode-projection",
-      trace
-    });
-    if (!messageIntent) {
-      return null;
-    }
-    recordOutputEpisodePrimaryIntentCandidate(state, messageIntent);
-    return dispatchEvent(
-      createEventFromMessageIntent({
-        session,
-        profile,
-        trace,
-        intent: messageIntent
-      })
-    );
   }
 
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
@@ -3879,8 +4230,12 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     const terminalProjection = ensureTerminalProjection(state, session);
-    const useProjectionTurnSemanticExtraction =
+    const projectionSemanticTurnActive =
       shouldUseProjectionSemanticExtraction(session, profile) && Boolean(state?.activeTerminalTurn?.turn);
+    const collectLegacyTurnReplyLines =
+      projectionSemanticTurnActive &&
+      (terminalSemanticShadowState.primaryMode === "legacy" || terminalSemanticShadowState.shadowModeEnabled);
+    const legacyTurnReplyDispatchEnabled = !projectionSemanticTurnActive;
     const chunk = typeof data === "string" ? data : String(data ?? "");
     const normalizedPromptBoundaries = Array.from(
       new Set(
@@ -3906,9 +4261,8 @@ export function createMessagingRuntime(options = {}) {
       recordProjectionRevisionObservation(state);
     }
     async function dispatchPromptReady() {
-      if (useProjectionTurnSemanticExtraction) {
-        await maybeDispatchProjectionSemanticTurnIntent(session, profile, state, trace);
-        clearPendingCodexTelegramReply(state);
+      if (projectionSemanticTurnActive) {
+        await maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace);
       } else {
         await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
       }
@@ -3927,7 +4281,15 @@ export function createMessagingRuntime(options = {}) {
     }
     async function consumeCompletedLine(line) {
       const replyVisibleLine = sanitizeCodexTelegramReplyLineCandidate(line, session, profile);
-      if (!useProjectionTurnSemanticExtraction && (await observeCodexTelegramReplyLine(session, profile, state, trace, replyVisibleLine))) {
+      if (
+        (
+          !projectionSemanticTurnActive ||
+          collectLegacyTurnReplyLines
+        ) &&
+        (await observeCodexTelegramReplyLine(session, profile, state, trace, replyVisibleLine, {
+          dispatchEnabled: legacyTurnReplyDispatchEnabled
+        }))
+      ) {
         pushRecentLine(state, replyVisibleLine);
         return;
       }
@@ -4080,7 +4442,7 @@ export function createMessagingRuntime(options = {}) {
       }
     }
     if (!chunk) {
-      if (normalizedPromptBoundaries.length > 0 && isCodexAppIdentity(session) && !useProjectionTurnSemanticExtraction) {
+      if (normalizedPromptBoundaries.length > 0 && isCodexAppIdentity(session) && !projectionSemanticTurnActive) {
         await advanceCodexAllowlistCandidate(
           session,
           profile,
@@ -4094,7 +4456,7 @@ export function createMessagingRuntime(options = {}) {
       }
       return;
     }
-    if (isCodexAppIdentity(session) && !useProjectionTurnSemanticExtraction) {
+    if (isCodexAppIdentity(session) && !projectionSemanticTurnActive) {
       await advanceCodexAllowlistCandidate(
         session,
         profile,
@@ -4125,16 +4487,15 @@ export function createMessagingRuntime(options = {}) {
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
     observeTurnCompletionBoundary(state, session, trace);
-    const useProjectionTurnSemanticExtraction =
+    const projectionSemanticTurnActive =
       shouldUseProjectionSemanticExtraction(session, profile) && Boolean(state?.activeTerminalTurn?.turn);
-    if (useProjectionTurnSemanticExtraction) {
-      await maybeDispatchProjectionSemanticTurnIntent(session, profile, state, trace);
-      clearPendingCodexTelegramReply(state);
+    if (projectionSemanticTurnActive) {
+      await maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace);
     } else {
       await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
     }
-    await maybeDispatchProjectionSemanticOutputEpisodeIntent(session, profile, state, trace);
+    await maybeFinalizeOutputEpisodeSemanticShadow(session, profile, state, trace);
     await flushPendingSummaryBlock(session, profile, state, trace, "quiet_window");
     closeActiveTurn(state, session?.activityCompletedAt || nowFn(), "completed");
     closeActiveOutputEpisode(state, session?.activityCompletedAt || nowFn(), "completed");
@@ -4540,6 +4901,24 @@ export function createMessagingRuntime(options = {}) {
     const completedTurnSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.lastCompletedTerminalTurn?.turn).length;
     const activeOutputEpisodeSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.activeOutputEpisode?.outputEpisode).length;
     const completedOutputEpisodeSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.lastCompletedOutputEpisode?.outputEpisode).length;
+    const comparisonDifferenceCount =
+      terminalSemanticShadowState.mismatchedTotal +
+      terminalSemanticShadowState.primaryOnlyTotal +
+      terminalSemanticShadowState.shadowOnlyTotal;
+    const comparisonMismatchRate =
+      terminalSemanticShadowState.comparisonTotal > 0
+        ? comparisonDifferenceCount / terminalSemanticShadowState.comparisonTotal
+        : 0;
+    const shadowTargetMode =
+      terminalSemanticShadowState.shadowModeEnabled
+        ? terminalSemanticShadowState.primaryMode === "projection"
+          ? "legacy"
+          : "projection"
+        : "disabled";
+    const cutoverReady =
+      terminalSemanticShadowState.shadowModeEnabled &&
+      terminalSemanticShadowState.comparisonTotal >= terminalSemanticShadowState.cutoverMinComparisons &&
+      comparisonMismatchRate <= terminalSemanticShadowState.cutoverMaxMismatchRate;
     return {
       enabled: telegramConfigured,
       deliveryEnabled: telegramOutboundEnabled,
@@ -4560,6 +4939,23 @@ export function createMessagingRuntime(options = {}) {
         activeOutputEpisodeSessionCount,
         completedOutputEpisodeSessionCount,
         projectionResourceLimits: DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
+        semanticExtraction: {
+          primaryMode: terminalSemanticShadowState.primaryMode,
+          shadowModeEnabled: terminalSemanticShadowState.shadowModeEnabled,
+          shadowTargetMode,
+          cutoverMinComparisons: terminalSemanticShadowState.cutoverMinComparisons,
+          cutoverMaxMismatchRate: terminalSemanticShadowState.cutoverMaxMismatchRate,
+          comparisons: {
+            total: terminalSemanticShadowState.comparisonTotal,
+            matched: terminalSemanticShadowState.matchedTotal,
+            mismatched: terminalSemanticShadowState.mismatchedTotal,
+            primaryOnly: terminalSemanticShadowState.primaryOnlyTotal,
+            shadowOnly: terminalSemanticShadowState.shadowOnlyTotal,
+            mismatchRate: comparisonMismatchRate,
+            cutoverReady,
+            lastComparedAt: terminalSemanticShadowState.lastComparedAt
+          }
+        },
         boundaryContracts: [
           "TerminalProjection",
           "Turn",

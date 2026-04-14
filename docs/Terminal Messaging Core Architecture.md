@@ -4,7 +4,7 @@ Last updated: 2026-04-14
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, runtime orchestration, and first projection-backed semantic extraction for the `v0.4.0-H128` stream-to-message refactor.
+This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, and shadow-mode migration surface for the `v0.4.0-H128` stream-to-message refactor.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,9 +34,9 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` through `MSG-086` still do not complete the full migration, but they now replace the most failure-prone primary reply seam.
+`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline.
 
-They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, and make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots.
+They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, and add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly.
 
 Current bridge behavior:
 
@@ -68,7 +68,7 @@ and a first-class terminal-state seam between:
 - stable terminal projection state
 - later semantic extraction work
 
-without changing the shipped delivery policy behavior in the same slice.
+without discarding the ability to compare the old and new pipelines while the runtime remains feature-flagged.
 
 ## Current Bridge Shape
 
@@ -87,7 +87,30 @@ The first shipped delivery descriptor is:
 
 - `telegram`
 
-This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, and `MSG-086` has now moved the first shipped semantic extraction onto those boundaries while `MSG-087` remains the migration/cutover slice.
+This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, `MSG-086` moved the first shipped semantic extraction onto those boundaries, and `MSG-087` plus `MSG-088` complete the migration/cutover surface by adding shadow-mode comparison and explicit parity validation.
+
+## Shadow Mode and Cutover Status
+
+The runtime now exposes a shipped migration surface instead of relying on one irreversible cutover:
+
+- `MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE`
+  - `projection` or `legacy`
+- `MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED`
+- `MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS`
+- `MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE`
+
+Current shipped behavior:
+
+1. turn replies can build comparable legacy and projection candidates side by side
+2. only the configured primary mode dispatches by default
+3. the other candidate is recorded as shadow evidence when shadow mode is enabled
+4. runtime traces now include bounded `terminal.semantic.compare` entries
+5. `buildStatusSummary().terminalMessagingCore.semanticExtraction` now reports:
+   - primary mode
+   - shadow target mode
+   - comparison totals
+   - mismatch rate
+   - cutover readiness
 
 ## Why This Matters
 
@@ -107,17 +130,17 @@ That is the minimum necessary step before the larger refactor can safely move to
 - stable diff plus bounded transcript extraction
 - shadow-mode dual-run comparison
 
-## What This Slice Does Not Claim
+## What This Architecture Does Not Claim
 
-This slice does not yet solve the central stream-to-message correctness problem.
+This architecture does not claim that the stream-to-message problem is solved for every future adapter or terminal app.
 
 It does not yet:
 
-- remove the remaining legacy separator-family evaluator from autonomous narrow allowlist delivery
-- run the legacy and projection-first pipelines in shipped shadow mode side by side
-- replace current delivery policy cutover with a feature-flagged migration path
+- eliminate every remaining legacy separator-family dependency for autonomous narrow allowlist delivery
+- provide one app-semantic adapter per future terminal app
+- provide one delivery adapter per future channel
 
-Those remain the next steps in `H128`.
+Those are future extension points on top of the shipped `H128` baseline, not missing prerequisites for the core architecture itself.
 
 ## Projection Baseline Now Shipped
 
@@ -167,13 +190,16 @@ The runtime currently exposes that orchestration seam through:
 - short but correct replies such as `Ok, verstanden` can now survive the semantic extractor without the former minimum-length/minimum-word gate blocking them
 - autonomous coding-agent multiline output can now fall back to one projection-backed `codex_separator_section` or `codex_separator_info` intent if the episode reaches quiet completion without a legacy separator-family delivery having already claimed it
 
-This means the most failure-prone reply path is no longer driven primarily by first-hit PTY line/chunk heuristics, even though the full `H128` migration is not complete yet.
+This means the most failure-prone reply path is no longer driven primarily by first-hit PTY line/chunk heuristics, and the migration path away from the legacy reply model is now observable rather than blind.
 
-## Next Steps
+## Resulting Baseline
 
-The next implementation slices are now:
+After `MSG-083` through `MSG-088`, ptydeck now has:
 
-1. `MSG-087`
-   - shadow mode and feature-flagged cutover
-2. `MSG-088`
-   - full end-to-end validation against known field failures and dual-run parity
+1. a neutral transport/app-independent messaging core
+2. a shipped backend terminal-state projection
+3. explicit turn and autonomous-output orchestration
+4. projection-backed semantic extraction for the narrow shipped path
+5. a shadow-mode and cutover-readiness surface for migration control
+
+That is the stable architectural baseline future adapter and app-specific follow-ups should extend.

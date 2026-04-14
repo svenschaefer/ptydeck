@@ -82,6 +82,15 @@ curl -s http://127.0.0.1:18080/ready | jq '.messaging.trace'
 
 That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.
 
+For the new terminal semantic migration surface, the same status payload now also exposes:
+
+- `messaging.terminalMessagingCore.semanticExtraction.primaryMode`
+- `messaging.terminalMessagingCore.semanticExtraction.shadowModeEnabled`
+- `messaging.terminalMessagingCore.semanticExtraction.shadowTargetMode`
+- `messaging.terminalMessagingCore.semanticExtraction.comparisons`
+
+Those fields make the current legacy-versus-projection comparison state visible without requiring a separate debug-only runtime.
+
 The Telegram adapter status now also surfaces active outbound backoff state after a Bot API `retry after` response, so repeated rate-limit failures can be distinguished from ordinary transport errors.
 
 The same adapter status payload now also exposes command-publication state:
@@ -182,6 +191,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 The Telegram reference adapter can:
 
 - send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger Codex closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover, repeated short-tail residue, and echoed operator input before the first real Codex answer line is delivered, commentary/progress chatter about repo/docs/runtime inspection work is suppressed across the narrow Codex outbound families, turn replies now derive their primary semantic text from the shipped projection-backed `Turn` transcript/diff seam instead of the former first-hit line heuristic, short but correct replies no longer depend on the earlier minimum-length/minimum-word gate, autonomous coding-agent output can fall back to one projection-backed multiline section/info delivery at quiet completion, and unavoidable Telegram-visible truncation now keeps both the beginning and end of a long Codex message via middle truncation instead of clipping only the tail
+- run the shipped terminal-semantic migration surface in either `projection` or `legacy` primary mode while optionally keeping the other pipeline in shadow mode, exposing bounded parity/cutover diagnostics through the runtime status and trace path instead of requiring an all-at-once stream-to-message cutover
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck

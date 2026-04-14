@@ -727,6 +727,167 @@ test("messaging runtime delivers short correct turn replies from projection sema
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
 });
 
+test("messaging runtime records projection-primary shadow comparisons for short turn replies", async () => {
+  const sends = [];
+  let now = 8_650;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
+    terminalSemanticShadowModeEnabled: true,
+    terminalSemanticCutoverMinComparisons: 1,
+    terminalSemanticCutoverMaxMismatchRate: 0,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 785 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 786 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-shadow-short-reply-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-shadow-short-open",
+    correlationId: "projection-shadow-short-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: 'Nur ein Test. Bitte nur mit "Ok, verstanden" antworten.'
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• Ok, verstanden\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-shadow-short-data" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-shadow-short-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ok, verstanden/u);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.primaryMode, "projection");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.shadowModeEnabled, true);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.shadowTargetMode, "legacy");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.total, 1);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.primaryOnly, 1);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.matched, 0);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.cutoverReady, false);
+  assert.ok(
+    status.trace.recent.some(
+      (entry) => entry.type === "terminal.semantic.compare" && entry.decision === "primary_only" && entry.primaryMode === "projection"
+    )
+  );
+});
+
+test("messaging runtime records legacy-primary shadow matches for turn replies when both pipelines agree", async () => {
+  const sends = [];
+  let now = 8_720;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "legacy",
+    terminalSemanticShadowModeEnabled: true,
+    terminalSemanticCutoverMinComparisons: 1,
+    terminalSemanticCutoverMaxMismatchRate: 0,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 788 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 789 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "legacy-shadow-match-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "legacy-shadow-match-open",
+    correlationId: "legacy-shadow-match-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "Please reply with a single delivery-ready sentence."
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• The status sync is stable and ready for delivery now.\n",
+    promptBoundaries: [],
+    trace: { traceId: "legacy-shadow-match-data" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "legacy-shadow-match-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /The status sync is stable and ready for delivery now\./u);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.primaryMode, "legacy");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.shadowTargetMode, "projection");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.total, 1);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.matched, 1);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.mismatchRate, 0);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.cutoverReady, true);
+  assert.ok(
+    status.trace.recent.some(
+      (entry) => entry.type === "terminal.semantic.compare" && entry.decision === "matched" && entry.primaryMode === "legacy"
+    )
+  );
+});
+
 test("messaging runtime ignores working-overlay chatter before a short turn reply when using projection semantic extraction", async () => {
   const sends = [];
   let now = 8_800;

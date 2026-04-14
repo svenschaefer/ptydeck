@@ -27,6 +27,22 @@ function parseNonNegativeInt(rawValue, key) {
   return parsed;
 }
 
+function parseUnitInterval(rawValue, key) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`${key} must be a number between 0 and 1.`);
+  }
+  return parsed;
+}
+
+function parseEnum(rawValue, key, allowedValues) {
+  const normalized = String(rawValue || "").trim().toLowerCase();
+  if (!allowedValues.includes(normalized)) {
+    throw new Error(`${key} must be one of: ${allowedValues.join(", ")}.`);
+  }
+  return normalized;
+}
+
 function parseOrigin(value, key) {
   try {
     const url = new URL(value);
@@ -175,6 +191,22 @@ export function loadConfig(env = process.env) {
     env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
     "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
   );
+  const messagingTerminalSemanticPrimaryMode = parseEnum(
+    env.MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE || "projection",
+    "MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE",
+    ["legacy", "projection"]
+  );
+  const messagingTerminalSemanticShadowModeEnabled = parseBoolean(
+    env.MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED ?? "1"
+  );
+  const messagingTerminalSemanticCutoverMinComparisons = parsePositiveInt(
+    env.MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS || 20,
+    "MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS"
+  );
+  const messagingTerminalSemanticCutoverMaxMismatchRate = parseUnitInterval(
+    env.MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE || 0.1,
+    "MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE"
+  );
   const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
   const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
   const authAudience = String(env.AUTH_AUDIENCE || "ptydeck-local").trim();
@@ -297,6 +329,10 @@ export function loadConfig(env = process.env) {
     messagingTelegramOutboundEnabled,
     messagingTelegramOutboundHardBreakActive: TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE,
     messagingTelegramInboundEnabled,
-    messagingTelegramPollTimeoutSeconds
+    messagingTelegramPollTimeoutSeconds,
+    messagingTerminalSemanticPrimaryMode,
+    messagingTerminalSemanticShadowModeEnabled,
+    messagingTerminalSemanticCutoverMinComparisons,
+    messagingTerminalSemanticCutoverMaxMismatchRate
   };
 }

@@ -45,6 +45,10 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
   assert.equal(config.messagingTelegramInboundEnabled, false);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 3);
+  assert.equal(config.messagingTerminalSemanticPrimaryMode, "projection");
+  assert.equal(config.messagingTerminalSemanticShadowModeEnabled, true);
+  assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 20);
+  assert.equal(config.messagingTerminalSemanticCutoverMaxMismatchRate, 0.1);
 });
 
 test("loadConfig maps environment values", () => {
@@ -83,7 +87,11 @@ test("loadConfig maps environment values", () => {
     MESSAGING_TELEGRAM_BOT_TOKEN: "telegram-token",
     MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001", profile: "build-test" }]),
     MESSAGING_TELEGRAM_API_BASE_URL: "https://api.telegram.example",
-    MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS: "7"
+    MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS: "7",
+    MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE: "legacy",
+    MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED: "false",
+    MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS: "7",
+    MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE: "0.25"
   });
 
   assert.equal(config.port, 9090);
@@ -126,6 +134,10 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
   assert.equal(config.messagingTelegramInboundEnabled, true);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 7);
+  assert.equal(config.messagingTerminalSemanticPrimaryMode, "legacy");
+  assert.equal(config.messagingTerminalSemanticShadowModeEnabled, false);
+  assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 7);
+  assert.equal(config.messagingTerminalSemanticCutoverMaxMismatchRate, 0.25);
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
@@ -209,6 +221,18 @@ test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(
     () => loadConfig({ SESSION_GUARDRAIL_SWEEP_MS: "0" }),
     /SESSION_GUARDRAIL_SWEEP_MS must be a positive integer\./
+  );
+  assert.throws(
+    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE: "wrong" }),
+    /MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE must be one of: legacy, projection\./
+  );
+  assert.throws(
+    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS: "0" }),
+    /MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS must be a positive integer\./
+  );
+  assert.throws(
+    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE: "1.1" }),
+    /MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE must be a number between 0 and 1\./
   );
 });
 
