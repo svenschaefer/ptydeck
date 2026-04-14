@@ -193,6 +193,18 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/analyze-startup-timeline.mjs` to reconstruct the latest restore/ready markers and the first frontend bootstrap window from `/tmp/ptydeck-backend-debug.log`
     - start any future corrective follow-up from the documented fact that backend startup already completed before the first frontend attach; the unresolved remaining detail is only the exact frontend-side source of the observed automatic startup `/input` writes
 
+### 14. PTY EINTR Write Path
+
+- `PTY EINTR Write Error Analysis.md`
+  - Role: repository-native analysis note for the recurring local-development `Unhandled pty write error [Error: EINTR: interrupted system call, write]` console messages
+  - Status:
+    - active analytical reference for the `v0.4.0-H126` closeout and its corrective follow-up
+    - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
+  - Current interpretation:
+    - use it when reasoning about whether PTY write interruptions are only noisy logging or a real queue-loss condition
+    - use the companion helper script `scripts/analyze-pty-write-eintr.mjs` to compare current structured `session.input.write` / `messaging.input.write_failed` traces against the installed `node-pty` async write-queue behavior
+    - start any corrective follow-up from the documented fact that the currently installed `node-pty` path retries `EAGAIN` but not `EINTR`, clears the remaining async write queue on unexpected errors, and therefore sits outside ptydeck's current structured write-failure contract
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:

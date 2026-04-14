@@ -14,14 +14,14 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-079` Owner `BE`
-  Investigate the recurring backend `Unhandled pty write error [Error: EINTR: interrupted system call, write]` field reports seen during local `npm run dev` startup and subsequent runtime activity. Reconstruct from logs and code which PTY write paths are emitting these unhandled `EINTR` errors, whether they are transient retryable interruptions versus genuine data-loss conditions, what observable runtime impact they currently have on session input/output behavior, and which concrete corrective strategies are technically appropriate.
-- `MSG-080` Owner `QA`
-  Reproduce and validate the PTY `EINTR` write-error path end to end in development mode: prove under which startup/runtime conditions the repeated unhandled write errors occur, whether PTY writes are silently retried or effectively lost today, and whether the current operator-visible behavior matches the intended runtime contract or requires a later corrective implementation wave.
 - `MSG-081` Owner `FE`
   Eliminate the remaining browser-originated session `/input` writes that still fire on first frontend attach after a backend-only restart despite `H125`. Use the live 2026-04-14 field case where `ws.snapshot.sent` at `2026-04-14T15:59:46.833Z` was followed by repeated browser `POST /api/v1/sessions/.../input` writes on session `b24c99aa-5152-41cc-8f69-32cfe8caa5ad` (`bytes=62` then `bytes=1` at `2026-04-14T16:00:06Z`, then the same pair again at `2026-04-14T16:00:21Z`). Isolate the exact remaining frontend bootstrap path that still emits those writes and ensure first frontend open stays passive until explicit operator interaction.
 - `MSG-082` Owner `QA`
   Reproduce and validate the residual frontend-bootstrap input-write regression after `H125`: prove that first frontend open after a backend-only restart still produces snapshot and resize behavior as intended, but no unintended session `/input` writes, reply-window arming, or PTY activity occur before explicit operator interaction once the corrective follow-up lands.
+- `MSG-089` Owner `BE`
+  Correct the unsafe PTY `EINTR` write path identified in `v0.4.0-H126`. Replace the current async queue-drop behavior inherited from the installed `node-pty` write queue with bounded retry handling for retryable PTY write interruptions such as `EINTR`, keep queued write data intact across retryable interruptions, and surface a structured ptydeck runtime failure only if retry exhaustion or a genuinely non-retryable async PTY write error occurs.
+- `MSG-090` Owner `QA`
+  Validate the PTY `EINTR` corrective wave end to end: prove retryable async PTY write interruptions no longer clear queued session input silently, prove the new path is observable through ptydeck-owned structured events instead of dependency stderr only, and prove normal direct/body/submit PTY writes still complete correctly under development-mode and mapped-messaging input flows.
 - `MSG-083` Owner `BE`
   Define and introduce a transport-neutral and app-neutral terminal messaging core so stream-to-message semantics are no longer modeled as Telegram/Codex-specific heuristics. The core contract must explicitly define `TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, and `AppSemanticAdapter` boundaries so the same runtime can support Telegram, Discord, Slack, and future adapters as delivery surfaces, and Codex, Claude Code CLI, Gemini Code CLI, and future terminal apps as semantic producers without rebuilding the architecture per integration.
 - `MSG-084` Owner `BE`
