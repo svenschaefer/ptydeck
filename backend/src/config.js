@@ -187,6 +187,11 @@ export function loadConfig(env = process.env) {
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
   const messagingTelegramOutboundEnabled = false;
   const messagingTelegramInboundEnabled = Boolean(messagingTelegramBotToken && messagingTelegramTargets.length > 0);
+  const messagingDiscordTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_DISCORD_TARGETS"), "MESSAGING_DISCORD_TARGETS");
+  const messagingDiscordApiBaseUrl = String(env.MESSAGING_DISCORD_API_BASE_URL || "https://discord.com/api/v10").trim();
+  const messagingDiscordOutboundEnabled = parseBoolean(
+    env.MESSAGING_DISCORD_OUTBOUND_ENABLED ?? (messagingDiscordTargets.length > 0 ? "1" : "0")
+  );
   const messagingTelegramPollTimeoutSeconds = parsePositiveInt(
     env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
     "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
@@ -230,6 +235,9 @@ export function loadConfig(env = process.env) {
   }
   if (messagingTelegramApiBaseUrl) {
     parseOrigin(messagingTelegramApiBaseUrl, "MESSAGING_TELEGRAM_API_BASE_URL");
+  }
+  if (messagingDiscordApiBaseUrl) {
+    parseOrigin(messagingDiscordApiBaseUrl, "MESSAGING_DISCORD_API_BASE_URL");
   }
   const port = parsePort(env.PORT || 18080, "PORT");
   const maxBodyBytes = parsePositiveInt(env.MAX_BODY_BYTES || 1024 * 1024, "MAX_BODY_BYTES");
@@ -330,6 +338,9 @@ export function loadConfig(env = process.env) {
     messagingTelegramOutboundHardBreakActive: TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE,
     messagingTelegramInboundEnabled,
     messagingTelegramPollTimeoutSeconds,
+    messagingDiscordTargets,
+    messagingDiscordApiBaseUrl,
+    messagingDiscordOutboundEnabled,
     messagingTerminalSemanticPrimaryMode,
     messagingTerminalSemanticShadowModeEnabled,
     messagingTerminalSemanticCutoverMinComparisons,

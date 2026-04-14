@@ -16,6 +16,7 @@ import { ApiError } from "./errors.js";
 import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { buildTelegramCommandCatalog } from "./telegram-command-surface.js";
 import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapter.js";
+import { createDiscordAdapter, createDiscordTransport } from "./discord-adapter.js";
 import { createAppSemanticAdapterRegistry } from "./app-semantic-adapters.js";
 import {
   DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
@@ -948,38 +949,51 @@ function normalizeMessagingProfile(value) {
   return MESSAGING_TRIGGER_PROFILE_SET.has(normalized) ? normalized : "";
 }
 
-function normalizeMessagingTargetEntry(entry) {
+function normalizeMessagingTargetEntry(entry, options = {}) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return null;
   }
+  const defaultAdapterId = normalizeNonEmptyString(options.adapterId).toLowerCase();
+  const adapterId = normalizeNonEmptyString(entry.adapterId || entry.adapter || defaultAdapterId).toLowerCase() || "telegram";
   const sessionId = normalizeNonEmptyString(entry.sessionId);
   const quickIdToken = normalizeNonEmptyString(entry.quickIdToken || entry.quickId);
   const sessionName = normalizeNonEmptyString(entry.sessionName || entry.name);
-  const chatId = normalizeNonEmptyString(entry.chatId) || String(entry.chatId ?? "").trim();
-  const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
+  const channelId =
+    normalizeNonEmptyString(
+      adapterId === "discord" ? entry.channelId || entry.chatId : entry.chatId || entry.channelId
+    ) || String((adapterId === "discord" ? entry.channelId ?? entry.chatId : entry.chatId ?? entry.channelId) ?? "").trim();
+  const threadId = normalizePositiveInteger(adapterId === "discord" ? entry.threadId ?? entry.messageThreadId : entry.messageThreadId ?? entry.threadId);
+  const webhookUrl = normalizeNonEmptyString(entry.webhookUrl);
   const profile = normalizeMessagingProfile(entry.profile);
   const topicMode = normalizeNonEmptyString(entry.topicMode).toLowerCase() === "deck-session" ? "deck-session" : "";
   const hasSelector = Boolean(sessionId || quickIdToken || sessionName);
-  const allowDynamicDeckSessionTarget = topicMode === "deck-session" && !hasSelector;
-  if (!chatId || (!hasSelector && !allowDynamicDeckSessionTarget)) {
+  const allowDynamicDeckSessionTarget = adapterId === "telegram" && topicMode === "deck-session" && !hasSelector;
+  if (!channelId || (!hasSelector && !allowDynamicDeckSessionTarget)) {
     return null;
   }
-  return Object.freeze({
+  if (adapterId === "discord" && !webhookUrl) {
+    return null;
+  }
+  const normalized = {
     sessionId,
     quickIdToken,
     sessionName,
-    chatId,
-    ...(Number.isInteger(messageThreadId) ? { messageThreadId } : {}),
+    ...(options.includeAdapterId === true ? { adapterId } : {}),
+    chatId: channelId,
+    channelId,
+    ...(Number.isInteger(threadId) ? { messageThreadId: threadId, threadId } : {}),
+    ...(adapterId === "discord" ? { webhookUrl } : {}),
     ...(profile ? { profile } : {}),
     ...(topicMode ? { topicMode } : {})
-  });
+  };
+  return Object.freeze(normalized);
 }
 
-export function normalizeMessagingTargets(entries = []) {
+export function normalizeMessagingTargets(entries = [], options = {}) {
   if (!Array.isArray(entries)) {
     return [];
   }
-  return entries.map((entry) => normalizeMessagingTargetEntry(entry)).filter(Boolean);
+  return entries.map((entry) => normalizeMessagingTargetEntry(entry, options)).filter(Boolean);
 }
 
 function normalizeMessagingTopicBindingEntry(entry) {
@@ -1773,7 +1787,18 @@ export function normalizeMessagingInboundInputPayload(value) {
 
 export function createMessagingRuntime(options = {}) {
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
-  const targetMappings = normalizeMessagingTargets(options.telegramTargets);
+  const telegramTargetMappings = normalizeMessagingTargets(options.telegramTargets, {
+    adapterId: "telegram",
+    includeAdapterId: true
+  });
+  const discordTargetMappings = normalizeMessagingTargets(options.discordTargets, {
+    adapterId: "discord",
+    includeAdapterId: true
+  });
+  const targetMappingsByAdapter = new Map([
+    ["telegram", telegramTargetMappings],
+    ["discord", discordTargetMappings]
+  ]);
   const sessionStates = new Map();
   const codexSummaryRestartRecoveryStates = new Map();
   const threadStates = new Map();
@@ -1818,13 +1843,16 @@ export function createMessagingRuntime(options = {}) {
   const adapters = [];
   const telegramTopicBindings = new Map();
   const sessionWorkQueues = new Map();
-  const telegramConfigured = Boolean(options.telegramBotToken && targetMappings.length > 0);
+  const telegramConfigured = Boolean(options.telegramBotToken && telegramTargetMappings.length > 0);
   const telegramOutboundHardBreakActive = options.telegramOutboundHardBreakActive === true;
   const telegramAllowlistDeliveryScopes = telegramConfigured ? CODEX_ALLOWLIST_DELIVERY_SCOPES.slice() : [];
   const telegramAllowlistDeliveryActive = telegramAllowlistDeliveryScopes.length > 0;
   const telegramOutboundEnabled =
     telegramConfigured && !telegramOutboundHardBreakActive && options.telegramOutboundEnabled === true;
   const telegramInboundEnabled = telegramConfigured && options.telegramInboundEnabled === true;
+  const discordConfigured = discordTargetMappings.length > 0;
+  const discordOutboundEnabled =
+    discordConfigured && (options.discordOutboundEnabled === undefined ? true : options.discordOutboundEnabled === true);
   const terminalSemanticPrimaryMode = normalizeTerminalSemanticPrimaryMode(options.terminalSemanticPrimaryMode);
   const terminalSemanticShadowModeEnabled =
     options.terminalSemanticShadowModeEnabled === undefined
@@ -1853,13 +1881,21 @@ export function createMessagingRuntime(options = {}) {
         fetchImpl: options.fetchImpl
       })
     : null;
+  const discordTransportFactory =
+    typeof options.createDiscordTransport === "function" ? options.createDiscordTransport : createDiscordTransport;
+  const discordTransport = discordConfigured
+    ? discordTransportFactory({
+        apiBaseUrl: options.discordApiBaseUrl,
+        fetchImpl: options.fetchImpl
+      })
+    : null;
   const telegramAdapter = createTelegramAdapter({
     configured: telegramConfigured,
     deliveryEnabled: telegramOutboundEnabled,
     deliveryHardBreakActive: telegramOutboundHardBreakActive,
     allowlistDeliveryScopes: telegramAllowlistDeliveryScopes,
     inboundEnabled: telegramInboundEnabled,
-    configuredTargets: targetMappings.length,
+    configuredTargets: telegramTargetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
     transport: telegramTransport,
     topicBindings: normalizeMessagingTopicBindings(options.telegramTopicBindings),
@@ -1872,20 +1908,46 @@ export function createMessagingRuntime(options = {}) {
     applyMessagePolicy: applyMessagingMessagePolicy,
     advanceThreadPolicyState: advanceMessagingThreadPolicyState
   });
+  const discordAdapter = createDiscordAdapter({
+    configured: discordConfigured,
+    deliveryEnabled: discordOutboundEnabled,
+    configuredTargets: discordTargetMappings.length,
+    transport: discordTransport,
+    nowFn,
+    logDebug,
+    formatSessionLabel: buildSessionLabel,
+    applyMessagePolicy: applyMessagingMessagePolicy,
+    advanceThreadPolicyState: advanceMessagingThreadPolicyState
+  });
   adapters.push(telegramAdapter);
-  const deliveryAdapterDescriptors = telegramConfigured
-    ? Object.freeze([
-        createDeliveryAdapterDescriptor({
-          adapterId: "telegram",
-          channel: "telegram",
-          capabilities: ["send_message", "edit_message", "thread_topics"],
-          metadata: {
-            allowlistDeliveryActive: telegramAllowlistDeliveryActive,
-            configuredTargets: targetMappings.length
-          }
-        })
-      ])
-    : Object.freeze([]);
+  adapters.push(discordAdapter);
+  const deliveryAdapterDescriptorEntries = [];
+  if (telegramConfigured) {
+    deliveryAdapterDescriptorEntries.push(
+      createDeliveryAdapterDescriptor({
+        adapterId: "telegram",
+        channel: "telegram",
+        capabilities: ["send_message", "edit_message", "thread_topics"],
+        metadata: {
+          allowlistDeliveryActive: telegramAllowlistDeliveryActive,
+          configuredTargets: telegramTargetMappings.length
+        }
+      })
+    );
+  }
+  if (discordConfigured) {
+    deliveryAdapterDescriptorEntries.push(
+      createDeliveryAdapterDescriptor({
+        adapterId: "discord",
+        channel: "discord",
+        capabilities: ["send_message", "edit_message", "thread_channels"],
+        metadata: {
+          configuredTargets: discordTargetMappings.length
+        }
+      })
+    );
+  }
+  const deliveryAdapterDescriptors = Object.freeze(deliveryAdapterDescriptorEntries);
   const appSemanticAdapterRegistry = createAppSemanticAdapterRegistry({
     getSessionAppIdentity,
     isCodingAgentContext,
@@ -1918,7 +1980,7 @@ export function createMessagingRuntime(options = {}) {
   function rebuildConversationTargetIndex(dynamicBindings = []) {
     conversationTargetIndex.clear();
     ambiguousConversationKeys.clear();
-    for (const target of targetMappings) {
+    for (const target of telegramTargetMappings) {
       if (target.topicMode === "deck-session" && !Number.isInteger(target.messageThreadId)) {
         continue;
       }
@@ -2313,7 +2375,8 @@ export function createMessagingRuntime(options = {}) {
     return state;
   }
 
-  function resolveTarget(session) {
+  function resolveTargetForAdapter(session, adapterId = "telegram") {
+    const targetMappings = targetMappingsByAdapter.get(normalizeNonEmptyString(adapterId).toLowerCase()) || [];
     if (!session || !targetMappings.length) {
       return null;
     }
@@ -2338,7 +2401,7 @@ export function createMessagingRuntime(options = {}) {
     if (!bestMatch) {
       return null;
     }
-    if (bestMatch.topicMode !== "deck-session") {
+    if (adapterId !== "telegram" || bestMatch.topicMode !== "deck-session") {
       return bestMatch;
     }
     const binding = telegramTopicBindings.get(buildTelegramTopicBindingKey(bestMatch.chatId, session.id)) || null;
@@ -2352,6 +2415,10 @@ export function createMessagingRuntime(options = {}) {
       topicStateKey: `${bestMatch.chatId}:${session.id}`,
       ...(binding && Number.isInteger(binding.messageThreadId) ? { messageThreadId: binding.messageThreadId } : {})
     });
+  }
+
+  function resolveTarget(session) {
+    return resolveTargetForAdapter(session, "telegram") || resolveTargetForAdapter(session, "discord");
   }
 
   function resolveInboundTarget(target) {
@@ -2371,6 +2438,9 @@ export function createMessagingRuntime(options = {}) {
 
   function rememberSessionForTarget(target, session) {
     if (!target || !session || !normalizeNonEmptyString(session.id)) {
+      return;
+    }
+    if (normalizeNonEmptyString(target.adapterId || "telegram") !== "telegram") {
       return;
     }
     recentSessionByConversationKey.set(buildConversationKey(target.chatId, target.messageThreadId), { ...session });
@@ -2636,38 +2706,48 @@ export function createMessagingRuntime(options = {}) {
   }
 
   async function ensureSessionTargetInternal(session, trace, resolvedTarget = null) {
-    const target = resolvedTarget || resolveTarget(session);
-    if (!target) {
-      return null;
-    }
-    rememberSessionForTarget(target, session);
-    let finalTarget = target;
+    let finalTarget = null;
     for (const adapter of adapters) {
-      if (typeof adapter.ensureTarget !== "function") {
+      const adapterId = normalizeNonEmptyString(adapter.getStatus?.().adapter);
+      const target = resolvedTarget && (!adapterId || adapterId === normalizeNonEmptyString(resolvedTarget?.adapterId || "telegram"))
+        ? resolvedTarget
+        : resolveTargetForAdapter(session, adapterId);
+      if (!target) {
         continue;
       }
+      if (typeof adapter.ensureTarget !== "function") {
+        if (!finalTarget) {
+          finalTarget = target;
+        }
+        continue;
+      }
+      rememberSessionForTarget(target, session);
+      let adapterFinalTarget = target;
       const result = await adapter.ensureTarget(target);
       if (result?.target?.chatId) {
-        finalTarget = result.target;
+        adapterFinalTarget = result.target;
       }
       if (result?.topicBinding) {
         await upsertTelegramTopicBinding(result.topicBinding);
       }
+      if (!finalTarget) {
+        finalTarget = adapterFinalTarget;
+      }
       logDebug(
         "messaging.target.ensure",
         {
-          adapter: adapter.getStatus?.().adapter || "adapter",
+          adapter: adapterId || "adapter",
           sessionId: normalizeNonEmptyString(session?.id),
           ok: result?.ok === true,
           reason: normalizeNonEmptyString(result?.reason),
           error: normalizeNonEmptyString(result?.error),
-          chatId: normalizeNonEmptyString(finalTarget?.chatId),
-          messageThreadId: Number.isInteger(finalTarget?.messageThreadId) ? finalTarget.messageThreadId : null
+          chatId: normalizeNonEmptyString(adapterFinalTarget?.chatId),
+          messageThreadId: Number.isInteger(adapterFinalTarget?.messageThreadId) ? adapterFinalTarget.messageThreadId : null
         },
         trace || null
       );
+      rememberSessionForTarget(adapterFinalTarget, session);
     }
-    rememberSessionForTarget(finalTarget, session);
     return finalTarget;
   }
 
@@ -3362,33 +3442,37 @@ export function createMessagingRuntime(options = {}) {
     if (!messageIntent) {
       return null;
     }
-    const target = resolveTarget(session);
     const fallbackEvent = createEventFromMessageIntent({
       session,
       profile,
       trace,
       intent: messageIntent
     });
-    if (!target) {
-      bumpEventMetric(fallbackEvent.profile, fallbackEvent.type, "suppress");
-      recordDispatchTrace(
-        fallbackEvent,
-        {
-          action: "suppress",
-          messageKey: fallbackEvent?.threadKey || "status",
-          reason: "unmapped_target"
-        },
-        null
-      );
-      return null;
-    }
-    rememberSessionForTarget(target, session);
+    const requestedAdapterIds =
+      Array.isArray(messageIntent.deliveryAdapters) && messageIntent.deliveryAdapters.length > 0
+        ? new Set(
+            messageIntent.deliveryAdapters
+              .map((descriptor) => normalizeNonEmptyString(descriptor?.adapterId))
+              .filter(Boolean)
+          )
+        : null;
     let delivered = false;
-    let finalTarget = target;
+    let attemptedDelivery = false;
+    let finalTarget = null;
     let tracedEvent = fallbackEvent;
     let finalDecision = null;
     const deliveryResults = [];
     for (const adapter of adapters) {
+      const adapterId = normalizeNonEmptyString(adapter.getStatus?.().adapter);
+      if (requestedAdapterIds && adapterId && !requestedAdapterIds.has(adapterId)) {
+        continue;
+      }
+      const target = resolveTargetForAdapter(session, adapterId);
+      if (!target) {
+        continue;
+      }
+      attemptedDelivery = true;
+      rememberSessionForTarget(target, session);
       const result =
         typeof adapter.handleMessageIntent === "function"
           ? await adapter.handleMessageIntent({
@@ -3405,10 +3489,11 @@ export function createMessagingRuntime(options = {}) {
                 action: "new",
                 messageKey: fallbackEvent?.threadKey || "status",
                 reason: "message_intent_event_fallback"
-              }
-            });
-      if (result?.target?.chatId) {
-        finalTarget = result.target;
+            }
+          });
+      const resultTarget = result?.target?.chatId ? result.target : target;
+      if (!finalTarget && resultTarget?.chatId) {
+        finalTarget = resultTarget;
       }
       if (result?.event) {
         tracedEvent = result.event;
@@ -3420,7 +3505,7 @@ export function createMessagingRuntime(options = {}) {
         await upsertTelegramTopicBinding(result.topicBinding);
       }
       deliveryResults.push({
-        adapter: adapter.getStatus?.().adapter || "adapter",
+        adapter: adapterId || "adapter",
         delivered: result?.delivered === true,
         action: result?.action || result?.decision?.action || "",
         error: result?.error || "",
@@ -3429,6 +3514,21 @@ export function createMessagingRuntime(options = {}) {
         recommendedBackoffMs: result?.recommendedBackoffMs
       });
       delivered = delivered || result?.delivered === true;
+      rememberSessionForTarget(resultTarget, session);
+    }
+    if (!attemptedDelivery) {
+      bumpEventMetric(fallbackEvent.profile, fallbackEvent.type, "suppress");
+      recordDispatchTrace(
+        fallbackEvent,
+        {
+          action: "suppress",
+          messageKey: fallbackEvent?.threadKey || "status",
+          reason: "unmapped_target"
+        },
+        null,
+        deliveryResults
+      );
+      return null;
     }
     const tracedDecision =
       finalDecision ||
@@ -3440,7 +3540,10 @@ export function createMessagingRuntime(options = {}) {
     bumpEventMetric(tracedEvent.profile, tracedEvent.type, tracedDecision.action);
     if (delivered) {
       if (normalizeNonEmptyString(tracedEvent?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(tracedEvent, finalTarget);
+        const ledgerEntry =
+          normalizeNonEmptyString(finalTarget?.adapterId || "telegram") === "telegram"
+            ? buildCodexSummaryRestartResendLedgerEntry(tracedEvent, finalTarget)
+            : null;
         if (ledgerEntry) {
           await upsertCodexRestartResendLedgerEntry(ledgerEntry);
         }
@@ -3913,8 +4016,8 @@ export function createMessagingRuntime(options = {}) {
   }
 
   async function dispatchEvent(event) {
-    const target = resolveTarget(event.session);
-    if (!target) {
+    const primaryTarget = resolveTarget(event.session);
+    if (!primaryTarget) {
       recordDispatchTrace(
         event,
         {
@@ -3926,12 +4029,12 @@ export function createMessagingRuntime(options = {}) {
       );
       return null;
     }
-    rememberSessionForTarget(target, event.session);
-    const threadState = getThreadState(target, event.sessionId, event.threadKey);
+    rememberSessionForTarget(primaryTarget, event.session);
+    const threadState = getThreadState(primaryTarget, event.sessionId, event.threadKey);
     const decision = applyMessagingMessagePolicy(event, threadState);
     bumpEventMetric(event.profile, event.type, decision.action);
     if (decision.action === "suppress") {
-      recordDispatchTrace(event, decision, target, []);
+      recordDispatchTrace(event, decision, primaryTarget, []);
       return Object.freeze({
         ...decision,
         delivered: false,
@@ -3940,9 +4043,16 @@ export function createMessagingRuntime(options = {}) {
     }
     advanceMessagingThreadPolicyState(threadState, event, decision, { delivered: false });
     let delivered = false;
+    let attemptedDelivery = false;
     const deliveryResults = [];
-    let finalTarget = target;
+    let finalTarget = primaryTarget;
     for (const adapter of adapters) {
+      const adapterId = normalizeNonEmptyString(adapter.getStatus?.().adapter);
+      const target = resolveTargetForAdapter(event.session, adapterId);
+      if (!target) {
+        continue;
+      }
+      attemptedDelivery = true;
       const result = await adapter.handleEvent({
         ...event,
         target,
@@ -3965,10 +4075,26 @@ export function createMessagingRuntime(options = {}) {
       });
       delivered = delivered || result?.delivered === true;
     }
+    if (!attemptedDelivery) {
+      recordDispatchTrace(
+        event,
+        {
+          action: "suppress",
+          messageKey: event?.threadKey || "status",
+          reason: "unmapped_target"
+        },
+        null,
+        deliveryResults
+      );
+      return null;
+    }
     if (delivered) {
       advanceMessagingThreadPolicyState(threadState, event, decision, { delivered: true });
       if (normalizeNonEmptyString(event?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, finalTarget);
+        const ledgerEntry =
+          normalizeNonEmptyString(finalTarget?.adapterId || "telegram") === "telegram"
+            ? buildCodexSummaryRestartResendLedgerEntry(event, finalTarget)
+            : null;
         if (ledgerEntry) {
           await upsertCodexRestartResendLedgerEntry(ledgerEntry);
         }
@@ -4768,6 +4894,9 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function buildStatusSummary() {
+    const adapterStatuses = adapters.map((adapter) => adapter.getStatus());
+    const anyAdapterEnabled = adapterStatuses.some((status) => status?.enabled === true);
+    const anyAdapterDeliveryEnabled = adapterStatuses.some((status) => status?.deliveryEnabled === true);
     const recoveringSessionCount = Array.from(codexSummaryRestartRecoveryStates.values()).filter((entry) => entry?.active).length;
     const activeReplySessionCount = Array.from(sessionStates.values()).filter((entry) => isCodexTelegramReplyActive(entry?.pendingCodexTelegramReply, nowFn())).length;
     const activeProjectionSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.terminalProjection).length;
@@ -4794,8 +4923,8 @@ export function createMessagingRuntime(options = {}) {
       terminalSemanticShadowState.comparisonTotal >= terminalSemanticShadowState.cutoverMinComparisons &&
       comparisonMismatchRate <= terminalSemanticShadowState.cutoverMaxMismatchRate;
     return {
-      enabled: telegramConfigured,
-      deliveryEnabled: telegramOutboundEnabled,
+      enabled: anyAdapterEnabled,
+      deliveryEnabled: anyAdapterDeliveryEnabled,
       deliveryHardBreakActive: telegramOutboundHardBreakActive,
       allowlistDeliveryActive: telegramAllowlistDeliveryActive,
       allowlistDeliveryScopes: telegramAllowlistDeliveryScopes.slice(),
@@ -4850,7 +4979,7 @@ export function createMessagingRuntime(options = {}) {
         activeSessionCount: recoveringSessionCount,
         ledgerSize: codexRestartResendLedger.size
       },
-      adapters: adapters.map((adapter) => adapter.getStatus()),
+      adapters: adapterStatuses,
       trace: {
         capacity: MAX_MESSAGING_TRACE_ENTRIES,
         capturedTotal: traceCapturedTotal,

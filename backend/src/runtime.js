@@ -2589,6 +2589,12 @@ export function createRuntime(config) {
     remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath,
     createTraceId: () => createTraceId("mgr"),
+    inspectTerminalForegroundProcess:
+      typeof config.inspectTerminalForegroundProcess === "function" ? config.inspectTerminalForegroundProcess : undefined,
+    foregroundProcessRefreshDelayMs:
+      Number.isInteger(config.foregroundProcessRefreshDelayMs) && config.foregroundProcessRefreshDelayMs >= 0
+        ? config.foregroundProcessRefreshDelayMs
+        : undefined,
     captureSessionStreamChunk: (event) => sessionStreamAnalysisCapture.captureChunk(event),
     nodePtyAsyncWriteOptions:
       config.nodePtyAsyncWriteOptions &&
@@ -2780,6 +2786,9 @@ export function createRuntime(config) {
     telegramOutboundHardBreakActive: config.messagingTelegramOutboundHardBreakActive,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
+    discordTargets: config.messagingDiscordTargets,
+    discordApiBaseUrl: config.messagingDiscordApiBaseUrl,
+    discordOutboundEnabled: config.messagingDiscordOutboundEnabled,
     terminalSemanticPrimaryMode: config.messagingTerminalSemanticPrimaryMode,
     terminalSemanticShadowModeEnabled: config.messagingTerminalSemanticShadowModeEnabled,
     terminalSemanticCutoverMinComparisons: config.messagingTerminalSemanticCutoverMinComparisons,

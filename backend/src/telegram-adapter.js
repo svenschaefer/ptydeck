@@ -3,6 +3,17 @@ import {
   normalizeTelegramCommandCatalog,
   resolveTelegramCommandCatalogEntry
 } from "./telegram-command-surface.js";
+import {
+  buildDeliveryEventFromMessageIntent,
+  buildFallbackSessionLabel,
+  createDefaultMessageIntentDecision,
+  normalizeLineBreaks,
+  normalizeNonEmptyString,
+  normalizeWhitespace,
+  truncateDisplayText,
+  truncateMiddleNormalizedText,
+  truncateStructuredMessageText
+} from "./delivery-adapter-utils.js";
 
 const DEFAULT_TELEGRAM_API_BASE_URL = "https://api.telegram.org";
 const TELEGRAM_CALLBACK_PREFIX = "ptydeck:";
@@ -14,60 +25,6 @@ const MAX_TELEGRAM_INBOUND_TRACE_ENTRIES = 25;
 const MAX_TELEGRAM_INBOUND_PREVIEW_LENGTH = 200;
 const MAX_TELEGRAM_TARGET_TRACE_ENTRIES = 25;
 const MAX_TELEGRAM_EVENT_SUMMARY_LENGTH = 280;
-
-function normalizeNonEmptyString(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim();
-}
-
-function normalizeWhitespace(value) {
-  return normalizeNonEmptyString(String(value || "").replace(/\s+/g, " "));
-}
-
-function normalizeLineBreaks(value) {
-  return String(value || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .trim();
-}
-
-function truncateMiddleNormalizedText(normalized, maxLength) {
-  if (!normalized) {
-    return "";
-  }
-  if (!Number.isInteger(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
-    return normalized;
-  }
-  if (maxLength <= 1) {
-    return "…";
-  }
-  const available = maxLength - 1;
-  const headLength = Math.max(1, Math.ceil(available / 2));
-  const tailLength = Math.max(1, Math.floor(available / 2));
-  const head = normalized.slice(0, headLength).trimEnd();
-  const tail = normalized.slice(normalized.length - tailLength).trimStart();
-  return `${head}…${tail}`;
-}
-
-function truncateStructuredMessageText(value, maxLength = MAX_TELEGRAM_EVENT_SUMMARY_LENGTH) {
-  const normalized = normalizeLineBreaks(value)
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return truncateMiddleNormalizedText(normalized, maxLength);
-}
-
-function truncateDisplayText(value, maxLength = MAX_TELEGRAM_EVENT_SUMMARY_LENGTH) {
-  return truncateMiddleNormalizedText(normalizeWhitespace(value), maxLength);
-}
-
-function buildFallbackSessionLabel(session) {
-  const quickIdToken = normalizeNonEmptyString(session?.quickIdToken);
-  const name = normalizeNonEmptyString(session?.name) || normalizeNonEmptyString(session?.shell) || normalizeNonEmptyString(session?.id);
-  return quickIdToken ? `[${quickIdToken}] ${name}` : name;
-}
 
 function normalizeTelegramApiBaseUrl(value) {
   const normalized = normalizeNonEmptyString(value);
@@ -727,55 +684,6 @@ export function createTelegramAdapter(options = {}) {
     return Boolean(deliveryScope && allowlistDeliveryScopes.includes(deliveryScope));
   }
 
-  function defaultMessageIntentDecision(event, state) {
-    const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
-    const hasMessage = state?.messageCreated === true || Number.isInteger(state?.messageId);
-    return Object.freeze({
-      action: hasMessage ? "update" : "new",
-      messageKey,
-      reason: "message_intent_default"
-    });
-  }
-
-  function buildEventFromMessageIntent(intent, session, profile, trace) {
-    const summaryMaxLength =
-      Number.isInteger(intent?.metadata?.summaryMaxLength) && intent.metadata.summaryMaxLength > 0
-        ? intent.metadata.summaryMaxLength
-        : MAX_TELEGRAM_EVENT_SUMMARY_LENGTH;
-    const preserveStructuredSummary =
-      intent?.format === "structured_text" || intent?.metadata?.preserveStructuredSummary === true;
-    const summary =
-      preserveStructuredSummary
-        ? truncateStructuredMessageText(intent?.text || "", summaryMaxLength)
-        : truncateDisplayText(intent?.text || "", summaryMaxLength);
-    const label = formatSessionLabel(session);
-    const text = summary ? `${label}: ${summary}` : label;
-    return Object.freeze({
-      id: normalizeNonEmptyString(intent?.intentId) || "",
-      occurredAt: nowFn(),
-      sessionId: normalizeNonEmptyString(intent?.sessionId) || normalizeNonEmptyString(session?.id),
-      session,
-      profile: normalizeNonEmptyString(profile),
-      type: normalizeNonEmptyString(intent?.eventType) || "session.output.summary",
-      severity: normalizeNonEmptyString(intent?.severity) || "info",
-      threadKey: normalizeNonEmptyString(intent?.threadKey) || "status",
-      summary,
-      detail: "",
-      text,
-      trace,
-      aggregationReason:
-        normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
-      deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
-      deliveryBlockKey:
-        normalizeNonEmptyString(intent?.turn?.turnId) ||
-        normalizeNonEmptyString(intent?.outputEpisode?.episodeId) ||
-        normalizeNonEmptyString(intent?.projection?.projectionId),
-      noiseClass: "",
-      comparableText: normalizeNonEmptyString(intent?.comparableText),
-      messageIntent: intent
-    });
-  }
-
   function getForumTopicState(target) {
     const stateKey = buildForumTopicStateKey(target);
     let state = forumTopicState.get(stateKey);
@@ -1153,10 +1061,19 @@ export function createTelegramAdapter(options = {}) {
         target: effectiveTarget
       };
     }
-    const event = buildEventFromMessageIntent(intent, session, profile, trace);
+    const event = buildDeliveryEventFromMessageIntent(intent, {
+      session,
+      profile,
+      trace,
+      nowFn,
+      formatSessionLabel,
+      maxEventSummaryLength: MAX_TELEGRAM_EVENT_SUMMARY_LENGTH
+    });
     const state = getThreadState(effectiveTarget, event.threadKey);
     const decision =
-      typeof applyMessagePolicy === "function" ? applyMessagePolicy(event, state) : defaultMessageIntentDecision(event, state);
+      typeof applyMessagePolicy === "function"
+        ? applyMessagePolicy(event, state)
+        : createDefaultMessageIntentDecision(event, state);
     return deliverPreparedEvent({
       event,
       decision,

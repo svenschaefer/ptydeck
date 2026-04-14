@@ -45,6 +45,9 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
   assert.equal(config.messagingTelegramInboundEnabled, false);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 3);
+  assert.deepEqual(config.messagingDiscordTargets, []);
+  assert.equal(config.messagingDiscordApiBaseUrl, "https://discord.com/api/v10");
+  assert.equal(config.messagingDiscordOutboundEnabled, false);
   assert.equal(config.messagingTerminalSemanticPrimaryMode, "projection");
   assert.equal(config.messagingTerminalSemanticShadowModeEnabled, true);
   assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 20);
@@ -88,6 +91,16 @@ test("loadConfig maps environment values", () => {
     MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001", profile: "build-test" }]),
     MESSAGING_TELEGRAM_API_BASE_URL: "https://api.telegram.example",
     MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS: "7",
+    MESSAGING_DISCORD_TARGETS: JSON.stringify([
+      {
+        sessionName: "claude",
+        channelId: "ops-room",
+        threadId: 71,
+        webhookUrl: "https://discord.example/api/v10/webhooks/123/token"
+      }
+    ]),
+    MESSAGING_DISCORD_API_BASE_URL: "https://discord.example/api/v10",
+    MESSAGING_DISCORD_OUTBOUND_ENABLED: "true",
     MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE: "legacy",
     MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED: "false",
     MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS: "7",
@@ -134,6 +147,16 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
   assert.equal(config.messagingTelegramInboundEnabled, true);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 7);
+  assert.deepEqual(config.messagingDiscordTargets, [
+    {
+      sessionName: "claude",
+      channelId: "ops-room",
+      threadId: 71,
+      webhookUrl: "https://discord.example/api/v10/webhooks/123/token"
+    }
+  ]);
+  assert.equal(config.messagingDiscordApiBaseUrl, "https://discord.example/api/v10");
+  assert.equal(config.messagingDiscordOutboundEnabled, true);
   assert.equal(config.messagingTerminalSemanticPrimaryMode, "legacy");
   assert.equal(config.messagingTerminalSemanticShadowModeEnabled, false);
   assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 7);

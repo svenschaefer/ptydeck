@@ -1,16 +1,24 @@
 # Messaging Adapters
 
-`ptydeck` now ships a single-user Telegram reference adapter on top of the provider-independent messaging contract.
+`ptydeck` now ships two reference delivery adapters on top of the provider-independent messaging contract:
 
-Use it when you want:
+- a Telegram operator adapter for the current live product path
+- a Discord-style webhook/thread reference adapter that proves the same `MessageIntent` seam on a second transport
+
+Use the Telegram adapter when you want:
 
 - concise external session status updates
 - bounded remote follow-up from a mapped Telegram chat
 - a stable session-to-chat mapping without opening a second terminal UI
 
-The adapter now also publishes its Telegram slash-command surface from the canonical ptydeck command model instead of a separate handwritten Telegram-only list.
+The Telegram adapter now also publishes its slash-command surface from the canonical ptydeck command model instead of a separate handwritten Telegram-only list.
 
-The adapter is intentionally not a remote shell.
+Both adapters are intentionally not remote shells.
+
+The current shipped split is:
+
+- Telegram remains the first operator-facing adapter with the full mapped-input and bot-command surface
+- Discord is currently a reference outbound adapter that consumes the same adapter-neutral `MessageIntent` objects with transport-specific formatting and thread/channel routing only
 
 ## Telegram Command Surface
 

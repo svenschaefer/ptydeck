@@ -55,10 +55,44 @@ test("messaging runtime normalizes targets and resolves trigger profiles determi
   ]);
 
   assert.deepEqual(targets, [
-    { chatId: "1002", sessionId: "", quickIdToken: "", sessionName: "build", profile: "build-test" },
-    { chatId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" },
-    { chatId: "1004", sessionId: "", quickIdToken: "", sessionName: "ops", profile: "coding-agent", topicMode: "deck-session" },
-    { chatId: "1005", sessionId: "", quickIdToken: "", sessionName: "", profile: "coding-agent", topicMode: "deck-session" }
+    { chatId: "1002", channelId: "1002", sessionId: "", quickIdToken: "", sessionName: "build", profile: "build-test" },
+    { chatId: "1003", channelId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" },
+    {
+      chatId: "1004",
+      channelId: "1004",
+      sessionId: "",
+      quickIdToken: "",
+      sessionName: "ops",
+      profile: "coding-agent",
+      topicMode: "deck-session"
+    },
+    {
+      chatId: "1005",
+      channelId: "1005",
+      sessionId: "",
+      quickIdToken: "",
+      sessionName: "",
+      profile: "coding-agent",
+      topicMode: "deck-session"
+    }
+  ]);
+
+  const discordTargets = normalizeMessagingTargets(
+    [{ channelId: "ops-room", threadId: 71, webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token", sessionName: "claude" }],
+    { adapterId: "discord", includeAdapterId: true }
+  );
+  assert.deepEqual(discordTargets, [
+    {
+      adapterId: "discord",
+      chatId: "ops-room",
+      channelId: "ops-room",
+      messageThreadId: 71,
+      threadId: 71,
+      webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+      sessionId: "",
+      quickIdToken: "",
+      sessionName: "claude"
+    }
   ]);
 
   const topicBindings = normalizeMessagingTopicBindings([
@@ -1157,6 +1191,181 @@ test("messaging runtime emits gemini-style multiline coding-agent episodes throu
 
   const orchestration = runtime.captureTerminalOrchestrationState(session.id);
   assert.equal(orchestration?.lastCompletedOutputEpisode?.primaryIntentScope, "codex_separator_section");
+});
+
+test("messaging runtime delivers the same short turn reply through telegram and discord delivery adapters", async () => {
+  const telegramSends = [];
+  const discordSends = [];
+  let now = 9_260;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "claude", profile: "coding-agent" }],
+    discordOutboundEnabled: true,
+    discordTargets: [
+      {
+        channelId: "ops-room",
+        threadId: 71,
+        webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+        sessionName: "claude",
+        profile: "coding-agent"
+      }
+    ],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          telegramSends.push(payload);
+          return { messageId: telegramSends.length + 820 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 821 };
+        }
+      };
+    },
+    createDiscordTransport() {
+      return {
+        async sendMessage(payload) {
+          discordSends.push(payload);
+          return { messageId: `d-${discordSends.length}` };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || "d-edit" };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-dual-reply-session",
+    name: "claude",
+    quickIdToken: "A",
+    startCommand: "claude",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "claude",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-dual-reply-open",
+    correlationId: "projection-dual-reply-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: 'Reply only with "Ok, acknowledged".'
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Ok, acknowledged\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-dual-reply-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-dual-reply-idle" }
+  });
+
+  assert.equal(telegramSends.length, 1);
+  assert.equal(discordSends.length, 1);
+  assert.match(telegramSends[0].text, /Ok, acknowledged/u);
+  assert.equal(discordSends[0].threadId, 71);
+  assert.match(discordSends[0].text, /Ok, acknowledged/u);
+
+  const status = runtime.buildStatusSummary();
+  assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram", "discord"]);
+  assert.equal(status.adapters.find((entry) => entry.adapter === "telegram")?.deliveredTotal, 1);
+  assert.equal(status.adapters.find((entry) => entry.adapter === "discord")?.deliveredTotal, 1);
+});
+
+test("messaging runtime keeps bounded autonomous multiline delivery in parity across telegram and discord", async () => {
+  const telegramSends = [];
+  const discordSends = [];
+  let now = 9_340;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "gemini", profile: "coding-agent" }],
+    discordOutboundEnabled: true,
+    discordTargets: [
+      {
+        channelId: "ops-room",
+        threadId: 72,
+        webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+        sessionName: "gemini",
+        profile: "coding-agent"
+      }
+    ],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          telegramSends.push(payload);
+          return { messageId: telegramSends.length + 840 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 841 };
+        }
+      };
+    },
+    createDiscordTransport() {
+      return {
+        async sendMessage(payload) {
+          discordSends.push(payload);
+          return { messageId: `d-episode-${discordSends.length}` };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || "d-episode-edit" };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-dual-episode-session",
+    name: "gemini",
+    quickIdToken: "B",
+    startCommand: "gemini",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "gemini",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "✦ Summary:\n- First result\n- Second result\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-dual-episode-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-dual-episode-idle" }
+  });
+
+  assert.equal(telegramSends.length, 1);
+  assert.equal(discordSends.length, 1);
+  assert.match(telegramSends[0].text, /Summary:/u);
+  assert.match(discordSends[0].text, /Summary:/u);
+  assert.doesNotMatch(discordSends[0].text, /✦/u);
+  assert.match(discordSends[0].text, /Second result/u);
 });
 
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {

@@ -140,7 +140,7 @@ Authoritative repository documents remain:
 - `ptydeck_messaging_adapter_framework_final_concept.md`
   - Role: non-technical product concept for the messaging-adapter framework now delivered on `main` as the first reference baseline
   - Status:
-    - the outbound-first Telegram reference wave and the bounded inbound reference wave are now delivered on `main`
+    - the outbound-first Telegram reference wave, the bounded inbound reference wave, and the Discord-style reference delivery follow-up are now delivered on `main`
     - the concept document remains useful for product boundaries and later adapter families, but it is not the implementation-status source of truth
   - Current interpretation:
     - adapters must remain subordinate to existing ptydeck session, share, and control contracts
@@ -214,9 +214,9 @@ Authoritative repository documents remain:
     - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
   - Current interpretation:
     - use it when reasoning about the neutral boundary contracts (`TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, `AppSemanticAdapter`)
-    - use it to understand the currently shipped bridge where the narrow Codex allowlist still decides candidate worthiness but now routes through neutral `MessageIntent` objects into a real Telegram `DeliveryAdapter` seam instead of a runtime-owned Telegram shortcut
-    - use it together with `backend/src/terminal-projection.js`, `backend/src/app-semantic-adapters.js`, `backend/src/telegram-adapter.js`, and `backend/src/messaging-runtime.js` when reasoning about the shipped `@xterm/headless`-backed projection seam, the runtime-owned `Turn` / `OutputEpisode` orchestration on top of it, the shipped projection-backed semantic extraction for turn replies and autonomous coding-agent episodes, the semantic-adapter registry seam with both Codex and generic coding-agent baselines, the direct Telegram `MessageIntent` delivery seam, and the shipped shadow-mode/cutover-readiness surface for comparing legacy versus projection reply behavior
-    - start future post-`H128` follow-up work from the documented fact that the neutral contract layer, the live terminal projection, the live turn/output-episode orchestration, the projection-backed semantic extraction, the semantic-adapter registry seam, the Telegram delivery-adapter seam, and the shadow-mode migration surface all now exist in code; future work should extend that baseline rather than reopen chunk-first parser heuristics
+    - use it to understand the currently shipped bridge where the narrow Codex allowlist still decides candidate worthiness but now routes through neutral `MessageIntent` objects into real Telegram and Discord `DeliveryAdapter` seams instead of runtime-owned transport shortcuts
+    - use it together with `backend/src/terminal-projection.js`, `backend/src/app-semantic-adapters.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, and `backend/src/messaging-runtime.js` when reasoning about the shipped `@xterm/headless`-backed projection seam, the runtime-owned `Turn` / `OutputEpisode` orchestration on top of it, the shipped projection-backed semantic extraction for turn replies and autonomous coding-agent episodes, the semantic-adapter registry seam with both Codex and generic coding-agent baselines, the direct Telegram/Discord `MessageIntent` delivery seams, and the shipped shadow-mode/cutover-readiness surface for comparing legacy versus projection reply behavior
+    - start future post-`H128` follow-up work from the documented fact that the neutral contract layer, the live terminal projection, the live turn/output-episode orchestration, the projection-backed semantic extraction, the semantic-adapter registry seam, the Telegram and Discord delivery-adapter seams, and the shadow-mode migration surface all now exist in code; future work should extend that baseline rather than reopen chunk-first parser heuristics
 
 ## Consolidation Outcome
 
