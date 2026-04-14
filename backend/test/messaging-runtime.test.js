@@ -656,6 +656,211 @@ test("messaging runtime tracks turn baselines transcript deltas and quiet-window
   assert.equal(status.terminalMessagingCore.completedTurnSessionCount, 1);
 });
 
+test("messaging runtime delivers short correct turn replies from projection semantic extraction", async () => {
+  const sends = [];
+  let now = 8_500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 780 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 781 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-short-reply-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-short-reply-open",
+    correlationId: "projection-short-reply-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: 'Nur ein Test. Bitte nur mit "Ok, verstanden" antworten.'
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "• Ok, verstanden\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-short-reply-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-short-reply-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ok, verstanden/u);
+  assert.doesNotMatch(sends[0].text, /Nur ein Test/u);
+
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText, "Ok, verstanden");
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+});
+
+test("messaging runtime ignores working-overlay chatter before a short turn reply when using projection semantic extraction", async () => {
+  const sends = [];
+  let now = 8_800;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 790 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 791 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-overlay-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "projection-overlay-open",
+    correlationId: "projection-overlay-correlation",
+    source: "messaging:telegram",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: 'Noch ein weiterer Test. Bitte nur mit "Ok, nochmals verstanden" antworten.'
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Summarize recent commits • Working (0s • esc to interrupt)\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-overlay-data-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ok, nochmals verstanden\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-overlay-data-2" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-overlay-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ok, nochmals verstanden/u);
+  assert.doesNotMatch(sends[0].text, /Summarize recent commits/u);
+  assert.doesNotMatch(sends[0].text, /esc to interrupt/u);
+});
+
+test("messaging runtime emits autonomous multiline coding-agent episodes from projection semantic extraction", async () => {
+  const sends = [];
+  let now = 9_100;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 800 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 801 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "projection-output-episode-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Kurzurteil\nDie neue Architektur ist aktiv.\n",
+    promptBoundaries: [],
+    trace: { traceId: "projection-episode-data" }
+  });
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-episode-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Kurzurteil/u);
+  assert.match(sends[0].text, /Die neue Architektur ist aktiv\./u);
+
+  const orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.lastCompletedOutputEpisode?.primaryIntentScope, "codex_separator_section");
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+});
+
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
   const sends = [];
   const edits = [];
@@ -1291,6 +1496,13 @@ test("messaging runtime truncates oversized codex replies in the middle so both 
     promptBoundaries: [],
     trace: { traceId: "reply-middle-4" }
   });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "reply-middle-idle" }
+  });
 
   assert.equal(sends.length, 1);
   assert.match(sends[0].text, /^\[7\] ptydeck: Beginn des großen Reply-Blocks\./);
@@ -1373,6 +1585,13 @@ test("messaging runtime correlates the next substantial telegram question reply 
       "• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
     promptBoundaries: [],
     trace: { traceId: "telegram-reply-5" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "telegram-reply-idle" }
   });
 
   assert.equal(sends.length, 1);
@@ -1475,6 +1694,13 @@ test("messaging runtime promotes the next substantial submitted codex reply even
       "• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
     promptBoundaries: [],
     trace: { traceId: "rest-reply-6" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "rest-reply-idle" }
   });
 
   assert.equal(sends.length, 1);
@@ -1586,6 +1812,13 @@ test("messaging runtime ignores stale carryover and input echo before starting a
     promptBoundaries: [],
     trace: { traceId: "rest-reply-stale-answer-end" }
   });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "rest-reply-stale-idle" }
+  });
 
   assert.equal(sends.length, 1);
   assert.match(sends[0].text, /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./);
@@ -1668,6 +1901,13 @@ test("messaging runtime ignores repeated stale short tails before starting a tel
     data: "\n",
     promptBoundaries: [],
     trace: { traceId: "telegram-reply-tail-4" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "telegram-reply-tail-idle" }
   });
 
   assert.equal(sends.length, 1);
@@ -2088,7 +2328,7 @@ test("messaging runtime suppresses persisted summary-family restart history with
   await runtime.observeSessionData({
     session,
     data:
-      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand,\n" +
+      "• Der Commit ist gepusht. Der finale Repo-/Prozesszustand ist sauber,\n" +
       "  damit der Analyse-Slice sauber abgeschlossen ist.\n",
     promptBoundaries: [],
     trace: { traceId: "h109-info-2" }

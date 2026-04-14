@@ -4,7 +4,7 @@ Last updated: 2026-04-14
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, and runtime orchestration foundation for the `v0.4.0-H128` stream-to-message refactor.
+This note records the delivered neutral core, terminal projection, runtime orchestration, and first projection-backed semantic extraction for the `v0.4.0-H128` stream-to-message refactor.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,15 +34,21 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083`, `MSG-084`, and `MSG-085` still do not replace the old stream parser.
+`MSG-083` through `MSG-086` still do not complete the full migration, but they now replace the most failure-prone primary reply seam.
 
-They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, and move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam.
+They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, and make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots.
 
 Current bridge behavior:
 
 1. the existing legacy Codex allowlist still decides when a candidate is worth delivering
 2. that candidate is now first converted into a neutral `MessageIntent`
 3. only then is it bridged into the existing messaging event and delivery-policy path
+
+Current semantic extraction behavior:
+
+1. submit-bearing turns now derive their primary reply candidate from projection transcript-delta plus stable diff state instead of the legacy first-hit line path
+2. short but correct replies no longer depend on the former minimum-length/minimum-word gates before they can become `MessageIntent` text
+3. autonomous coding-agent output can now fall back to one projection-backed multiline `OutputEpisode` intent when quiet completion occurs without a legacy separator-family delivery already claiming the episode
 
 Current terminal projection behavior:
 
@@ -81,7 +87,7 @@ The first shipped delivery descriptor is:
 
 - `telegram`
 
-This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, and `MSG-086` through `MSG-087` will move semantic extraction and migration onto those boundaries.
+This is intentional. `MSG-083` introduced the neutral boundaries, `MSG-084` introduced the first live projection seam, `MSG-085` introduced live turn/output-episode orchestration on top of that seam, and `MSG-086` has now moved the first shipped semantic extraction onto those boundaries while `MSG-087` remains the migration/cutover slice.
 
 ## Why This Matters
 
@@ -107,13 +113,11 @@ This slice does not yet solve the central stream-to-message correctness problem.
 
 It does not yet:
 
-- replace chunk-first interpretation
-- replace current delivery decisions with projection-derived turn/episode semantics
-- replace the current primary Codex allowlist heuristics
+- remove the remaining legacy separator-family evaluator from autonomous narrow allowlist delivery
+- run the legacy and projection-first pipelines in shipped shadow mode side by side
+- replace current delivery policy cutover with a feature-flagged migration path
 
 Those remain the next steps in `H128`.
-
-## Next Steps
 
 ## Projection Baseline Now Shipped
 
@@ -154,13 +158,22 @@ The runtime currently exposes that orchestration seam through:
 - `buildStatusSummary().terminalMessagingCore.activeOutputEpisodeSessionCount`
 - `buildStatusSummary().terminalMessagingCore.completedOutputEpisodeSessionCount`
 
+## Projection-Backed Semantic Extraction Now Shipped
+
+`backend/src/messaging-runtime.js` now uses the projection/orchestration seam as the primary source for narrow allowlist turn replies:
+
+- turn replies derive their semantic text from bounded transcript-delta plus stable diff state
+- working overlays, prompt/footer tails, input echo, separator-only fragments, commentary-like lines, and stale baseline residue are filtered before a `MessageIntent` is emitted
+- short but correct replies such as `Ok, verstanden` can now survive the semantic extractor without the former minimum-length/minimum-word gate blocking them
+- autonomous coding-agent multiline output can now fall back to one projection-backed `codex_separator_section` or `codex_separator_info` intent if the episode reaches quiet completion without a legacy separator-family delivery having already claimed it
+
+This means the most failure-prone reply path is no longer driven primarily by first-hit PTY line/chunk heuristics, even though the full `H128` migration is not complete yet.
+
 ## Next Steps
 
 The next implementation slices are now:
 
-1. `MSG-086`
-   - adapter-neutral semantic extraction from turns and episodes
-2. `MSG-087`
+1. `MSG-087`
    - shadow mode and feature-flagged cutover
-3. `MSG-088`
-   - full end-to-end validation against known field failures
+2. `MSG-088`
+   - full end-to-end validation against known field failures and dual-run parity

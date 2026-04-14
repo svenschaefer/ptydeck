@@ -14,8 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-086` Owner `BE`
-  Refactor outbound semantic extraction to emit adapter-neutral `MessageIntent` objects from turns and autonomous episodes instead of Telegram/Codex-specific first-hit chunk or line heuristics. The first shipped semantic adapter may target Codex, but the architecture must make app-specific interpretation pluggable for Claude Code CLI, Gemini Code CLI, and future terminal apps, while delivery adapters map the same intents into Telegram, Discord, Slack, and future outbound channels. Preserve existing restart-recovery, duplicate suppression, and delivery-policy guarantees while removing the current dependency on minimum-length/minimum-word heuristics for short but correct replies.
 - `MSG-087` Owner `PLAT`
   Introduce a shadow-mode and feature-flagged migration path for the `H128` architecture. The legacy and new stream-to-message pipelines must be able to run side by side on the same recorded traces and live runtime windows, emit comparable diagnostics, and gate primary cutover on explicit parity criteria so the refactor can be deployed safely without losing the ability to compare new `MessageIntent` output against the shipped narrow allowlist behavior.
 - `MSG-088` Owner `QA`
