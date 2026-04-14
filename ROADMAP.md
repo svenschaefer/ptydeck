@@ -20,10 +20,26 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - `MSG-080` after `MSG-079`
 - Queued next waves:
   - `v0.4.0-H127`
+  - `v0.4.0-H128`
 
 ## Queued Wave Order
 - `v0.4.0-H126`
 - `v0.4.0-H127`
+- `v0.4.0-H128`
+
+## Wave Dependencies
+
+- `v0.4.0-H126`
+  - `MSG-079`
+  - `MSG-080` after `MSG-079`
+- `v0.4.0-H127`
+  - `MSG-081`
+  - `MSG-082` after `MSG-081`
+- `v0.4.0-H128`
+  - `MSG-083`
+  - `MSG-084` after `MSG-083`
+  - `MSG-085` after `MSG-083` and `MSG-084`
+  - `MSG-086` after `MSG-083`, `MSG-084`, and `MSG-085`
 
 ## Sequencing Rules
 
