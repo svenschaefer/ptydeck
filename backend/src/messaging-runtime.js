@@ -22,6 +22,14 @@ import {
   renderCustomCommandForSession
 } from "../../frontend/src/public/custom-command-model.js";
 import { normalizeCustomCommandPayloadForShell } from "../../frontend/src/public/terminal-stream.js";
+import {
+  createAppSemanticAdapterDescriptor,
+  createDeliveryAdapterDescriptor,
+  createMessageIntent,
+  createOutputEpisode,
+  createTerminalProjection,
+  createTurn
+} from "./terminal-messaging-core.js";
 
 export const MESSAGING_TRIGGER_PROFILES = Object.freeze(["generic-shell", "coding-agent", "build-test"]);
 const MESSAGING_TRIGGER_PROFILE_SET = new Set(MESSAGING_TRIGGER_PROFILES);
@@ -1208,7 +1216,8 @@ function createEvent({
   deliveryScope = "",
   deliveryBlockKey = "",
   summaryMaxLength = MAX_EVENT_SUMMARY_LENGTH,
-  preserveStructuredSummary = false
+  preserveStructuredSummary = false,
+  messageIntent = null
 }) {
   const normalizedDeliveryScope = normalizeNonEmptyString(deliveryScope);
   const textSummary =
@@ -1235,7 +1244,8 @@ function createEvent({
     deliveryScope: normalizedDeliveryScope,
     deliveryBlockKey: normalizeNonEmptyString(deliveryBlockKey),
     noiseClass: normalizeNonEmptyString(noiseClass),
-    comparableText: normalizedComparableText
+    comparableText: normalizedComparableText,
+    messageIntent
   });
 }
 
@@ -1646,6 +1656,19 @@ export function createMessagingRuntime(options = {}) {
     logDebug
   });
   adapters.push(telegramAdapter);
+  const deliveryAdapterDescriptors = telegramConfigured
+    ? Object.freeze([
+        createDeliveryAdapterDescriptor({
+          adapterId: "telegram",
+          channel: "telegram",
+          capabilities: ["send_message", "edit_message", "thread_topics"],
+          metadata: {
+            allowlistDeliveryActive: telegramAllowlistDeliveryActive,
+            configuredTargets: targetMappings.length
+          }
+        })
+      ])
+    : Object.freeze([]);
 
   const conversationTargetIndex = new Map();
   const ambiguousConversationKeys = new Set();
@@ -1690,6 +1713,180 @@ export function createMessagingRuntime(options = {}) {
         adapter.replaceTopicBindings(normalizedBindings);
       }
     }
+  }
+
+  function buildAppSemanticAdapterDescriptorForSession(session, profile, strategy = "") {
+    const appIdentity = session?.appIdentity || null;
+    const appFamily =
+      normalizeNonEmptyString(appIdentity?.family) ||
+      (isCodingAgentContext(session, profile) ? "coding-agent" : "terminal-app");
+    const appLabel =
+      normalizeNonEmptyString(appIdentity?.label) ||
+      normalizeNonEmptyString(session?.name) ||
+      normalizeNonEmptyString(profile);
+    return createAppSemanticAdapterDescriptor({
+      adapterId: `${appFamily}-semantic-adapter`,
+      appFamily,
+      appLabels: appLabel ? [appLabel] : [],
+      strategy,
+      metadata: {
+        profile,
+        identitySource: normalizeNonEmptyString(appIdentity?.source),
+        identityConfidence: Number.isFinite(appIdentity?.confidence) ? Number(appIdentity.confidence) : 0
+      }
+    });
+  }
+
+  function buildLegacyCodexMessageIntent({
+    session,
+    profile,
+    state,
+    trace,
+    decision,
+    deliveryScope,
+    deliveredText,
+    candidateKey,
+    deliveryBlockKey,
+    maxLength
+  }) {
+    const traceId = normalizeNonEmptyString(trace?.traceId);
+    const projection = createTerminalProjection({
+      projectionId: deliveryBlockKey || candidateKey || traceId || `projection:${session.id}:${nowFn()}`,
+      sessionId: session.id,
+      transport: "pty",
+      representation: "legacy-stream-candidate",
+      sourceRevision: traceId || candidateKey || deliveryBlockKey,
+      appFamily: normalizeNonEmptyString(session?.appIdentity?.family),
+      appLabel: normalizeNonEmptyString(session?.appIdentity?.label),
+      profile,
+      metadata: {
+        deliveryScope,
+        candidateKey,
+        deliveryBlockKey,
+        firstObservedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : 0,
+        lastObservedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : 0
+      }
+    });
+    const semanticAdapter = buildAppSemanticAdapterDescriptorForSession(session, profile, "legacy-codex-allowlist");
+    const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText);
+    if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
+      const replyState = state?.pendingCodexTelegramReply || null;
+      const turn = createTurn({
+        turnId: deliveryBlockKey || candidateKey || normalizeNonEmptyString(replyState?.correlationId) || traceId,
+        sessionId: session.id,
+        triggerKind: "submitted-input",
+        inputSource: normalizeNonEmptyString(replyState?.source) || "legacy-reply-window",
+        correlationId: normalizeNonEmptyString(replyState?.correlationId),
+        traceId: normalizeNonEmptyString(replyState?.traceId) || traceId,
+        openedAt:
+          (Number.isInteger(replyState?.triggeredAt) && replyState.triggeredAt > 0
+            ? replyState.triggeredAt
+            : Number.isInteger(decision?.firstObservedAt) && decision.firstObservedAt > 0
+              ? decision.firstObservedAt
+              : nowFn()),
+        closedAt:
+          (Number.isInteger(decision?.lastObservedAt) && decision.lastObservedAt > 0 ? decision.lastObservedAt : nowFn()),
+        status: "completed",
+        metadata: {
+          replyWindowMs: CODEX_TELEGRAM_REPLY_WINDOW_MS,
+          legacyDeliveryScope: deliveryScope
+        }
+      });
+      return createMessageIntent({
+        intentId: deliveryBlockKey || candidateKey || normalizeNonEmptyString(replyState?.correlationId) || traceId,
+        sessionId: session.id,
+        intentKind: "reply",
+        eventType: "session.output.summary",
+        severity: "info",
+        threadKey: "status",
+        text: deliveredText,
+        format: structuredText ? "structured_text" : "plain_text",
+        comparableText: createComparableText(deliveredText),
+        projection,
+        turn,
+        semanticAdapter,
+        deliveryAdapters: deliveryAdapterDescriptors,
+        routing: {
+          threadKey: "status",
+          priority: "primary"
+        },
+        metadata: {
+          aggregationReason: deliveryScope,
+          legacyDeliveryScope: deliveryScope,
+          summaryMaxLength: maxLength,
+          preserveStructuredSummary: structuredText
+        }
+      });
+    }
+    const outputEpisode = createOutputEpisode({
+      episodeId: deliveryBlockKey || candidateKey || traceId,
+      sessionId: session.id,
+      episodeKind: "autonomous-output",
+      sourceProjectionId: projection.projectionId,
+      startedAt:
+        (Number.isInteger(decision?.firstObservedAt) && decision.firstObservedAt > 0 ? decision.firstObservedAt : nowFn()),
+      completedAt:
+        (Number.isInteger(decision?.lastObservedAt) && decision.lastObservedAt > 0 ? decision.lastObservedAt : nowFn()),
+      status: "completed",
+      metadata: {
+        legacyDeliveryScope: deliveryScope,
+        candidateKey
+      }
+    });
+    return createMessageIntent({
+      intentId: deliveryBlockKey || candidateKey || traceId,
+      sessionId: session.id,
+      intentKind: "autonomous-update",
+      eventType: "session.output.summary",
+      severity: "info",
+      threadKey: "status",
+      text: deliveredText,
+      format: structuredText ? "structured_text" : "plain_text",
+      comparableText: createComparableText(deliveredText),
+      projection,
+      outputEpisode,
+      semanticAdapter,
+      deliveryAdapters: deliveryAdapterDescriptors,
+      routing: {
+        threadKey: "status",
+        priority: "secondary"
+      },
+      metadata: {
+        aggregationReason: deliveryScope,
+        legacyDeliveryScope: deliveryScope,
+        summaryMaxLength: maxLength,
+        preserveStructuredSummary: structuredText
+      }
+    });
+  }
+
+  function createEventFromMessageIntent({ session, profile, trace, intent }) {
+    const summaryMaxLength =
+      Number.isInteger(intent?.metadata?.summaryMaxLength) && intent.metadata.summaryMaxLength > 0
+        ? intent.metadata.summaryMaxLength
+        : MAX_EVENT_SUMMARY_LENGTH;
+    const preserveStructuredSummary =
+      intent?.format === "structured_text" || intent?.metadata?.preserveStructuredSummary === true;
+    return createEvent({
+      session,
+      profile,
+      type: normalizeNonEmptyString(intent?.eventType) || "session.output.summary",
+      summary: intent?.text || "",
+      severity: normalizeNonEmptyString(intent?.severity) || "info",
+      threadKey: normalizeNonEmptyString(intent?.threadKey) || "status",
+      trace,
+      nowFn,
+      aggregationReason: normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
+      deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
+      comparableText: normalizeNonEmptyString(intent?.comparableText) || createComparableText(intent?.text || ""),
+      deliveryBlockKey:
+        normalizeNonEmptyString(intent?.turn?.turnId) ||
+        normalizeNonEmptyString(intent?.outputEpisode?.episodeId) ||
+        normalizeNonEmptyString(intent?.projection?.projectionId),
+      summaryMaxLength,
+      preserveStructuredSummary,
+      messageIntent: intent
+    });
   }
 
   async function upsertTelegramTopicBinding(binding) {
@@ -2349,21 +2546,23 @@ export function createMessagingRuntime(options = {}) {
       return null;
     }
     const target = resolveTarget(session);
-    const event = createEvent({
+    const messageIntent = buildLegacyCodexMessageIntent({
       session,
       profile,
-      type: "session.output.summary",
-      summary: deliveredText,
-      severity: "info",
-      threadKey: "status",
+      state,
       trace,
-      nowFn,
-      aggregationReason: deliveryScope,
+      decision,
       deliveryScope,
+      deliveredText,
+      candidateKey,
       deliveryBlockKey,
-      comparableText: createComparableText(deliveredText),
-      summaryMaxLength: maxLength,
-      preserveStructuredSummary: deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText)
+      maxLength
+    });
+    const event = createEventFromMessageIntent({
+      session,
+      profile,
+      trace,
+      intent: messageIntent
     });
     if (isCommentaryLikeCodexOutboundText(deliveredText, session, profile)) {
       const commentaryDecision = Object.freeze({
@@ -3412,6 +3611,19 @@ export function createMessagingRuntime(options = {}) {
       codexTelegramReplyCorrelation: {
         windowMs: CODEX_TELEGRAM_REPLY_WINDOW_MS,
         activeSessionCount: activeReplySessionCount
+      },
+      terminalMessagingCore: {
+        active: true,
+        bridgeMode: "legacy-candidate-to-message-intent",
+        deliveryAdapters: deliveryAdapterDescriptors.map((descriptor) => descriptor.adapterId),
+        boundaryContracts: [
+          "TerminalProjection",
+          "Turn",
+          "OutputEpisode",
+          "MessageIntent",
+          "DeliveryAdapter",
+          "AppSemanticAdapter"
+        ]
       },
       codexSummaryRestartRecovery: {
         quietPeriodMs: codexSummaryRestartRecoveryQuietMs,

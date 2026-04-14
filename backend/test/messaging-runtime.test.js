@@ -455,6 +455,84 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(codexTelegramReplySameBlockUpdate.reason, "codex_input_reply_block_update");
 });
 
+test("messaging runtime exposes the neutral terminal messaging core bridge while preserving codex allowlist delivery", async () => {
+  const sends = [];
+  let now = 4_500;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 510 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 511 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "terminal-core-bridge-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "terminal-core-bridge-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der Commit ist gepusht. Der finale Repo-Zustand ist sauber.\n",
+    promptBoundaries: [],
+    trace: { traceId: "terminal-core-bridge-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "  Damit der Analyse-Slice sauber abgeschlossen ist.\n",
+    promptBoundaries: [],
+    trace: { traceId: "terminal-core-bridge-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "terminal-core-bridge-4" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /^\[7\] ptydeck: Der Commit ist gepusht\. Der finale Repo-Zustand ist sauber\./u);
+  assert.match(sends[0].text, /Damit der Analyse-Slice sauber abgeschlossen ist\./u);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.active, true);
+  assert.equal(status.terminalMessagingCore.bridgeMode, "legacy-candidate-to-message-intent");
+  assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram"]);
+  assert.deepEqual(status.terminalMessagingCore.boundaryContracts, [
+    "TerminalProjection",
+    "Turn",
+    "OutputEpisode",
+    "MessageIntent",
+    "DeliveryAdapter",
+    "AppSemanticAdapter"
+  ]);
+});
+
 test("messaging runtime emits lifecycle, summary, prompt, control, share, idle, and alert flows through the telegram adapter", async () => {
   const sends = [];
   const edits = [];

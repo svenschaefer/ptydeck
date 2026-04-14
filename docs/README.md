@@ -205,6 +205,18 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/analyze-pty-write-eintr.mjs` to compare current structured `session.input.write` / `messaging.input.write_failed` traces against the installed `node-pty` async write-queue behavior
     - start any future PTY write investigation from the delivered fact that ptydeck now patches each patchable PTY instance locally, retries `EINTR` in a bounded way, and emits structured async `session.input.write` phases (`retry`, `committed`, `failed`) instead of depending only on dependency stderr
 
+### 15. Terminal Messaging Core
+
+- `Terminal Messaging Core Architecture.md`
+  - Role: repository-native architecture note for the delivered neutral messaging core that starts the `v0.4.0-H128` stream-to-message refactor
+  - Status:
+    - active architecture/source note for the first shipped neutral core boundary layer
+    - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
+  - Current interpretation:
+    - use it when reasoning about the neutral boundary contracts (`TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, `AppSemanticAdapter`)
+    - use it to understand the currently shipped bridge where the narrow Codex allowlist still decides candidate worthiness but now routes through neutral `MessageIntent` objects before adapter-facing delivery
+    - start `H128` follow-up work from the documented fact that the neutral contract layer already exists in code; the remaining work is terminal projection, turn/episode orchestration, semantic extraction, and shadow-mode migration
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:

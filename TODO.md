@@ -14,8 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-083` Owner `BE`
-  Define and introduce a transport-neutral and app-neutral terminal messaging core so stream-to-message semantics are no longer modeled as Telegram/Codex-specific heuristics. The core contract must explicitly define `TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, and `AppSemanticAdapter` boundaries so the same runtime can support Telegram, Discord, Slack, and future adapters as delivery surfaces, and Codex, Claude Code CLI, Gemini Code CLI, and future terminal apps as semantic producers without rebuilding the architecture per integration.
 - `MSG-084` Owner `BE`
   Replace the current chunk-first terminal interpretation path with a backend terminal-state projection built on `@xterm/headless` or a documented technically superior equivalent only if implementation evidence proves it is the better fit. Feed the full PTY byte stream into a stable emulated screen/buffer model, expose deterministic baseline, snapshot, bounded scrollback/transcript delta, and diff primitives, and define explicit resource/retention constraints for memory ceiling, scrollback depth, inactive-session handling, and restart persistence so the new core remains predictable under multi-session load.
 - `MSG-085` Owner `BE`
