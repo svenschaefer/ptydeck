@@ -13,12 +13,60 @@ const TELEGRAM_RATE_LIMIT_PATTERN = /\bretry after\s+(\d+)\b/i;
 const MAX_TELEGRAM_INBOUND_TRACE_ENTRIES = 25;
 const MAX_TELEGRAM_INBOUND_PREVIEW_LENGTH = 200;
 const MAX_TELEGRAM_TARGET_TRACE_ENTRIES = 25;
+const MAX_TELEGRAM_EVENT_SUMMARY_LENGTH = 280;
 
 function normalizeNonEmptyString(value) {
   if (typeof value !== "string") {
     return "";
   }
   return value.trim();
+}
+
+function normalizeWhitespace(value) {
+  return normalizeNonEmptyString(String(value || "").replace(/\s+/g, " "));
+}
+
+function normalizeLineBreaks(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+function truncateMiddleNormalizedText(normalized, maxLength) {
+  if (!normalized) {
+    return "";
+  }
+  if (!Number.isInteger(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
+    return normalized;
+  }
+  if (maxLength <= 1) {
+    return "…";
+  }
+  const available = maxLength - 1;
+  const headLength = Math.max(1, Math.ceil(available / 2));
+  const tailLength = Math.max(1, Math.floor(available / 2));
+  const head = normalized.slice(0, headLength).trimEnd();
+  const tail = normalized.slice(normalized.length - tailLength).trimStart();
+  return `${head}…${tail}`;
+}
+
+function truncateStructuredMessageText(value, maxLength = MAX_TELEGRAM_EVENT_SUMMARY_LENGTH) {
+  const normalized = normalizeLineBreaks(value)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return truncateMiddleNormalizedText(normalized, maxLength);
+}
+
+function truncateDisplayText(value, maxLength = MAX_TELEGRAM_EVENT_SUMMARY_LENGTH) {
+  return truncateMiddleNormalizedText(normalizeWhitespace(value), maxLength);
+}
+
+function buildFallbackSessionLabel(session) {
+  const quickIdToken = normalizeNonEmptyString(session?.quickIdToken);
+  const name = normalizeNonEmptyString(session?.name) || normalizeNonEmptyString(session?.shell) || normalizeNonEmptyString(session?.id);
+  return quickIdToken ? `[${quickIdToken}] ${name}` : name;
 }
 
 function normalizeTelegramApiBaseUrl(value) {
@@ -496,6 +544,10 @@ export function createTelegramAdapter(options = {}) {
   }
   const nowFn = typeof options.nowFn === "function" ? options.nowFn : () => Date.now();
   const logDebug = typeof options.logDebug === "function" ? options.logDebug : null;
+  const formatSessionLabel = typeof options.formatSessionLabel === "function" ? options.formatSessionLabel : buildFallbackSessionLabel;
+  const applyMessagePolicy = typeof options.applyMessagePolicy === "function" ? options.applyMessagePolicy : null;
+  const advanceThreadPolicyState =
+    typeof options.advanceThreadPolicyState === "function" ? options.advanceThreadPolicyState : null;
   const configuredTargets = Number.isInteger(options.configuredTargets) && options.configuredTargets >= 0 ? options.configuredTargets : 0;
   const pollTimeoutSeconds = normalizeTelegramPollTimeoutSeconds(options.pollTimeoutSeconds);
   const threadState = new Map();
@@ -673,6 +725,55 @@ export function createTelegramAdapter(options = {}) {
       return true;
     }
     return Boolean(deliveryScope && allowlistDeliveryScopes.includes(deliveryScope));
+  }
+
+  function defaultMessageIntentDecision(event, state) {
+    const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
+    const hasMessage = state?.messageCreated === true || Number.isInteger(state?.messageId);
+    return Object.freeze({
+      action: hasMessage ? "update" : "new",
+      messageKey,
+      reason: "message_intent_default"
+    });
+  }
+
+  function buildEventFromMessageIntent(intent, session, profile, trace) {
+    const summaryMaxLength =
+      Number.isInteger(intent?.metadata?.summaryMaxLength) && intent.metadata.summaryMaxLength > 0
+        ? intent.metadata.summaryMaxLength
+        : MAX_TELEGRAM_EVENT_SUMMARY_LENGTH;
+    const preserveStructuredSummary =
+      intent?.format === "structured_text" || intent?.metadata?.preserveStructuredSummary === true;
+    const summary =
+      preserveStructuredSummary
+        ? truncateStructuredMessageText(intent?.text || "", summaryMaxLength)
+        : truncateDisplayText(intent?.text || "", summaryMaxLength);
+    const label = formatSessionLabel(session);
+    const text = summary ? `${label}: ${summary}` : label;
+    return Object.freeze({
+      id: normalizeNonEmptyString(intent?.intentId) || "",
+      occurredAt: nowFn(),
+      sessionId: normalizeNonEmptyString(intent?.sessionId) || normalizeNonEmptyString(session?.id),
+      session,
+      profile: normalizeNonEmptyString(profile),
+      type: normalizeNonEmptyString(intent?.eventType) || "session.output.summary",
+      severity: normalizeNonEmptyString(intent?.severity) || "info",
+      threadKey: normalizeNonEmptyString(intent?.threadKey) || "status",
+      summary,
+      detail: "",
+      text,
+      trace,
+      aggregationReason:
+        normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
+      deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
+      deliveryBlockKey:
+        normalizeNonEmptyString(intent?.turn?.turnId) ||
+        normalizeNonEmptyString(intent?.outputEpisode?.episodeId) ||
+        normalizeNonEmptyString(intent?.projection?.projectionId),
+      noiseClass: "",
+      comparableText: normalizeNonEmptyString(intent?.comparableText),
+      messageIntent: intent
+    });
   }
 
   function getForumTopicState(target) {
@@ -866,45 +967,27 @@ export function createTelegramAdapter(options = {}) {
     }
   }
 
-  async function handleEvent(event) {
-    if (!configured) {
-      return { delivered: false, skipped: true, reason: "disabled" };
-    }
-    const target = event?.target;
-    if (!target?.chatId) {
-      return { delivered: false, skipped: true, reason: "unmapped" };
-    }
-    const action = String(event?.decision?.action || "");
-    let effectiveTarget = target;
-    let topicBinding = null;
-    try {
-      const resolved = await resolveEffectiveTarget(target);
-      effectiveTarget = resolved.target;
-      topicBinding = resolved.topicBinding || null;
-    } catch (error) {
-      return {
-        delivered: false,
-        skipped: true,
-        reason: "topic_provision_failed",
-        action,
-        error: noteTargetFailure(target, error, { topicAction: action })
-      };
-    }
+  async function deliverPreparedEvent({ event, decision, effectiveTarget, topicBinding = null }) {
+    const action = String(decision?.action || "");
     if (!action || action === "suppress") {
       return {
         delivered: false,
         skipped: true,
         reason: "suppressed",
+        decision,
+        event,
         ...(topicBinding ? { topicBinding } : {}),
         target: effectiveTarget
       };
     }
-    const text = String(event.text || "").trim();
+    const text = String(event?.text || "").trim();
     if (!text) {
       return {
         delivered: false,
         skipped: true,
         reason: "empty",
+        decision,
+        event,
         ...(topicBinding ? { topicBinding } : {}),
         target: effectiveTarget
       };
@@ -915,11 +998,13 @@ export function createTelegramAdapter(options = {}) {
         skipped: true,
         reason: "delivery_disabled",
         action,
+        decision,
+        event,
         ...(topicBinding ? { topicBinding } : {}),
         target: effectiveTarget
       };
     }
-    const state = getThreadState(effectiveTarget, event.decision?.messageKey || event.threadKey || "status");
+    const state = getThreadState(effectiveTarget, decision?.messageKey || event?.threadKey || "status");
     const now = nowFn();
     if (Number.isInteger(metrics.backoffUntil) && now < metrics.backoffUntil) {
       const remainingMs = Math.max(1, metrics.backoffUntil - now);
@@ -928,10 +1013,16 @@ export function createTelegramAdapter(options = {}) {
         skipped: true,
         reason: "backoff_active",
         action,
+        decision,
+        event,
         rateLimited: true,
         retryAfterSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
         recommendedBackoffMs: remainingMs
       };
+    }
+
+    if (typeof advanceThreadPolicyState === "function") {
+      advanceThreadPolicyState(state, event, decision, { delivered: false });
     }
 
     try {
@@ -969,9 +1060,14 @@ export function createTelegramAdapter(options = {}) {
         metrics.updatedTotal += 1;
         metrics.lastDeliveredAt = state.lastUpdatedAt;
         metrics.backoffUntil = null;
+        if (typeof advanceThreadPolicyState === "function") {
+          advanceThreadPolicyState(state, event, decision, { delivered: true });
+        }
         return {
           delivered: true,
           action,
+          decision,
+          event,
           messageId: state.messageId,
           target: effectiveTarget,
           ...(topicBinding ? { topicBinding } : {})
@@ -995,9 +1091,14 @@ export function createTelegramAdapter(options = {}) {
       }
       metrics.lastDeliveredAt = nowFn();
       metrics.backoffUntil = null;
+      if (typeof advanceThreadPolicyState === "function") {
+        advanceThreadPolicyState(state, event, decision, { delivered: true });
+      }
       return {
         delivered: true,
         action,
+        decision,
+        event,
         messageId: Number.isInteger(result?.messageId) ? result.messageId : null,
         target: effectiveTarget,
         ...(topicBinding ? { topicBinding } : {})
@@ -1019,10 +1120,82 @@ export function createTelegramAdapter(options = {}) {
       return {
         delivered: false,
         action,
+        decision,
+        event,
         error: metrics.lastError,
         ...rateLimit
       };
     }
+  }
+
+  async function handleMessageIntent({ target, session, profile = "", trace = null, intent } = {}) {
+    if (!configured) {
+      return { delivered: false, skipped: true, reason: "disabled" };
+    }
+    if (!intent || intent.entityType !== "MessageIntent") {
+      return { delivered: false, skipped: true, reason: "invalid_intent" };
+    }
+    if (!target?.chatId) {
+      return { delivered: false, skipped: true, reason: "unmapped" };
+    }
+    let effectiveTarget = target;
+    let topicBinding = null;
+    try {
+      const resolved = await resolveEffectiveTarget(target);
+      effectiveTarget = resolved.target;
+      topicBinding = resolved.topicBinding || null;
+    } catch (error) {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "topic_provision_failed",
+        error: noteTargetFailure(target, error, { topicAction: normalizeNonEmptyString(intent?.intentKind) }),
+        target: effectiveTarget
+      };
+    }
+    const event = buildEventFromMessageIntent(intent, session, profile, trace);
+    const state = getThreadState(effectiveTarget, event.threadKey);
+    const decision =
+      typeof applyMessagePolicy === "function" ? applyMessagePolicy(event, state) : defaultMessageIntentDecision(event, state);
+    return deliverPreparedEvent({
+      event,
+      decision,
+      effectiveTarget,
+      topicBinding
+    });
+  }
+
+  async function handleEvent(event) {
+    if (!configured) {
+      return { delivered: false, skipped: true, reason: "disabled" };
+    }
+    const target = event?.target;
+    if (!target?.chatId) {
+      return { delivered: false, skipped: true, reason: "unmapped" };
+    }
+    const action = String(event?.decision?.action || "");
+    let effectiveTarget = target;
+    let topicBinding = null;
+    try {
+      const resolved = await resolveEffectiveTarget(target);
+      effectiveTarget = resolved.target;
+      topicBinding = resolved.topicBinding || null;
+    } catch (error) {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: "topic_provision_failed",
+        action,
+        error: noteTargetFailure(target, error, { topicAction: action })
+      };
+    }
+    const decision = event?.decision || { action: "", messageKey: event?.threadKey || "status", reason: "" };
+    return deliverPreparedEvent({
+      event,
+      decision,
+      effectiveTarget,
+      topicBinding
+    });
   }
 
   async function syncCommands(nextCatalog) {
@@ -1337,6 +1510,7 @@ export function createTelegramAdapter(options = {}) {
 
   return {
     ensureTarget,
+    handleMessageIntent,
     handleEvent,
     syncCommands,
     replaceTopicBindings,

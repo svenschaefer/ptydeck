@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createTelegramAdapter, createTelegramTransport, parseTelegramInboundCommand } from "../src/telegram-adapter.js";
+import { applyMessagingMessagePolicy, advanceMessagingThreadPolicyState } from "../src/messaging-runtime.js";
+import {
+  createAppSemanticAdapterDescriptor,
+  createDeliveryAdapterDescriptor,
+  createMessageIntent,
+  createTerminalProjection,
+  createTurn
+} from "../src/terminal-messaging-core.js";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -762,6 +770,213 @@ test("telegram adapter allows codex allowlist delivery through the allowlist whi
     "codex_separator_section",
     "codex_separator_summary_sentence"
   ]);
+});
+
+test("telegram adapter applies thread policy directly on adapter-neutral message intents", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    allowlistDeliveryScopes: ["codex_input_reply"],
+    configuredTargets: 1,
+    nowFn: (() => {
+      let current = 1000;
+      return () => ++current;
+    })(),
+    formatSessionLabel: (session) => `[${session.quickIdToken}] ${session.name}`,
+    applyMessagePolicy: applyMessagingMessagePolicy,
+    advanceThreadPolicyState: advanceMessagingThreadPolicyState,
+    transport: {
+      async sendMessage(payload) {
+        calls.push({ method: "send", payload });
+        return { messageId: calls.length + 10 };
+      },
+      async editMessage(payload) {
+        calls.push({ method: "edit", payload });
+        return { messageId: payload.messageId };
+      }
+    }
+  });
+  const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
+  const projection = createTerminalProjection({
+    projectionId: "proj-1",
+    sessionId: "s1",
+    sourceRevision: "12",
+    appFamily: "coding-agent",
+    appLabel: "codex",
+    profile: "coding-agent"
+  });
+  const turn = createTurn({
+    turnId: "turn-1",
+    sessionId: "s1",
+    correlationId: "corr-1",
+    sourceProjectionId: "proj-1",
+    submittedAt: 1000,
+    inputText: "test"
+  });
+  const semanticAdapter = createAppSemanticAdapterDescriptor({
+    adapterId: "codex-semantic-adapter",
+    appFamily: "coding-agent",
+    appLabels: ["codex"],
+    strategy: "projection"
+  });
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: "telegram",
+    channel: "telegram"
+  });
+  const firstIntent = createMessageIntent({
+    intentId: "intent-1",
+    sessionId: "s1",
+    intentKind: "reply",
+    eventType: "session.output.summary",
+    severity: "info",
+    threadKey: "status",
+    text: "Ok, verstanden",
+    comparableText: "ok verstanden",
+    projection,
+    turn,
+    semanticAdapter,
+    deliveryAdapters: [deliveryAdapter],
+    routing: { threadKey: "status", priority: "primary" },
+    metadata: {
+      aggregationReason: "codex_input_reply",
+      legacyDeliveryScope: "codex_input_reply",
+      summaryMaxLength: 280
+    }
+  });
+  const secondIntent = createMessageIntent({
+    intentId: "intent-2",
+    sessionId: "s1",
+    intentKind: "reply",
+    eventType: "session.output.summary",
+    severity: "info",
+    threadKey: "status",
+    text: "Ok, nochmals verstanden",
+    comparableText: "ok nochmals verstanden",
+    projection,
+    turn,
+    semanticAdapter,
+    deliveryAdapters: [deliveryAdapter],
+    routing: { threadKey: "status", priority: "primary" },
+    metadata: {
+      aggregationReason: "codex_input_reply",
+      legacyDeliveryScope: "codex_input_reply",
+      summaryMaxLength: 280
+    }
+  });
+
+  const created = await adapter.handleMessageIntent({
+    target: { chatId: "-1001" },
+    session,
+    profile: "coding-agent",
+    trace: { traceId: "trace-1" },
+    intent: firstIntent
+  });
+  const updated = await adapter.handleMessageIntent({
+    target: { chatId: "-1001" },
+    session,
+    profile: "coding-agent",
+    trace: { traceId: "trace-2" },
+    intent: secondIntent
+  });
+
+  assert.equal(created.delivered, true);
+  assert.equal(created.decision.action, "new");
+  assert.equal(updated.delivered, true);
+  assert.equal(updated.decision.action, "update");
+  assert.deepEqual(calls.map((entry) => entry.method), ["send", "edit"]);
+  assert.equal(calls[0].payload.text, "[7] ptydeck: Ok, verstanden");
+  assert.equal(calls[1].payload.text, "[7] ptydeck: Ok, nochmals verstanden");
+});
+
+test("telegram adapter applies structured middle truncation when delivering message intents", async () => {
+  const calls = [];
+  const adapter = createTelegramAdapter({
+    configured: true,
+    deliveryEnabled: false,
+    allowlistDeliveryScopes: ["codex_separator_section"],
+    configuredTargets: 1,
+    nowFn: () => 2000,
+    formatSessionLabel: (session) => `[${session.quickIdToken}] ${session.name}`,
+    applyMessagePolicy: applyMessagingMessagePolicy,
+    advanceThreadPolicyState: advanceMessagingThreadPolicyState,
+    transport: {
+      async sendMessage(payload) {
+        calls.push(payload);
+        return { messageId: 33 };
+      },
+      async editMessage(payload) {
+        calls.push(payload);
+        return { messageId: payload.messageId || 33 };
+      }
+    }
+  });
+  const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
+  const projection = createTerminalProjection({
+    projectionId: "proj-2",
+    sessionId: "s1",
+    sourceRevision: "22",
+    appFamily: "coding-agent",
+    appLabel: "codex",
+    profile: "coding-agent"
+  });
+  const semanticAdapter = createAppSemanticAdapterDescriptor({
+    adapterId: "codex-semantic-adapter",
+    appFamily: "coding-agent",
+    appLabels: ["codex"],
+    strategy: "projection"
+  });
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: "telegram",
+    channel: "telegram"
+  });
+  const intent = createMessageIntent({
+    intentId: "intent-3",
+    sessionId: "s1",
+    intentKind: "autonomous-update",
+    eventType: "session.output.summary",
+    severity: "info",
+    threadKey: "status",
+    text: "Heading\n1. first block with useful detail\n2. second block with more useful detail\nFooter closes cleanly",
+    format: "structured_text",
+    comparableText: "heading 1 first block with useful detail 2 second block with more useful detail footer closes cleanly",
+    projection,
+    outputEpisode: {
+      entityType: "OutputEpisode",
+      episodeId: "episode-1",
+      sessionId: "s1",
+      episodeKind: "autonomous-output",
+      sourceProjectionId: "proj-2",
+      startedAt: 2000,
+      completedAt: 2001,
+      status: "completed",
+      metadata: {}
+    },
+    semanticAdapter,
+    deliveryAdapters: [deliveryAdapter],
+    routing: { threadKey: "status", priority: "secondary" },
+    metadata: {
+      aggregationReason: "codex_separator_section",
+      legacyDeliveryScope: "codex_separator_section",
+      summaryMaxLength: 60,
+      preserveStructuredSummary: true
+    }
+  });
+
+  const result = await adapter.handleMessageIntent({
+    target: { chatId: "-1001" },
+    session,
+    profile: "coding-agent",
+    trace: { traceId: "trace-3" },
+    intent
+  });
+
+  assert.equal(result.delivered, true);
+  assert.equal(result.decision.action, "new");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].text, /^\[7\] ptydeck: Heading/u);
+  assert.match(calls[0].text, /…/u);
+  assert.match(calls[0].text, /Footer closes cleanly$/u);
 });
 
 test("telegram adapter rejects channel targets for deck-session provisioning with a clear error", async () => {

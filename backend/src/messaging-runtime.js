@@ -1867,7 +1867,10 @@ export function createMessagingRuntime(options = {}) {
       customCommands: listCustomCommands()
     }),
     nowFn,
-    logDebug
+    logDebug,
+    formatSessionLabel: buildSessionLabel,
+    applyMessagePolicy: applyMessagingMessagePolicy,
+    advanceThreadPolicyState: advanceMessagingThreadPolicyState
   });
   adapters.push(telegramAdapter);
   const deliveryAdapterDescriptors = telegramConfigured
@@ -1970,7 +1973,7 @@ export function createMessagingRuntime(options = {}) {
     trace,
     decision,
     deliveryScope,
-    deliveredText,
+    messageText,
     candidateKey,
     deliveryBlockKey,
     maxLength
@@ -1986,7 +1989,7 @@ export function createMessagingRuntime(options = {}) {
       projectionSource: "legacy-candidate-bridge"
     });
     const semanticAdapter = buildAppSemanticAdapterDescriptorForSession(session, profile, "legacy-codex-allowlist");
-    const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText);
+    const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(messageText);
     if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
       const turn = resolveLegacyMessageIntentTurn(state, session, decision, trace);
       return createMessageIntent({
@@ -2001,9 +2004,9 @@ export function createMessagingRuntime(options = {}) {
         eventType: "session.output.summary",
         severity: "info",
         threadKey: "status",
-        text: deliveredText,
+        text: messageText,
         format: structuredText ? "structured_text" : "plain_text",
-        comparableText: createComparableText(deliveredText),
+        comparableText: createComparableText(messageText),
         projection,
         turn,
         semanticAdapter,
@@ -2028,9 +2031,9 @@ export function createMessagingRuntime(options = {}) {
       eventType: "session.output.summary",
       severity: "info",
       threadKey: "status",
-      text: deliveredText,
+      text: messageText,
       format: structuredText ? "structured_text" : "plain_text",
-      comparableText: createComparableText(deliveredText),
+      comparableText: createComparableText(messageText),
       projection,
       outputEpisode,
       semanticAdapter,
@@ -3355,6 +3358,103 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
+  async function dispatchMessageIntent(session, profile, trace, messageIntent) {
+    if (!messageIntent) {
+      return null;
+    }
+    const target = resolveTarget(session);
+    const fallbackEvent = createEventFromMessageIntent({
+      session,
+      profile,
+      trace,
+      intent: messageIntent
+    });
+    if (!target) {
+      bumpEventMetric(fallbackEvent.profile, fallbackEvent.type, "suppress");
+      recordDispatchTrace(
+        fallbackEvent,
+        {
+          action: "suppress",
+          messageKey: fallbackEvent?.threadKey || "status",
+          reason: "unmapped_target"
+        },
+        null
+      );
+      return null;
+    }
+    rememberSessionForTarget(target, session);
+    let delivered = false;
+    let finalTarget = target;
+    let tracedEvent = fallbackEvent;
+    let finalDecision = null;
+    const deliveryResults = [];
+    for (const adapter of adapters) {
+      const result =
+        typeof adapter.handleMessageIntent === "function"
+          ? await adapter.handleMessageIntent({
+              target,
+              session,
+              profile,
+              trace,
+              intent: messageIntent
+            })
+          : await adapter.handleEvent({
+              ...fallbackEvent,
+              target,
+              decision: {
+                action: "new",
+                messageKey: fallbackEvent?.threadKey || "status",
+                reason: "message_intent_event_fallback"
+              }
+            });
+      if (result?.target?.chatId) {
+        finalTarget = result.target;
+      }
+      if (result?.event) {
+        tracedEvent = result.event;
+      }
+      if (result?.decision && !finalDecision) {
+        finalDecision = result.decision;
+      }
+      if (result?.topicBinding?.chatId && result?.topicBinding?.sessionId && Number.isInteger(result?.topicBinding?.messageThreadId)) {
+        await upsertTelegramTopicBinding(result.topicBinding);
+      }
+      deliveryResults.push({
+        adapter: adapter.getStatus?.().adapter || "adapter",
+        delivered: result?.delivered === true,
+        action: result?.action || result?.decision?.action || "",
+        error: result?.error || "",
+        rateLimited: result?.rateLimited === true,
+        retryAfterSeconds: result?.retryAfterSeconds,
+        recommendedBackoffMs: result?.recommendedBackoffMs
+      });
+      delivered = delivered || result?.delivered === true;
+    }
+    const tracedDecision =
+      finalDecision ||
+      Object.freeze({
+        action: "suppress",
+        messageKey: tracedEvent?.threadKey || "status",
+        reason: "no_delivery_adapter"
+      });
+    bumpEventMetric(tracedEvent.profile, tracedEvent.type, tracedDecision.action);
+    if (delivered) {
+      if (normalizeNonEmptyString(tracedEvent?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
+        const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(tracedEvent, finalTarget);
+        if (ledgerEntry) {
+          await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+        }
+      }
+    }
+    rememberSessionForTarget(finalTarget, session);
+    recordDispatchTrace(tracedEvent, tracedDecision, finalTarget, deliveryResults);
+    return Object.freeze({
+      ...tracedDecision,
+      delivered,
+      delivery: deliveryResults
+    });
+  }
+
   async function dispatchProjectionSemanticIntent(session, profile, state, trace, messageIntent, recordPrimaryCandidate) {
     if (!messageIntent) {
       return null;
@@ -3362,14 +3462,7 @@ export function createMessagingRuntime(options = {}) {
     if (typeof recordPrimaryCandidate === "function") {
       recordPrimaryCandidate(state, messageIntent);
     }
-    return dispatchEvent(
-      createEventFromMessageIntent({
-        session,
-        profile,
-        trace,
-        intent: messageIntent
-      })
-    );
+    return dispatchMessageIntent(session, profile, trace, messageIntent);
   }
 
   async function maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace) {
@@ -3550,11 +3643,7 @@ export function createMessagingRuntime(options = {}) {
         : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
           ? CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH
           : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
-    const normalizedText = truncateDisplayText(decision?.text, maxLength);
-    const deliveredText =
-      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-        ? truncateStructuredMessageText(decision?.text, maxLength)
-        : normalizedText;
+    const messageText = normalizeLineBreaks(String(decision?.text || ""));
     const candidateKey = normalizeNonEmptyString(decision?.key);
     const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
     const lastCandidateKey =
@@ -3565,7 +3654,7 @@ export function createMessagingRuntime(options = {}) {
           : deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE
             ? state.lastCodexTelegramReplyCandidateKey
           : state.lastCodexSeparatorCandidateKey;
-    if (!deliveredText || candidateKey === lastCandidateKey) {
+    if (!messageText || candidateKey === lastCandidateKey) {
       return null;
     }
     const target = resolveTarget(session);
@@ -3576,7 +3665,7 @@ export function createMessagingRuntime(options = {}) {
       trace,
       decision,
       deliveryScope,
-      deliveredText,
+      messageText,
       candidateKey,
       deliveryBlockKey,
       maxLength
@@ -3592,7 +3681,7 @@ export function createMessagingRuntime(options = {}) {
       trace,
       intent: messageIntent
     });
-    if (isCommentaryLikeCodexOutboundText(deliveredText, session, profile)) {
+    if (isCommentaryLikeCodexOutboundText(messageText, session, profile)) {
       const commentaryDecision = Object.freeze({
         action: "suppress",
         messageKey: event.threadKey,
@@ -3640,7 +3729,7 @@ export function createMessagingRuntime(options = {}) {
         delivery: []
       });
     }
-    const dispatchResult = await dispatchEvent(event);
+    const dispatchResult = await dispatchMessageIntent(session, profile, trace, messageIntent);
     if (dispatchResult?.delivered === true) {
       if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
         state.lastCodexSeparatorSectionCandidateKey = candidateKey;

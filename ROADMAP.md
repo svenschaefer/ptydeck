@@ -14,12 +14,9 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - `v0.4.0-H131`
   - `v0.4.0-H132`
   - `v0.4.0-H133`
 - Active scoped tasks:
-  - `MSG-091`
-  - `MSG-092` after `MSG-091`
   - `MSG-093`
   - `MSG-094` after `MSG-093`
   - `MSG-095`
@@ -28,22 +25,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - none currently
 
 ## Queued Wave Order
-- `v0.4.0-H131`
 - `v0.4.0-H132`
 - `v0.4.0-H133`
 
 ## Wave Dependencies
 
-- `v0.4.0-H131`
-  - `MSG-091`
-  - `MSG-092` after `MSG-091`
 - `v0.4.0-H132`
   - `MSG-093`
   - `MSG-094` after `MSG-093`
 - `v0.4.0-H133`
   - `MSG-095`
   - `MSG-096` after `MSG-095`
-  - depends on `v0.4.0-H131`
   - should execute after `v0.4.0-H132` so the second transport proof lands on top of the already-proven multi-app semantic seam
 
 ## Sequencing Rules

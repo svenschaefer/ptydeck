@@ -14,10 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-091` Owner `BE`
-  Refactor Telegram outbound delivery to consume adapter-neutral `MessageIntent` categories end to end instead of the remaining Codex-family-specific delivery shortcuts inside the runtime. Thread routing, new-versus-update reuse, formatting, bounded truncation, and delivery-policy application must live behind the `DeliveryAdapter` seam so Telegram remains the first concrete adapter rather than a special case in the orchestration core.
-- `MSG-092` Owner `QA`
-  Validate Telegram delivery after the `MessageIntent` cutover end to end against the known live behaviors: one primary reply per turn, bounded autonomous multiline delivery, restart recovery, duplicate suppression, reply formatting preservation, and the current hard-break/narrow-allowlist guarantees.
 - `MSG-093` Owner `BE`
   Introduce a second semantic-adapter baseline on top of the new `AppSemanticAdapter` registry so the post-`H128` core is proven to support more than Codex. Ship a generic coding-agent adapter contract plus representative replay-backed adapter coverage for Codex-shaped versus Claude Code CLI / Gemini Code CLI-style transcript differences, keeping the core unchanged while proving future app adapters can plug in through the same semantic boundary.
 - `MSG-094` Owner `QA`
