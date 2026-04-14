@@ -181,6 +181,18 @@ Authoritative repository documents remain:
     - use the companion helper script `scripts/analyze-latest-restart-deliveries.mjs` together with `docs/Codex Latest Restart Delivery Review.md` when you need a per-delivery audit of the newest restart window, including a verdict for every delivered Telegram message and an explicit classification of why each one was or was not sensible
     - use `docs/examples/codex-terminal-dump-*.txt` as tracked operator-visible transcript fixtures for offline analysis of rendered Codex block grammar; they are visual dump references, not implementation-status documents and not raw PTY capture
 
+### 13. Backend Startup vs First Frontend Open
+
+- `Backend Startup vs First Frontend Open Analysis.md`
+  - Role: repository-native analysis note for the 2026-04-14 field case where the backend restarted well before the first frontend visit and the operator later observed terminal churn only when the frontend was opened
+  - Status:
+    - active analytical reference for startup-contract reasoning
+    - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
+  - Current interpretation:
+    - use it when you need to distinguish backend restore/ready completion from frontend-triggered snapshot replay, resize traffic, and other browser-side bootstrap side effects
+    - use the companion helper script `scripts/analyze-startup-timeline.mjs` to reconstruct the latest restore/ready markers and the first frontend bootstrap window from `/tmp/ptydeck-backend-debug.log`
+    - start any future corrective follow-up from the documented fact that backend startup already completed before the first frontend attach; the unresolved remaining detail is only the exact frontend-side source of the observed automatic startup `/input` writes
+
 ## Consolidation Outcome
 
 The imported review notes reduce to these actionable themes:
