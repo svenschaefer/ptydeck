@@ -152,6 +152,10 @@ Those records share stable `traceId`, `requestId`, and `correlationId` metadata 
 
 For delayed-submit messaging input, only the actual submit-bearing phase now opens the bounded `codex_input_reply` window. The pre-submit body write still records input text for later correlation, but it no longer arms reply promotion early.
 
+After `v0.4.0-H123`, that same reply path also snapshots the pre-submit pending line plus the most recent visible PTY lines and rejects a first reply start that merely repeats already-visible residue such as `- worktree clean` or previously visible assistant/footer tail text.
+
+The same `H123` pass also suppresses first-person commentary/progress chatter about repo/docs/runtime inspection work before it can ship through the narrow Codex outbound families, even if those commentary lines appear in the PTY stream during live investigation.
+
 Forum-target validation and topic provisioning now also leave a diagnosable trail through `messaging.target.update` and `targetTrace`, including:
 
 - `chatId`
@@ -177,7 +181,7 @@ node scripts/analyze-codex-stream-blocks.mjs \
 
 The Telegram reference adapter can:
 
-- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger Codex closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover plus echoed operator input before the first real Codex answer line is delivered, and unavoidable Telegram-visible truncation now keeps both the beginning and end of a long Codex message via middle truncation instead of clipping only the tail
+- send four narrow Codex-only outbound families, `codex_input_reply`, `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the summary family now keeps a stable content-based block identity so Telegram backoff retries do not later fan out into duplicate new posts, larger Codex closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured `codex_separator_section` message instead of fragmenting back into short `info` paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover, repeated short-tail residue, and echoed operator input before the first real Codex answer line is delivered, commentary/progress chatter about repo/docs/runtime inspection work is suppressed across the narrow Codex outbound families, and unavoidable Telegram-visible truncation now keeps both the beginning and end of a long Codex message via middle truncation instead of clipping only the tail
 - normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families
 - keep the active outbound families compact through the shipped trigger profiles
 - publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck
@@ -255,7 +259,7 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
     - the runtime assembles the next substantial Codex answer block directly from the PTY line stream instead of waiting for a separator anchor
     - structural planning/meta fragments such as `MSG-063 Owner QA` or `In ROADMAP.md:` are skipped until the first real answer appears
     - observed inline prompt chrome such as `›Explain this codebase ...` is stripped from the first captured answer line before delivery
-    - stale pre-submit PTY carryover, pure input echo, and prompt-echo tails such as `› ok, was machen wir dann jetzt da Find and fix a bug in @filename` are now rejected before the reply block starts, so delayed-submit local or REST flows cannot consume leftover terminal residue as the first Telegram-visible reply
+    - stale pre-submit PTY carryover, repeated short-tail residue such as `- worktree clean`, pure input echo, and prompt-echo tails such as `› ok, was machen wir dann jetzt da Find and fix a bug in @filename` are now rejected before the reply block starts, so delayed-submit local, Telegram, or REST flows cannot consume leftover terminal residue as the first Telegram-visible reply
     - long reply lines are no longer clipped to the generic short summary budget before reply assembly, so a later family-level Telegram cap can still preserve both the beginning and the final end-marker when middle truncation is required
     - later separator-family chatter cannot jump ahead of that first reply while the reply window is still active
   - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination
@@ -273,6 +277,7 @@ The first post-hard-break exception is now delivered as `v0.4.0-H99` and refined
     - multiline closing comments with still-growing continuation text now stay on this section path instead of being emitted first as `codex_separator_info` or being broken apart by transient line-local `attention_required` / `status_update` side signals
     - Telegram-visible section delivery now preserves multiline spacing between headings, lists, and later paragraphs instead of flattening the winning section back into a one-line summary, and if the family cap is still exceeded the visible text is shortened in the middle (`beginning … end`) instead of clipping only the tail
     - explicit section boundaries and window-state gating still reject anti-pattern bullets, prompt/footer markers, diff/output fragments, and overlay-churn windows
+    - first-person commentary/progress chatter about repo/docs/runtime inspection work is suppressed before it can ship as a Telegram-visible section, even if it appears in the PTY stream during live investigation
   - `codex_separator_summary_sentence` now covers the next narrow aggregated case:
     - separator-hint summary flushes may pass only when they collapse to one sentence-like Codex update
     - short stubs such as `committed.` and colon-headed fragments such as `validated target apps:` stay rejected

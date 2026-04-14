@@ -355,6 +355,7 @@ function createPendingCodexTelegramReply() {
     replyPreferred: false,
     inputText: "",
     preInputPendingLine: "",
+    preInputRecentLines: [],
     started: false,
     firstLineAt: 0,
     lastLineAt: 0,
@@ -400,6 +401,10 @@ function stripCodexReplyLinePrefix(value) {
   return stripCodexReplyInlineTail(String(value || "").replace(/^[•*]\s+/u, ""));
 }
 
+function normalizeCodexReplySnapshotLine(value) {
+  return stripCodexReplyInlineTail(normalizeWhitespace(value));
+}
+
 function sanitizeCodexTelegramReplyStartLine(line, replyState) {
   let normalized = normalizeWhitespace(String(line || ""));
   if (!normalized) {
@@ -442,6 +447,39 @@ function sanitizeCodexTelegramReplyStartLine(line, replyState) {
   return normalized;
 }
 
+function buildCodexReplyComparableText(value) {
+  const normalized = normalizeCodexReplySnapshotLine(value);
+  if (!normalized) {
+    return "";
+  }
+  return createComparableText(normalized);
+}
+
+function isLikelyStaleCodexReplyStart(line, replyState) {
+  const startComparableText = buildCodexReplyComparableText(line);
+  if (!startComparableText) {
+    return false;
+  }
+  const snapshots = [
+    buildCodexReplyComparableText(replyState?.preInputPendingLine),
+    ...(Array.isArray(replyState?.preInputRecentLines)
+      ? replyState.preInputRecentLines.map((entry) => buildCodexReplyComparableText(entry))
+      : [])
+  ].filter(Boolean);
+  for (const snapshotText of snapshots) {
+    if (snapshotText === startComparableText) {
+      return true;
+    }
+    if (snapshotText.length <= 64 && startComparableText.startsWith(snapshotText)) {
+      return true;
+    }
+    if (startComparableText.length <= 64 && snapshotText.startsWith(startComparableText)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isCodexTelegramReplyMetaLine(value) {
   const normalized = normalizeWhitespace(value);
   if (!normalized) {
@@ -452,6 +490,30 @@ function isCodexTelegramReplyMetaLine(value) {
     TELEGRAM_REPLY_MD_HEADING_PATTERN.test(normalized) ||
     TELEGRAM_REPLY_STRUCTURAL_META_PATTERN.test(normalized)
   );
+}
+
+const CODING_AGENT_COMMENTARY_LEAD_PATTERN =
+  /^(?:[•*]\s*)?(?:(?:ich|i(?:'m| am|’m)?|i(?:'ll| will)|we(?:'re| are|’re)?|we(?:'ll| will))\s+(?:prüfe|pruefe|ziehe|lese|analysiere|vergleiche|setze|gehe|check(?:ing)?|inspect(?:ing)?|review(?:ing)?|read(?:ing)?|trace(?:ing)?|compare(?:ing)?|analy(?:s|z)e(?:ing)?|implement(?:ing)?|narrow(?:ing)?|pull(?:ing)?|look(?:ing)?|verify(?:ing)?|sync(?:ing)?|push(?:ing)?))\b/iu;
+const CODING_AGENT_COMMENTARY_CONTEXT_PATTERN =
+  /(?:stream(?:-to-message)?-pipeline|reply-assembly|delivery-policy|section-assembly|seams\b|evaluator\b|runtime(?:-klassifikation)?|klassifikation|repo(?:[-/ ](?:prozess)?zustand|\s+state)?|repo-\s*und\s+dokumentationsstand|dokumentationsstand|document(?:ation)?(?:\s+state|\s+stand)?|markdown state|backlog separation|validator(?:en|s)?|worktree\b|drift(?:ed)?\b|logs?\b|capture\b|planungsstand\b|current code(?:base|path)?|todo(?:-outlook)?\.md|roadmap\.md|changelog\.md|codex_context\.md|deployment\.md|main\b)/iu;
+
+function isCommentaryLikeCodexOutboundText(value, session, profile) {
+  if (!isCodingAgentContext(session, profile)) {
+    return false;
+  }
+  const lines = normalizeLineBreaks(value)
+    .split("\n")
+    .map((line) => normalizeWhitespace(line))
+    .filter(Boolean);
+  if (lines.length === 0) {
+    return false;
+  }
+  const headline = lines[0].replace(/^[•*]\s+/u, "");
+  const combined = lines.join(" ");
+  if (!CODING_AGENT_COMMENTARY_LEAD_PATTERN.test(headline) && !CODING_AGENT_COMMENTARY_LEAD_PATTERN.test(combined)) {
+    return false;
+  }
+  return CODING_AGENT_COMMENTARY_CONTEXT_PATTERN.test(combined);
 }
 
 function shouldIgnoreCodexTelegramReplyStart(line, session, profile) {
@@ -469,6 +531,9 @@ function shouldIgnoreCodexTelegramReplyStart(line, session, profile) {
     return true;
   }
   if (isCodexTelegramReplyMetaLine(normalized)) {
+    return true;
+  }
+  if (isCommentaryLikeCodexOutboundText(normalized, session, profile)) {
     return true;
   }
   const noise = classifyNoiseSignature(normalized, session, profile);
@@ -494,6 +559,9 @@ function isCodexTelegramReplyBoundaryLine(line, session, profile) {
     return true;
   }
   if (isCodexTelegramReplyMetaLine(normalized)) {
+    return true;
+  }
+  if (isCommentaryLikeCodexOutboundText(normalized, session, profile)) {
     return true;
   }
   return classifyNoiseSignature(normalized, session, profile).lowInformation;
@@ -1771,6 +1839,7 @@ export function createMessagingRuntime(options = {}) {
         replyPreferred: isReplyPreferredTelegramTrace(trace),
         inputText: carriedInputText,
         preInputPendingLine: normalizeWhitespace(streamState.pendingLine),
+        preInputRecentLines: streamState.recentLines.slice(-MAX_RECENT_LINES),
         started: false,
         firstLineAt: 0,
         lastLineAt: 0,
@@ -2223,6 +2292,9 @@ export function createMessagingRuntime(options = {}) {
     }
     if (!replyState.started) {
       const sanitizedStartLine = sanitizeCodexTelegramReplyStartLine(visibleLine, replyState);
+      if (isLikelyStaleCodexReplyStart(sanitizedStartLine, replyState)) {
+        return false;
+      }
       if (shouldIgnoreCodexTelegramReplyStart(sanitizedStartLine, session, profile)) {
         return false;
       }
@@ -2276,6 +2348,7 @@ export function createMessagingRuntime(options = {}) {
     if (!deliveredText || candidateKey === lastCandidateKey) {
       return null;
     }
+    const target = resolveTarget(session);
     const event = createEvent({
       session,
       profile,
@@ -2292,7 +2365,20 @@ export function createMessagingRuntime(options = {}) {
       summaryMaxLength: maxLength,
       preserveStructuredSummary: deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText)
     });
-    const target = resolveTarget(session);
+    if (isCommentaryLikeCodexOutboundText(deliveredText, session, profile)) {
+      const commentaryDecision = Object.freeze({
+        action: "suppress",
+        messageKey: event.threadKey,
+        reason: "commentary_progress_chatter"
+      });
+      bumpEventMetric(event.profile, event.type, commentaryDecision.action);
+      recordDispatchTrace(event, commentaryDecision, target, []);
+      return Object.freeze({
+        ...commentaryDecision,
+        delivered: false,
+        delivery: []
+      });
+    }
     if (
       deliveryScope !== CODEX_TELEGRAM_REPLY_SCOPE &&
       isCodexTelegramReplyActive(state?.pendingCodexTelegramReply, event.occurredAt)

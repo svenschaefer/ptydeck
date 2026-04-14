@@ -564,7 +564,7 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   await runtime.observeSessionData({
     session,
     data:
-      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-/Prozesszustand,\n" +
+      "• Der Commit ist gepusht. Der finale Repo-/Prozesszustand ist sauber,\n" +
       "  damit der Analyse-Slice sauber abgeschlossen ist.\n",
     promptBoundaries: [],
     trace: { traceId: "h99-3" }
@@ -583,7 +583,7 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
     session,
     data:
       "• Der erste Ad-hoc-Read war ein reiner Shell-Fehler bei node -e.\n" +
-      "  Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n",
+      "  Die Chunks liegen jetzt sauber als ESM aus dem Capture vor.\n",
     promptBoundaries: [],
     trace: { traceId: "h99-5" }
   });
@@ -734,7 +734,7 @@ test("messaging runtime promotes growing separator-anchored closing comments ont
   await runtime.observeSessionData({
     session,
     data:
-      "• Der Scope ist sauber. Ich prüfe jetzt die letzten Validatoren.\n" +
+      "• Der Scope ist sauber. Die letzten Validatoren sind grün.\n" +
       "  Die Docs sind konsistent und der Slice ist fast fertig.\n",
     promptBoundaries: [],
     trace: { traceId: "h115-section-2" }
@@ -753,7 +753,7 @@ test("messaging runtime promotes growing separator-anchored closing comments ont
   });
 
   assert.equal(sends.length, 1);
-  assert.match(sends[0].text, /Der Scope ist sauber\. Ich prüfe jetzt die letzten Validatoren\./);
+  assert.match(sends[0].text, /Der Scope ist sauber\. Die letzten Validatoren sind grün\./);
   assert.match(sends[0].text, /Die Docs sind konsistent und der Slice ist fast fertig\./);
   assert.match(sends[0].text, /Danach pushe ich den finalen Stand\./);
 
@@ -806,7 +806,7 @@ test("messaging runtime still delivers short separator-anchored bullets through 
   await runtime.observeSessionData({
     session,
     data:
-      "• Der Commit ist gepusht. Ich prüfe noch einmal kurz den finalen Repo-Zustand.\n" +
+      "• Der Commit ist gepusht. Der finale Repo-Zustand ist sauber.\n" +
       "  Damit der Analyse-Slice sauber abgeschlossen ist.\n",
     promptBoundaries: [],
     trace: { traceId: "h115-info-2" }
@@ -819,7 +819,7 @@ test("messaging runtime still delivers short separator-anchored bullets through 
   });
 
   assert.equal(sends.length, 1);
-  assert.match(sends[0].text, /Der Commit ist gepusht\. Ich prüfe noch einmal kurz den finalen Repo-Zustand\./);
+  assert.match(sends[0].text, /Der Commit ist gepusht\. Der finale Repo-Zustand ist sauber\./);
   assert.match(sends[0].text, /Damit der Analyse-Slice sauber abgeschlossen ist\./);
 
   const status = runtime.buildStatusSummary();
@@ -1397,6 +1397,148 @@ test("messaging runtime ignores stale carryover and input echo before starting a
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+});
+
+test("messaging runtime ignores repeated stale short tails before starting a telegram reply block", async () => {
+  const sends = [];
+  let now = 12_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 860 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 861 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "telegram-reply-stale-tail-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "- worktree clean\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-tail-1" }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    source: "messaging:telegram",
+    traceId: "telegram-reply-tail-open",
+    correlationId: "msg-telegram-tail-open",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "/docu"
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "- worktree clean\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-tail-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Der aktuelle Status ist sauber.\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-tail-3" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "\n",
+    promptBoundaries: [],
+    trace: { traceId: "telegram-reply-tail-4" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Der aktuelle Status ist sauber\./);
+  assert.doesNotMatch(sends[0].text, /^.*\[7\] ptydeck: - worktree clean$/m);
+  assert.doesNotMatch(sends[0].text, /^\s*-\s*worktree clean\s*$/m);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.comparableText !== "- worktree clean"));
+});
+
+test("messaging runtime suppresses commentary-like codex sections from telegram delivery", async () => {
+  const sends = [];
+  let now = 13_000;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 960 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 961 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "commentary-section-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "commentary-section-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Ich prüfe jetzt die aktuelle Stream-to-message-Pipeline direkt im Code.\n" +
+      "  Ich ziehe jetzt die kritischen Seams noch enger.\n",
+    promptBoundaries: [],
+    trace: { traceId: "commentary-section-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "• Ran git status --short\n",
+    promptBoundaries: [],
+    trace: { traceId: "commentary-section-3" }
+  });
+
+  assert.equal(sends.length, 0);
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "commentary_progress_chatter"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_section_new_block"));
 });
 
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {

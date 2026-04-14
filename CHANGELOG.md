@@ -2,6 +2,12 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-14
+
+- [x] `v0.4.0-H123` is now completed on `main`, closing the next live Telegram reply-integrity gaps by preventing `codex_input_reply` from starting on stale PTY residue and by suppressing commentary/progress chatter before it can become Telegram-visible Codex outbound content.
+- [x] `backend/src/messaging-runtime.js` now snapshots the pre-submit pending line plus the most recent visible PTY lines when a submit-bearing Codex reply window opens, compares the first would-be reply start against that pre-submit snapshot, and rejects repeated stale short tails such as `- worktree clean` or previously visible assistant/footer residue before the first real new post-submit answer line can win `codex_input_reply`. The same runtime path now also treats commentary/progress chatter as an explicit suppression class across the narrow Codex allowlist families: first-person progress updates about repo/docs/runtime inspection work such as `Ich prüfe jetzt die aktuelle Stream-to-message-Pipeline...` or `Ich prüfe nur noch den aktuellen Repo- und Dokumentationsstand gegen main...` no longer ship through `codex_input_reply`, `codex_separator_info`, or `codex_separator_section` even if those lines appear in the PTY stream.
+- [x] Closeout validation for `H123` now directly covers the live 2026-04-14 field failures instead of only earlier abstract reply cases: `backend/test/messaging-runtime.test.js` proves repeated stale short tails are ignored before a Telegram reply starts and that commentary-like Codex sections are suppressed, while `backend/test/runtime.integration.test.js` proves a mapped Telegram custom command can now survive both a repeated stale tail and commentary leakage before delivering only the first fresh reply. The full local quality gate passed with `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, `npm run docs:check`, and `git diff --check`.
+
 ## 2026-04-13
 
 - [x] `v0.4.0-H122` is now completed on `main`, adding deterministic messaging-input write-path observability and correlation while tightening submitted-input reply promotion so Telegram or other submitted inputs no longer open the `codex_input_reply` window on the pre-submit body write.

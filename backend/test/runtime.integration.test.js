@@ -1331,6 +1331,135 @@ test("runtime publishes telegram commands from the canonical surface and execute
   }
 });
 
+test("runtime ignores stale tail and commentary leakage before delivering the first fresh telegram custom-command reply", async () => {
+  const sends = [];
+  const publishedCommands = [];
+  const updateQueue = [];
+  const writeCalls = [];
+  const telegramChat = {
+    id: -100200312,
+    type: "supergroup",
+    title: "ptydeck",
+    username: "ptydeck_group",
+    is_forum: true
+  };
+  let dataHandler = null;
+  const { runtime, baseUrl } = await createStartedRuntime({
+    messagingTelegramBotToken: "telegram-token",
+    messagingTelegramOutboundEnabled: true,
+    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200312", profile: "coding-agent" }],
+    messagingTelegramInboundEnabled: true,
+    messagingTelegramPollTimeoutSeconds: 1,
+    createMessagingTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 270 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 271 };
+        },
+        async setMyCommands(payload) {
+          publishedCommands.push(payload);
+          return true;
+        },
+        async getUpdates() {
+          if (updateQueue.length > 0) {
+            return updateQueue.splice(0, updateQueue.length);
+          }
+          await sleep(10);
+          return [];
+        },
+        async answerCallbackQuery() {
+          return true;
+        }
+      };
+    },
+    createPty() {
+      let exitHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized !== "\r") {
+            if (dataHandler) {
+              dataHandler(normalized);
+            }
+            return;
+          }
+          if (!dataHandler) {
+            return;
+          }
+          dataHandler("- worktree clean\n");
+          dataHandler("• Ich prüfe nur noch den aktuellen Repo- und Dokumentationsstand gegen main.\n");
+          dataHandler("  Wenn nichts gedriftet ist, bleibt es beim gerade gepushten H123-Planungsstand ohne neuen Commit.\n");
+          dataHandler("• Der aktuelle Status ist sauber.\n");
+          dataHandler("Repo state\n");
+          dataHandler("- nothing drifted\n");
+          dataHandler("\n");
+        },
+        resize() {},
+        kill(signal) {
+          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+
+    const putRes = await fetch(`${baseUrl}/custom-commands/docu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "echo DOCU_FROM_TELEGRAM\n" })
+    });
+    assert.equal(putRes.status, 200);
+
+    await waitFor(() => publishedCommands.length >= 1, 2000);
+    dataHandler?.("- worktree clean\n");
+
+    updateQueue.push({
+      update_id: 71,
+      message: {
+        chat: telegramChat,
+        from: { id: 42, username: "sven" },
+        text: "/docu"
+      }
+    });
+
+    await waitFor(() => writeCalls.includes("echo DOCU_FROM_TELEGRAM") && writeCalls.includes("\r"), 2000);
+    await waitFor(() => sends.some((entry) => /Custom command \/docu sent to \[[^\]]+\] ptydeck/.test(entry.text)), 2000);
+    await waitFor(() => sends.some((entry) => /Der aktuelle Status ist sauber\./.test(entry.text)), 2000);
+    await sleep(100);
+
+    const reply = sends.find((entry) => /Der aktuelle Status ist sauber\./.test(entry.text) && !/Custom command \/docu/.test(entry.text));
+    assert.ok(reply);
+    assert.doesNotMatch(reply.text, /Ich prüfe nur noch den aktuellen Repo- und Dokumentationsstand/i);
+    assert.doesNotMatch(reply.text, /\b- worktree clean\b/i);
+
+    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime provisions telegram forum topics per terminal and persists the binding", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
