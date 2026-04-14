@@ -519,10 +519,32 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   assert.match(sends[0].text, /^\[7\] ptydeck: Der Commit ist gepusht\. Der finale Repo-Zustand ist sauber\./u);
   assert.match(sends[0].text, /Damit der Analyse-Slice sauber abgeschlossen ist\./u);
 
+  const snapshot = runtime.captureTerminalProjectionSnapshot(session.id);
+  const baseline = runtime.createTerminalProjectionBaseline(session.id, "after-delivery");
+  const transcriptDelta = runtime.getTerminalProjectionTranscriptDelta(session.id, 0);
+  const diff = runtime.diffTerminalProjectionBaseline(session.id, baseline, { maxLines: 5 });
+
+  assert.equal(snapshot?.entityType, "TerminalProjectionSnapshot");
+  assert.equal(snapshot?.sessionId, session.id);
+  assert.equal(snapshot?.revision > 0, true);
+  assert.equal(snapshot?.activeTailLines.some((line) => line.includes("Der Commit ist gepusht.")), true);
+
+  assert.equal(baseline?.entityType, "TerminalProjectionBaseline");
+  assert.equal(baseline?.label, "after-delivery");
+  assert.equal(transcriptDelta?.entityType, "TerminalProjectionTranscriptDelta");
+  assert.equal(Array.isArray(transcriptDelta?.entries), true);
+  assert.equal(transcriptDelta.entries.length >= 4, true);
+  assert.equal(diff?.entityType, "TerminalProjectionDiff");
+  assert.equal(diff?.fromRevision, baseline.revision);
+  assert.equal(diff?.toRevision, snapshot.revision);
+  assert.equal(diff?.activeTailLines.totalChangedLines, 0);
+
   const status = runtime.buildStatusSummary();
   assert.equal(status.terminalMessagingCore.active, true);
   assert.equal(status.terminalMessagingCore.bridgeMode, "legacy-candidate-to-message-intent");
   assert.deepEqual(status.terminalMessagingCore.deliveryAdapters, ["telegram"]);
+  assert.equal(status.terminalMessagingCore.activeProjectionSessionCount, 1);
+  assert.equal(status.terminalMessagingCore.projectionResourceLimits.cols > 0, true);
   assert.deepEqual(status.terminalMessagingCore.boundaryContracts, [
     "TerminalProjection",
     "Turn",

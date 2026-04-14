@@ -17,6 +17,10 @@ import { normalizeVisibleReplayText, parseReplaySliceSelector } from "./replay-e
 import { buildTelegramCommandCatalog } from "./telegram-command-surface.js";
 import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapter.js";
 import {
+  DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
+  createTerminalProjectionTracker
+} from "./terminal-projection.js";
+import {
   parseCustomCommandInvocation,
   resolveCustomCommandForSession,
   renderCustomCommandForSession
@@ -1073,6 +1077,7 @@ function createSessionStreamState() {
   return {
     pendingLine: "",
     recentLines: [],
+    terminalProjection: null,
     pendingSummaryBlock: createPendingSummaryBlock(),
     pendingCodexTelegramReply: createPendingCodexTelegramReply(),
     lastObservedInputText: "",
@@ -1750,22 +1755,14 @@ export function createMessagingRuntime(options = {}) {
     maxLength
   }) {
     const traceId = normalizeNonEmptyString(trace?.traceId);
-    const projection = createTerminalProjection({
-      projectionId: deliveryBlockKey || candidateKey || traceId || `projection:${session.id}:${nowFn()}`,
-      sessionId: session.id,
-      transport: "pty",
-      representation: "legacy-stream-candidate",
-      sourceRevision: traceId || candidateKey || deliveryBlockKey,
-      appFamily: normalizeNonEmptyString(session?.appIdentity?.family),
-      appLabel: normalizeNonEmptyString(session?.appIdentity?.label),
-      profile,
-      metadata: {
-        deliveryScope,
-        candidateKey,
-        deliveryBlockKey,
-        firstObservedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : 0,
-        lastObservedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : 0
-      }
+    const projection = buildMessageIntentProjection(state, session, profile, {
+      deliveryScope,
+      candidateKey,
+      deliveryBlockKey,
+      firstObservedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : 0,
+      lastObservedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : 0,
+      traceId,
+      projectionSource: "legacy-candidate-bridge"
     });
     const semanticAdapter = buildAppSemanticAdapterDescriptorForSession(session, profile, "legacy-codex-allowlist");
     const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(deliveredText);
@@ -2170,6 +2167,49 @@ export function createMessagingRuntime(options = {}) {
     return state;
   }
 
+  function getSessionGeometry(session) {
+    return Object.freeze({
+      cols: Number.isInteger(session?.cols) && session.cols > 0 ? session.cols : 80,
+      rows: Number.isInteger(session?.rows) && session.rows > 0 ? session.rows : 24
+    });
+  }
+
+  function ensureTerminalProjection(state, session) {
+    if (state?.terminalProjection) {
+      return state.terminalProjection;
+    }
+    const geometry = getSessionGeometry(session);
+    state.terminalProjection = createTerminalProjectionTracker({
+      sessionId: normalizeNonEmptyString(session?.id),
+      resourceLimits: {
+        ...DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
+        cols: geometry.cols,
+        rows: geometry.rows
+      }
+    });
+    return state.terminalProjection;
+  }
+
+  function captureTerminalProjectionSnapshot(sessionId) {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    return state?.terminalProjection?.captureSnapshot() || null;
+  }
+
+  function createTerminalProjectionBaselineForSession(sessionId, label = "") {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    return state?.terminalProjection?.createBaseline(label) || null;
+  }
+
+  function getTerminalProjectionTranscriptDelta(sessionId, sinceRevision = 0) {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    return state?.terminalProjection?.getTranscriptDelta(sinceRevision) || null;
+  }
+
+  function diffTerminalProjectionBaselineForSession(sessionId, baseline, options = {}) {
+    const state = sessionStates.get(normalizeNonEmptyString(sessionId));
+    return state?.terminalProjection?.diffFromBaseline(baseline, options) || null;
+  }
+
   async function ensureSessionTargetInternal(session, trace, resolvedTarget = null) {
     const target = resolvedTarget || resolveTarget(session);
     if (!target) {
@@ -2514,6 +2554,27 @@ export function createMessagingRuntime(options = {}) {
       await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
     }
     return true;
+  }
+
+  function buildMessageIntentProjection(state, session, profile, metadata = {}) {
+    const snapshot = state?.terminalProjection?.captureSnapshot() || null;
+    return createTerminalProjection({
+      sessionId: session.id,
+      projectionId:
+        (snapshot ? `projection:${session.id}:${snapshot.revision}` : "") || `projection:${session.id}:${nowFn()}`,
+      transport: "pty",
+      representation: snapshot ? "screen-buffer" : "legacy-stream-candidate",
+      sourceRevision: snapshot ? String(snapshot.revision) : "",
+      appFamily: normalizeNonEmptyString(session?.appIdentity?.family),
+      appLabel: normalizeNonEmptyString(session?.appIdentity?.label),
+      profile,
+      metadata: {
+        activeBufferType: snapshot?.activeBufferType || "",
+        cols: Number.isInteger(snapshot?.cols) ? snapshot.cols : 0,
+        rows: Number.isInteger(snapshot?.rows) ? snapshot.rows : 0,
+        ...metadata
+      }
+    });
   }
 
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
@@ -2935,6 +2996,7 @@ export function createMessagingRuntime(options = {}) {
       state.lastLifecycleType = type;
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_exit");
+      state.terminalProjection = null;
       return dispatchEvent(
         createEvent({
           session,
@@ -2958,6 +3020,7 @@ export function createMessagingRuntime(options = {}) {
       state.lastLifecycleType = type;
       await advanceCodexAllowlistCandidate(session, profile, state, trace, null, { flush: true });
       await flushPendingSummaryBlock(session, profile, state, trace, "lifecycle_closed");
+      state.terminalProjection = null;
       return dispatchEvent(
         createEvent({
           session,
@@ -2980,6 +3043,7 @@ export function createMessagingRuntime(options = {}) {
     }
     const profile = resolveMessagingTriggerProfile(session, target);
     const state = getOrCreateSessionState(session.id);
+    const terminalProjection = ensureTerminalProjection(state, session);
     const chunk = typeof data === "string" ? data : String(data ?? "");
     const normalizedPromptBoundaries = Array.from(
       new Set(
@@ -2988,6 +3052,15 @@ export function createMessagingRuntime(options = {}) {
           .filter((entry) => entry !== null)
       )
     ).sort((left, right) => left - right);
+    if (chunk || normalizedPromptBoundaries.length > 0) {
+      const geometry = getSessionGeometry(session);
+      await terminalProjection.observeData(chunk, {
+        observedAt: nowFn(),
+        promptBoundaries: normalizedPromptBoundaries,
+        cols: geometry.cols,
+        rows: geometry.rows
+      });
+    }
     async function dispatchPromptReady() {
       await maybeDispatchPendingCodexTelegramReply(session, profile, state, trace);
       await flushPendingSummaryBlock(session, profile, state, trace, "prompt_boundary");
@@ -3602,6 +3675,7 @@ export function createMessagingRuntime(options = {}) {
   function buildStatusSummary() {
     const recoveringSessionCount = Array.from(codexSummaryRestartRecoveryStates.values()).filter((entry) => entry?.active).length;
     const activeReplySessionCount = Array.from(sessionStates.values()).filter((entry) => isCodexTelegramReplyActive(entry?.pendingCodexTelegramReply, nowFn())).length;
+    const activeProjectionSessionCount = Array.from(sessionStates.values()).filter((entry) => entry?.terminalProjection).length;
     return {
       enabled: telegramConfigured,
       deliveryEnabled: telegramOutboundEnabled,
@@ -3616,6 +3690,8 @@ export function createMessagingRuntime(options = {}) {
         active: true,
         bridgeMode: "legacy-candidate-to-message-intent",
         deliveryAdapters: deliveryAdapterDescriptors.map((descriptor) => descriptor.adapterId),
+        activeProjectionSessionCount,
+        projectionResourceLimits: DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
         boundaryContracts: [
           "TerminalProjection",
           "Turn",
@@ -3692,6 +3768,10 @@ export function createMessagingRuntime(options = {}) {
     observeSessionData,
     observeSessionIdle,
     observeShareChange,
+    captureTerminalProjectionSnapshot,
+    createTerminalProjectionBaseline: createTerminalProjectionBaselineForSession,
+    getTerminalProjectionTranscriptDelta,
+    diffTerminalProjectionBaseline: diffTerminalProjectionBaselineForSession,
     buildStatusSummary,
     renderMetricLines
   };

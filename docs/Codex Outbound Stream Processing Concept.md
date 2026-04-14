@@ -4,9 +4,9 @@ Last updated: 2026-04-14
 
 ## Current Status Note
 
-The transport-neutral/app-neutral contract layer planned for `v0.4.0-H128` is now partially delivered through `backend/src/terminal-messaging-core.js` and the first `MessageIntent` bridge in `backend/src/messaging-runtime.js`.
+The transport-neutral/app-neutral contract layer planned for `v0.4.0-H128` is now partially delivered through `backend/src/terminal-messaging-core.js`, the first `MessageIntent` bridge in `backend/src/messaging-runtime.js`, and the first shipped backend terminal projection in `backend/src/terminal-projection.js`.
 
-That means this concept note is no longer the place to define the neutral core contracts themselves. Its remaining value is the Codex-specific problem framing that explains why the old chunk-first model must be replaced by terminal projection, turn/output-episode orchestration, and stable semantic extraction.
+That means this concept note is no longer the place to define the neutral core contracts themselves. Its remaining value is the Codex-specific problem framing that explains why the old chunk-first model must be replaced by a real terminal projection, turn/output-episode orchestration, and stable semantic extraction.
 
 For the shipped neutral core boundary layer, use `docs/Terminal Messaging Core Architecture.md` as the canonical repository-native reference.
 

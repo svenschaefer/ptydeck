@@ -14,8 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-084` Owner `BE`
-  Replace the current chunk-first terminal interpretation path with a backend terminal-state projection built on `@xterm/headless` or a documented technically superior equivalent only if implementation evidence proves it is the better fit. Feed the full PTY byte stream into a stable emulated screen/buffer model, expose deterministic baseline, snapshot, bounded scrollback/transcript delta, and diff primitives, and define explicit resource/retention constraints for memory ceiling, scrollback depth, inactive-session handling, and restart persistence so the new core remains predictable under multi-session load.
 - `MSG-085` Owner `BE`
   Introduce turn-first and episode-first orchestration on top of the terminal-state projection so submit-bearing input opens a bounded `Turn` with a pre-turn baseline snapshot, stable completion on `session.activity.completed` plus a quiet window, and exactly one primary reply candidate by default, while autonomous output is modeled explicitly as `OutputEpisode` instead of being left to legacy separator heuristics. Message extraction must consume both turn-final stable screen diffs and bounded transcript/scrollback deltas so transient but relevant output is not lost, and input echo, prompt/footer chrome, working overlays, redraw churn, and stale pre-turn residue are treated as transport noise rather than direct message candidates.
 - `MSG-086` Owner `BE`
