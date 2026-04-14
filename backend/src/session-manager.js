@@ -5,6 +5,11 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./errors.js";
+import {
+  attachNodePtyAsyncWritePatch,
+  clearNodePtyAsyncWriteMeta,
+  queueNodePtyAsyncWriteMeta
+} from "./node-pty-write-retry.js";
 import { buildReplayExcerpt, parseReplaySliceSelector } from "./replay-excerpt.js";
 import { normalizeSessionInputSafetyProfile } from "./session-input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "./session-mouse-forwarding.js";
@@ -599,7 +604,8 @@ export class SessionManager {
     createTraceId = randomUUID,
     inspectTerminalForegroundProcess,
     foregroundProcessRefreshDelayMs = DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS,
-    captureSessionStreamChunk
+    captureSessionStreamChunk,
+    nodePtyAsyncWriteOptions
   } = {}) {
     this.defaultShell = defaultShell;
     this.sessions = new Map();
@@ -647,6 +653,10 @@ export class SessionManager {
         : DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS;
     this.captureSessionStreamChunk =
       typeof captureSessionStreamChunk === "function" ? captureSessionStreamChunk : null;
+    this.nodePtyAsyncWriteOptions =
+      nodePtyAsyncWriteOptions && typeof nodePtyAsyncWriteOptions === "object" && !Array.isArray(nodePtyAsyncWriteOptions)
+        ? { ...nodePtyAsyncWriteOptions }
+        : {};
     this.createPty =
       createPty ||
       (({ command, shell, args = [], cwd, cols, rows, env }) =>
@@ -873,6 +883,12 @@ export class SessionManager {
     this.scheduleSessionForegroundProcessIdentityRefresh(session, {
       delayMs: this.foregroundProcessRefreshDelayMs
     });
+    attachNodePtyAsyncWritePatch(ptyProcess, {
+      ...this.nodePtyAsyncWriteOptions,
+      onAsyncWriteEvent: (event) => {
+        this.handleAsyncPtyWriteEvent(session, event);
+      }
+    });
     ptyProcess.onData((data) => {
       let timestamp = null;
       let trace = null;
@@ -991,6 +1007,30 @@ export class SessionManager {
     if (launchSpec.postStartInput) {
       ptyProcess.write(launchSpec.postStartInput);
     }
+  }
+
+  handleAsyncPtyWriteEvent(session, event = {}) {
+    if (!session) {
+      return;
+    }
+    const trace = createTraceEnvelope(this.createTraceId, event.trace || session.traceSeed, {
+      sessionId: session.id,
+      source: event.trace?.source || session.traceSeed?.source || "pty"
+    });
+    this.events.emit("session.input.write", {
+      sessionId: session.id,
+      phase: typeof event.phase === "string" && event.phase ? event.phase : "failed",
+      writeKind: typeof event.writeKind === "string" && event.writeKind ? event.writeKind : "direct",
+      bytes: Number.isInteger(event.bytes) ? event.bytes : 0,
+      ...(event.error ? { error: event.error } : {}),
+      ...(typeof event.code === "string" && event.code ? { code: event.code } : {}),
+      ...(typeof event.failureStage === "string" && event.failureStage ? { failureStage: event.failureStage } : {}),
+      ...(Number.isInteger(event.retryCount) ? { retryCount: event.retryCount } : {}),
+      ...(Number.isInteger(event.queueDroppedCount) ? { queueDroppedCount: event.queueDroppedCount } : {}),
+      ...(event.droppedByQueueFailure === true ? { droppedByQueueFailure: true } : {}),
+      ...(event.retryable === true ? { retryable: true } : {}),
+      trace
+    });
   }
 
   buildReconnectUnavailableError(session) {
@@ -1812,9 +1852,16 @@ export class SessionManager {
       bytes,
       trace: eventTrace
     });
+    queueNodePtyAsyncWriteMeta(session.ptyProcess, {
+      sessionId,
+      writeKind,
+      bytes,
+      trace: eventTrace
+    });
     try {
       session.ptyProcess.write(data);
     } catch (error) {
+      clearNodePtyAsyncWriteMeta(session.ptyProcess);
       this.events.emit("session.input.write", {
         sessionId,
         phase: "failed",

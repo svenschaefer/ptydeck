@@ -198,12 +198,12 @@ Authoritative repository documents remain:
 - `PTY EINTR Write Error Analysis.md`
   - Role: repository-native analysis note for the recurring local-development `Unhandled pty write error [Error: EINTR: interrupted system call, write]` console messages
   - Status:
-    - active analytical reference for the `v0.4.0-H126` closeout and its corrective follow-up
+    - active analytical reference for the `v0.4.0-H126` closeout and the delivered `v0.4.0-H129` corrective runtime path
     - not a delivery-status document and not a substitute for `TODO.md` / `ROADMAP.md`
   - Current interpretation:
     - use it when reasoning about whether PTY write interruptions are only noisy logging or a real queue-loss condition
     - use the companion helper script `scripts/analyze-pty-write-eintr.mjs` to compare current structured `session.input.write` / `messaging.input.write_failed` traces against the installed `node-pty` async write-queue behavior
-    - start any corrective follow-up from the documented fact that the currently installed `node-pty` path retries `EAGAIN` but not `EINTR`, clears the remaining async write queue on unexpected errors, and therefore sits outside ptydeck's current structured write-failure contract
+    - start any future PTY write investigation from the delivered fact that ptydeck now patches each patchable PTY instance locally, retries `EINTR` in a bounded way, and emits structured async `session.input.write` phases (`retry`, `committed`, `failed`) instead of depending only on dependency stderr
 
 ## Consolidation Outcome
 

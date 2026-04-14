@@ -2589,7 +2589,13 @@ export function createRuntime(config) {
     remoteReconnectStableMs: config.remoteReconnectStableMs,
     sshKnownHostsPath,
     createTraceId: () => createTraceId("mgr"),
-    captureSessionStreamChunk: (event) => sessionStreamAnalysisCapture.captureChunk(event)
+    captureSessionStreamChunk: (event) => sessionStreamAnalysisCapture.captureChunk(event),
+    nodePtyAsyncWriteOptions:
+      config.nodePtyAsyncWriteOptions &&
+      typeof config.nodePtyAsyncWriteOptions === "object" &&
+      !Array.isArray(config.nodePtyAsyncWriteOptions)
+        ? config.nodePtyAsyncWriteOptions
+        : undefined
   });
   const persistence = new JsonPersistence(config.dataPath, {
     encryptionProvider: config.dataEncryptionProvider || null
@@ -6138,7 +6144,13 @@ function tryCreateRestoredSession({
         phase: event.phase || "",
         writeKind: event.writeKind || "",
         bytes: Number.isInteger(event.bytes) ? event.bytes : 0,
-        ...(event.error ? { error: event.error } : {})
+        ...(event.error ? { error: event.error } : {}),
+        ...(typeof event.code === "string" && event.code ? { code: event.code } : {}),
+        ...(typeof event.failureStage === "string" && event.failureStage ? { failureStage: event.failureStage } : {}),
+        ...(Number.isInteger(event.retryCount) ? { retryCount: event.retryCount } : {}),
+        ...(Number.isInteger(event.queueDroppedCount) ? { queueDroppedCount: event.queueDroppedCount } : {}),
+        ...(event.droppedByQueueFailure === true ? { droppedByQueueFailure: true } : {}),
+        ...(event.retryable === true ? { retryable: true } : {})
       },
       event.trace
     );

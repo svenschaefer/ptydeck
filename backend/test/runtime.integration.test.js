@@ -81,6 +81,57 @@ function createDelayedBootPtyFactory({ bootChunk = "BOOT\n", bootDelayMs = 20 } 
   };
 }
 
+function createPatchableAsyncWritePtyFactory({ interruptOnce = true } = {}) {
+  let interrupted = false;
+  const fsWrite = (fd, buffer, offset, callback) => {
+    if (interruptOnce && !interrupted) {
+      interrupted = true;
+      setImmediate(() => callback(Object.assign(new Error("interrupted"), { code: "EINTR" }), 0));
+      return;
+    }
+    setImmediate(() => callback(null, buffer.byteLength - offset));
+  };
+  return {
+    fsWrite,
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        pid: 4001,
+        _pty: "/dev/pts/test",
+        _writeStream: {
+          _fd: 11,
+          _encoding: "utf8",
+          _writeQueue: [],
+          _writeImmediate: undefined,
+          dispose() {}
+        },
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+        },
+        _write(data) {
+          this._writeStream.write(data);
+          if (dataHandler) {
+            dataHandler(String(data));
+          }
+        },
+        write(data) {
+          this._write(data);
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  };
+}
+
 async function createStartedRuntime(overrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const runtime = createRuntime({
@@ -1326,6 +1377,55 @@ test("runtime publishes telegram commands from the canonical surface and execute
     assert.equal(health.messaging.adapters[0].publishedCommandCount >= 2, true);
     assert.equal(health.messaging.adapters[0].lastCommandSyncError, "");
     assert.equal(created.id.length > 0, true);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime logs structured async PTY retry and commit events after EINTR", async () => {
+  const debugLogDir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-debug-"));
+  const debugLogFile = join(debugLogDir, "backend-debug.log");
+  const patchablePty = createPatchableAsyncWritePtyFactory();
+  const { runtime, baseUrl } = await createStartedRuntime({
+    createPty: patchablePty.createPty,
+    debugLogs: true,
+    debugLogFile,
+    nodePtyAsyncWriteOptions: {
+      fsWrite: patchablePty.fsWrite,
+      maxEintrRetries: 2
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: "echo REST_OK\r" })
+    });
+    assert.equal(inputRes.status, 204);
+
+    await waitFor(async () => {
+      try {
+        const contents = await readFile(debugLogFile, "utf8");
+        return contents.includes('"phase":"retry"') && contents.includes('"phase":"committed"');
+      } catch {
+        return false;
+      }
+    }, 2000);
+
+    const debugContents = await readFile(debugLogFile, "utf8");
+    assert.match(debugContents, /session\.input\.write .*"phase":"attempt".*"writeKind":"direct"/);
+    assert.match(debugContents, /session\.input\.write .*"phase":"ok".*"writeKind":"direct"/);
+    assert.match(debugContents, /session\.input\.write .*"phase":"retry".*"code":"EINTR".*"failureStage":"async".*"retryable":true/);
+    assert.match(debugContents, /session\.input\.write .*"phase":"committed".*"failureStage":"async".*"retryCount":1/);
   } finally {
     await runtime.stop();
   }

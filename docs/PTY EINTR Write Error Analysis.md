@@ -166,3 +166,31 @@ The conclusion is explicit:
 - it is currently a retryable interruption that `node-pty` treats as an unexpected fatal async write error
 - the remaining write queue can therefore be dropped silently from ptydeck's perspective
 - a corrective implementation follow-up is required
+
+## Delivered Corrective Follow-up
+
+`v0.4.0-H129` is now delivered on `main`.
+
+The shipped correction does not modify `node_modules` in place and does not globally monkeypatch `fs.write(...)`.
+Instead, ptydeck now patches each patchable Unix `node-pty` PTY instance at attach time through
+`backend/src/node-pty-write-retry.js`.
+
+Delivered behavior:
+
+- `EINTR` is now treated as a bounded retryable async PTY write interruption
+- queued write data remains intact across those retry attempts
+- structured `session.input.write` async phases now exist for:
+  - `retry`
+  - `committed`
+  - `failed`
+- runtime debug logs now include async write details such as:
+  - `code`
+  - `failureStage`
+  - `retryCount`
+  - queue-drop markers when a non-retryable/exhausted async failure clears queued writes
+
+That means the old blind spot is closed at the ptydeck runtime layer:
+
+- retryable PTY interruptions no longer depend on dependency stderr alone
+- async PTY write success/failure is now visible through ptydeck-owned structured events
+- queue drop on `EINTR` is no longer the shipped default behavior

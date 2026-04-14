@@ -14,10 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- `MSG-089` Owner `BE`
-  Correct the unsafe PTY `EINTR` write path identified in `v0.4.0-H126`. Replace the current async queue-drop behavior inherited from the installed `node-pty` write queue with bounded retry handling for retryable PTY write interruptions such as `EINTR`, keep queued write data intact across retryable interruptions, and surface a structured ptydeck runtime failure only if retry exhaustion or a genuinely non-retryable async PTY write error occurs.
-- `MSG-090` Owner `QA`
-  Validate the PTY `EINTR` corrective wave end to end: prove retryable async PTY write interruptions no longer clear queued session input silently, prove the new path is observable through ptydeck-owned structured events instead of dependency stderr only, and prove normal direct/body/submit PTY writes still complete correctly under development-mode and mapped-messaging input flows.
 - `MSG-083` Owner `BE`
   Define and introduce a transport-neutral and app-neutral terminal messaging core so stream-to-message semantics are no longer modeled as Telegram/Codex-specific heuristics. The core contract must explicitly define `TerminalProjection`, `Turn`, `OutputEpisode`, `MessageIntent`, `DeliveryAdapter`, and `AppSemanticAdapter` boundaries so the same runtime can support Telegram, Discord, Slack, and future adapters as delivery surfaces, and Codex, Claude Code CLI, Gemini Code CLI, and future terminal apps as semantic producers without rebuilding the architecture per integration.
 - `MSG-084` Owner `BE`

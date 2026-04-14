@@ -53,6 +53,53 @@ function createFakePty({ pid = 4001, ptyPath = "/dev/pts/test" } = {}) {
   };
 }
 
+function createPatchableAsyncWritePty({ pid = 4001, ptyPath = "/dev/pts/test" } = {}) {
+  let lastExitHandler = null;
+  let lastDataHandler = null;
+
+  return {
+    pid,
+    _pty: ptyPath,
+    _writeStream: {
+      _fd: 11,
+      _encoding: "utf8",
+      _writeQueue: [],
+      _writeImmediate: undefined,
+      dispose() {}
+    },
+    writes: [],
+    resizeCalls: [],
+    killSignals: [],
+    killed: false,
+    onExit(handler) {
+      lastExitHandler = handler;
+    },
+    onData(handler) {
+      lastDataHandler = handler;
+    },
+    _write(data) {
+      this.writes.push(data);
+      this._writeStream.write(data);
+      if (lastDataHandler) {
+        lastDataHandler(String(data));
+      }
+    },
+    write(data) {
+      this._write(data);
+    },
+    resize(cols, rows) {
+      this.resizeCalls.push({ cols, rows });
+    },
+    kill(signal) {
+      this.killSignals.push(signal || "SIGHUP");
+      this.killed = true;
+      if (lastExitHandler) {
+        lastExitHandler({ exitCode: 0, signal: 0 });
+      }
+    }
+  };
+}
+
 function createQueuedFakePtyFactory() {
   const ptys = [];
   return {
@@ -229,6 +276,85 @@ test("SessionManager emits input write failed events when the PTY write throws",
   assert.equal(events[1].trace.correlationId, "msg-telegram-100");
   assert.equal(events[1].trace.requestId, "msg-2");
   assert.match(events[1].error, /PTY write failed\./);
+});
+
+test("SessionManager emits async retry and committed write events for retryable PTY interruptions", async () => {
+  const fakePty = createPatchableAsyncWritePty();
+  let interrupted = false;
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nodePtyAsyncWriteOptions: {
+      maxEintrRetries: 2,
+      fsWrite(fd, buffer, offset, callback) {
+        if (!interrupted) {
+          interrupted = true;
+          setImmediate(() => callback(Object.assign(new Error("interrupted"), { code: "EINTR" }), 0));
+          return;
+        }
+        setImmediate(() => callback(null, buffer.byteLength - offset));
+      }
+    }
+  });
+  const created = manager.create({ cwd: "/tmp", shell: "bash" });
+  const events = [];
+  manager.on("session.input.write", (event) => events.push(event));
+
+  manager.sendInput(created.id, "pwd\r", {
+    writeKind: "submit_cr",
+    trace: {
+      traceId: "msg-3",
+      correlationId: "msg-telegram-101",
+      requestId: "msg-3",
+      source: "messaging:telegram"
+    }
+  });
+
+  await waitFor(() => events.some((event) => event.phase === "committed"), 500);
+
+  assert.deepEqual(
+    events.map((event) => ({
+      phase: event.phase,
+      writeKind: event.writeKind,
+      code: event.code || "",
+      failureStage: event.failureStage || "",
+      retryCount: event.retryCount || 0,
+      correlationId: event.trace.correlationId
+    })),
+    [
+      {
+        phase: "attempt",
+        writeKind: "submit_cr",
+        code: "",
+        failureStage: "",
+        retryCount: 0,
+        correlationId: "msg-telegram-101"
+      },
+      {
+        phase: "ok",
+        writeKind: "submit_cr",
+        code: "",
+        failureStage: "",
+        retryCount: 0,
+        correlationId: "msg-telegram-101"
+      },
+      {
+        phase: "retry",
+        writeKind: "submit_cr",
+        code: "EINTR",
+        failureStage: "async",
+        retryCount: 1,
+        correlationId: "msg-telegram-101"
+      },
+      {
+        phase: "committed",
+        writeKind: "submit_cr",
+        code: "",
+        failureStage: "async",
+        retryCount: 1,
+        correlationId: "msg-telegram-101"
+      }
+    ]
+  );
 });
 
 test("SessionManager refreshes explicit app identity when startup hints change", () => {
