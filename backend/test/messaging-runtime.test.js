@@ -977,6 +977,7 @@ test("messaging runtime cancels quiet-boundary finalization when activity resume
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -1145,6 +1146,20 @@ test("messaging runtime records projection-primary shadow comparisons for short 
   );
 });
 
+test("messaging runtime defaults semantic primary mode back to legacy while keeping projection in shadow", () => {
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }]
+  });
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.primaryMode, "legacy");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.shadowModeEnabled, true);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.shadowTargetMode, "projection");
+});
+
 test("messaging runtime records legacy-primary shadow matches for turn replies when both pipelines agree", async () => {
   const sends = [];
   let now = 8_720;
@@ -1233,6 +1248,7 @@ test("messaging runtime ignores working-overlay chatter before a short turn repl
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {

@@ -122,15 +122,16 @@ Current shipped behavior:
 
 1. turn replies can build comparable legacy and projection candidates side by side
 2. only the configured primary mode dispatches by default
-3. the other candidate is recorded as shadow evidence when shadow mode is enabled
-4. runtime traces now include bounded `terminal.semantic.compare` entries
-5. `buildStatusSummary().terminalMessagingCore.semanticExtraction` now reports:
+3. after `H136`, the shipped default is intentionally `legacy` primary with projection kept in shadow until parity is field-proven
+4. the other candidate is recorded as shadow evidence when shadow mode is enabled
+5. runtime traces now include bounded `terminal.semantic.compare` entries
+6. `buildStatusSummary().terminalMessagingCore.semanticExtraction` now reports:
    - primary mode
    - shadow target mode
    - comparison totals
    - mismatch rate
    - cutover readiness
-6. `buildStatusSummary().terminalMessagingCore.semanticAdapterIds` now reports the currently registered semantic-adapter ids
+7. `buildStatusSummary().terminalMessagingCore.semanticAdapterIds` now reports the currently registered semantic-adapter ids
 
 ## Why This Matters
 

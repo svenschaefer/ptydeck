@@ -48,7 +48,7 @@ test("loadConfig applies defaults", () => {
   assert.deepEqual(config.messagingDiscordTargets, []);
   assert.equal(config.messagingDiscordApiBaseUrl, "https://discord.com/api/v10");
   assert.equal(config.messagingDiscordOutboundEnabled, false);
-  assert.equal(config.messagingTerminalSemanticPrimaryMode, "projection");
+  assert.equal(config.messagingTerminalSemanticPrimaryMode, "legacy");
   assert.equal(config.messagingTerminalSemanticShadowModeEnabled, true);
   assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 20);
   assert.equal(config.messagingTerminalSemanticCutoverMaxMismatchRate, 0.1);

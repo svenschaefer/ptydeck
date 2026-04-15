@@ -197,7 +197,7 @@ export function loadConfig(env = process.env) {
     "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
   );
   const messagingTerminalSemanticPrimaryMode = parseEnum(
-    env.MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE || "projection",
+    env.MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE || "legacy",
     "MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE",
     ["legacy", "projection"]
   );
