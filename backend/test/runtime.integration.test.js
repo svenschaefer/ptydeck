@@ -1148,6 +1148,11 @@ test("runtime submits startup commands through startup_submit_cr write tracking"
         },
         onData(handler) {
           dataHandler = handler;
+          setTimeout(() => {
+            if (dataHandler) {
+              dataHandler("__CWD__/tmp__\nuser@host:/tmp$ ");
+            }
+          }, 20);
         },
         write(data) {
           const normalized = String(data);

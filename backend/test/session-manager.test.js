@@ -34,6 +34,11 @@ function createFakePty({ pid = 4001, ptyPath = "/dev/pts/test" } = {}) {
     onData(handler) {
       lastDataHandler = handler;
     },
+    emitData(data) {
+      if (lastDataHandler) {
+        lastDataHandler(String(data));
+      }
+    },
     write(data) {
       this.writes.push(data);
       if (lastDataHandler) {
@@ -242,7 +247,7 @@ test("SessionManager emits input write attempt and ok events with trace correlat
   assert.equal(events[0].trace.traceId, events[1].trace.traceId);
 });
 
-test("SessionManager submits local startup commands with CR through the normal input path", () => {
+test("SessionManager submits local startup commands with CR through the normal input path after shell readiness", async () => {
   const fakePty = createFakePty();
   const manager = new SessionManager({
     createPty: () => fakePty
@@ -263,7 +268,9 @@ test("SessionManager submits local startup commands with CR through the normal i
   });
 
   assert.equal(created.startCommand, "powershell.exe -Command \"echo hi\"");
-  assert.deepEqual(fakePty.writes, ["powershell.exe -Command \"echo hi\"\r"]);
+  assert.deepEqual(fakePty.writes, []);
+  fakePty.emitData("__CWD__/tmp__\nuser@host:/tmp$ ");
+  await waitFor(() => fakePty.writes.includes("powershell.exe -Command \"echo hi\"\r"));
   assert.deepEqual(
     events.map((event) => ({
       phase: event.phase,
@@ -1809,7 +1816,7 @@ test("SessionManager leaves unsupported shells on deterministic cwd fallback wit
   assert.equal(manager.get(created.id).meta.cwd, "/tmp/project");
 });
 
-test("SessionManager restart preserves identity and restarts PTY", () => {
+test("SessionManager restart preserves identity and restarts PTY", async () => {
   const firstPty = createFakePty();
   const secondPty = createFakePty();
   let spawnCount = 0;
@@ -1848,6 +1855,8 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.createdAt, created.createdAt);
   assert.ok(restarted.updatedAt >= created.createdAt);
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
+  secondPty.emitData("__CWD__/var/tmp__\nuser@host:/var/tmp$ ");
+  await waitFor(() => secondPty.writes.includes("echo START\r"));
   assert.deepEqual(secondPty.writes, ["echo START\r"]);
 });
 

@@ -83,6 +83,7 @@ const DEFAULT_REMOTE_RECONNECT_MAX_ATTEMPTS = 3;
 const DEFAULT_REMOTE_RECONNECT_DELAY_MS = 1500;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
 const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
+const DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS = 1500;
 const TRACE_TOKEN_MAX_LENGTH = 128;
 
 function normalizeTraceToken(value) {
@@ -613,6 +614,7 @@ export class SessionManager {
     createTraceId = randomUUID,
     inspectTerminalForegroundProcess,
     foregroundProcessRefreshDelayMs = DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS,
+    startupPostInputFallbackMs = DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS,
     captureSessionStreamChunk,
     nodePtyAsyncWriteOptions
   } = {}) {
@@ -660,6 +662,10 @@ export class SessionManager {
       Number.isInteger(foregroundProcessRefreshDelayMs) && foregroundProcessRefreshDelayMs >= 0
         ? foregroundProcessRefreshDelayMs
         : DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS;
+    this.startupPostInputFallbackMs =
+      Number.isInteger(startupPostInputFallbackMs) && startupPostInputFallbackMs >= 0
+        ? startupPostInputFallbackMs
+        : DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS;
     this.captureSessionStreamChunk =
       typeof captureSessionStreamChunk === "function" ? captureSessionStreamChunk : null;
     this.nodePtyAsyncWriteOptions =
@@ -712,6 +718,14 @@ export class SessionManager {
     session.activityTimer = null;
   }
 
+  clearLaunchPostStartInputTimer(session) {
+    if (!session?.launchPostStartInputTimer) {
+      return;
+    }
+    this.clearTimeoutFn(session.launchPostStartInputTimer);
+    session.launchPostStartInputTimer = null;
+  }
+
   clearForegroundProcessRefreshTimer(session) {
     if (!session?.foregroundProcessRefreshTimer) {
       return;
@@ -739,6 +753,14 @@ export class SessionManager {
   clearRemoteReconnectTimers(session) {
     this.clearRemoteReconnectTimer(session);
     this.clearRemoteReconnectStabilizeTimer(session);
+  }
+
+  clearPendingLaunchPostStartInput(session) {
+    if (!session) {
+      return;
+    }
+    this.clearLaunchPostStartInputTimer(session);
+    session.pendingLaunchPostStartInput = null;
   }
 
   clearExpectedExitReason(session) {
@@ -793,6 +815,9 @@ export class SessionManager {
       session: session.meta,
       trace
     });
+    if (session.pendingLaunchPostStartInput?.observedPtyData === true) {
+      this.scheduleLaunchPostStartInputDispatch(session, "activity_completed");
+    }
   }
 
   scheduleSessionActivityCompletion(session) {
@@ -966,6 +991,10 @@ export class SessionManager {
         });
         return;
       }
+      this.observePendingLaunchPostStartInput(session, {
+        rawData: typeof data === "string" ? data : "",
+        promptBoundaries
+      });
       if (cleaned) {
         const activityTimestamp = getTimestamp();
         if (session.meta.kind === SESSION_KIND_SSH && session.meta.remoteRuntime?.connectivityState !== REMOTE_CONNECTIVITY_CONNECTED) {
@@ -1015,15 +1044,60 @@ export class SessionManager {
 
   }
 
-  submitLaunchPostStartInput(session, launchSpec, options = {}) {
+  dispatchLaunchPostStartInput(session) {
+    if (!session?.ptyProcess || !session.pendingLaunchPostStartInput?.input) {
+      return false;
+    }
+    const pending = session.pendingLaunchPostStartInput;
+    this.clearPendingLaunchPostStartInput(session);
+    this.sendInput(session.id, pending.input, {
+      writeKind: "startup_submit_cr",
+      trace: pending.trace || session.traceSeed || null
+    });
+    return true;
+  }
+
+  scheduleLaunchPostStartInputDispatch(session, _reason = "", delayMs = 0) {
+    if (!session?.pendingLaunchPostStartInput?.input || !session.ptyProcess) {
+      return false;
+    }
+    this.clearLaunchPostStartInputTimer(session);
+    const currentPtyProcess = session.ptyProcess;
+    session.launchPostStartInputTimer = this.setTimeoutFn(() => {
+      session.launchPostStartInputTimer = null;
+      if (this.sessions.get(session.id) !== session || session.ptyProcess !== currentPtyProcess) {
+        return;
+      }
+      this.dispatchLaunchPostStartInput(session);
+    }, Math.max(0, delayMs));
+    return true;
+  }
+
+  armLaunchPostStartInput(session, launchSpec, options = {}) {
     if (!session?.ptyProcess || !launchSpec?.postStartInput) {
       return false;
     }
-    this.sendInput(session.id, launchSpec.postStartInput, {
-      writeKind: "startup_submit_cr",
-      trace: normalizeTraceSeed(options.trace) || session.traceSeed || null
-    });
+    this.clearPendingLaunchPostStartInput(session);
+    session.pendingLaunchPostStartInput = {
+      input: launchSpec.postStartInput,
+      trace: normalizeTraceSeed(options.trace) || session.traceSeed || null,
+      observedPtyData: false
+    };
+    this.scheduleLaunchPostStartInputDispatch(session, "startup_fallback", this.startupPostInputFallbackMs);
     return true;
+  }
+
+  observePendingLaunchPostStartInput(session, { rawData = "", promptBoundaries = [] } = {}) {
+    if (!session?.pendingLaunchPostStartInput) {
+      return false;
+    }
+    if (typeof rawData === "string" && rawData.length > 0) {
+      session.pendingLaunchPostStartInput.observedPtyData = true;
+    }
+    if (Array.isArray(promptBoundaries) && promptBoundaries.length > 0) {
+      return this.scheduleLaunchPostStartInputDispatch(session, "prompt_boundary");
+    }
+    return false;
   }
 
   handleAsyncPtyWriteEvent(session, event = {}) {
@@ -1154,6 +1228,7 @@ export class SessionManager {
 
   handlePtyExit(session, exit) {
     this.clearSessionActivityTimer(session);
+    this.clearLaunchPostStartInputTimer(session);
     this.clearForegroundProcessRefreshTimer(session);
     this.clearRemoteReconnectStabilizeTimer(session);
     const exitTimestamp = this.nowFn();
@@ -1785,11 +1860,13 @@ export class SessionManager {
       replayShellBlockTrackingSupported: false,
       activityTimer: null,
       foregroundProcessRefreshTimer: null,
+      launchPostStartInputTimer: null,
       remoteReconnectTimer: null,
       remoteReconnectStabilizeTimer: null,
       expectedExitReasonTimer: null,
       expectedExitReason: "",
       lastActivityAt: initialActivityTimestamp,
+      pendingLaunchPostStartInput: null,
       remoteSecret: normalizedRemoteSecret,
       traceSeed: normalizeTraceSeed(trace),
       meta: {
@@ -1840,7 +1917,7 @@ export class SessionManager {
     this.updateSessionTraceSeed(session, createdTrace, { source: session.traceSeed?.source || "rest" });
     this.events.emit("session.created", { session: session.meta, trace: createdTrace });
     this.transitionToRunning(session);
-    this.submitLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
+    this.armLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
     return session.meta;
   }
 
@@ -2130,6 +2207,7 @@ export class SessionManager {
       source: options.trace?.source || "rest"
     });
     this.clearSessionActivityTimer(session);
+    this.clearLaunchPostStartInputTimer(session);
     this.clearForegroundProcessRefreshTimer(session);
     this.clearRemoteReconnectTimers(session);
     this.clearExpectedExitReason(session);
