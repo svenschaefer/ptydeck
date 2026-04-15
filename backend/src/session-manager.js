@@ -452,6 +452,15 @@ function buildSshRemoteCommand({ startCwd, startCommand }) {
   return `sh -lc ${shellQuote(steps.join("; "))}`;
 }
 
+function buildLocalStartupSubmitPayload(startCommand) {
+  const normalized = typeof startCommand === "string" ? startCommand.replace(/\r\n/g, "\n").replace(/\r/g, "\n") : "";
+  const trimmed = normalized.replace(/\n+$/g, "");
+  if (!trimmed) {
+    return "";
+  }
+  return `${trimmed}\r`;
+}
+
 function buildSessionLaunchSpec({
   kind,
   shell,
@@ -472,7 +481,7 @@ function buildSessionLaunchSpec({
       spawnCwd,
       metaCwd: spawnCwd,
       ptyEnvAdditions: {},
-      postStartInput: typeof startCommand === "string" && startCommand.trim() ? `${startCommand}\n` : ""
+      postStartInput: buildLocalStartupSubmitPayload(startCommand)
     };
   }
 
@@ -1004,9 +1013,17 @@ export class SessionManager {
       this.handlePtyExit(session, exit);
     });
 
-    if (launchSpec.postStartInput) {
-      ptyProcess.write(launchSpec.postStartInput);
+  }
+
+  submitLaunchPostStartInput(session, launchSpec, options = {}) {
+    if (!session?.ptyProcess || !launchSpec?.postStartInput) {
+      return false;
     }
+    this.sendInput(session.id, launchSpec.postStartInput, {
+      writeKind: "startup_submit_cr",
+      trace: normalizeTraceSeed(options.trace) || session.traceSeed || null
+    });
+    return true;
   }
 
   handleAsyncPtyWriteEvent(session, event = {}) {
@@ -1823,6 +1840,7 @@ export class SessionManager {
     this.updateSessionTraceSeed(session, createdTrace, { source: session.traceSeed?.source || "rest" });
     this.events.emit("session.created", { session: session.meta, trace: createdTrace });
     this.transitionToRunning(session);
+    this.submitLaunchPostStartInput(session, launchBundle.launchSpec, { trace: createdTrace });
     return session.meta;
   }
 

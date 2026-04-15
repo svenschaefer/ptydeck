@@ -242,6 +242,58 @@ test("SessionManager emits input write attempt and ok events with trace correlat
   assert.equal(events[0].trace.traceId, events[1].trace.traceId);
 });
 
+test("SessionManager submits local startup commands with CR through the normal input path", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const events = [];
+  manager.on("session.input.write", (event) => events.push(event));
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash",
+    startCommand: "powershell.exe -Command \"echo hi\"",
+    trace: {
+      traceId: "req-startup-1",
+      correlationId: "req-create-startup-1",
+      requestId: "req-create-startup-1",
+      source: "rest"
+    }
+  });
+
+  assert.equal(created.startCommand, "powershell.exe -Command \"echo hi\"");
+  assert.deepEqual(fakePty.writes, ["powershell.exe -Command \"echo hi\"\r"]);
+  assert.deepEqual(
+    events.map((event) => ({
+      phase: event.phase,
+      writeKind: event.writeKind,
+      bytes: event.bytes,
+      correlationId: event.trace.correlationId,
+      requestId: event.trace.requestId,
+      source: event.trace.source
+    })),
+    [
+      {
+        phase: "attempt",
+        writeKind: "startup_submit_cr",
+        bytes: Buffer.byteLength("powershell.exe -Command \"echo hi\"\r", "utf8"),
+        correlationId: "req-create-startup-1",
+        requestId: "req-create-startup-1",
+        source: "rest"
+      },
+      {
+        phase: "ok",
+        writeKind: "startup_submit_cr",
+        bytes: Buffer.byteLength("powershell.exe -Command \"echo hi\"\r", "utf8"),
+        correlationId: "req-create-startup-1",
+        requestId: "req-create-startup-1",
+        source: "rest"
+      }
+    ]
+  );
+});
+
 test("SessionManager emits input write failed events when the PTY write throws", () => {
   const fakePty = createFakePty();
   fakePty.write = () => {
@@ -1796,7 +1848,7 @@ test("SessionManager restart preserves identity and restarts PTY", () => {
   assert.equal(restarted.createdAt, created.createdAt);
   assert.ok(restarted.updatedAt >= created.createdAt);
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
-  assert.deepEqual(secondPty.writes, ["echo START\n"]);
+  assert.deepEqual(secondPty.writes, ["echo START\r"]);
 });
 
 test("SessionManager restart preserves ssh auth context and secret-backed reconnect state", () => {
