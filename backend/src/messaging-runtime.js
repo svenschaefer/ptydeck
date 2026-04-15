@@ -88,6 +88,19 @@ const ALLOWLIST_DELIVERY_SIGNALS = Object.freeze([
   OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL,
   OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL
 ]);
+const TERMINAL_SEMANTIC_COMPARISON_CLASSES = Object.freeze([
+  "restart_remount_noise",
+  "overlay_working_noise",
+  "overlapping_turn_ownership",
+  "premature_quiet_boundary",
+  "semantic_adapter_divergence"
+]);
+const TERMINAL_SEMANTIC_RISKY_COMPARISON_CLASSES = new Set([
+  "restart_remount_noise",
+  "overlay_working_noise",
+  "overlapping_turn_ownership",
+  "premature_quiet_boundary"
+]);
 
 const NOISE_SEPARATOR_ONLY_PATTERN = /^\s*(?:[-_=|·•*]+|[─━]{8,})\s*$/u;
 const CODING_AGENT_SECTION_MARKER_PATTERN = /^\s*✦(?:\s|$)/u;
@@ -423,6 +436,17 @@ function createPendingTerminalTurnAdmission({
     inputText: normalizeReplyPromotionInputText(inputText),
     replyPreferred: replyPreferred === true
   };
+}
+
+function createComparisonClassCounterState() {
+  return Object.freeze({
+    all: new Map(),
+    byDecision: Object.freeze({
+      mismatched: new Map(),
+      primary_only: new Map(),
+      shadow_only: new Map()
+    })
+  });
 }
 
 function isReplyPreferredTelegramTrace(trace = null) {
@@ -1191,8 +1215,25 @@ function createTerminalSemanticShadowState({
     mismatchedTotal: 0,
     primaryOnlyTotal: 0,
     shadowOnlyTotal: 0,
+    comparisonClassCounters: createComparisonClassCounterState(),
     lastComparedAt: 0
   };
+}
+
+function incrementCounterMap(map, key) {
+  if (!map || !key) {
+    return;
+  }
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
+function buildSortedCounterEntries(map) {
+  if (!(map instanceof Map)) {
+    return [];
+  }
+  return Array.from(map.entries())
+    .sort((left, right) => right[1] - left[1] || String(left[0]).localeCompare(String(right[0])))
+    .map(([key, count]) => Object.freeze({ key, count }));
 }
 
 function createSessionStreamState() {
@@ -1202,6 +1243,7 @@ function createSessionStreamState() {
     terminalProjection: null,
     activeTerminalTurn: null,
     lastCompletedTerminalTurn: null,
+    pendingTerminalTurnAdmission: null,
     activeOutputEpisode: null,
     lastCompletedOutputEpisode: null,
     pendingBoundarySettlement: null,
@@ -1229,6 +1271,7 @@ function createTerminalTurnRuntimeState({
   inputText = "",
   replyPreferred = false,
   baseline = null,
+  activationReason = "immediate",
   preInputPendingLine = "",
   preInputRecentLines = []
 }) {
@@ -1263,12 +1306,14 @@ function createTerminalTurnRuntimeState({
     transcriptStartRevision,
     inputText,
     replyPreferred,
+    activationReason: normalizeNonEmptyString(activationReason) || "immediate",
     preInputPendingLine: normalizeWhitespace(preInputPendingLine),
     preInputRecentLines: Array.isArray(preInputRecentLines)
       ? preInputRecentLines.map((line) => normalizeWhitespace(line)).filter(Boolean).slice(-MAX_RECENT_LINES)
       : [],
     activityCompletedAt: 0,
     quietWindowSettledAt: 0,
+    quietBoundaryCancellationCount: 0,
     lastObservedProjectionRevision: transcriptStartRevision,
     primaryReplyCandidateKey: "",
     primaryReplyComparableText: "",
@@ -1281,7 +1326,8 @@ function createTerminalTurnRuntimeState({
 function createOutputEpisodeRuntimeState({
   sessionId,
   observedAt,
-  baseline = null
+  baseline = null,
+  activationReason = "autonomous"
 }) {
   const episodeId =
     normalizeNonEmptyString(baseline?.baselineId) ||
@@ -1302,8 +1348,10 @@ function createOutputEpisodeRuntimeState({
     }),
     baseline,
     transcriptStartRevision,
+    activationReason: normalizeNonEmptyString(activationReason) || "autonomous",
     activityCompletedAt: 0,
     quietWindowSettledAt: 0,
+    quietBoundaryCancellationCount: 0,
     lastObservedProjectionRevision: transcriptStartRevision,
     primaryIntentKey: "",
     primaryIntentComparableText: "",
@@ -2370,7 +2418,27 @@ export function createMessagingRuntime(options = {}) {
         inputText: carriedInputText,
         replyPreferred: isReplyPreferredTelegramTrace(trace)
       });
-      if (hasActiveTerminalOwnership(streamState) || streamState?.pendingBoundarySettlement) {
+      const activeTurnOwnership = Boolean(streamState?.activeTerminalTurn?.turn);
+      const activeEpisodeOwnership = Boolean(streamState?.activeOutputEpisode?.outputEpisode);
+      if (activeTurnOwnership) {
+        clearPendingCodexTelegramReply(streamState);
+        setPendingTerminalTurnAdmission(streamState, admission);
+        logDebug(
+          "terminal.orchestration.turn_admission_deferred",
+          {
+            sessionId: normalizedSessionId,
+            traceId: admission.traceId,
+            correlationId: admission.correlationId,
+            reason: "active_turn_ownership",
+            activeTurnId: normalizeNonEmptyString(streamState?.activeTerminalTurn?.turn?.turnId),
+            activeEpisodeId: normalizeNonEmptyString(streamState?.activeOutputEpisode?.outputEpisode?.episodeId),
+            inputObservedAt: admission.observedAt
+          },
+          trace || null
+        );
+        return;
+      }
+      if (activeEpisodeOwnership || streamState?.pendingBoundarySettlement) {
         applyTurnOwnershipBarrier(streamState, { id: normalizedSessionId }, trace);
         activateTurnAdmission(streamState, { id: normalizedSessionId }, admission, trace, "ownership_barrier");
         return;
@@ -2518,6 +2586,8 @@ export function createMessagingRuntime(options = {}) {
     if (state?.activeTerminalTurn?.turn && normalizeNonEmptyString(state.activeTerminalTurn.turn.status) === "quieting") {
       state.activeTerminalTurn.activityCompletedAt = 0;
       state.activeTerminalTurn.quietWindowSettledAt = 0;
+      state.activeTerminalTurn.quietBoundaryCancellationCount =
+        (state.activeTerminalTurn.quietBoundaryCancellationCount || 0) + 1;
       state.activeTerminalTurn = rebuildTurnRuntimeDescriptor(state.activeTerminalTurn, {
         status: "open"
       });
@@ -2528,6 +2598,8 @@ export function createMessagingRuntime(options = {}) {
     ) {
       state.activeOutputEpisode.activityCompletedAt = 0;
       state.activeOutputEpisode.quietWindowSettledAt = 0;
+      state.activeOutputEpisode.quietBoundaryCancellationCount =
+        (state.activeOutputEpisode.quietBoundaryCancellationCount || 0) + 1;
       state.activeOutputEpisode = rebuildOutputEpisodeRuntimeDescriptor(state.activeOutputEpisode, {
         status: "open"
       });
@@ -2556,6 +2628,115 @@ export function createMessagingRuntime(options = {}) {
       },
       trace || null
     );
+  }
+
+  function setPendingTerminalTurnAdmission(state, admission) {
+    if (!state || !admission) {
+      return null;
+    }
+    state.pendingTerminalTurnAdmission = {
+      ...admission
+    };
+    return state.pendingTerminalTurnAdmission;
+  }
+
+  function getProjectionRestartRecoveryReason(session, profile, sessionId, occurredAt, { requireFreshInput = false } = {}) {
+    if (!isCodingAgentContext(session, profile)) {
+      return "";
+    }
+    const recoveryState = codexSummaryRestartRecoveryStates.get(normalizeNonEmptyString(sessionId)) || null;
+    if (!recoveryState?.active) {
+      return "";
+    }
+    const effectiveOccurredAt = Number.isInteger(occurredAt) && occurredAt > 0 ? occurredAt : nowFn();
+    if (!runtimeReadyAt || effectiveOccurredAt < runtimeReadyAt) {
+      return "restart_pre_ready";
+    }
+    if (codexSummaryRestartRecoveryQuietUntil > effectiveOccurredAt) {
+      return "restart_quiet_window";
+    }
+    if (
+      requireFreshInput &&
+      (
+        !Number.isInteger(recoveryState.lastInputAt) ||
+        recoveryState.lastInputAt <= 0 ||
+        recoveryState.lastInputAt < codexSummaryRestartRecoveryQuietUntil
+      )
+    ) {
+      return "restart_waiting_for_input";
+    }
+    return "";
+  }
+
+  function classifyTerminalSemanticComparisonClass({
+    session,
+    profile,
+    state,
+    entityKind,
+    comparisonResult,
+    primaryCandidate,
+    shadowCandidate
+  }) {
+    if (!comparisonResult || comparisonResult === "matched") {
+      return "";
+    }
+    const recoveryReason = getProjectionRestartRecoveryReason(session, profile, session?.id, nowFn(), {
+      requireFreshInput: entityKind === "output_episode"
+    });
+    if (recoveryReason) {
+      return "restart_remount_noise";
+    }
+    const candidateTexts = [primaryCandidate?.text, shadowCandidate?.text]
+      .map((value) => normalizeWhitespace(value))
+      .filter(Boolean);
+    const combinedText = candidateTexts.join(" ");
+    if (combinedText && CODING_AGENT_WORKING_OVERLAY_PATTERN.test(combinedText)) {
+      return "overlay_working_noise";
+    }
+    if (state?.pendingTerminalTurnAdmission) {
+      return "overlapping_turn_ownership";
+    }
+    const relevantRuntimeState =
+      entityKind === "output_episode"
+        ? state?.activeOutputEpisode || state?.lastCompletedOutputEpisode
+        : state?.activeTerminalTurn || state?.lastCompletedTerminalTurn;
+    if ((relevantRuntimeState?.quietBoundaryCancellationCount || 0) > 0) {
+      return "premature_quiet_boundary";
+    }
+    return "semantic_adapter_divergence";
+  }
+
+  function isRiskyProjectionComparisonClass(comparisonClass) {
+    return TERMINAL_SEMANTIC_RISKY_COMPARISON_CLASSES.has(normalizeNonEmptyString(comparisonClass));
+  }
+
+  function isNoisySemanticCandidate(candidate, session, profile) {
+    const text = normalizeWhitespace(candidate?.text);
+    if (!text) {
+      return true;
+    }
+    if (
+      CODING_AGENT_WORKING_OVERLAY_PATTERN.test(text) ||
+      isCommentaryLikeCodexOutboundText(text, session, profile)
+    ) {
+      return true;
+    }
+    return classifyNoiseSignature(text, session, profile).lowInformation;
+  }
+
+  function isMeaningfulSemanticSuperset(candidate, projectionCandidate, session, profile) {
+    const candidateText = normalizeWhitespace(candidate?.text);
+    const projectionText = normalizeWhitespace(projectionCandidate?.text);
+    if (!candidateText || !projectionText || candidateText === projectionText) {
+      return false;
+    }
+    if (!candidateText.includes(projectionText)) {
+      return false;
+    }
+    if (candidateText.length - projectionText.length < 24) {
+      return false;
+    }
+    return !isNoisySemanticCandidate(candidate, session, profile);
   }
 
   function getSessionGeometry(session) {
@@ -2624,6 +2805,7 @@ export function createMessagingRuntime(options = {}) {
       inputText: admission.inputText,
       replyPreferred: admission.replyPreferred,
       baseline,
+      activationReason,
       preInputPendingLine: normalizeWhitespace(state.pendingLine),
       preInputRecentLines: state.recentLines.slice(-MAX_RECENT_LINES)
     });
@@ -2696,10 +2878,12 @@ export function createMessagingRuntime(options = {}) {
       diff,
       inputText: runtimeState.inputText || "",
       replyPreferred: runtimeState.replyPreferred === true,
+      activationReason: normalizeNonEmptyString(runtimeState.activationReason) || "immediate",
       preInputPendingLine: runtimeState.preInputPendingLine || "",
       preInputRecentLines: Array.isArray(runtimeState.preInputRecentLines) ? runtimeState.preInputRecentLines.slice() : [],
       activityCompletedAt: runtimeState.activityCompletedAt || 0,
       quietWindowSettledAt: runtimeState.quietWindowSettledAt || 0,
+      quietBoundaryCancellationCount: runtimeState.quietBoundaryCancellationCount || 0,
       lastObservedProjectionRevision: runtimeState.lastObservedProjectionRevision || 0,
       primaryReplyCandidateKey: runtimeState.primaryReplyCandidateKey || "",
       primaryReplyComparableText: runtimeState.primaryReplyComparableText || "",
@@ -2724,8 +2908,10 @@ export function createMessagingRuntime(options = {}) {
       baseline: runtimeState.baseline || null,
       transcriptDelta,
       diff,
+      activationReason: normalizeNonEmptyString(runtimeState.activationReason) || "autonomous",
       activityCompletedAt: runtimeState.activityCompletedAt || 0,
       quietWindowSettledAt: runtimeState.quietWindowSettledAt || 0,
+      quietBoundaryCancellationCount: runtimeState.quietBoundaryCancellationCount || 0,
       lastObservedProjectionRevision: runtimeState.lastObservedProjectionRevision || 0,
       primaryIntentKey: runtimeState.primaryIntentKey || "",
       primaryIntentComparableText: runtimeState.primaryIntentComparableText || "",
@@ -2824,8 +3010,22 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  function ensureAutonomousOutputEpisode(state, session, trace, hasVisibleChunk) {
+  function ensureAutonomousOutputEpisode(state, session, profile, trace, hasVisibleChunk) {
     if (!hasVisibleChunk || state?.activeTerminalTurn?.turn || state?.activeOutputEpisode?.outputEpisode) {
+      return;
+    }
+    const quarantineReason = getProjectionRestartRecoveryReason(session, profile, session?.id, nowFn(), {
+      requireFreshInput: true
+    });
+    if (quarantineReason) {
+      logDebug(
+        "terminal.orchestration.output_episode_quarantined",
+        {
+          sessionId: normalizeNonEmptyString(session?.id),
+          reason: quarantineReason
+        },
+        trace
+      );
       return;
     }
     const observedAt = nowFn();
@@ -2833,7 +3033,8 @@ export function createMessagingRuntime(options = {}) {
     state.activeOutputEpisode = createOutputEpisodeRuntimeState({
       sessionId: normalizeNonEmptyString(session?.id),
       observedAt,
-      baseline
+      baseline,
+      activationReason: "autonomous"
     });
     state.activeOutputEpisode.lastObservedProjectionRevision = Number.isInteger(baseline?.revision) ? baseline.revision : 0;
     logDebug(
@@ -2906,6 +3107,13 @@ export function createMessagingRuntime(options = {}) {
       (Number.isInteger(session?.activityCompletedAt) && session.activityCompletedAt > 0 ? session.activityCompletedAt : 0) || nowFn();
     closeActiveTurn(state, completedAt, "completed");
     closeActiveOutputEpisode(state, completedAt, "completed");
+    if (state?.pendingTerminalTurnAdmission) {
+      const pendingAdmission = state.pendingTerminalTurnAdmission;
+      const activated = activateTurnAdmission(state, session, pendingAdmission, trace, "deferred_quiescent");
+      if (activated) {
+        return;
+      }
+    }
     if (
       isCodingAgentContext(session, profile) &&
       state.pendingSummaryBlock.fragments.length === 0 &&
@@ -3052,6 +3260,7 @@ export function createMessagingRuntime(options = {}) {
         deliveryScope: normalizeNonEmptyString(entry?.deliveryScope),
         deliveryBlockKey: normalizeNonEmptyString(entry?.deliveryBlockKey),
         comparisonResult: normalizeNonEmptyString(entry?.comparisonResult),
+        comparisonClass: normalizeNonEmptyString(entry?.comparisonClass),
         primaryMode: normalizeNonEmptyString(entry?.primaryMode),
         shadowMode: normalizeNonEmptyString(entry?.shadowMode),
         primaryDeliveryScope: normalizeNonEmptyString(entry?.primaryDeliveryScope),
@@ -3528,6 +3737,16 @@ export function createMessagingRuntime(options = {}) {
     if (!semanticAdapter || !shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
       return null;
     }
+    if (state?.pendingTerminalTurnAdmission) {
+      return null;
+    }
+    if (
+      getProjectionRestartRecoveryReason(session, profile, session?.id, nowFn(), {
+        requireFreshInput: false
+      })
+    ) {
+      return null;
+    }
     const runtimeSnapshot = buildTurnRuntimeSnapshot(state, state.activeTerminalTurn);
     const semanticDecision = semanticAdapter.buildTurnSemanticDecision(runtimeSnapshot, session, profile);
     if (!semanticDecision?.text) {
@@ -3542,6 +3761,13 @@ export function createMessagingRuntime(options = {}) {
   function buildProjectionOutputEpisodeSemanticCandidate(session, profile, state) {
     const semanticAdapter = resolveAppSemanticAdapter(session, profile);
     if (!semanticAdapter || !shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeOutputEpisode?.outputEpisode) {
+      return null;
+    }
+    if (
+      getProjectionRestartRecoveryReason(session, profile, session?.id, nowFn(), {
+        requireFreshInput: true
+      })
+    ) {
       return null;
     }
     const runtimeSnapshot = buildOutputEpisodeRuntimeSnapshot(state, state.activeOutputEpisode);
@@ -3645,19 +3871,57 @@ export function createMessagingRuntime(options = {}) {
     return "";
   }
 
+  function createTerminalSemanticComparisonRecord({
+    session,
+    profile,
+    state,
+    entityKind,
+    primaryCandidate,
+    shadowCandidate
+  }) {
+    const comparisonResult = calculateTerminalSemanticComparisonResult(primaryCandidate, shadowCandidate);
+    if (!comparisonResult) {
+      return null;
+    }
+    const comparisonClass = classifyTerminalSemanticComparisonClass({
+      session,
+      profile,
+      state,
+      entityKind,
+      comparisonResult,
+      primaryCandidate,
+      shadowCandidate
+    });
+    return Object.freeze({
+      comparisonResult,
+      comparisonClass,
+      primaryCandidate,
+      shadowCandidate
+    });
+  }
+
   function recordTerminalSemanticComparison({
     session,
     profile,
+    state,
     trace,
     entityKind,
     phase,
     primaryCandidate,
     shadowCandidate
   }) {
-    const comparisonResult = calculateTerminalSemanticComparisonResult(primaryCandidate, shadowCandidate);
-    if (!comparisonResult) {
-      return;
+    const comparison = createTerminalSemanticComparisonRecord({
+      session,
+      profile,
+      state,
+      entityKind,
+      primaryCandidate,
+      shadowCandidate
+    });
+    if (!comparison) {
+      return null;
     }
+    const { comparisonResult, comparisonClass } = comparison;
     terminalSemanticShadowState.comparisonTotal += 1;
     terminalSemanticShadowState.lastComparedAt = nowFn();
     if (comparisonResult === "matched") {
@@ -3668,6 +3932,13 @@ export function createMessagingRuntime(options = {}) {
       terminalSemanticShadowState.primaryOnlyTotal += 1;
     } else if (comparisonResult === "shadow_only") {
       terminalSemanticShadowState.shadowOnlyTotal += 1;
+    }
+    if (comparisonClass) {
+      incrementCounterMap(terminalSemanticShadowState.comparisonClassCounters.all, comparisonClass);
+      incrementCounterMap(
+        terminalSemanticShadowState.comparisonClassCounters.byDecision[comparisonResult],
+        comparisonClass
+      );
     }
     appendTraceEntry({
       recordedAt: nowFn(),
@@ -3684,6 +3955,7 @@ export function createMessagingRuntime(options = {}) {
       text: primaryCandidate?.text || shadowCandidate?.text || "",
       comparableText: primaryCandidate?.comparableText || shadowCandidate?.comparableText || "",
       comparisonResult,
+      comparisonClass,
       primaryMode: terminalSemanticShadowState.primaryMode,
       shadowMode:
         terminalSemanticShadowState.shadowModeEnabled
@@ -3707,6 +3979,7 @@ export function createMessagingRuntime(options = {}) {
         primaryMode: terminalSemanticShadowState.primaryMode,
         shadowModeEnabled: terminalSemanticShadowState.shadowModeEnabled,
         comparisonResult,
+        comparisonClass,
         primaryDeliveryScope: primaryCandidate?.deliveryScope || "",
         primaryComparableText: primaryCandidate?.comparableText || "",
         shadowDeliveryScope: shadowCandidate?.deliveryScope || "",
@@ -3714,6 +3987,7 @@ export function createMessagingRuntime(options = {}) {
       },
       trace || null
     );
+    return comparison;
   }
 
   async function dispatchMessageIntent(session, profile, trace, messageIntent) {
@@ -3846,6 +4120,55 @@ export function createMessagingRuntime(options = {}) {
     return dispatchMessageIntent(session, profile, trace, messageIntent);
   }
 
+  function shouldAllowProjectionAuthority({
+    session,
+    profile,
+    state,
+    entityKind,
+    comparison,
+    primaryMode,
+    projectionCandidate,
+    legacyCandidate
+  }) {
+    if (!projectionCandidate) {
+      return false;
+    }
+    if (!comparison) {
+      return !isNoisySemanticCandidate(projectionCandidate, session, profile);
+    }
+    if (isNoisySemanticCandidate(projectionCandidate, session, profile)) {
+      return false;
+    }
+    if (comparison.comparisonClass === "restart_remount_noise") {
+      return false;
+    }
+    if (comparison.comparisonClass === "overlapping_turn_ownership" && state?.pendingTerminalTurnAdmission) {
+      return false;
+    }
+    if (comparison.comparisonClass === "premature_quiet_boundary") {
+      if (legacyCandidate && isMeaningfulSemanticSuperset(legacyCandidate, projectionCandidate, session, profile)) {
+        return false;
+      }
+      return primaryMode !== "legacy" || !legacyCandidate;
+    }
+    if (comparison.comparisonClass === "overlay_working_noise") {
+      return true;
+    }
+    if (comparison.comparisonResult === "matched") {
+      return true;
+    }
+    if (primaryMode === "legacy" && legacyCandidate) {
+      return false;
+    }
+    if (legacyCandidate && isMeaningfulSemanticSuperset(legacyCandidate, projectionCandidate, session, profile)) {
+      return false;
+    }
+    if (isRiskyProjectionComparisonClass(comparison.comparisonClass)) {
+      return false;
+    }
+    return true;
+  }
+
   async function maybeDispatchConfiguredTurnSemanticIntent(session, profile, state, trace) {
     if (!shouldUseProjectionSemanticExtraction(session, profile) || !state?.activeTerminalTurn?.turn) {
       return null;
@@ -3854,25 +4177,48 @@ export function createMessagingRuntime(options = {}) {
     const legacyDecision = buildCodexTelegramReplyDecision(state);
     const legacyCandidate = normalizeTerminalSemanticComparisonCandidate(legacyDecision, "legacy");
     const projectionCandidate = projectionDispatchCandidate?.normalizedCandidate || null;
-    if (terminalSemanticShadowState.shadowModeEnabled) {
-      recordTerminalSemanticComparison({
-        session,
-        profile,
-        trace,
-        entityKind: "turn",
-        phase: "turn_completion",
-        primaryCandidate:
-          terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
-        shadowCandidate:
-          terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
-      });
-    }
+    const comparison =
+      terminalSemanticShadowState.shadowModeEnabled
+        ? recordTerminalSemanticComparison({
+            session,
+            profile,
+            state,
+            trace,
+            entityKind: "turn",
+            phase: "turn_completion",
+            primaryCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+            shadowCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+          })
+        : createTerminalSemanticComparisonRecord({
+            session,
+            profile,
+            state,
+            entityKind: "turn",
+            primaryCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+            shadowCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+          });
     const turnState = state?.activeTerminalTurn;
     const primaryAlreadyRecorded = Number.isInteger(turnState?.primaryReplyOccurredAt) && turnState.primaryReplyOccurredAt > 0;
     let dispatchResult = null;
     if (!primaryAlreadyRecorded) {
       if (terminalSemanticShadowState.primaryMode === "projection") {
-        if (projectionDispatchCandidate?.messageIntent) {
+        if (
+          projectionDispatchCandidate?.messageIntent &&
+          shouldAllowProjectionAuthority({
+            session,
+            profile,
+            state,
+            entityKind: "turn",
+            comparison,
+            primaryMode: terminalSemanticShadowState.primaryMode,
+            projectionCandidate,
+            legacyCandidate
+          })
+        ) {
           dispatchResult = await dispatchProjectionSemanticIntent(
             session,
             profile,
@@ -3886,7 +4232,19 @@ export function createMessagingRuntime(options = {}) {
         }
       } else if (legacyDecision) {
         dispatchResult = await dispatchCodexAllowlistCandidate(session, profile, state, trace, legacyDecision);
-      } else if (projectionDispatchCandidate?.messageIntent) {
+      } else if (
+        projectionDispatchCandidate?.messageIntent &&
+        shouldAllowProjectionAuthority({
+          session,
+          profile,
+          state,
+          entityKind: "turn",
+          comparison,
+          primaryMode: terminalSemanticShadowState.primaryMode,
+          projectionCandidate,
+          legacyCandidate
+        })
+      ) {
         dispatchResult = await dispatchProjectionSemanticIntent(
           session,
           profile,
@@ -3908,25 +4266,48 @@ export function createMessagingRuntime(options = {}) {
     const projectionDispatchCandidate = buildProjectionOutputEpisodeSemanticDispatchCandidate(session, profile, state, trace);
     const projectionCandidate = projectionDispatchCandidate?.normalizedCandidate || null;
     const legacyCandidate = buildRecordedOutputEpisodePrimaryCandidate(state);
-    if (terminalSemanticShadowState.shadowModeEnabled) {
-      recordTerminalSemanticComparison({
-        session,
-        profile,
-        trace,
-        entityKind: "output_episode",
-        phase: "quiet_window",
-        primaryCandidate:
-          terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
-        shadowCandidate:
-          terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
-      });
-    }
+    const comparison =
+      terminalSemanticShadowState.shadowModeEnabled
+        ? recordTerminalSemanticComparison({
+            session,
+            profile,
+            state,
+            trace,
+            entityKind: "output_episode",
+            phase: "quiet_window",
+            primaryCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+            shadowCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+          })
+        : createTerminalSemanticComparisonRecord({
+            session,
+            profile,
+            state,
+            entityKind: "output_episode",
+            primaryCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? projectionCandidate : legacyCandidate,
+            shadowCandidate:
+              terminalSemanticShadowState.primaryMode === "projection" ? legacyCandidate : projectionCandidate
+          });
     const episodeState = state?.activeOutputEpisode;
     const primaryAlreadyRecorded = Number.isInteger(episodeState?.primaryIntentOccurredAt) && episodeState.primaryIntentOccurredAt > 0;
     if (primaryAlreadyRecorded || !projectionDispatchCandidate?.messageIntent) {
       return null;
     }
-    if (terminalSemanticShadowState.primaryMode === "projection" || !legacyCandidate) {
+    if (
+      (terminalSemanticShadowState.primaryMode === "projection" || !legacyCandidate) &&
+      shouldAllowProjectionAuthority({
+        session,
+        profile,
+        state,
+        entityKind: "output_episode",
+        comparison,
+        primaryMode: terminalSemanticShadowState.primaryMode,
+        projectionCandidate,
+        legacyCandidate
+      })
+    ) {
       return dispatchProjectionSemanticIntent(
         session,
         profile,
@@ -4550,7 +4931,7 @@ export function createMessagingRuntime(options = {}) {
     if (state?.activeTerminalTurn?.turn) {
       ensureActiveTurnBaseline(state);
     } else {
-      ensureAutonomousOutputEpisode(state, session, trace, hasVisibleChunk);
+      ensureAutonomousOutputEpisode(state, session, profile, trace, hasVisibleChunk);
     }
     if (chunk || normalizedPromptBoundaries.length > 0) {
       const geometry = getSessionGeometry(session);
@@ -5222,6 +5603,16 @@ export function createMessagingRuntime(options = {}) {
             mismatched: terminalSemanticShadowState.mismatchedTotal,
             primaryOnly: terminalSemanticShadowState.primaryOnlyTotal,
             shadowOnly: terminalSemanticShadowState.shadowOnlyTotal,
+            byClass: buildSortedCounterEntries(terminalSemanticShadowState.comparisonClassCounters.all),
+            mismatchedByClass: buildSortedCounterEntries(
+              terminalSemanticShadowState.comparisonClassCounters.byDecision.mismatched
+            ),
+            primaryOnlyByClass: buildSortedCounterEntries(
+              terminalSemanticShadowState.comparisonClassCounters.byDecision.primary_only
+            ),
+            shadowOnlyByClass: buildSortedCounterEntries(
+              terminalSemanticShadowState.comparisonClassCounters.byDecision.shadow_only
+            ),
             mismatchRate: comparisonMismatchRate,
             cutoverReady,
             lastComparedAt: terminalSemanticShadowState.lastComparedAt

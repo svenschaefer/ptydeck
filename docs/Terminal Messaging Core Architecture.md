@@ -4,7 +4,7 @@ Last updated: 2026-04-15
 
 ## Purpose
 
-This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, shadow-mode migration surface, overlapping-output turn-ownership correction, and the first neutral allowlist-delivery-signal bridge for the `v0.4.0-H128` stream-to-message refactor plus its first post-baseline follow-ups.
+This note records the delivered neutral core, terminal projection, runtime orchestration, projection-backed semantic extraction, semantic-adapter extraction, second semantic-adapter baseline, Telegram delivery-adapter cutover, Discord reference delivery-adapter follow-up, shadow-mode migration surface, overlapping-output turn-ownership correction, the first neutral allowlist-delivery-signal bridge, and the first projection-parity stabilization wave for the `v0.4.0-H128` stream-to-message refactor plus its post-baseline follow-ups.
 
 The goal is to stop treating Telegram- and Codex-specific heuristics as the primary runtime model for terminal messaging. Instead, ptydeck now has an explicit neutral contract layer that can later support multiple delivery adapters and multiple terminal apps without rebuilding the parser and delivery seams per integration.
 
@@ -34,7 +34,7 @@ They are intended to be reusable for:
 
 ## What Is Shipped Today
 
-`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps, `MSG-097` through `MSG-099` are now delivered as the first overlapping-output ownership correction on top of that baseline, and `v0.4.0-H135 / MSG-029` now ships the first signal-first outbound follow-up on top of the same neutral `MessageIntent` seam.
+`MSG-083` through `MSG-088` are now delivered and form the shipped `H128` baseline. `MSG-089` through `MSG-096` are now also delivered as the first post-`H128` baseline-extension steps, `MSG-097` through `MSG-099` are now delivered as the first overlapping-output ownership correction on top of that baseline, `v0.4.0-H135 / MSG-029` now ships the first signal-first outbound follow-up on top of the same neutral `MessageIntent` seam, and `v0.4.0-H137 / MSG-102` through `MSG-105` now stabilize the migration surface around parity evidence, restart quarantine, deferred turn admission, and quiet-boundary settlement safety.
 
 They introduce the neutral core, route the currently shipped narrow Codex allowlist path through it, add a backend terminal-projection layer that runs in parallel with the existing chunk-first heuristics, move the first real `Turn` / `OutputEpisode` runtime state onto that projection seam, make the shipped primary narrow allowlist reply extraction consume projection-backed turn/output-episode runtime snapshots, add a shipped shadow-mode plus cutover-readiness surface so the legacy and projection pipelines can be compared explicitly, move the shipped Codex semantic interpretation behind a real `AppSemanticAdapter` registry seam instead of leaving it embedded in the runtime core, move Telegram delivery behind the real `DeliveryAdapter` seam so thread-policy and formatting decisions are no longer runtime-owned Telegram shortcuts, prove the same semantic registry against a second generic coding-agent baseline that covers Claude-/Gemini-style transcript differences without changing the core, prove the delivery seam itself across both Telegram and a Discord-style reference adapter, and now harden the runtime against overlapping-output ownership leaks by introducing immediate turn-ownership barriers plus delayed quiet-boundary settlement.
 
@@ -129,9 +129,20 @@ Current shipped behavior:
    - primary mode
    - shadow target mode
    - comparison totals
+   - comparison-class counts by overall, `mismatched`, `primary_only`, and `shadow_only`
    - mismatch rate
    - cutover readiness
 7. `buildStatusSummary().terminalMessagingCore.semanticAdapterIds` now reports the currently registered semantic-adapter ids
+
+The runtime now also ships explicit comparison classes for parity triage:
+
+- `restart_remount_noise`
+- `overlay_working_noise`
+- `overlapping_turn_ownership`
+- `premature_quiet_boundary`
+- `semantic_adapter_divergence`
+
+The companion helper `scripts/analyze-terminal-semantic-shadow.mjs` can cluster those classes from shipped `messaging.semantic.shadow` debug events and `terminal.semantic.compare` trace entries so projection follow-up work can be driven from stable evidence instead of ad hoc live-log reading.
 
 ## Why This Matters
 

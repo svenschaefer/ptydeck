@@ -939,10 +939,25 @@ test("messaging runtime opens a fresh turn behind an ownership barrier instead o
   });
 
   let orchestration = runtime.captureTerminalOrchestrationState(session.id);
+  assert.equal(orchestration?.activeTurn?.inputText, "Earlier question");
+  assert.equal(orchestration?.activeTurn?.turn?.correlationId, "projection-overlap-old-correlation");
+  assert.equal(orchestration?.lastCompletedTurn, null);
+
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "projection-overlap-old-idle" }
+  });
+
+  await sleep(50);
+
+  orchestration = runtime.captureTerminalOrchestrationState(session.id);
   assert.equal(orchestration?.activeTurn?.inputText, "ja");
   assert.equal(orchestration?.activeTurn?.turn?.correlationId, "projection-overlap-new-correlation");
   assert.equal(orchestration?.lastCompletedTurn?.turn?.correlationId, "projection-overlap-old-correlation");
-  assert.equal(orchestration?.lastCompletedTurn?.turn?.status, "ownership_barrier");
+  assert.equal(orchestration?.lastCompletedTurn?.turn?.status, "completed");
 
   await runtime.observeSessionData({
     session,
@@ -1139,6 +1154,12 @@ test("messaging runtime records projection-primary shadow comparisons for short 
   assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.primaryOnly, 1);
   assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.matched, 0);
   assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.cutoverReady, false);
+  assert.deepEqual(status.terminalMessagingCore.semanticExtraction.comparisons.byClass, [
+    { key: "semantic_adapter_divergence", count: 1 }
+  ]);
+  assert.deepEqual(status.terminalMessagingCore.semanticExtraction.comparisons.primaryOnlyByClass, [
+    { key: "semantic_adapter_divergence", count: 1 }
+  ]);
   assert.ok(
     status.trace.recent.some(
       (entry) => entry.type === "terminal.semantic.compare" && entry.decision === "primary_only" && entry.primaryMode === "projection"
