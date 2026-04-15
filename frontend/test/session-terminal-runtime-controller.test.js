@@ -1409,6 +1409,35 @@ test("session-terminal-runtime controller suppresses terminal onData until expli
   assert.deepEqual(terminalWrites, [["s1", "pwd\n"]]);
 });
 
+test("session-terminal-runtime controller forwards bootstrap-safe terminal control responses before operator arming", () => {
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    }
+  });
+  const refs = createTerminalCardRefs("bootstrap-control-response");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.emitData("\u001b[1;1R");
+  entry.terminal.emitData("\u001b[I");
+
+  assert.deepEqual(terminalWrites, [["s1", "\u001b[1;1R"]]);
+});
+
 test("session-terminal-runtime controller focuses but does not arm terminal input forwarding from focus button interaction", () => {
   const terminalWrites = [];
   const refs = createTerminalCardRefs("focus-button-intent");

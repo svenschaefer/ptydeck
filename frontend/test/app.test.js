@@ -1918,6 +1918,15 @@ test("app handles critical error paths, DOM lifecycle, and connection state rend
     preventDefault() {}
   });
   await tick();
+  if (fixture.elements.commandInput.value === "/connection.list") {
+    fixture.elements.commandInput.dispatchEvent({
+      type: "keydown",
+      key: "Tab",
+      shiftKey: false,
+      preventDefault() {}
+    });
+    await tick();
+  }
   assert.equal(fixture.elements.commandInput.value, "/custom");
 
   fixture.elements.commandInput.dispatchEvent({

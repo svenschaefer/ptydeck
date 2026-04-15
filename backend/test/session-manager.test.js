@@ -301,6 +301,87 @@ test("SessionManager submits local startup commands with CR through the normal i
   );
 });
 
+test("SessionManager answers startup terminal cursor-position queries so Windows interop commands can continue", async () => {
+  let lastExitHandler = null;
+  let lastDataHandler = null;
+  const writes = [];
+  const fakePty = {
+    pid: 4102,
+    _pty: "/dev/pts/test-startup-dsr",
+    writes,
+    resizeCalls: [],
+    killSignals: [],
+    onExit(handler) {
+      lastExitHandler = handler;
+    },
+    onData(handler) {
+      lastDataHandler = handler;
+    },
+    emitData(data) {
+      if (lastDataHandler) {
+        lastDataHandler(String(data));
+      }
+    },
+    write(data) {
+      const normalized = String(data);
+      writes.push(normalized);
+      if (normalized === 'powershell.exe -Command "echo hi"\r') {
+        if (lastDataHandler) {
+          lastDataHandler(normalized);
+        }
+        setTimeout(() => {
+          fakePty.emitData("\u001b[6n");
+        }, 0);
+        return;
+      }
+      if (normalized === "\u001b[1;1R") {
+        setTimeout(() => {
+          fakePty.emitData("hi\r\n__CWD__/tmp__\nuser@host:/tmp$ ");
+        }, 0);
+        return;
+      }
+      if (lastDataHandler) {
+        lastDataHandler(normalized);
+      }
+    },
+    resize(cols, rows) {
+      this.resizeCalls.push({ cols, rows });
+    },
+    kill(signal) {
+      this.killSignals.push(signal || "SIGHUP");
+      if (lastExitHandler) {
+        lastExitHandler({ exitCode: 0, signal: 0 });
+      }
+    }
+  };
+
+  const manager = new SessionManager({
+    createPty: () => fakePty
+  });
+  const events = [];
+  manager.on("session.input.write", (event) => events.push(event));
+
+  manager.create({
+    cwd: "/tmp",
+    shell: "bash",
+    startCommand: 'powershell.exe -Command "echo hi"',
+    trace: {
+      traceId: "req-startup-dsr-1",
+      correlationId: "req-startup-dsr-1",
+      requestId: "req-startup-dsr-1",
+      source: "rest"
+    }
+  });
+
+  fakePty.emitData("__CWD__/tmp__\nuser@host:/tmp$ ");
+  await waitFor(() => writes.includes('powershell.exe -Command "echo hi"\r'));
+  await waitFor(() => writes.includes("\u001b[1;1R"));
+
+  const responseEvent = events.find((event) => event.writeKind === "startup_terminal_query_response" && event.phase === "ok");
+  assert.ok(responseEvent);
+  assert.equal(responseEvent.bytes, Buffer.byteLength("\u001b[1;1R", "utf8"));
+});
+
 test("SessionManager emits input write failed events when the PTY write throws", () => {
   const fakePty = createFakePty();
   fakePty.write = () => {

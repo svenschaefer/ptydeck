@@ -1204,6 +1204,96 @@ test("runtime submits startup commands through startup_submit_cr write tracking"
   }
 });
 
+test("runtime answers startup cursor-position queries so powershell start commands can complete under PTY control", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-dsr-debug-"));
+  const debugLogFile = join(dir, "backend-debug.log");
+  const writeCalls = [];
+  const { runtime, baseUrl } = await createStartedRuntime({
+    debugLogs: true,
+    debugLogFile,
+    createPty() {
+      let exitHandler = null;
+      let dataHandler = null;
+      return {
+        onExit(handler) {
+          exitHandler = handler;
+        },
+        onData(handler) {
+          dataHandler = handler;
+          setTimeout(() => {
+            if (dataHandler) {
+              dataHandler("__CWD__/tmp__\nuser@host:/tmp$ ");
+            }
+          }, 20);
+        },
+        write(data) {
+          const normalized = String(data);
+          writeCalls.push(normalized);
+          if (normalized === 'powershell.exe -Command "echo hi"\r') {
+            if (dataHandler) {
+              dataHandler(normalized);
+            }
+            setTimeout(() => {
+              if (dataHandler) {
+                dataHandler("\u001b[6n");
+              }
+            }, 0);
+            return;
+          }
+          if (normalized === "\u001b[1;1R") {
+            setTimeout(() => {
+              if (dataHandler) {
+                dataHandler("hi\r\n__CWD__/tmp__\nuser@host:/tmp$ ");
+              }
+            }, 0);
+            return;
+          }
+          if (dataHandler) {
+            dataHandler(normalized);
+          }
+        },
+        resize() {},
+        kill() {
+          if (exitHandler) {
+            exitHandler({ exitCode: 0, signal: 0 });
+          }
+        }
+      };
+    }
+  });
+
+  try {
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        shell: "bash",
+        name: "startup-powershell-dsr",
+        startCommand: 'powershell.exe -Command "echo hi"'
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    await waitFor(() => writeCalls.includes('powershell.exe -Command "echo hi"\r'), 2000);
+    await waitFor(() => writeCalls.includes("\u001b[1;1R"), 2000);
+
+    await waitFor(async () => {
+      const exportRes = await fetch(`${baseUrl}/sessions/${created.id}/replay-export`);
+      if (exportRes.status !== 200) {
+        return false;
+      }
+      const exportPayload = await exportRes.json();
+      return /hi/.test(exportPayload.data || "");
+    }, 2000);
+
+    const debugContents = await readFile(debugLogFile, "utf8");
+    assert.match(debugContents, /session\.input\.write .*"writeKind":"startup_terminal_query_response"/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("runtime logs telegram messaging input write phases and opens the reply window only on submit", async () => {
   const sends = [];
   const updateQueue = [];

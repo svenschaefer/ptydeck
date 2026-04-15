@@ -3,6 +3,13 @@ import {
   normalizeSessionMouseForwardingMode
 } from "../session-mouse-forwarding.js";
 
+function isBootstrapSafeTerminalResponse(data) {
+  if (typeof data !== "string" || data.length === 0) {
+    return false;
+  }
+  return /^(?:\u001b\[\d+;\d+R)+$/u.test(data);
+}
+
 export function createSessionTerminalRuntimeController(options = {}) {
   const windowRef = options.windowRef || globalThis;
   const documentRef = windowRef.document || globalThis.document || null;
@@ -690,6 +697,14 @@ export function createSessionTerminalRuntimeController(options = {}) {
     terminal.open(refs.mount);
     terminal.onData((data) => {
       if (!terminalInputGuard.armed) {
+        if (isBootstrapSafeTerminalResponse(data)) {
+          onTerminalData(session.id, data);
+          debugLog("terminal.input.bootstrap_control_forwarded", {
+            sessionId: session.id,
+            bytes: typeof data === "string" ? data.length : 0
+          });
+          return;
+        }
         terminalInputGuard.suppressedCount += 1;
         debugLog("terminal.input.bootstrap_suppressed", {
           sessionId: session.id,

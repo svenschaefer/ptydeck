@@ -84,6 +84,8 @@ const DEFAULT_REMOTE_RECONNECT_DELAY_MS = 1500;
 const DEFAULT_REMOTE_RECONNECT_STABLE_MS = 500;
 const DEFAULT_FOREGROUND_PROCESS_REFRESH_DELAY_MS = 90;
 const DEFAULT_STARTUP_POST_INPUT_FALLBACK_MS = 1500;
+const DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS = 15000;
+const DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES = 4;
 const TRACE_TOKEN_MAX_LENGTH = 128;
 
 function normalizeTraceToken(value) {
@@ -594,6 +596,19 @@ function buildRemoteRuntimeMeta({
   };
 }
 
+function countCursorPositionQueries(rawData) {
+  if (typeof rawData !== "string" || rawData.length === 0) {
+    return 0;
+  }
+  return (rawData.match(/\u001b\[6n/g) || []).length;
+}
+
+function buildCursorPositionReport(row = 1, col = 1) {
+  const normalizedRow = Number.isInteger(row) && row > 0 ? row : 1;
+  const normalizedCol = Number.isInteger(col) && col > 0 ? col : 1;
+  return `\u001b[${normalizedRow};${normalizedCol}R`;
+}
+
 export class SessionManager {
   constructor({
     defaultShell = "bash",
@@ -761,6 +776,13 @@ export class SessionManager {
     }
     this.clearLaunchPostStartInputTimer(session);
     session.pendingLaunchPostStartInput = null;
+  }
+
+  clearStartupTerminalQueryFallback(session) {
+    if (!session) {
+      return;
+    }
+    session.pendingStartupTerminalQueryFallback = null;
   }
 
   clearExpectedExitReason(session) {
@@ -942,6 +964,9 @@ export class SessionManager {
         }
         return trace;
       };
+      this.observeStartupTerminalQueryFallback(session, {
+        rawData: typeof data === "string" ? data : String(data ?? "")
+      });
       const signalResult = this.observeSessionTerminalSignals(session, data, {
         updatedAt: getTimestamp()
       });
@@ -1050,6 +1075,11 @@ export class SessionManager {
     }
     const pending = session.pendingLaunchPostStartInput;
     this.clearPendingLaunchPostStartInput(session);
+    session.pendingStartupTerminalQueryFallback = {
+      expiresAt: this.nowFn() + DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_WINDOW_MS,
+      remainingResponses: DEFAULT_STARTUP_TERMINAL_QUERY_FALLBACK_MAX_RESPONSES,
+      trace: pending.trace || session.traceSeed || null
+    };
     this.sendInput(session.id, pending.input, {
       writeKind: "startup_submit_cr",
       trace: pending.trace || session.traceSeed || null
@@ -1078,6 +1108,7 @@ export class SessionManager {
       return false;
     }
     this.clearPendingLaunchPostStartInput(session);
+    this.clearStartupTerminalQueryFallback(session);
     session.pendingLaunchPostStartInput = {
       input: launchSpec.postStartInput,
       trace: normalizeTraceSeed(options.trace) || session.traceSeed || null,
@@ -1098,6 +1129,36 @@ export class SessionManager {
       return this.scheduleLaunchPostStartInputDispatch(session, "prompt_boundary");
     }
     return false;
+  }
+
+  observeStartupTerminalQueryFallback(session, { rawData = "", trace = null } = {}) {
+    const pending = session?.pendingStartupTerminalQueryFallback;
+    if (!session?.ptyProcess || !pending) {
+      return false;
+    }
+    if (!Number.isInteger(pending.expiresAt) || pending.expiresAt <= this.nowFn()) {
+      this.clearStartupTerminalQueryFallback(session);
+      return false;
+    }
+    if (!Number.isInteger(pending.remainingResponses) || pending.remainingResponses <= 0) {
+      this.clearStartupTerminalQueryFallback(session);
+      return false;
+    }
+    const queryCount = countCursorPositionQueries(rawData);
+    if (queryCount <= 0) {
+      return false;
+    }
+    const responseCount = Math.min(queryCount, pending.remainingResponses);
+    pending.remainingResponses -= responseCount;
+    const response = buildCursorPositionReport().repeat(responseCount);
+    this.sendInput(session.id, response, {
+      writeKind: "startup_terminal_query_response",
+      trace: trace || pending.trace || session.traceSeed || null
+    });
+    if (pending.remainingResponses <= 0) {
+      this.clearStartupTerminalQueryFallback(session);
+    }
+    return true;
   }
 
   handleAsyncPtyWriteEvent(session, event = {}) {
@@ -1229,6 +1290,7 @@ export class SessionManager {
   handlePtyExit(session, exit) {
     this.clearSessionActivityTimer(session);
     this.clearLaunchPostStartInputTimer(session);
+    this.clearStartupTerminalQueryFallback(session);
     this.clearForegroundProcessRefreshTimer(session);
     this.clearRemoteReconnectStabilizeTimer(session);
     const exitTimestamp = this.nowFn();
@@ -1867,6 +1929,7 @@ export class SessionManager {
       expectedExitReason: "",
       lastActivityAt: initialActivityTimestamp,
       pendingLaunchPostStartInput: null,
+      pendingStartupTerminalQueryFallback: null,
       remoteSecret: normalizedRemoteSecret,
       traceSeed: normalizeTraceSeed(trace),
       meta: {
