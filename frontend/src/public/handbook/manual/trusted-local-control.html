@@ -70,6 +70,21 @@
 
 <p>That keeps desktop and laptop form factors usable without forcing one shared layout across all devices.</p>
 
+<h2 id="origin-discipline">Origin Discipline</h2>
+
+<p>Trusted-local identity and layout recall are browser-origin-local. In practice, that means:</p>
+
+<ul>
+<li><code>https://ptydeck.local.secos.rocks</code></li>
+<li><code>http://172.26.86.97:18081</code></li>
+</ul>
+
+<p>behave like two separate local devices even when they reach the same backend.</p>
+
+<p>If operators mix a canonical domain with direct IP or dev-port access, configure <code>FRONTEND_CANONICAL_ORIGIN</code> so non-canonical opens redirect before trusted-local bootstrap starts. That prevents accidental device splits and stale-controller drift across origins.</p>
+
+<p>When such a redirect still lands on the canonical origin after a split was already created, the frontend can now perform a bounded session-scoped control reclaim for the affected sessions if the backend shows only stale or inactive prior controllers for the same single-user owner.</p>
+
 <h2 id="startup-prompt">Startup Prompt</h2>
 
 <p>When a device opens the frontend and is not currently the controlling device, <code>ptydeck</code> can show a subtle startup prompt asking whether this device should take control and apply its local layouts.</p>
@@ -87,6 +102,7 @@
 <li><a class="handbook-page-toc-link" href="#take-or-reclaim-control">Take or Reclaim Control</a></li>
 <li><a class="handbook-page-toc-link" href="#scope">Scope</a></li>
 <li><a class="handbook-page-toc-link" href="#device-local-layout-recall">Device-Local Layout Recall</a></li>
+<li><a class="handbook-page-toc-link" href="#origin-discipline">Origin Discipline</a></li>
 <li><a class="handbook-page-toc-link" href="#startup-prompt">Startup Prompt</a></li>
 <li><a class="handbook-page-toc-link" href="#related-references">Related References</a></li>
 </ul>

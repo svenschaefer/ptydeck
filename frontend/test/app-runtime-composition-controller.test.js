@@ -277,7 +277,15 @@ function createWindowFixture(documentRef) {
     location: {
       protocol: "http:",
       hostname: "127.0.0.1",
-      search: ""
+      host: "127.0.0.1:18081",
+      pathname: "/",
+      search: "",
+      hash: "",
+      replace() {}
+    },
+    history: {
+      state: null,
+      replaceState() {}
     },
     navigator: {
       clipboard: {
@@ -326,8 +334,9 @@ function createControllerHarness(options = {}) {
   const fixture = createMinimalDocumentFixture();
   const hooks = {};
   let ensuredIdentityCount = 0;
+  const windowRef = options.windowRef || createWindowFixture(fixture.document);
   const controller = createAppRuntimeCompositionController({
-    windowRef: createWindowFixture(fixture.document),
+    windowRef,
     documentRef: fixture.document,
     createStartupBackupRuntimeController:
       options.createStartupBackupRuntimeController ||
@@ -355,6 +364,7 @@ function createControllerHarness(options = {}) {
   return {
     controller,
     fixture,
+    windowRef,
     hooks,
     getEnsuredIdentityCount: () => ensuredIdentityCount
   };
@@ -407,6 +417,31 @@ test("app-runtime composition controller initialize surfaces startup-backup fail
   await assert.rejects(harness.controller.initialize(), /Startup backup unavailable\./);
   assert.equal(harness.hooks.getInitializationErrorMessage(), "Startup backup unavailable.");
   assert.equal(harness.getEnsuredIdentityCount(), 0);
+});
+
+test("app-runtime composition controller redirects to the canonical origin before trusted-local bootstrap", async () => {
+  const fixture = createMinimalDocumentFixture();
+  const replaceCalls = [];
+  const windowRef = createWindowFixture(fixture.document);
+  windowRef.location.protocol = "http:";
+  windowRef.location.hostname = "172.26.86.97";
+  windowRef.location.host = "172.26.86.97:18081";
+  windowRef.location.pathname = "/";
+  windowRef.location.search = "?debug=1";
+  windowRef.location.hash = "#deck";
+  windowRef.location.replace = (url) => replaceCalls.push(url);
+  windowRef.__PTYDECK_CONFIG__ = {
+    canonicalOrigin: "https://ptydeck.local.secos.rocks"
+  };
+  const harness = createControllerHarness({ windowRef });
+
+  const result = await harness.controller.initialize();
+
+  assert.deepEqual(result, { redirected: true });
+  assert.equal(harness.getEnsuredIdentityCount(), 0);
+  assert.deepEqual(replaceCalls, [
+    "https://ptydeck.local.secos.rocks/?debug=1&ptydeck_origin_handoff=http%3A%2F%2F172.26.86.97%3A18081#deck"
+  ]);
 });
 
 test("app-runtime composition controller preserves a specific initialization error message over the generic fallback", () => {
@@ -499,6 +534,77 @@ test("app-runtime composition controller exposes reclaim-and-retry state with th
     sessionId: "s-1",
     retryAction
   });
+});
+
+test("app-runtime composition controller auto-reclaims control after a canonical-origin handoff when the stale controller is reconnecting", async () => {
+  const harness = createControllerHarness();
+  const takeCalls = [];
+  const feedbackMessages = [];
+  harness.hooks.setRuntimeClientId("client-local");
+  harness.hooks.setTrustedLocalClientLabel("Laptop");
+  harness.hooks.setRuntimeClientIdentityCreatedOnThisOrigin(true);
+  harness.hooks.setOriginHandoffSourceOrigin("http://172.26.86.97:18081");
+  harness.hooks.setSessionsForTest([
+    {
+      id: "s-1",
+      controlState: {
+        owner: {
+          subject: "dev-user",
+          tenantId: "",
+          accessMode: "operator",
+          permissionMode: ""
+        },
+        currentController: {
+          clientId: "client-legacy-ip",
+          active: false,
+          label: "Chrome on Windows (ABCD)"
+        },
+        attachedClients: [
+          {
+            clientId: "client-local",
+            active: true,
+            accessMode: "operator",
+            permissionMode: "",
+            subject: "dev-user",
+            tenantId: "",
+            label: "Laptop"
+          },
+          {
+            clientId: "client-legacy-ip",
+            active: false,
+            accessMode: "operator",
+            permissionMode: "",
+            subject: "dev-user",
+            tenantId: "",
+            label: "Chrome on Windows (ABCD)"
+          }
+        ]
+      }
+    }
+  ]);
+  harness.hooks.setCollaborators({
+    trustedLocalHandoffRuntimeController: {
+      async takeControlScope(scope, payload) {
+        takeCalls.push([scope, payload]);
+        return { updatedSessions: [] };
+      }
+    },
+    appCommandUiFacadeController: {
+      setCommandFeedback(message) {
+        feedbackMessages.push(message);
+      }
+    }
+  });
+
+  const repaired = await harness.hooks.maybeAutoRepairOriginHandoffControl();
+
+  assert.equal(repaired, true);
+  assert.deepEqual(takeCalls, [["session", { sessionId: "s-1" }]]);
+  assert.equal(harness.hooks.getOriginHandoffSourceOrigin(), "");
+  assert.equal(
+    feedbackMessages[0],
+    "Detected origin handoff from http://172.26.86.97:18081. This device reclaimed control for the affected sessions automatically."
+  );
 });
 
 test("app-runtime composition controller retries a blocked action immediately when control is already local again", async () => {

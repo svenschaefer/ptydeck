@@ -18,6 +18,8 @@ If you already know the deck you want, create or switch the deck first:
 /deck switch ops
 ```
 
+If your local runtime is reachable through both a canonical domain and a direct IP/dev-port URL, use the canonical browser origin consistently. Trusted-local identity, layout recall, and control state are browser-origin-local, so switching between origins such as `https://ptydeck.local.secos.rocks` and `http://172.26.86.97:18081` can make one physical browser look like two different devices unless `FRONTEND_CANONICAL_ORIGIN` redirects non-canonical opens first.
+
 The full command surface lives in the [slash command reference](../reference/commands.md).
 
 ## Shape the Deck

@@ -53,6 +53,7 @@ Set at least:
 Optional frontend overrides:
 
 - `API_BASE_URL`, `WS_URL` (leave unset to auto-derive from browser host)
+- `FRONTEND_CANONICAL_ORIGIN` (recommended when the same local backend is reachable through both a canonical domain and direct IP/dev-port URLs)
 
 Secrets policy baseline:
 
@@ -69,6 +70,7 @@ Optional for troubleshooting:
 - Backend (optional filter, comma-separated): `SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex`
 - Backend (optional bounded file size): `SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432`
 - Frontend: `FRONTEND_DEBUG_LOGS=1` (dev-server injected runtime config) and/or `?debug=1` in URL for browser-side REST/WS/render/resize logs
+- Frontend origin note: when operators may open the same local runtime through both `https://ptydeck.local.secos.rocks` and a direct dev/IP origin such as `http://172.26.86.97:18081`, set `FRONTEND_CANONICAL_ORIGIN=https://ptydeck.local.secos.rocks` so non-canonical opens redirect before trusted-local bootstrap creates another browser-local device identity. This prevents the common “IP-first feels cleaner than domain-first” split where trusted-local control/layout state is accidentally forked across two origins.
 - Frontend bootstrap note: after `H125`/`H127`, first frontend open after a backend-only restart is expected to replay snapshot output and run resize/stabilization work, but it should not emit session `/input` writes until explicit local operator interaction occurs. Plain focus/click is no longer intended to arm terminal input forwarding by itself.
 - PTY-write note: after `H129`, patchable Unix `node-pty` instances now retry `EINTR` asynchronously in a bounded way and emit structured `session.input.write` async phases (`retry`, `committed`, `failed`) with error-code/failure-stage metadata when backend debug logs are enabled, so PTY write-loss investigations no longer depend only on dependency stderr.
 - Messaging-specific note: the delivered Telegram baseline now emits structured `messaging.event.trace` debug lines when backend debug logs are enabled, which makes outbound candidate, suppression, and rate-limit behavior inspectable across real noisy CLI sessions

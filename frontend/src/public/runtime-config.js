@@ -64,6 +64,7 @@ export function resolveRuntimeConfig(win = window) {
     return {
       apiBaseUrl: injected.apiBaseUrl,
       wsUrl: injected.wsUrl,
+      canonicalOrigin: typeof injected.canonicalOrigin === "string" ? injected.canonicalOrigin : "",
       debugLogs
     };
   }
@@ -78,6 +79,7 @@ export function resolveRuntimeConfig(win = window) {
   return {
     apiBaseUrl: buildUrl(protocolHttp, apiHost, apiPort, "/api/v1"),
     wsUrl: buildUrl(protocolWs, wsHost, wsPort, "/ws"),
+    canonicalOrigin: typeof injected.canonicalOrigin === "string" ? injected.canonicalOrigin : "",
     debugLogs
   };
 }

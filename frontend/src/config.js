@@ -27,10 +27,16 @@ export function loadClientConfig(env = process.env) {
   const port = parsePort(env.FRONTEND_PORT || 18081, "FRONTEND_PORT");
   const apiBaseUrl = parseUrl(String(env.API_BASE_URL || "").trim(), "API_BASE_URL", ["http:", "https:"]);
   const wsUrl = parseUrl(String(env.WS_URL || "").trim(), "WS_URL", ["ws:", "wss:"]);
+  const canonicalOrigin = parseUrl(
+    String(env.FRONTEND_CANONICAL_ORIGIN || "").trim(),
+    "FRONTEND_CANONICAL_ORIGIN",
+    ["http:", "https:"]
+  );
   return {
     port,
     apiBaseUrl,
     wsUrl,
+    canonicalOrigin,
     debugLogs
   };
 }

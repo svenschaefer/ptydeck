@@ -18,6 +18,7 @@ function injectRuntimeConfig(html) {
   const runtimeConfig = {
     apiBaseUrl: config.apiBaseUrl,
     wsUrl: config.wsUrl,
+    canonicalOrigin: config.canonicalOrigin,
     debugLogs: config.debugLogs
   };
   const script = `<script>window.__PTYDECK_CONFIG__=${JSON.stringify(runtimeConfig)};</script>`;

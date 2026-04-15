@@ -48,6 +48,8 @@
 <pre><code class="language-text">/deck new ops
 /deck switch ops</code></pre>
 
+<p>If your local runtime is reachable through both a canonical domain and a direct IP/dev-port URL, use the canonical browser origin consistently. Trusted-local identity, layout recall, and control state are browser-origin-local, so switching between origins such as <code>https://ptydeck.local.secos.rocks</code> and <code>http://172.26.86.97:18081</code> can make one physical browser look like two different devices unless <code>FRONTEND_CANONICAL_ORIGIN</code> redirects non-canonical opens first.</p>
+
 <p>The full command surface lives in the <a href="/handbook/reference/commands.html">slash command reference</a>.</p>
 
 <h2 id="shape-the-deck">Shape the Deck</h2>

@@ -14,6 +14,7 @@ test("runtime config falls back to localhost dev ports", () => {
   assert.deepEqual(config, {
     apiBaseUrl: "http://127.0.0.1:18080/api/v1",
     wsUrl: "ws://127.0.0.1:18080/ws",
+    canonicalOrigin: "",
     debugLogs: false
   });
 });
@@ -30,6 +31,7 @@ test("runtime config derives api host from ptydeck domain without explicit env",
   assert.deepEqual(config, {
     apiBaseUrl: "https://api.ptydeck.local.example/api/v1",
     wsUrl: "wss://api.ptydeck.local.example/ws",
+    canonicalOrigin: "",
     debugLogs: false
   });
 });
@@ -52,6 +54,7 @@ test("runtime config uses injected host/port overrides", () => {
   assert.deepEqual(config, {
     apiBaseUrl: "https://api-host.local:8443/api/v1",
     wsUrl: "wss://ws-host.local:9443/ws",
+    canonicalOrigin: "",
     debugLogs: false
   });
 });
@@ -76,8 +79,24 @@ test("runtime config gives precedence to explicit apiBaseUrl/wsUrl", () => {
   assert.deepEqual(config, {
     apiBaseUrl: "https://api.explicit.local/api/v1",
     wsUrl: "wss://api.explicit.local/ws",
+    canonicalOrigin: "",
     debugLogs: false
   });
+});
+
+test("runtime config surfaces injected canonical origin", () => {
+  const config = resolveRuntimeConfig({
+    location: {
+      protocol: "http:",
+      hostname: "172.26.86.97",
+      search: ""
+    },
+    __PTYDECK_CONFIG__: {
+      canonicalOrigin: "https://ptydeck.local.secos.rocks"
+    }
+  });
+
+  assert.equal(config.canonicalOrigin, "https://ptydeck.local.secos.rocks");
 });
 
 test("runtime config enables debug logs via query string", () => {

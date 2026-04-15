@@ -398,6 +398,7 @@ const SESSION_TAG_MAX_LENGTH = 32;
 const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
+const ORIGIN_HANDOFF_QUERY_PARAM = "ptydeck_origin_handoff";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEV_AUTH_REFRESH_SAFETY_MS = 60_000;
 const DEV_AUTH_RETRY_DELAY_MS = 30_000;
@@ -593,9 +594,94 @@ function getReadOnlyModeMessage() {
 let runtimeClientId = "";
 let trustedLocalClientLabel = "";
 let commandFeedbackActionMeta = null;
+let runtimeClientIdentityCreatedOnThisOrigin = false;
+let originHandoffSourceOrigin = "";
+let originHandoffAutoRepairAttempted = false;
 
 function normalizeControlText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOriginValue(value) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) {
+    return "";
+  }
+  try {
+    return new URL(normalized).origin;
+  } catch {
+    return "";
+  }
+}
+
+function getWindowOrigin(win) {
+  const location = win?.location || null;
+  if (typeof location?.origin === "string" && location.origin.trim()) {
+    return normalizeOriginValue(location.origin);
+  }
+  const protocol = typeof location?.protocol === "string" ? location.protocol : "";
+  const host = typeof location?.host === "string" ? location.host : "";
+  if (!protocol || !host) {
+    return "";
+  }
+  return normalizeOriginValue(`${protocol}//${host}`);
+}
+
+function buildCanonicalOriginRedirectUrl(win, canonicalOrigin, handoffOrigin) {
+  const location = win?.location || null;
+  const targetUrl = new URL(typeof location?.pathname === "string" && location.pathname ? location.pathname : "/", canonicalOrigin);
+  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
+  params.delete(ORIGIN_HANDOFF_QUERY_PARAM);
+  if (handoffOrigin) {
+    params.set(ORIGIN_HANDOFF_QUERY_PARAM, handoffOrigin);
+  }
+  const search = params.toString();
+  targetUrl.search = search ? `?${search}` : "";
+  targetUrl.hash = typeof location?.hash === "string" ? location.hash : "";
+  return targetUrl.toString();
+}
+
+function readOriginHandoffSourceOrigin(win) {
+  const location = win?.location || null;
+  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
+  return normalizeOriginValue(params.get(ORIGIN_HANDOFF_QUERY_PARAM) || "");
+}
+
+function clearOriginHandoffSearchParam(win) {
+  const location = win?.location || null;
+  const historyRef = win?.history || null;
+  if (typeof historyRef?.replaceState !== "function") {
+    return false;
+  }
+  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
+  if (!params.has(ORIGIN_HANDOFF_QUERY_PARAM)) {
+    return false;
+  }
+  params.delete(ORIGIN_HANDOFF_QUERY_PARAM);
+  const pathname = typeof location?.pathname === "string" && location.pathname ? location.pathname : "/";
+  const nextSearch = params.toString();
+  const nextHash = typeof location?.hash === "string" ? location.hash : "";
+  const nextUrl = `${pathname}${nextSearch ? `?${nextSearch}` : ""}${nextHash}`;
+  historyRef.replaceState(historyRef.state || null, "", nextUrl);
+  return true;
+}
+
+function maybeRedirectToCanonicalOrigin() {
+  const canonicalOrigin = normalizeOriginValue(config.canonicalOrigin);
+  const currentOrigin = getWindowOrigin(window);
+  if (!canonicalOrigin || !currentOrigin || canonicalOrigin === currentOrigin) {
+    return false;
+  }
+  const targetUrl = buildCanonicalOriginRedirectUrl(window, canonicalOrigin, currentOrigin);
+  if (typeof window?.location?.replace === "function") {
+    window.location.replace(targetUrl);
+    return true;
+  }
+  if (window?.location) {
+    window.location.href = targetUrl;
+    return true;
+  }
+  return false;
 }
 
 function getSessionControlState(session) {
@@ -761,6 +847,75 @@ function canTakeSessionControl(session) {
     return false;
   }
   return true;
+}
+
+function isOriginHandoffRepairableSession(session) {
+  if (!originHandoffSourceOrigin || !session || !runtimeClientId) {
+    return false;
+  }
+  const controller = getCurrentSessionController(session);
+  if (!controller || controller.active === true) {
+    return false;
+  }
+  if (normalizeControlText(controller.clientId) === runtimeClientId) {
+    return false;
+  }
+  if (!runtimeClientIdentityCreatedOnThisOrigin) {
+    return false;
+  }
+  if (!isLocalOperatorSessionClient(session) || !isLocalSessionOwner(session)) {
+    return false;
+  }
+  return canTakeSessionControl(session);
+}
+
+function listOriginHandoffRepairableSessions() {
+  const sessions = Array.isArray(store?.getState?.().sessions) ? store.getState().sessions : [];
+  return sessions.filter((session) => isOriginHandoffRepairableSession(session));
+}
+
+async function maybeAutoRepairOriginHandoffControl() {
+  if (originHandoffAutoRepairAttempted || isReadOnlyMode()) {
+    return false;
+  }
+  const repairableSessions = listOriginHandoffRepairableSessions();
+  if (repairableSessions.length === 0) {
+    return false;
+  }
+  if (typeof trustedLocalHandoffRuntimeController?.takeControlScope !== "function") {
+    return false;
+  }
+  const handoffOrigin = originHandoffSourceOrigin;
+  originHandoffAutoRepairAttempted = true;
+  debugLog("trusted_local.origin_handoff_auto_repair.start", {
+    handoffOrigin,
+    sessionCount: repairableSessions.length
+  });
+  try {
+    for (const session of repairableSessions) {
+      const sessionId = normalizeControlText(session?.id);
+      if (!sessionId) {
+        continue;
+      }
+      await trustedLocalHandoffRuntimeController.takeControlScope("session", { sessionId });
+    }
+    originHandoffSourceOrigin = "";
+    appCommandUiFacadeController?.setCommandFeedback(
+      `Detected origin handoff from ${handoffOrigin}. This device reclaimed control for the affected sessions automatically.`
+    );
+    debugLog("trusted_local.origin_handoff_auto_repair.ok", {
+      handoffOrigin,
+      sessionCount: repairableSessions.length
+    });
+    return true;
+  } catch (error) {
+    debugLog("trusted_local.origin_handoff_auto_repair.error", {
+      handoffOrigin,
+      sessionCount: repairableSessions.length,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return false;
+  }
 }
 
 function canReleaseSessionControl(session) {
@@ -970,8 +1125,19 @@ function installTestHooks() {
     getTakeOrReclaimControlLabel,
     renderSessionControlClients,
     showBlockedWriteReclaimUi,
+    maybeAutoRepairOriginHandoffControl,
     handleCommandFeedbackAction,
     getCommandFeedbackActionMeta: () => commandFeedbackActionMeta,
+    getOriginHandoffSourceOrigin: () => originHandoffSourceOrigin,
+    setOriginHandoffSourceOrigin(origin) {
+      originHandoffSourceOrigin = normalizeOriginValue(origin);
+    },
+    setRuntimeClientIdentityCreatedOnThisOrigin(value) {
+      runtimeClientIdentityCreatedOnThisOrigin = value === true;
+    },
+    setSessionsForTest(sessions) {
+      store.setSessions(Array.isArray(sessions) ? sessions : []);
+    },
     setCommandFeedbackActionSessionId(sessionId) {
       uiState.commandFeedbackActionSessionId = normalizeControlText(sessionId);
     },
@@ -1775,7 +1941,10 @@ runtimeEventController = createRuntimeEventController({
   getPreferredActiveDeckId: () => store.getState().activeDeckId,
   setDecks: (nextDecks, options) => appLayoutDeckFacadeController?.setDecks(nextDecks, options),
   replaceCustomCommandState: (commands) => appCommandUiFacadeController?.replaceCustomCommands(commands),
-  setSessions: (sessions) => store.setSessions(sessions),
+  setSessions: (sessions) => {
+    store.setSessions(sessions);
+    Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});
+  },
   replaySnapshotOutputs: (outputs, attempt) => appSessionRuntimeFacadeController?.replaySnapshotOutputs(outputs, attempt),
   scheduleSnapshotTerminalStabilization: (sessionIds) =>
     appSessionRuntimeFacadeController?.scheduleSnapshotTerminalStabilization(sessionIds),
@@ -1784,7 +1953,10 @@ runtimeEventController = createRuntimeEventController({
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
   setRuntimeClientId,
-  upsertSession: (nextSession) => appSessionRuntimeFacadeController?.upsertSession(nextSession),
+  upsertSession: (nextSession) => {
+    appSessionRuntimeFacadeController?.upsertSession(nextSession);
+    Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});
+  },
   markSessionExited: (sessionId, exitDetails) => appSessionRuntimeFacadeController?.markSessionExited(sessionId, exitDetails),
   markSessionClosed: (sessionId) => appSessionRuntimeFacadeController?.markSessionClosed(sessionId),
   upsertDeckInState: (nextDeck, options) => appLayoutDeckFacadeController?.upsertDeckInState(nextDeck, options),
@@ -2411,8 +2583,15 @@ function setInitializationError(message) {
 
 async function initialize() {
   try {
+    if (maybeRedirectToCanonicalOrigin()) {
+      return { redirected: true };
+    }
+    originHandoffSourceOrigin = readOriginHandoffSourceOrigin(window);
+    clearOriginHandoffSearchParam(window);
     await startupBackupRuntimeController.ensureStartupBackup();
+    const existingTrustedLocalClient = trustedLocalClientRuntimeController.getClientIdentity?.() || null;
     const trustedLocalClient = await trustedLocalClientRuntimeController.ensureClientIdentity();
+    runtimeClientIdentityCreatedOnThisOrigin = !existingTrustedLocalClient && Boolean(trustedLocalClient?.clientId);
     trustedLocalClientLabel = normalizeControlText(trustedLocalClient?.label);
     setRuntimeClientId(trustedLocalClient?.clientId || "");
     return await appBootstrapCompositionController.bootstrapUiAndRuntime();
