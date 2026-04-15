@@ -79,6 +79,7 @@ Optional for troubleshooting:
 - Messaging-specific note: after `H136`, the shipped semantic-primary default is `legacy`; use `MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE=projection` only for controlled parity experiments, because the projection path is still meant to collect shadow evidence until the cutover metrics are demonstrably healthy
 - Stream-analysis note: the new session-stream capture is analysis-only and independent of Telegram delivery. It writes bounded JSONL entries with raw PTY chunks, cleaned chunks, prompt-boundary offsets, terminal-signal kinds, session metadata, and app-identity metadata so Codex block rules can be evaluated after a restart without depending on the short replay tail or the metadata-only backend debug log
 - Local dev startup note: `npm run dev` and `npm --prefix backend run dev` now auto-source the gitignored repo-local file `local-config/ptydeck/backend.env.local` when it exists, so machine-specific debug and analysis settings can survive restarts without manually prefixing every dev command
+- Frontend local-dev note: `npm --prefix frontend run dev` and therefore the root `npm run dev` path now auto-source `frontend/.env.local` first and `frontend/.env` second when those gitignored files exist, so local-only browser-origin overrides such as `FRONTEND_CANONICAL_ORIGIN=https://ptydeck.local.secos.rocks` persist across restarts without shell-prefixing every frontend launch
 
 Optional local auth baseline (development only):
 
