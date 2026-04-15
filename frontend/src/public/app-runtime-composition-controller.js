@@ -1974,6 +1974,19 @@ runtimeEventController = createRuntimeEventController({
   showBlockedWriteReclaimUi,
   isReadOnlyMode,
   getReadOnlyModeMessage,
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage(error, fallback) || fallback,
+  reportTerminalInputError: (sessionId, error, options = {}) => {
+    const message = appCommandUiFacadeController?.getErrorMessage(error, "Failed to send terminal input.") || "Failed to send terminal input.";
+    const payload = {
+      sessionId: String(sessionId || "").trim(),
+      source: String(options?.source || "").trim() || "terminal-input",
+      suppressed: options?.suppressed === true,
+      name: typeof error?.name === "string" ? error.name : "",
+      message
+    };
+    traceDebugController.record("terminal.input.error", payload);
+    debugLog("terminal.input.error", payload);
+  },
   setError: (message) => appCommandUiFacadeController?.setError(message),
   sendInput: (sessionId, data) => api.sendInput(sessionId, data)
 });

@@ -125,6 +125,45 @@ test("runtime-event controller blocks direct terminal input when this client doe
   ]);
 });
 
+test("runtime-event controller surfaces the concrete terminal input error message", async () => {
+  const errors = [];
+  const reports = [];
+  const controller = createRuntimeEventController({
+    getSessionById: () => ({ id: "s-1", state: "running" }),
+    getErrorMessage: (error, fallback) => error?.message || fallback,
+    reportTerminalInputError: (sessionId, error, options) =>
+      reports.push([sessionId, error?.message || "", options?.suppressed === true]),
+    setError: (message) => errors.push(message),
+    sendInput: () => Promise.reject(new Error("Network timeout while sending input."))
+  });
+
+  controller.handleSessionTerminalInput("s-1", "pwd");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(errors, ["Network timeout while sending input."]);
+  assert.deepEqual(reports, [["s-1", "Network timeout while sending input.", false]]);
+});
+
+test("runtime-event controller suppresses abort-like terminal input errors", async () => {
+  const errors = [];
+  const reports = [];
+  const controller = createRuntimeEventController({
+    getSessionById: () => ({ id: "s-1", state: "running" }),
+    reportTerminalInputError: (sessionId, error, options) =>
+      reports.push([sessionId, error?.name || "", options?.suppressed === true]),
+    setError: (message) => errors.push(message),
+    sendInput: () => Promise.reject(Object.assign(new Error("The operation was aborted."), { name: "AbortError" }))
+  });
+
+  controller.handleSessionTerminalInput("s-1", "pwd");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(reports, [["s-1", "AbortError", true]]);
+});
+
 test("runtime-event controller applies representative runtime updates and deck fallback defaults", () => {
   const calls = [];
   const sessions = new Map([["s2", { id: "s2", name: "two" }]]);

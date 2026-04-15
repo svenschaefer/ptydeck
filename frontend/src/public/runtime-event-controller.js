@@ -38,6 +38,22 @@ export function createRuntimeEventController(options = {}) {
     typeof options.showBlockedWriteReclaimUi === "function" ? options.showBlockedWriteReclaimUi : () => false;
   const setError = options.setError || (() => {});
   const sendInput = options.sendInput || (() => Promise.resolve());
+  const getErrorMessage =
+    typeof options.getErrorMessage === "function" ? options.getErrorMessage : (_error, fallback) => fallback;
+  const reportTerminalInputError =
+    typeof options.reportTerminalInputError === "function" ? options.reportTerminalInputError : () => {};
+
+  function isAbortLikeTerminalInputError(error) {
+    const name = typeof error?.name === "string" ? error.name.trim() : "";
+    const message = typeof error?.message === "string" ? error.message.trim() : "";
+    if (name === "AbortError") {
+      return true;
+    }
+    if (!message) {
+      return false;
+    }
+    return /abort(?:ed|ing)?/iu.test(message);
+  }
 
   function applyRuntimeSnapshot(event) {
     setRuntimeClientId(event?.clientId || "");
@@ -78,7 +94,14 @@ export function createRuntimeEventController(options = {}) {
       showBlockedWriteReclaimUi(latestSession, { source: "terminal-input", message });
       return;
     }
-    sendInput(sessionId, data).catch(() => setError("Failed to send terminal input."));
+    sendInput(sessionId, data).catch((error) => {
+      const suppressed = isAbortLikeTerminalInputError(error);
+      reportTerminalInputError(sessionId, error, { suppressed, source: "terminal-input" });
+      if (suppressed) {
+        return;
+      }
+      setError(getErrorMessage(error, "Failed to send terminal input."));
+    });
   }
 
   function applyRuntimeEvent(event, options = {}) {
