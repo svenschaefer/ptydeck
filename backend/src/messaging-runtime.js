@@ -1089,14 +1089,34 @@ function buildCodexRestartResendTargetStateKey(target, sessionId) {
   ].join(":");
 }
 
-function buildCodexRestartResendLedgerKey({ deliveryScope, sessionId, target, comparableText }) {
+function buildCodexRestartResendLedgerKeys({ deliveryScope, deliverySignal, sessionId, target, comparableText }) {
   const normalizedScope = normalizeNonEmptyString(deliveryScope);
+  const normalizedSignal = resolveAllowlistDeliverySignal(normalizedScope, deliverySignal);
   const normalizedComparableText = normalizeNonEmptyString(comparableText);
   const targetStateKey = buildCodexRestartResendTargetStateKey(target, sessionId);
-  if (!normalizedScope || !normalizedComparableText || !targetStateKey) {
-    return "";
+  if (!normalizedComparableText || !targetStateKey) {
+    return [];
   }
-  return `${normalizedScope}:${targetStateKey}:${normalizedComparableText}`;
+  const keys = [];
+  if (normalizedSignal) {
+    keys.push(`${normalizedSignal}:${targetStateKey}:${normalizedComparableText}`);
+  }
+  if (normalizedScope && normalizedScope !== normalizedSignal) {
+    keys.push(`${normalizedScope}:${targetStateKey}:${normalizedComparableText}`);
+  }
+  return keys;
+}
+
+function buildCodexRestartResendLedgerKey({ deliveryScope, deliverySignal, sessionId, target, comparableText }) {
+  return (
+    buildCodexRestartResendLedgerKeys({
+      deliveryScope,
+      deliverySignal,
+      sessionId,
+      target,
+      comparableText
+    })[0] || ""
+  );
 }
 
 function normalizeCodexRestartResendLedgerEntry(entry) {
@@ -1104,6 +1124,7 @@ function normalizeCodexRestartResendLedgerEntry(entry) {
     return null;
   }
   const deliveryScope = normalizeNonEmptyString(entry.deliveryScope);
+  const deliverySignal = resolveAllowlistDeliverySignal(deliveryScope, entry.deliverySignal);
   const sessionId = normalizeNonEmptyString(entry.sessionId);
   const chatId = normalizeNonEmptyString(entry.chatId) || String(entry.chatId ?? "").trim();
   const messageThreadId = normalizePositiveInteger(entry.messageThreadId);
@@ -1114,6 +1135,7 @@ function normalizeCodexRestartResendLedgerEntry(entry) {
     normalizeNonEmptyString(entry.key) ||
     buildCodexRestartResendLedgerKey({
       deliveryScope,
+      deliverySignal,
       sessionId,
       target: {
         chatId,
@@ -1128,6 +1150,7 @@ function normalizeCodexRestartResendLedgerEntry(entry) {
   return Object.freeze({
     key,
     deliveryScope,
+    deliverySignal,
     sessionId,
     chatId,
     ...(Number.isInteger(messageThreadId) ? { messageThreadId } : {}),
@@ -1505,6 +1528,14 @@ function getAllowlistDeliverySignalForScope(deliveryScope) {
   }
 }
 
+function resolveAllowlistDeliverySignal(deliveryScope = "", deliverySignal = "") {
+  return normalizeNonEmptyString(deliverySignal) || getAllowlistDeliverySignalForScope(deliveryScope);
+}
+
+function resolveAllowlistReasonPrefix(deliveryScope = "", deliverySignal = "") {
+  return resolveAllowlistDeliverySignal(deliveryScope, deliverySignal) || normalizeNonEmptyString(deliveryScope) || "allowlist_delivery";
+}
+
 function isAllowlistDeliverySignal(deliverySignal) {
   const normalizedDeliverySignal = normalizeNonEmptyString(deliverySignal);
   return Boolean(normalizedDeliverySignal && ALLOWLIST_DELIVERY_SIGNALS.includes(normalizedDeliverySignal));
@@ -1538,6 +1569,7 @@ function createEvent({
   messageIntent = null
 }) {
   const normalizedDeliveryScope = normalizeNonEmptyString(deliveryScope);
+  const normalizedDeliverySignal = resolveAllowlistDeliverySignal(normalizedDeliveryScope, deliverySignal);
   const textSummary =
     preserveStructuredSummary || normalizedDeliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
       ? truncateStructuredMessageText(summary, summaryMaxLength)
@@ -1560,7 +1592,7 @@ function createEvent({
     trace,
     aggregationReason: normalizeNonEmptyString(aggregationReason),
     deliveryScope: normalizedDeliveryScope,
-    deliverySignal: normalizeNonEmptyString(deliverySignal),
+    deliverySignal: normalizedDeliverySignal,
     deliveryBlockKey: normalizeNonEmptyString(deliveryBlockKey),
     noiseClass: normalizeNonEmptyString(noiseClass),
     comparableText: normalizedComparableText,
@@ -1615,7 +1647,8 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
   }
   const messageKey = normalizeNonEmptyString(event?.threadKey) || "status";
   const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
-  const deliverySignal = normalizeNonEmptyString(
+  const deliverySignal = resolveAllowlistDeliverySignal(
+    deliveryScope,
     event?.deliverySignal || event?.messageIntent?.metadata?.deliverySignal || event?.messageIntent?.intentKind
   );
   const deliveryBlockKey = normalizeNonEmptyString(event?.deliveryBlockKey);
@@ -1690,7 +1723,7 @@ export function applyMessagingMessagePolicy(event, threadState = {}) {
     return Object.freeze({ action: "alert", messageKey: "attention", reason: "attention_required" });
   }
   if (isCodexAllowlistScope(deliveryScope) || isAllowlistDeliverySignal(deliverySignal)) {
-    const reasonPrefix = deliveryScope || deliverySignal || "allowlist_delivery";
+    const reasonPrefix = resolveAllowlistReasonPrefix(deliveryScope, deliverySignal);
     if (
       threadState.messageCreated === true &&
       deliveryBlockKey &&
@@ -2261,7 +2294,10 @@ export function createMessagingRuntime(options = {}) {
       aggregationReason: normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
       deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
       deliverySignal:
-        normalizeNonEmptyString(intent?.metadata?.deliverySignal) || normalizeNonEmptyString(intent?.intentKind),
+        resolveAllowlistDeliverySignal(
+          normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
+          normalizeNonEmptyString(intent?.metadata?.deliverySignal) || normalizeNonEmptyString(intent?.intentKind)
+        ),
       comparableText: normalizeNonEmptyString(intent?.comparableText) || createComparableText(intent?.text || ""),
       deliveryBlockKey:
         normalizeNonEmptyString(intent?.turn?.turnId) ||
@@ -3258,13 +3294,16 @@ export function createMessagingRuntime(options = {}) {
         noiseClass: normalizeNonEmptyString(entry?.noiseClass),
         aggregationReason: normalizeNonEmptyString(entry?.aggregationReason),
         deliveryScope: normalizeNonEmptyString(entry?.deliveryScope),
+        deliverySignal: resolveAllowlistDeliverySignal(entry?.deliveryScope, entry?.deliverySignal),
         deliveryBlockKey: normalizeNonEmptyString(entry?.deliveryBlockKey),
         comparisonResult: normalizeNonEmptyString(entry?.comparisonResult),
         comparisonClass: normalizeNonEmptyString(entry?.comparisonClass),
         primaryMode: normalizeNonEmptyString(entry?.primaryMode),
         shadowMode: normalizeNonEmptyString(entry?.shadowMode),
         primaryDeliveryScope: normalizeNonEmptyString(entry?.primaryDeliveryScope),
+        primaryDeliverySignal: resolveAllowlistDeliverySignal(entry?.primaryDeliveryScope, entry?.primaryDeliverySignal),
         shadowDeliveryScope: normalizeNonEmptyString(entry?.shadowDeliveryScope),
+        shadowDeliverySignal: resolveAllowlistDeliverySignal(entry?.shadowDeliveryScope, entry?.shadowDeliverySignal),
         traceId: normalizeNonEmptyString(entry?.traceId),
         correlationId: normalizeNonEmptyString(entry?.correlationId),
         traceSource: normalizeNonEmptyString(entry?.traceSource),
@@ -3385,6 +3424,7 @@ export function createMessagingRuntime(options = {}) {
       noiseClass: event?.noiseClass,
       aggregationReason: event?.aggregationReason,
       deliveryScope: event?.deliveryScope,
+      deliverySignal: event?.deliverySignal,
       deliveryBlockKey: event?.deliveryBlockKey,
       traceId: event?.trace?.traceId,
       correlationId: event?.trace?.correlationId,
@@ -3404,6 +3444,7 @@ export function createMessagingRuntime(options = {}) {
         comparableText: event?.comparableText || "",
         aggregationReason: event?.aggregationReason || "",
         deliveryScope: event?.deliveryScope || "",
+        deliverySignal: resolveAllowlistDeliverySignal(event?.deliveryScope, event?.deliverySignal),
         deliveryBlockKey: event?.deliveryBlockKey || "",
         noiseClass: event?.noiseClass || "",
         targetChatId: target?.chatId || null,
@@ -3417,6 +3458,7 @@ export function createMessagingRuntime(options = {}) {
   function buildCodexSummaryRestartResendLedgerEntry(event, target) {
     const key = buildCodexRestartResendLedgerKey({
       deliveryScope: event?.deliveryScope,
+      deliverySignal: event?.deliverySignal,
       sessionId: event?.sessionId,
       target,
       comparableText: event?.comparableText
@@ -3427,6 +3469,7 @@ export function createMessagingRuntime(options = {}) {
     return {
       key,
       deliveryScope: normalizeNonEmptyString(event?.deliveryScope),
+      deliverySignal: resolveAllowlistDeliverySignal(event?.deliveryScope, event?.deliverySignal),
       sessionId: normalizeNonEmptyString(event?.sessionId),
       chatId: normalizeNonEmptyString(target?.chatId),
       ...(Number.isInteger(target?.messageThreadId) ? { messageThreadId: target.messageThreadId } : {}),
@@ -3437,7 +3480,9 @@ export function createMessagingRuntime(options = {}) {
   }
 
   function buildCodexSummaryRestartRecoveryDecision(event, target) {
-    if (normalizeNonEmptyString(event?.deliveryScope) !== CODEX_SEPARATOR_SUMMARY_SCOPE) {
+    const deliveryScope = normalizeNonEmptyString(event?.deliveryScope);
+    const deliverySignal = resolveAllowlistDeliverySignal(deliveryScope, event?.deliverySignal);
+    if (deliverySignal !== OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL && deliveryScope !== CODEX_SEPARATOR_SUMMARY_SCOPE) {
       return null;
     }
     const recoveryState = codexSummaryRestartRecoveryStates.get(normalizeNonEmptyString(event?.sessionId)) || null;
@@ -3459,7 +3504,16 @@ export function createMessagingRuntime(options = {}) {
       return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_waiting_for_input" });
     }
     const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, target);
-    if (ledgerEntry && codexRestartResendLedger.has(ledgerEntry.key)) {
+    const ledgerKeys = ledgerEntry
+      ? buildCodexRestartResendLedgerKeys({
+          deliveryScope: ledgerEntry.deliveryScope,
+          deliverySignal: ledgerEntry.deliverySignal,
+          sessionId: ledgerEntry.sessionId,
+          target,
+          comparableText: ledgerEntry.comparableText
+        })
+      : [];
+    if (ledgerKeys.some((entryKey) => codexRestartResendLedger.has(entryKey))) {
       return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_prior_history" });
     }
     recoveryState.active = false;
@@ -3964,7 +4018,9 @@ export function createMessagingRuntime(options = {}) {
             : "projection"
           : "disabled",
       primaryDeliveryScope: primaryCandidate?.deliveryScope || "",
+      primaryDeliverySignal: resolveAllowlistDeliverySignal(primaryCandidate?.deliveryScope, primaryCandidate?.deliverySignal),
       shadowDeliveryScope: shadowCandidate?.deliveryScope || "",
+      shadowDeliverySignal: resolveAllowlistDeliverySignal(shadowCandidate?.deliveryScope, shadowCandidate?.deliverySignal),
       traceId: trace?.traceId,
       correlationId: trace?.correlationId,
       traceSource: trace?.source,
@@ -3981,8 +4037,10 @@ export function createMessagingRuntime(options = {}) {
         comparisonResult,
         comparisonClass,
         primaryDeliveryScope: primaryCandidate?.deliveryScope || "",
+        primaryDeliverySignal: resolveAllowlistDeliverySignal(primaryCandidate?.deliveryScope, primaryCandidate?.deliverySignal),
         primaryComparableText: primaryCandidate?.comparableText || "",
         shadowDeliveryScope: shadowCandidate?.deliveryScope || "",
+        shadowDeliverySignal: resolveAllowlistDeliverySignal(shadowCandidate?.deliveryScope, shadowCandidate?.deliverySignal),
         shadowComparableText: shadowCandidate?.comparableText || ""
       },
       trace || null

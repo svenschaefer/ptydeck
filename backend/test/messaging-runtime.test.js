@@ -509,23 +509,23 @@ test("messaging message policy returns explicit new update alert and suppress de
   assert.equal(startupControlChatter.action, "suppress");
   assert.equal(startupControlChatter.reason, "startup_control_chatter");
   assert.equal(codexSeparatorInfo.action, "new");
-  assert.equal(codexSeparatorInfo.reason, "codex_separator_info_new_block");
+  assert.equal(codexSeparatorInfo.reason, "output-episode-info_new_block");
   assert.equal(codexSeparatorInfoSameBlockUpdate.action, "update");
-  assert.equal(codexSeparatorInfoSameBlockUpdate.reason, "codex_separator_info_block_update");
+  assert.equal(codexSeparatorInfoSameBlockUpdate.reason, "output-episode-info_block_update");
   assert.equal(codexSeparatorInfoSameTextNewBlock.action, "new");
-  assert.equal(codexSeparatorInfoSameTextNewBlock.reason, "codex_separator_info_new_block");
+  assert.equal(codexSeparatorInfoSameTextNewBlock.reason, "output-episode-info_new_block");
   assert.equal(codexSeparatorSection.action, "new");
-  assert.equal(codexSeparatorSection.reason, "codex_separator_section_new_block");
+  assert.equal(codexSeparatorSection.reason, "output-episode-section_new_block");
   assert.equal(codexSeparatorSectionSameBlockUpdate.action, "update");
-  assert.equal(codexSeparatorSectionSameBlockUpdate.reason, "codex_separator_section_block_update");
+  assert.equal(codexSeparatorSectionSameBlockUpdate.reason, "output-episode-section_block_update");
   assert.equal(codexSeparatorSummarySentence.action, "new");
-  assert.equal(codexSeparatorSummarySentence.reason, "codex_separator_summary_sentence_new_block");
+  assert.equal(codexSeparatorSummarySentence.reason, "output-episode-summary_new_block");
   assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.action, "update");
-  assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.reason, "codex_separator_summary_sentence_block_update");
+  assert.equal(codexSeparatorSummarySentenceSameBlockUpdate.reason, "output-episode-summary_block_update");
   assert.equal(codexTelegramReply.action, "new");
-  assert.equal(codexTelegramReply.reason, "codex_input_reply_new_block");
+  assert.equal(codexTelegramReply.reason, "turn-primary-reply_new_block");
   assert.equal(codexTelegramReplySameBlockUpdate.action, "update");
-  assert.equal(codexTelegramReplySameBlockUpdate.reason, "codex_input_reply_block_update");
+  assert.equal(codexTelegramReplySameBlockUpdate.reason, "turn-primary-reply_block_update");
 });
 
 test("messaging runtime exposes the neutral terminal messaging core bridge while preserving codex allowlist delivery", async () => {
@@ -801,7 +801,7 @@ test("messaging runtime delivers short correct turn replies from projection sema
   assert.equal(orchestration?.lastCompletedTurn?.primaryReplyText, "Ok, verstanden");
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime delivers short correct turn replies through the generic coding-agent semantic adapter", async () => {
@@ -1393,7 +1393,7 @@ test("messaging runtime emits autonomous multiline coding-agent episodes from pr
   assert.equal(orchestration?.lastCompletedOutputEpisode?.primaryIntentScope, "codex_separator_section");
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
 });
 
 test("messaging runtime emits gemini-style multiline coding-agent episodes through the generic semantic adapter", async () => {
@@ -1866,9 +1866,10 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   ]);
   assert.equal(status.adapters[0].deliveryEnabled, false);
   assert.equal(status.adapters[0].allowlistDeliveryActive, true);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-info_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.deliverySignal === "output-episode-section"));
   assert.ok(status.trace.recent.some((entry) => entry.delivery[0]?.delivered === true));
 });
 
@@ -1940,8 +1941,8 @@ test("messaging runtime promotes growing separator-anchored closing comments ont
   assert.match(sends[0].text, /Danach pushe ich den finalen Stand\./);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
-  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_info_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-info_new_block"));
 });
 
 test("messaging runtime still delivers short separator-anchored bullets through the info family after shallow section rejection", async () => {
@@ -2005,8 +2006,8 @@ test("messaging runtime still delivers short separator-anchored bullets through 
   assert.match(sends[0].text, /Damit der Analyse-Slice sauber abgeschlossen ist\./);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
-  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-info_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-section_new_block"));
 });
 
 test("messaging runtime assembles a multiline codex closing block from an implicit contaminated start without leaking attention or status fragments", async () => {
@@ -2092,7 +2093,7 @@ test("messaging runtime assembles a multiline codex closing block from an implic
   assert.doesNotMatch(sends[0].text, /ein…$/u);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_required"));
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "status_update"));
 });
@@ -2388,7 +2389,7 @@ test("messaging runtime correlates the next substantial telegram question reply 
     "output-episode-section",
     "output-episode-summary"
   ]);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime promotes the next substantial submitted codex reply even without telegram origin", async () => {
@@ -2493,7 +2494,7 @@ test("messaging runtime promotes the next substantial submitted codex reply even
 
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime ignores stale carryover and input echo before starting a submitted codex reply block", async () => {
@@ -2612,7 +2613,7 @@ test("messaging runtime ignores stale carryover and input echo before starting a
 
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexTelegramReplyCorrelation.activeSessionCount, 0);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime ignores repeated stale short tails before starting a telegram reply block", async () => {
@@ -2698,7 +2699,7 @@ test("messaging runtime ignores repeated stale short tails before starting a tel
   assert.doesNotMatch(sends[0].text, /^\s*-\s*worktree clean\s*$/m);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_input_reply_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
   assert.ok(status.trace.recent.every((entry) => entry.comparableText !== "- worktree clean"));
 });
 
@@ -2761,7 +2762,7 @@ test("messaging runtime suppresses commentary-like codex sections from telegram 
   assert.equal(sends.length, 0);
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "commentary_progress_chatter"));
-  assert.ok(status.trace.recent.every((entry) => entry.reason !== "codex_separator_section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-section_new_block"));
 });
 
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {
@@ -2942,6 +2943,7 @@ test("messaging runtime suppresses codex summary sentence restart resends until 
   assert.match(sends[0].text, /Validated the allowlist remains narrow enough for the next live check/);
   assert.equal(persistedLedgerEntries.length, 1);
   assert.equal(persistedLedgerEntries[0].deliveryScope, "codex_separator_summary_sentence");
+  assert.equal(persistedLedgerEntries[0].deliverySignal, "output-episode-summary");
   assert.equal(persistedLedgerEntries[0].sessionId, session.id);
 
   const status = runtime.buildStatusSummary();
@@ -2950,7 +2952,7 @@ test("messaging runtime suppresses codex summary sentence restart resends until 
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_pre_ready"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_quiet_window"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
 test("messaging runtime activates summary restart recovery for coding-agent restore sessions before codex identity is confirmed", async () => {
@@ -3030,7 +3032,7 @@ test("messaging runtime activates summary restart recovery for coding-agent rest
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
 test("messaging runtime suppresses persisted summary-family restart history without affecting info and section families", async () => {
@@ -3153,9 +3155,9 @@ test("messaging runtime suppresses persisted summary-family restart history with
 
   const status = runtime.buildStatusSummary();
   assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_prior_history"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_info_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_section_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-info_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
 test("messaging runtime does not enter summary restart recovery for codex sessions created after runtime readiness", async () => {
@@ -3214,7 +3216,7 @@ test("messaging runtime does not enter summary restart recovery for codex sessio
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexSummaryRestartRecovery.activeSessionCount, 0);
   assert.equal(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"), false);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "codex_separator_summary_sentence_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
 test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {

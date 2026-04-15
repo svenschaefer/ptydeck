@@ -169,6 +169,16 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 <li><code>allowlistDeliverySignals</code></li>
 </ul>
 
+<p>After <code>v0.4.0-H138</code>, the shipped narrow path also prefers <code>allowlistDeliverySignals</code> as the authoritative identity for:</p>
+
+<ul>
+<li>message-policy reasons such as <code>turn-primary-reply_new_block</code></li>
+<li>bounded runtime trace fields such as <code>deliverySignal</code>, <code>primaryDeliverySignal</code>, and <code>shadowDeliverySignal</code></li>
+<li>summary restart-resend ledger keys</li>
+</ul>
+
+<p>The historic <code>codex_*</code> scope names remain present as compatibility metadata and as the legacy scope list exposed by status payloads.</p>
+
 <p>The same adapter status payload now also exposes command-publication state:</p>
 
 <ul>

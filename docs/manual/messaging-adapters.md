@@ -115,6 +115,14 @@ The adapter-level status now mirrors the same split:
 - `allowlistDeliveryScopes`
 - `allowlistDeliverySignals`
 
+After `v0.4.0-H138`, the shipped narrow path also prefers `allowlistDeliverySignals` as the authoritative identity for:
+
+- message-policy reasons such as `turn-primary-reply_new_block`
+- bounded runtime trace fields such as `deliverySignal`, `primaryDeliverySignal`, and `shadowDeliverySignal`
+- summary restart-resend ledger keys
+
+The historic `codex_*` scope names remain present as compatibility metadata and as the legacy scope list exposed by status payloads.
+
 The same adapter status payload now also exposes command-publication state:
 
 - `publishedCommandCount`
