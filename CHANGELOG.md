@@ -2,6 +2,14 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-16
+
+- [x] `v0.4.0-H141 / MSG-113` and `MSG-114` are now completed on `main`, closing the current narrow Telegram text-integrity corruption slice without reopening the older chunk-first message heuristics.
+- [x] `backend/src/app-semantic-adapters.js` now rejects standalone numeric projection fragments such as `46` before they can be appended to a projected turn or output-episode message, which closes the live `because the backend side is currently behaving correctly. 46` corruption class from `2026-04-16`. `backend/src/messaging-runtime.js` and `backend/src/delivery-adapter-utils.js` now keep structured narrow outbound text continuous under bounded truncation by tail-truncating at a stable break instead of preserving the tail through middle truncation, so long multiline replies and sections no longer lose an arbitrary middle block such as the missing `Wenn du willst ... anschließend um.` paragraph segment. Direct regression coverage in `backend/test/app-semantic-adapters.test.js` and `backend/test/messaging-runtime.test.js` now locks down both the numeric-tail rejection and the continuity-preserving structured truncation behavior, and the full local quality gate passed with `node --test backend/test/app-semantic-adapters.test.js backend/test/messaging-runtime.test.js`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, `npm run docs:check`, and `git diff --check`.
+
+- [x] `v0.4.0-H140 / MSG-111` and `MSG-112` are now completed on `main`, widening restart-resend protection from the historic summary-only path to the full shipped narrow outbound family set.
+- [x] `backend/src/messaging-runtime.js` now applies restart-recovery admission and resend-memory checks to `codex_input_reply`, `codex_separator_info`, and `codex_separator_section` in addition to the existing summary family, writes resend-ledger entries for all shipped narrow outbound families across delivered adapter targets instead of only summary posts, and suppresses near-duplicate restart replays through a coarse comparable-text fingerprint instead of relying only on exact text matches. Runtime status now also exposes `codexRestartRecovery` alongside the historical `codexSummaryRestartRecovery` field so the broader recovery scope is visible without breaking existing callers. Direct regression coverage in `backend/test/messaging-runtime.test.js` now proves pre-ready, quiet-window, and waiting-for-input suppression still hold, persisted restart history is blocked across reply/info/section/summary deliveries, and trivial numeric reply rewrites such as a trailing `55` stay suppressed until a defensible fresh post-restart reply appears.
+
 ## 2026-04-15
 
 - [x] `v0.4.0-H139 / MSG-110` is now completed on `main`, closing the validation slice for the latest projection-shadow delivery safety follow-up after the live Telegram false-message investigation on `2026-04-16`.

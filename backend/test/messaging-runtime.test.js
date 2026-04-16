@@ -533,6 +533,7 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
   let now = 4_500;
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
+    codexSummaryRestartRecoveryQuietMs: 20,
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
@@ -1901,6 +1902,7 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
   let now = 220;
   const runtime = createMessagingRuntime({
     nowFn: () => ++now,
+    codexSummaryRestartRecoveryQuietMs: 20,
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
@@ -1933,6 +1935,9 @@ test("messaging runtime delivers only codex allowlist candidates while generic d
 
   await runtime.observeSessionLifecycle("session.created", session, { traceId: "h99-1" });
   assert.equal(sends.length, 0);
+  runtime.markRuntimeReady();
+  now += 30;
+  runtime.observeSessionInput(session.id, { traceId: "h99-input" });
 
   await runtime.observeSessionData({
     session,
@@ -2395,7 +2400,7 @@ test("messaging runtime keeps multiline section formatting and family length ins
   assert.doesNotMatch(sends[0].text, /Use \/skills/u);
 });
 
-test("messaging runtime truncates oversized codex replies in the middle so both start and end remain visible", async () => {
+test("messaging runtime tail-truncates oversized codex replies so delivered text stays continuous", async () => {
   const sends = [];
   let now = 12_000;
   const runtime = createMessagingRuntime({
@@ -2486,9 +2491,10 @@ test("messaging runtime truncates oversized codex replies in the middle so both 
 
   assert.equal(sends.length, 1);
   assert.match(sends[0].text, /^\[7\] ptydeck: Beginn des großen Reply-Blocks\./);
-  assert.match(sends[0].text, /Der abschließende Endmarker bleibt sichtbar und muss trotz Kürzung erhalten bleiben\.$/u);
+  assert.match(sends[0].text, /Status\n1\. Dieser Listenpunkt erweitert den Telegram-Text bewusst/u);
   assert.match(sends[0].text, /…/u);
   assert.ok(sends[0].text.length <= 1_220);
+  assert.doesNotMatch(sends[0].text, /Der abschließende Endmarker bleibt sichtbar und muss trotz Kürzung erhalten bleiben\.$/u);
   assert.doesNotMatch(sends[0].text, /Use \/skills/u);
 });
 
@@ -3152,9 +3158,9 @@ test("messaging runtime suppresses codex summary sentence restart resends until 
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexSummaryRestartRecovery.activeSessionCount, 0);
   assert.equal(status.codexSummaryRestartRecovery.ledgerSize, 1);
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_pre_ready"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_quiet_window"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_pre_ready"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_quiet_window"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_waiting_for_input"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
@@ -3234,11 +3240,11 @@ test("messaging runtime activates summary restart recovery for coding-agent rest
   assert.match(sends[0].text, /Completed and pushed multiple cycles on main with full local validation after/);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_waiting_for_input"));
   assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
 });
 
-test("messaging runtime suppresses persisted summary-family restart history without affecting info and section families", async () => {
+test("messaging runtime suppresses persisted restart history across narrow outbound families until fresh content appears", async () => {
   const sends = [];
   let now = 3_000;
   const session = createSession({
@@ -3268,6 +3274,22 @@ test("messaging runtime suppresses persisted summary-family restart history with
         targetStateKey: `1001:0:${session.id}`,
         comparableText: "validated the allowlist remains narrow enough for the next live check.",
         deliveredAt: now - 100
+      },
+      {
+        deliveryScope: "codex_separator_info",
+        sessionId: session.id,
+        chatId: "1001",
+        targetStateKey: `1001:0:${session.id}`,
+        comparableText: "der commit ist gepusht. der finale repo-/prozesszustand ist sauber, damit der analyse-slice sauber abgeschlossen ist.",
+        deliveredAt: now - 90
+      },
+      {
+        deliveryScope: "codex_separator_section",
+        sessionId: session.id,
+        chatId: "1001",
+        targetStateKey: `1001:0:${session.id}`,
+        comparableText: "der restart ist sauber. live-zustand - backend: ok - ready: ready wichtig - die delivery-counter sind nach dem restart wieder bei 0.",
+        deliveredAt: now - 80
       }
     ],
     createTelegramTransport() {
@@ -3320,6 +3342,7 @@ test("messaging runtime suppresses persisted summary-family restart history with
     promptBoundaries: [],
     trace: { traceId: "h109-info-2" }
   });
+  assert.equal(sends.length, 0);
 
   await runtime.observeSessionData({
     session,
@@ -3345,22 +3368,34 @@ test("messaging runtime suppresses persisted summary-family restart history with
     promptBoundaries: [],
     trace: { traceId: "h109-section-4" }
   });
+  assert.equal(sends.length, 0);
 
-  await emitSummaryCandidate(
-    "h109-summary-new",
-    "Validated the section assembly remains narrow enough for the next live check."
-  );
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "h109-reply-open",
+    correlationId: "req-h109-fresh-reply",
+    replyPromotionEligible: true
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Ja. Der Restart-Schutz bleibt für neue Replies nach der Input-Grenze korrekt offen.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h109-reply-1" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "h109-reply-idle" }
+  });
 
-  assert.equal(sends.length, 3);
-  assert.match(sends[0].text, /Der Commit ist gepusht/);
-  assert.match(sends[1].text, /Der Restart ist sauber/);
-  assert.match(sends[2].text, /Validated the section assembly remains narrow enough for the next live check/);
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Restart-Schutz bleibt für neue Replies nach der Input-Grenze korrekt offen/);
 
   const status = runtime.buildStatusSummary();
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_prior_history"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-info_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
-  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_prior_history"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime does not enter summary restart recovery for codex sessions created after runtime readiness", async () => {
@@ -3418,8 +3453,107 @@ test("messaging runtime does not enter summary restart recovery for codex sessio
   assert.equal(sends.length, 1);
   const status = runtime.buildStatusSummary();
   assert.equal(status.codexSummaryRestartRecovery.activeSessionCount, 0);
-  assert.equal(status.trace.recent.some((entry) => entry.reason === "summary_restart_recovery_waiting_for_input"), false);
+  assert.equal(status.trace.recent.some((entry) => entry.reason === "restart_recovery_waiting_for_input"), false);
   assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-summary_new_block"));
+});
+
+test("messaging runtime suppresses near-duplicate restart replies with trivial numeric drift before allowing fresh replies", async () => {
+  const sends = [];
+  let now = 4_000;
+  const session = createSession({
+    id: "restart-reply-near-duplicate",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    codexSummaryRestartRecoveryQuietMs: 20,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    codexRestartResendLedger: [
+      {
+        deliveryScope: "codex_input_reply",
+        sessionId: session.id,
+        chatId: "1001",
+        targetStateKey: `1001:0:${session.id}`,
+        comparableText: "ja. der restart-schutz bleibt nach dem boot noch zu schmal.",
+        deliveredAt: now - 100
+      }
+    ],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 398 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 399 };
+        }
+      };
+    }
+  });
+
+  await runtime.observeSessionLifecycle("session.created", session, { traceId: "h112-reply-created" });
+  runtime.markRuntimeReady();
+  now += 30;
+  runtime.observeSessionInput(session.id, { traceId: "h112-reply-input" });
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "h112-reply-near-duplicate-open",
+    correlationId: "req-h112-near-duplicate",
+    replyPromotionEligible: true
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Ja. Der Restart-Schutz bleibt nach dem Boot noch zu schmal. 55\n",
+    promptBoundaries: [],
+    trace: { traceId: "h112-reply-near-duplicate-text" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "h112-reply-near-duplicate-idle" }
+  });
+  assert.equal(sends.length, 0);
+
+  runtime.observeSessionInput(session.id, {
+    source: "rest",
+    traceId: "h112-reply-fresh-open",
+    correlationId: "req-h112-fresh",
+    replyPromotionEligible: true
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "Ja. Der neue Restart-Slice kann jetzt mit klarer Freshness-Grenze umgesetzt werden.\n",
+    promptBoundaries: [],
+    trace: { traceId: "h112-reply-fresh-text" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "h112-reply-fresh-idle" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Freshness-Grenze umgesetzt werden/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "restart_recovery_prior_history"));
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
 });
 
 test("messaging runtime rejects anti-pattern and prompt-contaminated separator candidates", async () => {

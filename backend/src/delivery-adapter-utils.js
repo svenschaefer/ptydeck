@@ -41,7 +41,22 @@ export function truncateStructuredMessageText(value, maxLength = DEFAULT_EVENT_S
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return truncateMiddleNormalizedText(normalized, maxLength);
+  if (!normalized) {
+    return "";
+  }
+  if (!Number.isInteger(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
+    return normalized;
+  }
+  if (maxLength <= 1) {
+    return "…";
+  }
+  const available = maxLength - 1;
+  const preferredBreak = Math.max(
+    normalized.lastIndexOf("\n", available),
+    normalized.lastIndexOf(" ", available)
+  );
+  const cutIndex = preferredBreak >= Math.floor(available * 0.6) ? preferredBreak : available;
+  return `${normalized.slice(0, Math.max(1, cutIndex)).trimEnd()}…`;
 }
 
 export function truncateDisplayText(value, maxLength = DEFAULT_EVENT_SUMMARY_MAX_LENGTH) {

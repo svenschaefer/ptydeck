@@ -258,6 +258,68 @@ test("app semantic adapter registry normalizes gemini-style section markers thro
   assert.equal(decision.metadata.semanticExtractionSource, "generic-output-episode-transcript-diff");
 });
 
+test("app semantic adapter registry drops standalone numeric projection fragments from codex output episodes", () => {
+  const registry = createAppSemanticAdapterRegistry(createHelpers());
+  const session = {
+    id: "session-4",
+    name: "ptydeck",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "explicit-hint",
+      confidence: 0.99
+    }
+  };
+  const adapter = registry.resolveForSession(session, "coding-agent");
+  assert.ok(adapter);
+
+  const decision = adapter.buildOutputEpisodeSemanticDecision(
+    {
+      baseline: {
+        snapshot: {
+          activeVisibleLines: [],
+          activeTailLines: []
+        }
+      },
+      transcriptDelta: {
+        entries: [
+          {
+            type: "pty_data",
+            visibleText:
+              "If the UI still shows the terminal-input failure, the next decisive artifact is now the frontend-side terminal.input.error trace, because the backend side is currently behaving correctly.\n46"
+          }
+        ]
+      },
+      diff: {
+        activeTailLines: {
+          lines: [
+            {
+              before: "",
+              after:
+                "If the UI still shows the terminal-input failure, the next decisive artifact is now the frontend-side terminal.input.error trace, because the backend side is currently behaving correctly.\n46"
+            }
+          ]
+        },
+        activeVisibleLines: {
+          lines: []
+        }
+      },
+      outputEpisode: {
+        episodeId: "episode-2"
+      }
+    },
+    session,
+    "coding-agent"
+  );
+
+  assert.equal(
+    decision.text,
+    "If the UI still shows the terminal-input failure, the next decisive artifact is now the frontend-side terminal.input.error trace, because the backend side is currently behaving correctly."
+  );
+  assert.doesNotMatch(decision.text, /\b46\b/);
+});
+
 test("app semantic adapter registry rejects vertically fragmented turn text", () => {
   const registry = createAppSemanticAdapterRegistry(createHelpers());
   const session = {

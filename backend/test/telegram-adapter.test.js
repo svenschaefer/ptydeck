@@ -972,7 +972,7 @@ test("telegram adapter applies thread policy directly on adapter-neutral message
   assert.equal(calls[1].payload.text, "[7] ptydeck: Ok, nochmals verstanden");
 });
 
-test("telegram adapter applies structured middle truncation when delivering message intents", async () => {
+test("telegram adapter applies structured tail truncation when delivering message intents", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
     configured: true,
@@ -1058,8 +1058,10 @@ test("telegram adapter applies structured middle truncation when delivering mess
   assert.equal(result.decision.action, "new");
   assert.equal(calls.length, 1);
   assert.match(calls[0].text, /^\[7\] ptydeck: Heading/u);
+  assert.match(calls[0].text, /1\. first block with useful detail/u);
+  assert.match(calls[0].text, /2\. second block/u);
   assert.match(calls[0].text, /…/u);
-  assert.match(calls[0].text, /Footer closes cleanly$/u);
+  assert.doesNotMatch(calls[0].text, /Footer closes cleanly/u);
 });
 
 test("telegram adapter rejects channel targets for deck-session provisioning with a clear error", async () => {

@@ -321,7 +321,22 @@ function truncateStructuredMessageText(value, maxLength = MAX_EVENT_SUMMARY_LENG
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
-  return truncateMiddleNormalizedText(normalized, maxLength);
+  if (!normalized) {
+    return "";
+  }
+  if (!Number.isInteger(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
+    return normalized;
+  }
+  if (maxLength <= 1) {
+    return "…";
+  }
+  const available = maxLength - 1;
+  const preferredBreak = Math.max(
+    normalized.lastIndexOf("\n", available),
+    normalized.lastIndexOf(" ", available)
+  );
+  const cutIndex = preferredBreak >= Math.floor(available * 0.6) ? preferredBreak : available;
+  return `${normalized.slice(0, Math.max(1, cutIndex)).trimEnd()}…`;
 }
 
 function truncateDisplayText(value, maxLength = MAX_EVENT_SUMMARY_LENGTH) {
@@ -710,6 +725,18 @@ function createComparableText(value) {
     .replace(/\bclaude\b/gi, "<agent>")
     .replace(/\bgemini\b/gi, "<agent>")
     .replace(/[|·•]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createRestartResendComparableFingerprint(value) {
+  const normalized = createComparableText(value);
+  if (!normalized) {
+    return "";
+  }
+  return normalized
+    .replace(/[^\p{L}\p{N}<>\s]+/gu, " ")
+    .replace(/\b\d+(?:\.\d+)?\b/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -1144,12 +1171,12 @@ function normalizeCodexRestartResendLedgerEntry(entry) {
       },
       comparableText
     });
-  if (!key || !deliveryScope || !sessionId || !chatId || !comparableText || !deliveredAt) {
+  if (!key || (!deliveryScope && !deliverySignal) || !sessionId || !chatId || !comparableText || !deliveredAt) {
     return null;
   }
   return Object.freeze({
     key,
-    deliveryScope,
+    ...(deliveryScope ? { deliveryScope } : {}),
     deliverySignal,
     sessionId,
     chatId,
@@ -1534,6 +1561,12 @@ function resolveAllowlistDeliverySignal(deliveryScope = "", deliverySignal = "")
 
 function resolveAllowlistReasonPrefix(deliveryScope = "", deliverySignal = "") {
   return resolveAllowlistDeliverySignal(deliveryScope, deliverySignal) || normalizeNonEmptyString(deliveryScope) || "allowlist_delivery";
+}
+
+function isRestartResendProtectedAllowlistFamily(deliveryScope = "", deliverySignal = "") {
+  const normalizedScope = normalizeNonEmptyString(deliveryScope);
+  const normalizedSignal = resolveAllowlistDeliverySignal(normalizedScope, deliverySignal);
+  return isCodexAllowlistScope(normalizedScope) || isAllowlistDeliverySignal(normalizedSignal);
 }
 
 function isAllowlistDeliverySignal(deliverySignal) {
@@ -3455,7 +3488,7 @@ export function createMessagingRuntime(options = {}) {
     );
   }
 
-  function buildCodexSummaryRestartResendLedgerEntry(event, target) {
+  function buildCodexRestartResendLedgerEntry(event, target) {
     const key = buildCodexRestartResendLedgerKey({
       deliveryScope: event?.deliveryScope,
       deliverySignal: event?.deliverySignal,
@@ -3479,10 +3512,43 @@ export function createMessagingRuntime(options = {}) {
     };
   }
 
-  function buildCodexSummaryRestartRecoveryDecision(event, target) {
+  function hasCodexRestartResendHistoryMatch(event, target) {
     const deliveryScope = normalizeNonEmptyString(event?.deliveryScope);
     const deliverySignal = resolveAllowlistDeliverySignal(deliveryScope, event?.deliverySignal);
-    if (deliverySignal !== OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL && deliveryScope !== CODEX_SEPARATOR_SUMMARY_SCOPE) {
+    const targetStateKey = buildCodexRestartResendTargetStateKey(target, event?.sessionId);
+    const comparableText = normalizeNonEmptyString(event?.comparableText);
+    const comparableFingerprint = createRestartResendComparableFingerprint(comparableText);
+    if (!targetStateKey || (!deliveryScope && !deliverySignal) || (!comparableText && !comparableFingerprint)) {
+      return false;
+    }
+    for (const entry of codexRestartResendLedger.values()) {
+      if (!entry || buildCodexRestartResendTargetStateKey(entry, entry.sessionId) !== targetStateKey) {
+        continue;
+      }
+      const entrySignal = resolveAllowlistDeliverySignal(entry.deliveryScope, entry.deliverySignal);
+      if (deliverySignal && entrySignal && deliverySignal !== entrySignal) {
+        continue;
+      }
+      if (!deliverySignal && deliveryScope && normalizeNonEmptyString(entry.deliveryScope) !== deliveryScope) {
+        continue;
+      }
+      if (normalizeNonEmptyString(entry.comparableText) === comparableText) {
+        return true;
+      }
+      if (
+        comparableFingerprint &&
+        createRestartResendComparableFingerprint(entry.comparableText) === comparableFingerprint
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function buildCodexRestartRecoveryDecision(event, target) {
+    const deliveryScope = normalizeNonEmptyString(event?.deliveryScope);
+    const deliverySignal = resolveAllowlistDeliverySignal(deliveryScope, event?.deliverySignal);
+    if (!isRestartResendProtectedAllowlistFamily(deliveryScope, deliverySignal)) {
       return null;
     }
     const recoveryState = codexSummaryRestartRecoveryStates.get(normalizeNonEmptyString(event?.sessionId)) || null;
@@ -3491,30 +3557,20 @@ export function createMessagingRuntime(options = {}) {
     }
     const occurredAt = Number.isInteger(event?.occurredAt) ? event.occurredAt : nowFn();
     if (!runtimeReadyAt || occurredAt < runtimeReadyAt) {
-      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_pre_ready" });
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "restart_recovery_pre_ready" });
     }
     if (codexSummaryRestartRecoveryQuietUntil > occurredAt) {
-      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_quiet_window" });
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "restart_recovery_quiet_window" });
     }
     if (
       !Number.isInteger(recoveryState.lastInputAt) ||
       recoveryState.lastInputAt <= 0 ||
       recoveryState.lastInputAt < codexSummaryRestartRecoveryQuietUntil
     ) {
-      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_waiting_for_input" });
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "restart_recovery_waiting_for_input" });
     }
-    const ledgerEntry = buildCodexSummaryRestartResendLedgerEntry(event, target);
-    const ledgerKeys = ledgerEntry
-      ? buildCodexRestartResendLedgerKeys({
-          deliveryScope: ledgerEntry.deliveryScope,
-          deliverySignal: ledgerEntry.deliverySignal,
-          sessionId: ledgerEntry.sessionId,
-          target,
-          comparableText: ledgerEntry.comparableText
-        })
-      : [];
-    if (ledgerKeys.some((entryKey) => codexRestartResendLedger.has(entryKey))) {
-      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "summary_restart_recovery_prior_history" });
+    if (hasCodexRestartResendHistoryMatch(event, target)) {
+      return Object.freeze({ action: "suppress", messageKey: event?.threadKey || "status", reason: "restart_recovery_prior_history" });
     }
     recoveryState.active = false;
     return null;
@@ -4072,6 +4128,7 @@ export function createMessagingRuntime(options = {}) {
     let tracedEvent = fallbackEvent;
     let finalDecision = null;
     const deliveryResults = [];
+    const deliveredTargets = [];
     for (const adapter of adapters) {
       const adapterId = normalizeNonEmptyString(adapter.getStatus?.().adapter);
       if (requestedAdapterIds && adapterId && !requestedAdapterIds.has(adapterId)) {
@@ -4123,6 +4180,9 @@ export function createMessagingRuntime(options = {}) {
         retryAfterSeconds: result?.retryAfterSeconds,
         recommendedBackoffMs: result?.recommendedBackoffMs
       });
+      if (result?.delivered === true && resultTarget?.chatId) {
+        deliveredTargets.push(resultTarget);
+      }
       delivered = delivered || result?.delivered === true;
       rememberSessionForTarget(resultTarget, session);
     }
@@ -4149,13 +4209,21 @@ export function createMessagingRuntime(options = {}) {
       });
     bumpEventMetric(tracedEvent.profile, tracedEvent.type, tracedDecision.action);
     if (delivered) {
-      if (normalizeNonEmptyString(tracedEvent?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        const ledgerEntry =
-          normalizeNonEmptyString(finalTarget?.adapterId || "telegram") === "telegram"
-            ? buildCodexSummaryRestartResendLedgerEntry(tracedEvent, finalTarget)
-            : null;
-        if (ledgerEntry) {
-          await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+      if (isRestartResendProtectedAllowlistFamily(tracedEvent?.deliveryScope, tracedEvent?.deliverySignal)) {
+        const uniqueTargets = new Map();
+        const ledgerTargets = deliveredTargets.length > 0 ? deliveredTargets : [finalTarget];
+        for (const target of ledgerTargets) {
+          const targetStateKey = buildCodexRestartResendTargetStateKey(target, tracedEvent?.sessionId);
+          if (!targetStateKey) {
+            continue;
+          }
+          uniqueTargets.set(targetStateKey, target);
+        }
+        for (const target of uniqueTargets.values()) {
+          const ledgerEntry = buildCodexRestartResendLedgerEntry(tracedEvent, target);
+          if (ledgerEntry) {
+            await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+          }
         }
       }
     }
@@ -4550,7 +4618,7 @@ export function createMessagingRuntime(options = {}) {
         delivery: []
       });
     }
-    const restartRecoveryDecision = buildCodexSummaryRestartRecoveryDecision(event, target);
+    const restartRecoveryDecision = buildCodexRestartRecoveryDecision(event, target);
     if (restartRecoveryDecision) {
       bumpEventMetric(event.profile, event.type, restartRecoveryDecision.action);
       recordDispatchTrace(event, restartRecoveryDecision, target, []);
@@ -4773,6 +4841,7 @@ export function createMessagingRuntime(options = {}) {
     let delivered = false;
     let attemptedDelivery = false;
     const deliveryResults = [];
+    const deliveredTargets = [];
     let finalTarget = primaryTarget;
     for (const adapter of adapters) {
       const adapterId = normalizeNonEmptyString(adapter.getStatus?.().adapter);
@@ -4791,6 +4860,9 @@ export function createMessagingRuntime(options = {}) {
       }
       if (result?.topicBinding?.chatId && result?.topicBinding?.sessionId && Number.isInteger(result?.topicBinding?.messageThreadId)) {
         await upsertTelegramTopicBinding(result.topicBinding);
+      }
+      if (result?.delivered === true && result?.target?.chatId) {
+        deliveredTargets.push(result.target);
       }
       deliveryResults.push({
         adapter: adapter.getStatus?.().adapter || "adapter",
@@ -4818,13 +4890,21 @@ export function createMessagingRuntime(options = {}) {
     }
     if (delivered) {
       advanceMessagingThreadPolicyState(threadState, event, decision, { delivered: true });
-      if (normalizeNonEmptyString(event?.deliveryScope) === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        const ledgerEntry =
-          normalizeNonEmptyString(finalTarget?.adapterId || "telegram") === "telegram"
-            ? buildCodexSummaryRestartResendLedgerEntry(event, finalTarget)
-            : null;
-        if (ledgerEntry) {
-          await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+      if (isRestartResendProtectedAllowlistFamily(event?.deliveryScope, event?.deliverySignal)) {
+        const uniqueTargets = new Map();
+        const ledgerTargets = deliveredTargets.length > 0 ? deliveredTargets : [finalTarget];
+        for (const target of ledgerTargets) {
+          const targetStateKey = buildCodexRestartResendTargetStateKey(target, event?.sessionId);
+          if (!targetStateKey) {
+            continue;
+          }
+          uniqueTargets.set(targetStateKey, target);
+        }
+        for (const target of uniqueTargets.values()) {
+          const ledgerEntry = buildCodexRestartResendLedgerEntry(event, target);
+          if (ledgerEntry) {
+            await upsertCodexRestartResendLedgerEntry(ledgerEntry);
+          }
         }
       }
     }
@@ -5686,6 +5766,16 @@ export function createMessagingRuntime(options = {}) {
         ]
       },
       codexSummaryRestartRecovery: {
+        quietPeriodMs: codexSummaryRestartRecoveryQuietMs,
+        quietMsRemaining:
+          runtimeReadyAt > 0 && codexSummaryRestartRecoveryQuietUntil > 0
+            ? Math.max(0, codexSummaryRestartRecoveryQuietUntil - nowFn())
+            : 0,
+        runtimeReadyAt,
+        activeSessionCount: recoveringSessionCount,
+        ledgerSize: codexRestartResendLedger.size
+      },
+      codexRestartRecovery: {
         quietPeriodMs: codexSummaryRestartRecoveryQuietMs,
         quietMsRemaining:
           runtimeReadyAt > 0 && codexSummaryRestartRecoveryQuietUntil > 0

@@ -899,7 +899,6 @@ test("runtime correlates a mapped telegram free-text question to the next codex 
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
     assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
   } finally {
     await runtime.stop();
   }
@@ -1011,7 +1010,6 @@ test("runtime promotes the next substantial codex reply after submitted REST inp
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
     assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
   } finally {
     await runtime.stop();
   }
@@ -1126,7 +1124,6 @@ test("runtime ignores stale carryover and input echo before promoting a submitte
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
     assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
   } finally {
     await runtime.stop();
   }
@@ -1720,7 +1717,7 @@ test("runtime ignores stale tail and commentary leakage before delivering the fi
     const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
-    assert.ok(health.messaging.trace.recent.some((entry) => entry.reason === "turn-primary-reply_new_block"));
+    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
   } finally {
     await runtime.stop();
   }

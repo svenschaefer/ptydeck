@@ -105,7 +105,12 @@ function buildProjectionSemanticMessageText(lines = [], normalizeWhitespace, nor
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
-  if (!normalizedText || isProjectionFooterMetricNoise(normalizedText) || isProjectionVerticalFragmentNoise([normalizedText])) {
+  if (
+    !normalizedText ||
+    isProjectionFooterMetricNoise(normalizedText) ||
+    isProjectionVerticalFragmentNoise([normalizedText]) ||
+    isProjectionStandaloneNumericNoise(normalizedText)
+  ) {
     return "";
   }
   return normalizedText;
@@ -184,7 +189,7 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
   if (!normalized) {
     return null;
   }
-  if (isProjectionFooterMetricNoise(normalized)) {
+  if (isProjectionFooterMetricNoise(normalized) || isProjectionStandaloneNumericNoise(normalized)) {
     return null;
   }
   if (inputText) {
@@ -258,6 +263,14 @@ function isProjectionFooterMetricNoise(value) {
     return false;
   }
   return /\b(?:weekly|wekly)\b/u.test(normalized);
+}
+
+function isProjectionStandaloneNumericNoise(value) {
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized) {
+    return false;
+  }
+  return /^\d{1,3}(?:\.\d+)?$/u.test(normalized);
 }
 
 function extractProjectionSemanticLines(runtimeSnapshot, session, profile, options, helpers) {
