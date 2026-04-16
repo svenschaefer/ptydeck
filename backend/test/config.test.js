@@ -42,16 +42,13 @@ test("loadConfig applies defaults", () => {
   assert.deepEqual(config.messagingTelegramTargets, []);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.org");
   assert.equal(config.messagingTelegramOutboundEnabled, false);
-  assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
   assert.equal(config.messagingTelegramInboundEnabled, false);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 3);
   assert.deepEqual(config.messagingDiscordTargets, []);
   assert.equal(config.messagingDiscordApiBaseUrl, "https://discord.com/api/v10");
   assert.equal(config.messagingDiscordOutboundEnabled, false);
-  assert.equal(config.messagingTerminalSemanticPrimaryMode, "legacy");
-  assert.equal(config.messagingTerminalSemanticShadowModeEnabled, true);
-  assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 20);
-  assert.equal(config.messagingTerminalSemanticCutoverMaxMismatchRate, 0.1);
+  assert.equal(Object.hasOwn(config, "messagingTelegramOutboundHardBreakActive"), false);
+  assert.equal(Object.hasOwn(config, "messagingTerminalSemanticPrimaryMode"), false);
 });
 
 test("loadConfig maps environment values", () => {
@@ -99,12 +96,7 @@ test("loadConfig maps environment values", () => {
         webhookUrl: "https://discord.example/api/v10/webhooks/123/token"
       }
     ]),
-    MESSAGING_DISCORD_API_BASE_URL: "https://discord.example/api/v10",
-    MESSAGING_DISCORD_OUTBOUND_ENABLED: "true",
-    MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE: "legacy",
-    MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED: "false",
-    MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS: "7",
-    MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE: "0.25"
+    MESSAGING_DISCORD_API_BASE_URL: "https://discord.example/api/v10"
   });
 
   assert.equal(config.port, 9090);
@@ -143,8 +135,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.messagingTelegramBotToken, "telegram-token");
   assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001", profile: "build-test" }]);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.example");
-  assert.equal(config.messagingTelegramOutboundEnabled, false);
-  assert.equal(config.messagingTelegramOutboundHardBreakActive, true);
+  assert.equal(config.messagingTelegramOutboundEnabled, true);
   assert.equal(config.messagingTelegramInboundEnabled, true);
   assert.equal(config.messagingTelegramPollTimeoutSeconds, 7);
   assert.deepEqual(config.messagingDiscordTargets, [
@@ -157,10 +148,8 @@ test("loadConfig maps environment values", () => {
   ]);
   assert.equal(config.messagingDiscordApiBaseUrl, "https://discord.example/api/v10");
   assert.equal(config.messagingDiscordOutboundEnabled, true);
-  assert.equal(config.messagingTerminalSemanticPrimaryMode, "legacy");
-  assert.equal(config.messagingTerminalSemanticShadowModeEnabled, false);
-  assert.equal(config.messagingTerminalSemanticCutoverMinComparisons, 7);
-  assert.equal(config.messagingTerminalSemanticCutoverMaxMismatchRate, 0.25);
+  assert.equal(Object.hasOwn(config, "messagingTelegramOutboundHardBreakActive"), false);
+  assert.equal(Object.hasOwn(config, "messagingTerminalSemanticPrimaryMode"), false);
 });
 
 test("loadConfig requires explicit CORS allowlist in production", () => {
@@ -244,18 +233,6 @@ test("loadConfig rejects invalid critical numeric values", () => {
   assert.throws(
     () => loadConfig({ SESSION_GUARDRAIL_SWEEP_MS: "0" }),
     /SESSION_GUARDRAIL_SWEEP_MS must be a positive integer\./
-  );
-  assert.throws(
-    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE: "wrong" }),
-    /MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE must be one of: legacy, projection\./
-  );
-  assert.throws(
-    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS: "0" }),
-    /MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS must be a positive integer\./
-  );
-  assert.throws(
-    () => loadConfig({ MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE: "1.1" }),
-    /MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE must be a number between 0 and 1\./
   );
 });
 

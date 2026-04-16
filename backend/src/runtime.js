@@ -2628,7 +2628,6 @@ export function createRuntime(config) {
   const sshTrustEntries = new Map();
   const shareLinks = new Map();
   const telegramTopicBindings = new Map();
-  const codexRestartResendLedger = new Map();
   const sessionControlStaleClientTtlMs =
     Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
       ? config.sessionControlStaleClientTtlMs
@@ -2780,20 +2779,13 @@ export function createRuntime(config) {
     telegramBotToken: config.messagingTelegramBotToken,
     telegramTargets: config.messagingTelegramTargets,
     telegramTopicBindings: Array.from(telegramTopicBindings.values()),
-    codexRestartResendLedger: Array.from(codexRestartResendLedger.values()),
     telegramApiBaseUrl: config.messagingTelegramApiBaseUrl,
     telegramOutboundEnabled: config.messagingTelegramOutboundEnabled,
-    telegramOutboundHardBreakActive: config.messagingTelegramOutboundHardBreakActive,
     telegramInboundEnabled: config.messagingTelegramInboundEnabled,
     telegramPollTimeoutSeconds: config.messagingTelegramPollTimeoutSeconds,
     discordTargets: config.messagingDiscordTargets,
     discordApiBaseUrl: config.messagingDiscordApiBaseUrl,
     discordOutboundEnabled: config.messagingDiscordOutboundEnabled,
-    terminalSemanticPrimaryMode: config.messagingTerminalSemanticPrimaryMode,
-    terminalSemanticShadowModeEnabled: config.messagingTerminalSemanticShadowModeEnabled,
-    terminalSemanticCutoverMinComparisons: config.messagingTerminalSemanticCutoverMinComparisons,
-    terminalSemanticCutoverMaxMismatchRate: config.messagingTerminalSemanticCutoverMaxMismatchRate,
-    terminalOrchestrationBoundarySettleMs: 350,
     createTelegramTransport: config.createMessagingTelegramTransport,
     fetchImpl: config.fetchImpl,
     resolveDeckNameForSession: (session) => {
@@ -2812,10 +2804,6 @@ export function createRuntime(config) {
     onTelegramTopicBindingUpsert: async (binding) => {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
       await persistNow("messaging.telegram.topic_binding");
-    },
-    onCodexRestartResendLedgerUpsert: async (entry) => {
-      codexRestartResendLedger.set(entry.key, { ...entry });
-      await persistNow("messaging.codex_restart_resend_ledger");
     },
     resolveSessionForMessagingTarget,
     requestMessagingStop,
@@ -5398,13 +5386,6 @@ export function createRuntime(config) {
       shareLinks: Array.from(shareLinks.values())
         .sort(compareShareLinkEntries)
         .map((entry) => ({ ...entry })),
-      messagingCodexRestartResendLedger: Array.from(codexRestartResendLedger.values())
-        .sort((left, right) => {
-          const leftTime = Number.isInteger(left.deliveredAt) ? left.deliveredAt : 0;
-          const rightTime = Number.isInteger(right.deliveredAt) ? right.deliveredAt : 0;
-          return leftTime - rightTime;
-        })
-        .map((entry) => ({ ...entry })),
       messagingTelegramTopicBindings: Array.from(telegramTopicBindings.values())
         .sort((left, right) => `${left.chatId}:${left.sessionId}`.localeCompare(`${right.chatId}:${right.sessionId}`))
         .map((entry) => ({ ...entry }))
@@ -6254,6 +6235,18 @@ function tryCreateRestoredSession({
           }
           if (messagingSession) {
             await messagingRuntime.observeSessionLifecycle(eventName, messagingSession, event.trace);
+            try {
+              await messagingRuntime.ensureSessionTarget(messagingSession, event.trace);
+            } catch (error) {
+              logDebug(
+                "messaging.target.ensure_failed",
+                {
+                  sessionId: messagingSession.id,
+                  error: error instanceof Error ? error.message : String(error || "Unknown messaging target setup failure.")
+                },
+                event.trace
+              );
+            }
           }
         } else if ((eventName === "session.exit" || eventName === "session.closed") && apiEventSession) {
           await messagingRuntime.observeSessionLifecycle(
@@ -7485,7 +7478,6 @@ function tryCreateRestoredSession({
     sshTrustEntries.clear();
     shareLinks.clear();
     telegramTopicBindings.clear();
-    codexRestartResendLedger.clear();
     sessionDeckAssignments.clear();
     sessionQuickIdAssignments.clear();
     for (const persistedDeck of persistedState.decks) {
@@ -7588,17 +7580,7 @@ function tryCreateRestoredSession({
     for (const binding of normalizeMessagingTopicBindings(persistedState.messagingTelegramTopicBindings)) {
       telegramTopicBindings.set(`${binding.chatId}:${binding.sessionId}`, { ...binding });
     }
-    for (const entry of Array.isArray(persistedState.messagingCodexRestartResendLedger) ? persistedState.messagingCodexRestartResendLedger : []) {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        continue;
-      }
-      if (typeof entry.key !== "string" || !entry.key.trim()) {
-        continue;
-      }
-      codexRestartResendLedger.set(entry.key, { ...entry });
-    }
     messagingRuntime.replaceTelegramTopicBindings(Array.from(telegramTopicBindings.values()));
-    messagingRuntime.replaceCodexRestartResendLedger(Array.from(codexRestartResendLedger.values()));
     await syncSshKnownHostsFile();
     ensureDefaultDeck();
     logDebug("runtime.restore.start", {

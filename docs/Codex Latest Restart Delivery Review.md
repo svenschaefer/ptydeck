@@ -1,5 +1,7 @@
 # Codex Latest Restart Delivery Review
 
+Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
+
 ## Scope
 
 This note reviews every Telegram message that was actually delivered in the latest restart window and classifies whether that delivery was sensible. The review is analysis only; it does not change runtime behavior.

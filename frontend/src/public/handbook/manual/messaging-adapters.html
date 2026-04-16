@@ -34,48 +34,48 @@
         <nav class="handbook-breadcrumbs"><a href="/handbook/index.html">Handbook</a><span>/</span><span>Manual</span></nav>
         <h1 id="messaging-adapters">Messaging Adapters</h1>
 
-<p><code>ptydeck</code> now ships two reference delivery adapters on top of the provider-independent messaging contract:</p>
+<p><code>ptydeck</code> currently ships a transport-only messaging-adapter baseline.</p>
+
+<p>That baseline keeps:</p>
 
 <ul>
-<li>a Telegram operator adapter for the current live product path</li>
-<li>a Discord-style webhook/thread reference adapter that proves the same <code>MessageIntent</code> seam on a second transport</li>
+<li>Telegram inbound polling and command/input handling</li>
+<li>Telegram forum-topic provisioning and persisted topic bindings</li>
+<li>explicit <code>MessageIntent</code> delivery support through Telegram and Discord adapters</li>
+<li>adapter health, metrics, target traces, and inbound traces</li>
 </ul>
 
-<p>Use the Telegram adapter when you want:</p>
+<p>It does not currently ship automatic PTY-output-to-message delivery.</p>
+
+<h2 id="current-product-model">Current Product Model</h2>
+
+<p>The messaging runtime is now intentionally <code>transport_only</code>.</p>
+
+<p>That means:</p>
 
 <ul>
-<li>concise external session status updates</li>
-<li>bounded remote follow-up from a mapped Telegram chat</li>
-<li>a stable session-to-chat mapping without opening a second terminal UI</li>
-</ul>
-
-<p>The Telegram adapter now also publishes its slash-command surface from the canonical ptydeck command model instead of a separate handwritten Telegram-only list.</p>
-
-<p>Both adapters are intentionally not remote shells.</p>
-
-<p>The current shipped split is:</p>
-
-<ul>
-<li>Telegram remains the first operator-facing adapter with the full mapped-input and bot-command surface</li>
-<li>Discord is currently a reference outbound adapter that consumes the same adapter-neutral <code>MessageIntent</code> objects with transport-specific formatting and thread/channel routing only</li>
+<li>the backend may receive operator input from a mapped Telegram target</li>
+<li>the backend may publish Telegram custom commands from the canonical ptydeck custom-command model</li>
+<li>the backend may provision Telegram forum topics for <code>topicMode: &quot;deck-session&quot;</code></li>
+<li>the adapters may deliver explicit <code>MessageIntent</code> objects if another runtime seam creates them deliberately</li>
+<li>the runtime does not automatically interpret terminal output into outbound Telegram or Discord messages</li>
 </ul>
 
 <h2 id="telegram-command-surface">Telegram Command Surface</h2>
 
-<p>The shipped Telegram bot command list is now derived from the operator-relevant ptydeck custom-command surface.</p>
-
-<p>The concrete command names shown below, such as <code>/docu</code> or <code>/go</code>, are only examples. The actual Telegram bot-command surface is derived from the custom commands configured in ptydeck at runtime.</p>
+<p>The Telegram bot command list is derived from the operator-relevant ptydeck custom-command surface.</p>
 
 <p>That means:</p>
 
 <ul>
 <li>eligible custom commands are published automatically to Telegram with deterministic Telegram-safe names</li>
-<li>scoped custom-command variants sharing the same canonical name collapse into one published Telegram command name; runtime resolution still picks the command that is valid for the mapped session</li>
-<li>invalid, conflicting, or overflow custom commands are skipped deterministically instead of drifting into an undocumented Telegram-only surface</li>
-<li>Telegram no longer publishes the earlier adapter-local built-in bot commands (<code>/status</code>, <code>/stop</code>, <code>/retry</code>, <code>/replay</code>) as part of the normal operator command surface</li>
+<li>scoped custom-command variants sharing the same canonical name collapse into one published Telegram command name</li>
+<li>invalid, conflicting, or overflow commands are skipped deterministically</li>
+<li>unpublished slash-prefixed text is not treated as a Telegram adapter action and instead falls through to normal mapped terminal input</li>
+<li>exact literal slash-prefixed terminal input for a published Telegram custom command remains available through the existing <code>//...</code> escape</li>
 </ul>
 
-<p>Telegram-safe custom command naming currently follows this deterministic encoding:</p>
+<p>Telegram-safe command naming follows this encoding:</p>
 
 <ul>
 <li>lowercase letters and digits remain unchanged</li>
@@ -92,231 +92,6 @@
 <li>ptydeck <code>/7zip</code> -&gt; Telegram <code>/c_7zip</code></li>
 </ul>
 
-<p>Runtime behavior follows the published catalog:</p>
-
-<ul>
-<li>a published Telegram custom command is resolved through the same custom-command model as the primary ptydeck slash-command surface</li>
-<li>Telegram custom commands cannot redirect to another target; the mapped chat/topic remains the authority</li>
-<li>unpublished slash-prefixed text is not intercepted as a Telegram adapter action and instead falls through to normal mapped terminal input</li>
-<li>exact literal slash-prefixed terminal input for a published Telegram custom command remains available through the existing <code>//...</code> escape</li>
-<li>no new adapter-owned built-in Telegram action buttons are attached to outbound messages; older legacy callback buttons may still be answered while old posts remain visible</li>
-</ul>
-
-<h2 id="noise-control-and-diagnostics">Noise Control and Diagnostics</h2>
-
-<p>The delivered Telegram baseline now favors one stable status thread over chatty line-by-line output.</p>
-
-<p>That means:</p>
-
-<ul>
-<li>duplicate status churn is suppressed aggressively</li>
-<li>repeated attention churn from the same logical failure is now damped so one error does not fan out into many nearly identical Telegram alerts</li>
-<li>exact repeated failure lines can now alert again after the bounded churn window expires instead of being suppressed forever by older duplicate state</li>
-<li>when a later line adds meaningful detail to the same recent failure, the adapter now edits the existing attention post instead of sending a second alert</li>
-<li>low-value agentic CLI chatter such as <code>Ran ...</code>, <code>Edited ...</code>, inline diff/update summaries, and separator-only fragments is filtered before it becomes a user-facing Telegram message</li>
-<li>coding-agent planning chatter such as <code>next active block ...</code>, version bullets, and <code>/review on my current changes</code> echoes is now treated as low-value noise rather than operator-facing Telegram status</li>
-<li>low-value coding-agent planning summaries such as <code>Updated Plan</code> are now treated as chatter rather than operator-facing Telegram status when no stronger progress signal accompanies them</li>
-<li>hash-prefixed coding-agent commit or plan lines such as <code>- 961f98a ...</code> or <code>└ 961f98a ...</code> are now treated as low-value chatter rather than Telegram status</li>
-<li>coding-agent summary detection now favors explicit result lines instead of any line that merely contains broad nouns such as <code>coverage</code>, so wrapped roadmap or plan fragments like <code>coverage hardening</code> or <code>host-window smoke coverage ...</code> no longer escape as operator-facing Telegram updates</li>
-<li>coding-agent and generic-shell sessions now aggregate bounded progress blocks on prompt boundaries and quiet windows instead of flushing every classified line independently</li>
-<li>prompt-boundary handling is now chunk-position-aware, so summary or attention text that arrives in the same PTY chunk as a prompt marker is flushed before any later <code>Prompt ready.</code> update can be considered</li>
-<li>structural follow-up lines such as trailing <code>}</code> or other punctuation-only tails are no longer treated as fresh alerts just because the previous line contained an error keyword</li>
-<li>status summaries no longer inherit generic completion keywords into unrelated follow-up lines, so prompt echoes, file lists, and similar tails do not become accidental Telegram updates just because a previous line contained <code>done</code> or <code>updated</code></li>
-<li>coding-agent breadcrumb headers dominated by model/path/budget context are now trimmed when a later segment carries the real progress signal, partial terminal-control residue such as <code>38;5;2m</code> or <code>9;1H</code> is stripped before classification, actionable path-bearing diagnostics are preserved when they are part of the real failure line, and repeated <code>Session idle.</code> updates are damped instead of churning the status thread</li>
-<li>coding-agent <code>Session idle.</code> follow-ons are now also suppressed after recent low-value chatter, after recent unclassified coding-agent chatter, or after a still-recent meaningful status update, so a filtered <code>Updated Plan</code>-style blip or wrapped planning fragment does not simply reappear as an idle-thread bump a few seconds later</li>
-<li>zero-count issue lines such as <code>0 Error(s)</code> are treated as low-value noise rather than user-facing status updates</li>
-<li>short coding-agent snippet follow-ons after a stronger failure line stay suppressed instead of becoming their own Telegram alert just because they still contain words like <code>Exception</code></li>
-<li>short low-value OS-error fragments such as <code>falsch. (os error 123)</code> are suppressed when they arrive without enough standalone context to be useful as operator-facing alerts</li>
-</ul>
-
-<p>When you need to inspect real adapter behavior, use both the runtime summary and the backend debug log path.</p>
-
-<p>Health and readiness now expose a bounded recent messaging trace:</p>
-
-<pre><code class="language-bash">curl -s http://127.0.0.1:18080/health | jq &#39;.messaging.trace&#39;
-curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre>
-
-<p>That trace includes recent candidate summaries, policy decisions, suppression reasons, correlation keys, target chat/thread metadata, and delivery outcomes such as Telegram rate-limit backoff hints.</p>
-
-<p>For the new terminal semantic migration surface, the same status payload now also exposes:</p>
-
-<ul>
-<li><code>messaging.terminalMessagingCore.semanticAdapterIds</code></li>
-<li><code>messaging.terminalMessagingCore.semanticExtraction.primaryMode</code></li>
-<li><code>messaging.terminalMessagingCore.semanticExtraction.shadowModeEnabled</code></li>
-<li><code>messaging.terminalMessagingCore.semanticExtraction.shadowTargetMode</code></li>
-<li><code>messaging.terminalMessagingCore.semanticExtraction.comparisons</code></li>
-</ul>
-
-<p>Those fields make the current legacy-versus-projection comparison state visible without requiring a separate debug-only runtime.</p>
-
-<p>The Telegram adapter status now also surfaces active outbound backoff state after a Bot API <code>retry after</code> response, so repeated rate-limit failures can be distinguished from ordinary transport errors.</p>
-
-<p>The runtime-level allowlist status now also exposes both compatibility scopes and neutral intent categories:</p>
-
-<ul>
-<li><code>/health.messaging.allowlistDeliveryScopes</code></li>
-<li><code>/ready.messaging.allowlistDeliveryScopes</code></li>
-<li><code>/health.messaging.allowlistDeliverySignals</code></li>
-<li><code>/ready.messaging.allowlistDeliverySignals</code></li>
-</ul>
-
-<p>The adapter-level status now mirrors the same split:</p>
-
-<ul>
-<li><code>allowlistDeliveryActive</code></li>
-<li><code>allowlistDeliveryScopes</code></li>
-<li><code>allowlistDeliverySignals</code></li>
-</ul>
-
-<p>After <code>v0.4.0-H138</code>, the shipped narrow path also prefers <code>allowlistDeliverySignals</code> as the authoritative identity for:</p>
-
-<ul>
-<li>message-policy reasons such as <code>turn-primary-reply_new_block</code></li>
-<li>bounded runtime trace fields such as <code>deliverySignal</code>, <code>primaryDeliverySignal</code>, and <code>shadowDeliverySignal</code></li>
-<li>summary restart-resend ledger keys</li>
-</ul>
-
-<p>The historic <code>codex_*</code> scope names remain present as compatibility metadata and as the legacy scope list exposed by status payloads.</p>
-
-<p>After <code>v0.4.0-H142</code>, that compatibility is also structurally bounded: the runtime core no longer owns the legacy Codex allowlist helper/control flow directly, and the remaining coding-agent commentary/attention logic now lives behind an explicit classifier seam instead of remaining embedded in <code>backend/src/messaging-runtime.js</code>.</p>
-
-<p>The same adapter status payload now also exposes command-publication state:</p>
-
-<ul>
-<li><code>publishedCommandCount</code></li>
-<li><code>commandCatalogSize</code></li>
-<li><code>commandSyncSkippedCount</code></li>
-<li><code>lastCommandSyncAt</code></li>
-<li><code>lastCommandSyncError</code></li>
-</ul>
-
-<p>One practical implication of that trace model: if Telegram backoff skips delivery of a meaningful status update, a later <code>Session idle.</code> event should still stay suppressed. The trace will show the skipped status attempt plus the later <code>idle_after_status_attempt</code> suppression instead of silently bumping the thread with low-value idle churn.</p>
-
-<p>For persisted lifecycle and adapter analysis, enable the existing backend debug log:</p>
-
-<pre><code class="language-env">BACKEND_DEBUG_LOGS=1
-BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log</code></pre>
-
-<p>With <code>BACKEND_DEBUG_LOG_FILE</code> configured, those backend debug traces are written to the file instead of flooding the interactive backend console.</p>
-
-<p>For persisted raw-stream analysis of coding-agent sessions such as Codex, enable the session-stream analysis capture as well:</p>
-
-<pre><code class="language-env">SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl
-SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex
-SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
-
-<p>That capture is analysis-only and independent of Telegram delivery. It records bounded JSONL entries with:</p>
-
-<ul>
-<li>raw PTY chunk bytes (base64)</li>
-<li>cleaned chunk bytes (base64)</li>
-<li>prompt-boundary offsets</li>
-<li>terminal-signal kinds</li>
-<li>session metadata</li>
-<li>app-identity metadata</li>
-</ul>
-
-<p>Use it when the question is about rendered Codex block structure, restart-time chunk boundaries, or later allowlist-/signal-first message selection, because the backend debug log remains metadata-oriented and the short replay tail can fall out of memory too quickly during restart churn.</p>
-
-<p>The Telegram adapter now also logs inbound discovery events before and during command/input handling through <code>messaging.inbound.update</code>, so group/topic messages such as <code>@ptydeck_bot ping</code>, plain text input, and still-unsupported non-text payloads all leave a diagnosable trail with:</p>
-
-<ul>
-<li><code>chatId</code></li>
-<li><code>messageThreadId</code></li>
-<li>chat type/title/username</li>
-<li>whether the chat is a forum</li>
-<li>preview text</li>
-<li>parse result such as <code>command</code>, <code>input_text</code>, <code>unsupported_text</code>, or <code>non_text_message</code></li>
-</ul>
-
-<p>This is specifically useful when the running backend is already consuming Telegram updates, because direct Bot API <code>getUpdates</code> inspection may then look empty while <code>inboundTrace</code> still shows what the live runtime actually observed.</p>
-
-<p>After <code>v0.4.0-H122</code>, the write path behind a mapped Telegram input is now observable end to end instead of disappearing between <code>handled ok = true</code> and the next PTY-side event. The backend debug log now includes:</p>
-
-<ul>
-<li><code>messaging.input.write_attempt</code></li>
-<li><code>messaging.input.write_ok</code></li>
-<li><code>messaging.input.write_failed</code></li>
-<li><code>messaging.input.delayed_submit_scheduled</code></li>
-<li><code>messaging.input.delayed_submit_fired</code></li>
-<li><code>session.input.write</code></li>
-</ul>
-
-<p>Those records share stable <code>traceId</code>, <code>requestId</code>, and <code>correlationId</code> metadata derived from the inbound adapter update, so one Telegram input can be followed deterministically through:</p>
-
-<ul>
-<li>inbound handling</li>
-<li>body write</li>
-<li>delayed submit firing</li>
-<li>PTY write attempt/ok/failure</li>
-<li>later PTY activity or reply promotion</li>
-</ul>
-
-<p>For delayed-submit messaging input, only the actual submit-bearing phase now opens the bounded <code>codex_input_reply</code> window. The pre-submit body write still records input text for later correlation, but it no longer arms reply promotion early.</p>
-
-<p>After <code>v0.4.0-H123</code>, that same reply path also snapshots the pre-submit pending line plus the most recent visible PTY lines and rejects a first reply start that merely repeats already-visible residue such as <code>- worktree clean</code> or previously visible assistant/footer tail text.</p>
-
-<p>The same <code>H123</code> pass also suppresses first-person commentary/progress chatter about repo/docs/runtime inspection work before it can ship through the narrow Codex outbound families, even if those commentary lines appear in the PTY stream during live investigation.</p>
-
-<p>Forum-target validation and topic provisioning now also leave a diagnosable trail through <code>messaging.target.update</code> and <code>targetTrace</code>, including:</p>
-
-<ul>
-<li><code>chatId</code></li>
-<li><code>messageThreadId</code></li>
-<li><code>topicMode</code></li>
-<li><code>sessionId</code></li>
-<li><code>topicName</code></li>
-<li>forum validation outcome</li>
-<li>create/reuse/rename phase</li>
-<li>provisioning or validation errors</li>
-</ul>
-
-<p>Then inspect structured <code>messaging.event.trace</code>, <code>messaging.inbound.update</code>, and <code>messaging.target.update</code> lines in that debug log file.</p>
-
-<p>For Codex-style block analysis against the captured raw stream, use:</p>
-
-<pre><code class="language-bash">node scripts/analyze-codex-stream-blocks.mjs \
-  --capture-file /tmp/ptydeck-session-stream-analysis.jsonl \
-  --session-name ptydeck</code></pre>
-
-<h2 id="what-it-can-do">What It Can Do</h2>
-
-<p>The Telegram reference adapter can:</p>
-
-<ul>
-<li>send the currently shipped narrow coding-agent outbound families, still named <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code> for compatibility while generic outbound delivery remains hard-disabled; new block identities create new posts, only the same block identity is eligible for an edit, the restart-resend guard now covers all four shipped narrow families instead of only the summary family, the resend ledger now blocks both exact prior-history matches and coarse near-duplicate rewrites during restart recovery, larger coding-agent closing comments can now survive contaminated starts plus short transient noise long enough to emerge as one structured <code>codex_separator_section</code> message instead of fragmenting back into short <code>info</code> paragraphs or transient side signals, submitted-input reply promotion now rejects stale PTY carryover, repeated short-tail residue, and echoed operator input before the first real coding-agent answer line is delivered, commentary/progress chatter about repo/docs/runtime inspection work is suppressed across the narrow outbound families, ordinary operational status prose is no longer suppressed merely for mentioning debug logs, current runtime/code state, or explanatory <code>failed</code> wording inside structured bullets, turn replies now derive their primary semantic text from the shipped projection-backed <code>Turn</code> transcript/diff seam instead of the former first-hit line heuristic, short but correct replies no longer depend on the earlier minimum-length/minimum-word gate, autonomous coding-agent output can fall back to one projection-backed multiline section/info delivery at quiet completion, generic coding-agent adapters can normalize non-Codex markers such as Gemini-style <code>✦</code> through the same semantic registry seam, projection now drops standalone numeric fragment tails such as <code>46</code>, and unavoidable Telegram-visible truncation now preserves a continuous prefix with a final ellipsis instead of deleting an arbitrary middle block to keep the tail visible</li>
-<li>consume adapter-neutral <code>MessageIntent</code> delivery directly inside the Telegram adapter, applying per-thread policy decisions, session labeling, structured-text preservation, and bounded continuity-preserving truncation at the <code>DeliveryAdapter</code> seam instead of relying on runtime-owned Telegram formatting shortcuts</li>
-<li>allowlist narrow-delivery decisions through either legacy <code>allowlistDeliveryScopes</code> or the newer neutral <code>allowlistDeliverySignals</code>, so the shipped transport can already gate on adapter-neutral intent categories without breaking current trace and compatibility metadata</li>
-<li>run the shipped terminal-semantic migration surface in either <code>projection</code> or <code>legacy</code> primary mode while optionally keeping the other pipeline in shadow mode, exposing bounded parity/cutover diagnostics through the runtime status and trace path instead of requiring an all-at-once stream-to-message cutover; after <code>H136</code>, the shipped default is intentionally <code>legacy</code> primary until the projection path meets the explicit cutover criteria</li>
-<li>expose the currently registered semantic-adapter ids through <code>messaging.terminalMessagingCore.semanticAdapterIds</code>, with the shipped registry now including both the Codex semantic adapter and a second generic coding-agent semantic adapter resolved by app identity</li>
-<li>normalize outbound status, summary, idle, attention, control, and share events in the underlying adapter contract, even though the current shipped product path re-enables only those narrow Codex allowlist families</li>
-<li>keep the active outbound families compact through the shipped trigger profiles</li>
-<li>publish eligible custom commands from the canonical ptydeck command surface to Telegram and execute those published commands through the same custom-command runtime path used inside ptydeck</li>
-<li>route mapped plain Telegram text into the same backend session-input path used by frontend <code>Send</code></li>
-<li>mirror frontend-style delayed submit semantics whenever the normalized messaging input carries a submit terminator, so mapped Telegram text is written first and the final submit <code>\r</code> follows as a short delayed second write instead of stopping at prompt insertion merely because live app detection was stale; after <code>H122</code>, only that submit-bearing phase can arm the bounded <code>codex_input_reply</code> window</li>
-<li>preserve literal slash-prefixed terminal input through a <code>//...</code> escape for published Telegram custom commands (<code>//docu</code> -&gt; <code>/docu</code>)</li>
-</ul>
-
-<h2 id="what-it-cannot-do">What It Cannot Do</h2>
-
-<p>The adapter does not:</p>
-
-<ul>
-<li>broadly reactivate generic Telegram outbound delivery; outside the narrow <code>codex_input_reply</code> / <code>codex_separator_info</code> / <code>codex_separator_section</code> / <code>codex_separator_summary_sentence</code> allowlist families, the product path still treats outbound delivery as hard-disabled</li>
-<li>bypass controller, read-only, share, or send-safety rules</li>
-<li>parse open-ended free-text intent beyond direct text-to-input forwarding</li>
-<li>execute Telegram text for unmapped chats/topics or for controller-denied sessions</li>
-<li>mirror raw PTY chunks as a second terminal stream</li>
-</ul>
-
-<p>If you need the exact command or settings contract, use the generated reference pages instead of repeating them here:</p>
-
-<ul>
-<li><a href="/handbook/reference/commands.html">Slash command reference</a></li>
-<li><a href="/handbook/reference/api.html">API reference</a></li>
-</ul>
-
 <h2 id="session-mapping">Session Mapping</h2>
 
 <p>A Telegram target maps either:</p>
@@ -326,301 +101,93 @@ SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432</code></pre>
 <li>or, for selectorless <code>topicMode: &quot;deck-session&quot;</code> targets, one forum-enabled supergroup to the live ptydeck session set, with one topic per terminal/session</li>
 </ul>
 
-<p>For the live operator model, the recommended destination is one forum-enabled Telegram supergroup for ptydeck with one topic per terminal/session. In that shape, every mapped session shares the same <code>chatId</code> and gets its own <code>messageThreadId</code>. The direct 1:1 bot chat remains the simplest bootstrap and smoke-test path, not the intended long-term operating layout.</p>
-
-<p>A Telegram channel is not sufficient for that layout. Forum topics require a forum-enabled supergroup, not a broadcast channel.</p>
-
-<p>The currently referenced invite target <code>https://t.me/+J4MInwk9nSg1MWJi</code> presently resolves to a Telegram channel, so it cannot host the per-terminal forum topics required by <code>topicMode: &quot;deck-session&quot;</code>.</p>
-
-<p>Recommended topic naming convention:</p>
+<p>Recommended operator layout:</p>
 
 <ul>
-<li><code>&lt;deck name&gt; + &lt;terminal name&gt;</code></li>
+<li>one forum-enabled Telegram supergroup for ptydeck</li>
+<li>one topic per mapped terminal/session</li>
 </ul>
 
-<p>Each mapping entry needs:</p>
+<p>In that shape, every mapped session shares the same <code>chatId</code> and gets its own <code>messageThreadId</code>.</p>
+
+<h2 id="what-transport-only-still-delivers">What Transport-Only Still Delivers</h2>
+
+<p>The current runtime can still send adapter-visible messages in bounded explicit cases:</p>
 
 <ul>
-<li><code>chatId</code></li>
-<li>for static mappings, at least one selector:</li>
+<li>Telegram callback responses</li>
+<li>Telegram inbound action confirmations or errors</li>
+<li>explicit <code>MessageIntent</code> objects passed to the adapters by other runtime code</li>
 </ul>
 
-<p>- <code>sessionId</code> - <code>quickIdToken</code> - <code>sessionName</code></p>
+<p>The adapters still apply per-thread message policy and transport-specific formatting to those explicit deliveries.</p>
 
-<p>Optional fields:</p>
+<h2 id="what-it-no-longer-does-automatically">What It No Longer Does Automatically</h2>
+
+<p>The current runtime does not:</p>
 
 <ul>
-<li><code>messageThreadId</code></li>
-<li><code>topicMode</code></li>
-<li><code>profile</code></li>
+<li>mirror raw PTY output to Telegram or Discord</li>
+<li>summarize terminal output automatically</li>
+<li>run automatic reply/section/summary extraction from PTY data</li>
+<li>keep projection/legacy dual semantic authority in production</li>
+<li>run restart-resend suppression, semantic shadow mode, or Codex-specific automatic outbound families in the live path</li>
 </ul>
 
-<p>When <code>topicMode</code> is set to <code>deck-session</code>, <code>ptydeck</code> provisions one Telegram forum topic per terminal/session automatically and persists the resulting <code>messageThreadId</code> binding for later reuse. In that mode, the configured <code>chatId</code> must point at a forum-enabled supergroup.</p>
+<p>Those earlier experiments are now retained as historical markdown learnings only.</p>
 
-<p>A selectorless target is now allowed only for <code>topicMode: &quot;deck-session&quot;</code>. That is the recommended live operator shape because the mapping then follows the current ptydeck session set dynamically in real time instead of depending on hard-coded <code>sessionName</code>, <code>quickIdToken</code>, or <code>sessionId</code> values.</p>
+<h2 id="health-and-diagnostics">Health and Diagnostics</h2>
 
-<h2 id="delivery-hard-break">Delivery Hard Break</h2>
-
-<p>Generic Telegram outbound delivery is currently hard-disabled in the shipped product path.</p>
-
-<p>That hard break is intentional:</p>
+<p>When messaging is configured, <code>/health</code> and <code>/ready</code> expose:</p>
 
 <ul>
-<li>no broad Telegram chat mirroring or generic status delivery is sent while the operator topology is being rebuilt</li>
-<li><code>topicMode: &quot;deck-session&quot;</code> can still validate the target chat and provision per-terminal forum topics</li>
-<li>there is intentionally no environment-variable re-enable switch at this stage</li>
-<li>inbound observation/command handling remains automatically on whenever Telegram is configured; there is intentionally no separate environment toggle for that path</li>
+<li><code>messaging.mode = &quot;transport_only&quot;</code></li>
+<li><code>messaging.boundaryContracts = [&quot;DeliveryAdapter&quot;, &quot;MessageIntent&quot;]</code></li>
+<li><code>messaging.adapters[*]</code> with adapter-specific configuration and counters</li>
+<li><code>messaging.trace</code> for transport/runtime trace entries</li>
 </ul>
 
-<p>The first post-hard-break exception is now delivered as <code>v0.4.0-H99</code> and refined through <code>v0.4.0-H119</code>:</p>
+<p>Telegram status additionally exposes:</p>
 
 <ul>
-<li>four narrow internal allowlist families, <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code>, can be delivered even while generic <code>deliveryEnabled</code> remains false</li>
-<li>those legacy family names now also map to neutral allowlist delivery signals so the shipped narrow gate is no longer modeled only through Codex-specific scope strings:</li>
+<li>command publication counters</li>
+<li>topic-provisioning counters and last errors</li>
+<li><code>targetTrace</code></li>
+<li><code>inboundTrace</code></li>
+<li>allowlist signal/scope metadata supported by the adapter for explicit intent delivery</li>
 </ul>
 
-<p>- <code>codex_input_reply</code> -&gt; <code>turn-primary-reply</code> - <code>codex_separator_info</code> -&gt; <code>output-episode-info</code> - <code>codex_separator_section</code> -&gt; <code>output-episode-section</code> - <code>codex_separator_summary_sentence</code> -&gt; <code>output-episode-summary</code></p>
+<p>Discord status exposes:</p>
 
 <ul>
-<li>all four families are Codex-only and block-aware:</li>
+<li>transport configuration state</li>
+<li>allowlist signal/scope metadata supported by the adapter for explicit intent delivery</li>
+<li><code>targetTrace</code></li>
 </ul>
 
-<p>- <code>codex_input_reply</code> covers the non-separator case: - submitted Codex session input can open this bounded reply window even when the originating input path was Telegram, REST, or frontend <code>Send</code> - the runtime assembles the next substantial Codex answer block directly from the PTY line stream instead of waiting for a separator anchor - structural planning/meta fragments such as <code>MSG-063 Owner QA</code> or <code>In ROADMAP.md:</code> are skipped until the first real answer appears - observed inline prompt chrome such as <code>›Explain this codebase ...</code> is stripped from the first captured answer line before delivery - stale pre-submit PTY carryover, repeated short-tail residue such as <code>- worktree clean</code>, pure input echo, and prompt-echo tails such as <code>› ok, was machen wir dann jetzt da Find and fix a bug in @filename</code> are now rejected before the reply block starts, so delayed-submit local, Telegram, or REST flows cannot consume leftover terminal residue as the first Telegram-visible reply - long reply lines are no longer clipped to the generic short summary budget before reply assembly, so a later family-level Telegram cap can still preserve one continuous visible prefix with a final ellipsis when bounded truncation is required - later separator-family chatter cannot jump ahead of that first reply while the reply window is still active - a major separator must survive as its own stream entry, or as an otherwise clean separator entry with only tiny redraw-tail contamination - <code>codex_separator_info</code> keeps the narrow simple case: - the next bounded substantial <code>•</code> block must classify as clean <code>info</code> - the separator-to-info horizon is still intentionally short, but now widened to roughly <code>4500ms</code> / <code>120</code> entries for real Codex timing - at most one immediate indented continuation line is merged - if the same separator/headline pair is still owned by an active section candidate, the runtime now defers this narrow <code>info</code> delivery until the section path either wins or explicitly rejects the block as too shallow - <code>codex_separator_section</code> now covers the next narrow structural case: - prompt/footer/background-terminal chrome is stripped from mixed entries before and during section assembly - the section path now opens provisionally across a short bounded multi-chunk window instead of living or dying on the first raw chunk - a substantial implicit <code>•</code> headline can now start the section candidate even when no clean separator entry survived the raw stream, so separators remain strong hints rather than the only viable start condition - the resulting assembled section can retain one narrative <code>•</code> headline plus subsection labels and numbered or dashed list items - simple one-bullet cases stay on <code>codex_separator_info</code>; the section family is reserved for the richer narrative shape - multiline closing comments with still-growing continuation text now stay on this section path instead of being emitted first as <code>codex_separator_info</code> or being broken apart by transient line-local <code>attention_required</code> / <code>status_update</code> side signals - Telegram-visible section delivery now preserves multiline spacing between headings, lists, and later paragraphs instead of flattening the winning section back into a one-line summary, and if the family cap is still exceeded the visible text is shortened as one continuous prefix with a final ellipsis instead of deleting an arbitrary middle block - explicit section boundaries and window-state gating still reject anti-pattern bullets, prompt/footer markers, diff/output fragments, and overlay-churn windows - first-person commentary/progress chatter about repo/docs/runtime inspection work is suppressed before it can ship as a Telegram-visible section, even if it appears in the PTY stream during live investigation - <code>codex_separator_summary_sentence</code> now covers the next narrow aggregated case: - separator-hint summary flushes may pass only when they collapse to one sentence-like Codex update - short stubs such as <code>committed.</code> and colon-headed fragments such as <code>validated target apps:</code> stay rejected - prompt/footer/background-terminal contamination and multi-fragment <code>|</code> summaries stay rejected</p>
+<h2 id="future-direction">Future Direction</h2>
+
+<p>The next automatic outbound attempt is intentionally deferred.</p>
+
+<p>See:</p>
 
 <ul>
-<li>the shipped narrow outbound families now also run behind one restart-recovery admission layer:</li>
+<li><code>docs/Messaging Reset and Third Attempt Notes.md</code></li>
+<li><code>TODO-OUTLOOK.md</code> (<code>MSG-201</code> through <code>MSG-205</code>)</li>
 </ul>
 
-<p>- narrow delivery is suppressed before <code>runtime.ready</code> - it remains suppressed through a bounded post-ready quiet window - it remains suppressed until the first fresh post-restart input observed after that quiet window for the same session - a persisted resend ledger keyed by normalized content plus session/thread context prevents old already-delivered or trivially rewritten narrow outbound posts from reappearing on later restarts - startup <code>coding-agent</code> restore sessions are covered even when their initial restore hint still looks like a wrapper launch such as <code>cody</code> instead of explicit <code>codex</code></p>
-
-<ul>
-<li>delivered candidates stay in the existing Telegram topic/thread, but a new separator-anchored block now opens a new Telegram post and only the same block identity is eligible for deterministic <code>update</code></li>
-</ul>
-
-<p>The shipped trigger profiles are:</p>
-
-<ul>
-<li><code>generic-shell</code></li>
-<li><code>coding-agent</code></li>
-<li><code>build-test</code></li>
-</ul>
-
-<h2 id="setup-checklist">Setup Checklist</h2>
-
-<p>Use this sequence for a first real Telegram setup.</p>
-
-<h3 id="1-create-the-bot">1. Create the Bot</h3>
-
-<p>In Telegram, talk to <code>@BotFather</code> and create a new bot with <code>/newbot</code>.</p>
-
-<p>Capture the issued bot token. <code>ptydeck</code> uses that token directly against the Telegram Bot API; there is no separate ptydeck-side Telegram login or OAuth flow.</p>
-
-<h3 id="2-add-the-bot-to-the-destination-chat">2. Add the Bot to the Destination Chat</h3>
-
-<p>Choose the destination first:</p>
-
-<ul>
-<li>direct 1:1 chat with the bot</li>
-<li>group chat</li>
-<li>supergroup topic/thread</li>
-</ul>
-
-<p>Then make sure the bot is present in that destination and can receive updates there.</p>
-
-<h3 id="3-discover-chatid-and-optional-messagethreadid">3. Discover <code>chatId</code> and Optional <code>messageThreadId</code></h3>
-
-<p>Send at least one message in the target chat or topic, then inspect Telegram updates for the bot.</p>
-
-<p>Example:</p>
-
-<pre><code class="language-bash">curl -s &quot;https://api.telegram.org/bot&lt;YOUR_BOT_TOKEN&gt;/getUpdates&quot; | jq</code></pre>
-
-<p>Look for:</p>
-
-<ul>
-<li><code>message.chat.id</code> -&gt; <code>chatId</code></li>
-<li><code>message.message_thread_id</code> -&gt; <code>messageThreadId</code> when using a topic/thread</li>
-</ul>
-
-<p>Notes:</p>
-
-<ul>
-<li>group and supergroup chat IDs are often negative</li>
-<li>if you use topics, keep <code>chatId</code> stable and set the specific <code>messageThreadId</code></li>
-</ul>
-
-<h3 id="4-choose-the-ptydeck-session-selector">4. Choose the ptydeck Session Selector</h3>
-
-<p>Each static mapping entry must include at least one of:</p>
-
-<ul>
-<li><code>sessionId</code></li>
-<li><code>quickIdToken</code></li>
-<li><code>sessionName</code></li>
-</ul>
-
-<p>Practical guidance:</p>
-
-<ul>
-<li>use <code>sessionId</code> when you want the narrowest exact mapping</li>
-<li>use <code>quickIdToken</code> when you work from stable quick IDs in the UI</li>
-<li>use <code>sessionName</code> only when names are intentionally unique enough for that role</li>
-<li>use a selectorless <code>topicMode: &quot;deck-session&quot;</code> target when you want one forum-enabled supergroup to track all live sessions dynamically and create one topic per terminal/session automatically</li>
-</ul>
-
-<p>If the same Telegram chat/thread maps ambiguously to multiple sessions, bounded inbound actions are rejected until the mapping is narrowed.</p>
-
-<h3 id="5-configure-the-backend">5. Configure the Backend</h3>
-
-<p>You can either place values directly in <code>backend/.env</code> or load them from files.</p>
-
-<p>Direct example:</p>
-
-<pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN=123456:replace_with_real_token
-MESSAGING_TELEGRAM_TARGETS=[
-  {
-    &quot;chatId&quot;: &quot;-1001234567890&quot;,
-    &quot;topicMode&quot;: &quot;deck-session&quot;,
-    &quot;profile&quot;: &quot;coding-agent&quot;
-  }
-]
-MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
-
-<p>File-backed example:</p>
-
-<pre><code class="language-env">MESSAGING_TELEGRAM_BOT_TOKEN_FILE=/secure/ptydeck/telegram-bot-token.txt
-MESSAGING_TELEGRAM_TARGETS_FILE=/secure/ptydeck/telegram-targets.json
-MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS=3</code></pre>
-
-<p>Example <code>telegram-targets.json</code>:</p>
-
-<pre><code class="language-json">[
-  {
-    &quot;chatId&quot;: &quot;-1001234567890&quot;,
-    &quot;topicMode&quot;: &quot;deck-session&quot;,
-    &quot;profile&quot;: &quot;coding-agent&quot;
-  }
-]</code></pre>
-
-<h3 id="6-start-ptydeck">6. Start ptydeck</h3>
-
-<p>Start the normal local runtime:</p>
-
-<pre><code class="language-bash">npm run dev</code></pre>
-
-<p>If the bot token and target mappings are both present, the messaging runtime becomes active automatically. If either side is missing, messaging stays disabled without making the core runtime unhealthy.</p>
-
-<h3 id="7-verify-adapter-health">7. Verify Adapter Health</h3>
-
-<p>Check:</p>
-
-<pre><code class="language-bash">curl -s http://127.0.0.1:18080/health | jq
-curl -s http://127.0.0.1:18080/ready | jq
-curl -s http://127.0.0.1:18080/metrics | rg ptydeck_messaging</code></pre>
-
-<p>Expect:</p>
-
-<ul>
-<li>a top-level messaging summary in <code>/health</code></li>
-<li>the same messaging summary in <code>/ready</code></li>
-<li><code>ptydeck_messaging_*</code> metric lines in <code>/metrics</code></li>
-<li>when inbound is enabled, additional <code>ptydeck_messaging_inbound_*</code> counters</li>
-<li>a bounded <code>.messaging.trace.recent</code> ring for recent outbound candidate and suppression analysis</li>
-<li>transient inbound polling failures during backlog drain or later live polling should now surface in the inbound counters and last-error fields while the adapter retries instead of stopping inbound permanently after one startup transport error</li>
-</ul>
-
-<h3 id="8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</h3>
-
-<p>Outbound:</p>
-
-<ol>
-<li>Start or use a mapped session.</li>
-<li>Produce some real activity in that session.</li>
-<li>Confirm a compact Telegram update appears in the mapped chat/thread.</li>
-</ol>
-
-<p>Inbound:</p>
-
-<p>Try:</p>
-
-<pre><code class="language-text">echo TELEGRAM_OK
-/docu
-/go
-/status</code></pre>
-
-<p>Literal slash-prefixed terminal input example:</p>
-
-<p><code>//docu</code> -&gt; <code>/docu</code></p>
-
-<h2 id="inbound-semantics">Inbound Semantics</h2>
-
-<h3 id="plain-text-input">plain text input</h3>
-
-<p>Mapped plain Telegram text now follows the same backend session-input path as frontend <code>Send</code>. It keeps owner-boundary checks plus <code>lastInput</code> tracking, but it does not require an attached browser controller client header for Telegram-originated input.</p>
-
-<p>Behavior:</p>
-
-<ul>
-<li>published Telegram custom commands still take priority as adapter commands</li>
-<li>other plain text, including unpublished slash-prefixed text such as <code>/status</code>, is written to the mapped PTY as terminal input</li>
-<li>multiline payloads are normalized to one final <code>\r</code> terminator</li>
-<li>exact slash-prefixed literal terminal input for a published Telegram custom command can be forced with <code>//...</code></li>
-<li>whitespace-only payloads are rejected instead of writing meaningless PTY input</li>
-<li>existing controller/access checks remain in force, so Telegram input does not bypass the normal single-writer control model</li>
-</ul>
-
-<h2 id="operational-notes">Operational Notes</h2>
-
-<ul>
-<li>Telegram inbound is enabled automatically whenever Telegram bot credentials and target mappings are configured.</li>
-<li>Telegram outages must not make the ptydeck runtime unhealthy.</li>
-<li><code>/health</code>, <code>/ready</code>, and <code>/metrics</code> expose adapter status and inbound polling counters.</li>
-<li><code>/health.messaging.adapters[0].inboundTrace</code> and <code>/ready.messaging.adapters[0].inboundTrace</code> expose a bounded recent Telegram inbound observation ring, including accepted <code>input_text</code> observations and unsupported/non-text messages that never become ptydeck actions.</li>
-<li><code>/health.messaging.adapters[0].targetTrace</code> and <code>/ready.messaging.adapters[0].targetTrace</code> expose a bounded recent Telegram target-validation and topic-provisioning ring, including forum mismatch failures and topic create/reuse/rename outcomes.</li>
-<li><code>/health.messaging.deliveryEnabled</code> shows whether generic outbound Telegram delivery is currently allowed.</li>
-<li><code>/health.messaging.allowlistDeliveryActive</code> and <code>/ready.messaging.allowlistDeliveryActive</code> show whether narrow internal outbound allowlist paths such as <code>codex_input_reply</code>, <code>codex_separator_info</code>, <code>codex_separator_section</code>, and <code>codex_separator_summary_sentence</code> are active while generic <code>deliveryEnabled</code> remains false.</li>
-<li><code>/health.messaging.codexTelegramReplyCorrelation</code> and <code>/ready.messaging.codexTelegramReplyCorrelation</code> show the bounded Codex reply-block promotion state under its historical field name, including the reply-window duration and the number of sessions currently waiting for the first correlated Codex answer block after an eligible submitted input.</li>
-<li><code>/health.messaging.allowlistDeliveryScopes</code> and <code>/ready.messaging.allowlistDeliveryScopes</code> enumerate those narrow delivered scopes.</li>
-<li><code>/health.messaging.allowlistDeliverySignals</code> and <code>/ready.messaging.allowlistDeliverySignals</code> enumerate the corresponding neutral narrow-delivery signals.</li>
-<li><code>/health.messaging.codexRestartRecovery</code> and <code>/ready.messaging.codexRestartRecovery</code> expose the current narrow-family restart-recovery state, including the configured quiet period, current post-ready quiet time remaining, active recovering-session count, and persisted resend-ledger size.</li>
-<li><code>/health.messaging.codexSummaryRestartRecovery</code> and <code>/ready.messaging.codexSummaryRestartRecovery</code> remain as a backward-compatible alias for the same restart-recovery counters.</li>
-<li>When <code>topicMode: &quot;deck-session&quot;</code> is active, adapter health also exposes topic-provisioning counters, target-validation errors, and active topic-binding totals.</li>
-<li><code>/health.messaging.adapters[0]</code> and <code>/ready.messaging.adapters[0]</code> also expose <code>allowlistDeliveryActive</code>, <code>allowlistDeliveryScopes</code>, and <code>allowlistDeliverySignals</code> for the Telegram adapter itself.</li>
-<li>Because the system stays single-user, the adapter remains subordinate to the existing ptydeck runtime instead of introducing a separate authorization plane.</li>
-<li><code>reply</code>/<code>edit</code> behavior is deterministic: status-style updates reuse the adapter thread when possible, the first attention post still creates an alert message, and a richer follow-up for that same bounded attention thread now edits the original alert instead of creating another near-duplicate Telegram message.</li>
-<li>Forum-topic provisioning is also deterministic: for <code>topicMode: &quot;deck-session&quot;</code>, the adapter creates or reuses a topic named <code>&lt;deck name&gt; + &lt;terminal name&gt;</code> for the initial binding and persists the resulting <code>messageThreadId</code>.</li>
-<li>After that first binding, routing continues by <code>chatId + messageThreadId</code>, not by topic title, so manual Telegram topic renames stay mapped correctly and are no longer snapped back automatically by the normal reuse path.</li>
-</ul>
-
-<h2 id="related-docs">Related Docs</h2>
-
-<ul>
-<li><a href="../../DEPLOYMENT.md">DEPLOYMENT.md</a></li>
-<li><a href="../ptydeck_messaging_adapter_framework_final_concept.md">Messaging adapter concept</a></li>
-</ul>
+<p>The current adapter framework is being kept precisely so a third attempt can reuse the transport and intent seams without inheriting the old live semantic ballast.</p>
       </main>
       <aside class="handbook-page-toc">
         <p class="handbook-page-toc-title">On This Page</p>
         <ul class="handbook-page-toc-list">
+<li><a class="handbook-page-toc-link" href="#current-product-model">Current Product Model</a></li>
 <li><a class="handbook-page-toc-link" href="#telegram-command-surface">Telegram Command Surface</a></li>
-<li><a class="handbook-page-toc-link" href="#noise-control-and-diagnostics">Noise Control and Diagnostics</a></li>
-<li><a class="handbook-page-toc-link" href="#what-it-can-do">What It Can Do</a></li>
-<li><a class="handbook-page-toc-link" href="#what-it-cannot-do">What It Cannot Do</a></li>
 <li><a class="handbook-page-toc-link" href="#session-mapping">Session Mapping</a></li>
-<li><a class="handbook-page-toc-link" href="#delivery-hard-break">Delivery Hard Break</a></li>
-<li><a class="handbook-page-toc-link" href="#setup-checklist">Setup Checklist</a></li>
-<li><a class="handbook-page-toc-link" href="#1-create-the-bot">1. Create the Bot</a></li>
-<li><a class="handbook-page-toc-link" href="#2-add-the-bot-to-the-destination-chat">2. Add the Bot to the Destination Chat</a></li>
-<li><a class="handbook-page-toc-link" href="#3-discover-chatid-and-optional-messagethreadid">3. Discover `chatId` and Optional `messageThreadId`</a></li>
-<li><a class="handbook-page-toc-link" href="#4-choose-the-ptydeck-session-selector">4. Choose the ptydeck Session Selector</a></li>
-<li><a class="handbook-page-toc-link" href="#5-configure-the-backend">5. Configure the Backend</a></li>
-<li><a class="handbook-page-toc-link" href="#6-start-ptydeck">6. Start ptydeck</a></li>
-<li><a class="handbook-page-toc-link" href="#7-verify-adapter-health">7. Verify Adapter Health</a></li>
-<li><a class="handbook-page-toc-link" href="#8-run-a-minimal-telegram-smoke-test">8. Run a Minimal Telegram Smoke Test</a></li>
-<li><a class="handbook-page-toc-link" href="#inbound-semantics">Inbound Semantics</a></li>
-<li><a class="handbook-page-toc-link" href="#plain-text-input">plain text input</a></li>
-<li><a class="handbook-page-toc-link" href="#operational-notes">Operational Notes</a></li>
-<li><a class="handbook-page-toc-link" href="#related-docs">Related Docs</a></li>
+<li><a class="handbook-page-toc-link" href="#what-transport-only-still-delivers">What Transport-Only Still Delivers</a></li>
+<li><a class="handbook-page-toc-link" href="#what-it-no-longer-does-automatically">What It No Longer Does Automatically</a></li>
+<li><a class="handbook-page-toc-link" href="#health-and-diagnostics">Health and Diagnostics</a></li>
+<li><a class="handbook-page-toc-link" href="#future-direction">Future Direction</a></li>
 </ul>
       </aside>
     </div>

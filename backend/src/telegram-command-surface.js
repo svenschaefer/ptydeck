@@ -1,4 +1,4 @@
-import { compareCustomCommandRecords, normalizeCustomCommandRecord } from "../../frontend/src/public/custom-command-model.js";
+import { compareCustomCommandRecords, normalizeCustomCommandRecord } from "./messaging-custom-command-utils.js";
 
 const TELEGRAM_COMMAND_MAX_COUNT = 100;
 const TELEGRAM_COMMAND_NAME_MAX_LENGTH = 32;

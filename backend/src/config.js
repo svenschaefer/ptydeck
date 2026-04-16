@@ -27,22 +27,6 @@ function parseNonNegativeInt(rawValue, key) {
   return parsed;
 }
 
-function parseUnitInterval(rawValue, key) {
-  const parsed = Number(rawValue);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-    throw new Error(`${key} must be a number between 0 and 1.`);
-  }
-  return parsed;
-}
-
-function parseEnum(rawValue, key, allowedValues) {
-  const normalized = String(rawValue || "").trim().toLowerCase();
-  if (!allowedValues.includes(normalized)) {
-    throw new Error(`${key} must be one of: ${allowedValues.join(", ")}.`);
-  }
-  return normalized;
-}
-
 function parseOrigin(value, key) {
   try {
     const url = new URL(value);
@@ -120,8 +104,6 @@ function parseAuthMode(rawValue) {
   throw new Error("AUTH_MODE must be one of: off, dev, prod.");
 }
 
-const TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE = true;
-
 export function loadConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
   const enforceTlsIngress = parseBoolean(env.ENFORCE_TLS_INGRESS ?? (nodeEnv === "production" ? "1" : "0"));
@@ -185,32 +167,14 @@ export function loadConfig(env = process.env) {
   const messagingTelegramBotToken = readOptionalEnvText(env, "MESSAGING_TELEGRAM_BOT_TOKEN");
   const messagingTelegramTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_TELEGRAM_TARGETS"), "MESSAGING_TELEGRAM_TARGETS");
   const messagingTelegramApiBaseUrl = String(env.MESSAGING_TELEGRAM_API_BASE_URL || "https://api.telegram.org").trim();
-  const messagingTelegramOutboundEnabled = false;
+  const messagingTelegramOutboundEnabled = Boolean(messagingTelegramBotToken && messagingTelegramTargets.length > 0);
   const messagingTelegramInboundEnabled = Boolean(messagingTelegramBotToken && messagingTelegramTargets.length > 0);
   const messagingDiscordTargets = parseJsonArray(readOptionalEnvText(env, "MESSAGING_DISCORD_TARGETS"), "MESSAGING_DISCORD_TARGETS");
   const messagingDiscordApiBaseUrl = String(env.MESSAGING_DISCORD_API_BASE_URL || "https://discord.com/api/v10").trim();
-  const messagingDiscordOutboundEnabled = parseBoolean(
-    env.MESSAGING_DISCORD_OUTBOUND_ENABLED ?? (messagingDiscordTargets.length > 0 ? "1" : "0")
-  );
+  const messagingDiscordOutboundEnabled = messagingDiscordTargets.length > 0;
   const messagingTelegramPollTimeoutSeconds = parsePositiveInt(
     env.MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS || 3,
     "MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS"
-  );
-  const messagingTerminalSemanticPrimaryMode = parseEnum(
-    env.MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE || "legacy",
-    "MESSAGING_TERMINAL_SEMANTIC_PRIMARY_MODE",
-    ["legacy", "projection"]
-  );
-  const messagingTerminalSemanticShadowModeEnabled = parseBoolean(
-    env.MESSAGING_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED ?? "1"
-  );
-  const messagingTerminalSemanticCutoverMinComparisons = parsePositiveInt(
-    env.MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS || 20,
-    "MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MIN_COMPARISONS"
-  );
-  const messagingTerminalSemanticCutoverMaxMismatchRate = parseUnitInterval(
-    env.MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE || 0.1,
-    "MESSAGING_TERMINAL_SEMANTIC_CUTOVER_MAX_MISMATCH_RATE"
   );
   const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
   const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
@@ -335,15 +299,10 @@ export function loadConfig(env = process.env) {
     messagingTelegramTargets,
     messagingTelegramApiBaseUrl,
     messagingTelegramOutboundEnabled,
-    messagingTelegramOutboundHardBreakActive: TELEGRAM_OUTBOUND_HARD_BREAK_ACTIVE,
     messagingTelegramInboundEnabled,
     messagingTelegramPollTimeoutSeconds,
     messagingDiscordTargets,
     messagingDiscordApiBaseUrl,
-    messagingDiscordOutboundEnabled,
-    messagingTerminalSemanticPrimaryMode,
-    messagingTerminalSemanticShadowModeEnabled,
-    messagingTerminalSemanticCutoverMinComparisons,
-    messagingTerminalSemanticCutoverMaxMismatchRate
+    messagingDiscordOutboundEnabled
   };
 }

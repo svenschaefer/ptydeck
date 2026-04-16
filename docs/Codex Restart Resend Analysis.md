@@ -1,5 +1,7 @@
 # Codex Restart Resend Analysis
 
+Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
+
 ## Purpose
 
 This note captures the currently observed restart-resend behavior on the narrow Codex Telegram outbound path and turns it into concrete product constraints for a future fix.

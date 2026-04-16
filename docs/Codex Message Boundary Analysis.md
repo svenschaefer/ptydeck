@@ -1,5 +1,7 @@
 # Codex Message Boundary Analysis
 
+Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
+
 This note analyzes the end criteria that decide how Codex stream fragments become Telegram messages.
 The concrete trigger for this analysis was the observation that many delivered Telegram messages appear to contain only the first line or first short paragraph of a larger Codex closing comment, even when the operator-visible terminal block clearly spans multiple visual lines.
 

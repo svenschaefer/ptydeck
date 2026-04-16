@@ -1,5 +1,7 @@
 # Restart Streaming Analysis
 
+Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
+
 ## Purpose
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.

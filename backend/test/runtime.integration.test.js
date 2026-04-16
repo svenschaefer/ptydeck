@@ -282,7 +282,8 @@ test("REST lifecycle endpoints work end-to-end", async () => {
   }
 });
 
-test("runtime exposes messaging health/metrics and emits outbound telegram updates for mapped sessions", async () => {
+
+test("runtime exposes transport-only messaging health/metrics without automatic outbound delivery", async () => {
   const sends = [];
   const edits = [];
   const { runtime, baseUrl } = await createStartedRuntime({
@@ -298,6 +299,9 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
         async editMessage(payload) {
           edits.push(payload);
           return { messageId: payload.messageId || 91 };
+        },
+        async setMyCommands() {
+          return true;
         }
       };
     },
@@ -335,9 +339,6 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
 
-    await waitFor(() => sends.length >= 1, 2000);
-    assert.match(sends[0].text, /build-run: Session created\./);
-
     const inputRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -345,34 +346,40 @@ test("runtime exposes messaging health/metrics and emits outbound telegram updat
     });
     assert.equal(inputRes.status, 204);
 
-    await waitFor(() => edits.some((entry) => /PASS test suite/.test(entry.text)), 2000);
+    await sleep(100);
+    assert.equal(sends.length, 0);
+    assert.equal(edits.length, 0);
 
     const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
     assert.equal(healthRes.status, 200);
     const health = await healthRes.json();
     assert.equal(health.messaging.enabled, true);
+    assert.equal(health.messaging.deliveryEnabled, true);
+    assert.equal(health.messaging.mode, "transport_only");
+    assert.deepEqual(health.messaging.boundaryContracts, ["DeliveryAdapter", "MessageIntent"]);
     assert.equal(health.messaging.adapters[0].configuredTargets, 1);
-    assert.equal(health.messaging.trace.capacity >= 100, true);
+    assert.equal(health.messaging.adapters[0].deliveryEnabled, true);
     assert.equal(health.messaging.trace.capturedTotal >= 1, true);
-    assert.equal(Array.isArray(health.messaging.trace.recent), true);
+    assert.equal(health.messaging.trace.recent.some((entry) => entry.type === "messaging.telegram.command_sync"), true);
 
     const readyRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/ready`);
     assert.equal(readyRes.status, 200);
     const ready = await readyRes.json();
     assert.equal(ready.messaging.enabled, true);
+    assert.equal(ready.messaging.mode, "transport_only");
 
     const metricsRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/metrics`);
     assert.equal(metricsRes.status, 200);
     const metrics = await metricsRes.text();
+    assert.match(metrics, /ptydeck_messaging_runtime_mode\{mode="transport_only"\} 1/);
     assert.match(metrics, /ptydeck_messaging_adapter_enabled\{adapter="telegram"\} 1/);
-    assert.match(metrics, /ptydeck_messaging_deliveries_total\{adapter="telegram",outcome="success"\}/);
+    assert.match(metrics, /ptydeck_messaging_delivery_enabled\{adapter="telegram"\} 1/);
   } finally {
     await runtime.stop();
   }
 });
 
-test("runtime writes debug messaging traces to file without flooding stdout when a debug log file is configured", async () => {
-  const sends = [];
+test("runtime writes transport-only messaging traces to file without flooding stdout when a debug log file is configured", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-debug-file-"));
   const debugLogFile = join(dir, "backend-debug.log");
   const originalConsoleLog = console.log;
@@ -389,12 +396,14 @@ test("runtime writes debug messaging traces to file without flooding stdout when
     messagingTelegramTargets: [{ sessionName: "build-run", chatId: "1001" }],
     createMessagingTelegramTransport() {
       return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 200 };
+        async sendMessage() {
+          throw new Error("transport-only runtime should not emit automatic outbound sends");
         },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 201 };
+        async editMessage() {
+          throw new Error("transport-only runtime should not emit automatic outbound edits");
+        },
+        async setMyCommands() {
+          return true;
         }
       };
     },
@@ -431,25 +440,24 @@ test("runtime writes debug messaging traces to file without flooding stdout when
     });
     assert.equal(createRes.status, 201);
 
-    await waitFor(() => sends.length >= 1, 2000);
     await waitFor(async () => {
       try {
         const contents = await readFile(debugLogFile, "utf8");
-        return contents.includes("messaging.event.trace") || contents.includes("messaging.target.update");
+        return contents.includes("messaging.telegram.command_sync") && contents.includes("messaging.target.ensure");
       } catch {
         return false;
       }
     }, 2000);
 
     const debugContents = await readFile(debugLogFile, "utf8");
-    assert.match(debugContents, /messaging\.(event\.trace|target\.update)/);
-    assert.equal(consoleLines.some((line) => /messaging\.(event\.trace|target\.update|inbound\.)/.test(line)), false);
+    assert.match(debugContents, /messaging\.telegram\.command_sync/);
+    assert.match(debugContents, /messaging\.target\.ensure/);
+    assert.equal(consoleLines.some((line) => /messaging\.(telegram\.command_sync|target\.ensure)/.test(line)), false);
   } finally {
     console.log = originalConsoleLog;
     await runtime.stop();
   }
 });
-
 test("runtime captures codex raw stream chunks to the analysis file and exposes capture health", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-stream-analysis-"));
   const captureFile = join(dir, "session-stream-analysis.jsonl");
@@ -613,7 +621,6 @@ test("runtime executes mapped telegram text and leaves unpublished slash command
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
 
-    await waitFor(() => sends.some((entry) => /build-run: Session created\./.test(entry.text)), 2000);
     await waitFor(async () => {
       const sessionRes = await fetch(`${baseUrl}/sessions/${created.id}`);
       if (sessionRes.status !== 200) {
@@ -782,353 +789,6 @@ test("runtime sends telegram text with delayed submit semantics when messaging i
   }
 });
 
-test("runtime correlates a mapped telegram free-text question to the next codex reply before later workflow chatter", async () => {
-  const sends = [];
-  const updateQueue = [];
-  const writeCalls = [];
-  let pendingQuestion = "";
-  const telegramChat = {
-    id: -100200304,
-    type: "supergroup",
-    title: "ptydeck",
-    username: "ptydeck_group",
-    is_forum: true
-  };
-  const { runtime, baseUrl } = await createStartedRuntime({
-    messagingTelegramBotToken: "telegram-token",
-    messagingTelegramOutboundEnabled: false,
-    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200304", profile: "coding-agent" }],
-    messagingTelegramInboundEnabled: true,
-    messagingTelegramPollTimeoutSeconds: 1,
-    createMessagingTelegramTransport() {
-      return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 190 };
-        },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 190 };
-        },
-        async getUpdates() {
-          if (updateQueue.length > 0) {
-            return updateQueue.splice(0, updateQueue.length);
-          }
-          await sleep(10);
-          return [];
-        },
-        async answerCallbackQuery() {
-          return true;
-        }
-      };
-    },
-    createPty() {
-      let exitHandler = null;
-      let dataHandler = null;
-      return {
-        onExit(handler) {
-          exitHandler = handler;
-        },
-        onData(handler) {
-          dataHandler = handler;
-        },
-        write(data) {
-          const normalized = String(data);
-          writeCalls.push(normalized);
-          if (normalized !== "\r") {
-            pendingQuestion += normalized;
-            return;
-          }
-          if (!dataHandler) {
-            return;
-          }
-          if (/Wie geht.s weiter\?/u.test(pendingQuestion)) {
-            dataHandler("4. MSG-063 Owner QA\n");
-            dataHandler("In ROADMAP.md:\n");
-            dataHandler("Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115 und liefere den Slice end-to-end.\n");
-            dataHandler("─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");
-            dataHandler("• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n");
-          } else {
-            dataHandler(normalized);
-          }
-          pendingQuestion = "";
-        },
-        resize() {},
-        kill(signal) {
-          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
-            exitHandler({ exitCode: 0, signal: 0 });
-          }
-        }
-      };
-    }
-  });
-
-  try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
-    });
-    assert.equal(createRes.status, 201);
-
-    updateQueue.push({
-      update_id: 1,
-      message: {
-        chat: telegramChat,
-        from: { id: 42, username: "sven" },
-        text: "Wie geht’s weiter?"
-      }
-    });
-
-    await waitFor(async () => {
-      const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
-      const health = await healthRes.json();
-      return health.messaging.adapters[0].inboundTrace.capturedTotal >= 1;
-    }, 2000);
-    await waitFor(() => writeCalls.includes("Wie geht’s weiter?") && writeCalls.includes("\r"), 2000);
-    await waitFor(() => sends.some((entry) => /Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115/.test(entry.text)), 2000);
-
-    const replyIndex = sends.findIndex((entry) => /Wenn kein neuer Blocker auftaucht, gehe ich direkt in H115/.test(entry.text));
-    const metaIndex = sends.findIndex((entry) => /shell-quoting/i.test(entry.text));
-    assert.notEqual(replyIndex, -1);
-    assert.equal(metaIndex, -1);
-    assert.ok(replyIndex >= 0);
-    assert.equal(writeCalls.includes("Wie geht’s weiter?"), true);
-    assert.equal(writeCalls.includes("\r"), true);
-
-    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
-    assert.equal(healthRes.status, 200);
-    const health = await healthRes.json();
-    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-  } finally {
-    await runtime.stop();
-  }
-});
-
-test("runtime promotes the next substantial codex reply after submitted REST input without requiring telegram origin", async () => {
-  const sends = [];
-  const writeCalls = [];
-  let pendingQuestion = "";
-  const { runtime, baseUrl } = await createStartedRuntime({
-    messagingTelegramBotToken: "telegram-token",
-    messagingTelegramOutboundEnabled: false,
-    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200304", profile: "coding-agent" }],
-    createMessagingTelegramTransport() {
-      return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 290 };
-        },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 291 };
-        },
-        async getUpdates() {
-          await sleep(10);
-          return [];
-        },
-        async answerCallbackQuery() {
-          return true;
-        }
-      };
-    },
-    createPty() {
-      let exitHandler = null;
-      let dataHandler = null;
-      return {
-        onExit(handler) {
-          exitHandler = handler;
-        },
-        onData(handler) {
-          dataHandler = handler;
-        },
-        write(data) {
-          const normalized = String(data);
-          writeCalls.push(normalized);
-          if (normalized !== "\r") {
-            pendingQuestion += normalized;
-            return;
-          }
-          if (!dataHandler) {
-            return;
-          }
-          if (/Wie geht.s weiter\?/u.test(pendingQuestion)) {
-            dataHandler("4. MSG-063 Owner QA\n");
-            dataHandler("In ROADMAP.md:\n");
-            dataHandler("• Ja. Der Fall ist jetzt sauber eingegrenzt.›Explain this codebase gpt-5.4 xhigh · 37% left\n");
-            dataHandler("Kurzurteil\n");
-            dataHandler("Die neue Reply-Logik greift grundsätzlich.\n");
-            dataHandler("─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n");
-            dataHandler("• Der erste capture-read war wegen shell-quoting unbrauchbar. Ich ziehe die Chunks jetzt sauber als ESM aus dem Capture.\n");
-          } else {
-            dataHandler(normalized);
-          }
-          pendingQuestion = "";
-        },
-        resize() {},
-        kill(signal) {
-          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
-            exitHandler({ exitCode: 0, signal: 0 });
-          }
-        }
-      };
-    }
-  });
-
-  try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
-    });
-    assert.equal(createRes.status, 201);
-    const created = await createRes.json();
-
-    const textRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: "Wie geht’s weiter?" })
-    });
-    assert.equal(textRes.status, 204);
-    assert.equal(sends.length, 0);
-
-    const submitRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: "\r" })
-    });
-    assert.equal(submitRes.status, 204);
-
-    await waitFor(() => writeCalls.includes("Wie geht’s weiter?") && writeCalls.includes("\r"), 2000);
-    await waitFor(() => sends.some((entry) => /Ja\. Der Fall ist jetzt sauber eingegrenzt\./.test(entry.text)), 2000);
-
-    const replyIndex = sends.findIndex((entry) => /Ja\. Der Fall ist jetzt sauber eingegrenzt\./.test(entry.text));
-    const metaIndex = sends.findIndex((entry) => /shell-quoting/i.test(entry.text));
-    assert.notEqual(replyIndex, -1);
-    assert.equal(metaIndex, -1);
-    assert.doesNotMatch(sends[replyIndex].text, /Explain this codebase/i);
-
-    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
-    assert.equal(healthRes.status, 200);
-    const health = await healthRes.json();
-    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-  } finally {
-    await runtime.stop();
-  }
-});
-
-test("runtime ignores stale carryover and input echo before promoting a submitted REST codex reply", async () => {
-  const sends = [];
-  const writeCalls = [];
-  let pendingQuestion = "";
-  let dataHandler = null;
-  const { runtime, baseUrl } = await createStartedRuntime({
-    messagingTelegramBotToken: "telegram-token",
-    messagingTelegramOutboundEnabled: false,
-    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200305", profile: "coding-agent" }],
-    createMessagingTelegramTransport() {
-      return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 390 };
-        },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 391 };
-        },
-        async getUpdates() {
-          await sleep(10);
-          return [];
-        },
-        async answerCallbackQuery() {
-          return true;
-        }
-      };
-    },
-    createPty() {
-      let exitHandler = null;
-      return {
-        onExit(handler) {
-          exitHandler = handler;
-        },
-        onData(handler) {
-          dataHandler = handler;
-        },
-        write(data) {
-          const normalized = String(data);
-          writeCalls.push(normalized);
-          if (normalized !== "\r") {
-            pendingQuestion += normalized;
-            if (dataHandler) {
-              dataHandler(normalized);
-            }
-            return;
-          }
-          if (!dataHandler) {
-            return;
-          }
-          dataHandler("\n");
-          dataHandler(`› ${pendingQuestion} Find and fix a bug in @filename\n`);
-          dataHandler("• Jetzt nicht breit umbauen. Ein enger Korrektur-Slice reicht.›Find and fix a bug in @filename gpt-5.4 xhigh · 15% left\n");
-          dataHandler("Was wir als Nächstes tun sollten\n");
-          dataHandler("1. codex_input_reply härten\n");
-          dataHandler("\n");
-          pendingQuestion = "";
-        },
-        resize() {},
-        kill(signal) {
-          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
-            exitHandler({ exitCode: 0, signal: 0 });
-          }
-        }
-      };
-    }
-  });
-
-  try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
-    });
-    assert.equal(createRes.status, 201);
-    const created = await createRes.json();
-
-    dataHandler?.("Keine Produktänderung in diesem Schritt.");
-    dataHandler?.("155");
-
-    const textRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: "ok, was machen wir dann jetzt da" })
-    });
-    assert.equal(textRes.status, 204);
-    assert.equal(sends.length, 0);
-
-    const submitRes = await fetch(`${baseUrl}/sessions/${created.id}/input`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: "\r" })
-    });
-    assert.equal(submitRes.status, 204);
-
-    await waitFor(() => writeCalls.includes("ok, was machen wir dann jetzt da") && writeCalls.includes("\r"), 2000);
-    await waitFor(() => sends.some((entry) => /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./.test(entry.text)), 2000);
-
-    assert.equal(sends.length, 1);
-    assert.match(sends[0].text, /Jetzt nicht breit umbauen\. Ein enger Korrektur-Slice reicht\./);
-    assert.match(sends[0].text, /Was wir als Nächstes tun sollten/);
-    assert.doesNotMatch(sends[0].text, /Keine Produktänderung in diesem Schritt/i);
-    assert.doesNotMatch(sends[0].text, /\b155\b/);
-    assert.doesNotMatch(sends[0].text, /ok, was machen wir dann jetzt da/i);
-    assert.doesNotMatch(sends[0].text, /Find and fix a bug/i);
-
-    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
-    assert.equal(healthRes.status, 200);
-    const health = await healthRes.json();
-    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
-  } finally {
-    await runtime.stop();
-  }
-});
-
 test("runtime submits startup commands through startup_submit_cr write tracking", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-submit-debug-"));
   const debugLogFile = join(dir, "backend-debug.log");
@@ -1286,121 +946,6 @@ test("runtime answers startup cursor-position queries so powershell start comman
 
     const debugContents = await readFile(debugLogFile, "utf8");
     assert.match(debugContents, /session\.input\.write .*"writeKind":"startup_terminal_query_response"/);
-  } finally {
-    await runtime.stop();
-  }
-});
-
-test("runtime logs telegram messaging input write phases and opens the reply window only on submit", async () => {
-  const sends = [];
-  const updateQueue = [];
-  const writeCalls = [];
-  const dir = await mkdtemp(join(tmpdir(), "ptydeck-telegram-input-debug-"));
-  const debugLogFile = join(dir, "backend-debug.log");
-  const telegramChat = {
-    id: -100200306,
-    type: "supergroup",
-    title: "ptydeck",
-    username: "ptydeck_group"
-  };
-  const { runtime, baseUrl } = await createStartedRuntime({
-    debugLogs: true,
-    debugLogFile,
-    messagingTelegramBotToken: "telegram-token",
-    messagingTelegramOutboundEnabled: false,
-    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200306", profile: "coding-agent" }],
-    messagingTelegramInboundEnabled: true,
-    messagingTelegramPollTimeoutSeconds: 1,
-    createMessagingTelegramTransport() {
-      return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 490 };
-        },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 491 };
-        },
-        async getUpdates() {
-          if (updateQueue.length > 0) {
-            return updateQueue.splice(0, updateQueue.length);
-          }
-          await sleep(10);
-          return [];
-        },
-        async answerCallbackQuery() {
-          return true;
-        }
-      };
-    },
-    createPty() {
-      let exitHandler = null;
-      let dataHandler = null;
-      return {
-        onExit(handler) {
-          exitHandler = handler;
-        },
-        onData(handler) {
-          dataHandler = handler;
-        },
-        write(data) {
-          const normalized = String(data);
-          writeCalls.push(normalized);
-          if (normalized === "\r" && dataHandler) {
-            dataHandler("• Antwort läuft.\n");
-          }
-        },
-        resize() {},
-        kill(signal) {
-          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
-            exitHandler({ exitCode: 0, signal: 0 });
-          }
-        }
-      };
-    }
-  });
-
-  try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
-    });
-    assert.equal(createRes.status, 201);
-
-    updateQueue.push({
-      update_id: 99,
-      message: {
-        chat: telegramChat,
-        from: { id: 42, username: "sven" },
-        text: "Ok. Die Nachricht ist auch korrekt angekommen."
-      }
-    });
-
-    await waitFor(() => writeCalls.includes("Ok. Die Nachricht ist auch korrekt angekommen.") && writeCalls.includes("\r"), 2000);
-    await waitFor(async () => {
-      try {
-        const contents = await readFile(debugLogFile, "utf8");
-        return (
-          contents.includes("messaging.input.delayed_submit_scheduled") &&
-          contents.includes("session.input.write") &&
-          contents.includes("session.activity.started")
-        );
-      } catch {
-        return false;
-      }
-    }, 2000);
-
-    const debugContents = await readFile(debugLogFile, "utf8");
-    assert.match(debugContents, /messaging\.input\.delayed_submit_scheduled .*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /messaging\.input\.delayed_submit_fired .*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /messaging\.input\.write_attempt .*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /messaging\.input\.write_ok .*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /messaging\.input\.write_attempt .*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /messaging\.input\.write_ok .*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /session\.input\.write .*"phase":"attempt".*"writeKind":"body".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /session\.input\.write .*"phase":"ok".*"writeKind":"submit_cr".*"correlationId":"msg-telegram-99"/);
-    assert.match(debugContents, /session\.event .*"type":"session\.activity\.started".*"correlationId":"msg-telegram-99"/);
-    assert.equal((debugContents.match(/messaging\.telegram_reply_window/g) || []).length, 1);
   } finally {
     await runtime.stop();
   }
@@ -1589,135 +1134,6 @@ test("runtime logs structured async PTY retry and commit events after EINTR", as
     assert.match(debugContents, /session\.input\.write .*"phase":"ok".*"writeKind":"direct"/);
     assert.match(debugContents, /session\.input\.write .*"phase":"retry".*"code":"EINTR".*"failureStage":"async".*"retryable":true/);
     assert.match(debugContents, /session\.input\.write .*"phase":"committed".*"failureStage":"async".*"retryCount":1/);
-  } finally {
-    await runtime.stop();
-  }
-});
-
-test("runtime ignores stale tail and commentary leakage before delivering the first fresh telegram custom-command reply", async () => {
-  const sends = [];
-  const publishedCommands = [];
-  const updateQueue = [];
-  const writeCalls = [];
-  const telegramChat = {
-    id: -100200312,
-    type: "supergroup",
-    title: "ptydeck",
-    username: "ptydeck_group",
-    is_forum: true
-  };
-  let dataHandler = null;
-  const { runtime, baseUrl } = await createStartedRuntime({
-    messagingTelegramBotToken: "telegram-token",
-    messagingTelegramOutboundEnabled: true,
-    messagingTelegramTargets: [{ sessionName: "ptydeck", chatId: "-100200312", profile: "coding-agent" }],
-    messagingTelegramInboundEnabled: true,
-    messagingTelegramPollTimeoutSeconds: 1,
-    createMessagingTelegramTransport() {
-      return {
-        async sendMessage(payload) {
-          sends.push(payload);
-          return { messageId: sends.length + 270 };
-        },
-        async editMessage(payload) {
-          return { messageId: payload.messageId || 271 };
-        },
-        async setMyCommands(payload) {
-          publishedCommands.push(payload);
-          return true;
-        },
-        async getUpdates() {
-          if (updateQueue.length > 0) {
-            return updateQueue.splice(0, updateQueue.length);
-          }
-          await sleep(10);
-          return [];
-        },
-        async answerCallbackQuery() {
-          return true;
-        }
-      };
-    },
-    createPty() {
-      let exitHandler = null;
-      return {
-        onExit(handler) {
-          exitHandler = handler;
-        },
-        onData(handler) {
-          dataHandler = handler;
-        },
-        write(data) {
-          const normalized = String(data);
-          writeCalls.push(normalized);
-          if (normalized !== "\r") {
-            if (dataHandler) {
-              dataHandler(normalized);
-            }
-            return;
-          }
-          if (!dataHandler) {
-            return;
-          }
-          dataHandler("- worktree clean\n");
-          dataHandler("• Ich prüfe nur noch den aktuellen Repo- und Dokumentationsstand gegen main.\n");
-          dataHandler("  Wenn nichts gedriftet ist, bleibt es beim gerade gepushten H123-Planungsstand ohne neuen Commit.\n");
-          dataHandler("• Der aktuelle Status ist sauber.\n");
-          dataHandler("Repo state\n");
-          dataHandler("- nothing drifted\n");
-          dataHandler("\n");
-        },
-        resize() {},
-        kill(signal) {
-          if ((signal === "SIGTERM" || signal === undefined) && exitHandler) {
-            exitHandler({ exitCode: 0, signal: 0 });
-          }
-        }
-      };
-    }
-  });
-
-  try {
-    const createRes = await fetch(`${baseUrl}/sessions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shell: "bash", name: "ptydeck", startCommand: "codex" })
-    });
-    assert.equal(createRes.status, 201);
-
-    const putRes = await fetch(`${baseUrl}/custom-commands/docu`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: "echo DOCU_FROM_TELEGRAM\n" })
-    });
-    assert.equal(putRes.status, 200);
-
-    await waitFor(() => publishedCommands.length >= 1, 2000);
-    dataHandler?.("- worktree clean\n");
-
-    updateQueue.push({
-      update_id: 71,
-      message: {
-        chat: telegramChat,
-        from: { id: 42, username: "sven" },
-        text: "/docu"
-      }
-    });
-
-    await waitFor(() => writeCalls.includes("echo DOCU_FROM_TELEGRAM") && writeCalls.includes("\r"), 2000);
-    await waitFor(() => sends.some((entry) => /Custom command \/docu sent to \[[^\]]+\] ptydeck/.test(entry.text)), 2000);
-    await waitFor(() => sends.some((entry) => /Der aktuelle Status ist sauber\./.test(entry.text)), 2000);
-    await sleep(100);
-
-    const reply = sends.find((entry) => /Der aktuelle Status ist sauber\./.test(entry.text) && !/Custom command \/docu/.test(entry.text));
-    assert.ok(reply);
-    assert.doesNotMatch(reply.text, /Ich prüfe nur noch den aktuellen Repo- und Dokumentationsstand/i);
-    assert.doesNotMatch(reply.text, /\b- worktree clean\b/i);
-
-    const healthRes = await fetch(`http://127.0.0.1:${runtime.getAddress().port}/health`);
-    assert.equal(healthRes.status, 200);
-    const health = await healthRes.json();
-    assert.equal(health.messaging.codexTelegramReplyCorrelation.activeSessionCount, 0);
   } finally {
     await runtime.stop();
   }
