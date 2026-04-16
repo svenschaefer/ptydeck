@@ -2974,6 +2974,217 @@ test("messaging runtime suppresses commentary-like codex sections from telegram 
   assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-section_new_block"));
 });
 
+test("messaging runtime still delivers operational restart-status bullets instead of suppressing them as commentary", async () => {
+  const sends = [];
+  let now = 13_100;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 980 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 981 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "operational-commentary-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "operational-commentary-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Ich prüfe direkt den frischen Restart-Zustand gegen /health und das aktuelle Debug-Log, damit wir eine saubere Baseline haben, bevor der nächste Restart-Fall sichtbar wird.\n",
+    promptBoundaries: [],
+    trace: { traceId: "operational-commentary-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "operational-commentary-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Ich prüfe direkt den frischen Restart-Zustand gegen \/health und das aktuelle Debug-Log/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-info_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "commentary_progress_chatter"));
+});
+
+test("messaging runtime keeps structured restart status blocks deliverable instead of dropping them", async () => {
+  const sends = [];
+  let now = 13_150;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 982 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 983 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "restart-status-section-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "restart-status-section-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• Gut.\n" +
+      "\n" +
+      "  Dann ist der aktuelle Stand dazu:\n" +
+      "\n" +
+      "  - pre-ready / quiet-window / waiting-for-input greifen im Restart-Fenster\n" +
+      "  - der grobe Restart-Noise ist aktuell unter Kontrolle\n" +
+      "  - das bestätigt, dass H140 zumindest den offensichtlichen Restart-Churn wirksam entschärft\n" +
+      "\n" +
+      "  Der relevante Restpunkt bleibt dann eher:\n" +
+      "\n" +
+      "  - spätere Resends oder near-duplicates nach dem eigentlichen Restart-Fenster\n" +
+      "  - nicht der unmittelbare Startup-Flood selbst\n",
+    promptBoundaries: [],
+    trace: { traceId: "restart-status-section-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "restart-status-section-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Dann ist der aktuelle Stand dazu:/);
+  assert.match(sends[0].text, /pre-ready \/ quiet-window \/ waiting-for-input greifen im Restart-Fenster/);
+  assert.match(sends[0].text, /spätere Resends oder near-duplicates nach dem eigentlichen Restart-Fenster/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_required"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "commentary_progress_chatter"));
+});
+
+test("messaging runtime does not misclassify explanatory failed-term bullets as attention alerts", async () => {
+  const sends = [];
+  let now = 13_200;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 984 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 985 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "failed-term-analysis-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "failed-term-analysis-1" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data:
+      "• The visible Failed to send terminal input. message was coming from the frontend catch path, not from a backend /input rejection.\n" +
+      "\n" +
+      "  What I found\n" +
+      "\n" +
+      "  - recent backend writes were succeeding with 204, so the generic frontend message was masking the real failure class.\n" +
+      "  - records a dedicated terminal.input.error trace/debug event\n",
+    promptBoundaries: [],
+    trace: { traceId: "failed-term-analysis-2" }
+  });
+  await runtime.observeSessionData({
+    session,
+    data: "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n",
+    promptBoundaries: [],
+    trace: { traceId: "failed-term-analysis-3" }
+  });
+
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].text, /Failed to send terminal input/);
+  assert.match(sends[0].text, /recent backend writes were succeeding with 204/);
+  assert.match(sends[0].text, /records a dedicated terminal\.input\.error trace\/debug event/);
+
+  const status = runtime.buildStatusSummary();
+  assert.ok(status.trace.recent.some((entry) => entry.reason === "output-episode-section_new_block"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_required"));
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "attention_snippet_tail"));
+});
+
 test("messaging runtime retries the same codex summary sentence after telegram backoff clears without duplicating once delivered", async () => {
   const sends = [];
   let now = 1_000;

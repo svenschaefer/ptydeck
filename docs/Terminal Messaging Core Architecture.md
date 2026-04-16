@@ -174,8 +174,11 @@ It does not yet:
 - eliminate every remaining legacy separator-family dependency for autonomous narrow allowlist delivery
 - provide one app-semantic adapter per future terminal app beyond the shipped Codex adapter
 - provide one delivery adapter per future channel beyond the shipped Telegram and Discord adapters
+- remove the remaining legacy narrow-path compatibility shell inside `backend/src/messaging-runtime.js`, which still carries `codex_*` scope compatibility, legacy allowlist dispatch helpers, and some historically grown commentary/attention classification logic around the neutral core while parity hardening is still in progress
 
 Those are future extension points on top of the shipped `H128` baseline, not missing prerequisites for the core architecture itself.
+
+The latest 2026-04-16 hardening pass narrowed one example of that remaining shell: ordinary operational coding-agent status blocks are no longer suppressed merely because they mention debug logs, current runtime/code state, or explanatory `failed` wording inside structured bullets. That confirms the core direction is sound, but it also confirms the end-state is not yet "no legacy ballast at all"; the runtime still has compatibility-era filters that must continue shrinking toward specific, bounded failure classes.
 
 ## Projection Baseline Now Shipped
 

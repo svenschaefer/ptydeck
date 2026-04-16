@@ -120,6 +120,7 @@ const STRONG_STATUS_SIGNAL_PATTERN =
   /\b(?:plan|validated?|generated?|wrote|updated?|restored|reclaimed|pushed|committed|tests?|lint|coverage|build|status|done|completed|ready|started|saved|connected|copied|uploaded|downloaded|created|deleted|renamed|applied|failed|failure|error|warning|blocked|conflict)\b/i;
 const STRONG_ATTENTION_SIGNAL_PATTERN =
   /\b(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied|timed out|timeout|refused|blocked|conflict)\b/i;
+const STRUCTURED_LIST_LINE_PATTERN = /^(?:[-*•]\s+|\d+\.\s+)/u;
 const ZERO_ISSUE_COUNT_PATTERN = /^\s*0\s+(?:error(?:\(s\))?|errors|warning(?:\(s\))?|warnings)\b/i;
 const SHORT_OS_ERROR_FRAGMENT_PATTERN = /\(\s*os error \d+\s*\)$/i;
 const CODING_AGENT_TAIL_MARKERS = Object.freeze([
@@ -218,7 +219,8 @@ const PROFILE_PATTERNS = Object.freeze({
   }),
   "coding-agent": Object.freeze({
     attention: [
-      /\b(?:error|failed|failure|traceback|exception|panic|blocked|conflict|validation failed|lint failed|tests failed)\b/i
+      /^(?:└\s*)?(?:fatal|error|failed|failure|traceback|exception|panic)\b[:\s-]?/i,
+      /\b(?:validation failed|lint failed|tests failed|unable to access|permission denied|timed out|timeout|refused)\b/i
     ],
     summary: [
       /^(?:[•*]\s*)?(?:updated plan|plan updated)\b/i,
@@ -618,7 +620,7 @@ const CODING_AGENT_COMMENTARY_LEAD_PATTERN =
 const CODING_AGENT_COMMENTARY_INLINE_PATTERN =
   /\b(?:ich|i(?:'m| am|’m)?|i(?:'ll| will)|we(?:'re| are|’re)?|we(?:'ll| will))\s+(?:prüfe|pruefe|ziehe|lese|analysiere|vergleiche|setze|gehe|check(?:ing)?|inspect(?:ing)?|review(?:ing)?|read(?:ing)?|trace(?:ing)?|compare(?:ing)?|analy(?:s|z)e(?:ing)?|implement(?:ing)?|narrow(?:ing)?|pull(?:ing)?|look(?:ing)?|verify(?:ing)?|sync(?:ing)?|push(?:ing)?)\b/iu;
 const CODING_AGENT_COMMENTARY_CONTEXT_PATTERN =
-  /(?:stream(?:-to-message)?-pipeline|reply-assembly|delivery-policy|section-assembly|seams\b|evaluator\b|runtime(?:-klassifikation)?|klassifikation|repo(?:[-/ ](?:prozess)?zustand|\s+state)?|repo-\s*und\s+dokumentationsstand|dokumentationsstand|document(?:ation)?(?:\s+state|\s+stand)?|markdown state|backlog separation|validator(?:en|s)?|worktree\b|drift(?:ed)?\b|logs?\b|capture\b|planungsstand\b|current code(?:base|path)?|todo(?:-outlook)?\.md|roadmap\.md|changelog\.md|codex_context\.md|deployment\.md|main\b)/iu;
+  /(?:stream(?:-to-message)?-pipeline|reply-assembly|delivery-policy|section-assembly|seams\b|evaluator\b|runtime(?:-klassifikation)?|klassifikation|repo(?:[-/ ](?:prozess)?zustand|\s+state)?|repo-\s*und\s+dokumentationsstand|dokumentationsstand|document(?:ation)?(?:\s+state|\s+stand)?|markdown state|backlog separation|validator(?:en|s)?|worktree\b|drift(?:ed)?\b|planungsstand\b|capture(?:-read)?\b|chunks?\b|\besm\b|shell-quoting\b|todo(?:-outlook)?\.md|roadmap\.md|changelog\.md|codex_context\.md|deployment\.md)/iu;
 
 function isCommentaryLikeCodexOutboundText(value, session, profile) {
   if (!isCodingAgentContext(session, profile)) {
@@ -823,6 +825,9 @@ function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profil
   if (!normalizedSummary) {
     return false;
   }
+  if (STRUCTURED_LIST_LINE_PATTERN.test(normalizedSummary)) {
+    return false;
+  }
   const strongPrefixPattern = /^(?:[•*]\s*)?(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied)\b/i;
   if (strongPrefixPattern.test(normalizedSummary)) {
     return false;
@@ -837,6 +842,26 @@ function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profil
   }
   if (!/[\\/:(]/.test(normalizedSummary) && !/^\s*[A-Z0-9_.-]/.test(normalizedSummary)) {
     return true;
+  }
+  return false;
+}
+
+function isCodingAgentAttentionLine(summary, session, profile) {
+  if (!isCodingAgentContext(session, profile)) {
+    return false;
+  }
+  const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
+  if (!normalizedSummary) {
+    return false;
+  }
+  if (STRUCTURED_LIST_LINE_PATTERN.test(normalizedSummary)) {
+    return false;
+  }
+  const activeProfile = PROFILE_PATTERNS[profile] || PROFILE_PATTERNS["generic-shell"];
+  for (const pattern of activeProfile.attention) {
+    if (pattern.test(normalizedSummary)) {
+      return true;
+    }
   }
   return false;
 }
@@ -1649,14 +1674,25 @@ function classifyTerminalLine(session, profile, line, recentLines = []) {
       threadKey: "attention"
     };
   }
-  for (const pattern of activeProfile.attention) {
-    if (pattern.test(visibleLine)) {
+  if (isCodingAgentContext(session, profile)) {
+    if (isCodingAgentAttentionLine(visibleLine, session, profile)) {
       return {
         type: "session.attention.required",
         severity: "attention",
         summary: visibleLine,
         threadKey: "attention"
       };
+    }
+  } else {
+    for (const pattern of activeProfile.attention) {
+      if (pattern.test(visibleLine)) {
+        return {
+          type: "session.attention.required",
+          severity: "attention",
+          summary: visibleLine,
+          threadKey: "attention"
+        };
+      }
     }
   }
   for (const pattern of activeProfile.summary) {
