@@ -94,14 +94,21 @@ function buildProjectionSemanticMessageText(lines = [], normalizeWhitespace, nor
   if (normalizedLines.length === 0) {
     return "";
   }
+  if (isProjectionVerticalFragmentNoise(normalizedLines)) {
+    return "";
+  }
   const structured =
     normalizedLines.length > 1 || normalizedLines.some((line) => /^(?:[-*]\s+|\d+\.\s+)|:$/u.test(line));
   const text = structured ? normalizedLines.join("\n") : normalizedLines.join(" ");
-  return normalizeLineBreaks(text)
+  const normalizedText = normalizeLineBreaks(text)
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
+  if (!normalizedText || isProjectionFooterMetricNoise(normalizedText) || isProjectionVerticalFragmentNoise([normalizedText])) {
+    return "";
+  }
+  return normalizedText;
 }
 
 function buildProjectionSemanticBaselineComparableSet(runtimeSnapshot, session, profile, helpers, options = {}) {
@@ -177,6 +184,9 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
   if (!normalized) {
     return null;
   }
+  if (isProjectionFooterMetricNoise(normalized)) {
+    return null;
+  }
   if (inputText) {
     if (normalized === inputText) {
       return null;
@@ -217,6 +227,37 @@ function normalizeProjectionSemanticSourceLine(rawLine, session, profile, option
     comparableText: noise.comparableText,
     structured: startsBullet || startsList || /:$/u.test(normalized)
   });
+}
+
+function isProjectionVerticalFragmentNoise(lines = []) {
+  const tokens = lines
+    .flatMap((line) => String(line || "").split(/\s+/u))
+    .map((token) => normalizeNonEmptyString(token))
+    .filter(Boolean);
+  if (tokens.length < 6) {
+    return false;
+  }
+  const shortAlphaTokens = tokens.filter((token) => /^\p{L}{1,2}$/u.test(token));
+  if (shortAlphaTokens.length < 6 || shortAlphaTokens.length / tokens.length < 0.75) {
+    return false;
+  }
+  const singleAlphaTokens = tokens.filter((token) => /^\p{L}$/u.test(token));
+  return singleAlphaTokens.length >= 4;
+}
+
+function isProjectionFooterMetricNoise(value) {
+  const normalized = normalizeNonEmptyString(value).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  const percentageMatches = normalized.match(/\d{1,3}%/gu) || [];
+  if (percentageMatches.length < 2) {
+    return false;
+  }
+  if (!/\b\d+\.\d+\b/u.test(normalized)) {
+    return false;
+  }
+  return /\b(?:weekly|wekly)\b/u.test(normalized);
 }
 
 function extractProjectionSemanticLines(runtimeSnapshot, session, profile, options, helpers) {

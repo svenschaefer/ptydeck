@@ -4191,6 +4191,9 @@ export function createMessagingRuntime(options = {}) {
     if (!projectionCandidate) {
       return false;
     }
+    if (primaryMode === "legacy") {
+      return false;
+    }
     if (!comparison) {
       return !isNoisySemanticCandidate(projectionCandidate, session, profile);
     }
@@ -4214,9 +4217,6 @@ export function createMessagingRuntime(options = {}) {
     }
     if (comparison.comparisonResult === "matched") {
       return true;
-    }
-    if (primaryMode === "legacy" && legacyCandidate) {
-      return false;
     }
     if (legacyCandidate && isMeaningfulSemanticSuperset(legacyCandidate, projectionCandidate, session, profile)) {
       return false;

@@ -536,6 +536,7 @@ test("messaging runtime exposes the neutral terminal messaging core bridge while
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -648,6 +649,7 @@ test("messaging runtime tracks turn baselines transcript deltas and quiet-window
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -741,6 +743,7 @@ test("messaging runtime delivers short correct turn replies from projection sema
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -812,6 +815,7 @@ test("messaging runtime delivers short correct turn replies through the generic 
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "claude", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -886,6 +890,7 @@ test("messaging runtime opens a fresh turn behind an ownership barrier instead o
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -1261,6 +1266,200 @@ test("messaging runtime records legacy-primary shadow matches for turn replies w
   );
 });
 
+test("messaging runtime suppresses projection-only output episodes while legacy remains primary", async () => {
+  const sends = [];
+  let now = 8_760;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "legacy",
+    terminalSemanticShadowModeEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 789 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 790 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "legacy-shadow-suppressed-episode-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "Projection-only delivery text that should remain shadow-only while legacy stays primary.\n",
+    promptBoundaries: [],
+    trace: { traceId: "legacy-shadow-suppressed-episode-data" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "legacy-shadow-suppressed-episode-idle" }
+  });
+
+  assert.equal(sends.length, 0);
+
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.primaryMode, "legacy");
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.total, 1);
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.shadowOnly, 1);
+  assert.ok(
+    status.trace.recent.some(
+      (entry) =>
+        entry.type === "terminal.semantic.compare" &&
+        entry.decision === "shadow_only" &&
+        entry.primaryMode === "legacy"
+    )
+  );
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-info_new_block"));
+});
+
+test("messaging runtime rejects vertically fragmented turn text from projection semantic extraction", async () => {
+  const sends = [];
+  let now = 8_790;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "legacy",
+    terminalSemanticShadowModeEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 791 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 792 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "legacy-shadow-vertical-turn-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  runtime.observeSessionInput(session.id, {
+    traceId: "legacy-shadow-vertical-turn-open",
+    correlationId: "legacy-shadow-vertical-turn-correlation",
+    source: "rest",
+    replyEligible: true,
+    replyPromotionEligible: true,
+    replyInputText: "Bitte pruefe den aktuellen Status."
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "B\ni\nt\ne\np\nr\nu\ne\nf\nd\ne\nn\na\nk\nt\nu\ne\nl\nl\ne\nn\ns\nt\na\nt\nu\ns\n",
+    promptBoundaries: [],
+    trace: { traceId: "legacy-shadow-vertical-turn-data" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "legacy-shadow-vertical-turn-idle" }
+  });
+
+  assert.equal(sends.length, 0);
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.total, 0);
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "turn-primary-reply_new_block"));
+});
+
+test("messaging runtime rejects footer metric chrome from projection output episodes", async () => {
+  const sends = [];
+  let now = 8_820;
+  const runtime = createMessagingRuntime({
+    nowFn: () => ++now,
+    telegramBotToken: "bot-token",
+    telegramOutboundEnabled: false,
+    telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "legacy",
+    terminalSemanticShadowModeEnabled: true,
+    telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
+    createTelegramTransport() {
+      return {
+        async sendMessage(payload) {
+          sends.push(payload);
+          return { messageId: sends.length + 793 };
+        },
+        async editMessage(payload) {
+          return { messageId: payload.messageId || 794 };
+        }
+      };
+    }
+  });
+
+  const session = createSession({
+    id: "legacy-shadow-footer-episode-session",
+    name: "ptydeck",
+    quickIdToken: "7",
+    startCommand: "codex",
+    activityCompletedAt: 0,
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  });
+
+  await runtime.observeSessionData({
+    session,
+    data: "99% · wekly 25% · 0.1\n",
+    promptBoundaries: [],
+    trace: { traceId: "legacy-shadow-footer-episode-data" }
+  });
+  await runtime.observeSessionIdle({
+    session: {
+      ...session,
+      activityCompletedAt: now + 1
+    },
+    trace: { traceId: "legacy-shadow-footer-episode-idle" }
+  });
+
+  assert.equal(sends.length, 0);
+  const status = runtime.buildStatusSummary();
+  assert.equal(status.terminalMessagingCore.semanticExtraction.comparisons.total, 0);
+  assert.ok(status.trace.recent.every((entry) => entry.reason !== "output-episode-info_new_block"));
+});
+
 test("messaging runtime ignores working-overlay chatter before a short turn reply when using projection semantic extraction", async () => {
   const sends = [];
   let now = 8_800;
@@ -1342,6 +1541,7 @@ test("messaging runtime emits autonomous multiline coding-agent episodes from pr
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "ptydeck", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -1404,6 +1604,7 @@ test("messaging runtime emits gemini-style multiline coding-agent episodes throu
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "gemini", profile: "coding-agent" }],
     createTelegramTransport() {
       return {
@@ -1465,6 +1666,7 @@ test("messaging runtime delivers the same short turn reply through telegram and 
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "claude", profile: "coding-agent" }],
     discordOutboundEnabled: true,
     discordTargets: [
@@ -1559,6 +1761,7 @@ test("messaging runtime keeps bounded autonomous multiline delivery in parity ac
     telegramBotToken: "bot-token",
     telegramOutboundEnabled: false,
     telegramOutboundHardBreakActive: true,
+    terminalSemanticPrimaryMode: "projection",
     telegramTargets: [{ chatId: "1001", sessionName: "gemini", profile: "coding-agent" }],
     discordOutboundEnabled: true,
     discordTargets: [

@@ -258,6 +258,111 @@ test("app semantic adapter registry normalizes gemini-style section markers thro
   assert.equal(decision.metadata.semanticExtractionSource, "generic-output-episode-transcript-diff");
 });
 
+test("app semantic adapter registry rejects vertically fragmented turn text", () => {
+  const registry = createAppSemanticAdapterRegistry(createHelpers());
+  const session = {
+    id: "session-vertical-fragment",
+    name: "ptydeck",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  };
+  const adapter = registry.resolveForSession(session, "coding-agent");
+  assert.ok(adapter);
+
+  const decision = adapter.buildTurnSemanticDecision(
+    {
+      baseline: {
+        snapshot: {
+          activeVisibleLines: [],
+          activeTailLines: []
+        }
+      },
+      transcriptDelta: {
+        entries: [
+          {
+            type: "pty_data",
+            visibleText: "B\ni\nt\ne\np\nr\nü\nf\nd\nn\na\nk\nu\nl\nat\nsu"
+          }
+        ]
+      },
+      diff: {
+        activeTailLines: {
+          lines: [{ before: "", after: "B\ni\nt\ne\np\nr\nü\nf\nd\nn\na\nk\nu\nl\nat\nsu" }]
+        },
+        activeVisibleLines: {
+          lines: []
+        }
+      },
+      inputText: "Bitte prüfe den aktuellen Status.",
+      turn: {
+        turnId: "turn-vertical",
+        correlationId: "corr-vertical",
+        traceId: "trace-vertical"
+      }
+    },
+    session,
+    "coding-agent"
+  );
+
+  assert.equal(decision, null);
+});
+
+test("app semantic adapter registry rejects footer metric chrome as an output episode", () => {
+  const registry = createAppSemanticAdapterRegistry(createHelpers());
+  const session = {
+    id: "session-footer-metrics",
+    name: "ptydeck",
+    startCommand: "codex",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.99
+    }
+  };
+  const adapter = registry.resolveForSession(session, "coding-agent");
+  assert.ok(adapter);
+
+  const decision = adapter.buildOutputEpisodeSemanticDecision(
+    {
+      baseline: {
+        snapshot: {
+          activeVisibleLines: [],
+          activeTailLines: []
+        }
+      },
+      transcriptDelta: {
+        entries: [
+          {
+            type: "pty_data",
+            visibleText: "99% · wekly 25% · 0.1"
+          }
+        ]
+      },
+      diff: {
+        activeTailLines: {
+          lines: [{ before: "", after: "99% · wekly 25% · 0.1" }]
+        },
+        activeVisibleLines: {
+          lines: []
+        }
+      },
+      outputEpisode: {
+        episodeId: "episode-footer"
+      }
+    },
+    session,
+    "coding-agent"
+  );
+
+  assert.equal(decision, null);
+});
+
 test("app semantic adapter registry leaves non-coding-agent sessions unresolved", () => {
   const registry = createAppSemanticAdapterRegistry(createHelpers());
   const session = {
