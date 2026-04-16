@@ -123,6 +123,8 @@ After `v0.4.0-H138`, the shipped narrow path also prefers `allowlistDeliverySign
 
 The historic `codex_*` scope names remain present as compatibility metadata and as the legacy scope list exposed by status payloads.
 
+After `v0.4.0-H142`, that compatibility is also structurally bounded: the runtime core no longer owns the legacy Codex allowlist helper/control flow directly, and the remaining coding-agent commentary/attention logic now lives behind an explicit classifier seam instead of remaining embedded in `backend/src/messaging-runtime.js`.
+
 The same adapter status payload now also exposes command-publication state:
 
 - `publishedCommandCount`

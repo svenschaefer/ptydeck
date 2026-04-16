@@ -14,27 +14,17 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - `v0.4.0-H142`
+  - none currently
 - Active scoped tasks:
-  - `MSG-115`
-  - `MSG-116`
-  - `MSG-117`
-  - `MSG-118`
+  - none currently
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
-- `v0.4.0-H142`
-  - `MSG-115`
-  - `MSG-116` after `MSG-115`
-  - `MSG-117` after `MSG-115`
-  - `MSG-118` after `MSG-115`, `MSG-116`, and `MSG-117`
+- none currently
 
 ## Wave Dependencies
-- `v0.4.0-H142`
-  - `MSG-116` depends on `MSG-115`
-  - `MSG-117` depends on `MSG-115`
-  - `MSG-118` depends on `MSG-115`, `MSG-116`, and `MSG-117`
+- none currently
 
 ## Sequencing Rules
 

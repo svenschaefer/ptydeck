@@ -179,6 +179,8 @@ curl -s http://127.0.0.1:18080/ready | jq &#39;.messaging.trace&#39;</code></pre
 
 <p>The historic <code>codex_*</code> scope names remain present as compatibility metadata and as the legacy scope list exposed by status payloads.</p>
 
+<p>After <code>v0.4.0-H142</code>, that compatibility is also structurally bounded: the runtime core no longer owns the legacy Codex allowlist helper/control flow directly, and the remaining coding-agent commentary/attention logic now lives behind an explicit classifier seam instead of remaining embedded in <code>backend/src/messaging-runtime.js</code>.</p>
+
 <p>The same adapter status payload now also exposes command-publication state:</p>
 
 <ul>

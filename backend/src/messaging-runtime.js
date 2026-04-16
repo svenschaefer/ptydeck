@@ -19,6 +19,12 @@ import { createTelegramAdapter, createTelegramTransport } from "./telegram-adapt
 import { createDiscordAdapter, createDiscordTransport } from "./discord-adapter.js";
 import { createAppSemanticAdapterRegistry } from "./app-semantic-adapters.js";
 import {
+  isCommentaryLikeCodingAgentText,
+  isCodingAgentAttentionText,
+  isLikelyCodingAgentAttentionSnippetTail
+} from "./coding-agent-runtime-classifier.js";
+import { buildLegacyCodexMessageIntent, createLegacyCodexAllowlistDispatchBridge } from "./legacy-codex-allowlist-bridge.js";
+import {
   DEFAULT_TERMINAL_PROJECTION_RESOURCE_LIMITS,
   createTerminalProjectionTracker
 } from "./terminal-projection.js";
@@ -71,6 +77,12 @@ const TURN_PRIMARY_REPLY_DELIVERY_SIGNAL = "turn-primary-reply";
 const OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL = "output-episode-info";
 const OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL = "output-episode-section";
 const OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL = "output-episode-summary";
+const ALLOWLIST_DELIVERY_SIGNAL_TO_SCOPE = Object.freeze({
+  [TURN_PRIMARY_REPLY_DELIVERY_SIGNAL]: CODEX_TELEGRAM_REPLY_SCOPE,
+  [OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL]: CODEX_SEPARATOR_INFO_SCOPE,
+  [OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL]: CODEX_SEPARATOR_SECTION_SCOPE,
+  [OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL]: CODEX_SEPARATOR_SUMMARY_SCOPE
+});
 const TERMINAL_SEMANTIC_PRIMARY_MODES = Object.freeze(["legacy", "projection"]);
 const DEFAULT_TERMINAL_SEMANTIC_PRIMARY_MODE = "legacy";
 const DEFAULT_TERMINAL_SEMANTIC_SHADOW_MODE_ENABLED = true;
@@ -120,7 +132,6 @@ const STRONG_STATUS_SIGNAL_PATTERN =
   /\b(?:plan|validated?|generated?|wrote|updated?|restored|reclaimed|pushed|committed|tests?|lint|coverage|build|status|done|completed|ready|started|saved|connected|copied|uploaded|downloaded|created|deleted|renamed|applied|failed|failure|error|warning|blocked|conflict)\b/i;
 const STRONG_ATTENTION_SIGNAL_PATTERN =
   /\b(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied|timed out|timeout|refused|blocked|conflict)\b/i;
-const STRUCTURED_LIST_LINE_PATTERN = /^(?:[-*•]\s+|\d+\.\s+)/u;
 const ZERO_ISSUE_COUNT_PATTERN = /^\s*0\s+(?:error(?:\(s\))?|errors|warning(?:\(s\))?|warnings)\b/i;
 const SHORT_OS_ERROR_FRAGMENT_PATTERN = /\(\s*os error \d+\s*\)$/i;
 const CODING_AGENT_TAIL_MARKERS = Object.freeze([
@@ -615,34 +626,11 @@ function isCodexTelegramReplyMetaLine(value) {
   );
 }
 
-const CODING_AGENT_COMMENTARY_LEAD_PATTERN =
-  /^(?:[•*]\s*)?(?:(?:ich|i(?:'m| am|’m)?|i(?:'ll| will)|we(?:'re| are|’re)?|we(?:'ll| will))\s+(?:prüfe|pruefe|ziehe|lese|analysiere|vergleiche|setze|gehe|check(?:ing)?|inspect(?:ing)?|review(?:ing)?|read(?:ing)?|trace(?:ing)?|compare(?:ing)?|analy(?:s|z)e(?:ing)?|implement(?:ing)?|narrow(?:ing)?|pull(?:ing)?|look(?:ing)?|verify(?:ing)?|sync(?:ing)?|push(?:ing)?))\b/iu;
-const CODING_AGENT_COMMENTARY_INLINE_PATTERN =
-  /\b(?:ich|i(?:'m| am|’m)?|i(?:'ll| will)|we(?:'re| are|’re)?|we(?:'ll| will))\s+(?:prüfe|pruefe|ziehe|lese|analysiere|vergleiche|setze|gehe|check(?:ing)?|inspect(?:ing)?|review(?:ing)?|read(?:ing)?|trace(?:ing)?|compare(?:ing)?|analy(?:s|z)e(?:ing)?|implement(?:ing)?|narrow(?:ing)?|pull(?:ing)?|look(?:ing)?|verify(?:ing)?|sync(?:ing)?|push(?:ing)?)\b/iu;
-const CODING_AGENT_COMMENTARY_CONTEXT_PATTERN =
-  /(?:stream(?:-to-message)?-pipeline|reply-assembly|delivery-policy|section-assembly|seams\b|evaluator\b|runtime(?:-klassifikation)?|klassifikation|repo(?:[-/ ](?:prozess)?zustand|\s+state)?|repo-\s*und\s+dokumentationsstand|dokumentationsstand|document(?:ation)?(?:\s+state|\s+stand)?|markdown state|backlog separation|validator(?:en|s)?|worktree\b|drift(?:ed)?\b|planungsstand\b|capture(?:-read)?\b|chunks?\b|\besm\b|shell-quoting\b|todo(?:-outlook)?\.md|roadmap\.md|changelog\.md|codex_context\.md|deployment\.md)/iu;
-
 function isCommentaryLikeCodexOutboundText(value, session, profile) {
   if (!isCodingAgentContext(session, profile)) {
     return false;
   }
-  const lines = normalizeLineBreaks(value)
-    .split("\n")
-    .map((line) => normalizeWhitespace(line))
-    .filter(Boolean);
-  if (lines.length === 0) {
-    return false;
-  }
-  const headline = lines[0].replace(/^[•*]\s+/u, "");
-  const combined = lines.join(" ");
-  if (
-    !CODING_AGENT_COMMENTARY_LEAD_PATTERN.test(headline) &&
-    !CODING_AGENT_COMMENTARY_LEAD_PATTERN.test(combined) &&
-    !CODING_AGENT_COMMENTARY_INLINE_PATTERN.test(combined)
-  ) {
-    return false;
-  }
-  return CODING_AGENT_COMMENTARY_CONTEXT_PATTERN.test(combined);
+  return isCommentaryLikeCodingAgentText(value);
 }
 
 function shouldIgnoreCodexTelegramReplyStart(line, session, profile) {
@@ -825,25 +813,8 @@ function isLikelyAttentionSnippetTail(summary, recentLines = [], session, profil
   if (!normalizedSummary) {
     return false;
   }
-  if (STRUCTURED_LIST_LINE_PATTERN.test(normalizedSummary)) {
-    return false;
-  }
-  const strongPrefixPattern = /^(?:[•*]\s*)?(?:fatal|error|failed|failure|exception|panic|traceback|unable to access|permission denied)\b/i;
-  if (strongPrefixPattern.test(normalizedSummary)) {
-    return false;
-  }
   const previousLine = sanitizeMessageCandidate(recentLines[recentLines.length - 1] || "", session, profile);
-  if (!previousLine || !STRONG_ATTENTION_SIGNAL_PATTERN.test(previousLine)) {
-    return false;
-  }
-  const wordCount = normalizedSummary.split(/\s+/).filter(Boolean).length;
-  if (wordCount <= 10) {
-    return true;
-  }
-  if (!/[\\/:(]/.test(normalizedSummary) && !/^\s*[A-Z0-9_.-]/.test(normalizedSummary)) {
-    return true;
-  }
-  return false;
+  return isLikelyCodingAgentAttentionSnippetTail(normalizedSummary, previousLine);
 }
 
 function isCodingAgentAttentionLine(summary, session, profile) {
@@ -851,19 +822,7 @@ function isCodingAgentAttentionLine(summary, session, profile) {
     return false;
   }
   const normalizedSummary = sanitizeMessageCandidate(summary, session, profile);
-  if (!normalizedSummary) {
-    return false;
-  }
-  if (STRUCTURED_LIST_LINE_PATTERN.test(normalizedSummary)) {
-    return false;
-  }
-  const activeProfile = PROFILE_PATTERNS[profile] || PROFILE_PATTERNS["generic-shell"];
-  for (const pattern of activeProfile.attention) {
-    if (pattern.test(normalizedSummary)) {
-      return true;
-    }
-  }
-  return false;
+  return isCodingAgentAttentionText(normalizedSummary);
 }
 
 function isLowValueAttentionFragment(summary, session, profile) {
@@ -1332,6 +1291,7 @@ function createSessionStreamState() {
     lastSuppressedStatusLikeAt: 0,
     lastNonMeaningfulActivityAt: 0,
     ...createCodexAllowlistState(),
+    lastAllowlistCandidateKeys: new Map(),
     lastCodexSeparatorCandidateKey: "",
     lastCodexSeparatorSectionCandidateKey: "",
     lastCodexSeparatorSummaryCandidateKey: "",
@@ -1566,26 +1526,32 @@ function isCodexAllowlistScope(deliveryScope) {
 }
 
 function getAllowlistDeliverySignalForScope(deliveryScope) {
-  switch (normalizeNonEmptyString(deliveryScope)) {
-    case CODEX_TELEGRAM_REPLY_SCOPE:
-      return TURN_PRIMARY_REPLY_DELIVERY_SIGNAL;
-    case CODEX_SEPARATOR_INFO_SCOPE:
-      return OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL;
-    case CODEX_SEPARATOR_SECTION_SCOPE:
-      return OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL;
-    case CODEX_SEPARATOR_SUMMARY_SCOPE:
-      return OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL;
-    default:
-      return "";
-  }
+  const normalizedScope = normalizeNonEmptyString(deliveryScope);
+  return (
+    Object.entries(ALLOWLIST_DELIVERY_SIGNAL_TO_SCOPE).find(([, scope]) => scope === normalizedScope)?.[0] || ""
+  );
+}
+
+function getAllowlistDeliveryScopeForSignal(deliverySignal) {
+  return ALLOWLIST_DELIVERY_SIGNAL_TO_SCOPE[normalizeNonEmptyString(deliverySignal)] || "";
 }
 
 function resolveAllowlistDeliverySignal(deliveryScope = "", deliverySignal = "") {
   return normalizeNonEmptyString(deliverySignal) || getAllowlistDeliverySignalForScope(deliveryScope);
 }
 
+function normalizeAllowlistDeliveryIdentity(deliveryScope = "", deliverySignal = "") {
+  const signal = resolveAllowlistDeliverySignal(deliveryScope, deliverySignal);
+  const scope = normalizeNonEmptyString(deliveryScope) || getAllowlistDeliveryScopeForSignal(signal);
+  return Object.freeze({
+    scope,
+    signal,
+    reasonPrefix: signal || scope || "allowlist_delivery"
+  });
+}
+
 function resolveAllowlistReasonPrefix(deliveryScope = "", deliverySignal = "") {
-  return resolveAllowlistDeliverySignal(deliveryScope, deliverySignal) || normalizeNonEmptyString(deliveryScope) || "allowlist_delivery";
+  return normalizeAllowlistDeliveryIdentity(deliveryScope, deliverySignal).reasonPrefix;
 }
 
 function isRestartResendProtectedAllowlistFamily(deliveryScope = "", deliverySignal = "") {
@@ -1597,6 +1563,61 @@ function isRestartResendProtectedAllowlistFamily(deliveryScope = "", deliverySig
 function isAllowlistDeliverySignal(deliverySignal) {
   const normalizedDeliverySignal = normalizeNonEmptyString(deliverySignal);
   return Boolean(normalizedDeliverySignal && ALLOWLIST_DELIVERY_SIGNALS.includes(normalizedDeliverySignal));
+}
+
+const ALLOWLIST_SIGNAL_MAX_TEXT_LENGTHS = Object.freeze({
+  [TURN_PRIMARY_REPLY_DELIVERY_SIGNAL]: CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH,
+  [OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL]: CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH,
+  [OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL]: CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH,
+  [OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL]: CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH,
+  default: CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH
+});
+
+function getLastAllowlistCandidateKey(state, deliveryIdentity) {
+  const signal = normalizeNonEmptyString(deliveryIdentity?.signal);
+  if (state?.lastAllowlistCandidateKeys instanceof Map && signal && state.lastAllowlistCandidateKeys.has(signal)) {
+    return normalizeNonEmptyString(state.lastAllowlistCandidateKeys.get(signal));
+  }
+  switch (signal) {
+    case TURN_PRIMARY_REPLY_DELIVERY_SIGNAL:
+      return normalizeNonEmptyString(state?.lastCodexTelegramReplyCandidateKey);
+    case OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL:
+      return normalizeNonEmptyString(state?.lastCodexSeparatorSectionCandidateKey);
+    case OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL:
+      return normalizeNonEmptyString(state?.lastCodexSeparatorSummaryCandidateKey);
+    case OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL:
+      return normalizeNonEmptyString(state?.lastCodexSeparatorCandidateKey);
+    default:
+      return "";
+  }
+}
+
+function setLastAllowlistCandidateKey(state, deliveryIdentity, candidateKey) {
+  const normalizedCandidateKey = normalizeNonEmptyString(candidateKey);
+  const signal = normalizeNonEmptyString(deliveryIdentity?.signal);
+  if (!state || !signal) {
+    return;
+  }
+  if (!(state.lastAllowlistCandidateKeys instanceof Map)) {
+    state.lastAllowlistCandidateKeys = new Map();
+  }
+  state.lastAllowlistCandidateKeys.set(signal, normalizedCandidateKey);
+  switch (signal) {
+    case TURN_PRIMARY_REPLY_DELIVERY_SIGNAL:
+      state.lastCodexTelegramReplyCandidateKey = normalizedCandidateKey;
+      break;
+    case OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL:
+      state.lastCodexSeparatorSectionCandidateKey = normalizedCandidateKey;
+      break;
+    case OUTPUT_EPISODE_SUMMARY_DELIVERY_SIGNAL:
+      state.lastCodexSeparatorSummaryCandidateKey = normalizedCandidateKey;
+      break;
+    case OUTPUT_EPISODE_INFO_DELIVERY_SIGNAL:
+      state.lastCodexSeparatorCandidateKey = normalizedCandidateKey;
+      break;
+    default:
+      break;
+  }
 }
 
 function pushRecentLine(state, line) {
@@ -1626,10 +1647,11 @@ function createEvent({
   preserveStructuredSummary = false,
   messageIntent = null
 }) {
-  const normalizedDeliveryScope = normalizeNonEmptyString(deliveryScope);
-  const normalizedDeliverySignal = resolveAllowlistDeliverySignal(normalizedDeliveryScope, deliverySignal);
+  const deliveryIdentity = normalizeAllowlistDeliveryIdentity(deliveryScope, deliverySignal);
+  const normalizedDeliveryScope = deliveryIdentity.scope;
+  const normalizedDeliverySignal = deliveryIdentity.signal;
   const textSummary =
-    preserveStructuredSummary || normalizedDeliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
+    preserveStructuredSummary || normalizedDeliverySignal === OUTPUT_EPISODE_SECTION_DELIVERY_SIGNAL
       ? truncateStructuredMessageText(summary, summaryMaxLength)
       : truncateSummary(summary, summaryMaxLength);
   const label = buildSessionLabel(session);
@@ -2256,94 +2278,6 @@ export function createMessagingRuntime(options = {}) {
     return semanticAdapter ? semanticAdapter.createDescriptor(session, profile, strategy) : null;
   }
 
-  function buildLegacyCodexMessageIntent({
-    session,
-    profile,
-    state,
-    trace,
-    decision,
-    deliveryScope,
-    messageText,
-    candidateKey,
-    deliveryBlockKey,
-    maxLength
-  }) {
-    const traceId = normalizeNonEmptyString(trace?.traceId);
-    const deliverySignal = getAllowlistDeliverySignalForScope(deliveryScope);
-    const projection = buildMessageIntentProjection(state, session, profile, {
-      deliveryScope,
-      candidateKey,
-      deliveryBlockKey,
-      firstObservedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : 0,
-      lastObservedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : 0,
-      traceId,
-      projectionSource: "legacy-candidate-bridge"
-    });
-    const semanticAdapter = buildAppSemanticAdapterDescriptorForSession(session, profile, "legacy-codex-allowlist");
-    const structuredText = deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE || /\n/u.test(messageText);
-    if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
-      const turn = resolveLegacyMessageIntentTurn(state, session, decision, trace);
-      return createMessageIntent({
-        intentId:
-          deliveryBlockKey ||
-          candidateKey ||
-          normalizeNonEmptyString(turn?.correlationId) ||
-          normalizeNonEmptyString(turn?.traceId) ||
-          traceId,
-        sessionId: session.id,
-        intentKind: deliverySignal || "reply",
-        eventType: "session.output.summary",
-        severity: "info",
-        threadKey: "status",
-        text: messageText,
-        format: structuredText ? "structured_text" : "plain_text",
-        comparableText: createComparableText(messageText),
-        projection,
-        turn,
-        semanticAdapter,
-        deliveryAdapters: deliveryAdapterDescriptors,
-        routing: {
-          threadKey: "status",
-          priority: "primary"
-        },
-        metadata: {
-          aggregationReason: deliveryScope,
-          legacyDeliveryScope: deliveryScope,
-          deliverySignal,
-          summaryMaxLength: maxLength,
-          preserveStructuredSummary: structuredText
-        }
-      });
-    }
-    const outputEpisode = resolveLegacyMessageIntentOutputEpisode(state, session, decision, trace);
-    return createMessageIntent({
-      intentId: deliveryBlockKey || candidateKey || traceId,
-      sessionId: session.id,
-      intentKind: deliverySignal || "autonomous-update",
-      eventType: "session.output.summary",
-      severity: "info",
-      threadKey: "status",
-      text: messageText,
-      format: structuredText ? "structured_text" : "plain_text",
-      comparableText: createComparableText(messageText),
-      projection,
-      outputEpisode,
-      semanticAdapter,
-      deliveryAdapters: deliveryAdapterDescriptors,
-      routing: {
-        threadKey: "status",
-        priority: "secondary"
-      },
-      metadata: {
-        aggregationReason: deliveryScope,
-        legacyDeliveryScope: deliveryScope,
-        deliverySignal,
-        summaryMaxLength: maxLength,
-        preserveStructuredSummary: structuredText
-      }
-    });
-  }
-
   function createEventFromMessageIntent({ session, profile, trace, intent }) {
     const summaryMaxLength =
       Number.isInteger(intent?.metadata?.summaryMaxLength) && intent.metadata.summaryMaxLength > 0
@@ -2377,6 +2311,57 @@ export function createMessagingRuntime(options = {}) {
       messageIntent: intent
     });
   }
+
+  const legacyCodexAllowlistDispatchBridge = createLegacyCodexAllowlistDispatchBridge({
+    codexTelegramReplyScope: CODEX_TELEGRAM_REPLY_SCOPE,
+    signalMaxTextLengths: ALLOWLIST_SIGNAL_MAX_TEXT_LENGTHS,
+    normalizeAllowlistDeliveryIdentity,
+    buildCodexSeparatorDeliveryBlockKey,
+    buildLegacyMessageIntent({
+      session,
+      profile,
+      state,
+      trace,
+      decision,
+      deliveryIdentity,
+      messageText,
+      candidateKey,
+      deliveryBlockKey,
+      maxLength
+    }) {
+      return buildLegacyCodexMessageIntent({
+        session,
+        profile,
+        state,
+        trace,
+        decision,
+        deliveryIdentity,
+        messageText,
+        candidateKey,
+        deliveryBlockKey,
+        maxLength,
+        buildMessageIntentProjection,
+        buildAppSemanticAdapterDescriptorForSession,
+        deliveryAdapterDescriptors,
+        createComparableText,
+        nowFn
+      });
+    },
+    recordTurnPrimaryReplyCandidate,
+    recordOutputEpisodePrimaryIntentCandidate,
+    createEventFromMessageIntent,
+    isCommentaryLikeCodexOutboundText,
+    isCodexTelegramReplyActive,
+    buildCodexRestartRecoveryDecision(event, target) {
+      return buildCodexRestartRecoveryDecision(event, target);
+    },
+    dispatchMessageIntent,
+    resolveTarget,
+    bumpEventMetric,
+    recordDispatchTrace,
+    getLastAllowlistCandidateKey,
+    setLastAllowlistCandidateKey
+  });
 
   async function upsertTelegramTopicBinding(binding) {
     const normalizedBinding = normalizeMessagingTopicBindingEntry(binding);
@@ -3734,74 +3719,6 @@ export function createMessagingRuntime(options = {}) {
     });
   }
 
-  function resolveLegacyMessageIntentTurn(state, session, decision, trace) {
-    const activeTurn = state?.activeTerminalTurn;
-    const lastCompletedTurn = state?.lastCompletedTerminalTurn;
-    if (activeTurn?.turn) {
-      return activeTurn.turn;
-    }
-    if (
-      lastCompletedTurn?.turn &&
-      Number.isInteger(lastCompletedTurn.turn.closedAt) &&
-      Number.isInteger(decision?.lastObservedAt) &&
-      lastCompletedTurn.turn.closedAt >= decision.lastObservedAt
-    ) {
-      return lastCompletedTurn.turn;
-    }
-    if (lastCompletedTurn?.turn) {
-      return lastCompletedTurn.turn;
-    }
-    return createTurn({
-      turnId:
-        normalizeNonEmptyString(decision?.deliveryBlockKey) ||
-        normalizeNonEmptyString(decision?.key) ||
-        normalizeNonEmptyString(trace?.correlationId) ||
-        normalizeNonEmptyString(trace?.traceId),
-      sessionId: normalizeNonEmptyString(session?.id),
-      triggerKind: "submitted-input",
-      inputSource: normalizeNonEmptyString(trace?.source),
-      correlationId: normalizeNonEmptyString(trace?.correlationId),
-      traceId: normalizeNonEmptyString(trace?.traceId),
-      openedAt: Number.isInteger(decision?.firstObservedAt) ? decision.firstObservedAt : nowFn(),
-      closedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : nowFn(),
-      status: "completed"
-    });
-  }
-
-  function resolveLegacyMessageIntentOutputEpisode(state, session, decision, trace) {
-    const activeEpisode = state?.activeOutputEpisode;
-    const lastCompletedEpisode = state?.lastCompletedOutputEpisode;
-    const runtimeEpisode = activeEpisode?.outputEpisode || lastCompletedEpisode?.outputEpisode || null;
-    return createOutputEpisode({
-      episodeId:
-        normalizeNonEmptyString(decision?.deliveryBlockKey) ||
-        normalizeNonEmptyString(decision?.key) ||
-        normalizeNonEmptyString(trace?.traceId),
-      sessionId: normalizeNonEmptyString(session?.id),
-      episodeKind: "autonomous-output",
-      sourceProjectionId: normalizeNonEmptyString(runtimeEpisode?.sourceProjectionId),
-      completedAt: Number.isInteger(decision?.lastObservedAt) ? decision.lastObservedAt : nowFn(),
-      startedAt:
-        Number.isInteger(runtimeEpisode?.startedAt) && runtimeEpisode.startedAt > 0
-          ? runtimeEpisode.startedAt
-          : Number.isInteger(decision?.firstObservedAt)
-            ? decision.firstObservedAt
-            : nowFn(),
-      status:
-        normalizeNonEmptyString(runtimeEpisode?.status) ||
-        (activeEpisode?.outputEpisode ? "open" : "completed"),
-      metadata: {
-        runtimeEpisodeId: normalizeNonEmptyString(runtimeEpisode?.episodeId),
-        transcriptStartRevision:
-          Number.isInteger(activeEpisode?.transcriptStartRevision) && activeEpisode.transcriptStartRevision >= 0
-            ? activeEpisode.transcriptStartRevision
-            : Number.isInteger(lastCompletedEpisode?.transcriptStartRevision) && lastCompletedEpisode.transcriptStartRevision >= 0
-              ? lastCompletedEpisode.transcriptStartRevision
-              : 0
-      }
-    });
-  }
-
   function recordTurnPrimaryReplyCandidate(state, messageIntent) {
     const turnState = state?.activeTerminalTurn || state?.lastCompletedTerminalTurn;
     if (!turnState?.turn || !messageIntent?.turn) {
@@ -4568,115 +4485,13 @@ export function createMessagingRuntime(options = {}) {
   }
 
   async function dispatchCodexAllowlistCandidate(session, profile, state, trace, decision) {
-    const deliveryScope = normalizeNonEmptyString(decision?.family);
-    const maxLength =
-      deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE
-        ? CODEX_TELEGRAM_REPLY_MAX_TEXT_LENGTH
-        :
-      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-        ? CODEX_SEPARATOR_SECTION_MAX_TEXT_LENGTH
-        : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
-          ? CODEX_SEPARATOR_SUMMARY_MAX_TEXT_LENGTH
-          : CODEX_SEPARATOR_INFO_MAX_TEXT_LENGTH;
-    const messageText = normalizeLineBreaks(String(decision?.text || ""));
-    const candidateKey = normalizeNonEmptyString(decision?.key);
-    const deliveryBlockKey = buildCodexSeparatorDeliveryBlockKey(decision);
-    const lastCandidateKey =
-      deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE
-        ? state.lastCodexSeparatorSectionCandidateKey
-        : deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE
-          ? state.lastCodexSeparatorSummaryCandidateKey
-          : deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE
-            ? state.lastCodexTelegramReplyCandidateKey
-          : state.lastCodexSeparatorCandidateKey;
-    if (!messageText || candidateKey === lastCandidateKey) {
-      return null;
-    }
-    const target = resolveTarget(session);
-    const messageIntent = buildLegacyCodexMessageIntent({
+    return legacyCodexAllowlistDispatchBridge.dispatchCandidate({
       session,
       profile,
       state,
       trace,
-      decision,
-      deliveryScope,
-      messageText,
-      candidateKey,
-      deliveryBlockKey,
-      maxLength
+      decision
     });
-    if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
-      recordTurnPrimaryReplyCandidate(state, messageIntent);
-    } else {
-      recordOutputEpisodePrimaryIntentCandidate(state, messageIntent);
-    }
-    const event = createEventFromMessageIntent({
-      session,
-      profile,
-      trace,
-      intent: messageIntent
-    });
-    if (isCommentaryLikeCodexOutboundText(messageText, session, profile)) {
-      const commentaryDecision = Object.freeze({
-        action: "suppress",
-        messageKey: event.threadKey,
-        reason: "commentary_progress_chatter"
-      });
-      bumpEventMetric(event.profile, event.type, commentaryDecision.action);
-      recordDispatchTrace(event, commentaryDecision, target, []);
-      return Object.freeze({
-        ...commentaryDecision,
-        delivered: false,
-        delivery: []
-      });
-    }
-    if (
-      deliveryScope !== CODEX_TELEGRAM_REPLY_SCOPE &&
-      isCodexTelegramReplyActive(state?.pendingCodexTelegramReply, event.occurredAt)
-    ) {
-      if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
-        state.lastCodexSeparatorSectionCandidateKey = candidateKey;
-      } else if (deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        state.lastCodexSeparatorSummaryCandidateKey = candidateKey;
-      } else {
-        state.lastCodexSeparatorCandidateKey = candidateKey;
-      }
-      const replyPriorityDecision = Object.freeze({
-        action: "suppress",
-        messageKey: event.threadKey,
-        reason: "telegram_reply_window_priority"
-      });
-      bumpEventMetric(event.profile, event.type, replyPriorityDecision.action);
-      recordDispatchTrace(event, replyPriorityDecision, target, []);
-      return Object.freeze({
-        ...replyPriorityDecision,
-        delivered: false,
-        delivery: []
-      });
-    }
-    const restartRecoveryDecision = buildCodexRestartRecoveryDecision(event, target);
-    if (restartRecoveryDecision) {
-      bumpEventMetric(event.profile, event.type, restartRecoveryDecision.action);
-      recordDispatchTrace(event, restartRecoveryDecision, target, []);
-      return Object.freeze({
-        ...restartRecoveryDecision,
-        delivered: false,
-        delivery: []
-      });
-    }
-    const dispatchResult = await dispatchMessageIntent(session, profile, trace, messageIntent);
-    if (dispatchResult?.delivered === true) {
-      if (deliveryScope === CODEX_SEPARATOR_SECTION_SCOPE) {
-        state.lastCodexSeparatorSectionCandidateKey = candidateKey;
-      } else if (deliveryScope === CODEX_SEPARATOR_SUMMARY_SCOPE) {
-        state.lastCodexSeparatorSummaryCandidateKey = candidateKey;
-      } else if (deliveryScope === CODEX_TELEGRAM_REPLY_SCOPE) {
-        state.lastCodexTelegramReplyCandidateKey = candidateKey;
-      } else {
-        state.lastCodexSeparatorCandidateKey = candidateKey;
-      }
-    }
-    return dispatchResult;
   }
 
   function buildCodexSummaryAllowlistDecision(session, profile, block, summary, aggregationReason) {
