@@ -7,10 +7,10 @@ References below to shipped evaluators, delivered follow-up behavior, or Codex-f
 This note analyzes the end criteria that decide how Codex stream fragments become Telegram messages.
 The concrete trigger for this analysis was the observation that many delivered Telegram messages appear to contain only the first line or first short paragraph of a larger Codex closing comment, even when the operator-visible terminal block clearly spans multiple visual lines.
 
-The original analysis in this note led directly to delivered `v0.4.0-H115`.
-The historical evidence and option comparison remain relevant because they explain why the shipped fix uses ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
-The later 2026-04-13 architecture review also showed that message-boundary refinement alone is not the full answer for free-form replies: the original `codex_input_reply` path still gated eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks can also arise from REST or frontend input and should still be promotable as Telegram-visible messages once they are recognized as relevant stream content.
-The later post-13:00 `H118 is delivered and pushed.` field case then showed that family-local tuning still was not enough for larger multiline closing blocks when the first chunk was already contaminated and later lines fragmented before a stable family candidate existed. Delivered `v0.4.0-H119` therefore added a block-first assembly layer ahead of the existing narrow families instead of widening those families yet again.
+The original analysis in this note led directly to historical `v0.4.0-H115` on the removed path.
+The historical evidence and option comparison remain relevant because they explain why that removed implementation used ownership handoff between `codex_separator_info` and `codex_separator_section` instead of widening the narrow `info` family again.
+The later 2026-04-13 architecture review also showed that message-boundary refinement alone was not the full answer for free-form replies: the original `codex_input_reply` path still gated eligibility on Telegram origin, while the observed noon `ptydeck` case showed that relevant new reply blocks could also arise from REST or frontend input and would still have needed promotion as Telegram-visible messages once recognized as relevant stream content.
+The later post-13:00 `H118 is delivered and pushed.` field case then showed that family-local tuning still was not enough for larger multiline closing blocks when the first chunk was already contaminated and later lines fragmented before a stable family candidate existed. Historical `v0.4.0-H119` therefore added a block-first assembly layer ahead of the existing narrow families instead of widening those families yet again.
 
 ## Scope
 
@@ -20,17 +20,17 @@ It later also recorded the follow-up behavior that analysis motivated in the rem
 The evidence base in this note comes from three historical sources:
 
 - the evaluator code that used to live in `backend/src/codex-outbound-evaluator.js` before the reset
-- current runtime dispatch in `backend/src/messaging-runtime.js`
+- historical runtime dispatch in `backend/src/messaging-runtime.js`
 - operator-view transcript fixtures in `docs/examples/codex-terminal-dump-2026-04-11-22-41.txt` and `docs/examples/codex-terminal-dump-2026-04-11-23-30.txt`
 
-## Current Families and Their Real End Criteria
+## Historical Families And Their Real End Criteria
 
 ### 1. `codex_separator_info`
 
 This is the narrowest family.
 It starts only after a major separator and then looks for a single `• info` bullet.
 
-Current behavior from `backend/src/codex-outbound-evaluator.js`:
+Historical behavior from `backend/src/codex-outbound-evaluator.js`:
 
 - only one immediate indented continuation line is allowed
 - any second extra content line in the same entry becomes `multi_line_contamination`
@@ -60,7 +60,7 @@ Practical consequence:
 This is the richer structural family.
 It also starts after a major separator, but it assembles a bounded section instead of stopping at one short bullet.
 
-Current behavior from `backend/src/codex-outbound-evaluator.js`:
+Historical behavior from `backend/src/codex-outbound-evaluator.js`:
 
 - prompt/footer/background chrome is scrubbed before section assembly
 - one narrative `• info` headline starts the section
@@ -109,9 +109,9 @@ Practical consequence:
 - this family is appropriate for condensed status summaries
 - it is not appropriate for preserving larger multi-line Codex closing comments
 
-## Runtime Selection Order
+## Historical Runtime Selection Order
 
-The runtime dispatches `section` and `info` candidate evaluation on every stream entry:
+The removed runtime dispatched `section` and `info` candidate evaluation on every stream entry:
 
 - `backend/src/messaging-runtime.js:1833-1848`
 
@@ -120,14 +120,14 @@ The order is:
 - `advanceCodexSeparatorSectionState(...)`
 - `advanceCodexSeparatorInfoState(...)`
 
-Summary-family promotion is separate and happens only on aggregated summary flushes:
+Summary-family promotion was separate and happened only on aggregated summary flushes:
 
 - `backend/src/messaging-runtime.js:1820-1830`
 - `backend/src/messaging-runtime.js:1852-1865`
 
-This means the message-end problem is not just “which family exists”, but also “which family dominates in actual live traffic”.
+This means the historical message-end problem was not just “which family exists”, but also “which family dominates in actual live traffic”.
 
-## Live Evidence: `ptydeck` Currently Delivers Mostly the Narrow Family
+## Historical Live Evidence: `ptydeck` Delivered Mostly The Narrow Family
 
 From the current live process window, the last 120 minutes of delivered `ptydeck` Telegram messages are all:
 
@@ -135,13 +135,13 @@ From the current live process window, the last 120 minutes of delivered `ptydeck
 - `codex_separator_section`: `0`
 - `codex_separator_summary_sentence`: `0`
 
-This was measured from `/tmp/ptydeck-backend-debug.log` with `scripts/analyze-live-messaging-runtime.mjs`.
+This was measured at the time from `/tmp/ptydeck-backend-debug.log` with `scripts/analyze-live-messaging-runtime.mjs`, which has since been removed.
 
 That is the key practical mismatch:
 
-- the product already has a richer `section` family
-- but current `ptydeck` live output is still dominated by `info`
-- so the actual user-visible Telegram feed remains biased toward short paragraph closure
+- the removed product path already had a richer `section` family
+- but the then-current `ptydeck` live output was still dominated by `info`
+- so the actual user-visible Telegram feed remained biased toward short paragraph closure
 
 Representative current delivered `ptydeck` messages are therefore short paragraphs such as:
 

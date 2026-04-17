@@ -8,7 +8,7 @@ Everything below describes the removed implementation in historical terms. Refer
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
 
-It now also records the analysis path that led to the delivered narrow outbound families `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic Telegram outbound remains hard-disabled.
+It also records the historical analysis path that led to the removed narrow outbound families `codex_separator_info`, `codex_separator_section`, and `codex_separator_summary_sentence`, while generic Telegram outbound was hard-disabled at that time.
 
 The focus here is analytical only:
 
@@ -93,7 +93,7 @@ node scripts/experiment-codex-first-use-case.mjs \
   --tail-entries 10000
 ```
 
-After `v0.4.0-H100` and `v0.4.0-H105`, those helpers no longer carry private approximations of the shipped Codex rules. They now replay persisted JSONL capture through the same shared `backend/src/codex-outbound-evaluator.js` module that the runtime uses for both `codex_separator_info` and `codex_separator_section`, so offline candidate/rejection timelines and live runtime delivery stay aligned on separator anchors, bounded lookahead, chrome stripping, section boundaries, window-state gating, contamination rejection, continuation merge, and candidate keys.
+After historical `v0.4.0-H100` and `v0.4.0-H105`, those helpers no longer carried private approximations of the then-shipped Codex rules. They replayed persisted JSONL capture through the same shared `backend/src/codex-outbound-evaluator.js` module that the removed runtime used for both `codex_separator_info` and `codex_separator_section`, so offline candidate/rejection timelines and live runtime delivery stayed aligned on separator anchors, bounded lookahead, chrome stripping, section boundaries, window-state gating, contamination rejection, continuation merge, and candidate keys.
 
 The script parses the debug log, filters one window, and summarizes:
 
