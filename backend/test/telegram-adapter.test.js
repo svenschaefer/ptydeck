@@ -2,13 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createTelegramAdapter, createTelegramTransport, parseTelegramInboundCommand } from "../src/telegram-adapter.js";
 import { applyMessagingMessagePolicy, advanceMessagingThreadPolicyState } from "../src/messaging-runtime.js";
-import {
-  createAppSemanticAdapterDescriptor,
-  createDeliveryAdapterDescriptor,
-  createMessageIntent,
-  createTerminalProjection,
-  createTurn
-} from "../src/terminal-messaging-core.js";
+import { createDeliveryAdapterDescriptor, createMessageIntent } from "../src/terminal-messaging-core.js";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -726,59 +720,11 @@ test("telegram adapter can provision deck-session topics while delivery is disab
   assert.equal(adapter.getStatus().targetTrace.recent[3].messageThreadId, 66);
 });
 
-test("telegram adapter allows codex allowlist delivery through the allowlist while generic delivery is disabled", async () => {
+test("telegram adapter suppresses explicit message-intent delivery while outbound delivery is disabled", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
     configured: true,
     deliveryEnabled: false,
-    allowlistDeliveryScopes: [
-      "codex_input_reply",
-      "codex_separator_info",
-      "codex_separator_section",
-      "codex_separator_summary_sentence"
-    ],
-    configuredTargets: 1,
-    nowFn: () => 886,
-    transport: {
-      async sendMessage(payload) {
-        calls.push({ method: "send", payload });
-        return { messageId: 91 };
-      },
-      async editMessage(payload) {
-        calls.push({ method: "edit", payload });
-        return { messageId: payload.messageId || 91 };
-      }
-    }
-  });
-
-  const result = await adapter.handleEvent({
-    target: { chatId: "-1001" },
-    decision: { action: "update", messageKey: "status" },
-    threadKey: "status",
-    text: "codex separator summary candidate",
-    aggregationReason: "codex_separator_summary_sentence",
-    deliveryScope: "codex_separator_summary_sentence"
-  });
-
-  assert.equal(result.delivered, true);
-  assert.deepEqual(calls.map((entry) => entry.method), ["send"]);
-  assert.equal(adapter.getStatus().deliveryEnabled, false);
-  assert.equal(adapter.getStatus().allowlistDeliveryActive, true);
-  assert.deepEqual(adapter.getStatus().allowlistDeliveryScopes, [
-    "codex_input_reply",
-    "codex_separator_info",
-    "codex_separator_section",
-    "codex_separator_summary_sentence"
-  ]);
-  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, []);
-});
-
-test("telegram adapter allows neutral delivery-signal intents through the allowlist while legacy scopes are absent", async () => {
-  const calls = [];
-  const adapter = createTelegramAdapter({
-    configured: true,
-    deliveryEnabled: false,
-    allowlistDeliverySignals: ["turn-primary-reply"],
     configuredTargets: 1,
     nowFn: () => 990,
     formatSessionLabel: (session) => `[${session.quickIdToken}] ${session.name}`,
@@ -794,29 +740,6 @@ test("telegram adapter allows neutral delivery-signal intents through the allowl
     }
   });
   const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
-  const projection = createTerminalProjection({
-    projectionId: "proj-signal",
-    sessionId: "s1",
-    sourceRevision: "7",
-    appFamily: "coding-agent",
-    appLabel: "codex",
-    profile: "coding-agent"
-  });
-  const turn = createTurn({
-    turnId: "turn-signal",
-    sessionId: "s1",
-    correlationId: "corr-signal",
-    baselineProjectionId: "proj-signal",
-    openedAt: 1_000,
-    closedAt: 1_100,
-    status: "completed"
-  });
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "codex-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "projection"
-  });
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "telegram",
     channel: "telegram"
@@ -824,19 +747,19 @@ test("telegram adapter allows neutral delivery-signal intents through the allowl
   const intent = createMessageIntent({
     intentId: "intent-signal",
     sessionId: "s1",
-    intentKind: "turn-primary-reply",
+    intentKind: "status-update",
     eventType: "session.output.summary",
     severity: "info",
     threadKey: "status",
     text: "Ok, signal delivered",
     comparableText: "ok signal delivered",
-    projection,
-    turn,
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
-    routing: { threadKey: "status", priority: "primary" },
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "signal-block"
+    },
     metadata: {
-      deliverySignal: "turn-primary-reply",
+      deliverySignal: "status-update",
       summaryMaxLength: 280
     }
   });
@@ -849,18 +772,17 @@ test("telegram adapter allows neutral delivery-signal intents through the allowl
     intent
   });
 
-  assert.equal(result.delivered, true);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].text, "[7] ptydeck: Ok, signal delivered");
-  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, ["turn-primary-reply"]);
+  assert.equal(result.delivered, false);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "delivery_disabled");
+  assert.equal(calls.length, 0);
 });
 
 test("telegram adapter applies thread policy directly on adapter-neutral message intents", async () => {
   const calls = [];
   const adapter = createTelegramAdapter({
     configured: true,
-    deliveryEnabled: false,
-    allowlistDeliveryScopes: ["codex_input_reply"],
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: (() => {
       let current = 1000;
@@ -881,28 +803,6 @@ test("telegram adapter applies thread policy directly on adapter-neutral message
     }
   });
   const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
-  const projection = createTerminalProjection({
-    projectionId: "proj-1",
-    sessionId: "s1",
-    sourceRevision: "12",
-    appFamily: "coding-agent",
-    appLabel: "codex",
-    profile: "coding-agent"
-  });
-  const turn = createTurn({
-    turnId: "turn-1",
-    sessionId: "s1",
-    correlationId: "corr-1",
-    sourceProjectionId: "proj-1",
-    submittedAt: 1000,
-    inputText: "test"
-  });
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "codex-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "projection"
-  });
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "telegram",
     channel: "telegram"
@@ -916,14 +816,14 @@ test("telegram adapter applies thread policy directly on adapter-neutral message
     threadKey: "status",
     text: "Ok, verstanden",
     comparableText: "ok verstanden",
-    projection,
-    turn,
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
-    routing: { threadKey: "status", priority: "primary" },
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "reply-1",
+      priority: "primary"
+    },
     metadata: {
-      aggregationReason: "codex_input_reply",
-      legacyDeliveryScope: "codex_input_reply",
+      aggregationReason: "explicit_reply",
       summaryMaxLength: 280
     }
   });
@@ -936,14 +836,14 @@ test("telegram adapter applies thread policy directly on adapter-neutral message
     threadKey: "status",
     text: "Ok, nochmals verstanden",
     comparableText: "ok nochmals verstanden",
-    projection,
-    turn,
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
-    routing: { threadKey: "status", priority: "primary" },
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "reply-1",
+      priority: "primary"
+    },
     metadata: {
-      aggregationReason: "codex_input_reply",
-      legacyDeliveryScope: "codex_input_reply",
+      aggregationReason: "explicit_reply",
       summaryMaxLength: 280
     }
   });
@@ -976,8 +876,7 @@ test("telegram adapter applies structured tail truncation when delivering messag
   const calls = [];
   const adapter = createTelegramAdapter({
     configured: true,
-    deliveryEnabled: false,
-    allowlistDeliveryScopes: ["codex_separator_section"],
+    deliveryEnabled: true,
     configuredTargets: 1,
     nowFn: () => 2000,
     formatSessionLabel: (session) => `[${session.quickIdToken}] ${session.name}`,
@@ -995,20 +894,6 @@ test("telegram adapter applies structured tail truncation when delivering messag
     }
   });
   const session = { id: "s1", name: "ptydeck", quickIdToken: "7" };
-  const projection = createTerminalProjection({
-    projectionId: "proj-2",
-    sessionId: "s1",
-    sourceRevision: "22",
-    appFamily: "coding-agent",
-    appLabel: "codex",
-    profile: "coding-agent"
-  });
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "codex-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "projection"
-  });
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "telegram",
     channel: "telegram"
@@ -1023,24 +908,14 @@ test("telegram adapter applies structured tail truncation when delivering messag
     text: "Heading\n1. first block with useful detail\n2. second block with more useful detail\nFooter closes cleanly",
     format: "structured_text",
     comparableText: "heading 1 first block with useful detail 2 second block with more useful detail footer closes cleanly",
-    projection,
-    outputEpisode: {
-      entityType: "OutputEpisode",
-      episodeId: "episode-1",
-      sessionId: "s1",
-      episodeKind: "autonomous-output",
-      sourceProjectionId: "proj-2",
-      startedAt: 2000,
-      completedAt: 2001,
-      status: "completed",
-      metadata: {}
-    },
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
-    routing: { threadKey: "status", priority: "secondary" },
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "structured-1",
+      priority: "secondary"
+    },
     metadata: {
-      aggregationReason: "codex_separator_section",
-      legacyDeliveryScope: "codex_separator_section",
+      aggregationReason: "explicit_structured_status",
       summaryMaxLength: 60,
       preserveStructuredSummary: true
     }

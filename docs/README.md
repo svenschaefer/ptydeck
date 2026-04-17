@@ -20,7 +20,7 @@ Authoritative repository documents remain:
 ### Active Architecture and Runbook Documents
 
 - `Terminal Messaging Core Architecture.md`
-  - role: current transport-only messaging-adapter architecture note
+  - role: current transport-only messaging-adapter architecture note with the reduced `DeliveryAdapter` / `MessageIntent` contract baseline
   - status: active
 - `Messaging Reset and Third Attempt Notes.md`
   - role: postmortem and design constraints for the future third messaging attempt

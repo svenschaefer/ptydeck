@@ -2,6 +2,8 @@
 
 Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
 
+The helper scripts and runtime surfaces referenced below belonged to the removed implementation and are no longer part of the shipped repository baseline.
+
 ## Scope
 
 This note reviews every Telegram message that was actually delivered in the latest restart window and classifies whether that delivery was sensible. The review is analysis only; it does not change runtime behavior.
@@ -9,9 +11,9 @@ This note reviews every Telegram message that was actually delivered in the late
 ## Evidence Base
 
 - Primary source: `/tmp/ptydeck-backend-debug.log`
-- Review helper: `scripts/analyze-latest-restart-deliveries.mjs`
-- Cross-check helper: `scripts/analyze-restart-resends.mjs`
-- Session/thread mapping helper: `scripts/analyze-live-messaging-runtime.mjs`
+- Review helper at the time: `scripts/analyze-latest-restart-deliveries.mjs` (removed during the reset)
+- Cross-check helper at the time: `scripts/analyze-restart-resends.mjs` (removed during the reset)
+- Session/thread mapping helper at the time: `scripts/analyze-live-messaging-runtime.mjs` (removed during the reset)
 
 ## Latest Restart Window
 

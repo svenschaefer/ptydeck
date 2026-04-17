@@ -2,6 +2,8 @@
 
 Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
 
+Everything below describes the removed implementation in historical terms. References to helper scripts, delivery families, and runtime status are evidence from the discarded path, not part of the current shipped product.
+
 ## Purpose
 
 This note captures the observed restart-time streaming behavior of the current `ptydeck` runtime so later messaging work can start from an accurate model instead of another round of symptom-driven tuning.
@@ -43,11 +45,9 @@ This note compares three concrete restart-related windows from `2026-04-11`:
 - `2026-04-11T20:08:00.000Z` to `2026-04-11T20:08:09.500Z`
 - `2026-04-11T20:22:29.000Z` to `2026-04-11T20:22:46.999Z`
 
-## Helper Script
+## Historical Helper Script References
 
-To keep the analysis reproducible, the repository includes:
-
-- `scripts/analyze-restart-streaming.mjs`
+The helper scripts referenced in this archived section were removed during the 2026-04-16 reset. The commands below are preserved only to show how the old investigation was performed.
 
 Example usage:
 
@@ -57,7 +57,7 @@ node scripts/analyze-restart-streaming.mjs \
   --end 2026-04-11T20:22:46.999Z
 ```
 
-For Codex-oriented block analysis against the raw captured stream, the repository also includes:
+For Codex-oriented block analysis against the raw captured stream, the removed repository snapshot also included:
 
 - `scripts/analyze-codex-stream-blocks.mjs`
 - `scripts/experiment-codex-candidates.mjs`

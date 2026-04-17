@@ -1,6 +1,6 @@
 # Messaging Reset and Third Attempt Notes
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Purpose
 
@@ -44,11 +44,18 @@ The transport-level adapter framework was worth keeping.
 That retained foundation is:
 
 - `backend/src/terminal-messaging-core.js`
+- `backend/src/messaging-custom-command-utils.js`
 - `backend/src/delivery-adapter-utils.js`
 - `backend/src/telegram-adapter.js`
 - `backend/src/discord-adapter.js`
 - `backend/src/telegram-command-surface.js`
 - `backend/src/messaging-runtime.js` as a transport-only runtime facade
+
+On 2026-04-17 that retained foundation was reduced one step further:
+
+- the kept contract layer now exposes only `DeliveryAdapter` and `MessageIntent`
+- retained adapters no longer carry allowlist-based delivery gates
+- the kept framework no longer requires projection-, turn-, output-episode-, or semantic-adapter descriptors just to represent an explicit outbound message
 
 This means the future rebuild does not need to rediscover:
 

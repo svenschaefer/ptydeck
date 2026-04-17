@@ -2,11 +2,13 @@
 
 Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
 
+Everything below is a historical snapshot of the removed path. References to "current product status", shipped fixes, or helper scripts describe the discarded implementation state at the time of analysis, not the current transport-only baseline.
+
 ## Purpose
 
 This note captures the currently observed restart-resend behavior on the narrow Codex Telegram outbound path and turns it into concrete product constraints for a future fix.
 
-## Current Product Status
+## Historical Snapshot Of The Removed Path
 
 As of `v0.4.0-H112`, the narrow product fix from this analysis is shipped in its corrected live form:
 

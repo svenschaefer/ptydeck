@@ -2,6 +2,12 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-17
+
+- [x] `v0.4.0-H144` is now completed on `main`, reducing the retained post-reset messaging framework to a cleaner transport-only contract surface instead of leaving semantic-era descriptor and allowlist ballast behind after `H143`.
+- [x] `backend/src/terminal-messaging-core.js` now retains only the explicit transport contracts that still matter in the shipped product path: `DeliveryAdapter` and `MessageIntent`. Explicit message intents no longer require `TerminalProjection`, `Turn`, `OutputEpisode`, or `AppSemanticAdapter` descriptors, which removes the last projection-/semantic-shaped contract dependency from the kept framework. `backend/src/delivery-adapter-utils.js` now builds adapter delivery events from generic routing/metadata block keys instead of projection-era entity ids and now formats sessionless intents without producing malformed `\": text\"` output.
+- [x] `backend/src/telegram-adapter.js` and `backend/src/discord-adapter.js` now treat explicit outbound delivery as plain `deliveryEnabled` transport behavior without retained allowlist scope/signal gates, hard-break status fields, or allowlist-only metrics. The transport-only runtime in `backend/src/messaging-runtime.js` no longer passes or reports those removed compatibility controls. Direct regression coverage in `backend/test/terminal-messaging-core.test.js`, `backend/test/telegram-adapter.test.js`, and `backend/test/discord-adapter.test.js` now proves the cleaned contracts, disabled-delivery suppression, and enabled explicit delivery/update behavior on the retained baseline. The historical messaging analysis docs were also normalized further so deleted helper scripts and removed runtime surfaces are labeled explicitly as historical references instead of reading like current runbooks. The local validation gate passed with `node --test backend/test/messaging-runtime.test.js backend/test/terminal-messaging-core.test.js backend/test/telegram-adapter.test.js backend/test/discord-adapter.test.js`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, `npm run docs:check`, and `git diff --check`.
+
 ## 2026-04-16
 
 - [x] `v0.4.0-H143` is now completed on `main`, resetting the messaging live path to a transport-only adapter baseline after the earlier stream-to-message migration stack proved too complex and too operationally opaque in the product path.

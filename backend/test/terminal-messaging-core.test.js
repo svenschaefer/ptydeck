@@ -1,144 +1,68 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  createAppSemanticAdapterDescriptor,
-  createDeliveryAdapterDescriptor,
-  createMessageIntent,
-  createOutputEpisode,
-  createTerminalProjection,
-  createTurn
-} from "../src/terminal-messaging-core.js";
+import { createDeliveryAdapterDescriptor, createMessageIntent } from "../src/terminal-messaging-core.js";
 
-test("terminal messaging core builds a reply intent from neutral boundary contracts", () => {
-  const projection = createTerminalProjection({
-    projectionId: "projection-1",
-    sessionId: "session-1",
-    transport: "pty",
-    representation: "screen-buffer",
-    sourceRevision: "rev-1",
-    appFamily: "coding-agent",
-    appLabel: "codex",
-    profile: "coding-agent",
-    metadata: {
-      source: "unit-test",
-      scrollbackDelta: 12
-    }
-  });
-  const turn = createTurn({
-    turnId: "turn-1",
-    sessionId: "session-1",
-    triggerKind: "submitted-input",
-    inputSource: "messaging:telegram",
-    correlationId: "corr-1",
-    traceId: "trace-1",
-    baselineProjectionId: "projection-baseline-1",
-    openedAt: 100,
-    closedAt: 150,
-    status: "completed"
-  });
+test("terminal messaging core builds a transport-neutral explicit message intent", () => {
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "telegram",
     channel: "telegram",
     capabilities: ["send_message", "thread_topics"]
   });
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "coding-agent-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "legacy-codex-allowlist"
-  });
 
   const intent = createMessageIntent({
     intentId: "intent-1",
     sessionId: "session-1",
-    intentKind: "reply",
+    intentKind: "status-update",
     eventType: "session.output.summary",
     severity: "info",
     threadKey: "status",
     text: "Ok, verstanden",
     format: "plain_text",
     comparableText: "ok, verstanden",
-    projection,
-    turn,
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
     routing: {
       threadKey: "status",
+      deliveryBlockKey: "block-1",
       priority: "primary"
     },
     metadata: {
-      aggregationReason: "codex_input_reply",
+      aggregationReason: "explicit_operator_status",
       summaryMaxLength: 1200
     }
   });
 
   assert.equal(intent.entityType, "MessageIntent");
-  assert.equal(intent.turn?.entityType, "Turn");
-  assert.equal(intent.outputEpisode, null);
-  assert.equal(intent.projection?.entityType, "TerminalProjection");
-  assert.equal(intent.semanticAdapter?.entityType, "AppSemanticAdapter");
+  assert.equal(intent.sessionId, "session-1");
   assert.equal(intent.deliveryAdapters[0]?.entityType, "DeliveryAdapter");
-  assert.equal(intent.metadata.aggregationReason, "codex_input_reply");
+  assert.equal(intent.routing.deliveryBlockKey, "block-1");
+  assert.equal(intent.metadata.aggregationReason, "explicit_operator_status");
   assert.equal(Object.isFrozen(intent), true);
 });
 
-test("terminal messaging core builds an autonomous output intent from an output episode", () => {
-  const projection = createTerminalProjection({
-    projectionId: "projection-2",
-    sessionId: "session-2",
-    representation: "screen-buffer"
-  });
-  const outputEpisode = createOutputEpisode({
-    episodeId: "episode-2",
-    sessionId: "session-2",
-    episodeKind: "autonomous-output",
-    sourceProjectionId: "projection-2",
-    startedAt: 200,
-    completedAt: 260,
-    status: "completed"
-  });
-
+test("terminal messaging core permits explicit sessionless intents for transport-only notifications", () => {
   const intent = createMessageIntent({
     intentId: "intent-2",
-    sessionId: "session-2",
-    intentKind: "autonomous-update",
-    text: "Background summary block",
-    format: "structured_text",
-    projection,
-    outputEpisode,
-    routing: {
-      threadKey: "status",
-      priority: "secondary"
+    intentKind: "status-update",
+    text: "Transport connected",
+    threadKey: "transport",
+    metadata: {
+      deliveryBlockKey: "transport-connected"
     }
   });
 
-  assert.equal(intent.outputEpisode?.entityType, "OutputEpisode");
-  assert.equal(intent.turn, null);
-  assert.equal(intent.format, "structured_text");
+  assert.equal(intent.sessionId, "");
+  assert.equal(intent.threadKey, "transport");
+  assert.equal(intent.metadata.deliveryBlockKey, "transport-connected");
 });
 
-test("terminal messaging core rejects message intents without exactly one turn boundary", () => {
-  const projection = createTerminalProjection({
-    projectionId: "projection-3",
-    sessionId: "session-3"
-  });
-  const turn = createTurn({
-    turnId: "turn-3",
-    sessionId: "session-3"
-  });
-  const outputEpisode = createOutputEpisode({
-    episodeId: "episode-3",
-    sessionId: "session-3"
-  });
-
+test("terminal messaging core rejects malformed explicit message intent input", () => {
   assert.throws(
     () =>
       createMessageIntent({
         sessionId: "session-3",
-        text: "broken",
-        projection
+        text: ""
       }),
-    /requires exactly one of Turn or OutputEpisode/
+    /requires text/
   );
 
   assert.throws(
@@ -146,10 +70,8 @@ test("terminal messaging core rejects message intents without exactly one turn b
       createMessageIntent({
         sessionId: "session-3",
         text: "broken",
-        projection,
-        turn,
-        outputEpisode
+        deliveryAdapters: [{}]
       }),
-    /requires exactly one of Turn or OutputEpisode/
+    /deliveryAdapters entries must be DeliveryAdapter descriptors/
   );
 });

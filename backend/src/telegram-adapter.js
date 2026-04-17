@@ -481,18 +481,6 @@ export function createTelegramTransport(options = {}) {
 export function createTelegramAdapter(options = {}) {
   const configured = options.configured === true;
   const deliveryEnabled = configured && options.deliveryEnabled === true;
-  const deliveryHardBreakActive = options.deliveryHardBreakActive === true;
-  const allowlistDeliveryScopes = Array.isArray(options.allowlistDeliveryScopes)
-    ? options.allowlistDeliveryScopes
-        .map((entry) => normalizeNonEmptyString(entry))
-        .filter(Boolean)
-    : [];
-  const allowlistDeliverySignals = Array.isArray(options.allowlistDeliverySignals)
-    ? options.allowlistDeliverySignals
-        .map((entry) => normalizeNonEmptyString(entry))
-        .filter(Boolean)
-    : [];
-  const allowlistDeliveryActive = configured && (allowlistDeliveryScopes.length > 0 || allowlistDeliverySignals.length > 0);
   const inboundEnabled = configured && options.inboundEnabled === true;
   const transport = configured ? options.transport : null;
   if (configured && (!transport || typeof transport.sendMessage !== "function" || typeof transport.editMessage !== "function")) {
@@ -682,15 +670,7 @@ export function createTelegramAdapter(options = {}) {
   }
 
   function canDeliverEvent(event) {
-    const deliveryScope = normalizeNonEmptyString(event?.deliveryScope || event?.aggregationReason);
-    const deliverySignal = normalizeNonEmptyString(event?.deliverySignal || event?.messageIntent?.metadata?.deliverySignal || event?.messageIntent?.intentKind);
-    if (deliveryEnabled) {
-      return true;
-    }
-    return Boolean(
-      (deliveryScope && allowlistDeliveryScopes.includes(deliveryScope)) ||
-        (deliverySignal && allowlistDeliverySignals.includes(deliverySignal))
-    );
+    return deliveryEnabled;
   }
 
   function getForumTopicState(target) {
@@ -1348,10 +1328,6 @@ export function createTelegramAdapter(options = {}) {
       adapter: "telegram",
       enabled: configured,
       deliveryEnabled,
-      deliveryHardBreakActive,
-      allowlistDeliveryActive,
-      allowlistDeliveryScopes: allowlistDeliveryScopes.slice(),
-      allowlistDeliverySignals: allowlistDeliverySignals.slice(),
       inboundEnabled,
       configuredTargets,
       deliveredTotal: metrics.deliveredTotal,
@@ -1410,13 +1386,11 @@ export function createTelegramAdapter(options = {}) {
   function renderMetricLines() {
     const enabledValue = configured ? 1 : 0;
     const deliveryEnabledValue = deliveryEnabled ? 1 : 0;
-    const allowlistDeliveryValue = allowlistDeliveryActive ? 1 : 0;
     const inboundEnabledValue = inboundEnabled ? 1 : 0;
     const pollingValue = metrics.pollingActive ? 1 : 0;
     return [
       `ptydeck_messaging_adapter_enabled{adapter="telegram"} ${enabledValue}`,
       `ptydeck_messaging_delivery_enabled{adapter="telegram"} ${deliveryEnabledValue}`,
-      `ptydeck_messaging_allowlist_delivery_enabled{adapter="telegram"} ${allowlistDeliveryValue}`,
       `ptydeck_messaging_adapter_configured_targets{adapter="telegram"} ${configuredTargets}`,
       `ptydeck_messaging_inbound_enabled{adapter="telegram"} ${inboundEnabledValue}`,
       `ptydeck_messaging_inbound_polling{adapter="telegram"} ${pollingValue}`,

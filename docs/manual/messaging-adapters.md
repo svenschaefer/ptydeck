@@ -99,12 +99,10 @@ Telegram status additionally exposes:
 - topic-provisioning counters and last errors
 - `targetTrace`
 - `inboundTrace`
-- allowlist signal/scope metadata supported by the adapter for explicit intent delivery
 
 Discord status exposes:
 
 - transport configuration state
-- allowlist signal/scope metadata supported by the adapter for explicit intent delivery
 - `targetTrace`
 
 ## Future Direction

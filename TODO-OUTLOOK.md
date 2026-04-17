@@ -61,6 +61,7 @@ This file is structured into:
 
 - The 2026-04-16 reset removed automatic terminal-output-to-message delivery from the live product path.
 - The current shipped baseline is transport-only: adapter lifecycle, topic provisioning, inbound command/input handling, explicit `MessageIntent` delivery support, and transport health/metrics remain in place.
+- The retained framework has since also been reduced to a cleaner contract surface: `DeliveryAdapter`, `MessageIntent`, transport shaping helpers, adapter implementations, command publication, and backend-local custom-command helpers remain; projection-/turn-/allowlist-specific coupling no longer remains in that kept baseline.
 - Historical stream-to-message experiments, projection/shadow migration, restart-resend heuristics, and narrow Codex allowlists are now archived as markdown learnings rather than active product behavior.
 
 - [ ] `MSG-201` Owner `SAS`: Define the single authoritative live delivery contract for a third messaging attempt. The design must state exactly which outputs are message-worthy, which outputs are never message-worthy, how restart behavior works, and what the acceptance corpus must prove before any automatic outbound is re-enabled.

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-16 (`v0.4.0-H143` messaging live-path reset to a transport-only adapter baseline)
+Last updated: 2026-04-17 (`v0.4.0-H144` retained messaging framework reduced to transport-only contracts)
 
 ## Current Product Truth
 
@@ -24,7 +24,7 @@ The live runtime no longer performs automatic PTY-stream or terminal-output inte
 The retained messaging-adapter framework is:
 
 - `backend/src/terminal-messaging-core.js`
-  - neutral descriptor factories such as `DeliveryAdapter`, `MessageIntent`, and the archived descriptor types kept as framework reference
+  - transport-neutral descriptor factories for `DeliveryAdapter` and `MessageIntent` only
 - `backend/src/delivery-adapter-utils.js`
   - shared transport-neutral shaping helpers
 - `backend/src/messaging-custom-command-utils.js`
@@ -59,6 +59,7 @@ Current live messaging behavior is intentionally narrow and explicit:
 - Telegram topic provisioning for `topicMode: "deck-session"` still works and remains persisted.
 - The adapters can still deliver explicit `MessageIntent` objects when another runtime seam constructs them deliberately.
 - There is no automatic terminal-output mirroring or automatic terminal-output summarization in the live product path.
+- The retained adapter/runtime layer no longer carries semantic allowlists, shadow-mode remnants, or projection-era descriptor requirements.
 
 ## Delivery and Status Expectations
 
@@ -114,6 +115,7 @@ Any future automatic outbound rebuild must start from these constraints:
 4. no restart-recovery or semantic-gating logic without explicit contract tests
 5. offline corpus/replay acceptance before any live automatic outbound reactivation
 6. explicit `SAS` approval before reintroducing automatic outbound stream interpretation
+7. keep the retained transport foundation free of semantic compatibility ballast while the third attempt is deferred
 
 ## Current Planning State
 

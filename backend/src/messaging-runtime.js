@@ -390,9 +390,6 @@ export function createMessagingRuntime(options = {}) {
   const telegramAdapter = createTelegramAdapter({
     configured: telegramConfigured,
     deliveryEnabled: telegramOutboundEnabled,
-    deliveryHardBreakActive: false,
-    allowlistDeliveryScopes: [],
-    allowlistDeliverySignals: [],
     inboundEnabled: telegramInboundEnabled,
     configuredTargets: telegramTargetMappings.length,
     pollTimeoutSeconds: options.telegramPollTimeoutSeconds,
@@ -409,8 +406,6 @@ export function createMessagingRuntime(options = {}) {
   const discordAdapter = createDiscordAdapter({
     configured: discordConfigured,
     deliveryEnabled: discordOutboundEnabled,
-    allowlistDeliveryScopes: [],
-    allowlistDeliverySignals: [],
     configuredTargets: discordTargetMappings.length,
     transport: discordTransport,
     nowFn,

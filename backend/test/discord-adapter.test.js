@@ -2,13 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createDiscordAdapter, createDiscordTransport } from "../src/discord-adapter.js";
 import { applyMessagingMessagePolicy, advanceMessagingThreadPolicyState } from "../src/messaging-runtime.js";
-import {
-  createAppSemanticAdapterDescriptor,
-  createDeliveryAdapterDescriptor,
-  createMessageIntent,
-  createTerminalProjection,
-  createTurn
-} from "../src/terminal-messaging-core.js";
+import { createDeliveryAdapterDescriptor, createMessageIntent } from "../src/terminal-messaging-core.js";
 
 test("discord transport sends webhook posts and edits with thread query parameters", async () => {
   const requests = [];
@@ -67,26 +61,10 @@ test("discord adapter consumes adapter-neutral message intents with the same bou
     name: "codex",
     quickIdToken: "7"
   };
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "codex-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "projection-turn-transcript"
-  });
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "discord",
     channel: "discord",
     capabilities: ["send_message", "edit_message", "thread_channels"]
-  });
-  const projection = createTerminalProjection({
-    sessionId: session.id,
-    screenText: "Ok, delivered"
-  });
-  const turn = createTurn({
-    sessionId: session.id,
-    startedAt: 100,
-    completedAt: 200,
-    status: "completed"
   });
   const adapter = createDiscordAdapter({
     configured: true,
@@ -127,10 +105,14 @@ test("discord adapter consumes adapter-neutral message intents with the same bou
     threadKey: "status",
     text: "Ok, delivered",
     comparableText: "ok delivered",
-    projection,
-    turn,
-    semanticAdapter,
-    deliveryAdapters: [deliveryAdapter]
+    deliveryAdapters: [deliveryAdapter],
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "reply-1"
+    },
+    metadata: {
+      aggregationReason: "explicit_reply"
+    }
   });
   const secondIntent = createMessageIntent({
     sessionId: session.id,
@@ -140,10 +122,14 @@ test("discord adapter consumes adapter-neutral message intents with the same bou
     threadKey: "status",
     text: "Ok, delivered with more detail",
     comparableText: "ok delivered with more detail",
-    projection,
-    turn,
-    semanticAdapter,
-    deliveryAdapters: [deliveryAdapter]
+    deliveryAdapters: [deliveryAdapter],
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "reply-1"
+    },
+    metadata: {
+      aggregationReason: "explicit_reply"
+    }
   });
 
   const firstResult = await adapter.handleMessageIntent({
@@ -176,12 +162,11 @@ test("discord adapter consumes adapter-neutral message intents with the same bou
   assert.equal(status.updatedTotal, 1);
 });
 
-test("discord adapter allows neutral delivery-signal intents when legacy scopes are absent", async () => {
+test("discord adapter suppresses explicit message intents while outbound delivery is disabled", async () => {
   const sends = [];
   const adapter = createDiscordAdapter({
     configured: true,
     deliveryEnabled: false,
-    allowlistDeliverySignals: ["turn-primary-reply"],
     configuredTargets: 1,
     transport: {
       async sendMessage(payload) {
@@ -196,25 +181,6 @@ test("discord adapter allows neutral delivery-signal intents when legacy scopes 
     nowFn: () => 400
   });
   const session = { id: "session-allowlist", name: "codex", quickIdToken: "7" };
-  const projection = createTerminalProjection({
-    sessionId: session.id,
-    sourceRevision: "1",
-    appFamily: "coding-agent",
-    appLabel: "codex",
-    profile: "coding-agent"
-  });
-  const turn = createTurn({
-    sessionId: session.id,
-    openedAt: 100,
-    closedAt: 120,
-    status: "completed"
-  });
-  const semanticAdapter = createAppSemanticAdapterDescriptor({
-    adapterId: "codex-semantic-adapter",
-    appFamily: "coding-agent",
-    appLabels: ["codex"],
-    strategy: "projection"
-  });
   const deliveryAdapter = createDeliveryAdapterDescriptor({
     adapterId: "discord",
     channel: "discord",
@@ -228,12 +194,13 @@ test("discord adapter allows neutral delivery-signal intents when legacy scopes 
     threadKey: "status",
     text: "Ok, Discord signal delivered",
     comparableText: "ok discord signal delivered",
-    projection,
-    turn,
-    semanticAdapter,
     deliveryAdapters: [deliveryAdapter],
+    routing: {
+      threadKey: "status",
+      deliveryBlockKey: "status-block"
+    },
     metadata: {
-      deliverySignal: "turn-primary-reply"
+      deliverySignal: "status-update"
     }
   });
 
@@ -253,8 +220,8 @@ test("discord adapter allows neutral delivery-signal intents when legacy scopes 
     intent
   });
 
-  assert.equal(result.delivered, true);
-  assert.equal(sends.length, 1);
-  assert.match(sends[0].text, /\[7\] codex: Ok, Discord signal delivered/u);
-  assert.deepEqual(adapter.getStatus().allowlistDeliverySignals, ["turn-primary-reply"]);
+  assert.equal(result.delivered, false);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "delivery_disabled");
+  assert.equal(sends.length, 0);
 });

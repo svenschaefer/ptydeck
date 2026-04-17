@@ -1,6 +1,6 @@
 # Terminal Messaging Core Architecture
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Purpose
 
@@ -40,7 +40,7 @@ Its live responsibilities do not include:
 The retained framework consists of:
 
 - `backend/src/terminal-messaging-core.js`
-  - descriptor factories for `DeliveryAdapter`, `MessageIntent`, and the archived higher-level descriptor types kept as framework reference
+  - descriptor factories for `DeliveryAdapter` and `MessageIntent`
 - `backend/src/delivery-adapter-utils.js`
   - shared delivery shaping utilities
 - `backend/src/messaging-custom-command-utils.js`
@@ -59,7 +59,7 @@ The live runtime now reports only these active boundary contracts:
 - `DeliveryAdapter`
 - `MessageIntent`
 
-The broader descriptor set retained in `backend/src/terminal-messaging-core.js` remains available as framework reference, but those descriptors are not currently driving live automatic outbound behavior.
+No projection-, turn-, output-episode-, or semantic-adapter descriptor contract remains in the shipped retained framework.
 
 ## Telegram Adapter Responsibilities
 

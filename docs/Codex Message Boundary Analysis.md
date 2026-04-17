@@ -2,6 +2,8 @@
 
 Historical note: this document analyzes a removed live messaging implementation. It is retained for learnings only after the 2026-04-16 transport-only reset.
 
+References below to shipped evaluators, delivered follow-up behavior, or Codex-family runtime paths describe the removed implementation and are kept only as failure-context history.
+
 This note analyzes the end criteria that decide how Codex stream fragments become Telegram messages.
 The concrete trigger for this analysis was the observation that many delivered Telegram messages appear to contain only the first line or first short paragraph of a larger Codex closing comment, even when the operator-visible terminal block clearly spans multiple visual lines.
 
@@ -13,11 +15,11 @@ The later post-13:00 `H118 is delivered and pushed.` field case then showed that
 ## Scope
 
 This note began as analysis only.
-It now also records the delivered follow-up behavior that the analysis directly motivated.
+It later also recorded the follow-up behavior that analysis motivated in the removed implementation.
 
-The evidence base in this note comes from three sources:
+The evidence base in this note comes from three historical sources:
 
-- the shipped evaluator code in `backend/src/codex-outbound-evaluator.js`
+- the evaluator code that used to live in `backend/src/codex-outbound-evaluator.js` before the reset
 - current runtime dispatch in `backend/src/messaging-runtime.js`
 - operator-view transcript fixtures in `docs/examples/codex-terminal-dump-2026-04-11-22-41.txt` and `docs/examples/codex-terminal-dump-2026-04-11-23-30.txt`
 

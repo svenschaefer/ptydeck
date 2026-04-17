@@ -104,7 +104,7 @@ export function buildDeliveryEventFromMessageIntent(
     : truncateDisplayText(intent?.text || "", summaryMaxLength);
   const label =
     typeof formatSessionLabel === "function" ? formatSessionLabel(session) : buildFallbackSessionLabel(session);
-  const text = summary ? `${label}: ${summary}` : label;
+  const text = label ? (summary ? `${label}: ${summary}` : label) : summary;
   const deliverySignal =
     normalizeNonEmptyString(intent?.metadata?.deliverySignal) || normalizeNonEmptyString(intent?.intentKind);
   return Object.freeze({
@@ -122,12 +122,11 @@ export function buildDeliveryEventFromMessageIntent(
     trace,
     aggregationReason:
       normalizeNonEmptyString(intent?.metadata?.aggregationReason) || normalizeNonEmptyString(intent?.intentKind),
-    deliveryScope: normalizeNonEmptyString(intent?.metadata?.legacyDeliveryScope),
     deliverySignal,
     deliveryBlockKey:
-      normalizeNonEmptyString(intent?.turn?.turnId) ||
-      normalizeNonEmptyString(intent?.outputEpisode?.episodeId) ||
-      normalizeNonEmptyString(intent?.projection?.projectionId),
+      normalizeNonEmptyString(intent?.routing?.deliveryBlockKey) ||
+      normalizeNonEmptyString(intent?.metadata?.deliveryBlockKey) ||
+      normalizeNonEmptyString(intent?.threadKey),
     noiseClass: "",
     comparableText: normalizeNonEmptyString(intent?.comparableText),
     messageIntent: intent
