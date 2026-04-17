@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-17 (`v0.4.0-H145` retained messaging runtime no longer infers app-specific trigger profiles)
+Last updated: 2026-04-17 (post-`v0.4.0-H145` repository quality and coverage review queued follow-up hardening waves)
 
 ## Current Product Truth
 
@@ -121,7 +121,19 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: intentionally empty
-- `ROADMAP.md`: intentionally empty
+- `TODO.md`: active explicit quality and coverage hardening tasks queued for `v0.4.0-H146` through `v0.4.0-H148`
+- `ROADMAP.md`: active and queued quality/coverage waves `v0.4.0-H146` through `v0.4.0-H148`
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
+
+## Repository Quality Review (2026-04-17)
+
+The repo-wide quality gates still pass at the top line, but the 2026-04-17 review surfaced several concrete gaps worth promoting into active work:
+
+- Backend reported line coverage is `92.16%`, but the backend coverage runner currently excludes `contract-conformance.test.js`, `nonfunctional.load.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` from the reported gate. That makes the top-line number less trustworthy than it should be for runtime and request/WS seams.
+- Frontend reported line coverage is `93.91%`, but the frontend coverage output currently lists `frontend/src/public/app-runtime-composition-controller.js` twice with conflicting metrics (`85.67/68.22/60.20` and `62.64/61.70/13.82`), so the current report is not a clean one-file-to-one-row artifact.
+- The retained transport-only messaging baseline still has low direct coverage in `backend/src/messaging-runtime.js` (`67.77` line / `60.78` branch), `backend/src/discord-adapter.js` (`74.75` line / `39.73` branch), `backend/src/delivery-adapter-utils.js` (`41.46` branch), and `backend/src/telegram-command-surface.js` (`85.07` line / `68.25` branch).
+- Backend maintainability risk remains concentrated in `backend/src/validation.js` (`1610` lines, `76.34` line coverage) and `backend/src/messaging-custom-command-utils.js` (`81.20` line / `70.55` branch), where high branch fan-out makes the current coverage less convincing than the global total suggests.
+- Frontend maintainability risk remains concentrated in `frontend/src/public/app-runtime-composition-controller.js` (`2623` lines), `frontend/src/public/command-executor.js` (`2432` lines, `84.83` line / `49.61` function coverage), `frontend/src/public/app-lifecycle-controller.js` (`32.79` function coverage), and `frontend/src/public/api-client.js` (`77.92` branch coverage).
+
+The queued quality waves therefore prioritize coverage-report integrity first, then backend transport/validation hardening, then frontend controller and command-path hardening. The intent is to improve the trustworthiness of the current coverage contract and reduce monolith risk, not to chase top-line percentages blindly.
