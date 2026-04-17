@@ -6,8 +6,7 @@ import {
   normalizeMessagingInboundInputPayload,
   normalizeMessagingInboundReplaySelector,
   normalizeMessagingTopicBindings,
-  normalizeMessagingTargets,
-  resolveMessagingTriggerProfile
+  normalizeMessagingTargets
 } from "../src/messaging-runtime.js";
 
 function createSession(overrides = {}) {
@@ -93,7 +92,7 @@ function createTelegramTransportStub() {
   };
 }
 
-test("messaging runtime normalizes targets, topic bindings, and trigger profiles deterministically", () => {
+test("messaging runtime normalizes targets and topic bindings deterministically without app-specific profile routing", () => {
   const targets = normalizeMessagingTargets([
     null,
     { chatId: "1001" },
@@ -104,15 +103,14 @@ test("messaging runtime normalizes targets, topic bindings, and trigger profiles
   ]);
 
   assert.deepEqual(targets, [
-    { chatId: "1002", channelId: "1002", sessionId: "", quickIdToken: "", sessionName: "build", profile: "build-test" },
-    { chatId: "1003", channelId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "", profile: "coding-agent" },
+    { chatId: "1002", channelId: "1002", sessionId: "", quickIdToken: "", sessionName: "build" },
+    { chatId: "1003", channelId: "1003", sessionId: "", quickIdToken: "A1", sessionName: "" },
     {
       chatId: "1004",
       channelId: "1004",
       sessionId: "",
       quickIdToken: "",
       sessionName: "ops",
-      profile: "coding-agent",
       topicMode: "deck-session"
     },
     {
@@ -121,7 +119,6 @@ test("messaging runtime normalizes targets, topic bindings, and trigger profiles
       sessionId: "",
       quickIdToken: "",
       sessionName: "",
-      profile: "coding-agent",
       topicMode: "deck-session"
     }
   ]);
@@ -150,10 +147,6 @@ test("messaging runtime normalizes targets, topic bindings, and trigger profiles
     { chatId: "1001", sessionId: "", messageThreadId: 82 }
   ]);
   assert.deepEqual(topicBindings, [{ chatId: "1001", sessionId: "s-1", messageThreadId: 81, topicName: "Ops + codex", updatedAt: 123 }]);
-
-  assert.equal(resolveMessagingTriggerProfile(createSession({ name: "Codex agent", startCommand: "codex" })), "coding-agent");
-  assert.equal(resolveMessagingTriggerProfile(createSession({ name: "build-run", startCommand: "npm test" })), "build-test");
-  assert.equal(resolveMessagingTriggerProfile(createSession({ name: "plain-shell", startCommand: "bash" })), "generic-shell");
 });
 
 test("messaging inbound replay selector and input payload stay bounded and deterministic", () => {

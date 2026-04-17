@@ -85,7 +85,7 @@ test("loadConfig maps environment values", () => {
     AUTH_WS_TICKET_TTL_SECONDS: "45",
     ENFORCE_TLS_INGRESS: "true",
     MESSAGING_TELEGRAM_BOT_TOKEN: "telegram-token",
-    MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001", profile: "build-test" }]),
+    MESSAGING_TELEGRAM_TARGETS: JSON.stringify([{ sessionName: "build", chatId: "1001" }]),
     MESSAGING_TELEGRAM_API_BASE_URL: "https://api.telegram.example",
     MESSAGING_TELEGRAM_POLL_TIMEOUT_SECONDS: "7",
     MESSAGING_DISCORD_TARGETS: JSON.stringify([
@@ -133,7 +133,7 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.authDevTokenTtlSeconds, 1200);
   assert.equal(config.authWsTicketTtlSeconds, 45);
   assert.equal(config.messagingTelegramBotToken, "telegram-token");
-  assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001", profile: "build-test" }]);
+  assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001" }]);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.example");
   assert.equal(config.messagingTelegramOutboundEnabled, true);
   assert.equal(config.messagingTelegramInboundEnabled, true);

@@ -22,6 +22,7 @@ That means:
 - the backend may provision Telegram forum topics for `topicMode: "deck-session"`
 - the adapters may deliver explicit `MessageIntent` objects if another runtime seam creates them deliberately
 - the runtime does not automatically interpret terminal output into outbound Telegram or Discord messages
+- the runtime does not infer app-specific trigger profiles for target routing
 
 ## Telegram Command Surface
 

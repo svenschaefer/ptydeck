@@ -1,6 +1,6 @@
 # Terminal Messaging Core Architecture
 
-Last updated: 2026-04-17
+Last updated: 2026-04-17 (`v0.4.0-H145`)
 
 ## Purpose
 
@@ -34,6 +34,7 @@ Its live responsibilities do not include:
 - automatic reply extraction
 - automatic section/summary extraction
 - legacy/projection dual control flow
+- app-specific trigger-profile inference for routing
 
 ## Retained Framework Pieces
 

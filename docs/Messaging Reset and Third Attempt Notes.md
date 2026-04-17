@@ -56,6 +56,7 @@ On 2026-04-17 that retained foundation was reduced one step further:
 - the kept contract layer now exposes only `DeliveryAdapter` and `MessageIntent`
 - retained adapters no longer carry allowlist-based delivery gates
 - the kept framework no longer requires projection-, turn-, output-episode-, or semantic-adapter descriptors just to represent an explicit outbound message
+- the transport-only runtime no longer infers app-specific trigger profiles for target selection
 
 This means the future rebuild does not need to rediscover:
 

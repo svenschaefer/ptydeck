@@ -11,8 +11,6 @@ import {
   resolveCustomCommandForSession
 } from "./messaging-custom-command-utils.js";
 
-export const MESSAGING_TRIGGER_PROFILES = Object.freeze(["generic-shell", "coding-agent", "build-test"]);
-const MESSAGING_TRIGGER_PROFILE_SET = new Set(MESSAGING_TRIGGER_PROFILES);
 const MAX_RUNTIME_TRACE_ENTRIES = 200;
 const MAX_EVENT_SUMMARY_LENGTH = 280;
 const MAX_INBOUND_REPLAY_LINES = 80;
@@ -74,11 +72,6 @@ function buildSessionLabel(session) {
   return quickIdToken ? `[${quickIdToken}] ${name}` : name;
 }
 
-function normalizeMessagingProfile(value) {
-  const normalized = normalizeNonEmptyString(value).toLowerCase();
-  return MESSAGING_TRIGGER_PROFILE_SET.has(normalized) ? normalized : "";
-}
-
 function normalizeMessagingTargetEntry(entry, options = {}) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     return null;
@@ -93,7 +86,6 @@ function normalizeMessagingTargetEntry(entry, options = {}) {
     String((adapterId === "discord" ? entry.channelId ?? entry.chatId : entry.chatId ?? entry.channelId) ?? "").trim();
   const threadId = normalizePositiveInteger(adapterId === "discord" ? entry.threadId ?? entry.messageThreadId : entry.messageThreadId ?? entry.threadId);
   const webhookUrl = normalizeNonEmptyString(entry.webhookUrl);
-  const profile = normalizeMessagingProfile(entry.profile);
   const topicMode = normalizeNonEmptyString(entry.topicMode).toLowerCase() === "deck-session" ? "deck-session" : "";
   const hasSelector = Boolean(sessionId || quickIdToken || sessionName);
   const allowDynamicDeckSessionTarget = adapterId === "telegram" && topicMode === "deck-session" && !hasSelector;
@@ -112,7 +104,6 @@ function normalizeMessagingTargetEntry(entry, options = {}) {
     channelId,
     ...(Number.isInteger(threadId) ? { messageThreadId: threadId, threadId } : {}),
     ...(adapterId === "discord" ? { webhookUrl } : {}),
-    ...(profile ? { profile } : {}),
     ...(topicMode ? { topicMode } : {})
   };
   return Object.freeze(normalized);
@@ -151,24 +142,6 @@ export function normalizeMessagingTopicBindings(entries = []) {
     return [];
   }
   return entries.map((entry) => normalizeMessagingTopicBindingEntry(entry)).filter(Boolean);
-}
-
-export function resolveMessagingTriggerProfile(session, target = null) {
-  const targetProfile = normalizeMessagingProfile(target?.profile);
-  if (targetProfile) {
-    return targetProfile;
-  }
-  const fingerprint = [session?.name, session?.shell, session?.startCommand, session?.note]
-    .filter((value) => typeof value === "string" && value.trim())
-    .join(" ")
-    .toLowerCase();
-  if (/(?:codex|claude|gemini|agent|openai|apply_patch|plan updated)/.test(fingerprint)) {
-    return "coding-agent";
-  }
-  if (/(?:npm test|pnpm test|yarn test|pytest|jest|vitest|cargo test|go test|gradle|mvn|build|compile|coverage)/.test(fingerprint)) {
-    return "build-test";
-  }
-  return "generic-shell";
 }
 
 export function applyMessagingMessagePolicy(event, threadState = {}) {
@@ -262,14 +235,11 @@ function buildInboundLogDetails(request = {}, extra = {}) {
   };
 }
 
-function buildInboundStatusText(session, profile) {
+function buildInboundStatusText(session) {
   const lines = [
     `Status for ${buildSessionLabel(session)}`,
     `State: ${normalizeNonEmptyString(session?.state) || "unknown"}`
   ];
-  if (profile) {
-    lines.push(`Trigger profile: ${profile}`);
-  }
   const kind = normalizeNonEmptyString(session?.kind);
   if (kind) {
     lines.push(`Kind: ${kind}`);
@@ -508,14 +478,10 @@ export function createMessagingRuntime(options = {}) {
 
   function resolveTargetForAdapter(session, adapterId) {
     const mappings = adapterId === "discord" ? discordTargetMappings : telegramTargetMappings;
-    const sessionProfile = resolveMessagingTriggerProfile(session);
     let bestMatch = null;
     let bestScore = -1;
     for (const target of mappings) {
       if (normalizeNonEmptyString(target.adapterId || adapterId) !== adapterId) {
-        continue;
-      }
-      if (target.profile && target.profile !== sessionProfile) {
         continue;
       }
       if (target.sessionId && target.sessionId !== session.id) {
@@ -696,8 +662,6 @@ export function createMessagingRuntime(options = {}) {
     rememberSessionForTarget(target, session);
     const action = normalizeNonEmptyString(request.command?.action || request.action).toLowerCase();
     const trace = buildInboundTrace(request, session.id);
-    const profile = resolveMessagingTriggerProfile(session, target);
-
     try {
       if (action === "input") {
         const payload = normalizeMessagingInboundInputPayload(request.text);
@@ -731,7 +695,7 @@ export function createMessagingRuntime(options = {}) {
         const result = {
           ok: true,
           callbackText: "Status ready.",
-          text: buildInboundStatusText(session, profile)
+          text: buildInboundStatusText(session)
         };
         logDebug("messaging.inbound.action", buildInboundLogDetails(request, { sessionId: session.id, ok: true }), trace);
         appendTraceEntry({ type: "messaging.inbound.action", reason: "status", sessionId: session.id, adapter: request.adapter, text: result.text, traceId: trace.traceId, correlationId: trace.correlationId });

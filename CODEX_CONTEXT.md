@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-17 (`v0.4.0-H144` retained messaging framework reduced to transport-only contracts)
+Last updated: 2026-04-17 (`v0.4.0-H145` retained messaging runtime no longer infers app-specific trigger profiles)
 
 ## Current Product Truth
 
@@ -18,6 +18,7 @@ The shipped runtime now keeps only a transport-only messaging baseline:
 - adapter-neutral message policy helpers for explicit `MessageIntent` delivery
 
 The live runtime no longer performs automatic PTY-stream or terminal-output interpretation into outbound Telegram/Discord messages.
+The live runtime also no longer infers app-specific trigger profiles such as `coding-agent` or `build-test` for target routing.
 
 ## Messaging Files Intentionally Kept
 
@@ -60,6 +61,7 @@ Current live messaging behavior is intentionally narrow and explicit:
 - The adapters can still deliver explicit `MessageIntent` objects when another runtime seam constructs them deliberately.
 - There is no automatic terminal-output mirroring or automatic terminal-output summarization in the live product path.
 - The retained adapter/runtime layer no longer carries semantic allowlists, shadow-mode remnants, or projection-era descriptor requirements.
+- The retained transport runtime no longer applies app-derived routing profiles when matching targets.
 
 ## Delivery and Status Expectations
 
