@@ -14,17 +14,28 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - none currently
+  - `v0.4.0-H149`
 - Active scoped tasks:
-  - none currently
+  - `MSG-214`
+  - `MSG-215`
 - Queued next waves:
-  - none currently
+  - `v0.4.0-H150`
+  - `v0.4.0-H151`
 
 ## Queued Wave Order
-- none currently
+1. `v0.4.0-H149`
+   - `MSG-214`
+   - `MSG-215` after `MSG-214`
+2. `v0.4.0-H150`
+   - `MSG-216`
+   - `MSG-217` after `MSG-216`
+3. `v0.4.0-H151`
+   - `MSG-218`
+   - `MSG-219` after `MSG-218`
 
 ## Wave Dependencies
-- none currently
+- `v0.4.0-H150` has no hard dependency on `v0.4.0-H149`, but should follow it so the largest backend hotspot is reduced before the next frontend composition wave.
+- `v0.4.0-H151` should execute after `v0.4.0-H150` because both waves are frontend-owned and share the same maintainability objective.
 
 ## Sequencing Rules
 

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`v0.4.0-H148` frontend quality and coverage hardening)
+Last updated: 2026-04-18 (post-repo-wide quality/coverage review and queued `H149`-`H151` hardening waves)
 
 ## Current Product Truth
 
@@ -121,8 +121,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active open tasks
-- `ROADMAP.md`: no active or queued waves
+- `TODO.md`: active explicit quality/coverage hardening tasks are queued for `v0.4.0-H149` through `v0.4.0-H151`
+- `ROADMAP.md`: `v0.4.0-H149` is now active, with `v0.4.0-H150` and `v0.4.0-H151` queued behind it
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
@@ -135,4 +135,8 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
 - The corrected local coverage-check contract now reports backend line coverage at `92.16%` and frontend line coverage at `94.58%` on the full gate. The delivered backend hardening raised the promoted backend hotspots to `95.52%` line / `51.11%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `85.24%` line / `67.28%` branch for `backend/src/messaging-runtime.js`, `90.05%` line / `77.63%` branch for `backend/src/telegram-command-surface.js`, and `81.42%` line / `80.08%` branch for `backend/src/validation.js`.
 - `v0.4.0-H148` then reduced `frontend/src/public/app-runtime-composition-controller.js` from `2623` to `2328` lines by extracting `frontend/src/public/session-control-runtime-state.js` (`428` lines) and by adding direct seam tests for trusted-local handoff/control ownership behavior instead of testing only through the larger composition controller.
 - Focused frontend hardening in `H148` also covered the promoted failure-path gaps in `frontend/src/public/app-lifecycle-controller.js`, `frontend/src/public/api-client.js`, and `frontend/src/public/command-executor.js`. The focused seam snapshot reached `92.12%` line / `77.22%` branch / `94.20%` function coverage for `frontend/src/public/api-client.js`, `95.62%` line / `95.00%` branch / `45.16%` function coverage for `frontend/src/public/app-lifecycle-controller.js`, `85.05%` line / `64.84%` branch / `22.80%` function coverage for `frontend/src/public/app-runtime-composition-controller.js`, and `74.07%` line / `58.62%` branch / `97.56%` function coverage for `frontend/src/public/session-control-runtime-state.js`.
-- There is no currently promoted follow-up quality wave. Future quality work can be re-promoted from `TODO-OUTLOOK.md` only if a new explicit risk justifies it; the current transport-only baseline now sits on repaired coverage reporting plus closed backend/frontend hardening waves rather than on disputed coverage numbers or a single large untested controller surface.
+- A follow-up repo-wide review on the validated current tree promoted three remaining quality waves because the repaired coverage report now makes the residual risks unambiguous instead of anecdotal:
+  - `backend/src/runtime.js` remains the largest backend hotspot at `7938` lines with `82.78%` line and `76.53%` branch coverage, so the next promoted backend wave targets runtime-core seam extraction and direct branch coverage there instead of spreading effort across smaller backend files first.
+  - `frontend/src/public/app-runtime-composition-controller.js` remains the largest frontend hotspot even after `H148`, still at `2328` lines with only `71.31%` line / `64.13%` branch / `14.58%` function coverage; the extracted `frontend/src/public/session-control-runtime-state.js` seam improved testability but still sits at `76.87%` line / `62.87%` branch coverage, so the next frontend wave continues decomposition and branch closure around bootstrap/auth/handoff/reconnect flows.
+  - The remaining high-fan-out frontend command/workspace stack is now the next clear maintainability cluster after the composition controller: `frontend/src/public/command-executor.js` sits at `2432` lines with `49.61%` function coverage, `frontend/src/public/connection-profile-runtime-controller.js` sits at `1984` lines with `69.23%` branch coverage, and `frontend/src/public/workspace-preset-runtime-controller.js` sits at `1557` lines with `73.81%` branch coverage. Those files were therefore promoted together into a later frontend wave rather than leaving them as untracked known debt.
+- Smaller low-coverage utilities and UI controllers still exist, but they were not promoted in this review because they are either already bounded, substantially better covered than the newly promoted monoliths, or lower risk than the backend runtime and frontend composition/command/workspace surfaces now queued in `TODO.md`.
