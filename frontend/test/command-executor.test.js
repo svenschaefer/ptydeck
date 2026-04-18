@@ -2898,3 +2898,131 @@ test("command executor exposes structured detailed results for success and failu
     }
   );
 });
+
+test("command executor returns retry guidance for non-empty deck deletion and emits deck-deleted events on forced success", async () => {
+  const events = [];
+  let deleteCalls = 0;
+  const executor = createExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [],
+          decks: [
+            { id: "default", name: "Default" },
+            { id: "ops", name: "Ops" }
+          ],
+          activeSessionId: ""
+        };
+      }
+    },
+    api: {
+      async deleteDeck(deckId, options = {}) {
+        deleteCalls += 1;
+        assert.equal(deckId, "ops");
+        if (options.force !== true) {
+          const error = new Error("conflict");
+          error.status = 409;
+          throw error;
+        }
+      }
+    },
+    defaultDeckId: "default",
+    getActiveDeck: () => ({ id: "ops", name: "Ops" }),
+    applyRuntimeEvent: (event, runtimeOptions) => events.push([event, runtimeOptions]),
+    resolveDeckToken: (token, decks) => ({
+      deck: decks.find((deck) => deck.id === token) || null,
+      error: `Unknown deck: ${token}`
+    })
+  });
+
+  const retryFeedback = await executor.execute({
+    command: "deck",
+    args: ["delete"],
+    raw: "/deck delete"
+  });
+  const successFeedback = await executor.execute({
+    command: "deck",
+    args: ["delete", "ops", "force"],
+    raw: "/deck delete ops force"
+  });
+
+  assert.equal(retryFeedback, "Deck 'Ops' is not empty. Retry with '/deck delete ops force'.");
+  assert.equal(successFeedback, "Deleted deck [ops] Ops.");
+  assert.equal(deleteCalls, 2);
+  assert.deepEqual(events, [
+    [
+      {
+        type: "deck.deleted",
+        deckId: "ops",
+        fallbackDeckId: "default"
+      },
+      { preferredActiveDeckId: "default" }
+    ]
+  ]);
+});
+
+test("command executor surfaces missing scoped custom commands cleanly when custom removal receives a 404", async () => {
+  const removedCommands = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [{ id: "s1", name: "one", deckId: "default" }],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async deleteCustomCommand() {
+        const error = new Error("missing");
+        error.status = 404;
+        throw error;
+      }
+    },
+    systemSlashCommands: ["custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [
+      { name: "deploy", content: "echo project", scope: "project", kind: "plain" }
+    ],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: (command) => removedCommands.push(command),
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 })
+  });
+
+  const feedback = await executor.execute({
+    command: "custom",
+    args: ["remove", "scope:project", "deploy"],
+    raw: "/custom remove scope:project deploy"
+  });
+
+  assert.equal(feedback, "Custom command not found: /deploy");
+  assert.deepEqual(removedCommands, []);
+});

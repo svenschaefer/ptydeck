@@ -300,3 +300,107 @@ test("app lifecycle controller blocks write actions in read-only spectator mode"
     "Spectator · Read-only deck ops. Write actions are disabled."
   ]);
 });
+
+test("app lifecycle controller surfaces create-session and guarded action failures deterministically", async () => {
+  const createBtn = createEventTarget();
+  const deckCreateBtn = createEventTarget();
+  const sendBtn = createEventTarget();
+  const commandFeedbackActionBtn = createEventTarget();
+  const commandGuardSendOnceBtn = createEventTarget();
+  const workflowStopBtn = createEventTarget();
+  const workflowInterruptBtn = createEventTarget();
+  const workflowKillBtn = createEventTarget();
+  const errors = [];
+  const feedback = [];
+
+  const controller = createAppLifecycleController({
+    createBtn,
+    deckCreateBtn,
+    sendBtn,
+    commandFeedbackActionBtn,
+    commandGuardSendOnceBtn,
+    workflowStopBtn,
+    workflowInterruptBtn,
+    workflowKillBtn,
+    api: {
+      async createSession() {
+        throw new Error("boom");
+      }
+    },
+    createDeckFlow: async () => {
+      throw new Error("Deck creation exploded.");
+    },
+    submitCommand: async () => {
+      throw new Error("send exploded");
+    },
+    handleCommandFeedbackAction: async () => {
+      throw new Error("Action exploded.");
+    },
+    confirmPendingCommandSend: async () => {
+      throw new Error("guard exploded");
+    },
+    stopWorkflow: () => false,
+    interruptWorkflowSession: async () => {
+      throw new Error("interrupt exploded");
+    },
+    killWorkflowSession: async () => {
+      throw new Error("kill exploded");
+    },
+    setError: (message) => errors.push(message),
+    setCommandFeedback: (message) => feedback.push(message),
+    getErrorMessage: (error, fallback) => error?.message || fallback
+  });
+
+  controller.bindUiEvents();
+  await createBtn.dispatch("click");
+  await deckCreateBtn.dispatch("click");
+  await sendBtn.dispatch("click");
+  await commandFeedbackActionBtn.dispatch("click");
+  await commandGuardSendOnceBtn.dispatch("click");
+  await workflowStopBtn.dispatch("click");
+  await workflowInterruptBtn.dispatch("click");
+  await workflowKillBtn.dispatch("click");
+
+  assert.deepEqual(feedback, ["No workflow is currently running."]);
+  assert.deepEqual(errors, [
+    "Failed to create session.",
+    "Deck creation exploded.",
+    "Failed to send command.",
+    "Action exploded.",
+    "Failed to send guarded command.",
+    "interrupt exploded",
+    "kill exploded"
+  ]);
+});
+
+test("app lifecycle controller initializes with a null websocket client when startup runtime returns nothing", async () => {
+  const calls = [];
+  let wsClient = "unset";
+
+  const controller = createAppLifecycleController({
+    waitForStartupWarmup: async () => {
+      calls.push("warmup");
+      return "ready";
+    },
+    bootstrapDevAuthToken: async () => {
+      calls.push("auth");
+      return false;
+    },
+    startWsRuntime: () => {
+      calls.push("ws");
+      return null;
+    },
+    setWsClient: (value) => {
+      calls.push("set");
+      wsClient = value;
+    },
+    scheduleBootstrapFallback: () => {
+      calls.push("fallback");
+    }
+  });
+
+  await controller.initializeRuntime();
+
+  assert.deepEqual(calls, ["warmup", "auth", "ws", "set", "fallback"]);
+  assert.equal(wsClient, null);
+});

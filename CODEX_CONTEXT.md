@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`v0.4.0-H147` backend quality and coverage hardening)
+Last updated: 2026-04-18 (post-`v0.4.0-H148` frontend quality and coverage hardening)
 
 ## Current Product Truth
 
@@ -121,24 +121,18 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active explicit frontend quality and coverage hardening tasks queued for `v0.4.0-H148`
-- `ROADMAP.md`: `v0.4.0-H148` is the active wave
+- `TODO.md`: no active open tasks
+- `ROADMAP.md`: no active or queued waves
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
 ## Repository Quality Review (2026-04-18)
 
-The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports, and `v0.4.0-H147` then closed the first promoted backend transport/validation blind spots on top of that repaired contract:
+The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports, `v0.4.0-H147` then closed the first promoted backend transport/validation blind spots on top of that repaired contract, and `v0.4.0-H148` completed the promoted frontend controller/command-path hardening wave:
 
 - Backend coverage still runs through the same deterministic workspace file selection contract as the backend default test suite, excluding only `nonfunctional.load.test.js` from the coverage lane. The previously hidden `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` surfaces remain visible in the reported backend coverage gate.
 - Frontend coverage still emits a normalized one-row-per-source-file report even when the Node test runner produces duplicate file rows. The normalization remains explicit in the emitted report so duplicate-row repair is auditable instead of silent.
-- The corrected local coverage-check contract now reports backend line coverage at `92.73%` and frontend line coverage at `94.18%` on the full gate, while the delivered `H147` targeted hardening raised the promoted backend hotspots to `95.52%` line / `51.11%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `85.24%` line / `67.28%` branch for `backend/src/messaging-runtime.js`, `90.05%` line / `77.63%` branch for `backend/src/telegram-command-surface.js`, and `81.42%` line / `80.08%` branch for `backend/src/validation.js`.
-
-The remaining promoted quality risks after `H147` are frontend maintainability and branch-depth risks concentrated in:
-
-- `frontend/src/public/app-runtime-composition-controller.js` (`2623` lines)
-- `frontend/src/public/command-executor.js` (`2432` lines, `84.83%` line / `49.61%` function coverage)
-- `frontend/src/public/app-lifecycle-controller.js` (`32.79%` function coverage)
-- `frontend/src/public/api-client.js` (`77.92%` branch coverage)
-
-The active quality wave therefore now focuses on frontend controller decomposition and command-path coverage hardening in `v0.4.0-H148`. The intent remains to improve the trustworthiness and maintainability of the current transport-only baseline without chasing top-line percentages blindly.
+- The corrected local coverage-check contract now reports backend line coverage at `92.16%` and frontend line coverage at `94.58%` on the full gate. The delivered backend hardening raised the promoted backend hotspots to `95.52%` line / `51.11%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `85.24%` line / `67.28%` branch for `backend/src/messaging-runtime.js`, `90.05%` line / `77.63%` branch for `backend/src/telegram-command-surface.js`, and `81.42%` line / `80.08%` branch for `backend/src/validation.js`.
+- `v0.4.0-H148` then reduced `frontend/src/public/app-runtime-composition-controller.js` from `2623` to `2328` lines by extracting `frontend/src/public/session-control-runtime-state.js` (`428` lines) and by adding direct seam tests for trusted-local handoff/control ownership behavior instead of testing only through the larger composition controller.
+- Focused frontend hardening in `H148` also covered the promoted failure-path gaps in `frontend/src/public/app-lifecycle-controller.js`, `frontend/src/public/api-client.js`, and `frontend/src/public/command-executor.js`. The focused seam snapshot reached `92.12%` line / `77.22%` branch / `94.20%` function coverage for `frontend/src/public/api-client.js`, `95.62%` line / `95.00%` branch / `45.16%` function coverage for `frontend/src/public/app-lifecycle-controller.js`, `85.05%` line / `64.84%` branch / `22.80%` function coverage for `frontend/src/public/app-runtime-composition-controller.js`, and `74.07%` line / `58.62%` branch / `97.56%` function coverage for `frontend/src/public/session-control-runtime-state.js`.
+- There is no currently promoted follow-up quality wave. Future quality work can be re-promoted from `TODO-OUTLOOK.md` only if a new explicit risk justifies it; the current transport-only baseline now sits on repaired coverage reporting plus closed backend/frontend hardening waves rather than on disputed coverage numbers or a single large untested controller surface.

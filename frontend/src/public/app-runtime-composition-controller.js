@@ -51,6 +51,32 @@ import { createReplayExportRuntimeController } from "./replay-export-runtime-con
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSendHistoryRuntimeController } from "./send-history-runtime-controller.js";
+import {
+  ORIGIN_HANDOFF_QUERY_PARAM,
+  buildCanonicalOriginRedirectUrl,
+  canForgetSessionControlClient as canForgetSessionControlClientState,
+  canManageTrustedLocalDevice as canManageTrustedLocalDeviceState,
+  canReleaseSessionControl as canReleaseSessionControlState,
+  canTakeSessionControl as canTakeSessionControlState,
+  canTransferSessionControl as canTransferSessionControlState,
+  canUseImplicitOwnerFallback as canUseImplicitOwnerFallbackState,
+  canWriteToSession as canWriteToSessionState,
+  clearOriginHandoffSearchParam,
+  getAttachedClientsForSession,
+  getCurrentSessionController,
+  getLocalDeviceLabel as getLocalDeviceLabelState,
+  getSessionControlBadgeState as getSessionControlBadgeStateState,
+  getSessionControlClientLabel,
+  getSessionControlState,
+  getSessionControlSummary as getSessionControlSummaryState,
+  getTakeOrReclaimControlLabel as getTakeOrReclaimControlLabelState,
+  getSessionWriteBlockMessage as getSessionWriteBlockMessageState,
+  listOriginHandoffRepairableSessions as listOriginHandoffRepairableSessionsState,
+  normalizeControlText,
+  normalizeOriginValue,
+  readOriginHandoffSourceOrigin,
+  getWindowOrigin
+} from "./session-control-runtime-state.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
@@ -398,7 +424,6 @@ const SESSION_TAG_MAX_LENGTH = 32;
 const DEFAULT_TERMINAL_COLS = 80;
 const DEFAULT_TERMINAL_ROWS = 20;
 const DEFAULT_DECK_ID = "default";
-const ORIGIN_HANDOFF_QUERY_PARAM = "ptydeck_origin_handoff";
 const SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEV_AUTH_REFRESH_SAFETY_MS = 60_000;
 const DEV_AUTH_RETRY_DELAY_MS = 30_000;
@@ -598,72 +623,67 @@ let runtimeClientIdentityCreatedOnThisOrigin = false;
 let originHandoffSourceOrigin = "";
 let originHandoffAutoRepairAttempted = false;
 
-function normalizeControlText(value) {
-  return typeof value === "string" ? value.trim() : "";
+function getSessionControlContext() {
+  return {
+    runtimeClientId,
+    trustedLocalClientLabel,
+    isReadOnlyMode,
+    getReadOnlyModeMessage,
+    runtimeClientIdentityCreatedOnThisOrigin,
+    originHandoffSourceOrigin
+  };
 }
 
-function normalizeOriginValue(value) {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  if (!normalized) {
-    return "";
-  }
-  try {
-    return new URL(normalized).origin;
-  } catch {
-    return "";
-  }
+function getLocalDeviceLabel(session = null) {
+  return getLocalDeviceLabelState(session, getSessionControlContext());
 }
 
-function getWindowOrigin(win) {
-  const location = win?.location || null;
-  if (typeof location?.origin === "string" && location.origin.trim()) {
-    return normalizeOriginValue(location.origin);
-  }
-  const protocol = typeof location?.protocol === "string" ? location.protocol : "";
-  const host = typeof location?.host === "string" ? location.host : "";
-  if (!protocol || !host) {
-    return "";
-  }
-  return normalizeOriginValue(`${protocol}//${host}`);
+function canUseImplicitOwnerFallback(session) {
+  return canUseImplicitOwnerFallbackState(session, getSessionControlContext());
 }
 
-function buildCanonicalOriginRedirectUrl(win, canonicalOrigin, handoffOrigin) {
-  const location = win?.location || null;
-  const targetUrl = new URL(typeof location?.pathname === "string" && location.pathname ? location.pathname : "/", canonicalOrigin);
-  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
-  params.delete(ORIGIN_HANDOFF_QUERY_PARAM);
-  if (handoffOrigin) {
-    params.set(ORIGIN_HANDOFF_QUERY_PARAM, handoffOrigin);
-  }
-  const search = params.toString();
-  targetUrl.search = search ? `?${search}` : "";
-  targetUrl.hash = typeof location?.hash === "string" ? location.hash : "";
-  return targetUrl.toString();
+function canWriteToSession(session) {
+  return canWriteToSessionState(session, getSessionControlContext());
 }
 
-function readOriginHandoffSourceOrigin(win) {
-  const location = win?.location || null;
-  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
-  return normalizeOriginValue(params.get(ORIGIN_HANDOFF_QUERY_PARAM) || "");
+function getSessionWriteBlockMessage(session) {
+  return getSessionWriteBlockMessageState(session, getSessionControlContext());
 }
 
-function clearOriginHandoffSearchParam(win) {
-  const location = win?.location || null;
-  const historyRef = win?.history || null;
-  if (typeof historyRef?.replaceState !== "function") {
-    return false;
-  }
-  const params = new URLSearchParams(typeof location?.search === "string" ? location.search : "");
-  if (!params.has(ORIGIN_HANDOFF_QUERY_PARAM)) {
-    return false;
-  }
-  params.delete(ORIGIN_HANDOFF_QUERY_PARAM);
-  const pathname = typeof location?.pathname === "string" && location.pathname ? location.pathname : "/";
-  const nextSearch = params.toString();
-  const nextHash = typeof location?.hash === "string" ? location.hash : "";
-  const nextUrl = `${pathname}${nextSearch ? `?${nextSearch}` : ""}${nextHash}`;
-  historyRef.replaceState(historyRef.state || null, "", nextUrl);
-  return true;
+function getSessionControlSummary(session) {
+  return getSessionControlSummaryState(session, getSessionControlContext());
+}
+
+function canTakeSessionControl(session) {
+  return canTakeSessionControlState(session, getSessionControlContext());
+}
+
+function listOriginHandoffRepairableSessions(sessions) {
+  return listOriginHandoffRepairableSessionsState(sessions, getSessionControlContext());
+}
+
+function canReleaseSessionControl(session) {
+  return canReleaseSessionControlState(session, getSessionControlContext());
+}
+
+function canTransferSessionControl(session, targetClientId) {
+  return canTransferSessionControlState(session, targetClientId, getSessionControlContext());
+}
+
+function canManageTrustedLocalDevice(session) {
+  return canManageTrustedLocalDeviceState(session, getSessionControlContext());
+}
+
+function canForgetSessionControlClient(session, targetClientId) {
+  return canForgetSessionControlClientState(session, targetClientId, getSessionControlContext());
+}
+
+function getTakeOrReclaimControlLabel(session) {
+  return getTakeOrReclaimControlLabelState(session, getSessionControlContext());
+}
+
+function getSessionControlBadgeState(session) {
+  return getSessionControlBadgeStateState(session, getSessionControlContext());
 }
 
 function maybeRedirectToCanonicalOrigin() {
@@ -672,7 +692,7 @@ function maybeRedirectToCanonicalOrigin() {
   if (!canonicalOrigin || !currentOrigin || canonicalOrigin === currentOrigin) {
     return false;
   }
-  const targetUrl = buildCanonicalOriginRedirectUrl(window, canonicalOrigin, currentOrigin);
+  const targetUrl = buildCanonicalOriginRedirectUrl(window, canonicalOrigin, currentOrigin, ORIGIN_HANDOFF_QUERY_PARAM);
   if (typeof window?.location?.replace === "function") {
     window.location.replace(targetUrl);
     return true;
@@ -684,201 +704,12 @@ function maybeRedirectToCanonicalOrigin() {
   return false;
 }
 
-function getSessionControlState(session) {
-  return session?.controlState && typeof session.controlState === "object" ? session.controlState : null;
-}
-
-function getCurrentSessionController(session) {
-  const controlState = getSessionControlState(session);
-  const controller = controlState?.currentController;
-  return controller && typeof controller === "object" ? controller : null;
-}
-
-function getAttachedClientsForSession(session) {
-  const controlState = getSessionControlState(session);
-  return Array.isArray(controlState?.attachedClients) ? controlState.attachedClients : [];
-}
-
-function getLocalSessionClient(session) {
-  if (!runtimeClientId) {
-    return null;
-  }
-  return getAttachedClientsForSession(session).find((entry) => normalizeControlText(entry?.clientId) === runtimeClientId) || null;
-}
-
-function getLocalDeviceLabel(session = null) {
-  const localClient = session ? getLocalSessionClient(session) : null;
-  return normalizeControlText(localClient?.label) || trustedLocalClientLabel || "this device";
-}
-
-function isLocalSessionController(session) {
-  return normalizeControlText(getCurrentSessionController(session)?.clientId) === runtimeClientId && Boolean(runtimeClientId);
-}
-
-function isLocalSessionOwner(session) {
-  const localClient = getLocalSessionClient(session);
-  const owner = getSessionControlState(session)?.owner;
-  if (!localClient || !owner) {
-    return false;
-  }
-  return (
-    normalizeControlText(localClient.subject) === normalizeControlText(owner.subject) &&
-    normalizeControlText(localClient.tenantId) === normalizeControlText(owner.tenantId) &&
-    normalizeControlText(localClient.accessMode) === normalizeControlText(owner.accessMode) &&
-    normalizeControlText(localClient.permissionMode) === normalizeControlText(owner.permissionMode)
-  );
-}
-
-function isLocalOperatorSessionClient(session) {
-  const localClient = getLocalSessionClient(session);
-  return Boolean(localClient) && normalizeControlText(localClient?.accessMode) !== "spectator";
-}
-
-function canUseImplicitOwnerFallback(session) {
-  if (isReadOnlyMode() || !session) {
-    return false;
-  }
-  if (!getSessionControlState(session)) {
-    return true;
-  }
-  if (getCurrentSessionController(session)) {
-    return false;
-  }
-  const attachedClients = getAttachedClientsForSession(session);
-  return attachedClients.length === 0 || attachedClients.every((entry) => normalizeControlText(entry?.accessMode) === "spectator");
-}
-
-function canWriteToSession(session) {
-  if (isReadOnlyMode() || !session) {
-    return false;
-  }
-  return isLocalSessionController(session) || canUseImplicitOwnerFallback(session);
-}
-
-function getSessionWriteBlockMessage(session) {
-  if (isReadOnlyMode()) {
-    return getReadOnlyModeMessage();
-  }
-  if (!session) {
-    return "No active session selected.";
-  }
-  if (canUseImplicitOwnerFallback(session)) {
-    return "";
-  }
-  const localDeviceLabel = getLocalDeviceLabel(session);
-  if (!runtimeClientId || !getLocalSessionClient(session)) {
-    return `Waiting for ${localDeviceLabel} to attach to session control.`;
-  }
-  const controller = getCurrentSessionController(session);
-  if (!controller) {
-    return "No client currently holds control for this session. Take control before sending input or resizing.";
-  }
-  if (normalizeControlText(controller.clientId) === runtimeClientId) {
-    return "";
-  }
-  if (controller.active !== true) {
-    if (isLocalOperatorSessionClient(session)) {
-      return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. Take control to reclaim it or wait for reconnect.`;
-    }
-    return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. Input and resize are disabled on this device.`;
-  }
-  if (isLocalOperatorSessionClient(session)) {
-    return `Device ${getSessionControlClientLabel(controller)} currently controls this session. Take control to override or wait for release.`;
-  }
-  return "This session is currently controlled by another client. Input and resize are disabled.";
-}
-
-function getSessionControlClientLabel(client) {
-  const label = normalizeControlText(client?.label);
-  if (label) {
-    return label;
-  }
-  const subject = normalizeControlText(client?.subject) || "unknown";
-  const tenantId = normalizeControlText(client?.tenantId);
-  return tenantId ? `${subject}@${tenantId}` : subject;
-}
-
-function getSessionControlSummary(session) {
-  const controller = getCurrentSessionController(session);
-  const localClient = getLocalSessionClient(session);
-  const localDeviceLabel = getLocalDeviceLabel(session);
-  if (!session) {
-    return "Control unavailable.";
-  }
-  if (!runtimeClientId || !localClient) {
-    if (canUseImplicitOwnerFallback(session)) {
-      return "Local operator write access is active until a session control client attaches.";
-    }
-    return `Waiting for ${localDeviceLabel} to attach.`;
-  }
-  if (!controller) {
-    return `No active controller. ${localDeviceLabel} can take control.`;
-  }
-  if (normalizeControlText(controller.clientId) === runtimeClientId) {
-    const tabCount = Number.isInteger(localClient.activeConnectionCount) ? localClient.activeConnectionCount : 0;
-    return tabCount > 1
-      ? `${localDeviceLabel} controls this session. ${tabCount} tabs are attached for this device.`
-      : `${localDeviceLabel} controls this session.`;
-  }
-  if (controller.active !== true) {
-    if (isLocalOperatorSessionClient(session)) {
-      return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}. ${localDeviceLabel} can reclaim it.`;
-    }
-    return `Control is reserved for reconnecting device ${getSessionControlClientLabel(controller)}.`;
-  }
-  if (isLocalOperatorSessionClient(session)) {
-    return `Device ${getSessionControlClientLabel(controller)} controls this session. ${localDeviceLabel} can take control.`;
-  }
-  return `Device ${getSessionControlClientLabel(controller)} controls this session. Observe-only on this device.`;
-}
-
-function canTakeSessionControl(session) {
-  if (isReadOnlyMode() || !session || !runtimeClientId) {
-    return false;
-  }
-  const localClient = getLocalSessionClient(session);
-  if (!localClient || localClient.active !== true) {
-    return false;
-  }
-  if (normalizeControlText(localClient.accessMode) === "spectator") {
-    return false;
-  }
-  if (isLocalSessionController(session)) {
-    return false;
-  }
-  return true;
-}
-
-function isOriginHandoffRepairableSession(session) {
-  if (!originHandoffSourceOrigin || !session || !runtimeClientId) {
-    return false;
-  }
-  const controller = getCurrentSessionController(session);
-  if (!controller || controller.active === true) {
-    return false;
-  }
-  if (normalizeControlText(controller.clientId) === runtimeClientId) {
-    return false;
-  }
-  if (!runtimeClientIdentityCreatedOnThisOrigin) {
-    return false;
-  }
-  if (!isLocalOperatorSessionClient(session) || !isLocalSessionOwner(session)) {
-    return false;
-  }
-  return canTakeSessionControl(session);
-}
-
-function listOriginHandoffRepairableSessions() {
-  const sessions = Array.isArray(store?.getState?.().sessions) ? store.getState().sessions : [];
-  return sessions.filter((session) => isOriginHandoffRepairableSession(session));
-}
-
 async function maybeAutoRepairOriginHandoffControl() {
   if (originHandoffAutoRepairAttempted || isReadOnlyMode()) {
     return false;
   }
-  const repairableSessions = listOriginHandoffRepairableSessions();
+  const sessions = Array.isArray(store?.getState?.().sessions) ? store.getState().sessions : [];
+  const repairableSessions = listOriginHandoffRepairableSessions(sessions);
   if (repairableSessions.length === 0) {
     return false;
   }
@@ -916,71 +747,6 @@ async function maybeAutoRepairOriginHandoffControl() {
     });
     return false;
   }
-}
-
-function canReleaseSessionControl(session) {
-  if (isReadOnlyMode() || !session || !runtimeClientId) {
-    return false;
-  }
-  const localClient = getLocalSessionClient(session);
-  if (!localClient || localClient.active !== true) {
-    return false;
-  }
-  return isLocalSessionController(session) || isLocalSessionOwner(session);
-}
-
-function canTransferSessionControl(session, targetClientId) {
-  if (isReadOnlyMode() || !session || !runtimeClientId) {
-    return false;
-  }
-  const normalizedTargetClientId = normalizeControlText(targetClientId);
-  if (!normalizedTargetClientId) {
-    return false;
-  }
-  const targetClient = getAttachedClientsForSession(session).find(
-    (entry) => normalizeControlText(entry?.clientId) === normalizedTargetClientId
-  );
-  if (!targetClient || targetClient.active !== true) {
-    return false;
-  }
-  const controllerClientId = normalizeControlText(getCurrentSessionController(session)?.clientId);
-  if (normalizedTargetClientId === controllerClientId) {
-    return false;
-  }
-  return isLocalSessionController(session) || isLocalSessionOwner(session);
-}
-
-function canManageTrustedLocalDevice(session) {
-  if (isReadOnlyMode() || !session || !runtimeClientId) {
-    return false;
-  }
-  const localClient = getLocalSessionClient(session);
-  if (!localClient || localClient.active !== true) {
-    return false;
-  }
-  return normalizeControlText(localClient.accessMode) !== "spectator";
-}
-
-function canForgetSessionControlClient(session, targetClientId) {
-  if (!canManageTrustedLocalDevice(session)) {
-    return false;
-  }
-  const normalizedTargetClientId = normalizeControlText(targetClientId);
-  if (!normalizedTargetClientId || normalizedTargetClientId === runtimeClientId) {
-    return false;
-  }
-  const targetClient = getAttachedClientsForSession(session).find(
-    (entry) => normalizeControlText(entry?.clientId) === normalizedTargetClientId
-  );
-  if (!targetClient) {
-    return false;
-  }
-  return targetClient.active !== true && (targetClient.activeConnectionCount || 0) === 0;
-}
-
-function getTakeOrReclaimControlLabel(session) {
-  const reclaiming = getCurrentSessionController(session)?.active !== true && canTakeSessionControl(session);
-  return reclaiming ? "Reclaim Control" : "Take Control";
 }
 
 function setRuntimeClientId(clientId) {
@@ -1208,67 +974,6 @@ function getSessionLastInputSummary(session) {
       ? "you"
       : getSessionControlClientLabel(lastInput);
   return `Last input: ${actorLabel}.`;
-}
-
-function getSessionControlBadgeState(session) {
-  if (!session) {
-    return { label: "", tone: "", title: "" };
-  }
-  if (canUseImplicitOwnerFallback(session)) {
-    return {
-      label: "LOCAL",
-      tone: "owner",
-      title: "Local operator write access is active until a session control client attaches."
-    };
-  }
-  const localClient = getLocalSessionClient(session);
-  if (!runtimeClientId || !localClient) {
-    return {
-      label: "ATTACHING",
-      tone: "pending",
-      title: `Waiting for ${getLocalDeviceLabel(session)} to attach to session control metadata.`
-    };
-  }
-  if (isLocalSessionController(session)) {
-    return {
-      label: "CONTROLLER",
-      tone: "controller",
-      title: "This browser client currently controls terminal input and resize for this session."
-    };
-  }
-  if (normalizeControlText(localClient?.accessMode) === "spectator") {
-    return {
-      label: "READ ONLY",
-      tone: "spectator",
-      title: "This browser client is attached in read-only spectator mode."
-    };
-  }
-  if (!getCurrentSessionController(session)) {
-    return {
-      label: "ATTACHED",
-      tone: "owner",
-      title: `${getLocalDeviceLabel(session)} is attached and can take control.`
-    };
-  }
-  if (getCurrentSessionController(session)?.active !== true && isLocalOperatorSessionClient(session)) {
-    return {
-      label: "RECLAIM",
-      tone: "owner",
-      title: "Another device is reconnecting. This browser client can reclaim control."
-    };
-  }
-  if (isLocalOperatorSessionClient(session)) {
-    return {
-      label: "ATTACHED",
-      tone: "owner",
-      title: `${getLocalDeviceLabel(session)} is attached and can take or transfer control.`
-    };
-  }
-  return {
-    label: "REMOTE",
-    tone: "remote",
-    title: "Another attached client currently controls this session."
-  };
 }
 
 function renderSessionControlClients(container, session) {

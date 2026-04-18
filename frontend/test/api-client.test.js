@@ -876,3 +876,66 @@ test("api client calls custom command list/get/delete endpoints", async () => {
   assert.equal(calls[2].url, "http://localhost:18080/api/v1/custom-commands/docu");
   assert.equal(calls[2].options.method, "DELETE");
 });
+
+test("api client retries ready-status requests once after unauthorized recovery and tolerates missing header getters", async () => {
+  const calls = [];
+  let attempt = 0;
+  let recoveryCalls = 0;
+  const traceEvents = [];
+
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    attempt += 1;
+    if (attempt === 1) {
+      return {
+        ok: false,
+        status: 401,
+        headers: {},
+        json: async () => ({ error: "Unauthorized", message: "Ticket expired." })
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: {},
+      json: async () => ({ status: "ok" })
+    };
+  };
+
+  const api = createApiClient("http://localhost:18080/api/v1", {
+    authToken: "stale-token",
+    async onUnauthorized() {
+      recoveryCalls += 1;
+      api.setAuthToken("fresh-token");
+      return true;
+    },
+    onTrace: (meta) => traceEvents.push(meta)
+  });
+
+  const payload = await api.getReadyStatus();
+
+  assert.equal(payload.status, "ok");
+  assert.equal(recoveryCalls, 1);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "http://localhost:18080/ready");
+  assert.equal(calls[0].options.headers.authorization, "Bearer stale-token");
+  assert.equal(calls[1].options.headers.authorization, "Bearer fresh-token");
+  assert.deepEqual(traceEvents, [
+    {
+      source: "rest",
+      method: "GET",
+      url: "http://localhost:18080/ready",
+      status: 401,
+      traceId: "",
+      correlationId: ""
+    },
+    {
+      source: "rest",
+      method: "GET",
+      url: "http://localhost:18080/ready",
+      status: 200,
+      traceId: "",
+      correlationId: ""
+    }
+  ]);
+});

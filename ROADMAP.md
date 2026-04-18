@@ -14,19 +14,14 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active release waves:
-  - `v0.4.0-H148`
+  - none currently
 - Active scoped tasks:
-  - `MSG-211`
-  - `MSG-212`
-  - `MSG-213`
+  - none currently
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
-1. `v0.4.0-H148`
-   - `MSG-211`
-   - `MSG-212`
-   - `MSG-213` after `MSG-211` and `MSG-212`
+- none currently
 
 ## Wave Dependencies
 - none currently
