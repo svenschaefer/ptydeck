@@ -13,6 +13,7 @@ import { createCommandPaletteRuntimeController } from "./command-palette-runtime
 import { createControlPaneRuntimeController } from "./control-pane-runtime-controller.js";
 import { createDeckRuntimeController } from "./deck-runtime-controller.js";
 import { createLayoutProfileRuntimeController } from "./layout-profile-runtime-controller.js";
+import { createSessionControlRuntimeController } from "./session-control-runtime-controller.js";
 import { createStore } from "./store.js";
 import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-controller.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
@@ -51,32 +52,7 @@ import { createReplayExportRuntimeController } from "./replay-export-runtime-con
 import { createReplayViewerRuntimeController } from "./replay-viewer-runtime-controller.js";
 import { createLayoutSettingsController } from "./ui/layout-settings-controller.js";
 import { createSendHistoryRuntimeController } from "./send-history-runtime-controller.js";
-import {
-  ORIGIN_HANDOFF_QUERY_PARAM,
-  buildCanonicalOriginRedirectUrl,
-  canForgetSessionControlClient as canForgetSessionControlClientState,
-  canManageTrustedLocalDevice as canManageTrustedLocalDeviceState,
-  canReleaseSessionControl as canReleaseSessionControlState,
-  canTakeSessionControl as canTakeSessionControlState,
-  canTransferSessionControl as canTransferSessionControlState,
-  canUseImplicitOwnerFallback as canUseImplicitOwnerFallbackState,
-  canWriteToSession as canWriteToSessionState,
-  clearOriginHandoffSearchParam,
-  getAttachedClientsForSession,
-  getCurrentSessionController,
-  getLocalDeviceLabel as getLocalDeviceLabelState,
-  getSessionControlBadgeState as getSessionControlBadgeStateState,
-  getSessionControlClientLabel,
-  getSessionControlState,
-  getSessionControlSummary as getSessionControlSummaryState,
-  getTakeOrReclaimControlLabel as getTakeOrReclaimControlLabelState,
-  getSessionWriteBlockMessage as getSessionWriteBlockMessageState,
-  listOriginHandoffRepairableSessions as listOriginHandoffRepairableSessionsState,
-  normalizeControlText,
-  normalizeOriginValue,
-  readOriginHandoffSourceOrigin,
-  getWindowOrigin
-} from "./session-control-runtime-state.js";
+import { normalizeControlText } from "./session-control-runtime-state.js";
 import { createSessionDisposalController } from "./ui/session-disposal-controller.js";
 import { createSessionCardMetaController } from "./ui/session-card-meta-controller.js";
 import { createSessionCardFactoryController } from "./ui/session-card-factory-controller.js";
@@ -514,6 +490,7 @@ let appLayoutDeckFacadeController = null;
 let appRuntimeStateController = null;
 let appSessionRuntimeFacadeController = null;
 let appCommandUiFacadeController = null;
+let sessionControlRuntimeController = null;
 let deckRuntimeController = null;
 let sessionViewModel = null;
 let runtimeEventController = null;
@@ -598,279 +575,48 @@ const uiState = {
   startupGateCanSkip: false
 };
 
-function setAccessState(nextState = {}) {
-  uiState.accessMode = typeof nextState.accessMode === "string" ? nextState.accessMode : "operator";
-  uiState.readOnlyMode = nextState.readOnly === true;
-  uiState.accessSummary = typeof nextState.summary === "string" ? nextState.summary : "";
-  appCommandUiFacadeController?.render?.();
-}
+sessionControlRuntimeController = createSessionControlRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  config,
+  uiState,
+  api,
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  clearCommandFeedbackAction: (options) => appRuntimeStateController?.clearCommandFeedbackAction?.(options),
+  setCommandFeedbackAction: (nextState) => appRuntimeStateController?.setCommandFeedbackAction?.(nextState),
+  clearError: () => appRuntimeStateController?.clearError?.(),
+  getSessions: () => {
+    const state = store?.getState?.() || {};
+    return Array.isArray(state.sessions) ? state.sessions : [];
+  },
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || "",
+  takeSessionControlScope: (scope, runtimeOptions) =>
+    trustedLocalHandoffRuntimeController?.takeControlScope?.(scope, runtimeOptions),
+  renameTrustedLocalClientIdentity: (label) => trustedLocalClientRuntimeController.renameClientIdentity(label),
+  retryBlockedAction: (retryAction) => commandComposerRuntimeController?.retryBlockedAction?.(retryAction),
+  applyResizeForSession: (sessionId, options) => sessionTerminalResizeController?.applyResizeForSession?.(sessionId, options),
+  showControlPane: () => controlPaneRuntimeController?.show?.(),
+  debugLog
+});
 
-function isReadOnlyMode() {
-  return uiState.readOnlyMode === true;
-}
+const setAccessState = sessionControlRuntimeController.setAccessState;
+const isReadOnlyMode = sessionControlRuntimeController.isReadOnlyMode;
+const getReadOnlyModeMessage = sessionControlRuntimeController.getReadOnlyModeMessage;
+const canWriteToSession = sessionControlRuntimeController.canWriteToSession;
+const getSessionWriteBlockMessage = sessionControlRuntimeController.getSessionWriteBlockMessage;
+const canTakeSessionControl = sessionControlRuntimeController.canTakeSessionControl;
+const setRuntimeClientId = sessionControlRuntimeController.setRuntimeClientId;
+const renameTrustedLocalDevice = sessionControlRuntimeController.renameTrustedLocalDevice;
+const showBlockedWriteReclaimUi = sessionControlRuntimeController.showBlockedWriteReclaimUi;
+const renderSessionControl = sessionControlRuntimeController.renderSessionControl;
+const maybeRedirectToCanonicalOrigin = sessionControlRuntimeController.maybeRedirectToCanonicalOrigin;
+const maybeAutoRepairOriginHandoffControl = () => sessionControlRuntimeController.maybeAutoRepairOriginHandoffControl();
 
-function getReadOnlyModeMessage() {
-  if (uiState.accessSummary) {
-    return `${uiState.accessSummary}. Write actions are disabled.`;
-  }
-  return "Read-only spectator mode. Write actions are disabled.";
-}
-
-let runtimeClientId = "";
-let trustedLocalClientLabel = "";
-let commandFeedbackActionMeta = null;
-let runtimeClientIdentityCreatedOnThisOrigin = false;
-let originHandoffSourceOrigin = "";
-let originHandoffAutoRepairAttempted = false;
-
-function getSessionControlContext() {
-  return {
-    runtimeClientId,
-    trustedLocalClientLabel,
-    isReadOnlyMode,
-    getReadOnlyModeMessage,
-    runtimeClientIdentityCreatedOnThisOrigin,
-    originHandoffSourceOrigin
-  };
-}
-
-function getLocalDeviceLabel(session = null) {
-  return getLocalDeviceLabelState(session, getSessionControlContext());
-}
-
-function canUseImplicitOwnerFallback(session) {
-  return canUseImplicitOwnerFallbackState(session, getSessionControlContext());
-}
-
-function canWriteToSession(session) {
-  return canWriteToSessionState(session, getSessionControlContext());
-}
-
-function getSessionWriteBlockMessage(session) {
-  return getSessionWriteBlockMessageState(session, getSessionControlContext());
-}
-
-function getSessionControlSummary(session) {
-  return getSessionControlSummaryState(session, getSessionControlContext());
-}
-
-function canTakeSessionControl(session) {
-  return canTakeSessionControlState(session, getSessionControlContext());
-}
-
-function listOriginHandoffRepairableSessions(sessions) {
-  return listOriginHandoffRepairableSessionsState(sessions, getSessionControlContext());
-}
-
-function canReleaseSessionControl(session) {
-  return canReleaseSessionControlState(session, getSessionControlContext());
-}
-
-function canTransferSessionControl(session, targetClientId) {
-  return canTransferSessionControlState(session, targetClientId, getSessionControlContext());
-}
-
-function canManageTrustedLocalDevice(session) {
-  return canManageTrustedLocalDeviceState(session, getSessionControlContext());
-}
-
-function canForgetSessionControlClient(session, targetClientId) {
-  return canForgetSessionControlClientState(session, targetClientId, getSessionControlContext());
-}
-
-function getTakeOrReclaimControlLabel(session) {
-  return getTakeOrReclaimControlLabelState(session, getSessionControlContext());
-}
-
-function getSessionControlBadgeState(session) {
-  return getSessionControlBadgeStateState(session, getSessionControlContext());
-}
-
-function maybeRedirectToCanonicalOrigin() {
-  const canonicalOrigin = normalizeOriginValue(config.canonicalOrigin);
-  const currentOrigin = getWindowOrigin(window);
-  if (!canonicalOrigin || !currentOrigin || canonicalOrigin === currentOrigin) {
-    return false;
-  }
-  const targetUrl = buildCanonicalOriginRedirectUrl(window, canonicalOrigin, currentOrigin, ORIGIN_HANDOFF_QUERY_PARAM);
-  if (typeof window?.location?.replace === "function") {
-    window.location.replace(targetUrl);
-    return true;
-  }
-  if (window?.location) {
-    window.location.href = targetUrl;
-    return true;
-  }
-  return false;
-}
-
-async function maybeAutoRepairOriginHandoffControl() {
-  if (originHandoffAutoRepairAttempted || isReadOnlyMode()) {
-    return false;
-  }
-  const sessions = Array.isArray(store?.getState?.().sessions) ? store.getState().sessions : [];
-  const repairableSessions = listOriginHandoffRepairableSessions(sessions);
-  if (repairableSessions.length === 0) {
-    return false;
-  }
-  if (typeof trustedLocalHandoffRuntimeController?.takeControlScope !== "function") {
-    return false;
-  }
-  const handoffOrigin = originHandoffSourceOrigin;
-  originHandoffAutoRepairAttempted = true;
-  debugLog("trusted_local.origin_handoff_auto_repair.start", {
-    handoffOrigin,
-    sessionCount: repairableSessions.length
-  });
-  try {
-    for (const session of repairableSessions) {
-      const sessionId = normalizeControlText(session?.id);
-      if (!sessionId) {
-        continue;
-      }
-      await trustedLocalHandoffRuntimeController.takeControlScope("session", { sessionId });
-    }
-    originHandoffSourceOrigin = "";
-    appCommandUiFacadeController?.setCommandFeedback(
-      `Detected origin handoff from ${handoffOrigin}. This device reclaimed control for the affected sessions automatically.`
-    );
-    debugLog("trusted_local.origin_handoff_auto_repair.ok", {
-      handoffOrigin,
-      sessionCount: repairableSessions.length
-    });
-    return true;
-  } catch (error) {
-    debugLog("trusted_local.origin_handoff_auto_repair.error", {
-      handoffOrigin,
-      sessionCount: repairableSessions.length,
-      message: error instanceof Error ? error.message : String(error)
-    });
-    return false;
-  }
-}
-
-function setRuntimeClientId(clientId) {
-  const nextClientId = normalizeControlText(clientId);
-  if (runtimeClientId === nextClientId) {
-    return runtimeClientId;
-  }
-  runtimeClientId = nextClientId;
-  api.setSessionControlClientId(runtimeClientId);
-  appCommandUiFacadeController?.render?.();
-  return runtimeClientId;
-}
-
-async function renameTrustedLocalDevice(sessionId, label) {
-  const normalizedSessionId = normalizeControlText(sessionId);
-  const session = normalizedSessionId
-    ? appSessionRuntimeFacadeController?.getSessionById?.(normalizedSessionId) || null
-    : null;
-  if (!canManageTrustedLocalDevice(session)) {
-    throw new Error(getSessionWriteBlockMessage(session) || "This device cannot rename its trusted-local attachment yet.");
-  }
-  const normalizedLabel = normalizeControlText(label);
-  if (!normalizedLabel) {
-    throw new Error("Device name cannot be empty.");
-  }
-  const updated = await api.renameSessionControlClient(normalizedSessionId, normalizedLabel);
-  const identity = trustedLocalClientRuntimeController.renameClientIdentity(normalizedLabel);
-  trustedLocalClientLabel = normalizeControlText(identity?.label);
-  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-  appCommandUiFacadeController?.render?.();
-  return updated;
-}
-
-async function forgetTrustedLocalDevice(sessionId, clientId) {
-  const normalizedSessionId = normalizeControlText(sessionId);
-  const session = normalizedSessionId
-    ? appSessionRuntimeFacadeController?.getSessionById?.(normalizedSessionId) || null
-    : null;
-  if (!canForgetSessionControlClient(session, clientId)) {
-    throw new Error("Only stale offline devices can be forgotten from this session.");
-  }
-  const updated = await api.forgetSessionControlClient(normalizedSessionId, clientId);
-  appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-  return updated;
-}
-
-function showBlockedWriteReclaimUi(session, options = {}) {
-  if (!session) {
-    commandFeedbackActionMeta = null;
-    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-    return false;
-  }
-  const message = normalizeControlText(options.message) || getSessionWriteBlockMessage(session);
-  if (!canTakeSessionControl(session)) {
-    commandFeedbackActionMeta = null;
-    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-    if (message) {
-      appCommandUiFacadeController?.setCommandFeedback?.(message);
-    }
-    return false;
-  }
-  if (message) {
-    appCommandUiFacadeController?.setCommandFeedback?.(message);
-  }
-  const retryAction =
-    options.retryAction && typeof options.retryAction === "object" && !Array.isArray(options.retryAction)
-      ? { ...options.retryAction }
-      : null;
-  commandFeedbackActionMeta = {
-    scope: "session",
-    sessionId: session.id,
-    retryAction
-  };
-  appRuntimeStateController?.setCommandFeedbackAction?.({
-    visible: true,
-    label: retryAction ? `${getTakeOrReclaimControlLabel(session)} and Retry` : getTakeOrReclaimControlLabel(session),
-    title: message,
-    sessionId: session.id
-  });
-  controlPaneRuntimeController?.show?.();
-  return true;
-}
-
-async function handleCommandFeedbackAction() {
-  const sessionId = normalizeControlText(uiState.commandFeedbackActionSessionId);
-  if (!sessionId) {
-    return false;
-  }
-  const session = appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null;
-  const retryAction = commandFeedbackActionMeta?.retryAction || null;
-  const completeAction = async (feedbackMessage = "") => {
-    commandFeedbackActionMeta = null;
-    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-    if (retryAction?.kind === "resize") {
-      sessionTerminalResizeController?.applyResizeForSession?.(sessionId, { force: true });
-    } else if (retryAction?.kind === "send" || retryAction?.kind === "paste" || retryAction?.kind === "paste-continue") {
-      await commandComposerRuntimeController?.retryBlockedAction?.(retryAction);
-    } else if (feedbackMessage) {
-      appCommandUiFacadeController?.setCommandFeedback?.(feedbackMessage);
-    }
-    appRuntimeStateController?.clearError?.();
-    return true;
-  };
-  if (canWriteToSession(session)) {
-    return completeAction(
-      `This device already controls [${
-        appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
-      }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
-    );
-  }
-  if (!canTakeSessionControl(session)) {
-    commandFeedbackActionMeta = null;
-    appRuntimeStateController?.clearCommandFeedbackAction?.({ render: false });
-    throw new Error(getSessionWriteBlockMessage(session) || "This session cannot be controlled from this device.");
-  }
-  const reclaiming = getCurrentSessionController(session)?.active !== true;
-  await trustedLocalHandoffRuntimeController?.takeControlScope?.("session", { sessionId });
-  return completeAction(
-    retryAction
-      ? ""
-      : `${reclaiming ? "Reclaimed" : "Took"} control of [${
-          appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?"
-        }] ${appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || sessionId}.`
-  );
+function handleCommandFeedbackAction() {
+  return sessionControlRuntimeController.handleCommandFeedbackAction(uiState.commandFeedbackActionSessionId);
 }
 
 function installTestHooks() {
@@ -882,24 +628,24 @@ function installTestHooks() {
     setAccessState,
     setRuntimeClientId,
     setTrustedLocalClientLabel(label) {
-      trustedLocalClientLabel = normalizeControlText(label);
+      sessionControlRuntimeController.setTrustedLocalClientLabel(label);
     },
     getInitializationErrorMessage: () => initializationErrorMessage,
-    getSessionWriteBlockMessage,
-    getSessionControlSummary,
-    getSessionControlBadgeState,
-    getTakeOrReclaimControlLabel,
-    renderSessionControlClients,
+    getSessionWriteBlockMessage: sessionControlRuntimeController.getSessionWriteBlockMessage,
+    getSessionControlSummary: sessionControlRuntimeController.getSessionControlSummary,
+    getSessionControlBadgeState: sessionControlRuntimeController.getSessionControlBadgeState,
+    getTakeOrReclaimControlLabel: sessionControlRuntimeController.getTakeOrReclaimControlLabel,
+    renderSessionControlClients: sessionControlRuntimeController.renderSessionControlClients,
     showBlockedWriteReclaimUi,
     maybeAutoRepairOriginHandoffControl,
     handleCommandFeedbackAction,
-    getCommandFeedbackActionMeta: () => commandFeedbackActionMeta,
-    getOriginHandoffSourceOrigin: () => originHandoffSourceOrigin,
+    getCommandFeedbackActionMeta: () => sessionControlRuntimeController.getCommandFeedbackActionMeta(),
+    getOriginHandoffSourceOrigin: () => sessionControlRuntimeController.getOriginHandoffSourceOrigin(),
     setOriginHandoffSourceOrigin(origin) {
-      originHandoffSourceOrigin = normalizeOriginValue(origin);
+      sessionControlRuntimeController.setOriginHandoffSourceOrigin(origin);
     },
     setRuntimeClientIdentityCreatedOnThisOrigin(value) {
-      runtimeClientIdentityCreatedOnThisOrigin = value === true;
+      sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value);
     },
     setSessionsForTest(sessions) {
       store.setSessions(Array.isArray(sessions) ? sessions : []);
@@ -908,10 +654,7 @@ function installTestHooks() {
       uiState.commandFeedbackActionSessionId = normalizeControlText(sessionId);
     },
     setCommandFeedbackActionMeta(meta) {
-      commandFeedbackActionMeta =
-        meta && typeof meta === "object" && !Array.isArray(meta)
-          ? { ...meta }
-          : null;
+      sessionControlRuntimeController.setCommandFeedbackActionMeta(meta);
     },
     setCollaborators(overrides = {}) {
       if (!overrides || typeof overrides !== "object") {
@@ -943,200 +686,6 @@ function installTestHooks() {
 }
 
 installTestHooks();
-
-function clearNodeChildren(node) {
-  if (!node) {
-    return;
-  }
-  if (typeof node.replaceChildren === "function") {
-    node.replaceChildren();
-    return;
-  }
-  while (node.firstChild) {
-    node.removeChild(node.firstChild);
-  }
-}
-
-function appendNodeText(node, text) {
-  if (!node) {
-    return;
-  }
-  node.textContent = typeof text === "string" ? text : String(text || "");
-}
-
-function getSessionLastInputSummary(session) {
-  const lastInput = getSessionControlState(session)?.lastInput;
-  if (!lastInput) {
-    return "No input has been recorded for this session yet.";
-  }
-  const actorLabel =
-    normalizeControlText(lastInput.clientId) && normalizeControlText(lastInput.clientId) === runtimeClientId
-      ? "you"
-      : getSessionControlClientLabel(lastInput);
-  return `Last input: ${actorLabel}.`;
-}
-
-function renderSessionControlClients(container, session) {
-  if (!container) {
-    return;
-  }
-  clearNodeChildren(container);
-  const clients = getAttachedClientsForSession(session);
-  if (!clients.length) {
-    appendNodeText(container, "No attached clients.");
-    return;
-  }
-  if (!document || typeof document.createElement !== "function") {
-    appendNodeText(
-      container,
-      clients
-        .map((client) => {
-          const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
-          const name = isLocalClient ? "this device" : getSessionControlClientLabel(client);
-          const status = client?.active === true ? "connected" : "offline window";
-          return `${name} · ${status}`;
-        })
-        .join("\n")
-    );
-    return;
-  }
-  for (const client of clients) {
-    const row = document.createElement("div");
-    row.className = "session-control-client";
-    const meta = document.createElement("div");
-    meta.className = "session-control-client-meta";
-    const title = document.createElement("p");
-    title.className = "session-control-client-name";
-    const isLocalClient = normalizeControlText(client?.clientId) === runtimeClientId;
-    title.textContent = isLocalClient ? "This device" : "Other device";
-    const detail = document.createElement("p");
-    detail.className = "session-control-client-detail";
-    const detailParts = [];
-    if (isLocalClient) {
-      detailParts.push(getLocalDeviceLabel(session));
-    } else {
-      detailParts.push(getSessionControlClientLabel(client));
-    }
-    if (normalizeControlText(client?.accessMode) === "spectator") {
-      detailParts.push("read only");
-    }
-    if (normalizeControlText(getCurrentSessionController(session)?.clientId) === normalizeControlText(client?.clientId)) {
-      detailParts.push(client?.active === true ? "controlling" : "reconnect pending");
-    } else {
-      detailParts.push(client?.active === true ? "connected" : "offline window");
-    }
-    if (Number.isInteger(client?.activeConnectionCount) && client.activeConnectionCount > 1) {
-      detailParts.push(`${client.activeConnectionCount} tabs`);
-    }
-    detail.textContent = detailParts.join(" · ");
-    meta.appendChild(title);
-    meta.appendChild(detail);
-    row.appendChild(meta);
-    const actions = document.createElement("div");
-    actions.className = "session-control-client-actions";
-    if (canTransferSessionControl(session, client?.clientId)) {
-      const transferBtn = document.createElement("button");
-      transferBtn.type = "button";
-      transferBtn.className = "session-control-transfer";
-      transferBtn.textContent = "Transfer";
-      transferBtn.dataset = transferBtn.dataset || {};
-      transferBtn.dataset.sessionControlAction = "transfer";
-      transferBtn.dataset.clientId = normalizeControlText(client?.clientId);
-      actions.appendChild(transferBtn);
-    }
-    if (canForgetSessionControlClient(session, client?.clientId)) {
-      const forgetBtn = document.createElement("button");
-      forgetBtn.type = "button";
-      forgetBtn.className = "session-control-forget";
-      forgetBtn.textContent = "Forget";
-      forgetBtn.dataset = forgetBtn.dataset || {};
-      forgetBtn.dataset.sessionControlAction = "forget";
-      forgetBtn.dataset.clientId = normalizeControlText(client?.clientId);
-      forgetBtn.dataset.clientLabel = getSessionControlClientLabel(client);
-      actions.appendChild(forgetBtn);
-    }
-    const actionCount = Number(actions.childNodes?.length ?? actions.children?.length ?? 0);
-    if (actionCount > 0) {
-      row.appendChild(actions);
-    }
-    container.appendChild(row);
-  }
-}
-
-function renderSessionControl(entry, session) {
-  if (!entry || !session) {
-    return;
-  }
-  const badgeState = getSessionControlBadgeState(session);
-  if (entry.controlBadgeEl) {
-    entry.controlBadgeEl.hidden = !badgeState.label;
-    entry.controlBadgeEl.textContent = badgeState.label;
-    entry.controlBadgeEl.className = "session-control-badge";
-    if (badgeState.tone) {
-      entry.controlBadgeEl.classList.add(`session-control-badge-${badgeState.tone}`);
-    }
-    if (badgeState.title) {
-      entry.controlBadgeEl.setAttribute("title", badgeState.title);
-    } else {
-      entry.controlBadgeEl.removeAttribute("title");
-    }
-  }
-  if (entry.sessionControlSummaryEl) {
-    entry.sessionControlSummaryEl.textContent = `${getSessionControlSummary(session)} ${getSessionLastInputSummary(session)}`.trim();
-  }
-  if (entry.sessionControlTakeBtn) {
-    const takeEnabled = canTakeSessionControl(session);
-    const reclaiming = getCurrentSessionController(session)?.active !== true && takeEnabled;
-    entry.sessionControlTakeBtn.textContent = getTakeOrReclaimControlLabel(session);
-    entry.sessionControlTakeBtn.disabled = !takeEnabled;
-    entry.sessionControlTakeBtn.setAttribute(
-      "title",
-      takeEnabled
-        ? reclaiming
-          ? "Reclaim active control for this session after another device disconnected."
-          : "Take active control for this session."
-        : getSessionWriteBlockMessage(session)
-    );
-  }
-  if (entry.sessionControlReleaseBtn) {
-    const releaseEnabled = canReleaseSessionControl(session);
-    entry.sessionControlReleaseBtn.disabled = !releaseEnabled;
-    entry.sessionControlReleaseBtn.setAttribute(
-      "title",
-      releaseEnabled
-        ? "Release active control for this session."
-        : "Only the active controller or another attached operator device can release control."
-    );
-  }
-  if (entry.settingsApplyBtn) {
-    const writable = canWriteToSession(session);
-    entry.settingsApplyBtn.disabled = !writable;
-    if (writable) {
-      entry.settingsApplyBtn.removeAttribute("title");
-    } else {
-      entry.settingsApplyBtn.setAttribute("title", getSessionWriteBlockMessage(session));
-    }
-  }
-  if (entry.sessionControlDeviceNameInput) {
-    const localDeviceName = getLocalDeviceLabel(session);
-    if (document?.activeElement !== entry.sessionControlDeviceNameInput) {
-      entry.sessionControlDeviceNameInput.value = localDeviceName;
-    }
-    entry.sessionControlDeviceNameInput.disabled = !canManageTrustedLocalDevice(session);
-    entry.sessionControlDeviceNameInput.setAttribute("title", localDeviceName);
-  }
-  if (entry.sessionControlDeviceSaveBtn) {
-    const canRenameDevice = canManageTrustedLocalDevice(session);
-    entry.sessionControlDeviceSaveBtn.disabled = !canRenameDevice;
-    entry.sessionControlDeviceSaveBtn.setAttribute(
-      "title",
-      canRenameDevice
-        ? "Rename this trusted-local device for future reconnect and handoff flows."
-        : getSessionWriteBlockMessage(session) || "This device must attach before it can be renamed."
-    );
-  }
-  renderSessionControlClients(entry.sessionControlClientsEl, session);
-}
 const terminalSearchState = {
   query: "",
   sessionId: "",
@@ -2304,13 +1853,14 @@ async function initialize() {
     if (maybeRedirectToCanonicalOrigin()) {
       return { redirected: true };
     }
-    originHandoffSourceOrigin = readOriginHandoffSourceOrigin(window);
-    clearOriginHandoffSearchParam(window);
+    sessionControlRuntimeController.consumeOriginHandoffSourceFromWindow();
     await startupBackupRuntimeController.ensureStartupBackup();
     const existingTrustedLocalClient = trustedLocalClientRuntimeController.getClientIdentity?.() || null;
     const trustedLocalClient = await trustedLocalClientRuntimeController.ensureClientIdentity();
-    runtimeClientIdentityCreatedOnThisOrigin = !existingTrustedLocalClient && Boolean(trustedLocalClient?.clientId);
-    trustedLocalClientLabel = normalizeControlText(trustedLocalClient?.label);
+    sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(
+      !existingTrustedLocalClient && Boolean(trustedLocalClient?.clientId)
+    );
+    sessionControlRuntimeController.setTrustedLocalClientLabel(trustedLocalClient?.label);
     setRuntimeClientId(trustedLocalClient?.clientId || "");
     return await appBootstrapCompositionController.bootstrapUiAndRuntime();
   } catch (error) {

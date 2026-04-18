@@ -11,10 +11,14 @@ import {
   canUseImplicitOwnerFallback,
   canWriteToSession,
   clearOriginHandoffSearchParam,
+  getLocalDeviceLabel,
+  getWindowOrigin,
+  isOriginHandoffRepairableSession,
   getSessionControlBadgeState,
   getSessionControlSummary,
   getSessionWriteBlockMessage,
   listOriginHandoffRepairableSessions,
+  normalizeOriginValue,
   readOriginHandoffSourceOrigin
 } from "../src/public/session-control-runtime-state.js";
 
@@ -189,4 +193,306 @@ test("session control helpers identify repairable origin-handoff sessions and st
   assert.equal(canTransferSessionControl(session, "client-local", context), true);
   assert.equal(canForgetSessionControlClient(session, "client-remote", context), true);
   assert.equal(canForgetSessionControlClient(session, "client-local", context), false);
+});
+
+test("session control helpers normalize origin/window state and handle missing browser history safely", () => {
+  assert.equal(normalizeOriginValue(" https://ptydeck.local.secos.rocks/ui "), "https://ptydeck.local.secos.rocks");
+  assert.equal(normalizeOriginValue("not a url"), "");
+  assert.equal(
+    getWindowOrigin({
+      location: {
+        protocol: "http:",
+        host: "172.26.86.97:18081"
+      }
+    }),
+    "http://172.26.86.97:18081"
+  );
+  assert.equal(getWindowOrigin({ location: { protocol: "http:" } }), "");
+  assert.equal(getLocalDeviceLabel(null, createContext({ trustedLocalClientLabel: "" })), "this device");
+  assert.equal(
+    getLocalDeviceLabel(
+      {
+        controlState: {
+          attachedClients: [
+            {
+              clientId: "client-local",
+              label: "Older Attached Label",
+              active: true
+            }
+          ]
+        }
+      },
+      createContext({ trustedLocalClientLabel: "Desk" })
+    ),
+    "Desk"
+  );
+  assert.equal(
+    clearOriginHandoffSearchParam(
+      {
+        location: { search: `?${ORIGIN_HANDOFF_QUERY_PARAM}=http%3A%2F%2Fold.example` },
+        history: {}
+      },
+      ORIGIN_HANDOFF_QUERY_PARAM
+    ),
+    false
+  );
+  assert.equal(
+    clearOriginHandoffSearchParam(
+      {
+        location: { search: "?debug=1" },
+        history: { replaceState() {} }
+      },
+      ORIGIN_HANDOFF_QUERY_PARAM
+    ),
+    false
+  );
+});
+
+test("session control helpers surface waiting, unattached-controller, local-controller, and spectator-remote variants", () => {
+  const waitingSession = {
+    id: "waiting",
+    controlState: {
+      currentController: null,
+      attachedClients: [
+        {
+          clientId: "client-remote",
+          label: "Desktop",
+          active: true,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  };
+  const unattachedControllerSession = {
+    id: "free",
+    controlState: {
+      currentController: null,
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  };
+  const localControllerSession = {
+    id: "local",
+    controlState: {
+      currentController: {
+        clientId: "client-local",
+        label: "Laptop",
+        active: true
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 2,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  };
+  const spectatorRemoteSession = {
+    id: "spectator",
+    controlState: {
+      currentController: {
+        clientId: "client-remote",
+        label: "Desktop",
+        active: true
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "spectator",
+          permissionMode: "read",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        },
+        {
+          clientId: "client-remote",
+          label: "Desktop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-2",
+          tenantId: "tenant-2"
+        }
+      ]
+    }
+  };
+  const context = createContext();
+
+  assert.equal(
+    getSessionWriteBlockMessage(waitingSession, context),
+    "Waiting for Laptop to attach to session control."
+  );
+  assert.equal(
+    getSessionWriteBlockMessage(unattachedControllerSession, context),
+    "No client currently holds control for this session. Take control before sending input or resizing."
+  );
+  assert.equal(
+    getSessionControlSummary(unattachedControllerSession, context),
+    "No active controller. Laptop can take control."
+  );
+  assert.equal(getSessionWriteBlockMessage(localControllerSession, context), "");
+  assert.equal(
+    getSessionControlSummary(localControllerSession, context),
+    "Laptop controls this session. 2 tabs are attached for this device."
+  );
+  assert.deepEqual(getSessionControlBadgeState(localControllerSession, context), {
+    label: "CONTROLLER",
+    tone: "controller",
+    title: "This browser client currently controls terminal input and resize for this session."
+  });
+  assert.equal(
+    getSessionWriteBlockMessage(spectatorRemoteSession, context),
+    "This session is currently controlled by another client. Input and resize are disabled."
+  );
+  assert.equal(
+    getSessionControlSummary(spectatorRemoteSession, context),
+    "Device Desktop controls this session. Observe-only on this device."
+  );
+  assert.deepEqual(getSessionControlBadgeState(spectatorRemoteSession, context), {
+    label: "READ ONLY",
+    tone: "spectator",
+    title: "This browser client is attached in read-only spectator mode."
+  });
+});
+
+test("session control helpers gate transfer, release, take, and origin-handoff repair on ownership and attachment state", () => {
+  const inactiveLocalSession = {
+    id: "inactive",
+    controlState: {
+      owner: {
+        subject: "user-1",
+        tenantId: "tenant-1",
+        accessMode: "operator",
+        permissionMode: "write"
+      },
+      currentController: {
+        clientId: "client-remote",
+        label: "Desktop",
+        active: true,
+        subject: "user-1",
+        tenantId: "tenant-1"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: false,
+          activeConnectionCount: 0,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  };
+  const ownerContext = createContext();
+  const foreignOwnerSession = {
+    id: "foreign-owner",
+    controlState: {
+      owner: {
+        subject: "user-2",
+        tenantId: "tenant-2",
+        accessMode: "operator",
+        permissionMode: "write"
+      },
+      currentController: {
+        clientId: "client-remote",
+        label: "Desktop",
+        active: true,
+        subject: "user-2",
+        tenantId: "tenant-2"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        },
+        {
+          clientId: "client-remote",
+          label: "Desktop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-2",
+          tenantId: "tenant-2"
+        }
+      ]
+    }
+  };
+
+  assert.equal(canTakeSessionControl(inactiveLocalSession, ownerContext), false);
+  assert.equal(canReleaseSessionControl(inactiveLocalSession, ownerContext), false);
+  assert.equal(canTransferSessionControl(inactiveLocalSession, "client-remote", ownerContext), false);
+
+  assert.equal(canReleaseSessionControl(foreignOwnerSession, ownerContext), false);
+  assert.equal(canTransferSessionControl(foreignOwnerSession, "client-remote", ownerContext), false);
+  assert.equal(
+    isOriginHandoffRepairableSession(
+      createReconnectReservedSession({
+        controlState: {
+          ...createReconnectReservedSession().controlState,
+          currentController: {
+            clientId: "client-local",
+            label: "Laptop",
+            active: false,
+            subject: "user-1",
+            tenantId: "tenant-1"
+          }
+        }
+      }),
+      ownerContext
+    ),
+    false
+  );
+  assert.equal(
+    isOriginHandoffRepairableSession(createReconnectReservedSession(), createContext({ runtimeClientIdentityCreatedOnThisOrigin: false })),
+    false
+  );
+  assert.equal(
+    isOriginHandoffRepairableSession(
+      createReconnectReservedSession({
+        controlState: {
+          ...createReconnectReservedSession().controlState,
+          owner: {
+            subject: "user-2",
+            tenantId: "tenant-2",
+            accessMode: "operator",
+            permissionMode: "write"
+          }
+        }
+      }),
+      ownerContext
+    ),
+    false
+  );
 });

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`H149` backend runtime seam extraction; `H150` active and `H151` queued)
+Last updated: 2026-04-18 (post-`H150` frontend session-control seam extraction; `H151` active)
 
 ## Current Product Truth
 
@@ -121,14 +121,14 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active explicit quality/coverage hardening tasks are now `MSG-216` through `MSG-219`
-- `ROADMAP.md`: `v0.4.0-H150` is now active, with `v0.4.0-H151` queued behind it
+- `TODO.md`: active explicit quality/coverage hardening tasks are now `MSG-218` and `MSG-219`
+- `ROADMAP.md`: `v0.4.0-H151` is now active, with no further queued wave behind it
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
 ## Repository Quality Review (2026-04-18)
 
-The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports, `v0.4.0-H147` then closed the first promoted backend transport/validation blind spots on top of that repaired contract, and `v0.4.0-H148` completed the promoted frontend controller/command-path hardening wave:
+The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports, `v0.4.0-H147` then closed the first promoted backend transport/validation blind spots on top of that repaired contract, `v0.4.0-H148` completed the first frontend controller/command-path hardening wave, and `v0.4.0-H150` continued that decomposition around trusted-local control orchestration:
 
 - Backend coverage still runs through the same deterministic workspace file selection contract as the backend default test suite, excluding only `nonfunctional.load.test.js` from the coverage lane. The previously hidden `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` surfaces remain visible in the reported backend coverage gate.
 - Frontend coverage still emits a normalized one-row-per-source-file report even when the Node test runner produces duplicate file rows. The normalization remains explicit in the emitted report so duplicate-row repair is auditable instead of silent.
@@ -138,9 +138,14 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
   - `backend/src/runtime-status-reporting.js` (`171` lines) now owns health/ready/metrics payload shaping and is covered at `100.00%` line / `96.43%` branch / `100.00%` function.
   - `backend/src/runtime-session-control-attachments.js` (`215` lines) now owns the attachment registry, prune scheduling, and label normalization/update behavior and is covered at `90.70%` line / `75.71%` branch / `94.44%` function.
   - The remaining `backend/src/runtime.js` file still sits at `82.08%` line / `75.60%` branch / `91.67%` function coverage, but the extracted seams materially reduced monolith risk and moved promoted helper branches into deterministic unit tests without changing the shipped transport-only runtime contract.
-- `v0.4.0-H148` then reduced `frontend/src/public/app-runtime-composition-controller.js` from `2623` to `2328` lines by extracting `frontend/src/public/session-control-runtime-state.js` (`428` lines) and by adding direct seam tests for trusted-local handoff/control ownership behavior instead of testing only through the larger composition controller.
-- Focused frontend hardening in `H148` also covered the promoted failure-path gaps in `frontend/src/public/app-lifecycle-controller.js`, `frontend/src/public/api-client.js`, and `frontend/src/public/command-executor.js`. The focused seam snapshot reached `92.12%` line / `77.22%` branch / `94.20%` function coverage for `frontend/src/public/api-client.js`, `95.62%` line / `95.00%` branch / `45.16%` function coverage for `frontend/src/public/app-lifecycle-controller.js`, `85.05%` line / `64.84%` branch / `22.80%` function coverage for `frontend/src/public/app-runtime-composition-controller.js`, and `74.07%` line / `58.62%` branch / `97.56%` function coverage for `frontend/src/public/session-control-runtime-state.js`.
+- `v0.4.0-H148` reduced `frontend/src/public/app-runtime-composition-controller.js` from `2623` to `2328` lines by extracting `frontend/src/public/session-control-runtime-state.js` (`428` lines) and by adding direct seam tests for trusted-local handoff/control ownership behavior instead of testing only through the larger composition controller.
+- `v0.4.0-H150` then reduced `frontend/src/public/app-runtime-composition-controller.js` further from `2328` to `1878` lines by extracting `frontend/src/public/session-control-runtime-controller.js` (`594` lines), which now owns canonical-origin redirects, origin-handoff auto-repair, reclaim-and-retry feedback actions, trusted-local rename/forget flows, and rendered session-control UI state instead of leaving those branches buried inside one composition controller.
+- The validated post-`H150` frontend seam snapshot on the current tree is:
+  - `frontend/src/public/app-runtime-composition-controller.js`: `86.47%` line / `62.92%` branch / `14.29%` function
+  - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch / `68.97%` function
+  - `frontend/src/public/session-control-runtime-state.js`: `85.98%` line / `75.65%` branch / `100.00%` function
+  - repo-wide validated coverage totals: backend `93.65%` line coverage, frontend `95.07%` line coverage
 - A follow-up repo-wide review on the validated current tree still leaves two active frontend-focused quality waves because the repaired coverage report now makes the residual risks unambiguous instead of anecdotal:
-  - `frontend/src/public/app-runtime-composition-controller.js` remains the largest frontend hotspot even after `H148`, still at `2328` lines with only `71.31%` line / `64.13%` branch / `14.58%` function coverage; the extracted `frontend/src/public/session-control-runtime-state.js` seam improved testability but still sits at `76.87%` line / `62.87%` branch coverage, so `v0.4.0-H150` continues decomposition and branch closure around bootstrap/auth/handoff/reconnect flows.
-  - The remaining high-fan-out frontend command/workspace stack is still the next clear maintainability cluster after the composition controller: `frontend/src/public/command-executor.js` sits at `2432` lines with `49.61%` function coverage, `frontend/src/public/connection-profile-runtime-controller.js` sits at `1984` lines with `69.23%` branch coverage, and `frontend/src/public/workspace-preset-runtime-controller.js` sits at `1557` lines with `73.81%` branch coverage. Those files therefore remain promoted together in `v0.4.0-H151` instead of being left as untracked known debt.
+  - `frontend/src/public/app-runtime-composition-controller.js` is materially smaller after `H150`, but it still remains a large composition surface at `1878` lines and still carries low function coverage because bootstrap/auth/runtime composition is concentrated there. The session-control and trusted-local control branches are now pulled into directly tested seams instead of remaining inline, which is the intended `H150` outcome.
+  - The remaining high-fan-out frontend command/workspace stack is now the next clear maintainability cluster: `frontend/src/public/command-executor.js` sits at `2432` lines with `49.61%` function coverage, `frontend/src/public/connection-profile-runtime-controller.js` sits at `1984` lines with `69.23%` branch coverage, and `frontend/src/public/workspace-preset-runtime-controller.js` sits at `1557` lines with `73.81%` branch coverage. Those files now make up active `v0.4.0-H151` instead of being left as untracked known debt.
 - Smaller low-coverage utilities and UI controllers still exist, but they were not promoted in this review because they are either already bounded, substantially better covered than the newly promoted monoliths, or lower risk than the backend runtime and frontend composition/command/workspace surfaces now queued in `TODO.md`.

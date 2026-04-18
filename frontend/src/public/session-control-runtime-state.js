@@ -131,7 +131,7 @@ export function getLocalSessionClient(session, context = {}) {
 
 export function getLocalDeviceLabel(session = null, context = {}) {
   const localClient = session ? getLocalSessionClient(session, context) : null;
-  return normalizeControlText(localClient?.label) || readTrustedLocalClientLabel(context) || "this device";
+  return readTrustedLocalClientLabel(context) || normalizeControlText(localClient?.label) || "this device";
 }
 
 export function isLocalSessionController(session, context = {}) {
