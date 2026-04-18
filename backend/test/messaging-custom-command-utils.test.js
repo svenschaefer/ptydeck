@@ -101,9 +101,34 @@ test('renderCustomCommandForSession resolves template variables and rejects inva
   });
 });
 
+test('template custom command helpers reject malformed placeholders and parameterless redirects deterministically', () => {
+  const invalidTemplateCommand = {
+    name: 'bad',
+    kind: 'template',
+    scope: 'project',
+    content: 'echo {{param:9bad}}'
+  };
+  const parameterlessTemplate = {
+    name: 'jump',
+    kind: 'template',
+    scope: 'project',
+    content: 'echo {{var:session.name}}'
+  };
+
+  assert.match(parseCustomCommandInvocation('/bad topic=health', invalidTemplateCommand).error, /invalid/);
+  assert.match(renderCustomCommandForSession(invalidTemplateCommand, { id: 's-1' }, { id: 'ops' }, { topic: 'health' }).error, /invalid/);
+  assert.deepEqual(parseCustomCommandInvocation('/jump -- deck:ops', parameterlessTemplate), {
+    ok: true,
+    parameterAssignments: {},
+    targetSelector: 'deck:ops'
+  });
+});
+
 test('normalizeCustomCommandPayloadForShell escapes only unmatched single quotes', () => {
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'unterminated"), "echo \\\'unterminated");
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'closed'"), "echo 'closed'");
   assert.equal(normalizeCustomCommandPayloadForShell("echo \\\'already escaped"), "echo \\\'already escaped");
   assert.equal(normalizeCustomCommandPayloadForShell("first\r\nsecond 'line"), "first\nsecond \\\'line");
+  assert.equal(normalizeCustomCommandPayloadForShell('echo \\\\'), 'echo \\\\');
+  assert.equal(normalizeCustomCommandPayloadForShell("echo 'open\nsecond \\\\'quoted"), "echo \\\'open\nsecond \\\\\\'quoted");
 });

@@ -225,3 +225,148 @@ test("discord adapter suppresses explicit message intents while outbound deliver
   assert.equal(result.reason, "delivery_disabled");
   assert.equal(sends.length, 0);
 });
+
+test("discord transport rejects invalid webhook URLs and surfaces API error payloads", async () => {
+  const transport = createDiscordTransport({
+    apiBaseUrl: "https://discord.example.test/api/v10",
+    fetchImpl: async () => {
+      throw new Error("fetch should not be called for invalid webhook URLs");
+    }
+  });
+
+  await assert.rejects(
+    transport.sendMessage({
+      webhookUrl: "ftp://discord.example.test/webhooks/123/token",
+      text: "hello"
+    }),
+    /valid webhookUrl/
+  );
+
+  const failingTransport = createDiscordTransport({
+    apiBaseUrl: "https://discord.example.test/api/v10",
+    fetchImpl: async () => ({
+      ok: false,
+      status: 429,
+      async json() {
+        return { message: "rate limited" };
+      }
+    })
+  });
+
+  await assert.rejects(
+    failingTransport.sendMessage({
+      webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+      text: "hello"
+    }),
+    /rate limited/
+  );
+});
+
+test("discord adapter validates targets, falls back from edit to send, and records alert/failure metrics", async () => {
+  const sends = [];
+  const edits = [];
+  let editFailures = 0;
+  const adapter = createDiscordAdapter({
+    configured: true,
+    deliveryEnabled: true,
+    configuredTargets: 1,
+    transport: {
+      async sendMessage(payload) {
+        sends.push(payload);
+        if (payload.text.includes("delivery failure")) {
+          throw new Error("discord send failed");
+        }
+        return { messageId: `m-${sends.length}` };
+      },
+      async editMessage(payload) {
+        edits.push(payload);
+        editFailures += 1;
+        throw new Error("discord edit failed");
+      }
+    },
+    nowFn: (() => {
+      let now = 800;
+      return () => ++now;
+    })(),
+    applyMessagePolicy: applyMessagingMessagePolicy,
+    advanceThreadPolicyState: advanceMessagingThreadPolicyState
+  });
+
+  const invalidTargetResult = await adapter.ensureTarget({
+    channelId: "ops-room",
+    webhookUrl: "notaurl"
+  });
+  assert.equal(invalidTargetResult.ok, false);
+  assert.equal(invalidTargetResult.reason, "invalid_target");
+
+  const target = {
+    channelId: "ops-room",
+    chatId: "ops-room",
+    threadId: 77,
+    messageThreadId: 77,
+    webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+    stateKey: "ops-room:77"
+  };
+  const validTargetResult = await adapter.ensureTarget(target);
+  assert.equal(validTargetResult.ok, true);
+
+  const first = await adapter.handleEvent({
+    target,
+    threadKey: "status",
+    text: "first status",
+    occurredAt: 1,
+    decision: {
+      action: "new",
+      messageKey: "status",
+      reason: "status_new"
+    }
+  });
+  const second = await adapter.handleEvent({
+    target,
+    threadKey: "status",
+    text: "updated status",
+    occurredAt: 2,
+    decision: {
+      action: "update",
+      messageKey: "status",
+      reason: "status_update"
+    }
+  });
+  const alert = await adapter.handleEvent({
+    target,
+    threadKey: "attention",
+    text: "attention required",
+    occurredAt: 3,
+    decision: {
+      action: "alert",
+      messageKey: "attention",
+      reason: "attention_new"
+    }
+  });
+  const failed = await adapter.handleEvent({
+    target,
+    threadKey: "status",
+    text: "delivery failure",
+    occurredAt: 4,
+    decision: {
+      action: "new",
+      messageKey: "status",
+      reason: "status_new"
+    }
+  });
+
+  assert.equal(first.delivered, true);
+  assert.equal(second.delivered, true);
+  assert.equal(alert.delivered, true);
+  assert.equal(failed.delivered, false);
+  assert.equal(editFailures, 1);
+  assert.equal(sends.length, 4);
+  assert.equal(edits.length, 1);
+  const status = adapter.getStatus();
+  assert.equal(status.failedTotal, 1);
+  assert.equal(status.alertedTotal, 1);
+  assert.match(status.lastError, /discord send failed/);
+  assert.equal(status.targetTrace.capturedTotal, 2);
+  assert.equal(status.targetTrace.recent[0].outcome, "target_invalid");
+  assert.equal(status.targetTrace.recent[1].outcome, "target_validated");
+});

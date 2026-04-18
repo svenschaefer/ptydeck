@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`v0.4.0-H146` coverage-report integrity repair)
+Last updated: 2026-04-18 (post-`v0.4.0-H147` backend quality and coverage hardening)
 
 ## Current Product Truth
 
@@ -121,23 +121,24 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active explicit quality and coverage hardening tasks queued for `v0.4.0-H147` and `v0.4.0-H148`
-- `ROADMAP.md`: `v0.4.0-H147` is the active wave, with `v0.4.0-H148` queued after it
+- `TODO.md`: active explicit frontend quality and coverage hardening tasks queued for `v0.4.0-H148`
+- `ROADMAP.md`: `v0.4.0-H148` is the active wave
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
 ## Repository Quality Review (2026-04-18)
 
-The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports:
+The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired the coverage-report contract so later hardening work is based on trustworthy numbers instead of partially hidden or duplicated reports, and `v0.4.0-H147` then closed the first promoted backend transport/validation blind spots on top of that repaired contract:
 
-- Backend coverage now runs through the same deterministic workspace file selection contract as the backend default test suite, excluding only `nonfunctional.load.test.js` from the coverage lane. The previously hidden `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` surfaces are now visible in the reported backend coverage gate.
-- Frontend coverage now emits a normalized one-row-per-source-file report even when the Node test runner produces duplicate file rows. The normalization is explicit in the emitted report so duplicate-row repair is auditable instead of silent.
-- The corrected local coverage-check contract now reports backend line coverage at `92.73%` and frontend line coverage at `94.18%`.
+- Backend coverage still runs through the same deterministic workspace file selection contract as the backend default test suite, excluding only `nonfunctional.load.test.js` from the coverage lane. The previously hidden `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` surfaces remain visible in the reported backend coverage gate.
+- Frontend coverage still emits a normalized one-row-per-source-file report even when the Node test runner produces duplicate file rows. The normalization remains explicit in the emitted report so duplicate-row repair is auditable instead of silent.
+- The corrected local coverage-check contract now reports backend line coverage at `92.73%` and frontend line coverage at `94.18%` on the full gate, while the delivered `H147` targeted hardening raised the promoted backend hotspots to `95.52%` line / `51.11%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `85.24%` line / `67.28%` branch for `backend/src/messaging-runtime.js`, `90.05%` line / `77.63%` branch for `backend/src/telegram-command-surface.js`, and `81.42%` line / `80.08%` branch for `backend/src/validation.js`.
 
-The remaining promoted quality risks after `H146` are:
+The remaining promoted quality risks after `H147` are frontend maintainability and branch-depth risks concentrated in:
 
-- The retained transport-only messaging baseline still has low direct coverage in `backend/src/messaging-runtime.js` (`67.77` line / `60.78` branch), `backend/src/discord-adapter.js` (`74.75` line / `39.73` branch), `backend/src/delivery-adapter-utils.js` (`41.46` branch), and `backend/src/telegram-command-surface.js` (`85.07` line / `68.25` branch).
-- Backend maintainability risk remains concentrated in `backend/src/validation.js` (`1610` lines, `76.34` line coverage) and `backend/src/messaging-custom-command-utils.js` (`81.20` line / `70.55` branch), where high branch fan-out makes the current coverage less convincing than the global total suggests.
-- Frontend maintainability risk remains concentrated in `frontend/src/public/app-runtime-composition-controller.js` (`2623` lines), `frontend/src/public/command-executor.js` (`2432` lines, `84.83` line / `49.61` function coverage), `frontend/src/public/app-lifecycle-controller.js` (`32.79` function coverage), and `frontend/src/public/api-client.js` (`77.92` branch coverage).
+- `frontend/src/public/app-runtime-composition-controller.js` (`2623` lines)
+- `frontend/src/public/command-executor.js` (`2432` lines, `84.83%` line / `49.61%` function coverage)
+- `frontend/src/public/app-lifecycle-controller.js` (`32.79%` function coverage)
+- `frontend/src/public/api-client.js` (`77.92%` branch coverage)
 
-The active quality waves therefore now prioritize backend transport/validation hardening first and frontend controller/command-path hardening second. The intent remains to improve the trustworthiness and maintainability of the current transport-only baseline without chasing top-line percentages blindly.
+The active quality wave therefore now focuses on frontend controller decomposition and command-path coverage hardening in `v0.4.0-H148`. The intent remains to improve the trustworthiness and maintainability of the current transport-only baseline without chasing top-line percentages blindly.

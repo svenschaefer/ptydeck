@@ -92,6 +92,34 @@ function createTelegramTransportStub() {
   };
 }
 
+function createTelegramCallbackUpdate(updateId, callbackData, overrides = {}) {
+  return {
+    update_id: updateId,
+    callback_query: {
+      id: `cb-${updateId}`,
+      data: callbackData,
+      from: { id: 42, username: "sven" },
+      message: {
+        chat: { id: "-100200300", type: "supergroup", title: "ptydeck" },
+        ...("message" in overrides ? overrides.message : {})
+      },
+      ...overrides
+    }
+  };
+}
+
+function createTelegramMessageUpdate(updateId, text, overrides = {}) {
+  return {
+    update_id: updateId,
+    message: {
+      chat: { id: "-100200300", type: "supergroup", title: "ptydeck" },
+      from: { id: 42, username: "sven" },
+      text,
+      ...overrides
+    }
+  };
+}
+
 test("messaging runtime normalizes targets and topic bindings deterministically without app-specific profile routing", () => {
   const targets = normalizeMessagingTargets([
     null,
@@ -312,6 +340,201 @@ test("transport-only messaging runtime provisions deck-session telegram topics t
       }
     ]);
     assert.equal(runtime.buildStatusSummary().adapters[0].activeTopicCount, 1);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("transport-only messaging runtime handles mapped callback actions and published custom commands", async () => {
+  const telegram = createTelegramTransportStub();
+  const sentInputs = [];
+  const stopRequests = [];
+  const replayRequests = [];
+  const session = createSession({ id: "s-actions", name: "build-run", state: "running" });
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "telegram-token",
+    telegramTargets: [{ sessionName: "build-run", chatId: "-100200300" }],
+    telegramOutboundEnabled: true,
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport: () => telegram.transport,
+    resolveSessionForMessagingTarget: async () => session,
+    requestMessagingStop: async (sessionId) => {
+      stopRequests.push(sessionId);
+    },
+    requestMessagingReplayExcerpt: async (sessionId, selector) => {
+      replayRequests.push({ sessionId, selector });
+      return {
+        selector,
+        selectorKind: "lines",
+        resolvedCount: 2,
+        availableCount: 2,
+        selectorSatisfied: true,
+        data: "line one\nline two"
+      };
+    },
+    requestMessagingSendInput: async (sessionId, payload) => {
+      sentInputs.push({ sessionId, payload });
+    },
+    listCustomCommands: () => [
+      {
+        name: "doc-u",
+        scope: "project",
+        kind: "template",
+        content: "echo {{param:topic}} {{var:session.name}}"
+      }
+    ],
+    logDebug() {}
+  });
+
+  await runtime.start();
+  try {
+    telegram.updateQueue.push(
+      createTelegramCallbackUpdate(1, "ptydeck:status"),
+      createTelegramCallbackUpdate(2, "ptydeck:stop"),
+      createTelegramCallbackUpdate(3, "ptydeck:replay:l:5"),
+      createTelegramMessageUpdate(4, "/doc_du topic=health")
+    );
+
+    await waitFor(() => telegram.sentMessages.length >= 4, 2000);
+
+    assert.deepEqual(stopRequests, ["s-actions"]);
+    assert.deepEqual(replayRequests, [{ sessionId: "s-actions", selector: "l:5" }]);
+    assert.deepEqual(sentInputs, [{ sessionId: "s-actions", payload: "echo health build-run\r" }]);
+    assert.match(telegram.sentMessages[0].text, /Status for \[4\] build-run/u);
+    assert.match(telegram.sentMessages[1].text, /Stop requested for \[4\] build-run\./u);
+    assert.match(telegram.sentMessages[2].text, /\[4\] build-run replay l:5/u);
+    assert.match(telegram.sentMessages[3].text, /Custom command \/doc-u sent to \[4\] build-run\./u);
+    assert.equal(telegram.callbackAnswers.length, 3);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("transport-only messaging runtime rejects unmapped and ambiguous inbound routes deterministically", async () => {
+  const telegram = createTelegramTransportStub();
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "telegram-token",
+    telegramTargets: [
+      { sessionId: "s-1", chatId: "-100200300" },
+      { sessionName: "other", chatId: "-100200300" }
+    ],
+    telegramOutboundEnabled: true,
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport: () => telegram.transport,
+    logDebug() {}
+  });
+
+  await runtime.start();
+  try {
+    telegram.updateQueue.push(
+      createTelegramCallbackUpdate(1, "ptydeck:status", {
+        message: { chat: { id: "-100999999", type: "supergroup", title: "unmapped" } }
+      }),
+      createTelegramCallbackUpdate(2, "ptydeck:status")
+    );
+
+    await waitFor(() => telegram.sentMessages.length >= 2, 2000);
+
+    assert.match(telegram.sentMessages[0].text, /not mapped to a ptydeck session/u);
+    assert.match(telegram.sentMessages[1].text, /matches multiple ptydeck messaging targets/u);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("transport-only messaging runtime covers retry-unavailable and custom-command rejection branches", async () => {
+  const telegram = createTelegramTransportStub();
+  const retryRequests = [];
+  const session = createSession({ id: "s-branches", name: "build-run", state: "running" });
+  const commands = [
+    {
+      name: "bad",
+      scope: "project",
+      kind: "template",
+      content: "echo {{param:9bad}}"
+    },
+    {
+      name: "blank",
+      scope: "project",
+      kind: "plain",
+      content: "   \n"
+    },
+    {
+      name: "jump",
+      scope: "project",
+      kind: "template",
+      content: "echo {{var:session.name}}"
+    }
+  ];
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "telegram-token",
+    telegramTargets: [{ sessionName: "build-run", chatId: "-100200300" }],
+    telegramOutboundEnabled: true,
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport: () => telegram.transport,
+    resolveSessionForMessagingTarget: async () => session,
+    requestMessagingRetry: async (...args) => {
+      retryRequests.push(args);
+      return session;
+    },
+    listCustomCommands: () => commands,
+    logDebug() {}
+  });
+
+  await runtime.start();
+  try {
+    telegram.updateQueue.push(
+      createTelegramCallbackUpdate(1, "ptydeck:retry"),
+      createTelegramMessageUpdate(2, "/bad topic=health"),
+      createTelegramMessageUpdate(3, "/blank"),
+      createTelegramMessageUpdate(4, "/jump -- deck:ops")
+    );
+
+    await waitFor(() => telegram.sentMessages.length >= 4, 2000);
+
+    assert.equal(retryRequests.length, 0);
+    assert.match(telegram.sentMessages[0].text, /Retry is unavailable while \[4\] build-run is running\./u);
+    assert.match(telegram.sentMessages[1].text, /Template custom command \/bad is invalid\./u);
+    assert.match(telegram.sentMessages[2].text, /resolved to empty terminal input/u);
+    assert.match(telegram.sentMessages[3].text, /cannot redirect to another target/u);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("transport-only messaging runtime validates discord targets and records ensure traces", async () => {
+  const runtime = createMessagingRuntime({
+    discordTargets: [
+      {
+        adapterId: "discord",
+        channelId: "ops-room",
+        webhookUrl: "https://discord.example.test/api/v10/webhooks/123/token",
+        sessionName: "build-run"
+      }
+    ],
+    discordOutboundEnabled: true,
+    createDiscordTransport: () => ({
+      async sendMessage() {
+        throw new Error("not used");
+      },
+      async editMessage() {
+        throw new Error("not used");
+      }
+    }),
+    logDebug() {}
+  });
+
+  try {
+    const session = createSession({ id: "s-discord", name: "build-run" });
+    const target = await runtime.ensureSessionTarget(session, { traceId: "discord-1", correlationId: "discord-1" });
+    assert.equal(target.channelId, "ops-room");
+    const status = runtime.buildStatusSummary();
+    assert.equal(status.adapters[1].adapter, "discord");
+    assert.equal(status.adapters[1].targetTrace.capturedTotal, 1);
+    assert.equal(status.trace.recent.some((entry) => entry.type === "messaging.target.ensure" && entry.adapter === "discord"), true);
   } finally {
     await runtime.stop();
   }

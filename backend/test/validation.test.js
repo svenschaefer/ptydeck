@@ -540,6 +540,87 @@ test("validateRequest rejects invalid session create body", () => {
   });
 });
 
+test("validateRequest rejects malformed session create-only and patch edge fields", () => {
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        cwd: 42
+      }
+    });
+  }, /Field 'cwd' must be a string/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        shell: 42
+      }
+    });
+  }, /Field 'shell' must be a string/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "POST",
+      pathname: "/api/v1/sessions",
+      params: {},
+      body: {
+        connectionProfileId: 42
+      }
+    });
+  }, /Field 'connectionProfileId' must be a string/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        env: { FOO: 1 }
+      }
+    });
+  }, /Field 'env' must be an object with string values/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        tags: ["ops", 1]
+      }
+    });
+  }, /Field 'tags' must be an array of strings/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        activeThemeProfile: "bad"
+      }
+    });
+  }, /Field 'activeThemeProfile' must be an object/);
+
+  assert.throws(() => {
+    validateRequest({
+      method: "PATCH",
+      pathname: "/api/v1/sessions/abc",
+      params: { sessionId: "abc" },
+      body: {
+        inactiveThemeProfile: {
+          background: "#fff"
+        }
+      }
+    });
+  }, /Field 'inactiveThemeProfile' must contain only supported hex color entries/);
+});
+
 test("validateRequest rejects missing input payload field", () => {
   assert.throws(() => {
     validateRequest({

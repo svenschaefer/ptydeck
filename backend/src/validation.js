@@ -43,6 +43,24 @@ const TERMINAL_APP_IDENTITY_FAMILY_SET = new Set(TERMINAL_APP_IDENTITY_FAMILY_VA
 const TERMINAL_APP_IDENTITY_SOURCE_SET = new Set(TERMINAL_APP_IDENTITY_SOURCE_VALUES);
 const SSH_TRUST_ENTRY_ID_PATTERN = /^trust-[a-f0-9]{24}$/;
 const BASE64_CONTENT_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const SESSION_MUTABLE_COMMON_FIELDS = Object.freeze([
+  "name",
+  "kind",
+  "remoteConnection",
+  "remoteAuth",
+  "remoteSecret",
+  "startCwd",
+  "startCommand",
+  "note",
+  "mouseForwardingMode",
+  "inputSafetyProfile",
+  "env",
+  "tags",
+  "themeProfile",
+  "activeThemeProfile",
+  "inactiveThemeProfile"
+]);
+const SESSION_CREATE_ONLY_FIELDS = Object.freeze(["cwd", "shell", "connectionProfileId"]);
 
 function isRemoteConnection(value) {
   return (
@@ -235,6 +253,112 @@ function isTerminalAppIdentity(value) {
     isObject(value.details) &&
     Object.values(value.details).every((entry) => isTerminalAppIdentityDetailValue(entry)) &&
     Number.isInteger(value.updatedAt)
+  );
+}
+
+function hasDefinedField(body, fieldNames) {
+  return fieldNames.some((fieldName) => body[fieldName] !== undefined);
+}
+
+function validateOptionalStringField(body, fieldName, message) {
+  if (body?.[fieldName] !== undefined && typeof body[fieldName] !== "string") {
+    throw new ApiError(400, "ValidationError", message);
+  }
+}
+
+function validateOptionalObjectField(body, fieldName, message) {
+  if (body?.[fieldName] !== undefined && !isObject(body[fieldName])) {
+    throw new ApiError(400, "ValidationError", message);
+  }
+}
+
+function validateSessionEnvironmentPayload(value) {
+  return isObject(value) && Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function validateStringMapField(body, fieldName, message) {
+  if (body?.[fieldName] !== undefined && !validateSessionEnvironmentPayload(body[fieldName])) {
+    throw new ApiError(400, "ValidationError", message);
+  }
+}
+
+function validateStringArrayField(body, fieldName, message) {
+  if (body?.[fieldName] !== undefined && (!Array.isArray(body[fieldName]) || !body[fieldName].every((entry) => typeof entry === "string"))) {
+    throw new ApiError(400, "ValidationError", message);
+  }
+}
+
+function validateThemeProfilePatchField(body, fieldName, objectMessage, patchMessage) {
+  if (body?.[fieldName] !== undefined && !isObject(body[fieldName])) {
+    throw new ApiError(400, "ValidationError", objectMessage);
+  }
+  if (body?.[fieldName] !== undefined && !isThemeProfilePatch(body[fieldName])) {
+    throw new ApiError(400, "ValidationError", patchMessage);
+  }
+}
+
+function validateSessionMutableFields(body, { allowCreateOnlyFields = false, requireAtLeastOneField = false } = {}) {
+  const allowedFieldNames = allowCreateOnlyFields
+    ? [...SESSION_CREATE_ONLY_FIELDS, ...SESSION_MUTABLE_COMMON_FIELDS]
+    : SESSION_MUTABLE_COMMON_FIELDS;
+  if (requireAtLeastOneField && !hasDefinedField(body, allowedFieldNames)) {
+    throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
+  }
+  if (allowCreateOnlyFields) {
+    validateOptionalStringField(body, "cwd", "Field 'cwd' must be a string.");
+    validateOptionalStringField(body, "shell", "Field 'shell' must be a string.");
+    validateOptionalStringField(body, "connectionProfileId", "Field 'connectionProfileId' must be a string.");
+  }
+  validateOptionalStringField(body, "name", "Field 'name' must be a string.");
+  if (body?.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
+    throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
+  }
+  validateOptionalObjectField(body, "remoteConnection", "Field 'remoteConnection' must be an object.");
+  validateOptionalObjectField(body, "remoteAuth", "Field 'remoteAuth' must be an object.");
+  validateOptionalStringField(body, "remoteSecret", "Field 'remoteSecret' must be a string.");
+  validateOptionalStringField(body, "startCwd", "Field 'startCwd' must be a string.");
+  validateOptionalStringField(body, "startCommand", "Field 'startCommand' must be a string.");
+  validateOptionalStringField(body, "note", "Field 'note' must be a string.");
+  if (body?.mouseForwardingMode !== undefined && !isMouseForwardingMode(body.mouseForwardingMode)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      `Field 'mouseForwardingMode' must be one of: ${SESSION_MOUSE_FORWARDING_MODE_VALUES.join(", ")}.`
+    );
+  }
+  validateOptionalObjectField(body, "inputSafetyProfile", "Field 'inputSafetyProfile' must be an object.");
+  if (body?.remoteConnection !== undefined && !isRemoteConnection(body.remoteConnection)) {
+    throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be a valid remote connection object.");
+  }
+  if (body?.remoteAuth !== undefined && !isRemoteAuth(body.remoteAuth)) {
+    throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be a valid remote auth object.");
+  }
+  if (body?.inputSafetyProfile !== undefined && !isInputSafetyProfilePatch(body.inputSafetyProfile)) {
+    throw new ApiError(
+      400,
+      "ValidationError",
+      "Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries."
+    );
+  }
+  validateStringMapField(body, "env", "Field 'env' must be an object with string values.");
+  validateStringArrayField(body, "tags", "Field 'tags' must be an array of strings.");
+  validateThemeProfilePatchField(
+    body,
+    "themeProfile",
+    "Field 'themeProfile' must be an object.",
+    "Field 'themeProfile' must contain only supported hex color entries."
+  );
+  validateThemeProfilePatchField(
+    body,
+    "activeThemeProfile",
+    "Field 'activeThemeProfile' must be an object.",
+    "Field 'activeThemeProfile' must contain only supported hex color entries."
+  );
+  validateThemeProfilePatchField(
+    body,
+    "inactiveThemeProfile",
+    "Field 'inactiveThemeProfile' must be an object.",
+    "Field 'inactiveThemeProfile' must contain only supported hex color entries."
   );
 }
 
@@ -519,94 +643,7 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (body !== undefined && !isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
-    if (body?.cwd !== undefined && typeof body.cwd !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'cwd' must be a string.");
-    }
-    if (body?.shell !== undefined && typeof body.shell !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'shell' must be a string.");
-    }
-    if (body?.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
-      throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
-    }
-    if (body?.connectionProfileId !== undefined && typeof body.connectionProfileId !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'connectionProfileId' must be a string.");
-    }
-    if (body?.name !== undefined && typeof body.name !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
-    }
-    if (body?.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
-    }
-    if (body?.remoteAuth !== undefined && !isObject(body.remoteAuth)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object.");
-    }
-    if (body?.remoteSecret !== undefined && typeof body.remoteSecret !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' must be a string.");
-    }
-    if (body?.startCwd !== undefined && typeof body.startCwd !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
-    }
-    if (body?.startCommand !== undefined && typeof body.startCommand !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
-    }
-    if (body?.note !== undefined && typeof body.note !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
-    }
-    if (body?.mouseForwardingMode !== undefined && !isMouseForwardingMode(body.mouseForwardingMode)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        `Field 'mouseForwardingMode' must be one of: ${SESSION_MOUSE_FORWARDING_MODE_VALUES.join(", ")}.`
-      );
-    }
-    if (body?.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
-    }
-    if (body?.remoteConnection !== undefined && !isRemoteConnection(body.remoteConnection)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be a valid remote connection object.");
-    }
-    if (body?.remoteAuth !== undefined && !isRemoteAuth(body.remoteAuth)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be a valid remote auth object.");
-    }
-    if (body?.inputSafetyProfile !== undefined && !isInputSafetyProfilePatch(body.inputSafetyProfile)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        "Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries."
-      );
-    }
-    if (body?.env !== undefined) {
-      if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
-        throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
-      }
-    }
-    if (body?.tags !== undefined) {
-      if (!Array.isArray(body.tags) || !body.tags.every((value) => typeof value === "string")) {
-        throw new ApiError(400, "ValidationError", "Field 'tags' must be an array of strings.");
-      }
-    }
-    if (body?.themeProfile !== undefined && !isObject(body.themeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
-    }
-    if (body?.activeThemeProfile !== undefined && !isObject(body.activeThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must be an object.");
-    }
-    if (body?.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
-    }
-    if (body?.themeProfile !== undefined && !isThemeProfilePatch(body.themeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must contain only supported hex color entries.");
-    }
-    if (body?.activeThemeProfile !== undefined && !isThemeProfilePatch(body.activeThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must contain only supported hex color entries.");
-    }
-    if (body?.inactiveThemeProfile !== undefined && !isThemeProfilePatch(body.inactiveThemeProfile)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        "Field 'inactiveThemeProfile' must contain only supported hex color entries."
-      );
-    }
+    validateSessionMutableFields(body, { allowCreateOnlyFields: true });
   }
 
   if (method === "PATCH" && pathname.match(/^\/api\/v1\/sessions\/[^/]+$/)) {
@@ -616,104 +653,7 @@ export function validateRequest({ method, pathname, params, query, body }) {
     if (!isObject(body)) {
       throw new ApiError(400, "ValidationError", "Body must be an object.");
     }
-    if (
-      body.name === undefined &&
-      body.kind === undefined &&
-      body.remoteConnection === undefined &&
-      body.remoteAuth === undefined &&
-      body.remoteSecret === undefined &&
-      body.startCwd === undefined &&
-      body.startCommand === undefined &&
-      body.note === undefined &&
-      body.mouseForwardingMode === undefined &&
-      body.inputSafetyProfile === undefined &&
-      body.env === undefined &&
-      body.tags === undefined &&
-      body.themeProfile === undefined &&
-      body.activeThemeProfile === undefined &&
-      body.inactiveThemeProfile === undefined
-    ) {
-      throw new ApiError(400, "ValidationError", "At least one updatable field is required.");
-    }
-    if (body.name !== undefined && typeof body.name !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'name' must be a string.");
-    }
-    if (body.kind !== undefined && !SESSION_KIND_VALUES.has(body.kind)) {
-      throw new ApiError(400, "ValidationError", "Field 'kind' must be 'local' or 'ssh'.");
-    }
-    if (body.remoteConnection !== undefined && !isObject(body.remoteConnection)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be an object.");
-    }
-    if (body.remoteAuth !== undefined && !isObject(body.remoteAuth)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be an object.");
-    }
-    if (body.remoteSecret !== undefined && typeof body.remoteSecret !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'remoteSecret' must be a string.");
-    }
-    if (body.startCwd !== undefined && typeof body.startCwd !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'startCwd' must be a string.");
-    }
-    if (body.startCommand !== undefined && typeof body.startCommand !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'startCommand' must be a string.");
-    }
-    if (body.note !== undefined && typeof body.note !== "string") {
-      throw new ApiError(400, "ValidationError", "Field 'note' must be a string.");
-    }
-    if (body.mouseForwardingMode !== undefined && !isMouseForwardingMode(body.mouseForwardingMode)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        `Field 'mouseForwardingMode' must be one of: ${SESSION_MOUSE_FORWARDING_MODE_VALUES.join(", ")}.`
-      );
-    }
-    if (body.inputSafetyProfile !== undefined && !isObject(body.inputSafetyProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'inputSafetyProfile' must be an object.");
-    }
-    if (body.remoteConnection !== undefined && !isRemoteConnection(body.remoteConnection)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteConnection' must be a valid remote connection object.");
-    }
-    if (body.remoteAuth !== undefined && !isRemoteAuth(body.remoteAuth)) {
-      throw new ApiError(400, "ValidationError", "Field 'remoteAuth' must be a valid remote auth object.");
-    }
-    if (body.inputSafetyProfile !== undefined && !isInputSafetyProfilePatch(body.inputSafetyProfile)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        "Field 'inputSafetyProfile' must contain only supported boolean and integer threshold entries."
-      );
-    }
-    if (body.env !== undefined) {
-      if (!isObject(body.env) || !Object.values(body.env).every((value) => typeof value === "string")) {
-        throw new ApiError(400, "ValidationError", "Field 'env' must be an object with string values.");
-      }
-    }
-    if (body.tags !== undefined) {
-      if (!Array.isArray(body.tags) || !body.tags.every((value) => typeof value === "string")) {
-        throw new ApiError(400, "ValidationError", "Field 'tags' must be an array of strings.");
-      }
-    }
-    if (body.themeProfile !== undefined && !isObject(body.themeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must be an object.");
-    }
-    if (body.activeThemeProfile !== undefined && !isObject(body.activeThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must be an object.");
-    }
-    if (body.inactiveThemeProfile !== undefined && !isObject(body.inactiveThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'inactiveThemeProfile' must be an object.");
-    }
-    if (body.themeProfile !== undefined && !isThemeProfilePatch(body.themeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'themeProfile' must contain only supported hex color entries.");
-    }
-    if (body.activeThemeProfile !== undefined && !isThemeProfilePatch(body.activeThemeProfile)) {
-      throw new ApiError(400, "ValidationError", "Field 'activeThemeProfile' must contain only supported hex color entries.");
-    }
-    if (body.inactiveThemeProfile !== undefined && !isThemeProfilePatch(body.inactiveThemeProfile)) {
-      throw new ApiError(
-        400,
-        "ValidationError",
-        "Field 'inactiveThemeProfile' must contain only supported hex color entries."
-      );
-    }
+    validateSessionMutableFields(body, { requireAtLeastOneField: true });
   }
 
   if (method === "POST" && pathname.endsWith("/input")) {

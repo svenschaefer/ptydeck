@@ -184,6 +184,50 @@ function analyzeCustomCommandTemplate(content) {
   };
 }
 
+function collectTemplateInvocationAssignments(parameterTokens = []) {
+  const assignments = {};
+  const duplicateParameters = [];
+  const invalidTokens = [];
+  for (const token of parameterTokens) {
+    if (!token) {
+      continue;
+    }
+    const equalsIndex = token.indexOf("=");
+    if (equalsIndex < 1) {
+      invalidTokens.push(token);
+      continue;
+    }
+    const name = normalizeLower(token.slice(0, equalsIndex));
+    const value = token.slice(equalsIndex + 1);
+    if (!CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN.test(name)) {
+      invalidTokens.push(token);
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(assignments, name)) {
+      duplicateParameters.push(name);
+      continue;
+    }
+    assignments[name] = value;
+  }
+  return {
+    assignments,
+    duplicateParameters,
+    invalidTokens
+  };
+}
+
+function validateTemplateParameterAssignments(template, parameterAssignments, customCommandName) {
+  const missing = template.parameters.filter((name) => !Object.prototype.hasOwnProperty.call(parameterAssignments, name));
+  if (missing.length > 0) {
+    return `Missing template parameter(s) for /${customCommandName}: ${missing.join(", ")}.`;
+  }
+  const unknown = Object.keys(parameterAssignments).filter((name) => !template.parameters.includes(name));
+  if (unknown.length > 0) {
+    return `Unknown template parameter(s) for /${customCommandName}: ${unknown.join(", ")}.`;
+  }
+  return "";
+}
+
 function isCustomCommandVisibleForSession(command, sessionId) {
   const custom = normalizeCustomCommandRecord(command);
   if (!custom) {
@@ -235,30 +279,7 @@ export function parseCustomCommandInvocation(rawInput, command) {
     targetSelector = remainder;
   }
 
-  const assignments = {};
-  const duplicateParameters = [];
-  const invalidTokens = [];
-  for (const token of parameterTokens) {
-    if (!token) {
-      continue;
-    }
-    const equalsIndex = token.indexOf("=");
-    if (equalsIndex < 1) {
-      invalidTokens.push(token);
-      continue;
-    }
-    const name = normalizeLower(token.slice(0, equalsIndex));
-    const value = token.slice(equalsIndex + 1);
-    if (!CUSTOM_COMMAND_TEMPLATE_PARAM_NAME_PATTERN.test(name)) {
-      invalidTokens.push(token);
-      continue;
-    }
-    if (Object.prototype.hasOwnProperty.call(assignments, name)) {
-      duplicateParameters.push(name);
-      continue;
-    }
-    assignments[name] = value;
-  }
+  const { assignments, duplicateParameters, invalidTokens } = collectTemplateInvocationAssignments(parameterTokens);
 
   if (invalidTokens.length > 0) {
     return {
@@ -273,19 +294,11 @@ export function parseCustomCommandInvocation(rawInput, command) {
     };
   }
 
-  const missing = template.parameters.filter((name) => !Object.prototype.hasOwnProperty.call(assignments, name));
-  if (missing.length > 0) {
+  const assignmentError = validateTemplateParameterAssignments(template, assignments, custom.name);
+  if (assignmentError) {
     return {
       ok: false,
-      error: `Missing template parameter(s) for /${custom.name}: ${missing.join(", ")}.`
-    };
-  }
-
-  const unknown = Object.keys(assignments).filter((name) => !template.parameters.includes(name));
-  if (unknown.length > 0) {
-    return {
-      ok: false,
-      error: `Unknown template parameter(s) for /${custom.name}: ${unknown.join(", ")}.`
+      error: assignmentError
     };
   }
 
@@ -329,19 +342,11 @@ export function renderCustomCommandForSession(command, session, deck, parameterA
     return { ok: false, error: `Template custom command /${custom.name} is invalid.` };
   }
 
-  const missing = template.parameters.filter((name) => !Object.prototype.hasOwnProperty.call(parameterAssignments, name));
-  if (missing.length > 0) {
+  const assignmentError = validateTemplateParameterAssignments(template, parameterAssignments, custom.name);
+  if (assignmentError) {
     return {
       ok: false,
-      error: `Missing template parameter(s) for /${custom.name}: ${missing.join(", ")}.`
-    };
-  }
-
-  const unknown = Object.keys(parameterAssignments).filter((name) => !template.parameters.includes(name));
-  if (unknown.length > 0) {
-    return {
-      ok: false,
-      error: `Unknown template parameter(s) for /${custom.name}: ${unknown.join(", ")}.`
+      error: assignmentError
     };
   }
 
