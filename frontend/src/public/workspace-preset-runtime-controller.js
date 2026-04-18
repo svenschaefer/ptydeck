@@ -1,3 +1,5 @@
+import { createWorkspacePresetRuntimeActions } from "./workspace-preset-runtime-actions.js";
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -902,224 +904,9 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     };
   }
 
-  async function persistWorkspaceStateForSelectedPreset() {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return null;
-    }
-    const updated = await api.updateWorkspacePreset(preset.id, {
-      workspace: captureCurrentWorkspace()
-    });
-    const normalized = requireUpsertedPreset(updated, "workspace persistence");
-    workspaceState = cloneWorkspaceState(normalized.workspace);
-    render();
-    requestRender();
-    return normalized;
-  }
-
-  async function applyPresetById(presetId) {
-    const preset = getPreset(presetId);
-    if (!preset) {
-      throw new Error(`Unknown workspace preset: ${presetId}`);
-    }
-    workspaceState = cloneWorkspaceState(preset.workspace);
-    selectedPresetId = preset.id;
-    if (workspaceState.layoutProfileId) {
-      await applyLayoutProfileById(workspaceState.layoutProfileId);
-    }
-    if (typeof setDeckSplitLayouts === "function") {
-      setDeckSplitLayouts(workspaceState.deckSplitLayouts);
-    }
-    if (typeof setControlPaneState === "function") {
-      setControlPaneState(normalizeControlPaneState(workspaceState));
-    }
-    if (workspaceState.activeDeckId) {
-      setActiveDeck(workspaceState.activeDeckId);
-    }
-    render();
-    requestRender();
-    return `Applied workspace preset [${preset.id}] ${preset.name}.`;
-  }
-
-  async function createPresetFromCurrentWorkspace(name) {
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Workspace preset name is required.");
-    }
-    const created = await api.createWorkspacePreset({
-      name: normalizedName,
-      workspace: captureCurrentWorkspace()
-    });
-    const preset = requireUpsertedPreset(created, "workspace preset save");
-    workspaceState = cloneWorkspaceState(preset.workspace);
-    requestRender();
-    return `Saved workspace preset [${preset.id}] ${preset.name}.`;
-  }
-
-  async function renamePresetById(presetId, name) {
-    const preset = getPreset(presetId);
-    if (!preset) {
-      throw new Error(`Unknown workspace preset: ${presetId}`);
-    }
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Workspace preset name is required.");
-    }
-    const updated = await api.updateWorkspacePreset(preset.id, { name: normalizedName });
-    const updatedPreset = requireUpsertedPreset(updated, "workspace preset rename");
-    return `Renamed workspace preset [${updatedPreset.id}] to ${updatedPreset.name}.`;
-  }
-
-  async function duplicatePresetById(presetId, name) {
-    const preset = getPreset(presetId);
-    if (!preset) {
-      throw new Error(`Unknown workspace preset: ${presetId}`);
-    }
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Workspace preset name is required.");
-    }
-    const created = await api.createWorkspacePreset({
-      name: normalizedName,
-      workspace: cloneWorkspaceState(preset.workspace)
-    });
-    const duplicated = requireUpsertedPreset(created, "workspace preset duplicate");
-    workspaceState = cloneWorkspaceState(duplicated.workspace);
-    requestRender();
-    return `Duplicated workspace preset [${preset.id}] ${preset.name} as [${duplicated.id}] ${duplicated.name}.`;
-  }
-
-  async function deletePresetById(presetId) {
-    const preset = getPreset(presetId);
-    if (!preset) {
-      throw new Error(`Unknown workspace preset: ${presetId}`);
-    }
-    await api.deleteWorkspacePreset(preset.id);
-    removePreset(preset.id);
-    requestRender();
-    return `Deleted workspace preset [${preset.id}] ${preset.name}.`;
-  }
-
-  function createGroupFromVisibleDeckSessions(name, deckId = getActiveDeckId()) {
-    const normalizedDeckId = normalizeText(deckId) || "default";
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Workspace group name is required.");
-    }
-    const visibleSessions = captureCurrentVisibleDeckSessions(normalizedDeckId);
-    if (visibleSessions.length === 0) {
-      throw new Error("No visible deck sessions to capture for a workspace group.");
-    }
-    const nextWorkspace = captureCurrentWorkspace();
-    const deckGroupState = cloneWorkspaceDeckGroups(nextWorkspace.deckGroups[normalizedDeckId]);
-    let groupId =
-      normalizedName
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "") || "group";
-    groupId = groupId.slice(0, 32).replace(/-+$/g, "") || "group";
-    let suffix = 2;
-    const usedIds = new Set(deckGroupState.groups.map((group) => group.id));
-    while (usedIds.has(groupId)) {
-      const suffixText = `-${suffix}`;
-      const rootMaxLength = 32 - suffixText.length;
-      const root = (groupId.slice(0, rootMaxLength).replace(/-+$/g, "") || "group");
-      groupId = `${root}${suffixText}`;
-      suffix += 1;
-    }
-    const nextGroup = {
-      id: groupId,
-      name: normalizedName,
-      sessionIds: visibleSessions.map((session) => session.id)
-    };
-    deckGroupState.groups = deckGroupState.groups.filter((group) => group.id !== nextGroup.id);
-    deckGroupState.groups.push(nextGroup);
-    deckGroupState.activeGroupId = nextGroup.id;
-    nextWorkspace.deckGroups[normalizedDeckId] = deckGroupState;
-    workspaceState = cloneWorkspaceState(nextWorkspace);
-    setSelectedGroupIdForDeck(normalizedDeckId, nextGroup.id);
-    render();
-    requestRender();
-    return nextGroup;
-  }
-
   function resolveGroup(selectorText, deckId = getActiveDeckId()) {
     const normalizedDeckId = normalizeText(deckId) || "default";
     return resolveWorkspaceGroupToken(listGroupsForDeck(normalizedDeckId), selectorText);
-  }
-
-  function applyGroupLocally(groupId, deckId = getActiveDeckId()) {
-    const normalizedDeckId = normalizeText(deckId) || "default";
-    const normalizedGroupId = normalizeText(groupId);
-    const nextWorkspace = captureCurrentWorkspace();
-    const deckGroupState = cloneWorkspaceDeckGroups(nextWorkspace.deckGroups[normalizedDeckId]);
-    if (normalizedGroupId && !deckGroupState.groups.some((group) => group.id === normalizedGroupId)) {
-      throw new Error(`Unknown workspace group: ${normalizedGroupId}`);
-    }
-    deckGroupState.activeGroupId = normalizedGroupId;
-    nextWorkspace.deckGroups[normalizedDeckId] = deckGroupState;
-    workspaceState = cloneWorkspaceState(nextWorkspace);
-    setSelectedGroupIdForDeck(normalizedDeckId, normalizedGroupId);
-    render();
-    requestRender();
-    return normalizedGroupId;
-  }
-
-  function renameGroupLocally(groupId, name, deckId = getActiveDeckId()) {
-    const normalizedDeckId = normalizeText(deckId) || "default";
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Workspace group name is required.");
-    }
-    const nextWorkspace = captureCurrentWorkspace();
-    const deckGroupState = cloneWorkspaceDeckGroups(nextWorkspace.deckGroups[normalizedDeckId]);
-    const index = deckGroupState.groups.findIndex((group) => group.id === normalizeText(groupId));
-    if (index < 0) {
-      throw new Error(`Unknown workspace group: ${groupId}`);
-    }
-    deckGroupState.groups[index] = {
-      ...deckGroupState.groups[index],
-      name: normalizedName
-    };
-    nextWorkspace.deckGroups[normalizedDeckId] = deckGroupState;
-    workspaceState = cloneWorkspaceState(nextWorkspace);
-    render();
-    requestRender();
-    return deckGroupState.groups[index];
-  }
-
-  function deleteGroupLocally(groupId, deckId = getActiveDeckId()) {
-    const normalizedDeckId = normalizeText(deckId) || "default";
-    const normalizedGroupId = normalizeText(groupId);
-    const nextWorkspace = captureCurrentWorkspace();
-    const deckGroupState = cloneWorkspaceDeckGroups(nextWorkspace.deckGroups[normalizedDeckId]);
-    const group = deckGroupState.groups.find((entry) => entry.id === normalizedGroupId) || null;
-    if (!group) {
-      throw new Error(`Unknown workspace group: ${groupId}`);
-    }
-    deckGroupState.groups = deckGroupState.groups.filter((entry) => entry.id !== normalizedGroupId);
-    if (deckGroupState.activeGroupId === normalizedGroupId) {
-      deckGroupState.activeGroupId = "";
-    }
-    nextWorkspace.deckGroups[normalizedDeckId] = deckGroupState;
-    workspaceState = cloneWorkspaceState(nextWorkspace);
-    setSelectedGroupIdForDeck(normalizedDeckId, "");
-    render();
-    requestRender();
-    return group;
-  }
-
-  function clearGroupLocally(deckId = getActiveDeckId()) {
-    const normalizedDeckId = normalizeText(deckId) || "default";
-    const nextWorkspace = captureCurrentWorkspace();
-    const deckGroupState = cloneWorkspaceDeckGroups(nextWorkspace.deckGroups[normalizedDeckId]);
-    deckGroupState.activeGroupId = "";
-    nextWorkspace.deckGroups[normalizedDeckId] = deckGroupState;
-    workspaceState = cloneWorkspaceState(nextWorkspace);
-    setSelectedGroupIdForDeck(normalizedDeckId, "");
-    render();
-    requestRender();
   }
 
   async function loadPresets() {
@@ -1138,295 +925,86 @@ export function createWorkspacePresetRuntimeController(options = {}) {
     }
   }
 
-  async function createPresetFlow(name) {
-    const input = normalizeText(name) || getPresetNameInputValue();
-    if (!input) {
-      throw new Error("Enter the preset name before saving the current workspace.");
-    }
-    const feedback = await createPresetFromCurrentWorkspace(input);
-    clearPendingPresetDelete();
-    if (presetNameInputEl) {
-      presetNameInputEl.value = input;
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
+  const runtimeActions = createWorkspacePresetRuntimeActions({
+    api,
+    normalizeText,
+    cloneWorkspaceState,
+    cloneWorkspaceDeckGroups,
+    normalizeControlPaneState,
+    getPreset,
+    getSelectedPreset,
+    setSelectedPresetId: (value) => {
+      selectedPresetId = normalizeText(value);
+    },
+    getWorkspaceState: () => workspaceState,
+    setWorkspaceState: (nextState) => {
+      workspaceState = nextState;
+    },
+    requireUpsertedPreset,
+    removePreset,
+    captureCurrentWorkspace,
+    captureCurrentVisibleDeckSessions,
+    getActiveDeckId,
+    listGroupsForDeck,
+    setSelectedGroupIdForDeck,
+    getSelectedGroupIdForDeck,
+    resolveGroup,
+    applyLayoutProfileById,
+    setDeckSplitLayouts,
+    setControlPaneState,
+    setActiveDeck,
+    requestRender,
+    render,
+    setStatus,
+    setCommandFeedback,
+    presetNameInputEl,
+    groupNameInputEl,
+    clearPendingPresetDelete,
+    clearPendingGroupDelete,
+    getPendingDeletePresetId: () => pendingDeletePresetId,
+    setPendingDeletePresetId: (value) => {
+      pendingDeletePresetId = normalizeText(value);
+    },
+    getPendingDeleteGroupKey: () => pendingDeleteGroupKey,
+    setPendingDeleteGroupKey: (value) => {
+      pendingDeleteGroupKey = normalizeText(value);
+    },
+    getPresetNameInputValue,
+    getGroupNameInputValue
+  });
 
-  async function applySelectedPresetFlow() {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return "";
-    }
-    const feedback = await applyPresetById(preset.id);
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function renameSelectedPresetFlow(name) {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return "";
-    }
-    const input = normalizeText(name) || getPresetNameInputValue();
-    if (!input) {
-      throw new Error("Enter the desired preset name before renaming.");
-    }
-    const feedback = await renamePresetById(preset.id, input);
-    clearPendingPresetDelete();
-    if (presetNameInputEl) {
-      presetNameInputEl.value = input;
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function requestDeleteSelectedPresetFlow() {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return "";
-    }
-    pendingDeletePresetId = preset.id;
-    render();
-    const feedback = `Confirm deletion for workspace preset [${preset.id}] ${preset.name}.`;
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function deleteSelectedPresetFlow() {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return "";
-    }
-    if (pendingDeletePresetId !== preset.id) {
-      return requestDeleteSelectedPresetFlow();
-    }
-    const feedback = await deletePresetById(preset.id);
-    clearPendingPresetDelete();
-    if (presetNameInputEl) {
-      presetNameInputEl.value = "";
-    }
-    render();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function cancelDeleteSelectedPresetFlow() {
-    clearPendingPresetDelete();
-    render();
-    const feedback = "Cancelled deletion of the workspace preset.";
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function duplicateSelectedPresetFlow(name) {
-    const preset = getSelectedPreset();
-    if (!preset) {
-      return "";
-    }
-    const requestedName = normalizeText(name) || getPresetNameInputValue();
-    const input =
-      requestedName && requestedName !== preset.name
-        ? requestedName
-        : `${preset.name} Copy`;
-    const feedback = await duplicatePresetById(preset.id, input);
-    clearPendingPresetDelete();
-    if (presetNameInputEl) {
-      presetNameInputEl.value = input;
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function saveGroupByName(name, deckId = getActiveDeckId()) {
-    const activeDeckId = normalizeText(deckId) || "default";
-    const group = createGroupFromVisibleDeckSessions(name, activeDeckId);
-    let feedback = `Saved workspace group [${group.id}] ${group.name} for deck [${activeDeckId}].`;
-    const preset = getSelectedPreset();
-    if (preset) {
-      await persistWorkspaceStateForSelectedPreset();
-      feedback = `Saved workspace group [${group.id}] ${group.name} for deck [${activeDeckId}] and persisted it into preset [${preset.id}] ${preset.name}.`;
-    } else {
-      feedback = `${feedback} It is local-only until you save or select a workspace preset.`;
-    }
-    clearPendingGroupDelete();
-    if (groupNameInputEl) {
-      groupNameInputEl.value = group.name;
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function saveGroupFlow(name) {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    const input = normalizeText(name) || getGroupNameInputValue();
-    if (!input) {
-      throw new Error("Enter the group name before saving the visible deck sessions.");
-    }
-    return saveGroupByName(input, activeDeckId);
-  }
-
-  async function applyGroupById(groupId, deckId = getActiveDeckId()) {
-    const activeDeckId = normalizeText(deckId) || "default";
-    const normalizedGroupId = normalizeText(groupId);
-    applyGroupLocally(normalizedGroupId, activeDeckId);
-    const preset = getSelectedPreset();
-    if (preset) {
-      await persistWorkspaceStateForSelectedPreset();
-    }
-    const feedback = normalizedGroupId
-      ? preset
-        ? `Active workspace group for deck [${activeDeckId}] is now [${normalizedGroupId}] and persisted into preset [${preset.id}] ${preset.name}.`
-        : `Active workspace group for deck [${activeDeckId}] is now [${normalizedGroupId}]. It is local-only until you save or select a workspace preset.`
-      : preset
-        ? `Cleared the active workspace group for deck [${activeDeckId}] and persisted it into preset [${preset.id}] ${preset.name}.`
-        : `Cleared the active workspace group for deck [${activeDeckId}]. The change is local-only until you save or select a workspace preset.`;
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function applySelectedGroupFlow() {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    return applyGroupById(getSelectedGroupIdForDeck(activeDeckId), activeDeckId);
-  }
-
-  async function renameGroupById(groupId, name, deckId = getActiveDeckId()) {
-    const activeDeckId = normalizeText(deckId) || "default";
-    const normalizedGroupId = normalizeText(groupId);
-    if (!normalizedGroupId) {
-      return "";
-    }
-    const groups = listGroupsForDeck(activeDeckId);
-    const group = groups.find((entry) => entry.id === normalizedGroupId) || null;
-    if (!group) {
-      return "";
-    }
-    const input = normalizeText(name);
-    if (!input) {
-      throw new Error("Workspace group name is required.");
-    }
-    const updatedGroup = renameGroupLocally(normalizedGroupId, input, activeDeckId);
-    const preset = getSelectedPreset();
-    if (preset) {
-      await persistWorkspaceStateForSelectedPreset();
-    }
-    const feedback = preset
-      ? `Renamed workspace group [${updatedGroup.id}] to ${updatedGroup.name} and persisted it into preset [${preset.id}] ${preset.name}.`
-      : `Renamed workspace group [${updatedGroup.id}] to ${updatedGroup.name}. The change is local-only until you save or select a workspace preset.`;
-    clearPendingGroupDelete();
-    if (groupNameInputEl) {
-      groupNameInputEl.value = updatedGroup.name;
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function renameSelectedGroupFlow(name) {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
-    if (!selectedGroupId) {
-      return "";
-    }
-    const groups = listGroupsForDeck(activeDeckId);
-    const group = groups.find((entry) => entry.id === selectedGroupId) || null;
-    if (!group) {
-      return "";
-    }
-    const input = normalizeText(name) || getGroupNameInputValue();
-    if (!input) {
-      throw new Error("Enter the desired group name before renaming.");
-    }
-    return renameGroupById(selectedGroupId, input, activeDeckId);
-  }
-
-  async function deleteGroupById(groupId, deckId = getActiveDeckId()) {
-    const activeDeckId = normalizeText(deckId) || "default";
-    const normalizedGroupId = normalizeText(groupId);
-    if (!normalizedGroupId) {
-      return "";
-    }
-    const deletedGroup = deleteGroupLocally(normalizedGroupId, activeDeckId);
-    const preset = getSelectedPreset();
-    if (preset) {
-      await persistWorkspaceStateForSelectedPreset();
-    }
-    const feedback = preset
-      ? `Deleted workspace group [${deletedGroup.id}] ${deletedGroup.name} and persisted it into preset [${preset.id}] ${preset.name}.`
-      : `Deleted workspace group [${deletedGroup.id}] ${deletedGroup.name}. The change is local-only until you save or select a workspace preset.`;
-    clearPendingGroupDelete();
-    if (groupNameInputEl) {
-      groupNameInputEl.value = "";
-    }
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function requestDeleteSelectedGroupFlow() {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
-    if (!selectedGroupId) {
-      return "";
-    }
-    const groups = listGroupsForDeck(activeDeckId);
-    const group = groups.find((entry) => entry.id === selectedGroupId) || null;
-    if (!group) {
-      return "";
-    }
-    pendingDeleteGroupKey = `${activeDeckId}:${selectedGroupId}`;
-    render();
-    const feedback = `Confirm deletion for workspace group [${group.id}] ${group.name} on deck [${activeDeckId}].`;
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function deleteSelectedGroupFlow() {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    const selectedGroupId = getSelectedGroupIdForDeck(activeDeckId);
-    if (!selectedGroupId) {
-      return "";
-    }
-    if (pendingDeleteGroupKey !== `${activeDeckId}:${selectedGroupId}`) {
-      return requestDeleteSelectedGroupFlow();
-    }
-    return deleteGroupById(selectedGroupId, activeDeckId);
-  }
-
-  async function cancelDeleteSelectedGroupFlow() {
-    clearPendingGroupDelete();
-    render();
-    const feedback = "Cancelled deletion of the workspace group.";
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function clearGroupForDeck(deckId = getActiveDeckId()) {
-    const activeDeckId = normalizeText(deckId) || "default";
-    clearGroupLocally(activeDeckId);
-    const preset = getSelectedPreset();
-    if (preset) {
-      await persistWorkspaceStateForSelectedPreset();
-    }
-    const feedback = preset
-      ? `Cleared the active workspace group for deck [${activeDeckId}] and persisted it into preset [${preset.id}] ${preset.name}.`
-      : `Cleared the active workspace group for deck [${activeDeckId}]. The change is local-only until you save or select a workspace preset.`;
-    clearPendingGroupDelete();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function clearSelectedGroupFlow() {
-    const activeDeckId = normalizeText(getActiveDeckId()) || "default";
-    return clearGroupForDeck(activeDeckId);
-  }
+  const {
+    persistWorkspaceStateForSelectedPreset,
+    applyPresetById,
+    createPresetFromCurrentWorkspace,
+    renamePresetById,
+    duplicatePresetById,
+    deletePresetById,
+    createGroupFromVisibleDeckSessions,
+    applyGroupLocally,
+    renameGroupLocally,
+    deleteGroupLocally,
+    clearGroupLocally,
+    createPresetFlow,
+    applySelectedPresetFlow,
+    renameSelectedPresetFlow,
+    requestDeleteSelectedPresetFlow,
+    deleteSelectedPresetFlow,
+    cancelDeleteSelectedPresetFlow,
+    duplicateSelectedPresetFlow,
+    saveGroupByName,
+    saveGroupFlow,
+    applyGroupById,
+    applySelectedGroupFlow,
+    renameGroupById,
+    renameSelectedGroupFlow,
+    deleteGroupById,
+    requestDeleteSelectedGroupFlow,
+    deleteSelectedGroupFlow,
+    cancelDeleteSelectedGroupFlow,
+    clearGroupForDeck,
+    clearSelectedGroupFlow
+  } = runtimeActions;
 
   function bindUiEvents() {
     if (uiEventsBound) {

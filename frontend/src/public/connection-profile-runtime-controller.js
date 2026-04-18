@@ -1,3 +1,5 @@
+import { createConnectionProfileRuntimeActions } from "./connection-profile-runtime-actions.js";
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -1419,28 +1421,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     });
   }
 
-  async function createProfileFromSession(sessionOrId, name, options = {}) {
-    const session = typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId;
-    if (!session) {
-      throw new Error("Session is required to save a connection profile.");
-    }
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Connection profile name is required.");
-    }
-    const launch = getLaunchForSession(session);
-    if (!launch) {
-      throw new Error("Session launch settings are incomplete and cannot be saved as a connection profile.");
-    }
-    const created = await api.createConnectionProfile({
-      ...(normalizeText(options.id) ? { id: normalizeText(options.id) } : {}),
-      name: normalizedName,
-      launch
-    });
-    const profile = requireUpsertedProfile(created, "connection profile save");
-    return `Saved connection profile [${profile.id}] ${profile.name} from [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
-  }
-
   async function promptForLaunchSecret(profile) {
     if (!authMethodRequiresSecret(profile?.launch?.remoteAuth)) {
       return { ok: true, remoteSecret: undefined, cancelled: false };
@@ -1484,196 +1464,6 @@ export function createConnectionProfileRuntimeController(options = {}) {
     throw new Error(
       `No trusted host key is stored for ${formatSshTarget(host, port)}. Review the fetched host key below, trust the one that matches your server, then launch again.`
     );
-  }
-
-  async function applyProfileById(profileId) {
-    const profile = getProfile(profileId);
-    if (!profile) {
-      throw new Error(`Unknown connection profile: ${profileId}`);
-    }
-    await ensureTrustedHostKeyBeforeLaunch(profile);
-    const secretResult = await promptForLaunchSecret(profile);
-    if (secretResult.cancelled) {
-      return `Connection profile apply cancelled for [${profile.id}] ${profile.name}.`;
-    }
-    const session = await api.createSession({
-      connectionProfileId: profile.id,
-      ...(secretResult.remoteSecret !== undefined ? { remoteSecret: secretResult.remoteSecret } : {})
-    });
-    if (runtimeSecretInputEl) {
-      runtimeSecretInputEl.value = "";
-    }
-    applyRuntimeEvent({ type: "session.created", session });
-    if (normalizeText(session.deckId)) {
-      setActiveDeck(session.deckId);
-    }
-    setActiveSession(session.id);
-    requestRender();
-    return `Started session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)} from connection profile [${profile.id}] ${profile.name}.`;
-  }
-
-  async function renameProfileById(profileId, name) {
-    const profile = getProfile(profileId);
-    if (!profile) {
-      throw new Error(`Unknown connection profile: ${profileId}`);
-    }
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Connection profile name is required.");
-    }
-    const updated = await api.updateConnectionProfile(profile.id, { name: normalizedName });
-    const updatedProfile = requireUpsertedProfile(updated, "connection profile rename");
-    return `Renamed connection profile [${updatedProfile.id}] to ${updatedProfile.name}.`;
-  }
-
-  async function duplicateProfileById(profileId, name) {
-    const profile = getProfile(profileId);
-    if (!profile) {
-      throw new Error(`Unknown connection profile: ${profileId}`);
-    }
-    const normalizedName = normalizeText(name);
-    if (!normalizedName) {
-      throw new Error("Connection profile name is required.");
-    }
-    const created = await api.createConnectionProfile({
-      name: normalizedName,
-      launch: profile.launch
-    });
-    const duplicated = requireUpsertedProfile(created, "connection profile duplicate");
-    return `Duplicated connection profile [${profile.id}] ${profile.name} as [${duplicated.id}] ${duplicated.name}.`;
-  }
-
-  async function deleteProfileById(profileId) {
-    const profile = getProfile(profileId);
-    if (!profile) {
-      throw new Error(`Unknown connection profile: ${profileId}`);
-    }
-    await api.deleteConnectionProfile(profile.id);
-    removeProfile(profile.id);
-    return `Deleted connection profile [${profile.id}] ${profile.name}.`;
-  }
-
-  async function saveDraftById() {
-    const name = normalizeText(draftNameInputEl?.value || draftState?.name);
-    if (!name) {
-      throw new Error("Connection profile name is required.");
-    }
-    const launch = buildPersistedDraftLaunch();
-    const existingProfileId = normalizeText(draftState?.profileId);
-    if (existingProfileId && getProfile(existingProfileId)) {
-      const updated = await api.updateConnectionProfile(existingProfileId, { name, launch });
-      const profile = requireUpsertedProfile(updated, "connection profile update");
-      setDraftState({
-        mode: "profile",
-        profileId: profile?.id,
-        name: profile?.name,
-        launch: profile?.launch
-      });
-      return `Updated connection profile [${profile.id}] ${profile.name}.`;
-    }
-    const created = await api.createConnectionProfile({ name, launch });
-    const profile = requireUpsertedProfile(created, "connection profile save");
-    setDraftState({
-      mode: "profile",
-      profileId: profile?.id,
-      name: profile?.name,
-      launch: profile?.launch
-    });
-    return `Saved connection profile [${profile.id}] ${profile.name}.`;
-  }
-
-  async function saveAndLaunchDraftFlow() {
-    const inlineRuntimeSecret = typeof runtimeSecretInputEl?.value === "string" ? runtimeSecretInputEl.value : "";
-    const feedback = await saveDraftById();
-    if (runtimeSecretInputEl && inlineRuntimeSecret && !runtimeSecretInputEl.value) {
-      runtimeSecretInputEl.value = inlineRuntimeSecret;
-    }
-    const profile = getSelectedProfile();
-    if (!profile) {
-      setCommandFeedback(feedback);
-      setStatus(feedback);
-      return feedback;
-    }
-    const launchFeedback = await applyProfileById(profile.id);
-    const combinedFeedback = `${feedback}\n${launchFeedback}`;
-    setCommandFeedback(combinedFeedback);
-    setStatus(launchFeedback);
-    return combinedFeedback;
-  }
-
-  async function loadProfiles() {
-    if (typeof api.listConnectionProfiles !== "function") {
-      clearSshTrustState();
-      replaceProfiles([]);
-      return [];
-    }
-    try {
-      const payload = await api.listConnectionProfiles();
-      replaceProfiles(payload || []);
-      clearSshTrustState();
-      await refreshSshTrustEntries({ silent: true });
-      return profiles.slice();
-    } catch (error) {
-      setError(getErrorMessage(error, "Failed to load connection profiles."));
-      clearSshTrustState();
-      replaceProfiles([]);
-      return [];
-    }
-  }
-
-  async function createProfileFlow(name, sessionOrId = undefined) {
-    const activeSessionId = getActiveSessionId();
-    const session = sessionOrId ? (typeof sessionOrId === "string" ? getSessionById(sessionOrId) : sessionOrId) : getSessionById(activeSessionId);
-    if (!session) {
-      throw new Error("No active session to save as a connection profile.");
-    }
-    const defaultName = formatSessionDisplayName(session);
-    const input = normalizeText(name) || normalizeText(windowRef?.prompt?.("Connection profile name", defaultName));
-    if (!input) {
-      return "";
-    }
-    const feedback = await createProfileFromSession(session, input);
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function newDraftFlow(kind = "local") {
-    const activeSession = getSessionById(getActiveSessionId());
-    const normalizedKind = normalizeLower(kind) === "ssh" ? "ssh" : "local";
-    setDraftState({
-      mode: "blank",
-      profileId: "",
-      name: normalizedKind === "ssh" ? "New SSH Connection" : "New Local Connection",
-      deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-      launch: buildBlankConnectionProfileLaunch({
-        deckId: normalizeText(activeSession?.deckId) || defaultDeckId,
-        defaultThemeProfile,
-        kind: normalizedKind
-      })
-    });
-    const feedback =
-      normalizedKind === "ssh"
-        ? "Opened a new guided SSH connection profile draft."
-        : "Opened a new guided local connection profile draft.";
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function loadActiveDraftFlow() {
-    loadDraftFromActiveSession();
-    const feedback = "Loaded the active session into a new connection profile draft.";
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function saveDraftFlow() {
-    const feedback = await saveDraftById();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
   }
 
   async function probeSshHostKeysFlow(options = {}) {
@@ -1758,95 +1548,73 @@ export function createConnectionProfileRuntimeController(options = {}) {
     return feedback;
   }
 
-  async function resetDraftFlow() {
-    resetDraftFromSelectedProfile();
-    const feedback = "Reset the connection profile draft.";
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
+  const runtimeActions = createConnectionProfileRuntimeActions({
+    api,
+    defaultDeckId,
+    defaultThemeProfile,
+    normalizeText,
+    normalizeLower,
+    getErrorMessage,
+    getSessionById,
+    getActiveSessionId,
+    getLaunchForSession,
+    getProfile,
+    getSelectedProfile,
+    requireUpsertedProfile,
+    removeProfile,
+    replaceProfiles,
+    listProfiles,
+    promptForLaunchSecret,
+    ensureTrustedHostKeyBeforeLaunch,
+    runtimeSecretInputEl,
+    applyRuntimeEvent,
+    setActiveDeck,
+    setActiveSession,
+    requestRender,
+    formatSessionToken,
+    formatSessionDisplayName,
+    buildPersistedDraftLaunch,
+    getDraftState: () => draftState,
+    setDraftState,
+    clearSshTrustState,
+    refreshSshTrustEntries,
+    setError,
+    setCommandFeedback,
+    setStatus,
+    windowRef,
+    buildBlankConnectionProfileLaunch,
+    loadDraftFromActiveSession,
+    resetDraftFromSelectedProfile,
+    getDraftNameInputValue,
+    clearPendingDeleteConfirmation,
+    renderDraftComputedState,
+    getPendingDeleteProfileId: () => pendingDeleteProfileId,
+    setPendingDeleteProfileId: (value) => {
+      pendingDeleteProfileId = normalizeText(value);
+    }
+  });
 
-  async function applySelectedProfileFlow() {
-    const profile = getSelectedProfile();
-    if (!profile) {
-      return "";
-    }
-    const feedback = await applyProfileById(profile.id);
-    clearPendingDeleteConfirmation();
-    renderDraftComputedState();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function renameSelectedProfileFlow(name) {
-    const profile = getSelectedProfile();
-    if (!profile) {
-      return "";
-    }
-    const input = normalizeText(name) || getDraftNameInputValue();
-    if (!input) {
-      throw new Error("Enter the desired saved profile name in Profile Name before renaming.");
-    }
-    const feedback = await renameProfileById(profile.id, input);
-    clearPendingDeleteConfirmation();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function duplicateSelectedProfileFlow(name) {
-    const profile = getSelectedProfile();
-    if (!profile) {
-      return "";
-    }
-    const requestedName = normalizeText(name) || getDraftNameInputValue();
-    const input =
-      requestedName && requestedName !== profile.name
-        ? requestedName
-        : `${profile.name} Copy`;
-    const feedback = await duplicateProfileById(profile.id, input);
-    clearPendingDeleteConfirmation();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function requestDeleteSelectedProfileFlow() {
-    const profile = getSelectedProfile();
-    if (!profile) {
-      return "";
-    }
-    pendingDeleteProfileId = profile.id;
-    renderDraftComputedState();
-    const feedback = `Confirm deletion for saved connection profile [${profile.id}] ${profile.name}.`;
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function deleteSelectedProfileFlow() {
-    const profile = getSelectedProfile();
-    if (!profile) {
-      return "";
-    }
-    if (pendingDeleteProfileId !== profile.id) {
-      return requestDeleteSelectedProfileFlow();
-    }
-    const feedback = await deleteProfileById(profile.id);
-    clearPendingDeleteConfirmation();
-    renderDraftComputedState();
-    setCommandFeedback(feedback);
-    setStatus(feedback);
-    return feedback;
-  }
-
-  async function cancelDeleteSelectedProfileFlow() {
-    clearPendingDeleteConfirmation();
-    renderDraftComputedState();
-    const feedback = "Cancelled deletion of the saved connection profile.";
-    setStatus(feedback);
-    return feedback;
-  }
+  const {
+    createProfileFromSession,
+    applyProfileById,
+    renameProfileById,
+    duplicateProfileById,
+    deleteProfileById,
+    saveDraftById,
+    saveAndLaunchDraftFlow,
+    loadProfiles,
+    createProfileFlow,
+    newDraftFlow,
+    loadActiveDraftFlow,
+    saveDraftFlow,
+    resetDraftFlow,
+    applySelectedProfileFlow,
+    duplicateSelectedProfileFlow,
+    renameSelectedProfileFlow,
+    requestDeleteSelectedProfileFlow,
+    deleteSelectedProfileFlow,
+    cancelDeleteSelectedProfileFlow
+  } = runtimeActions;
 
   function bindUiEvents() {
     if (uiEventsBound) {

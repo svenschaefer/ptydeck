@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`H150` frontend session-control seam extraction; `H151` active)
+Last updated: 2026-04-18 (post-`H151` frontend command/workspace seam extraction)
 
 ## Current Product Truth
 
@@ -121,8 +121,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active explicit quality/coverage hardening tasks are now `MSG-218` and `MSG-219`
-- `ROADMAP.md`: `v0.4.0-H151` is now active, with no further queued wave behind it
+- `TODO.md`: no active explicit tasks remain
+- `ROADMAP.md`: no active or queued release wave remains
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
@@ -140,12 +140,20 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
   - The remaining `backend/src/runtime.js` file still sits at `82.08%` line / `75.60%` branch / `91.67%` function coverage, but the extracted seams materially reduced monolith risk and moved promoted helper branches into deterministic unit tests without changing the shipped transport-only runtime contract.
 - `v0.4.0-H148` reduced `frontend/src/public/app-runtime-composition-controller.js` from `2623` to `2328` lines by extracting `frontend/src/public/session-control-runtime-state.js` (`428` lines) and by adding direct seam tests for trusted-local handoff/control ownership behavior instead of testing only through the larger composition controller.
 - `v0.4.0-H150` then reduced `frontend/src/public/app-runtime-composition-controller.js` further from `2328` to `1878` lines by extracting `frontend/src/public/session-control-runtime-controller.js` (`594` lines), which now owns canonical-origin redirects, origin-handoff auto-repair, reclaim-and-retry feedback actions, trusted-local rename/forget flows, and rendered session-control UI state instead of leaving those branches buried inside one composition controller.
-- The validated post-`H150` frontend seam snapshot on the current tree is:
+- `v0.4.0-H151` then closed the remaining promoted frontend command/workspace monolith wave by extracting three more directly tested seams from the highest-fan-out controller cluster:
+  - `frontend/src/public/command-executor-domain-handlers.js` (`560` lines) now owns the main structured command-family dispatch, reducing `frontend/src/public/command-executor.js` from `2432` to `1984` lines.
+  - `frontend/src/public/connection-profile-runtime-actions.js` (`411` lines) now owns profile lifecycle/action flows, reducing `frontend/src/public/connection-profile-runtime-controller.js` from `1984` to `1752` lines.
+  - `frontend/src/public/workspace-preset-runtime-actions.js` (`605` lines) now owns preset/group lifecycle/action flows, reducing `frontend/src/public/workspace-preset-runtime-controller.js` from `1557` to `1135` lines.
+- The validated post-`H151` frontend seam snapshot on the current tree is:
   - `frontend/src/public/app-runtime-composition-controller.js`: `86.47%` line / `62.92%` branch / `14.29%` function
   - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch / `68.97%` function
   - `frontend/src/public/session-control-runtime-state.js`: `85.98%` line / `75.65%` branch / `100.00%` function
+  - `frontend/src/public/command-executor-domain-handlers.js`: `87.86%` line / `71.49%` branch / `22.39%` function
+  - `frontend/src/public/command-executor.js`: `82.86%` line / `73.54%` branch / `47.58%` function
+  - `frontend/src/public/connection-profile-runtime-actions.js`: `77.37%` line / `74.19%` branch / `26.79%` function
+  - `frontend/src/public/connection-profile-runtime-controller.js`: `91.38%` line / `70.33%` branch / `79.87%` function
+  - `frontend/src/public/workspace-preset-runtime-actions.js`: `85.62%` line / `67.43%` branch / `54.67%` function
+  - `frontend/src/public/workspace-preset-runtime-controller.js`: `91.63%` line / `79.82%` branch / `76.56%` function
   - repo-wide validated coverage totals: backend `93.65%` line coverage, frontend `95.07%` line coverage
-- A follow-up repo-wide review on the validated current tree still leaves two active frontend-focused quality waves because the repaired coverage report now makes the residual risks unambiguous instead of anecdotal:
-  - `frontend/src/public/app-runtime-composition-controller.js` is materially smaller after `H150`, but it still remains a large composition surface at `1878` lines and still carries low function coverage because bootstrap/auth/runtime composition is concentrated there. The session-control and trusted-local control branches are now pulled into directly tested seams instead of remaining inline, which is the intended `H150` outcome.
-  - The remaining high-fan-out frontend command/workspace stack is now the next clear maintainability cluster: `frontend/src/public/command-executor.js` sits at `2432` lines with `49.61%` function coverage, `frontend/src/public/connection-profile-runtime-controller.js` sits at `1984` lines with `69.23%` branch coverage, and `frontend/src/public/workspace-preset-runtime-controller.js` sits at `1557` lines with `73.81%` branch coverage. Those files now make up active `v0.4.0-H151` instead of being left as untracked known debt.
+- The repo-wide review that promoted `v0.4.0-H151` is now closed: the command/workspace hotspot cluster has direct extracted seams plus focused tests, and no further active or queued quality wave remains in `TODO.md` or `ROADMAP.md`.
 - Smaller low-coverage utilities and UI controllers still exist, but they were not promoted in this review because they are either already bounded, substantially better covered than the newly promoted monoliths, or lower risk than the backend runtime and frontend composition/command/workspace surfaces now queued in `TODO.md`.

@@ -26,6 +26,7 @@ import {
   resolveExactCustomCommand,
   renderCustomCommandForSession
 } from "./custom-command-model.js";
+import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
 
 export function createCommandExecutor(options = {}) {
   const store = options.store;
@@ -654,6 +655,62 @@ export function createCommandExecutor(options = {}) {
       exactSession: null
     };
   }
+
+  const domainHandlers = createCommandExecutorDomainHandlers({
+    defaultDeckId,
+    normalizeKeyword,
+    formatUsage,
+    parseJsonObjectToken,
+    getSessionById,
+    resolveActiveOrDirectTargetSession,
+    listLayoutProfiles,
+    resolveLayoutProfile,
+    createLayoutProfileFromCurrent,
+    applyLayoutProfile,
+    renameLayoutProfile,
+    deleteLayoutProfile,
+    listConnectionProfiles,
+    formatConnectionProfileSummary,
+    formatConnectionProfileReport,
+    resolveConnectionProfile,
+    createConnectionProfileFromSession,
+    getConnectionProfileDraft,
+    setConnectionProfileDraft,
+    loadConnectionProfileDraftFromActive,
+    formatConnectionDraftReport,
+    normalizeConnectionProfileLaunch,
+    saveConnectionProfileDraft,
+    resetConnectionProfileDraft,
+    applyConnectionProfile,
+    duplicateConnectionProfile,
+    renameConnectionProfile,
+    deleteConnectionProfile,
+    listWorkspacePresets,
+    resolveWorkspacePreset,
+    formatWorkspacePresetDetail,
+    createWorkspacePresetFromCurrent,
+    applyWorkspacePreset,
+    duplicateWorkspacePreset,
+    renameWorkspacePreset,
+    deleteWorkspacePreset,
+    getActiveDeck,
+    listWorkspaceGroupsForDeck,
+    resolveWorkspaceGroup,
+    saveWorkspaceGroup,
+    applyWorkspaceGroup,
+    renameWorkspaceGroup,
+    deleteWorkspaceGroup,
+    clearWorkspaceGroup,
+    getBroadcastStatus,
+    enableGroupBroadcast,
+    disableBroadcast,
+    listShares,
+    createShareLink,
+    revokeShareLink,
+    writeClipboardText,
+    resolveDeckToken,
+    formatShareLinkSummary
+  });
 
   function renderCustomCommandForTargets(commandName, exactCustom, targetSessions, parameterAssignments, decks, commands, sessions) {
     const renderedEntries = [];
@@ -1330,521 +1387,16 @@ export function createCommandExecutor(options = {}) {
       return outcome?.feedback || "";
     }
 
-    if (command === "layout") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
-      const rest = args.slice(1);
-      if (!subcommand || subcommand === "list") {
-        const profiles = listLayoutProfiles();
-        if (!Array.isArray(profiles) || profiles.length === 0) {
-          return "No layout profiles available.";
-        }
-        return profiles
-          .map((profile) => `[${profile.id}] ${profile.name} -> deck=${profile.layout?.activeDeckId || "default"} filter=${JSON.stringify(profile.layout?.sessionFilterText || "")}`)
-          .join("\n");
-      }
-
-      if (subcommand === "save") {
-        const name = rest.join(" ").trim();
-        if (!name) {
-          return formatUsage("layout", "save");
-        }
-        return createLayoutProfileFromCurrent(name);
-      }
-
-      if (subcommand === "apply") {
-        if (rest.length !== 1) {
-          return formatUsage("layout", "apply");
-        }
-        const resolved = resolveLayoutProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        return applyLayoutProfile(resolved.profile.id);
-      }
-
-      if (subcommand === "rename") {
-        if (rest.length < 2) {
-          return formatUsage("layout", "rename");
-        }
-        const resolved = resolveLayoutProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        const name = rest.slice(1).join(" ").trim();
-        if (!name) {
-          return formatUsage("layout", "rename");
-        }
-        return renameLayoutProfile(resolved.profile.id, name);
-      }
-
-      if (subcommand === "delete") {
-        if (rest.length !== 1) {
-          return formatUsage("layout", "delete");
-        }
-        const resolved = resolveLayoutProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        return deleteLayoutProfile(resolved.profile.id);
-      }
-
-      return formatUsage("layout");
-    }
-
-    if (command === "connection") {
-      const subcommand = normalizeKeyword(args[0]);
-      const rest = args.slice(1);
-      if (!subcommand || subcommand === "list") {
-        const profiles = listConnectionProfiles();
-        if (!Array.isArray(profiles) || profiles.length === 0) {
-          return "No connection profiles available.";
-        }
-        return profiles.map((profile) => formatConnectionProfileSummary(profile)).join("\n");
-      }
-
-      if (subcommand === "new") {
-        const name = rest.join(" ").trim();
-        if (!name) {
-          return formatUsage("connection", "new");
-        }
-        const activeSession = getSessionById(activeSessionId, sessions);
-        setConnectionProfileDraft({
-          mode: "blank",
-          profileId: "",
-          name,
-          deckId: activeSession?.deckId || defaultDeckId,
-          launch: {}
-        });
-        return saveConnectionProfileDraft();
-      }
-
-      if (subcommand === "save") {
-        if (rest.length === 0) {
-          return formatUsage("connection", "save");
-        }
-        const resolvedTarget = resolveActiveOrDirectTargetSession(
-          interpreted,
-          sessions,
-          activeSessionId,
-          "No active session to save as a connection profile.",
-          "Connection profile session selector"
-        );
-        if (resolvedTarget.error) {
-          return resolvedTarget.error;
-        }
-        const targetSession = resolvedTarget.session;
-        const name = rest.join(" ").trim();
-        if (!name) {
-          return formatUsage("connection", "save");
-        }
-        return createConnectionProfileFromSession(targetSession, name);
-      }
-
-      if (subcommand === "show") {
-        if (rest.length !== 1) {
-          return formatUsage("connection", "show");
-        }
-        const resolved = resolveConnectionProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        return formatConnectionProfileReport(resolved.profile);
-      }
-
-      if (subcommand === "apply") {
-        if (rest.length !== 1) {
-          return formatUsage("connection", "apply");
-        }
-        const resolved = resolveConnectionProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        return applyConnectionProfile(resolved.profile.id);
-      }
-
-      if (subcommand === "duplicate") {
-        if (rest.length < 2) {
-          return formatUsage("connection", "duplicate");
-        }
-        const resolved = resolveConnectionProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        const name = rest.slice(1).join(" ").trim();
-        if (!name) {
-          return formatUsage("connection", "duplicate");
-        }
-        return duplicateConnectionProfile(resolved.profile.id, name);
-      }
-
-      if (subcommand === "rename") {
-        if (rest.length < 2) {
-          return formatUsage("connection", "rename");
-        }
-        const resolved = resolveConnectionProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        const name = rest.slice(1).join(" ").trim();
-        if (!name) {
-          return formatUsage("connection", "rename");
-        }
-        return renameConnectionProfile(resolved.profile.id, name);
-      }
-
-      if (subcommand === "delete") {
-        if (rest.length !== 1) {
-          return formatUsage("connection", "delete");
-        }
-        const resolved = resolveConnectionProfile(rest[0]);
-        if (!resolved.profile) {
-          return resolved.error;
-        }
-        return deleteConnectionProfile(resolved.profile.id);
-      }
-
-      if (subcommand === "draft") {
-        const draftSubcommand = normalizeKeyword(rest[0]);
-        const draftArgs = rest.slice(1);
-        if (!draftSubcommand || draftSubcommand === "show") {
-          if (draftArgs.length > 0) {
-            return formatUsage("connection", "draft");
-          }
-          return formatConnectionDraftReport(getConnectionProfileDraft());
-        }
-
-        if (draftSubcommand === "new") {
-          const activeSession = getSessionById(activeSessionId, sessions);
-          const name = draftArgs.join(" ").trim() || "New Connection";
-          setConnectionProfileDraft({
-            mode: "blank",
-            profileId: "",
-            name,
-            deckId: activeSession?.deckId || defaultDeckId,
-            launch: {}
-          });
-          return "Opened a new connection profile draft.";
-        }
-
-        if (draftSubcommand === "active") {
-          if (draftArgs.length !== 0) {
-            return formatUsage("connection", "draft");
-          }
-          const resolvedTarget = resolveActiveOrDirectTargetSession(
-            interpreted,
-            sessions,
-            activeSessionId,
-            "No active session to load into a connection profile draft.",
-            "Connection draft selector"
-          );
-          if (resolvedTarget.error) {
-            return resolvedTarget.error;
-          }
-          loadConnectionProfileDraftFromActive(resolvedTarget.session);
-          return "Loaded the active session into a new connection profile draft.";
-        }
-
-        if (draftSubcommand === "set") {
-          const payloadText = draftArgs.join(" ").trim();
-          if (!payloadText) {
-            return formatUsage("connection", "draft");
-          }
-          const launch = normalizeConnectionProfileLaunch(parseJsonObjectToken(payloadText, "Connection draft launch"));
-          if (!launch) {
-            return "Connection draft launch JSON is incomplete. Required fields: shell, startCwd, activeThemeProfile, inactiveThemeProfile.";
-          }
-          const currentDraft = getConnectionProfileDraft() || {};
-          setConnectionProfileDraft({
-            mode: currentDraft.mode || "blank",
-            profileId: currentDraft.profileId || "",
-            name: currentDraft.name || "New Connection",
-            deckId: launch.deckId || currentDraft?.launch?.deckId || defaultDeckId,
-            launch
-          });
-          return "Updated the connection profile draft.";
-        }
-
-        if (draftSubcommand === "save") {
-          const name = draftArgs.join(" ").trim();
-          const currentDraft = getConnectionProfileDraft() || {};
-          if (name) {
-            setConnectionProfileDraft({
-              ...currentDraft,
-              name
-            });
-          }
-          return saveConnectionProfileDraft();
-        }
-
-        if (draftSubcommand === "reset") {
-          if (draftArgs.length !== 0) {
-            return formatUsage("connection", "draft");
-          }
-          return resetConnectionProfileDraft();
-        }
-
-        return formatUsage("connection", "draft");
-      }
-
-      return formatUsage("connection");
-    }
-
-    if (command === "workspace") {
-      const subcommand = normalizeKeyword(args[0]);
-      const rest = args.slice(1);
-      const activeDeckId = String(getActiveDeck()?.id || defaultDeckId).trim() || defaultDeckId;
-      if (!subcommand || subcommand === "list") {
-        const presets = listWorkspacePresets();
-        if (!Array.isArray(presets) || presets.length === 0) {
-          return "No workspace presets available.";
-        }
-        return presets
-          .map((preset) => `[${preset.id}] ${preset.name} -> deck=${preset.workspace?.activeDeckId || "default"} layout=${preset.workspace?.layoutProfileId || "-"} decks=${Object.keys(preset.workspace?.deckGroups || {}).length}`)
-          .join("\n");
-      }
-
-      if (subcommand === "save") {
-        const name = rest.join(" ").trim();
-        if (!name) {
-          return formatUsage("workspace", "save");
-        }
-        return createWorkspacePresetFromCurrent(name);
-      }
-
-      if (subcommand === "show") {
-        if (rest.length !== 1) {
-          return formatUsage("workspace", "show");
-        }
-        const resolved = resolveWorkspacePreset(rest[0]);
-        if (!resolved.preset) {
-          return resolved.error;
-        }
-        return formatWorkspacePresetDetail(resolved.preset);
-      }
-
-      if (subcommand === "apply") {
-        if (rest.length !== 1) {
-          return formatUsage("workspace", "apply");
-        }
-        const resolved = resolveWorkspacePreset(rest[0]);
-        if (!resolved.preset) {
-          return resolved.error;
-        }
-        return applyWorkspacePreset(resolved.preset.id);
-      }
-
-      if (subcommand === "duplicate") {
-        if (rest.length < 2) {
-          return formatUsage("workspace", "duplicate");
-        }
-        const resolved = resolveWorkspacePreset(rest[0]);
-        if (!resolved.preset) {
-          return resolved.error;
-        }
-        const name = rest.slice(1).join(" ").trim();
-        if (!name) {
-          return formatUsage("workspace", "duplicate");
-        }
-        return duplicateWorkspacePreset(resolved.preset.id, name);
-      }
-
-      if (subcommand === "rename") {
-        if (rest.length < 2) {
-          return formatUsage("workspace", "rename");
-        }
-        const resolved = resolveWorkspacePreset(rest[0]);
-        if (!resolved.preset) {
-          return resolved.error;
-        }
-        const name = rest.slice(1).join(" ").trim();
-        if (!name) {
-          return formatUsage("workspace", "rename");
-        }
-        return renameWorkspacePreset(resolved.preset.id, name);
-      }
-
-      if (subcommand === "delete") {
-        if (rest.length !== 1) {
-          return formatUsage("workspace", "delete");
-        }
-        const resolved = resolveWorkspacePreset(rest[0]);
-        if (!resolved.preset) {
-          return resolved.error;
-        }
-        return deleteWorkspacePreset(resolved.preset.id);
-      }
-
-      if (subcommand === "group") {
-        const groupSubcommand = String(rest[0] || "").trim().toLowerCase();
-        const groupArgs = rest.slice(1);
-        if (!groupSubcommand || groupSubcommand === "list") {
-          const groups = listWorkspaceGroupsForDeck(activeDeckId);
-          if (!Array.isArray(groups) || groups.length === 0) {
-            return `No workspace groups on deck [${activeDeckId}].`;
-          }
-          return [`Deck [${activeDeckId}] workspace groups:`]
-            .concat(groups.map((group) => `[${group.id}] ${group.name} -> ${Array.isArray(group.sessionIds) ? group.sessionIds.length : 0} session(s)`))
-            .join("\n");
-        }
-
-        if (groupSubcommand === "save") {
-          const name = groupArgs.join(" ").trim();
-          if (!name) {
-            return formatUsage("workspace", "group");
-          }
-          return saveWorkspaceGroup(name, activeDeckId);
-        }
-
-        if (groupSubcommand === "apply") {
-          if (groupArgs.length !== 1) {
-            return formatUsage("workspace", "group");
-          }
-          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
-          if (!resolved.group) {
-            return resolved.error;
-          }
-          return applyWorkspaceGroup(resolved.group.id, activeDeckId);
-        }
-
-        if (groupSubcommand === "rename") {
-          if (groupArgs.length < 2) {
-            return formatUsage("workspace", "group");
-          }
-          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
-          if (!resolved.group) {
-            return resolved.error;
-          }
-          const name = groupArgs.slice(1).join(" ").trim();
-          if (!name) {
-            return formatUsage("workspace", "group");
-          }
-          return renameWorkspaceGroup(resolved.group.id, name, activeDeckId);
-        }
-
-        if (groupSubcommand === "delete") {
-          if (groupArgs.length !== 1) {
-            return formatUsage("workspace", "group");
-          }
-          const resolved = resolveWorkspaceGroup(groupArgs[0], activeDeckId);
-          if (!resolved.group) {
-            return resolved.error;
-          }
-          return deleteWorkspaceGroup(resolved.group.id, activeDeckId);
-        }
-
-        if (groupSubcommand === "clear") {
-          if (groupArgs.length !== 0) {
-            return formatUsage("workspace", "group");
-          }
-          return clearWorkspaceGroup(activeDeckId);
-        }
-
-        return formatUsage("workspace", "group");
-      }
-
-      return formatUsage("workspace");
-    }
-
-    if (command === "broadcast") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
-      const selector = args.slice(1).join(" ").trim();
-
-      if (!subcommand || subcommand === "status") {
-        return getBroadcastStatus();
-      }
-      if (subcommand === "off") {
-        return disableBroadcast();
-      }
-      if (subcommand === "group") {
-        return enableGroupBroadcast(selector);
-      }
-      return formatUsage("broadcast");
-    }
-
-    if (command === "share") {
-      const subcommand = String(args[0] || "").trim().toLowerCase();
-      const rest = args.slice(1);
-
-      if (!subcommand || subcommand === "list") {
-        const shares = await listShares();
-        if (!Array.isArray(shares) || shares.length === 0) {
-          return "No share links available.";
-        }
-        return shares.map((shareLink) => formatShareLinkSummary(shareLink, sessions, decks)).join("\n");
-      }
-
-      if (subcommand === "session") {
-        if (rest.length > 0) {
-          return formatUsage("share", "session");
-        }
-        const resolvedTarget = resolveActiveOrDirectTargetSession(
-          interpreted,
-          sessions,
-          activeSessionId,
-          "No active session for /share session.",
-          "Share session selector"
-        );
-        if (resolvedTarget.error) {
-          return resolvedTarget.error;
-        }
-        const shareLink = await createShareLink({
-          targetType: "session",
-          targetId: resolvedTarget.session.id,
-          permissionMode: "read_only"
-        });
-        const copied = shareLink?.joinUrl ? await writeClipboardText(shareLink.joinUrl) : false;
-        const summary = formatShareLinkSummary(shareLink, sessions, decks);
-        if (shareLink?.joinUrl) {
-          return `${summary}${copied ? "\nCopied join URL to clipboard." : ""}\n${shareLink.joinUrl}`;
-        }
-        return summary;
-      }
-
-      if (subcommand === "deck") {
-        if (rest.length > 1) {
-          return formatUsage("share", "deck");
-        }
-        const activeDeck = getActiveDeck();
-        if (!activeDeck && rest.length === 0) {
-          return "No active deck for /share deck.";
-        }
-        let targetDeck = activeDeck;
-        if (rest.length === 1) {
-          const resolvedDeck = resolveDeckToken(rest[0], decks);
-          if (!resolvedDeck.deck) {
-            return resolvedDeck.error;
-          }
-          targetDeck = resolvedDeck.deck;
-        }
-        if (!targetDeck) {
-          return "No active deck for /share deck.";
-        }
-        const shareLink = await createShareLink({
-          targetType: "deck",
-          targetId: targetDeck.id,
-          permissionMode: "read_only"
-        });
-        const copied = shareLink?.joinUrl ? await writeClipboardText(shareLink.joinUrl) : false;
-        const summary = formatShareLinkSummary(shareLink, sessions, decks);
-        if (shareLink?.joinUrl) {
-          return `${summary}${copied ? "\nCopied join URL to clipboard." : ""}\n${shareLink.joinUrl}`;
-        }
-        return summary;
-      }
-
-      if (subcommand === "revoke") {
-        if (rest.length !== 1) {
-          return formatUsage("share", "revoke");
-        }
-        const shareId = String(rest[0] || "").trim();
-        if (!shareId) {
-          return formatUsage("share", "revoke");
-        }
-        const shareLink = await revokeShareLink(shareId);
-        return `Revoked ${formatShareLinkSummary(shareLink, sessions, decks)}.`;
-      }
-
-      return formatUsage("share");
+    const structuredDomainFeedback = await domainHandlers.executeStructuredCommand({
+      command,
+      args,
+      interpreted,
+      sessions,
+      decks,
+      activeSessionId
+    });
+    if (structuredDomainFeedback !== null) {
+      return structuredDomainFeedback;
     }
 
     if (command === "custom") {
