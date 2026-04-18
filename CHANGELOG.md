@@ -2,6 +2,12 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-18
+
+- [x] `v0.4.0-H146` is now completed on `main`, repairing repository coverage-report integrity so the reported quality gates match the actual backend/frontend test contract instead of hiding runtime seams or emitting duplicate frontend file rows.
+- [x] The backend coverage runner now uses the shared workspace coverage helper in `scripts/lib/coverage-report.mjs`, and `backend/scripts/run-coverage-tests.mjs` now includes the same deterministic backend test surface as the default backend suite except for the explicitly segregated `nonfunctional.load.test.js` lane. That makes `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` visible in the reported backend coverage gate instead of silently excluding them.
+- [x] The frontend coverage runner now uses the same shared helper through `frontend/scripts/run-coverage-tests.mjs`, and the emitted coverage report is normalized so each source file appears exactly once even when the Node test runner emits duplicate rows for the same file. Direct regression coverage in `test/coverage-report-utils.test.js` now proves both the backend workspace file-selection contract and the duplicate-row normalization behavior. The validated local quality gate passed with `node --test test/coverage-report-utils.test.js`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`, and the corrected reported coverage totals on the validated tree are backend `92.73%` line coverage and frontend `94.18%` line coverage.
+
 ## 2026-04-17
 
 - [x] `v0.4.0-H145` is now completed on `main`, removing the last retained app-specific routing inference from the transport-only messaging runtime so the kept baseline is not still quietly shaped around coding-agent/build profile detection.
