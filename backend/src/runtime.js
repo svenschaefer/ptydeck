@@ -11,11 +11,21 @@ import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
+import { createRuntimeHttpHelpers, requiredScopeForRoute } from "./runtime-http-helpers.js";
+import {
+  buildRuntimeHealthPayload,
+  buildRuntimeReadyPayload,
+  countActiveRuntimeSessions,
+  renderRuntimeMetrics
+} from "./runtime-status-reporting.js";
+import {
+  createSessionControlAttachmentRegistry,
+  normalizeSessionControlClientLabel
+} from "./runtime-session-control-attachments.js";
 import { createSessionStreamAnalysisCapture } from "./session-stream-analysis-capture.js";
 import {
   buildSessionControlStateView,
   createLocalOperatorPrincipal,
-  createSessionAttachedClient,
   createSessionControlPrincipal,
   normalizeSessionControlState,
   setSessionControllerClient,
@@ -151,7 +161,6 @@ const SESSION_QUICK_ID_FALLBACK = "?";
 const TRACE_HEADER_ID = "x-ptydeck-trace-id";
 const TRACE_HEADER_CORRELATION_ID = "x-ptydeck-correlation-id";
 const SESSION_CONTROL_CLIENT_ID_HEADER = "x-ptydeck-client-id";
-const SESSION_CONTROL_CLIENT_LABEL_MAX_LENGTH = 64;
 const DEFAULT_SESSION_CONTROL_STALE_CLIENT_TTL_MS = 90_000;
 const TRACE_TOKEN_MAX_LENGTH = 128;
 const DEFAULT_SESSION_THEME_PROFILE = {
@@ -2616,7 +2625,6 @@ export function createRuntime(config) {
   });
   const wsTickets = new Map();
   const sockets = new Set();
-  const sessionControlAttachments = new Map();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
   let persistedReplayOutputs = new Map();
@@ -2632,7 +2640,6 @@ export function createRuntime(config) {
     Number.isInteger(config.sessionControlStaleClientTtlMs) && config.sessionControlStaleClientTtlMs >= 0
       ? config.sessionControlStaleClientTtlMs
       : DEFAULT_SESSION_CONTROL_STALE_CLIENT_TTL_MS;
-  let sessionControlAttachmentPruneTimer = null;
   const probeSshHostKeys =
     typeof config.probeSshHostKeys === "function"
       ? config.probeSshHostKeys
@@ -2739,17 +2746,6 @@ export function createRuntime(config) {
     };
   }
 
-  function buildTraceHeaders(traceContext) {
-    const normalizedTrace = normalizeTraceSeed(traceContext);
-    if (!normalizedTrace) {
-      return {};
-    }
-    return {
-      ...(normalizedTrace.traceId ? { [TRACE_HEADER_ID]: normalizedTrace.traceId } : {}),
-      ...(normalizedTrace.correlationId ? { [TRACE_HEADER_CORRELATION_ID]: normalizedTrace.correlationId } : {})
-    };
-  }
-
   function logDebug(event, details = {}, traceContext = null) {
     if (!debugLogs) {
       return;
@@ -2812,60 +2808,32 @@ export function createRuntime(config) {
     requestMessagingReplayExcerpt,
     logDebug
   });
+  const runtimeHttpHelpers = createRuntimeHttpHelpers({
+    config,
+    corsAllowedOrigins,
+    traceHeaderId: TRACE_HEADER_ID,
+    traceHeaderCorrelationId: TRACE_HEADER_CORRELATION_ID,
+    sessionControlClientIdHeader: SESSION_CONTROL_CLIENT_ID_HEADER,
+    normalizeTraceSeed,
+    ensureShareLinkAuthActive,
+    ensureShareRouteAllowed
+  });
+  const {
+    authenticateRequest,
+    buildSecurityHeaders,
+    buildTraceHeaders,
+    ensureTlsIngress,
+    writeJson
+  } = runtimeHttpHelpers;
 
-  function buildCorsHeaders(req, traceContext = null) {
-    const requestOrigin = typeof req.headers.origin === "string" ? req.headers.origin : "";
-    const allowAnyOrigin = corsAllowedOrigins.includes("*");
-    const allowedOrigin = resolveAllowedRequestOrigin(requestOrigin);
-
-    const headers = {
-      ...buildSecurityHeaders(),
-      "content-type": "application/json",
-      "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-      "access-control-allow-headers": `content-type,authorization,${TRACE_HEADER_CORRELATION_ID},${SESSION_CONTROL_CLIENT_ID_HEADER}`,
-      "access-control-expose-headers": `${TRACE_HEADER_ID},${TRACE_HEADER_CORRELATION_ID}`,
-      ...buildTraceHeaders(traceContext)
-    };
-
-    if (allowedOrigin) {
-      headers["access-control-allow-origin"] = allowedOrigin;
+  const sessionControlAttachmentRegistry = createSessionControlAttachmentRegistry({
+    staleClientTtlMs: sessionControlStaleClientTtlMs,
+    isStopping: () => isStopping,
+    isStopped: () => isStopped,
+    onPruned: () => {
+      broadcastSessionControlRefreshForAuth(null, { source: "ws" });
     }
-    if (!allowAnyOrigin) {
-      headers.vary = "origin";
-    }
-
-    return headers;
-  }
-
-  function resolveAllowedRequestOrigin(requestOrigin) {
-    const allowAnyOrigin = corsAllowedOrigins.includes("*");
-    if (allowAnyOrigin) {
-      return "*";
-    }
-    if (requestOrigin && corsAllowedOrigins.includes(requestOrigin)) {
-      return requestOrigin;
-    }
-    return "";
-  }
-
-  function buildSecurityHeaders() {
-    return {
-      "x-content-type-options": "nosniff",
-      "referrer-policy": "no-referrer",
-      "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-    };
-  }
-
-  function writeJson(req, res, statusCode, body, traceContext = null) {
-    res.writeHead(statusCode, buildCorsHeaders(req, traceContext));
-
-    if (body === undefined) {
-      res.end();
-      return;
-    }
-
-    res.end(JSON.stringify(body));
-  }
+  });
 
   function clearStartupWarmupQuietTimer() {
     if (!startupWarmupQuietTimer) {
@@ -2874,43 +2842,6 @@ export function createRuntime(config) {
     clearTimeout(startupWarmupQuietTimer);
     startupWarmupQuietTimer = null;
     startupWarmupQuietDeadlineAt = 0;
-  }
-
-  function countActiveSessions() {
-    let activeSessionCount = 0;
-    for (const session of manager.list()) {
-      if (session?.activityState === "active") {
-        activeSessionCount += 1;
-      }
-    }
-    return activeSessionCount;
-  }
-
-  function buildHealthPayload() {
-    return {
-      status: "ok",
-      messaging: messagingRuntime.buildStatusSummary(),
-      streamAnalysisCapture: sessionStreamAnalysisCapture.buildStatusSummary()
-    };
-  }
-
-  function buildReadyPayload() {
-    return {
-      status: isReady ? "ready" : "starting",
-      phase: isReady ? "ready" : startupWarmupGateReleased && startupWarmupEnabled ? "starting_sessions" : "booting",
-      warmup: {
-        enabled: startupWarmupEnabled,
-        gateReleased: startupWarmupGateReleased,
-        quietPeriodMs: startupWarmupQuietMs,
-        activeSessionCount: countActiveSessions(),
-        quietMsRemaining:
-          startupWarmupEnabled && startupWarmupQuietDeadlineAt > 0
-            ? Math.max(0, startupWarmupQuietDeadlineAt - Date.now())
-            : 0
-      },
-      messaging: messagingRuntime.buildStatusSummary(),
-      streamAnalysisCapture: sessionStreamAnalysisCapture.buildStatusSummary()
-    };
   }
 
   function markRuntimeReady() {
@@ -2946,7 +2877,7 @@ export function createRuntime(config) {
       return;
     }
 
-    const activeSessionCount = countActiveSessions();
+    const activeSessionCount = countActiveRuntimeSessions(manager.list());
     if (activeSessionCount > 0) {
       clearStartupWarmupQuietTimer();
       logDebug("runtime.startup_warmup.active", { activeSessionCount });
@@ -2964,126 +2895,12 @@ export function createRuntime(config) {
       if (isStopping || isReady || !startupWarmupGateReleased) {
         return;
       }
-      if (countActiveSessions() > 0) {
+      if (countActiveRuntimeSessions(manager.list()) > 0) {
         reconcileStartupWarmup();
         return;
       }
       markRuntimeReady();
     }, startupWarmupQuietMs);
-  }
-
-  function renderMetrics() {
-    const sessionsByLifecycle = new Map();
-    for (const session of manager.list()) {
-      const state = typeof session.state === "string" && session.state ? session.state : "unknown";
-      bumpMetricCounter(sessionsByLifecycle, state);
-    }
-    if (unrestoredSessions.size > 0) {
-      bumpMetricCounter(sessionsByLifecycle, "unrestored", unrestoredSessions.size);
-    }
-
-    const lines = [];
-    lines.push("# HELP ptydeck_http_requests_total Total number of HTTP requests.");
-    lines.push("# TYPE ptydeck_http_requests_total counter");
-    lines.push(`ptydeck_http_requests_total ${metrics.httpRequestsTotal}`);
-    lines.push("# HELP ptydeck_http_errors_total Total number of HTTP requests with status >= 400.");
-    lines.push("# TYPE ptydeck_http_errors_total counter");
-    lines.push(`ptydeck_http_errors_total ${metrics.httpErrorsTotal}`);
-    lines.push("# HELP ptydeck_http_request_duration_ms_sum Sum of HTTP request duration in milliseconds.");
-    lines.push("# TYPE ptydeck_http_request_duration_ms_sum counter");
-    lines.push(`ptydeck_http_request_duration_ms_sum ${metrics.httpDurationMsSum}`);
-    lines.push("# HELP ptydeck_http_request_duration_ms_count Total number of observed HTTP request durations.");
-    lines.push("# TYPE ptydeck_http_request_duration_ms_count counter");
-    lines.push(`ptydeck_http_request_duration_ms_count ${metrics.httpDurationMsCount}`);
-    lines.push("# HELP ptydeck_http_request_duration_ms_bucket HTTP request duration histogram buckets in milliseconds.");
-    lines.push("# TYPE ptydeck_http_request_duration_ms_bucket histogram");
-    for (const bucketLimitMs of HTTP_DURATION_BUCKETS_MS) {
-      lines.push(
-        `ptydeck_http_request_duration_ms_bucket{le="${escapePrometheusLabel(bucketLimitMs)}"} ${metrics.httpRequestDurationMsBuckets.get(bucketLimitMs) || 0}`
-      );
-    }
-    lines.push(`ptydeck_http_request_duration_ms_bucket{le="+Inf"} ${metrics.httpDurationMsCount}`);
-    lines.push("# HELP ptydeck_sessions_active Number of active PTY sessions.");
-    lines.push("# TYPE ptydeck_sessions_active gauge");
-    lines.push(`ptydeck_sessions_active ${manager.list().length}`);
-    lines.push("# HELP ptydeck_sessions_active_by_lifecycle Number of sessions grouped by lifecycle state.");
-    lines.push("# TYPE ptydeck_sessions_active_by_lifecycle gauge");
-    for (const [state, count] of sessionsByLifecycle.entries()) {
-      lines.push(`ptydeck_sessions_active_by_lifecycle{state="${escapePrometheusLabel(state)}"} ${count}`);
-    }
-    lines.push("# HELP ptydeck_sessions_created_total Total number of created sessions.");
-    lines.push("# TYPE ptydeck_sessions_created_total counter");
-    lines.push(`ptydeck_sessions_created_total ${metrics.sessionsCreatedTotal}`);
-    lines.push("# HELP ptydeck_sessions_started_total Total number of started sessions.");
-    lines.push("# TYPE ptydeck_sessions_started_total counter");
-    lines.push(`ptydeck_sessions_started_total ${metrics.sessionsStartedTotal}`);
-    lines.push("# HELP ptydeck_sessions_exited_total Total number of exited sessions.");
-    lines.push("# TYPE ptydeck_sessions_exited_total counter");
-    lines.push(`ptydeck_sessions_exited_total ${metrics.sessionsExitedTotal}`);
-    lines.push("# HELP ptydeck_sessions_unrestored_total Total number of sessions marked unrestored during startup.");
-    lines.push("# TYPE ptydeck_sessions_unrestored_total counter");
-    lines.push(`ptydeck_sessions_unrestored_total ${metrics.sessionsUnrestoredTotal}`);
-    lines.push("# HELP ptydeck_ws_connections_active Number of active WebSocket connections.");
-    lines.push("# TYPE ptydeck_ws_connections_active gauge");
-    lines.push(`ptydeck_ws_connections_active ${sockets.size}`);
-    lines.push("# HELP ptydeck_ws_connections_opened_total Total number of accepted WebSocket connections.");
-    lines.push("# TYPE ptydeck_ws_connections_opened_total counter");
-    lines.push(`ptydeck_ws_connections_opened_total ${metrics.wsConnectionsOpenedTotal}`);
-    lines.push("# HELP ptydeck_ws_connections_closed_total Total number of closed WebSocket connections.");
-    lines.push("# TYPE ptydeck_ws_connections_closed_total counter");
-    lines.push(`ptydeck_ws_connections_closed_total ${metrics.wsConnectionsClosedTotal}`);
-    lines.push("# HELP ptydeck_ws_reconnects_total Total number of websocket reconnects observed per client IP.");
-    lines.push("# TYPE ptydeck_ws_reconnects_total counter");
-    lines.push(`ptydeck_ws_reconnects_total ${metrics.wsReconnectsTotal}`);
-    lines.push("# HELP ptydeck_ws_errors_total Total number of websocket upgrade/socket errors.");
-    lines.push("# TYPE ptydeck_ws_errors_total counter");
-    lines.push(`ptydeck_ws_errors_total ${metrics.wsErrorsTotal}`);
-    lines.push("# HELP ptydeck_ws_errors_by_reason_total Websocket errors grouped by reason.");
-    lines.push("# TYPE ptydeck_ws_errors_by_reason_total counter");
-    for (const [reason, count] of metrics.wsErrorsByReason.entries()) {
-      lines.push(`ptydeck_ws_errors_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
-    }
-    lines.push("# HELP ptydeck_ws_disconnects_by_reason_total Websocket disconnects grouped by normalized reason.");
-    lines.push("# TYPE ptydeck_ws_disconnects_by_reason_total counter");
-    for (const [reason, count] of metrics.wsDisconnectsByReason.entries()) {
-      lines.push(`ptydeck_ws_disconnects_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
-    }
-    lines.push("# HELP ptydeck_ws_reconnects_by_reason_total Websocket reconnects grouped by previous disconnect reason.");
-    lines.push("# TYPE ptydeck_ws_reconnects_by_reason_total counter");
-    for (const [reason, count] of metrics.wsReconnectsByReason.entries()) {
-      lines.push(`ptydeck_ws_reconnects_by_reason_total{reason="${escapePrometheusLabel(reason)}"} ${count}`);
-    }
-    lines.push("# HELP ptydeck_http_requests_by_status_total HTTP requests grouped by status code.");
-    lines.push("# TYPE ptydeck_http_requests_by_status_total counter");
-    for (const [statusCode, count] of metrics.httpRequestsByStatus.entries()) {
-      lines.push(`ptydeck_http_requests_by_status_total{status="${escapePrometheusLabel(statusCode)}"} ${count}`);
-    }
-    lines.push("# HELP ptydeck_http_requests_by_route_total HTTP requests grouped by normalized route.");
-    lines.push("# TYPE ptydeck_http_requests_by_route_total counter");
-    for (const [routeKey, count] of metrics.httpRequestsByRoute.entries()) {
-      const [method, route] = routeKey.split(" ", 2);
-      lines.push(
-        `ptydeck_http_requests_by_route_total{method="${escapePrometheusLabel(method)}",route="${escapePrometheusLabel(route)}"} ${count}`
-      );
-    }
-    lines.push("# HELP ptydeck_messaging_events_total Messaging events grouped by profile, event type, and policy decision.");
-    lines.push("# TYPE ptydeck_messaging_events_total counter");
-    lines.push("# HELP ptydeck_messaging_deliveries_total Messaging adapter deliveries grouped by adapter and outcome.");
-    lines.push("# TYPE ptydeck_messaging_deliveries_total counter");
-    lines.push("# HELP ptydeck_messaging_actions_total Messaging adapter actions grouped by adapter and action.");
-    lines.push("# TYPE ptydeck_messaging_actions_total counter");
-    lines.push("# HELP ptydeck_messaging_adapter_enabled Whether a messaging adapter is enabled.");
-    lines.push("# TYPE ptydeck_messaging_adapter_enabled gauge");
-    lines.push("# HELP ptydeck_messaging_adapter_configured_targets Number of configured messaging targets for an adapter.");
-    lines.push("# TYPE ptydeck_messaging_adapter_configured_targets gauge");
-    lines.push("# HELP ptydeck_messaging_inbound_enabled Whether bounded inbound messaging is enabled for an adapter.");
-    lines.push("# TYPE ptydeck_messaging_inbound_enabled gauge");
-    lines.push("# HELP ptydeck_messaging_inbound_polling Whether an adapter inbound poll loop is currently active.");
-    lines.push("# TYPE ptydeck_messaging_inbound_polling gauge");
-    lines.push("# HELP ptydeck_messaging_inbound_total Bounded inbound messaging interactions grouped by adapter and outcome.");
-    lines.push("# TYPE ptydeck_messaging_inbound_total counter");
-    lines.push(...messagingRuntime.renderMetricLines());
-    return `${lines.join("\n")}\n`;
   }
 
   function pruneExpiredWsTickets(now = Date.now()) {
@@ -3092,181 +2909,6 @@ export function createRuntime(config) {
         wsTickets.delete(ticket);
       }
     }
-  }
-
-  function normalizeSessionControlClientLabel(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-    return value.trim().slice(0, SESSION_CONTROL_CLIENT_LABEL_MAX_LENGTH);
-  }
-
-  function getSessionControlAttachmentKey(input = {}) {
-    const clientId = typeof input.clientId === "string" ? input.clientId.trim() : "";
-    if (!clientId) {
-      return "";
-    }
-    const principal = createSessionControlPrincipal(input.auth || input.principal || input);
-    return [
-      clientId,
-      principal.subject,
-      principal.tenantId,
-      principal.accessMode,
-      principal.permissionMode || ""
-    ].join("\u001f");
-  }
-
-  function pruneStaleSessionControlAttachments(now = Date.now()) {
-    let removed = false;
-    for (const [attachmentKey, entry] of sessionControlAttachments.entries()) {
-      const client = entry?.client;
-      if (!client || client.activeConnectionCount > 0) {
-        continue;
-      }
-      if (!client.lastDisconnectedAt) {
-        sessionControlAttachments.delete(attachmentKey);
-        removed = true;
-        continue;
-      }
-      if (now - client.lastDisconnectedAt >= sessionControlStaleClientTtlMs) {
-        sessionControlAttachments.delete(attachmentKey);
-        removed = true;
-      }
-    }
-    return removed;
-  }
-
-  function clearSessionControlAttachmentPruneTimer() {
-    if (sessionControlAttachmentPruneTimer === null) {
-      return;
-    }
-    clearTimeout(sessionControlAttachmentPruneTimer);
-    sessionControlAttachmentPruneTimer = null;
-  }
-
-  function getNextSessionControlAttachmentPruneDelay(now = Date.now()) {
-    let nextDelay = null;
-    for (const entry of sessionControlAttachments.values()) {
-      const client = entry?.client;
-      if (!client || client.activeConnectionCount > 0 || !client.lastDisconnectedAt) {
-        continue;
-      }
-      const expiresIn = Math.max(0, sessionControlStaleClientTtlMs - (now - client.lastDisconnectedAt));
-      nextDelay = nextDelay === null ? expiresIn : Math.min(nextDelay, expiresIn);
-    }
-    return nextDelay;
-  }
-
-  function scheduleSessionControlAttachmentPrune() {
-    clearSessionControlAttachmentPruneTimer();
-    if (isStopping || isStopped) {
-      return;
-    }
-    const delayMs = getNextSessionControlAttachmentPruneDelay();
-    if (delayMs === null) {
-      return;
-    }
-    sessionControlAttachmentPruneTimer = setTimeout(() => {
-      sessionControlAttachmentPruneTimer = null;
-      const removed = pruneStaleSessionControlAttachments();
-      if (removed) {
-        broadcastSessionControlRefreshForAuth(null, { source: "ws" });
-      }
-      scheduleSessionControlAttachmentPrune();
-    }, delayMs);
-  }
-
-  function registerSessionControlAttachment(input = {}) {
-    const attachmentKey = getSessionControlAttachmentKey(input);
-    if (!attachmentKey) {
-      return null;
-    }
-    const existing = sessionControlAttachments.get(attachmentKey) || null;
-    const nextClient = createSessionAttachedClient({
-      ...(existing?.client || {}),
-      clientId: input.clientId,
-      label: normalizeSessionControlClientLabel(input.label) || existing?.client?.label || "",
-      principal: input.auth,
-      connectedAt: existing?.client?.connectedAt || Number(Date.now()),
-      lastSeenAt: Number(Date.now()),
-      lastDisconnectedAt: null,
-      activeConnectionCount: (existing?.client?.activeConnectionCount || 0) + 1,
-      active: true
-    });
-    const auth =
-      input.auth && typeof input.auth === "object" && !Array.isArray(input.auth)
-        ? { ...input.auth }
-        : null;
-    sessionControlAttachments.set(attachmentKey, {
-      key: attachmentKey,
-      client: nextClient,
-      auth
-    });
-    scheduleSessionControlAttachmentPrune();
-    return nextClient;
-  }
-
-  function unregisterSessionControlAttachment(socket) {
-    const attachmentKey = typeof socket?.sessionControlAttachmentKey === "string" ? socket.sessionControlAttachmentKey : "";
-    if (!attachmentKey) {
-      return;
-    }
-    const existing = sessionControlAttachments.get(attachmentKey);
-    if (!existing?.client) {
-      return;
-    }
-    const nextCount = Math.max(0, (existing.client.activeConnectionCount || 0) - 1);
-    sessionControlAttachments.set(attachmentKey, {
-      ...existing,
-      client: createSessionAttachedClient({
-        ...existing.client,
-        lastSeenAt: Number(Date.now()),
-        lastDisconnectedAt: nextCount === 0 ? Number(Date.now()) : null,
-        activeConnectionCount: nextCount,
-        active: nextCount > 0
-      })
-    });
-    scheduleSessionControlAttachmentPrune();
-  }
-
-  function updateSessionControlAttachmentLabel(auth, clientId, label) {
-    const attachmentKey = getSessionControlAttachmentKey({
-      auth,
-      clientId
-    });
-    if (!attachmentKey) {
-      return null;
-    }
-    const existing = sessionControlAttachments.get(attachmentKey) || null;
-    if (!existing?.client) {
-      return null;
-    }
-    const nextLabel = normalizeSessionControlClientLabel(label);
-    if (!nextLabel) {
-      throw new ApiError(400, "ValidationError", "Field 'label' must be a non-empty string.");
-    }
-    const nextClient = createSessionAttachedClient({
-      ...existing.client,
-      label: nextLabel,
-      principal: existing.auth || auth,
-      lastSeenAt: Number(Date.now())
-    });
-    sessionControlAttachments.set(attachmentKey, {
-      ...existing,
-      client: nextClient
-    });
-    return nextClient;
-  }
-
-  function forgetSessionControlAttachment(auth, clientId) {
-    const attachmentKey = getSessionControlAttachmentKey({
-      auth,
-      clientId
-    });
-    if (!attachmentKey) {
-      return false;
-    }
-    return sessionControlAttachments.delete(attachmentKey);
   }
 
   function issueWsTicket(auth, input = {}) {
@@ -3422,110 +3064,6 @@ export function createRuntime(config) {
       }
     }
     return "";
-  }
-
-  function requiredScopeForRoute(kind) {
-    if (kind === "listShares" || kind === "getShareLink") {
-      return "sessions:read";
-    }
-    if (kind === "createShareLink" || kind === "revokeShareLink") {
-      return "sessions:write";
-    }
-    if (kind === "listDecks" || kind === "getDeck") {
-      return "sessions:read";
-    }
-    if (kind === "createDeck" || kind === "updateDeck" || kind === "deleteDeck" || kind === "moveSessionToDeck") {
-      return "sessions:write";
-    }
-    if (kind === "listWorkspacePresets" || kind === "getWorkspacePreset") {
-      return "sessions:read";
-    }
-    if (kind === "createWorkspacePreset" || kind === "updateWorkspacePreset" || kind === "deleteWorkspacePreset") {
-      return "sessions:write";
-    }
-    if (kind === "listConnectionProfiles" || kind === "getConnectionProfile") {
-      return "sessions:read";
-    }
-    if (kind === "createConnectionProfile" || kind === "updateConnectionProfile" || kind === "deleteConnectionProfile") {
-      return "sessions:write";
-    }
-    if (kind === "listSshTrustEntries") {
-      return "sessions:read";
-    }
-    if (kind === "probeSshHostKeys") {
-      return "sessions:read";
-    }
-    if (kind === "createSshTrustEntry" || kind === "deleteSshTrustEntry") {
-      return "sessions:write";
-    }
-    if (kind === "listCustomCommands" || kind === "getCustomCommand") {
-      return "sessions:read";
-    }
-    if (kind === "upsertCustomCommand" || kind === "deleteCustomCommand") {
-      return "sessions:write";
-    }
-    if (kind === "listSessions" || kind === "getSession") {
-      return "sessions:read";
-    }
-    if (kind === "getSessionReplayExport" || kind === "getSessionReplayExcerpt") {
-      return "sessions:read";
-    }
-    if (kind === "downloadSessionFile") {
-      return "sessions:read";
-    }
-    if (kind === "createSession") {
-      return "sessions:create";
-    }
-    if (kind === "wsTicket") {
-      return "ws:connect";
-    }
-    if (kind === "deleteSession") {
-      return "sessions:delete";
-    }
-    if (
-      kind === "updateSession" ||
-      kind === "uploadSessionFile" ||
-      kind === "input" ||
-      kind === "resize" ||
-      kind === "takeSessionControl" ||
-      kind === "takeSessionControlScope" ||
-      kind === "releaseSessionControl" ||
-      kind === "transferSessionControl" ||
-      kind === "renameSessionControlClient" ||
-      kind === "forgetSessionControlClient" ||
-      kind === "restart" ||
-      kind === "interrupt" ||
-      kind === "terminate" ||
-      kind === "kill"
-    ) {
-      return "sessions:write";
-    }
-    return "";
-  }
-
-  function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "") {
-    if (!config.authEnabled) {
-      return null;
-    }
-    const token = resolveBearerToken(req, parsedUrl);
-    const auth = verifyDevToken(token, {
-      secret: config.authDevSecret,
-      issuer: config.authIssuer,
-      audience: config.authAudience
-    });
-    ensureShareLinkAuthActive(auth);
-    ensureScope(auth, requiredScope);
-    ensureShareRouteAllowed(auth, routeKind);
-    return auth;
-  }
-
-  function ensureTlsIngress(requestContext) {
-    if (!config.enforceTlsIngress) {
-      return;
-    }
-    if (requestContext.protocol !== "https") {
-      throw new ApiError(426, "TlsRequired", "TLS is required for this endpoint.");
-    }
   }
 
   function listCustomCommands({ scope = null, sessionId = null } = {}) {
@@ -4967,7 +4505,7 @@ export function createRuntime(config) {
       return [];
     }
     const attachedClients = [];
-    for (const entry of sessionControlAttachments.values()) {
+    for (const entry of sessionControlAttachmentRegistry.listEntries()) {
       if (!entry?.client) {
         continue;
       }
@@ -5101,18 +4639,7 @@ export function createRuntime(config) {
   }
 
   function findActiveSessionControlAttachment(auth = null, clientId = "") {
-    const attachmentKey = getSessionControlAttachmentKey({
-      auth,
-      clientId
-    });
-    if (!attachmentKey) {
-      return null;
-    }
-    const attachment = sessionControlAttachments.get(attachmentKey) || null;
-    if (!attachment?.client || attachment.client.active !== true) {
-      return null;
-    }
-    return attachment.client;
+    return sessionControlAttachmentRegistry.findActiveAttachment(auth, clientId);
   }
 
   function requireActiveSessionControlAttachment(auth = null, req = null) {
@@ -5276,7 +4803,7 @@ export function createRuntime(config) {
     if (!nextLabel) {
       throw new ApiError(400, "ValidationError", "Field 'label' must be a non-empty string.");
     }
-    const renamedClient = updateSessionControlAttachmentLabel(auth, requestClient.clientId, nextLabel);
+    const renamedClient = sessionControlAttachmentRegistry.updateAttachmentLabel(auth, requestClient.clientId, nextLabel);
     if (!renamedClient || renamedClient.active !== true) {
       throw new ApiError(
         409,
@@ -5304,7 +4831,7 @@ export function createRuntime(config) {
     if (targetClient.active === true || targetClient.activeConnectionCount > 0) {
       throw new ApiError(409, "ControlAttachmentActive", "Only stale offline devices can be forgotten.");
     }
-    forgetSessionControlAttachment(auth, normalizedTargetClientId);
+    sessionControlAttachmentRegistry.forgetAttachment(auth, normalizedTargetClientId);
     broadcastSessionControlRefreshForAuth(auth, traceSeed);
     return getSessionControlViewOrThrow(sessionId, auth);
   }
@@ -6353,17 +5880,37 @@ function tryCreateRestoredSession({
       ensureTlsIngress(requestContext);
 
       if (match.kind === "health") {
-        writeJsonResponse(200, buildHealthPayload());
+        writeJsonResponse(200, buildRuntimeHealthPayload({
+          messagingStatusSummary: messagingRuntime.buildStatusSummary(),
+          streamAnalysisStatusSummary: sessionStreamAnalysisCapture.buildStatusSummary()
+        }));
         return;
       }
 
       if (match.kind === "ready") {
-        writeJsonResponse(200, buildReadyPayload());
+        writeJsonResponse(200, buildRuntimeReadyPayload({
+          isReady,
+          startupWarmupGateReleased,
+          startupWarmupEnabled,
+          startupWarmupQuietMs,
+          startupWarmupQuietDeadlineAt,
+          sessions: manager.list(),
+          messagingStatusSummary: messagingRuntime.buildStatusSummary(),
+          streamAnalysisStatusSummary: sessionStreamAnalysisCapture.buildStatusSummary()
+        }));
         return;
       }
 
       if (match.kind === "metrics") {
-        const payload = renderMetrics();
+        const payload = renderRuntimeMetrics({
+          sessions: manager.list(),
+          unrestoredSessionCount: unrestoredSessions.size,
+          wsConnectionCount: sockets.size,
+          metrics,
+          httpDurationBucketsMs: HTTP_DURATION_BUCKETS_MS,
+          escapePrometheusLabel,
+          messagingMetricLines: messagingRuntime.renderMetricLines()
+        });
         res.writeHead(200, {
           ...buildSecurityHeaders(),
           ...buildTraceHeaders(requestTraceContext),
@@ -7254,7 +6801,7 @@ function tryCreateRestoredSession({
       socket.destroy();
       return;
     }
-    const allowedRequestOrigin = resolveAllowedRequestOrigin(requestOrigin);
+    const allowedRequestOrigin = runtimeHttpHelpers.resolveAllowedRequestOrigin(requestOrigin);
     if (!allowedRequestOrigin) {
       const payload = {
         error: "UnauthorizedOrigin",
@@ -7356,11 +6903,11 @@ function tryCreateRestoredSession({
           : ws.connectionId;
       const sessionControlClientLabel =
         typeof wsAuth?.sessionControlClientLabel === "string" ? wsAuth.sessionControlClientLabel : "";
-      ws.sessionControlAttachmentKey = getSessionControlAttachmentKey({
+      ws.sessionControlAttachmentKey = sessionControlAttachmentRegistry.getAttachmentKey({
         clientId: sessionControlClientId,
         auth: wsAuth
       });
-      ws.sessionControlClient = registerSessionControlAttachment({
+      ws.sessionControlClient = sessionControlAttachmentRegistry.registerAttachment({
         clientId: sessionControlClientId,
         label: sessionControlClientLabel,
         auth: wsAuth
@@ -7379,7 +6926,7 @@ function tryCreateRestoredSession({
 
       ws.on("close", (code, reasonBuffer) => {
         sockets.delete(ws);
-        unregisterSessionControlAttachment(ws);
+        sessionControlAttachmentRegistry.unregisterAttachment(ws);
         metrics.wsConnectionsClosedTotal += 1;
         const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
         const wsClientState = wsClientConnections.get(clientIp);
@@ -7854,7 +7401,7 @@ function tryCreateRestoredSession({
       clearTimeout(persistTimer);
       persistTimer = null;
     }
-    clearSessionControlAttachmentPruneTimer();
+    sessionControlAttachmentRegistry.clearPruneTimer();
     await messagingRuntime.stop();
 
     for (const ws of sockets) {
