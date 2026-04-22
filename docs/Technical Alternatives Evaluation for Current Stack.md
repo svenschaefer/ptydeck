@@ -140,6 +140,11 @@ The following alternatives are only relevant if specific system properties are r
 
 ## 7. State Management
 
+**Current decision after `v0.4.0-H153`**
+- Keep the custom reducer-first store.
+- Do not add Zustand, Redux Toolkit, or another external state-management dependency now.
+- Re-evaluate only if a future frontend framework migration or substantially larger plugin/component graph creates pressure that the current store cannot address cleanly.
+
 **Alternative**
 - Zustand (minimal)
 - Redux Toolkit (structured)
@@ -155,6 +160,8 @@ The following alternatives are only relevant if specific system properties are r
 **When to adopt**
 - Complex UI interactions
 - Multiple state sources (sessions, WS events, commands)
+- A frontend framework migration needs a framework-native state adapter
+- Direct tests can prove the migration reduces coupling instead of moving it into a new abstraction
 
 ---
 

@@ -11,6 +11,10 @@ export function createRuntimeEventController(options = {}) {
   const clearError = options.clearError || (() => {});
   const markRuntimeBootstrapReady = options.markRuntimeBootstrapReady || (() => {});
   const setRuntimeClientId = typeof options.setRuntimeClientId === "function" ? options.setRuntimeClientId : () => {};
+  const applySessionInterpretationActions =
+    typeof options.applySessionInterpretationActions === "function"
+      ? options.applySessionInterpretationActions
+      : () => {};
   const upsertSession = options.upsertSession || (() => {});
   const markSessionExited = options.markSessionExited || (() => {});
   const markSessionClosed = options.markSessionClosed || (() => {});
@@ -153,6 +157,15 @@ export function createRuntimeEventController(options = {}) {
           return true;
         }
         return false;
+      case "session.interpretation.apply": {
+        const sessionId = event.sessionId || event.session?.id;
+        if (sessionId && Array.isArray(event.actions) && event.actions.length > 0) {
+          applySessionInterpretationActions(sessionId, event.actions);
+          clearError();
+          return true;
+        }
+        return false;
+      }
       case "deck.created":
       case "deck.updated":
         if (event.deck) {

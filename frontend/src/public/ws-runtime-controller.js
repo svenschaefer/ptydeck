@@ -10,10 +10,57 @@ export function createWsRuntimeController(options = {}) {
   const pushSessionData = options.pushSessionData || (() => {});
   const observeSessionData = options.observeSessionData || (() => {});
   const applyRuntimeEvent = options.applyRuntimeEvent || (() => false);
+  const interpretRuntimeEvent =
+    typeof options.interpretRuntimeEvent === "function" ? options.interpretRuntimeEvent : () => ({ batches: [], errors: [] });
+  const applySessionInterpretationActions =
+    typeof options.applySessionInterpretationActions === "function"
+      ? options.applySessionInterpretationActions
+      : () => {};
   const recordTrace = typeof options.recordTrace === "function" ? options.recordTrace : () => {};
   const getWsAuthToken = options.getWsAuthToken || (() => "");
   const createWsTicket = options.createWsTicket || (() => Promise.resolve({ ticket: "" }));
   const bootstrapDevAuthToken = options.bootstrapDevAuthToken || (() => Promise.resolve(false));
+
+  function normalizeInterpretationResult(result) {
+    if (Array.isArray(result)) {
+      return { batches: result, errors: [] };
+    }
+    if (!result || typeof result !== "object") {
+      return { batches: [], errors: [] };
+    }
+    return {
+      batches: Array.isArray(result.batches) ? result.batches : [],
+      errors: Array.isArray(result.errors) ? result.errors : []
+    };
+  }
+
+  function applyInterpretationResult(event) {
+    let result;
+    try {
+      result = normalizeInterpretationResult(interpretRuntimeEvent(event));
+    } catch (error) {
+      log("ws.interpretation.error", {
+        type: event?.type || "",
+        sessionId: event?.sessionId || event?.session?.id || "",
+        message: error?.message || "Stream interpretation failed."
+      });
+      return;
+    }
+    for (const error of result.errors) {
+      log("ws.interpretation.error", {
+        type: event?.type || "",
+        sessionId: event?.sessionId || event?.session?.id || "",
+        pluginId: error?.pluginId || "",
+        message: error?.message || "Stream interpretation plugin failed."
+      });
+    }
+    for (const batch of result.batches) {
+      if (!batch?.sessionId || !Array.isArray(batch.actions) || batch.actions.length === 0) {
+        continue;
+      }
+      applySessionInterpretationActions(batch.sessionId, batch.actions);
+    }
+  }
 
   function start() {
     return createWsClient(wsUrl, {
@@ -42,12 +89,16 @@ export function createWsRuntimeController(options = {}) {
         });
         if (event.type === "session.data") {
           observeSessionData(event.sessionId, event.data);
+          applyInterpretationResult(event);
           if (hasTerminal(event.sessionId)) {
             pushSessionData(event.sessionId, event.data);
             return;
           }
+          applyRuntimeEvent(event);
+          return;
         }
         applyRuntimeEvent(event);
+        applyInterpretationResult(event);
       }
     }, {
       debug,

@@ -133,6 +133,12 @@ export function createAppBootstrapCompositionController(options = {}) {
     typeof options.recordDiscoveryUsage === "function" ? options.recordDiscoveryUsage : () => {};
   const observeSessionData =
     typeof options.observeSessionData === "function" ? options.observeSessionData : () => {};
+  const interpretRuntimeEvent =
+    typeof options.interpretRuntimeEvent === "function" ? options.interpretRuntimeEvent : () => ({ batches: [], errors: [] });
+  const applySessionInterpretationActions =
+    typeof options.applySessionInterpretationActions === "function"
+      ? options.applySessionInterpretationActions
+      : (sessionId, actions) => store?.applySessionInterpretationActions?.(sessionId, actions);
   const exportSessionReplayDownload =
     typeof options.exportSessionReplayDownload === "function" ? options.exportSessionReplayDownload : async () => null;
   const exportSessionReplayCopy =
@@ -334,6 +340,8 @@ export function createAppBootstrapCompositionController(options = {}) {
       hasTerminal: (sessionId) => terminals.has(sessionId),
       pushSessionData: (sessionId, data) => streamAdapter?.push?.(sessionId, data),
       observeSessionData,
+      interpretRuntimeEvent,
+      applySessionInterpretationActions,
       applyRuntimeEvent: (event, runtimeOptions) => appSessionRuntimeFacadeController?.applyRuntimeEvent?.(event, runtimeOptions) === true,
       getWsAuthToken: () => authBootstrapRuntimeController?.getWsAuthToken?.() || "",
       createWsTicket: () => api?.createWsTicket?.(getWsTicketPayload()),

@@ -23,6 +23,7 @@ import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
 import { createStartupBackupRuntimeController as defaultCreateStartupBackupRuntimeController } from "./startup-backup-runtime-controller.js";
+import { createStreamInterpretationPluginEngine } from "./stream-interpretation-plugin-engine.js";
 import { createStreamDebugTraceController } from "./stream-debug-trace-controller.js";
 import { createTraceDebugController } from "./trace-debug-controller.js";
 import { createPasteObservationRuntimeController } from "./paste-observation-runtime-controller.js";
@@ -152,6 +153,9 @@ const traceDebugController = debugLogs
     })
   : { record() {}, dispose() {} };
 const store = createStore();
+const streamInterpretationPluginEngine = createStreamInterpretationPluginEngine({
+  plugins: Array.isArray(options.streamInterpretationPlugins) ? options.streamInterpretationPlugins : []
+});
 let initializationErrorMessage = "";
 
 const {
@@ -1207,6 +1211,7 @@ runtimeEventController = createRuntimeEventController({
   clearError: () => appRuntimeStateController?.clearError(),
   markRuntimeBootstrapReady: (source) => appCommandUiFacadeController?.markRuntimeBootstrapReady(source),
   setRuntimeClientId,
+  applySessionInterpretationActions: (sessionId, actions) => store.applySessionInterpretationActions(sessionId, actions),
   upsertSession: (nextSession) => {
     appSessionRuntimeFacadeController?.upsertSession(nextSession);
     Promise.resolve(maybeAutoRepairOriginHandoffControl()).catch(() => {});
@@ -1702,6 +1707,11 @@ const appBootstrapCompositionController = createAppBootstrapCompositionControlle
   windowRef: window,
   documentRef: document,
   wsStateRef,
+  interpretRuntimeEvent: (event) =>
+    streamInterpretationPluginEngine.interpretRuntimeEvent(event, {
+      getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId)
+    }),
+  applySessionInterpretationActions: (sessionId, actions) => store.applySessionInterpretationActions(sessionId, actions),
   observeSessionData: (sessionId, data) => {
     streamDebugTraceController.record(sessionId, "ws.session.data", {
       chunk: data,

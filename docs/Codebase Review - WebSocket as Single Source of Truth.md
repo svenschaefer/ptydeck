@@ -1,381 +1,137 @@
-# Refactoring Plan: WebSocket as Single Source of Truth
+# WebSocket as Single Source of Truth
 
-## 1. Objective
+## Status
 
-Establish the WebSocket layer as the **single authoritative source of runtime state** in the frontend.
+Current baseline after `v0.4.0-H153`.
 
-Goals:
+The frontend runtime state model is reducer-first and WebSocket-driven for live runtime changes. REST remains available for bootstrap and explicit user-triggered mutations, but live session/deck/custom-command and session-interpretation changes are expected to converge through runtime events and store actions.
 
-- eliminate duplicated data flows (WS + REST)
-- ensure consistent session and command state
-- enable real-time, event-driven architecture
-- prepare the system for plugin-based interpretation
+## Source-of-Truth Rule
 
----
+Live runtime state must enter the frontend through one of these paths:
 
-## 2. Current Problem
+- WebSocket snapshot or runtime event
+- explicit local runtime event produced from a confirmed user-triggered mutation
+- initial REST bootstrap state before WebSocket readiness
 
-The system currently uses a **hybrid data model**:
+UI code must not mutate session/deck/custom-command/interpretation state directly. It must use the store or a runtime event controller seam.
 
-- WebSocket:
-  - session lifecycle events
-  - terminal output
-- REST:
-  - custom commands (`listCustomCommands`)
-  - possibly other state queries
+## Current Runtime Event Domains
 
-### Result
+### Snapshot
 
-- multiple sources of truth
-- potential race conditions
-- redundant network calls
-- unclear data ownership
-
----
-
-## 3. Core Principle
-
-> All live state MUST originate from the WebSocket stream.
-
-REST is only used for:
-
-- initial state hydration
-- explicit user-triggered actions (mutations)
-
----
-
-## 4. Target Data Flow
-
-```text
-Backend → WebSocket → Stream Layer → State Layer → UI
-````
-
-### Rules
-
-* WebSocket events = authoritative updates
-* REST responses = initial snapshot or mutation confirmation only
-* frontend never polls for state
-
----
-
-## 5. State Domains to Unify
-
-### 5.1 Sessions
-
-Already partially WS-driven:
-
-* `session.created`
-* `session.data`
-* `session.closed`
-* (missing: `session.exit` handling)
-
-**Action**
-
-* treat WS events as the only session state source
-* snapshot used only at connect
-
----
-
-### 5.2 Custom Commands
-
-Current issue:
-
-* backend emits WS events:
-
-  * `custom-command.created`
-  * `custom-command.updated`
-  * `custom-command.deleted`
-* frontend ignores them and calls REST repeatedly
-
-**Action**
-
-* maintain in-memory command registry
-* update via WS events
-* REST only for initial load
-
----
-
-### 5.3 Runtime Status
-
-Future domains (important for plugins):
-
-* session activity
-* status messages
-* artifacts (summaries)
-* errors
-
-→ must be derived and stored centrally, not ad-hoc in UI
-
----
-
-## 6. State Model (Unified)
-
-```js id="m4r9du"
-{
-  sessions: {
-    [sessionId]: {
-      id,
-      state,
-      statusText,
-      lastActivityAt,
-      cwd,
-      tags,
-      artifacts,
-      meta
-    }
-  },
-
-  commands: {
-    [commandId]: {
-      id,
-      name,
-      description,
-      body
-    }
-  }
-}
-```
-
----
-
-## 7. WebSocket Event Model
-
-### Requirements
-
-All state-relevant changes must be represented as WS events.
-
----
-
-### 7.1 Session Events
-
-```json id="q8o2iv"
-{ "type": "session.created", "session": {...} }
-{ "type": "session.updated", "session": {...} }
-{ "type": "session.data", "sessionId": "...", "data": "..." }
-{ "type": "session.exit", "sessionId": "...", "code": 0 }
-{ "type": "session.closed", "sessionId": "..." }
-```
-
----
-
-### 7.2 Command Events
-
-```json id="z3r8fl"
-{ "type": "custom-command.created", "command": {...} }
-{ "type": "custom-command.updated", "command": {...} }
-{ "type": "custom-command.deleted", "id": "..." }
-```
-
----
-
-### 7.3 Snapshot Event
-
-```json id="e2b4zp"
+```json
 {
   "type": "snapshot",
-  "sessions": [...],
-  "commands": [...]
+  "sessions": [],
+  "decks": [],
+  "customCommands": [],
+  "outputs": []
 }
 ```
 
-Used only:
+The snapshot hydrates the reducer-first store, replays buffered terminal output, marks WebSocket bootstrap readiness, and schedules terminal stabilization.
 
-* on initial connect
-* after reconnect
+### Sessions
 
----
+Supported live events:
 
-## 8. Frontend Responsibilities
+```json
+{ "type": "session.created", "session": {} }
+{ "type": "session.updated", "session": {} }
+{ "type": "session.exit", "sessionId": "s1" }
+{ "type": "session.activity.completed", "sessionId": "s1" }
+{ "type": "session.closed", "sessionId": "s1" }
+{ "type": "session.data", "sessionId": "s1", "data": "..." }
+```
 
-### 8.1 Stream Layer
+`session.data` is handled specially by the WebSocket runtime controller:
 
-* receives WS events
-* normalizes payloads
-* forwards to state layer
+1. session-output observers run first
+2. stream interpretation runs and may emit session interpretation actions
+3. mounted terminal chunks are written
+4. when no terminal is mounted, the event also falls through to generic runtime-event handling
 
----
+### Decks
 
-### 8.2 State Layer
+Supported live events:
 
-* applies WS events as reducers
-* maintains canonical state
+```json
+{ "type": "deck.created", "deck": {} }
+{ "type": "deck.updated", "deck": {} }
+{ "type": "deck.deleted", "deckId": "deck-a" }
+```
 
-Example:
+### Custom Commands
 
-```js id="c8w7yt"
-function reducer(state, event) {
-  switch (event.type) {
-    case "custom-command.created":
-      state.commands[event.command.id] = event.command
-      break
+Supported live events:
 
-    case "custom-command.deleted":
-      delete state.commands[event.id]
-      break
-  }
+```json
+{ "type": "custom-command.created", "command": {} }
+{ "type": "custom-command.updated", "command": {} }
+{ "type": "custom-command.deleted", "command": {} }
+```
+
+### Session Interpretation
+
+`v0.4.0-H153` adds an explicit source-of-truth bridge for derived session state:
+
+```json
+{
+  "type": "session.interpretation.apply",
+  "sessionId": "s1",
+  "actions": [
+    { "type": "setSessionStatus", "value": "Ready" }
+  ]
 }
 ```
 
----
+This event flows through `runtime-event-controller` into `store.applySessionInterpretationActions`. The same sink is used by the frontend stream-interpretation plugin engine.
 
-### 8.3 UI Layer
+## Store-Owned Interpretation State
 
-* consumes state only
-* no direct WS or REST calls for state
+The store owns these derived per-session fields:
 
----
+- `interpretationState`
+- `statusText`
+- `attentionActive`
+- `pluginBadges`
+- `meta`
+- `tags`
+- `artifacts`
+- `notifications`
+- `commandCorrelations`
 
-## 9. REST Usage After Refactor
+Allowed action types are listed in `docs/Frontend Plugin System for Terminal Stream Interpretation.md`.
 
-REST remains for:
+## Frontend Seams
 
-### 9.1 Initial Load
+- `frontend/src/public/runtime-event-controller.js`
+  - maps canonical runtime events to store/facade operations
+- `frontend/src/public/ws-runtime-controller.js`
+  - owns WebSocket message ordering, trace logging, stream interpretation invocation, and terminal data routing
+- `frontend/src/public/stream-interpretation-plugin-engine.js`
+  - owns plugin execution and normalized session interpretation action batches
+- `frontend/src/public/store.js`
+  - owns reducer state, normalization, limits, and command-correlation derivation
 
-* optional bootstrap before WS connects
+## Current Non-Goals
 
-### 9.2 Mutations
+The current source-of-truth baseline does not add:
 
-Examples:
+- a backend WebSocket protocol framework
+- multiplexed channels
+- external frontend state-management dependencies
+- semantic PTY interpretation plugins
+- automatic outbound messaging
 
-* create session
-* update command
-* delete session
+Those remain separate future work items and must be promoted explicitly before implementation.
 
-### Rule
+## Validation Baseline
 
-> REST responses are NOT used as authoritative state.
+Regression coverage for the H153 source-of-truth extension lives in:
 
-Instead:
-
-* backend emits WS event after mutation
-* frontend updates state via WS
-
----
-
-## 10. Benefits
-
-### 10.1 Consistency
-
-* single source of truth
-* no divergence between WS and REST
-
----
-
-### 10.2 Real-Time Reactivity
-
-* instant UI updates
-* no polling
-
----
-
-### 10.3 Simpler Mental Model
-
-* “state flows from WS”
-* easier reasoning
-
----
-
-### 10.4 Enables Plugin System
-
-Plugins depend on:
-
-* consistent stream of events
-* unified state
-
-Without this:
-
-* plugin behavior becomes unpredictable
-
----
-
-## 11. Refactoring Strategy
-
-### Phase 1: Identify All REST Reads
-
-* locate all `GET` calls used for state
-* especially:
-
-  * custom commands
-  * session lists
-
----
-
-### Phase 2: Introduce State Store
-
-* central store (existing `store.js` can evolve)
-* all updates go through reducers
-
----
-
-### Phase 3: Wire WS Events to Store
-
-* implement reducer handlers for:
-
-  * sessions
-  * commands
-
----
-
-### Phase 4: Remove Redundant REST Reads
-
-* replace with store access
-* ensure WS events cover all cases
-
----
-
-### Phase 5: Add Snapshot Handling
-
-* on connect:
-
-  * replace full state from snapshot
-* ensure idempotency
-
----
-
-## 12. Edge Cases
-
-### 12.1 Reconnect
-
-* snapshot must fully restore state
-* incremental events must be idempotent
-
----
-
-### 12.2 Event Ordering
-
-* WS guarantees order per connection
-* reducers must tolerate duplicates
-
----
-
-### 12.3 Partial State
-
-* UI must handle:
-
-  * session exists but no data yet
-  * command exists but not loaded yet
-
----
-
-## 13. Anti-Patterns to Avoid
-
-* polling REST for live state
-* mixing WS updates with local mutations
-* updating UI directly from WS handlers
-* bypassing state layer
-
----
-
-## 14. Final Assessment
-
-This refactor establishes:
-
-> WebSocket = single runtime truth
-> State layer = deterministic representation
-> UI = pure projection
-
-This is a foundational step for:
-
-* plugin-based interpretation
-* consistent multi-session behavior
-* scalable frontend architecture
+- `frontend/test/runtime-event-controller.test.js`
+- `frontend/test/ws-runtime-controller.test.js`
+- `frontend/test/stream-interpretation-plugin-engine.test.js`
+- `frontend/test/store.test.js`

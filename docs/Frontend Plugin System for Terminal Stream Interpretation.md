@@ -1,471 +1,194 @@
 # Frontend Plugin System for Terminal Stream Interpretation
 
-## 1. Objective
+## Status
 
-Define a **frontend-only plugin architecture** that interprets terminal streams (PTY over WebSocket) and derives higher-level semantics such as:
+Implemented baseline: `v0.4.0-H153`.
 
-- activity state (busy / idle)
-- status messages
-- summaries / artifacts
+The frontend now has a small, deterministic stream-interpretation/plugin seam. It is intentionally infrastructure only. No semantic default plugin is active in production, and no automatic messaging behavior is reintroduced by this layer.
 
-The system must remain:
+## Goal
 
-- deterministic at the action layer
-- heuristic at the interpretation layer
-- non-invasive (no backend dependency)
+Provide a clean extension point for future frontend-only interpretation of PTY/WebSocket runtime events while keeping UI state mutations centralized in the existing reducer-first store.
 
----
+The layer is allowed to:
 
-## 2. Core Principle
+- observe WebSocket runtime events
+- derive declarative session interpretation actions
+- attach plugin attribution to badges, artifacts, and notifications
+- isolate plugin failures from terminal rendering and runtime state updates
 
-> The terminal is an unstructured byte stream.  
-> Meaning is derived via interpretation, not provided explicitly.
+The layer is not allowed to:
 
-Therefore:
+- mutate DOM directly
+- call backend APIs directly
+- bypass the store
+- send remote messages
+- reintroduce historical Codex stream-to-message behavior
 
-- plugins observe the stream
-- plugins infer state
-- plugins emit declarative actions
-- the system executes actions in a controlled way
-
----
-
-## 3. Architecture Overview
+## Current Data Flow
 
 ```text
-WebSocket → Stream Adapter → Plugin Engine → Action Dispatcher → UI State
-````
+WebSocket event
+  -> ws-runtime-controller
+  -> stream-interpretation-plugin-engine
+  -> session interpretation action batches
+  -> store.applySessionInterpretationActions(sessionId, actions)
+  -> session UI state
+```
 
-### Components
+For explicit runtime events from backend or other frontend seams, the same store sink is available through:
 
-#### 3.1 Stream Adapter
+```text
+{ "type": "session.interpretation.apply", "sessionId": "...", "actions": [...] }
+```
 
-* reconstructs lines from chunks
-* tracks activity timestamps
-* optionally strips ANSI
+## Implemented Files
 
-Emits:
+- `frontend/src/public/stream-interpretation-plugin-engine.js`
+  - owns plugin registration, deterministic execution order, action filtering, plugin attribution, and error isolation
+- `frontend/src/public/ws-runtime-controller.js`
+  - invokes interpretation for `session.data` before terminal write and for other WebSocket runtime events after normal runtime-event application
+- `frontend/src/public/runtime-event-controller.js`
+  - handles explicit `session.interpretation.apply` events and forwards them to the store sink
+- `frontend/src/public/store.js`
+  - remains the single owner of normalized session interpretation state
 
-* `onData(sessionId, chunk)`
-* `onLine(sessionId, line)`
-* `onIdle(sessionId)`
+`createAppRuntimeCompositionController` accepts an optional `streamInterpretationPlugins` array for wiring plugins into the runtime. The default production configuration keeps this array empty.
 
----
+## Plugin Contract
 
-#### 3.2 Plugin Engine
-
-* runs all registered plugins
-* collects emitted actions
-* resolves conflicts (priority / last-wins)
-
----
-
-#### 3.3 Action Dispatcher
-
-* executes allowed actions only
-* updates UI state or triggers side effects
-
----
-
-#### 3.4 UI State Layer
-
-* session status
-* badges / titles
-* artifacts
-* notifications
-
----
-
-## 4. Plugin Model
-
-### Interface (conceptual)
+A plugin is a plain object:
 
 ```js
-plugin = {
-  id: "string",
-
-  onLine(session, line) => Action[] | null,
-  onData(session, chunk) => Action[] | null,
-  onIdle(session) => Action[] | null
+{
+  id: "example-plugin",
+  priority: 10,
+  eventTypes: ["session.data"],
+  interpret(context) {
+    return [
+      { type: "setSessionStatus", value: "Ready" }
+    ];
+  }
 }
 ```
 
-### Constraints
+Fields:
 
-* no direct DOM access
-* no side-effects outside actions
-* idempotent behavior
-* isolated per session
+- `id`: required non-empty plugin identifier
+- `priority`: optional numeric ordering key, lower values run first
+- `eventTypes`: optional array of WebSocket/runtime event type names; omitted or empty means all event types
+- `interpret(context)`: required function returning actions, a batch, or batches
 
----
+Context fields:
 
-## 5. Action Model
+- `type`: normalized event type
+- `event`: original event object
+- `sessionId`: normalized session id when available
+- `session`: current session record when resolvable
+- `data`: string data only for `session.data`
+- `timestamp`: interpretation timestamp
 
-### Allowed Actions
+## Return Shapes
 
-#### Status / State
-
-* `setSessionState(busy | idle | error | streaming)`
-* `setSessionStatus(text)`
-
-#### Title / Label
-
-* `setSessionTitle(text)`
-* `setSessionSubtitle(text)`
-
-#### Visual
-
-* `setSessionBadge(icon | color)`
-* `markSessionAttention()`
-
-#### Artifacts
-
-* `storeArtifact(name, text)`
-* `copyToClipboard(text)`
-
-#### Notifications
-
-* `notify(message, severity)`
-
-#### Metadata
-
-* `setSessionMeta(key, value)`
-* `setSessionTags([...])`
-
----
-
-## 6. Codex Use Case 1: "Working …" Detection
-
-### Problem
-
-Codex emits a continuously updating line:
-
-```
-Working (4m 32s • esc to interrupt)
-```
-
-This line:
-
-* is updated in-place (via `\r`)
-* represents active processing
-* contains a time counter
-
----
-
-### Detection Strategy
-
-#### Pattern
-
-```regex
-^Working \(\d+m \d+s .*?\)$
-```
-
-#### Behavior
-
-* match against **last visible line**
-* tolerate missing newline
-* handle overwrite via carriage return
-
----
-
-### State Model
-
-| Condition               | State |
-| ----------------------- | ----- |
-| pattern matches         | busy  |
-| no match + prompt found | idle  |
-
----
-
-### Actions
+A plugin may return an action array for the current session:
 
 ```js
 [
-  setSessionState("busy"),
-  setSessionStatus(line),
-  setSessionTitle(`[${line}] ${session.name}`)
+  { type: "setSessionStatus", value: "Running" }
 ]
 ```
 
----
-
-### Optional Enhancements
-
-* extract elapsed time → numeric value
-* animate UI independently (not from stream)
-* show progress indicator
-
----
-
-### Exit Condition
-
-* pattern disappears OR
-* prompt detected OR
-* idle timeout
-
----
-
-## 7. Codex Use Case 2: Summary Extraction via Delimiter
-
-### Problem
-
-Codex emits a delimiter line:
-
-```
-────────────────────────────
-```
-
-followed by a summary block.
-
-Goal:
-
-* extract this block
-* make it available as structured output
-
----
-
-### Detection Strategy
-
-#### Start Trigger
+A plugin may return an explicit batch:
 
 ```js
-line.startsWith("──") && line.length > threshold
+{
+  sessionId: "s1",
+  actions: [
+    { type: "markSessionAttention", active: true }
+  ]
+}
 ```
 
----
-
-### Capture Phase
-
-* start buffering lines after delimiter
-* include multiline output
-
----
-
-### End Condition
-
-Combination of:
-
-* idle timeout (e.g. 1000 ms without output)
-* optional prompt detection
-
----
-
-### Extraction
-
-* join buffered lines
-* trim whitespace
-* optionally strip ANSI
-
----
-
-### Actions
+A plugin may return multiple batches:
 
 ```js
-[
-  storeArtifact("summary", text),
-  copyToClipboard(text),
-  notify("Summary ready", "info"),
-  setSessionBadge("summary-available")
-]
+{
+  batches: [
+    { sessionId: "s1", actions: [...] },
+    { sessionId: "s2", actions: [...] }
+  ]
+}
 ```
 
----
+Invalid actions and empty batches are ignored. Plugin exceptions are returned as non-fatal interpretation errors and logged by the WebSocket runtime controller.
 
-### UX Options
+## Allowed Action Vocabulary
 
-* icon on session card
-* one-click copy
-* expandable summary view
+The engine only forwards actions that match the store-owned session interpretation vocabulary:
 
----
+- `setSessionState`
+- `setSessionStatus`
+- `markSessionAttention`
+- `setSessionBadges`
+- `mergeSessionMeta`
+- `setSessionTags`
+- `upsertSessionArtifact`
+- `removeSessionArtifact`
+- `pushSessionNotification`
 
-## 8. Generalization Potential
+The store owns normalization, limits, deduplication, and derived command-correlation updates for those actions.
 
-The same pattern applies broadly.
+## Attribution
 
----
+The plugin engine attaches the plugin id to nested records when the plugin did not provide one:
 
-### 8.1 Activity Detection
+- badges in `setSessionBadges`
+- artifacts in `upsertSessionArtifact`
+- notifications in `pushSessionNotification`
 
-Generic:
+This keeps later UI and debugging surfaces able to identify which plugin produced visible derived state.
 
-* output frequency
-* known patterns (spinners, progress)
+## Failure Semantics
 
-Derived states:
+Plugin failures must not break terminal rendering or runtime state application.
 
-* busy
-* idle
-* streaming
+Current behavior:
 
----
+- exceptions are caught per plugin
+- valid actions from other plugins still apply
+- errors are logged as `ws.interpretation.error`
+- terminal chunks continue to be written after interpretation failure
 
-### 8.2 Progress Extraction
+## Non-Goals
 
-Examples:
+The H153 baseline deliberately does not implement:
 
-* `Receiving objects: 42%`
-* `[ 73%] Building`
+- Codex-specific working-line detection
+- summary extraction
+- idle detection
+- outbound messaging
+- remote adapter actions
+- DOM-side effects
+- clipboard actions
+- backend protocol changes beyond recognizing `session.interpretation.apply` on the frontend runtime-event controller
 
-→ extract numeric progress
+Any future semantic plugin must be introduced as an explicit task with corpus-backed tests if it affects user-visible automation.
 
----
+## Test Coverage
 
-### 8.3 Error Detection
+Regression coverage lives in:
 
-Patterns:
+- `frontend/test/stream-interpretation-plugin-engine.test.js`
+- `frontend/test/ws-runtime-controller.test.js`
+- `frontend/test/runtime-event-controller.test.js`
+- `frontend/test/store.test.js`
 
-* `ERROR`
-* `FAIL`
-* exit codes
+The focused H153 test scope proves:
 
-Actions:
-
-* `setSessionState("error")`
-* `markSessionAttention()`
-
----
-
-### 8.4 Tool-Specific Plugins
-
-Examples:
-
-#### git
-
-* detect branch
-* detect clean/dirty state
-
-#### docker
-
-* build steps
-* image success
-
-#### npm
-
-* install success / vulnerabilities
-
----
-
-### 8.5 Streaming Mode Detection
-
-Tools like:
-
-* `tail -f`
-* `journalctl -f`
-
-→ classify as:
-
-* `streaming` (no completion expected)
-
----
-
-### 8.6 Command Correlation
-
-Track:
-
-* last command
-* resulting output
-
-→ enables:
-
-* command-result mapping
-* retry suggestions
-
----
-
-### 8.7 Automation Hooks (optional)
-
-* suggest commands
-* pre-fill input
-* trigger follow-ups (with safeguards)
-
----
-
-### 8.8 External Integration
-
-* send summaries to API
-* webhook triggers
-* AI post-processing
-
----
-
-## 9. Design Constraints
-
-### 9.1 Heuristic Nature
-
-* no guaranteed correctness
-* depends on output format
-* must fail safely
-
----
-
-### 9.2 ANSI Complexity
-
-* cursor movement
-* overwritten lines
-
-Mitigation:
-
-* basic ANSI stripping
-* or use terminal buffer abstraction
-
----
-
-### 9.3 Chunking
-
-* data not line-aligned
-* requires buffering
-
----
-
-## 10. Recommended Implementation Phases
-
-### Phase 1
-
-* Stream adapter
-* plugin engine
-* working detector
-* summary extractor
-
----
-
-### Phase 2
-
-* generic activity detection
-* error detection
-* artifact storage UI
-
----
-
-### Phase 3
-
-* tool-specific plugins
-* progress extraction
-* notifications
-
----
-
-### Phase 4 (optional)
-
-* backend signals (structured events)
-* shared plugin registry
-* persistence / replay
-
----
-
-## 11. Final Assessment
-
-The plugin system transforms the terminal from:
-
-> passive output viewer
-
-into:
-
-> interpreted execution environment
-
-Key property:
-
-* **interpretation remains flexible**
-* **actions remain deterministic**
-
-This preserves system control while enabling rich, context-aware UX without backend changes.
+- plugin ordering
+- action filtering
+- plugin id attribution
+- explicit multi-session batches
+- plugin failure isolation
+- `session.data` interpretation before terminal write
+- `session.interpretation.apply` dispatch into the store sink

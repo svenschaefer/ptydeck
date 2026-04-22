@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-23 (theme import/export compatibility baseline)
+Last updated: 2026-04-23 (frontend runtime-state and stream-interpretation baseline)
 
 ## Current Product Truth
 
@@ -125,6 +125,29 @@ Any future automatic outbound rebuild must start from these constraints:
 - `ROADMAP.md`: no active or queued release wave remains
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
+- future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests
+
+## Frontend Runtime-State and Plugin Baseline
+
+`v0.4.0-H153` added the frontend source-of-truth and plugin infrastructure needed for future stream interpretation without reintroducing production heuristics or messaging behavior.
+
+Current contract:
+
+- `frontend/src/public/store.js` remains the single owner of normalized session interpretation state.
+- `frontend/src/public/runtime-event-controller.js` accepts explicit `session.interpretation.apply` runtime events and forwards them to `store.applySessionInterpretationActions(...)`.
+- `frontend/src/public/ws-runtime-controller.js` invokes stream interpretation for `session.data` before terminal writes and invokes it for other WebSocket runtime events after canonical runtime-event handling.
+- `frontend/src/public/stream-interpretation-plugin-engine.js` owns plugin registration, deterministic priority order, event-type filtering, action-vocabulary filtering, plugin attribution for badges/artifacts/notifications, and per-plugin failure isolation.
+- `createAppRuntimeCompositionController` accepts an optional `streamInterpretationPlugins` array, but the default production configuration keeps it empty.
+- The allowed action vocabulary is intentionally bounded to the store-owned session interpretation actions: `setSessionState`, `setSessionStatus`, `markSessionAttention`, `setSessionBadges`, `mergeSessionMeta`, `setSessionTags`, `upsertSessionArtifact`, `removeSessionArtifact`, and `pushSessionNotification`.
+- No Codex-specific working-line detection, summary extraction, outbound messaging, remote adapter action, DOM side effect, or clipboard action was added in this baseline.
+- The external frontend state-management evaluation is closed for now: keep the custom reducer-first store and re-evaluate Zustand/Redux Toolkit only if a future framework migration or significantly larger component/plugin graph creates a demonstrated need.
+- Regression coverage lives in `frontend/test/stream-interpretation-plugin-engine.test.js`, `frontend/test/ws-runtime-controller.test.js`, `frontend/test/runtime-event-controller.test.js`, and the existing `frontend/test/store.test.js`.
+
+Relevant docs:
+
+- `docs/Frontend Plugin System for Terminal Stream Interpretation.md`
+- `docs/Codebase Review - WebSocket as Single Source of Truth.md`
+- `docs/Technical Alternatives Evaluation for Current Stack.md`
 
 ## Theme Import/Export Baseline
 
@@ -182,4 +205,4 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
 
 ## Latest Validated Coverage
 
-The latest closeout validation on 2026-04-23 for `v0.4.0-H152` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, and the generated-doc checks. The validated repo-wide line coverage totals are backend `93.69%` and frontend `95.01%`.
+The latest closeout validation on 2026-04-23 for `v0.4.0-H153` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`. The validated repo-wide line coverage totals are backend `93.65%` and frontend `95.00%`.

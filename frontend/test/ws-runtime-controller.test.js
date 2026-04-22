@@ -122,6 +122,48 @@ test("ws-runtime controller delays ready notification until runtime bootstrap is
   ]);
 });
 
+test("ws-runtime controller applies stream interpretation for mounted terminal data before terminal write", () => {
+  const calls = [];
+  let capturedHandlers = null;
+  createWsRuntimeController({
+    createWsClient(_url, handlers) {
+      capturedHandlers = handlers;
+      return { close() {} };
+    },
+    wsUrl: "ws://localhost:18080/ws",
+    log: (event, payload) => calls.push(["log", event, payload.pluginId || payload.type || ""]),
+    hasTerminal: () => true,
+    observeSessionData: (sessionId, data) => calls.push(["observe", sessionId, data]),
+    interpretRuntimeEvent: (event) => {
+      calls.push(["interpret", event.type]);
+      return {
+        batches: [
+          {
+            sessionId: event.sessionId,
+            actions: [{ type: "setSessionStatus", value: "Ready" }]
+          }
+        ],
+        errors: [{ pluginId: "example-plugin", message: "non-fatal" }]
+      };
+    },
+    applySessionInterpretationActions: (sessionId, actions) =>
+      calls.push(["applyInterpretation", sessionId, actions[0].type]),
+    pushSessionData: (sessionId, data) => calls.push(["data", sessionId, data]),
+    applyRuntimeEvent: (event) => calls.push(["event", event.type])
+  }).start();
+
+  capturedHandlers.onMessage({ type: "session.data", sessionId: "s1", data: "ready\n" });
+
+  assert.deepEqual(calls, [
+    ["log", "ws.event", "session.data"],
+    ["observe", "s1", "ready\n"],
+    ["interpret", "session.data"],
+    ["log", "ws.interpretation.error", "example-plugin"],
+    ["applyInterpretation", "s1", "setSessionStatus"],
+    ["data", "s1", "ready\n"]
+  ]);
+});
+
 test("ws-runtime controller fails clearly when the ws ticket response is missing a ticket", async () => {
   let capturedOptions = null;
   createWsRuntimeController({

@@ -225,3 +225,33 @@ test("runtime-event controller applies representative runtime updates and deck f
     ["clearError"]
   ]);
 });
+
+test("runtime-event controller applies session interpretation events through the store sink", () => {
+  const calls = [];
+  const controller = createRuntimeEventController({
+    applySessionInterpretationActions: (sessionId, actions) => calls.push(["interpretation", sessionId, actions]),
+    clearError: () => calls.push(["clearError"])
+  });
+
+  assert.equal(
+    controller.applyRuntimeEvent({
+      type: "session.interpretation.apply",
+      sessionId: "s1",
+      actions: [{ type: "setSessionStatus", value: "Ready" }]
+    }),
+    true
+  );
+  assert.equal(
+    controller.applyRuntimeEvent({
+      type: "session.interpretation.apply",
+      sessionId: "s1",
+      actions: []
+    }),
+    false
+  );
+
+  assert.deepEqual(calls, [
+    ["interpretation", "s1", [{ type: "setSessionStatus", value: "Ready" }]],
+    ["clearError"]
+  ]);
+});
