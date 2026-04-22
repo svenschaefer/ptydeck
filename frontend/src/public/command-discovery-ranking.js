@@ -96,7 +96,8 @@ function scoreTextForToken(text, token, fieldIndex) {
       start: 0,
       span: token.length,
       gaps: 0,
-      lengthDelta: normalizedText.length - token.length
+      lengthDelta: normalizedText.length - token.length,
+      text: normalizedText
     };
   }
   const wordPrefixStart = findWordPrefixStart(normalizedText, token);
@@ -107,7 +108,8 @@ function scoreTextForToken(text, token, fieldIndex) {
       start: wordPrefixStart,
       span: token.length,
       gaps: 0,
-      lengthDelta: normalizedText.length - token.length
+      lengthDelta: normalizedText.length - token.length,
+      text: normalizedText
     };
   }
   const substringStart = normalizedText.indexOf(token);
@@ -118,7 +120,8 @@ function scoreTextForToken(text, token, fieldIndex) {
       start: substringStart,
       span: token.length,
       gaps: 0,
-      lengthDelta: normalizedText.length - token.length
+      lengthDelta: normalizedText.length - token.length,
+      text: normalizedText
     };
   }
   const subsequenceMetrics = findSubsequenceMetrics(normalizedText, token);
@@ -129,7 +132,8 @@ function scoreTextForToken(text, token, fieldIndex) {
       start: subsequenceMetrics.start,
       span: subsequenceMetrics.span,
       gaps: subsequenceMetrics.gaps,
-      lengthDelta: normalizedText.length - token.length
+      lengthDelta: normalizedText.length - token.length,
+      text: normalizedText
     };
   }
   return null;
@@ -181,6 +185,7 @@ function buildRankedEntry(item, stableIndex, queryTokens, options) {
       sumStart: 0,
       sumGaps: 0,
       sumSpan: 0,
+      exactPrefixText: "",
       key
     };
   }
@@ -210,8 +215,24 @@ function buildRankedEntry(item, stableIndex, queryTokens, options) {
     sumStart: tokenScores.reduce((sum, entry) => sum + entry.start, 0),
     sumGaps: tokenScores.reduce((sum, entry) => sum + entry.gaps, 0),
     sumSpan: tokenScores.reduce((sum, entry) => sum + entry.span, 0),
+    exactPrefixText: tokenScores.length === 1 && tokenScores[0]?.tier === 0 ? normalizeLower(tokenScores[0].text) : "",
     key
   };
+}
+
+function compareStrictPrefixCompletion(left, right) {
+  const leftText = normalizeLower(left?.exactPrefixText);
+  const rightText = normalizeLower(right?.exactPrefixText);
+  if (!leftText || !rightText || leftText === rightText) {
+    return 0;
+  }
+  if (rightText.startsWith(leftText)) {
+    return -1;
+  }
+  if (leftText.startsWith(rightText)) {
+    return 1;
+  }
+  return 0;
 }
 
 function compareRankedEntries(left, right) {
@@ -222,6 +243,7 @@ function compareRankedEntries(left, right) {
     compareNumeric(left.sumStart, right.sumStart) ||
     compareNumeric(left.sumGaps, right.sumGaps) ||
     compareNumeric(left.sumSpan, right.sumSpan) ||
+    compareStrictPrefixCompletion(left, right) ||
     compareNumeric(right.usageScore, left.usageScore) ||
     compareNumeric(left.stableIndex, right.stableIndex)
   );

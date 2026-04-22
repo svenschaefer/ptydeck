@@ -2,6 +2,11 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-22
+
+- [x] Frontend command-composer autocomplete now keeps direct prefix completions deterministic when one completion is a strict prefix of another. `frontend/src/public/command-discovery-ranking.js` now prefers the shorter exact-prefix candidate only for strict-prefix siblings such as `doc` before `doc-en`, while preserving stable schema order for unrelated aliases such as `deck.list` versus `deck.new` and preserving usage personalization for same-length ties such as `clone` versus `close`.
+- [x] Direct regression coverage in `frontend/test/command-discovery-ranking.test.js` and `frontend/test/command-engine.test.js` now locks down the reported `/do` case even when usage history favors `doc-en`, plus the retained same-length usage-tie behavior. Closeout validation passed with focused autocomplete tests, `npm run lint`, `npm run test`, and `npm run test:coverage:check`; validated coverage totals are backend `93.69%` line coverage and frontend `95.07%` line coverage.
+
 ## 2026-04-18
 
 - [x] `v0.4.0-H151` is now completed on `main`, closing the promoted frontend command/workspace monolith hardening wave and leaving no active or queued release wave in `TODO.md` or `ROADMAP.md`.

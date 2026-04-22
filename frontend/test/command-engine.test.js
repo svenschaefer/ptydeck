@@ -167,13 +167,31 @@ test("command engine keeps exact-prefix results ahead of fuzzy slash matches and
   );
 
   const personalizedEngine = createEngineFixture({
-    systemSlashCommands: ["close", "custom"],
-    getDiscoveryUsageScore: (key) => (key === "slash:custom" ? 10 : 0)
+    systemSlashCommands: ["close", "clone"],
+    getDiscoveryUsageScore: (key) => (key === "slash:clone" ? 10 : 0)
   });
 
-  const exactPrefixContext = personalizedEngine.parseAutocompleteContext("/c");
-  assert.equal(exactPrefixContext.matches[0].insertText, "custom");
+  const exactPrefixContext = personalizedEngine.parseAutocompleteContext("/cl");
+  assert.equal(exactPrefixContext.matches[0].insertText, "clone");
   assert.equal(exactPrefixContext.matches[1].insertText, "close");
+});
+
+test("command engine prefers the shortest slash completion for Tab autocomplete prefixes", () => {
+  const engine = createCommandEngine({
+    systemSlashCommands: [],
+    listCustomCommands: () => [
+      { name: "doc-en", content: "sync english docs", scope: "project" },
+      { name: "doc", content: "sync docs", scope: "project" }
+    ],
+    getDiscoveryUsageScore: (key) => (key === "slash-custom:doc-en" ? 10 : 0)
+  });
+
+  const context = engine.parseAutocompleteContext("/do");
+  assert.equal(context.replacePrefix, "/");
+  assert.deepEqual(
+    context.matches.map((candidate) => candidate.insertText),
+    ["doc", "doc-en"]
+  );
 });
 
 test("command engine resolves declarative provider autocomplete for command arguments", () => {

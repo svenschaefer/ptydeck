@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-18 (post-`H151` frontend command/workspace seam extraction)
+Last updated: 2026-04-22 (autocomplete strict-prefix ranking fix)
 
 ## Current Product Truth
 
@@ -125,6 +125,12 @@ Any future automatic outbound rebuild must start from these constraints:
 - `ROADMAP.md`: no active or queued release wave remains
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
+
+## Command Autocomplete Behavior
+
+Command autocomplete ranking keeps deterministic discovery scoring, with one strict-prefix completion rule: when two exact-prefix matches differ only because one full candidate is a strict prefix of the other, the shorter candidate wins before usage recency. This keeps `/do` + Tab on `doc` ahead of `doc-en`, while preserving schema/stable ordering for unrelated exact-prefix aliases and preserving usage personalization for same-length ties.
+
+The 2026-04-22 closeout validation for this behavior passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`; the latest validated repo-wide line coverage totals are backend `93.69%` and frontend `95.07%`.
 
 ## Repository Quality Review (2026-04-18)
 

@@ -58,6 +58,46 @@ test("rankDiscoveryItems uses recency only after deterministic fuzzy scoring", (
   );
 });
 
+test("rankDiscoveryItems prefers the shortest exact-prefix completion before recency", () => {
+  const ranked = rankDiscoveryItems(
+    [
+      { key: "doc-en", label: "doc-en" },
+      { key: "doc", label: "doc" }
+    ],
+    "do",
+    {
+      getKey: (entry) => entry.key,
+      getTexts: (entry) => [entry.label],
+      getUsageScore: (key) => (key === "doc-en" ? 10 : 0)
+    }
+  );
+
+  assert.deepEqual(
+    ranked.map((entry) => entry.key),
+    ["doc", "doc-en"]
+  );
+});
+
+test("rankDiscoveryItems still personalizes exact-prefix ties with the same completion length", () => {
+  const ranked = rankDiscoveryItems(
+    [
+      { key: "close", label: "close" },
+      { key: "clone", label: "clone" }
+    ],
+    "cl",
+    {
+      getKey: (entry) => entry.key,
+      getTexts: (entry) => [entry.label],
+      getUsageScore: (key) => (key === "clone" ? 10 : 0)
+    }
+  );
+
+  assert.deepEqual(
+    ranked.map((entry) => entry.key),
+    ["clone", "close"]
+  );
+});
+
 test("createCommandDiscoveryUsageStore persists bounded recency order", () => {
   const storageRef = createStorageStub();
   const store = createCommandDiscoveryUsageStore({
