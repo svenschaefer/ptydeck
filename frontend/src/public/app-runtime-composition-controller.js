@@ -1296,6 +1296,8 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   normalizeThemeProfile: sessionUiFacadeController.normalizeThemeProfile,
   normalizeThemeFilterCategory: sessionUiFacadeController.normalizeThemeFilterCategory,
   readThemeProfileFromControls: sessionUiFacadeController.readThemeProfileFromControls,
+  importThemeProfileIntoDraft: sessionUiFacadeController.importThemeProfileIntoDraft,
+  exportThemeProfileFromDraft: sessionUiFacadeController.exportThemeProfileFromDraft,
   updateSessionThemeDraftFromControls: sessionUiFacadeController.updateSessionThemeDraftFromControls,
   readSessionThemeProfilesForSave: sessionUiFacadeController.readSessionThemeProfilesForSave,
   readSessionStartupFromControls: sessionUiFacadeController.readSessionStartupFromControls,
@@ -1308,6 +1310,7 @@ sessionCardInteractionsController = createSessionCardInteractionsController({
   setActiveSettingsTab: sessionUiFacadeController.setActiveSettingsTab,
   stabilizeSettingsLayout: sessionUiFacadeController.stabilizeSettingsLayout,
   getBlockedSessionActionMessage: sessionUiFacadeController.getBlockedSessionActionMessage,
+  writeClipboardText: (text) => clipboardRuntimeController.writeText(text),
   getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage(error, fallback) || fallback
 });
 

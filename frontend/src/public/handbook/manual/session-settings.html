@@ -93,7 +93,23 @@
 
 <p>Use <code>Theme</code> when you want different active/inactive visual treatment for a specific session.</p>
 
-<p>The theme tab supports active/inactive slots, preset filtering, and advanced custom colors. For the exact contract, use the <a href="/handbook/reference/session-settings.html#theme-tab">Theme tab reference</a>.</p>
+<p>The theme tab supports active/inactive slots, preset filtering, external theme import/export, and advanced custom colors. For the exact contract, use the <a href="/handbook/reference/session-settings.html#theme-tab">Theme tab reference</a>.</p>
+
+<p>Theme import/export supports these formats:</p>
+
+<ul>
+<li>ptydeck JSON</li>
+<li>iTerm2 JSON</li>
+<li>Windows Terminal JSON</li>
+<li>Xresources key/value payloads</li>
+</ul>
+
+<p>UI import writes into the selected active or inactive theme slot as a draft. Use <code>Save Settings</code> to persist the imported slot. Export previews the selected slot in the requested format and can copy the payload to the browser clipboard.</p>
+
+<p>The same compatibility layer is available through slash commands:</p>
+
+<pre><code class="language-text">/settings theme import &lt;active|inactive&gt; &lt;auto|iterm2|windows-terminal|xresources|ptydeck&gt; &lt;payload...&gt;
+/settings theme export &lt;active|inactive&gt; &lt;ptydeck|iterm2|windows-terminal|xresources&gt;</code></pre>
 
 <h2 id="save-or-cancel">Save or Cancel</h2>
 

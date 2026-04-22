@@ -878,6 +878,35 @@
                   <option value="custom">Custom</option>
                 </select>
               </div>
+              <details class="session-settings-advanced session-theme-exchange-details">
+                <summary>Import / export external theme</summary>
+                <div class="session-settings-advanced-body session-theme-exchange">
+                  <label class="session-theme-label" for="">Import Format</label>
+                  <select class="session-theme-import-format">
+                    <option value="auto">Auto-detect</option>
+                    <option value="iterm2">iTerm2 JSON</option>
+                    <option value="windows-terminal">Windows Terminal JSON</option>
+                    <option value="xresources">Xresources</option>
+                    <option value="ptydeck">ptydeck JSON</option>
+                  </select>
+                  <label class="session-theme-label" for="">Import Payload</label>
+                  <textarea class="session-theme-import-payload" rows="5" spellcheck="false" placeholder='Paste iTerm2 JSON, Windows Terminal JSON, Xresources, or ptydeck theme JSON'></textarea>
+                  <button class="session-theme-import" type="button">Import to Selected Slot</button>
+                  <label class="session-theme-label" for="">Export Format</label>
+                  <select class="session-theme-export-format">
+                    <option value="ptydeck">ptydeck JSON</option>
+                    <option value="iterm2">iTerm2 JSON</option>
+                    <option value="windows-terminal">Windows Terminal JSON</option>
+                    <option value="xresources">Xresources</option>
+                  </select>
+                  <label class="session-theme-label" for="">Export Payload</label>
+                  <textarea class="session-theme-export-payload" rows="5" spellcheck="false" readonly placeholder="Exported theme payload appears here"></textarea>
+                  <div class="session-theme-exchange-actions">
+                    <button class="session-theme-export" type="button">Preview Export</button>
+                    <button class="session-theme-copy-export" type="button">Copy Export</button>
+                  </div>
+                </div>
+              </details>
               <details class="session-settings-advanced">
                 <summary>Advanced custom colors</summary>
                 <div class="session-settings-advanced-body">

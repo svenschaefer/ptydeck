@@ -73,6 +73,13 @@ export function createSessionCardFactoryController(options = {}) {
     const themeSearch = node.querySelector(".session-theme-search");
     const themeSlotSelect = node.querySelector(".session-theme-slot");
     const themeSelect = node.querySelector(".session-theme-select");
+    const themeImportFormat = node.querySelector(".session-theme-import-format");
+    const themeImportPayload = node.querySelector(".session-theme-import-payload");
+    const themeImportBtn = node.querySelector(".session-theme-import");
+    const themeExportFormat = node.querySelector(".session-theme-export-format");
+    const themeExportPayload = node.querySelector(".session-theme-export-payload");
+    const themeExportBtn = node.querySelector(".session-theme-export");
+    const themeCopyExportBtn = node.querySelector(".session-theme-copy-export");
     const themeBg = node.querySelector(".session-theme-bg");
     const themeFg = node.querySelector(".session-theme-fg");
     const settingsApplyBtn = node.querySelector(".session-settings-apply");
@@ -180,6 +187,13 @@ export function createSessionCardFactoryController(options = {}) {
       themeSearch,
       themeSlotSelect,
       themeSelect,
+      themeImportFormat,
+      themeImportPayload,
+      themeImportBtn,
+      themeExportFormat,
+      themeExportPayload,
+      themeExportBtn,
+      themeCopyExportBtn,
       themeBg,
       themeFg,
       themeInputs,

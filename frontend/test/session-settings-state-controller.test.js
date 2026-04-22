@@ -676,3 +676,84 @@ test("session-settings state controller falls back to the startup tab and syncs 
   assert.equal(entry.settingsPanelInput.classList.contains("session-settings-panel-inactive"), true);
   assert.equal(entry.settingsPanelInput.getAttribute("aria-hidden"), "true");
 });
+
+test("session-settings state controller imports and exports external theme payloads through drafts", () => {
+  const themeProfileKeys = ["background", "foreground", "cursor"];
+  const defaultTheme = {
+    background: "#000000",
+    foreground: "#ffffff",
+    cursor: "#00ff00"
+  };
+  const inactiveTheme = {
+    background: "#222222",
+    foreground: "#dddddd",
+    cursor: "#ff00ff"
+  };
+  const sessionThemeDrafts = new Map();
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys,
+    defaultTerminalTheme: defaultTheme,
+    terminalThemeModeSet: new Set(["custom"]),
+    sessionThemeDrafts,
+    getSessionById: () => ({
+      id: "s1",
+      activeThemeProfile: defaultTheme,
+      inactiveThemeProfile: inactiveTheme
+    }),
+    documentRef: createFakeDocument()
+  });
+  const entry = {
+    themeSlotSelect: new FakeSelect(),
+    themeCategory: createInput("all"),
+    themeSearch: createInput(""),
+    themeSelect: new FakeSelect(),
+    themeInputs: {
+      background: createInput(),
+      foreground: createInput(),
+      cursor: createInput()
+    },
+    themeExportPayload: createInput("stale export")
+  };
+
+  controller.syncSessionThemeControls(entry, "s1");
+  entry.themeSlotSelect.value = "inactive";
+  const imported = controller.importThemeProfileIntoDraft(entry, "s1", {
+    slot: "inactive",
+    format: "xresources",
+    payload: "*.background: #010203\n*.foreground: #fefefe\n"
+  });
+
+  assert.equal(imported.ok, true);
+  assert.equal(imported.format, "xresources");
+  assert.equal(imported.slot, "inactive");
+  assert.deepEqual(imported.importedKeys, ["background", "foreground"]);
+  assert.deepEqual(sessionThemeDrafts.get("s1").inactive.profile, {
+    background: "#010203",
+    foreground: "#fefefe",
+    cursor: "#ff00ff"
+  });
+
+  controller.syncSessionThemeControls(entry, "s1");
+  assert.equal(entry.themeSlotSelect.value, "inactive");
+  assert.equal(entry.themeInputs.background.value, "#010203");
+  assert.equal(entry.themeInputs.foreground.value, "#fefefe");
+  assert.equal(entry.themeInputs.cursor.value, "#ff00ff");
+  assert.equal(entry.themeExportPayload.value, "");
+
+  const exported = controller.exportThemeProfileFromDraft(entry, "s1", {
+    slot: "inactive",
+    format: "windows-terminal",
+    name: "one inactive"
+  });
+  const windowsTheme = JSON.parse(exported.text);
+
+  assert.equal(exported.ok, true);
+  assert.equal(exported.format, "windows-terminal");
+  assert.equal(exported.slot, "inactive");
+  assert.deepEqual(windowsTheme, {
+    name: "one inactive",
+    background: "#010203",
+    foreground: "#fefefe",
+    cursorColor: "#ff00ff"
+  });
+});

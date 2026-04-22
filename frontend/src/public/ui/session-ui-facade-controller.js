@@ -179,6 +179,22 @@ export function createSessionUiFacadeController(options = {}) {
     return normalizeThemeProfile(null);
   }
 
+  function importThemeProfileIntoDraft(entry, sessionId, options = {}) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.importThemeProfileIntoDraft === "function") {
+      return settingsStateController.importThemeProfileIntoDraft(entry, sessionId, options);
+    }
+    return { ok: false, error: "Theme import is unavailable." };
+  }
+
+  function exportThemeProfileFromDraft(entry, sessionId, options = {}) {
+    const settingsStateController = getSessionSettingsStateController();
+    if (typeof settingsStateController?.exportThemeProfileFromDraft === "function") {
+      return settingsStateController.exportThemeProfileFromDraft(entry, sessionId, options);
+    }
+    return { ok: false, error: "Theme export is unavailable." };
+  }
+
   function updateSessionThemeDraftFromControls(entry, sessionId, overrides = {}) {
     const settingsStateController = getSessionSettingsStateController();
     if (typeof settingsStateController?.updateSessionThemeDraftFromControls === "function") {
@@ -352,6 +368,8 @@ export function createSessionUiFacadeController(options = {}) {
     buildThemeFromConfig,
     applyThemeForSession,
     readThemeProfileFromControls,
+    importThemeProfileIntoDraft,
+    exportThemeProfileFromDraft,
     updateSessionThemeDraftFromControls,
     readSessionThemeProfilesForSave,
     syncSessionThemeControls,

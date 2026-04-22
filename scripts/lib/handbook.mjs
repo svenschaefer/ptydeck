@@ -1037,6 +1037,12 @@ function extractLabels(sectionSource, className) {
   return Array.from(String(sectionSource || "").matchAll(pattern)).map((entry) => cleanInlineText(stripHtmlToMarkdownText(entry[1])));
 }
 
+function extractBlockByClass(sectionSource, tagName, className) {
+  const pattern = new RegExp(`<${tagName} class="[^"]*\\b${className}\\b[^"]*">([\\s\\S]*?)<\\/${tagName}>`);
+  const match = String(sectionSource || "").match(pattern);
+  return match ? match[0] : "";
+}
+
 function extractInputSafetyChecks(inputSection) {
   const pattern = /<input class="session-input-safety-([^"]+)" type="checkbox" \/>[\s\S]*?<span class="session-input-safety-check-title">([\s\S]*?)<\/span>[\s\S]*?<span class="session-input-safety-check-detail">([\s\S]*?)<\/span>/g;
   return Array.from(String(inputSection || "").matchAll(pattern)).map((entry) => ({
@@ -1088,11 +1094,18 @@ async function buildSessionSettingsReferenceMarkdown(rootDir) {
 
   const startupFields = extractLabels(startupSection, "session-startup-label");
   const noteFields = extractLabels(noteSection, "session-startup-label");
-  const themeFields = extractLabels(themeSection, "session-theme-label");
+  const themeFilterSection = extractBlockByClass(themeSection, "div", "session-theme-filter-grid");
+  const themeExchangeSection = extractBlockByClass(themeSection, "details", "session-theme-exchange-details");
+  const themePaletteSection = extractBlockByClass(themeSection, "div", "session-theme-palette");
+  const themePrimaryFields = extractLabels(themeFilterSection, "session-theme-label");
+  const themeExchangeFields = extractLabels(themeExchangeSection, "session-theme-label");
+  const themeAdvancedFields = extractLabels(themePaletteSection, "session-theme-label");
   const sendTerminatorOptions = extractSelectOptions(inputSection, "session-send-terminator");
   const mouseForwardingOptions = extractSelectOptions(inputSection, "session-mouse-forwarding-mode");
   const themeSlotOptions = extractSelectOptions(themeSection, "session-theme-slot");
   const themeCategoryOptions = extractSelectOptions(themeSection, "session-theme-category");
+  const themeImportFormatOptions = extractSelectOptions(themeSection, "session-theme-import-format");
+  const themeExportFormatOptions = extractSelectOptions(themeSection, "session-theme-export-format");
   const inputSafetyChecks = extractInputSafetyChecks(inputSection);
   const thresholdFields = extractThresholdFields(inputSection);
   const settingsTabs = Array.from(indexHtml.matchAll(/<button class="session-settings-tab [^"]+" type="button">([\s\S]*?)<\/button>/g)).map((entry) => cleanInlineText(entry[1]));
@@ -1166,13 +1179,21 @@ async function buildSessionSettingsReferenceMarkdown(rootDir) {
     "",
     "Session-local appearance controls for active and inactive terminal views.",
     "",
-    `Primary selectors: ${themeFields.slice(0, 4).map(formatCode).join(", ")}.`,
+    `Primary selectors: ${themePrimaryFields.map(formatCode).join(", ")}.`,
     "",
     `Theme slots: ${themeSlotOptions.map((option) => `${formatCode(option.value)} (${option.label})`).join(", ")}.`,
     "",
     `Theme categories: ${themeCategoryOptions.map((option) => `${formatCode(option.value)} (${option.label})`).join(", ")}.`,
     "",
-    `Advanced custom colors: ${themeFields.slice(4).map(formatCode).join(", ")}.`
+    `Import/export controls: ${themeExchangeFields.map(formatCode).join(", ")}.`,
+    "",
+    `Import formats: ${themeImportFormatOptions.map((option) => `${formatCode(option.value)} (${option.label})`).join(", ")}.`,
+    "",
+    `Export formats: ${themeExportFormatOptions.map((option) => `${formatCode(option.value)} (${option.label})`).join(", ")}.`,
+    "",
+    "Theme import writes the selected active/inactive slot as a draft. Use `Save Settings` to persist imported UI changes.",
+    "",
+    `Advanced custom colors: ${themeAdvancedFields.map(formatCode).join(", ")}.`
   );
 
   return `${lines.join("\n")}\n`;

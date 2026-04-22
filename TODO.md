@@ -14,7 +14,7 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- none currently
+- none currently.
 
 ## Active Ownership Role
 

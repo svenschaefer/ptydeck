@@ -4,6 +4,10 @@ import {
   SESSION_INPUT_SAFETY_INTEGER_DEFAULTS
 } from "../input-safety-profile.js";
 import { normalizeSessionMouseForwardingMode } from "../session-mouse-forwarding.js";
+import {
+  parseExternalThemeProfile,
+  serializeExternalThemeProfile
+} from "../theme-io.js";
 
 const THEME_SLOT_OPTIONS = Object.freeze([
   { value: "active", label: "Active" },
@@ -278,6 +282,54 @@ export function createSessionSettingsStateController(options = {}) {
     };
   }
 
+  function importThemeProfileIntoDraft(entry, sessionId, options = {}) {
+    const selectedSlot = normalizeThemeSlot(options.slot || entry?.themeSlotSelect?.value || getSessionThemeSelectedSlot(sessionId));
+    const currentConfig = getSessionThemeConfig(sessionId, selectedSlot);
+    const result = parseExternalThemeProfile(options.payload, {
+      format: options.format || "auto",
+      themeProfileKeys,
+      defaultThemeProfile: defaultTerminalTheme,
+      baseThemeProfile: currentConfig.profile
+    });
+    if (!result.ok) {
+      return result;
+    }
+    updateSessionThemeDraftFromControls(entry, sessionId, {
+      selectedSlot,
+      slot: selectedSlot,
+      preset: "custom",
+      profile: result.profile,
+      category: entry?.themeCategory?.value || currentConfig.category || "all",
+      search: entry?.themeSearch?.value || currentConfig.search || ""
+    });
+    return {
+      ...result,
+      slot: selectedSlot
+    };
+  }
+
+  function exportThemeProfileFromDraft(entry, sessionId, options = {}) {
+    const selectedSlot = normalizeThemeSlot(options.slot || entry?.themeSlotSelect?.value || getSessionThemeSelectedSlot(sessionId));
+    const draft = updateSessionThemeDraftFromControls(entry, sessionId, {
+      selectedSlot,
+      slot: selectedSlot
+    });
+    const selectedProfile = selectedSlot === "inactive" ? draft.inactive?.profile : draft.active?.profile;
+    const result = serializeExternalThemeProfile(selectedProfile, {
+      format: options.format || "ptydeck",
+      name: options.name,
+      themeProfileKeys,
+      defaultThemeProfile: defaultTerminalTheme
+    });
+    if (!result.ok) {
+      return result;
+    }
+    return {
+      ...result,
+      slot: selectedSlot
+    };
+  }
+
   function syncThemePresetOptions(entry, config) {
     if (!entry?.themeSelect) {
       return;
@@ -327,6 +379,9 @@ export function createSessionSettingsStateController(options = {}) {
       if (input) {
         input.disabled = !customSelected;
       }
+    }
+    if (entry.themeExportPayload && typeof entry.themeExportPayload.value === "string") {
+      entry.themeExportPayload.value = "";
     }
   }
 
@@ -711,6 +766,8 @@ export function createSessionSettingsStateController(options = {}) {
     buildThemeFromConfig,
     applyThemeForSession,
     readThemeProfileFromControls,
+    importThemeProfileIntoDraft,
+    exportThemeProfileFromDraft,
     updateSessionThemeDraftFromControls,
     readSessionThemeProfilesForSave,
     syncSessionThemeControls,

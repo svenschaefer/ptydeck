@@ -991,3 +991,111 @@ test("session-card-interactions controller restores draft state on settings canc
     "close-dialog"
   ]);
 });
+
+test("session-card-interactions controller wires theme import, export, and copy workflows", async () => {
+  const calls = [];
+  const importCalls = [];
+  const exportCalls = [];
+  const clipboardWrites = [];
+  const controller = createSessionCardInteractionsController({
+    normalizeThemeSlot: (value) => (value === "inactive" ? "inactive" : "active"),
+    importThemeProfileIntoDraft: (_refs, sessionId, options) => {
+      importCalls.push({ sessionId, options });
+      return {
+        ok: true,
+        format: "xresources",
+        slot: options.slot
+      };
+    },
+    exportThemeProfileFromDraft: (_refs, sessionId, options) => {
+      exportCalls.push({ sessionId, options });
+      return {
+        ok: true,
+        format: options.format,
+        slot: options.slot,
+        text: "{\"background\":\"#010203\"}\n"
+      };
+    },
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    },
+    isSessionSettingsDirty: () => true
+  });
+  const refs = {
+    focusBtn: createEventTarget(),
+    themeSlotSelect: createEventTarget("inactive"),
+    themeImportFormat: createEventTarget("xresources"),
+    themeImportPayload: createEventTarget("*.background: #010203\n"),
+    themeImportBtn: createEventTarget(),
+    themeExportFormat: createEventTarget("windows-terminal"),
+    themeExportPayload: createEventTarget(""),
+    themeExportBtn: createEventTarget(),
+    themeCopyExportBtn: createEventTarget(),
+    startFeedback: {}
+  };
+
+  controller.bindSessionCardInteractions({
+    session: { id: "s1", name: "alpha" },
+    refs,
+    api: {},
+    getSession: () => ({ id: "s1", name: "alpha" }),
+    getEntry: () => ({ id: "entry" }),
+    syncSessionThemeControls: () => calls.push(["sync"]),
+    applyThemeForSession: (_sessionId, payload) => calls.push(["theme", payload.themeSlot]),
+    setSettingsDirty: (_entry, dirty) => calls.push(["dirty", dirty]),
+    clearError: () => calls.push(["clear"]),
+    setError: (message) => calls.push(["error", message]),
+    setStartupSettingsFeedback: (_entry, message, isError) => calls.push(["feedback", message, isError === true]),
+    requestRender: () => calls.push(["render"]),
+    formatSessionDisplayName: () => "alpha"
+  });
+
+  await refs.themeImportBtn.emit("click");
+  await refs.themeCopyExportBtn.emit("click");
+  refs.themeExportPayload.value = "";
+  await refs.themeExportBtn.emit("click");
+
+  assert.deepEqual(importCalls, [
+    {
+      sessionId: "s1",
+      options: {
+        slot: "inactive",
+        format: "xresources",
+        payload: "*.background: #010203\n"
+      }
+    }
+  ]);
+  assert.deepEqual(exportCalls, [
+    {
+      sessionId: "s1",
+      options: {
+        slot: "inactive",
+        format: "windows-terminal",
+        name: "alpha inactive"
+      }
+    },
+    {
+      sessionId: "s1",
+      options: {
+        slot: "inactive",
+        format: "windows-terminal",
+        name: "alpha inactive"
+      }
+    }
+  ]);
+  assert.deepEqual(clipboardWrites, ["{\"background\":\"#010203\"}\n"]);
+  assert.equal(refs.themeExportPayload.value, "{\"background\":\"#010203\"}\n");
+  assert.deepEqual(calls, [
+    ["sync"],
+    ["theme", "inactive"],
+    ["dirty", true],
+    ["clear"],
+    ["feedback", "Imported xresources theme into inactive theme draft. Save Settings to persist it.", false],
+    ["render"],
+    ["clear"],
+    ["feedback", "Copied exported theme payload.", false],
+    ["clear"],
+    ["feedback", "Exported inactive theme as windows-terminal.", false]
+  ]);
+});

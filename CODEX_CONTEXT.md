@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-22 (autocomplete strict-prefix ranking fix)
+Last updated: 2026-04-23 (theme import/export compatibility baseline)
 
 ## Current Product Truth
 
@@ -126,11 +126,27 @@ Any future automatic outbound rebuild must start from these constraints:
 - the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
 - no active near-term messaging rebuild is in progress
 
+## Theme Import/Export Baseline
+
+`v0.4.0-H152` added a bounded frontend-only compatibility layer for terminal theme import/export without changing the backend session schema.
+
+Current contract:
+
+- `frontend/src/public/theme-io.js` is the single parser/serializer seam for external theme compatibility.
+- Supported import formats are `auto`, `ptydeck`, `iterm2`, `windows-terminal`, and `xresources`.
+- Supported export formats are `ptydeck`, `iterm2`, `windows-terminal`, and `xresources`.
+- The compatibility layer normalizes external payloads into the existing `activeThemeProfile` / `inactiveThemeProfile` color-key model.
+- Missing imported colors preserve the selected slot's current profile where possible, then fall back to the default terminal theme.
+- Session Settings UI import writes the selected active/inactive slot as a draft; `Save Settings` persists the draft through the existing session update path.
+- Slash-command import applies immediately through `/settings theme import <active|inactive> <format> <payload...>`.
+- Slash-command export returns the serialized payload through `/settings theme export <active|inactive> <format>`.
+- Regression coverage lives in `frontend/test/theme-io.test.js`, `frontend/test/command-executor.test.js`, `frontend/test/session-settings-state-controller.test.js`, and `frontend/test/session-card-interactions-controller.test.js`.
+
 ## Command Autocomplete Behavior
 
 Command autocomplete ranking keeps deterministic discovery scoring, with one strict-prefix completion rule: when two exact-prefix matches differ only because one full candidate is a strict prefix of the other, the shorter candidate wins before usage recency. This keeps `/do` + Tab on `doc` ahead of `doc-en`, while preserving schema/stable ordering for unrelated exact-prefix aliases and preserving usage personalization for same-length ties.
 
-The 2026-04-22 closeout validation for this behavior passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`; the latest validated repo-wide line coverage totals are backend `93.69%` and frontend `95.07%`.
+The 2026-04-22 closeout validation for this behavior passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`.
 
 ## Repository Quality Review (2026-04-18)
 
@@ -138,7 +154,7 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
 
 - Backend coverage still runs through the same deterministic workspace file selection contract as the backend default test suite, excluding only `nonfunctional.load.test.js` from the coverage lane. The previously hidden `contract-conformance.test.js`, `runtime.request-seams.test.js`, `runtime.integration.test.js`, and `ws.integration.test.js` surfaces remain visible in the reported backend coverage gate.
 - Frontend coverage still emits a normalized one-row-per-source-file report even when the Node test runner produces duplicate file rows. The normalization remains explicit in the emitted report so duplicate-row repair is auditable instead of silent.
-- The corrected local coverage-check contract now reports backend line coverage at `93.69%` and frontend line coverage at `94.58%` on the current validated tree. The delivered backend hardening raised the promoted backend hotspots to `95.52%` line / `54.17%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `88.64%` line / `78.02%` branch for `backend/src/messaging-runtime.js`, `92.54%` line / `82.19%` branch for `backend/src/telegram-command-surface.js`, and `94.45%` line / `93.40%` branch for `backend/src/validation.js`.
+- At the 2026-04-18 review point, the corrected local coverage-check contract reported backend line coverage at `93.69%` and frontend line coverage at `94.58%`. The delivered backend hardening raised the promoted backend hotspots to `95.52%` line / `54.17%` branch for `backend/src/delivery-adapter-utils.js`, `92.08%` line / `54.90%` branch for `backend/src/discord-adapter.js`, `87.86%` line / `78.85%` branch for `backend/src/messaging-custom-command-utils.js`, `88.64%` line / `78.02%` branch for `backend/src/messaging-runtime.js`, `92.54%` line / `82.19%` branch for `backend/src/telegram-command-surface.js`, and `94.45%` line / `93.40%` branch for `backend/src/validation.js`.
 - `v0.4.0-H149` then reduced `backend/src/runtime.js` from `7938` to `7485` lines by extracting three smaller backend seams with direct tests instead of keeping those branches inside one runtime file:
   - `backend/src/runtime-http-helpers.js` (`184` lines) now owns request-auth/CORS/security/TLS/JSON-response helpers and is covered at `100.00%` line / `98.18%` branch / `81.82%` function.
   - `backend/src/runtime-status-reporting.js` (`171` lines) now owns health/ready/metrics payload shaping and is covered at `100.00%` line / `96.43%` branch / `100.00%` function.
@@ -150,7 +166,7 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
   - `frontend/src/public/command-executor-domain-handlers.js` (`560` lines) now owns the main structured command-family dispatch, reducing `frontend/src/public/command-executor.js` from `2432` to `1984` lines.
   - `frontend/src/public/connection-profile-runtime-actions.js` (`411` lines) now owns profile lifecycle/action flows, reducing `frontend/src/public/connection-profile-runtime-controller.js` from `1984` to `1752` lines.
   - `frontend/src/public/workspace-preset-runtime-actions.js` (`605` lines) now owns preset/group lifecycle/action flows, reducing `frontend/src/public/workspace-preset-runtime-controller.js` from `1557` to `1135` lines.
-- The validated post-`H151` frontend seam snapshot on the current tree is:
+- The validated post-`H151` frontend seam snapshot was:
   - `frontend/src/public/app-runtime-composition-controller.js`: `86.47%` line / `62.92%` branch / `14.29%` function
   - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch / `68.97%` function
   - `frontend/src/public/session-control-runtime-state.js`: `85.98%` line / `75.65%` branch / `100.00%` function
@@ -160,6 +176,10 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
   - `frontend/src/public/connection-profile-runtime-controller.js`: `91.38%` line / `70.33%` branch / `79.87%` function
   - `frontend/src/public/workspace-preset-runtime-actions.js`: `85.62%` line / `67.43%` branch / `54.67%` function
   - `frontend/src/public/workspace-preset-runtime-controller.js`: `91.63%` line / `79.82%` branch / `76.56%` function
-  - repo-wide validated coverage totals: backend `93.65%` line coverage, frontend `95.07%` line coverage
+  - post-`H151` repo-wide validated coverage totals: backend `93.65%` line coverage, frontend `95.07%` line coverage
 - The repo-wide review that promoted `v0.4.0-H151` is now closed: the command/workspace hotspot cluster has direct extracted seams plus focused tests, and no further active or queued quality wave remains in `TODO.md` or `ROADMAP.md`.
 - Smaller low-coverage utilities and UI controllers still exist, but they were not promoted in this review because they are either already bounded, substantially better covered than the newly promoted monoliths, or lower risk than the backend runtime and frontend composition/command/workspace surfaces now queued in `TODO.md`.
+
+## Latest Validated Coverage
+
+The latest closeout validation on 2026-04-23 for `v0.4.0-H152` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:generate`, and the generated-doc checks. The validated repo-wide line coverage totals are backend `93.69%` and frontend `95.01%`.

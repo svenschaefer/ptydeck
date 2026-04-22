@@ -74,4 +74,12 @@ Theme slots: `active` (Active), `inactive` (Inactive).
 
 Theme categories: `all` (All), `dark` (Dark), `light` (Light).
 
+Import/export controls: `Import Format`, `Import Payload`, `Export Format`, `Export Payload`.
+
+Import formats: `auto` (Auto-detect), `iterm2` (iTerm2 JSON), `windows-terminal` (Windows Terminal JSON), `xresources` (Xresources), `ptydeck` (ptydeck JSON).
+
+Export formats: `ptydeck` (ptydeck JSON), `iterm2` (iTerm2 JSON), `windows-terminal` (Windows Terminal JSON), `xresources` (Xresources).
+
+Theme import writes the selected active/inactive slot as a draft. Use `Save Settings` to persist imported UI changes.
+
 Advanced custom colors: `Background`, `Foreground`, `Cursor`, `Black`, `Red`, `Green`, `Yellow`, `Blue`, `Magenta`, `Cyan`, `White`, `Bright Black`, `Bright Red`, `Bright Green`, `Bright Yellow`, `Bright Blue`, `Bright Magenta`, `Bright Cyan`, `Bright White`.

@@ -57,6 +57,10 @@ This file is structured into:
 - [ ] `ARC-001` Owner `FE`: Introduce a frontend stream-interpretation/plugin layer for semantic PTY output classification and extensible automation hooks.
 - [ ] `ARC-002` Owner `FE`: Generalize WebSocket-as-single-source-of-truth state handling beyond the near-term session/deck/custom-command reducer baseline to future plugin artifacts, richer derived state, and later protocol evolution.
 
+Notes:
+
+- External terminal and SSH command-surface inspiration continues to include [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.
+
 ### Messaging Adapters
 
 - The 2026-04-16 reset removed automatic terminal-output-to-message delivery from the live product path.
@@ -72,14 +76,3 @@ This file is structured into:
 - [ ] `MSG-009` Owner `PLAT`: After a new automatic outbound baseline exists again, add an interaction-oriented Discord adapter path that preserves the same single-user ptydeck authority boundaries while validating a richer button- or workflow-driven remote interaction surface instead of only plain outbound message parity.
 - [ ] `MSG-010` Owner `PLAT`: After the third attempt is proven on at least one live outbound path plus Discord, add a Slack-style workflow-oriented adapter focused on concise summaries, handoff context, and approval/status-style workflows rather than stream mirroring.
 - [ ] `MSG-011` Owner `QA`: After a second concrete post-reset outbound adapter lands, add cross-adapter parity and contract validation ensuring provider-specific adapters still honor the same normalized event model, bounded action vocabulary, and ptydeck authority rules.
-
-### Remote / External Theme Compatibility
-
-- [ ] `REM-008A` Owner `FE`: Add a deterministic terminal theme import/export compatibility layer that can parse and emit normalized theme payloads for the existing per-session `activeThemeProfile` / `inactiveThemeProfile` model, starting with explicit adapters for iTerm2 JSON, Windows Terminal JSON fragments, and Xresources-style key/value payloads.
-- [ ] `REM-008B` Owner `FE`: Add frontend operator workflows for theme import/export, including slash-command entry points plus session-settings UI for importing a supported external theme payload into the active or inactive theme slot and exporting the current slot in a selected external format with explicit validation feedback.
-- [ ] `REM-008C` Owner `QA`: Add regression coverage for theme import/export parsing, invalid payload rejection, deterministic slot mapping, and roundtrip fidelity across the supported external theme formats.
-
-Notes:
-
-- The `REM-008*` block was deliberately moved back out of near-term delivery after `v0.4.0-H40`.
-- External terminal and SSH command-surface inspiration continues to include [`withfig/autocomplete`](https://github.com/withfig/autocomplete) for declarative completion specs, generator-backed contextual suggestions, and richer completion metadata.

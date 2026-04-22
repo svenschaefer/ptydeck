@@ -598,6 +598,8 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
       "/settings theme preset <active|inactive> <theme>",
       "/settings theme set <active|inactive> <key> <#rrggbb>",
       "/settings theme reset <active|inactive>",
+      "/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>",
+      "/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>",
       "/settings input-safety show",
       "/settings input-safety set <field> <value>",
       "/settings mouse-forwarding show",
@@ -738,7 +740,9 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
           "/settings theme show [active|inactive]",
           "/settings theme preset <active|inactive> <theme>",
           "/settings theme set <active|inactive> <key> <#rrggbb>",
-          "/settings theme reset <active|inactive>"
+          "/settings theme reset <active|inactive>",
+          "/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>",
+          "/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>"
         ],
         subcommands: {
           show: {
@@ -776,6 +780,24 @@ const DEFAULT_SLASH_COMMAND_SCHEMA = Object.freeze({
             example: "/settings theme reset inactive",
             key: "slash:settings:theme:reset",
             usage: "/settings theme reset <active|inactive>"
+          },
+          import: {
+            insertText: "import",
+            label: "/settings theme import",
+            kind: "subcommand",
+            description: "import an external theme payload into a theme slot",
+            example: "/settings theme import active windows-terminal {\"background\":\"#000000\"}",
+            key: "slash:settings:theme:import",
+            usage: "/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>"
+          },
+          export: {
+            insertText: "export",
+            label: "/settings theme export",
+            kind: "subcommand",
+            description: "export a theme slot in an external theme format",
+            example: "/settings theme export active xresources",
+            key: "slash:settings:theme:export",
+            usage: "/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>"
           }
         }
       },

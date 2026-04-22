@@ -2879,6 +2879,18 @@ dialog:not([open]) {
   gap: 6px;
 }
 
+.session-theme-exchange {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.session-theme-exchange-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .session-theme-palette {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3006,6 +3018,10 @@ dialog:not([open]) {
 }
 
 .session-theme-select,
+.session-theme-import-format,
+.session-theme-export-format,
+.session-theme-import-payload,
+.session-theme-export-payload,
 .session-theme-bg,
 .session-theme-fg {
   width: 100%;
@@ -3015,6 +3031,15 @@ dialog:not([open]) {
   color: var(--text);
   padding: 6px 8px;
   font-family: inherit;
+}
+
+.session-theme-import-payload,
+.session-theme-export-payload {
+  min-height: 96px;
+  resize: vertical;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .session-theme-palette input:disabled,

@@ -21,9 +21,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
   - none currently
 
 ## Queued Wave Order
+
 - none currently
 
 ## Wave Dependencies
+
 - none currently
 
 ## Sequencing Rules

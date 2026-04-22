@@ -27,6 +27,11 @@ import {
   renderCustomCommandForSession
 } from "./custom-command-model.js";
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
+import {
+  formatThemeIoFormats,
+  parseExternalThemeProfile,
+  serializeExternalThemeProfile
+} from "./theme-io.js";
 
 export function createCommandExecutor(options = {}) {
   const store = options.store;
@@ -375,6 +380,30 @@ export function createCommandExecutor(options = {}) {
       normalizedSlot === "inactive" ? session?.inactiveThemeProfile || session?.themeProfile : session?.activeThemeProfile || session?.themeProfile
     );
     return `${normalizedSlot}ThemeProfile=${JSON.stringify(profile, null, 2)}`;
+  }
+
+  function getThemeSlotPatchKey(slot) {
+    return resolveThemeSlotToken(slot) === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+  }
+
+  function getThemeSlotProfile(session, slot) {
+    return normalizeThemeProfile(
+      resolveThemeSlotToken(slot) === "inactive"
+        ? session?.inactiveThemeProfile || session?.themeProfile
+        : session?.activeThemeProfile || session?.themeProfile
+    );
+  }
+
+  function parseThemeImportRaw(raw) {
+    const match = /^\/settings\s+theme\s+import\s+(\S+)\s+(\S+)\s+([\s\S]+)$/i.exec(String(raw || ""));
+    if (!match) {
+      return null;
+    }
+    return {
+      slot: match[1],
+      format: match[2],
+      payload: match[3]
+    };
   }
 
   function formatInputSafetyFieldList() {
@@ -1688,7 +1717,7 @@ export function createCommandExecutor(options = {}) {
           if (!presetResolution.preset) {
             return presetResolution.error;
           }
-          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+          const patchKey = getThemeSlotPatchKey(slot);
           const updated = await applySessionSettingsPatch(resolvedTarget.session, {
             [patchKey]: normalizeThemeProfile(presetResolution.preset.profile || defaultTerminalTheme)
           });
@@ -1706,12 +1735,8 @@ export function createCommandExecutor(options = {}) {
           if (!isValidHexColor(themeArgs[2])) {
             return "Theme value must be a #rrggbb color.";
           }
-          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
-          const baseProfile = normalizeThemeProfile(
-            slot === "inactive"
-              ? resolvedTarget.session.inactiveThemeProfile || resolvedTarget.session.themeProfile
-              : resolvedTarget.session.activeThemeProfile || resolvedTarget.session.themeProfile
-          );
+          const patchKey = getThemeSlotPatchKey(slot);
+          const baseProfile = getThemeSlotProfile(resolvedTarget.session, slot);
           const updated = await applySessionSettingsPatch(resolvedTarget.session, {
             [patchKey]: {
               ...baseProfile,
@@ -1725,11 +1750,49 @@ export function createCommandExecutor(options = {}) {
             return formatUsage("settings", "theme");
           }
           const slot = resolveThemeSlotToken(themeArgs[0]);
-          const patchKey = slot === "inactive" ? "inactiveThemeProfile" : "activeThemeProfile";
+          const patchKey = getThemeSlotPatchKey(slot);
           const updated = await applySessionSettingsPatch(resolvedTarget.session, {
             [patchKey]: normalizeThemeProfile(defaultTerminalTheme)
           });
           return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${patchKey}.`;
+        }
+        if (themeSubcommand === "import") {
+          const parsedImport = parseThemeImportRaw(interpreted.raw);
+          if (!parsedImport) {
+            return formatUsage("settings", "theme");
+          }
+          const slot = resolveThemeSlotToken(parsedImport.slot);
+          const baseProfile = getThemeSlotProfile(resolvedTarget.session, slot);
+          const result = parseExternalThemeProfile(parsedImport.payload, {
+            format: parsedImport.format,
+            themeProfileKeys,
+            defaultThemeProfile: defaultTerminalTheme,
+            baseThemeProfile: baseProfile
+          });
+          if (!result.ok) {
+            return result.error;
+          }
+          const patchKey = getThemeSlotPatchKey(slot);
+          const updated = await applySessionSettingsPatch(resolvedTarget.session, {
+            [patchKey]: normalizeThemeProfile(result.profile)
+          });
+          return `Imported ${result.format} theme into [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${patchKey}.`;
+        }
+        if (themeSubcommand === "export") {
+          if (themeArgs.length !== 2) {
+            return formatUsage("settings", "theme");
+          }
+          const slot = resolveThemeSlotToken(themeArgs[0]);
+          const result = serializeExternalThemeProfile(getThemeSlotProfile(resolvedTarget.session, slot), {
+            format: themeArgs[1],
+            name: `${formatSessionDisplayName(resolvedTarget.session) || resolvedTarget.session.id || "ptydeck"} ${slot}`,
+            themeProfileKeys,
+            defaultThemeProfile: defaultTerminalTheme
+          });
+          if (!result.ok) {
+            return `${result.error} Supported formats: ${formatThemeIoFormats()}.`;
+          }
+          return result.text;
         }
         return formatUsage("settings", "theme");
       }

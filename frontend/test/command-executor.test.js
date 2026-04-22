@@ -156,7 +156,7 @@ test("command executor help and usage strings derive from declarative schema met
   const settingsUsage = await executor.execute({ command: "settings", args: [], raw: "/settings" });
   assert.equal(
     settingsUsage,
-    "Usage: /settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
+    "Usage: /settings show | /settings startup show | /settings startup cwd <path> | /settings startup command <text...> | /settings startup env <json> | /settings startup tags <tag[,tag...]> | /settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay> | /settings note show | /settings note set <text...> | /settings note clear | /settings theme show [active|inactive] | /settings theme preset <active|inactive> <theme> | /settings theme set <active|inactive> <key> <#rrggbb> | /settings theme reset <active|inactive> | /settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...> | /settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources> | /settings input-safety show | /settings input-safety set <field> <value> | /settings mouse-forwarding show | /settings mouse-forwarding set <off|application>"
   );
 
   const customShowUsage = await executor.execute({ command: "custom", args: ["show"], raw: "/custom show" });
@@ -2517,6 +2517,122 @@ test("command executor applies typed theme, mouse forwarding, and input safety s
   assert.equal(calls[4][0], "patch");
   assert.equal(calls[4][1], "s1");
   assert.equal(calls[4][2].inputSafetyProfile.requireValidShellSyntax, true);
+});
+
+test("command executor imports and exports external theme formats through settings theme", async () => {
+  const calls = [];
+  const themeKeys = ["background", "foreground", "cursor", "magenta", "brightMagenta"];
+  const defaultTheme = {
+    background: "#000000",
+    foreground: "#ffffff",
+    cursor: "#00ff00",
+    magenta: "#111111",
+    brightMagenta: "#222222"
+  };
+  const sessions = [
+    {
+      id: "s1",
+      name: "one",
+      deckId: "default",
+      activeThemeProfile: defaultTheme,
+      inactiveThemeProfile: {
+        ...defaultTheme,
+        background: "#101010"
+      }
+    }
+  ];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession(sessionId, payload) {
+        calls.push(["patch", sessionId, payload]);
+        sessions[0] = { ...sessions[0], ...payload };
+        return sessions[0];
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: (event) => calls.push(["event", event.type, event.session.activeThemeProfile]),
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions, error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    themeProfileKeys: themeKeys,
+    defaultTerminalTheme: defaultTheme,
+    terminalThemePresets: [],
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => {
+      const source = profile || {};
+      return Object.fromEntries(themeKeys.map((key) => [key, source[key] || defaultTheme[key]]));
+    },
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  const importPayload = JSON.stringify({
+    background: "#010203",
+    foreground: "#fefefe",
+    cursorColor: "#123456",
+    purple: "#445566",
+    brightPurple: "#778899"
+  });
+  const importFeedback = await executor.execute({
+    command: "settings",
+    args: ["theme", "import", "active", "windows-terminal", importPayload],
+    raw: `/settings theme import active windows-terminal ${importPayload}`
+  });
+  const exported = await executor.execute({
+    command: "settings",
+    args: ["theme", "export", "active", "xresources"],
+    raw: "/settings theme export active xresources"
+  });
+
+  assert.equal(importFeedback, "Imported windows-terminal theme into [7] one: activeThemeProfile.");
+  assert.deepEqual(calls[0], [
+    "patch",
+    "s1",
+    {
+      activeThemeProfile: {
+        background: "#010203",
+        foreground: "#fefefe",
+        cursor: "#123456",
+        magenta: "#445566",
+        brightMagenta: "#778899"
+      }
+    }
+  ]);
+  assert.match(exported, /\*\.background: #010203/);
+  assert.match(exported, /\*\.cursorColor: #123456/);
+  assert.match(exported, /\*\.color13: #778899/);
 });
 
 test("command executor rejects invalid typed input safety values", async () => {

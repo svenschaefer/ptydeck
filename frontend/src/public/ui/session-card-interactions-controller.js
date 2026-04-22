@@ -7,6 +7,14 @@ export function createSessionCardInteractionsController(options = {}) {
   const normalizeThemeProfile = options.normalizeThemeProfile || ((value) => value);
   const normalizeThemeFilterCategory = options.normalizeThemeFilterCategory || ((value) => value);
   const readThemeProfileFromControls = options.readThemeProfileFromControls || (() => ({}));
+  const importThemeProfileIntoDraft =
+    typeof options.importThemeProfileIntoDraft === "function"
+      ? options.importThemeProfileIntoDraft
+      : () => ({ ok: false, error: "Theme import is unavailable." });
+  const exportThemeProfileFromDraft =
+    typeof options.exportThemeProfileFromDraft === "function"
+      ? options.exportThemeProfileFromDraft
+      : () => ({ ok: false, error: "Theme export is unavailable." });
   const updateSessionThemeDraftFromControls = options.updateSessionThemeDraftFromControls || (() => null);
   const readSessionThemeProfilesForSave = options.readSessionThemeProfilesForSave || (() => ({
     activeThemeProfile: {},
@@ -23,6 +31,7 @@ export function createSessionCardInteractionsController(options = {}) {
   const stabilizeSettingsLayout = options.stabilizeSettingsLayout || (() => 0);
   const getBlockedSessionActionMessage = options.getBlockedSessionActionMessage || (() => "");
   const getErrorMessage = options.getErrorMessage || ((error, fallback) => (error instanceof Error && error.message ? error.message : fallback));
+  const writeClipboardText = typeof options.writeClipboardText === "function" ? options.writeClipboardText : async () => false;
 
   function bindSessionCardInteractions(args = {}) {
     const session = args.session;
@@ -391,6 +400,86 @@ export function createSessionCardInteractionsController(options = {}) {
         markDirtyFromControls();
       });
     }
+
+    refs.themeImportBtn?.addEventListener("click", () => {
+      const result = importThemeProfileIntoDraft(refs, session.id, {
+        slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        format: refs.themeImportFormat?.value || "auto",
+        payload: refs.themeImportPayload?.value || ""
+      });
+      if (!result.ok) {
+        const message = result.error || "Theme import failed.";
+        setError(message);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), message, true);
+        return;
+      }
+      syncSessionThemeControls(refs, session.id);
+      applyThemeForSession(session.id, { themeSlot: result.slot });
+      markDirtyFromControls();
+      clearError();
+      setStartupSettingsFeedback(
+        buildSettingsFeedbackEntry(),
+        `Imported ${result.format} theme into ${result.slot} theme draft. Save Settings to persist it.`
+      );
+      requestRender();
+    });
+
+    refs.themeExportBtn?.addEventListener("click", () => {
+      const currentSession = getSession() || session;
+      const result = exportThemeProfileFromDraft(refs, session.id, {
+        slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+        format: refs.themeExportFormat?.value || "ptydeck",
+        name: `${formatSessionDisplayName(currentSession) || currentSession.id || "ptydeck"} ${normalizeThemeSlot(refs.themeSlotSelect?.value)}`
+      });
+      if (!result.ok) {
+        const message = result.error || "Theme export failed.";
+        setError(message);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), message, true);
+        return;
+      }
+      if (refs.themeExportPayload) {
+        refs.themeExportPayload.value = result.text;
+      }
+      clearError();
+      setStartupSettingsFeedback(buildSettingsFeedbackEntry(), `Exported ${result.slot} theme as ${result.format}.`);
+    });
+
+    refs.themeCopyExportBtn?.addEventListener("click", async () => {
+      let text = String(refs.themeExportPayload?.value || "");
+      if (!text.trim()) {
+        const currentSession = getSession() || session;
+        const result = exportThemeProfileFromDraft(refs, session.id, {
+          slot: normalizeThemeSlot(refs.themeSlotSelect?.value),
+          format: refs.themeExportFormat?.value || "ptydeck",
+          name: `${formatSessionDisplayName(currentSession) || currentSession.id || "ptydeck"} ${normalizeThemeSlot(refs.themeSlotSelect?.value)}`
+        });
+        if (!result.ok) {
+          const message = result.error || "Theme export failed.";
+          setError(message);
+          setStartupSettingsFeedback(buildSettingsFeedbackEntry(), message, true);
+          return;
+        }
+        text = result.text;
+        if (refs.themeExportPayload) {
+          refs.themeExportPayload.value = text;
+        }
+      }
+      if (!text.trim()) {
+        return;
+      }
+      try {
+        const copied = await writeClipboardText(text);
+        if (!copied) {
+          throw new Error("clipboard unavailable");
+        }
+        clearError();
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), "Copied exported theme payload.");
+      } catch {
+        const message = "Failed to copy exported theme payload.";
+        setError(message);
+        setStartupSettingsFeedback(buildSettingsFeedbackEntry(), message, true);
+      }
+    });
 
     refs.settingsApplyBtn?.addEventListener("click", async () => {
       const currentSession = getSession() || session;

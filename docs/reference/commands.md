@@ -24,7 +24,7 @@ Generated from `frontend/src/public/command-schema.js` and `frontend/src/public/
 | `/replay` | view retained replay tails or preview/copy/paste normalized replay excerpts | `/replay view`<br>`/replay export`<br>`/replay copy`<br>`/replay copy <sourceSelector> <sliceSelector>`<br>`/replay preview <sourceSelector> <sliceSelector>`<br>`/replay paste <sourceSelector> <targetSelector> <sliceSelector>` | - |
 | `/restart` | restart sessions | `/restart [selector[,selector...]]` | `/session.restart` |
 | `/run` | run a newline-separated slash-command script | `/run + newline-separated slash commands`<br>`/cmd1 + newline + /cmd2` | - |
-| `/settings` | inspect or manage session settings | `/settings show`<br>`/settings startup show`<br>`/settings startup cwd <path>`<br>`/settings startup command <text...>`<br>`/settings startup env <json>`<br>`/settings startup tags <tag[,tag...]>`<br>`/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>`<br>`/settings note show`<br>`/settings note set <text...>`<br>`/settings note clear`<br>`/settings theme show [active|inactive]`<br>`/settings theme preset <active|inactive> <theme>`<br>`/settings theme set <active|inactive> <key> <#rrggbb>`<br>`/settings theme reset <active|inactive>`<br>`/settings input-safety show`<br>`/settings input-safety set <field> <value>`<br>`/settings mouse-forwarding show`<br>`/settings mouse-forwarding set <off|application>` | - |
+| `/settings` | inspect or manage session settings | `/settings show`<br>`/settings startup show`<br>`/settings startup cwd <path>`<br>`/settings startup command <text...>`<br>`/settings startup env <json>`<br>`/settings startup tags <tag[,tag...]>`<br>`/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>`<br>`/settings note show`<br>`/settings note set <text...>`<br>`/settings note clear`<br>`/settings theme show [active|inactive]`<br>`/settings theme preset <active|inactive> <theme>`<br>`/settings theme set <active|inactive> <key> <#rrggbb>`<br>`/settings theme reset <active|inactive>`<br>`/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>`<br>`/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>`<br>`/settings input-safety show`<br>`/settings input-safety set <field> <value>`<br>`/settings mouse-forwarding show`<br>`/settings mouse-forwarding set <off|application>` | - |
 | `/share` | manage read-only spectator shares for sessions and decks | `/share list`<br>`/share session`<br>`/share deck [deckSelector]`<br>`/share revoke <shareId>` | - |
 | `/size` | set deck terminal size | `/size <cols> <rows>`<br>`/size c<cols>`<br>`/size r<rows>` | - |
 | `/swap` | swap quick ids between two sessions | `/swap <selectorA> <selectorB>` | `/session.swap` |
@@ -321,6 +321,8 @@ inspect or manage session settings
 - `/settings theme preset <active|inactive> <theme>`
 - `/settings theme set <active|inactive> <key> <#rrggbb>`
 - `/settings theme reset <active|inactive>`
+- `/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>`
+- `/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>`
 - `/settings input-safety show`
 - `/settings input-safety set <field> <value>`
 - `/settings mouse-forwarding show`
@@ -335,7 +337,7 @@ inspect or manage session settings
 | `/settings note` | inspect or edit the persisted session note<br>Aliases: `/settings.note` | `/settings note show`<br>`/settings note set <text...>`<br>`/settings note clear` |
 | `/settings show` | show session settings<br>Aliases: `/settings.show` | `/settings show` |
 | `/settings startup` | inspect or edit startup-related session settings<br>Aliases: `/settings.startup` | `/settings startup show`<br>`/settings startup cwd <path>`<br>`/settings startup cwd clear`<br>`/settings startup command <text...>`<br>`/settings startup command clear`<br>`/settings startup env <json>`<br>`/settings startup env clear`<br>`/settings startup tags <tag[,tag...]>`<br>`/settings startup tags clear`<br>`/settings startup terminator <auto|crlf|lf|cr|cr2|cr_delay>` |
-| `/settings theme` | inspect or edit active and inactive terminal theme slots<br>Aliases: `/settings.theme` | `/settings theme show [active|inactive]`<br>`/settings theme preset <active|inactive> <theme>`<br>`/settings theme set <active|inactive> <key> <#rrggbb>`<br>`/settings theme reset <active|inactive>` |
+| `/settings theme` | inspect or edit active and inactive terminal theme slots<br>Aliases: `/settings.theme` | `/settings theme show [active|inactive]`<br>`/settings theme preset <active|inactive> <theme>`<br>`/settings theme set <active|inactive> <key> <#rrggbb>`<br>`/settings theme reset <active|inactive>`<br>`/settings theme import <active|inactive> <auto|iterm2|windows-terminal|xresources|ptydeck> <payload...>`<br>`/settings theme export <active|inactive> <ptydeck|iterm2|windows-terminal|xresources>` |
 
 ## /share
 

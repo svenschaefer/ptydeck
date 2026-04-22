@@ -2,6 +2,13 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-23
+
+- [x] `v0.4.0-H152` is now completed on `main`, closing the promoted `REM-008A` / `REM-008B` / `REM-008C` theme import/export block and leaving no active or queued release wave in `TODO.md` or `ROADMAP.md`.
+- [x] `frontend/src/public/theme-io.js` now provides the single frontend compatibility layer for terminal theme import/export. It parses and emits normalized ptydeck theme profiles for `ptydeck` JSON, iTerm2 JSON color-component payloads, Windows Terminal JSON color schemes, and Xresources-style key/value payloads while preserving the existing per-session `activeThemeProfile` / `inactiveThemeProfile` model and rejecting unsupported or empty payloads explicitly.
+- [x] Operator workflows now exist in both supported frontend entry points: the Session Settings `Theme` tab imports into the selected active/inactive draft slot and exports/copies the selected slot, while `/settings theme import ...` and `/settings theme export ...` expose the same compatibility layer through slash commands. The generated command reference and session-settings handbook now document the supported formats and persistence behavior.
+- [x] Regression coverage now locks down parser compatibility, invalid payload rejection, deterministic slot mapping, draft import/export behavior, UI import/export/copy interactions, and slash-command import/export execution. Closeout validation passed with focused frontend tests, `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`; validated coverage totals are backend `93.69%` line coverage and frontend `95.01%` line coverage.
+
 ## 2026-04-22
 
 - [x] Frontend command-composer autocomplete now keeps direct prefix completions deterministic when one completion is a strict prefix of another. `frontend/src/public/command-discovery-ranking.js` now prefers the shorter exact-prefix candidate only for strict-prefix siblings such as `doc` before `doc-en`, while preserving stable schema order for unrelated aliases such as `deck.list` versus `deck.new` and preserving usage personalization for same-length ties such as `clone` versus `close`.
