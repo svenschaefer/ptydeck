@@ -1,5 +1,7 @@
 # Refactoring Plan: Explicit Session Lifecycle Modeling
 
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+
 ## 1. Objective
 
 Introduce a **clear, explicit, and fully synchronized session lifecycle model** across backend and frontend.

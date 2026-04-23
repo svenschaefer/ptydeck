@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-23 (frontend runtime-state and stream-interpretation baseline)
+Last updated: 2026-04-23 (documentation cleanup and current runtime baseline)
 
 ## Current Product Truth
 
@@ -92,6 +92,18 @@ The source-of-truth documents now mean:
 - `DEPLOYMENT.md`
   - operational runbook for the currently shipped system
 
+Large stack-replacement evaluations are not part of the current or deferred project outlook. Future work should extend the existing runtime shape in place unless `SAS` explicitly reopens that direction.
+
+## Documentation Cleanup Baseline
+
+The 2026-04-23 documentation cleanup established these current rules:
+
+- De-scoped access-partitioning and large stack-replacement planning no longer belong in `TODO-OUTLOOK.md`.
+- The removed stack-evaluation document is no longer part of the docs index or active repository knowledge.
+- `DEPLOYMENT.md` is reserved for the current runbook and no longer carries closed feature-branch rollback or merge-readiness gates.
+- Closed branch-acceptance sheets may remain only when clearly marked as historical evidence, not as active deployment gates.
+- Older codebase review notes are retained as review input only; they do not create active work unless a concrete owned task is promoted into `TODO.md` or `TODO-OUTLOOK.md`.
+
 ## Messaging Reset Learnings
 
 The key learnings from the removed live messaging attempt are now captured as markdown, not as active runtime behavior.
@@ -140,14 +152,13 @@ Current contract:
 - `createAppRuntimeCompositionController` accepts an optional `streamInterpretationPlugins` array, but the default production configuration keeps it empty.
 - The allowed action vocabulary is intentionally bounded to the store-owned session interpretation actions: `setSessionState`, `setSessionStatus`, `markSessionAttention`, `setSessionBadges`, `mergeSessionMeta`, `setSessionTags`, `upsertSessionArtifact`, `removeSessionArtifact`, and `pushSessionNotification`.
 - No Codex-specific working-line detection, summary extraction, outbound messaging, remote adapter action, DOM side effect, or clipboard action was added in this baseline.
-- The external frontend state-management evaluation is closed for now: keep the custom reducer-first store and re-evaluate Zustand/Redux Toolkit only if a future framework migration or significantly larger component/plugin graph creates a demonstrated need.
+- Large stack-replacement refactors are not part of the project outlook; the current custom reducer-first store and current runtime stack remain the planning baseline.
 - Regression coverage lives in `frontend/test/stream-interpretation-plugin-engine.test.js`, `frontend/test/ws-runtime-controller.test.js`, `frontend/test/runtime-event-controller.test.js`, and the existing `frontend/test/store.test.js`.
 
 Relevant docs:
 
 - `docs/Frontend Plugin System for Terminal Stream Interpretation.md`
 - `docs/Codebase Review - WebSocket as Single Source of Truth.md`
-- `docs/Technical Alternatives Evaluation for Current Stack.md`
 
 ## Theme Import/Export Baseline
 

@@ -1,21 +1,20 @@
 # MDT-014 Trusted-Local LAN Acceptance
 
-This document is the execution and sign-off sheet for `MDT-014`.
+Historical note: this document was the execution and sign-off sheet for the closed `MDT-014` second-client LAN validation. It is retained as evidence and process learning only; it is not a current deployment gate or active task document.
 
-Use it when validating `feature/h62-multi-device-control-foundation` from a real second LAN client under the production-like local hostnames:
+The original validation used `feature/h62-multi-device-control-foundation` from a real second LAN client under the production-like local hostnames:
 
 - `https://ptydeck.local.secos.rocks`
 - `https://api.ptydeck.local.secos.rocks`
 
-Primary references:
+Current references:
 
-- [DEPLOYMENT.md](../DEPLOYMENT.md) section `8.2` for the operational smoke procedure
-- [DEPLOYMENT.md](../DEPLOYMENT.md) section `8.3` for branch merge-readiness gates
-- [TODO.md](../TODO.md) for the current authoritative task wording
+- [DEPLOYMENT.md](../DEPLOYMENT.md) for the current deployment runbook
+- [CHANGELOG.md](../CHANGELOG.md) for the completed `MDT-014` / `v0.4.0-H65` branch-close history
 
 ## 1. Goal
 
-Close `MDT-014` only after a real second LAN client verifies that the trusted-local multi-device branch works under the real hostnames, with correct startup backup boot behavior, trusted-local identity creation, REST and WebSocket bootstrap, control handoff, and device-local layout recall.
+The historical goal was to close `MDT-014` only after a real second LAN client verified that the trusted-local multi-device branch worked under the real hostnames, with correct startup backup boot behavior, trusted-local identity creation, REST and WebSocket bootstrap, control handoff, and device-local layout recall.
 
 ## 2. Scope
 
@@ -51,7 +50,7 @@ Out of scope for `MDT-014` itself:
 
 ## 4. Preconditions
 
-All items below must be true before starting:
+Historical preconditions used for the original run:
 
 1. Active branch is `feature/h62-multi-device-control-foundation`.
 2. Backend and frontend are running on the primary host.

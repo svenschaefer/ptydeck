@@ -1,5 +1,7 @@
 # Backend Startup vs First Frontend Open Analysis
 
+Historical note: this document records a 2026-04-14 field investigation and is retained for startup/restart learnings only. It is not a current implementation-status document; current runtime behavior is defined by code, `CODEX_CONTEXT.md`, and the active runbook.
+
 ## Scope
 
 This note documents the real 2026-04-14 field case where the backend was restarted well before 14:00 CEST and the frontend at `https://ptydeck.local.secos.rocks` was only opened around 14:27 CEST.

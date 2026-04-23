@@ -1,4 +1,7 @@
 # ptydeck Messaging Adapter Framework
+
+Historical note: this concept predates the 2026-04-16 messaging reset and is retained as product/design learning only. The current shipped authority is the transport-only adapter framework documented in `Terminal Messaging Core Architecture.md` and `CODEX_CONTEXT.md`; future automatic outbound behavior must follow the deferred third-attempt contract tasks before returning to the live path.
+
 ## Final Requirements Concept (Non-Technical, ptydeck-aligned)
 
 ### 1. Document Purpose

@@ -4,6 +4,7 @@ This directory contains three document classes:
 
 - active repository-native architecture and operational notes
 - historical analysis notes kept for learnings after the 2026-04-16 messaging reset
+- historical branch-acceptance notes kept as evidence only
 - handbook source under `docs/manual/` plus generated reference output under `docs/reference/`
 
 Authoritative repository documents remain:
@@ -47,6 +48,12 @@ The following documents are retained for learnings only. They describe removed l
 - `Backend Startup vs First Frontend Open Analysis.md`
 - `ptydeck_messaging_adapter_framework_final_concept.md`
 
+### Historical Branch Acceptance Notes
+
+- `MDT-014 Trusted-Local LAN Acceptance.md`
+
+This document records the closed trusted-local second-client LAN acceptance process. It is not part of the current deployment runbook and should not be treated as an active branch gate.
+
 ### Other Architecture / Review Notes
 
 - `Codebase Review.md`
@@ -56,12 +63,12 @@ The following documents are retained for learnings only. They describe removed l
 - `Codebase Review - Security Foundation Hardening.md`
 - `Codebase Review - WebSocket as Single Source of Truth.md`
 - `Frontend Plugin System for Terminal Stream Interpretation.md`
-- `Technical Alternatives Evaluation for Current Stack.md`
 - `Multi-Device Terminal Control Requirements.md`
 - `Slash Workflow Chains.md`
-- `MDT-014 Trusted-Local LAN Acceptance.md`
 
 These remain useful as review or design references, but not as implementation-status documents.
+
+Obsolete stack-replacement evaluations and branch-specific deployment gates are intentionally not retained in the active docs index. Current task authority remains limited to `TODO.md`, `ROADMAP.md`, and `TODO-OUTLOOK.md`.
 
 ### Handbook System
 

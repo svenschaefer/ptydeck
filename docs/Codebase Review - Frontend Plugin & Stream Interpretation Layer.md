@@ -1,5 +1,7 @@
 # Refactoring Plan: Frontend Plugin & Stream Interpretation Layer
 
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+
 ## 1. Objective
 
 Introduce a **formal plugin-based interpretation layer** that:

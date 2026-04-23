@@ -1,5 +1,7 @@
 # Refactoring Plan: Decomposing `app.js` into a Layered Frontend Architecture
 
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+
 ## 1. Objective
 
 Refactor the current `app.js` monolith into a **modular, layered frontend architecture** that:

@@ -1,5 +1,7 @@
 # ptydeck Codebase Review
 
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+
 ## 1. Executive Summary
 
 ptydeck is already beyond a simple terminal wrapper. It represents a **multi-session terminal workspace with orchestration capabilities**, including:

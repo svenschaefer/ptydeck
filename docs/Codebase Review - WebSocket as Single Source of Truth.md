@@ -119,13 +119,10 @@ Allowed action types are listed in `docs/Frontend Plugin System for Terminal Str
 
 The current source-of-truth baseline does not add:
 
-- a backend WebSocket protocol framework
-- multiplexed channels
-- external frontend state-management dependencies
 - semantic PTY interpretation plugins
 - automatic outbound messaging
 
-Those remain separate future work items and must be promoted explicitly before implementation.
+It also does not introduce any stack-replacement work. Future work should extend the current runtime shape in place unless `SAS` explicitly changes that direction.
 
 ## Validation Baseline
 
