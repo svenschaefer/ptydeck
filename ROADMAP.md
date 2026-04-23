@@ -13,20 +13,19 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Current Execution Status
 
-- Active release waves:
-  - none currently
-- Active scoped tasks:
-  - none currently
+- No active release waves are currently open.
+- Latest completed wave in this segment:
+  - `v0.4.0-H154` Security/Auditability Foundation
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
 
-- none currently
+1. none currently queued.
 
 ## Wave Dependencies
 
-- none currently
+- `v0.4.0-H154` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
 
 ## Sequencing Rules
 

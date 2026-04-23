@@ -147,7 +147,7 @@ export function createRuntimeHttpHelpers({
     res.end(JSON.stringify(body));
   }
 
-  function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "") {
+  function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "", options = {}) {
     if (!config.authEnabled) {
       return null;
     }
@@ -157,6 +157,9 @@ export function createRuntimeHttpHelpers({
       issuer: config.authIssuer,
       audience: config.authAudience
     });
+    if (typeof options.onAuthenticated === "function") {
+      options.onAuthenticated(auth);
+    }
     ensureShareLinkAuthActive(auth);
     ensureScope(auth, requiredScope);
     ensureShareRouteAllowed(auth, routeKind);

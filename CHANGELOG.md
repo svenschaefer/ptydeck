@@ -4,6 +4,15 @@ Completed and validated release history belongs here.
 
 ## 2026-04-23
 
+- [x] `v0.4.0-H154` is now completed on `main`. It adds a production-safe structured security audit trail for HTTP session control and authentication outcomes, including event-shape normalization and redaction controls:
+  - `backend/src/audit-log.js` introduces route/action/error outcome mapping plus actor normalization and safe metadata serialization into JSON-line records.
+  - `backend/src/config.js` adds `AUDIT_LOGS` and `AUDIT_LOG_FILE` and wiring so audit output can run to stdout or an explicit file.
+  - `backend/src/runtime.js` emits audit events from REST requests for session create/delete/input/resize and auth failure/denial/error paths while preserving existing route behavior and status handling.
+  - `backend/src/runtime-http-helpers.js` captures authenticated identity during request authorization without affecting route contracts.
+  - The closeout test surface now covers contract/normalization (`backend/test/audit-log.test.js`), configuration mapping (`backend/test/config.test.js`), session audit-path coverage with auth boundaries and redaction (`backend/test/runtime.integration.test.js`), and rate-limit auth failures.
+  - Backend lint/test/coverage checks include these new audit paths and keep legacy behavior unaffected.
+  - This wave is now moved from active TODO/ROADMAP to changelog.
+
 - [x] Documentation cleanup removed de-scoped access-partitioning planning and large stack-replacement alternatives from current/deferred planning, deleted the obsolete stack-evaluation document, removed closed H62/H65 branch rollback and merge-readiness gates from `DEPLOYMENT.md`, and marked retained branch/review notes as historical or non-authoritative where needed. `TODO.md` and `ROADMAP.md` still have no active or queued task wave after this docs-only cleanup. Closeout validation passed with `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`; validated coverage totals are backend `93.68%` line coverage and frontend `95.00%` line coverage.
 
 - [x] `v0.4.0-H153` is now completed on `main`, closing the promoted frontend runtime-state block and leaving no active or queued release wave in `TODO.md` or `ROADMAP.md`.

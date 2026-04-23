@@ -24,6 +24,8 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.sessionGuardrailSweepMs, 1000);
   assert.equal(config.debugLogs, false);
   assert.equal(config.debugLogFile, "");
+  assert.equal(config.auditLogs, false);
+  assert.equal(config.auditLogFile, "");
   assert.equal(config.sessionStreamAnalysisCaptureFile, "");
   assert.deepEqual(config.sessionStreamAnalysisCaptureAppLabels, ["codex"]);
   assert.equal(config.sessionStreamAnalysisCaptureMaxBytes, 32 * 1024 * 1024);
@@ -73,6 +75,8 @@ test("loadConfig maps environment values", () => {
     DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a",
     BACKEND_DEBUG_LOGS: "true",
     BACKEND_DEBUG_LOG_FILE: "/tmp/ptydeck-debug.log",
+    AUDIT_LOGS: "true",
+    AUDIT_LOG_FILE: "/tmp/ptydeck-audit.jsonl",
     SESSION_STREAM_ANALYSIS_CAPTURE_FILE: "/tmp/ptydeck-stream-analysis.jsonl",
     SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS: "codex, gemini-cli , codex",
     SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES: "65536",
@@ -119,6 +123,8 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.dataEncryptionProvider?.getActiveKey().id, "key-a");
   assert.equal(config.debugLogs, true);
   assert.equal(config.debugLogFile, "/tmp/ptydeck-debug.log");
+  assert.equal(config.auditLogs, true);
+  assert.equal(config.auditLogFile, "/tmp/ptydeck-audit.jsonl");
   assert.equal(config.sessionStreamAnalysisCaptureFile, "/tmp/ptydeck-stream-analysis.jsonl");
   assert.deepEqual(config.sessionStreamAnalysisCaptureAppLabels, ["codex", "gemini-cli"]);
   assert.equal(config.sessionStreamAnalysisCaptureMaxBytes, 65536);

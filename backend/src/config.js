@@ -124,6 +124,7 @@ export function loadConfig(env = process.env) {
     origin === "*" ? origin : parseOrigin(origin, "CORS_ORIGIN")
   );
   const debugLogs = parseBoolean(env.BACKEND_DEBUG_LOGS);
+  const auditLogs = parseBoolean(env.AUDIT_LOGS);
   const dataEncryptionProvider = createDataEncryptionProvider(
     env.DATA_ENCRYPTION_KEYS,
     env.DATA_ENCRYPTION_ACTIVE_KEY_ID
@@ -158,6 +159,7 @@ export function loadConfig(env = process.env) {
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
   const debugLogFile = String(env.BACKEND_DEBUG_LOG_FILE || "").trim();
+  const auditLogFile = String(env.AUDIT_LOG_FILE || "").trim();
   const sessionStreamAnalysisCaptureFile = String(env.SESSION_STREAM_ANALYSIS_CAPTURE_FILE || "").trim();
   const sessionStreamAnalysisCaptureAppLabels = parseCsvList(env.SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS || "codex");
   const sessionStreamAnalysisCaptureMaxBytes = parsePositiveInt(
@@ -281,6 +283,8 @@ export function loadConfig(env = process.env) {
     sessionGuardrailSweepMs,
     debugLogs,
     debugLogFile,
+    auditLogs,
+    auditLogFile,
     sessionStreamAnalysisCaptureFile,
     sessionStreamAnalysisCaptureAppLabels,
     sessionStreamAnalysisCaptureMaxBytes,

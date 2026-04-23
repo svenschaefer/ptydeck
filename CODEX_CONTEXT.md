@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-23 (documentation cleanup and current runtime baseline)
+Last updated: 2026-04-23 (structured auditability closeout and current runtime baseline)
 
 ## Current Product Truth
 
@@ -19,6 +19,28 @@ The shipped runtime now keeps only a transport-only messaging baseline:
 
 The live runtime no longer performs automatic PTY-stream or terminal-output interpretation into outbound Telegram/Discord messages.
 The live runtime also no longer infers app-specific trigger profiles such as `coding-agent` or `build-test` for target routing.
+
+Structured Audit Baseline (v0.4.0-H154):
+
+- Backend HTTP entrypoints now emit structured audit events for security-relevant access and session operations.
+- `backend/src/audit-log.js` owns normalized action/outcome classification and sensitive-field redaction.
+- `backend/src/runtime.js` emits JSON-line events for:
+  - `session.create`
+  - `session.delete`
+  - `session.input`
+  - `session.resize`
+  - `auth.failure` on authentication/authorization failures
+- Configuration is controlled via:
+  - `AUDIT_LOGS` (boolean enable switch)
+  - `AUDIT_LOG_FILE` (optional destination path; if omitted, events go to stdout)
+- Actor handling:
+  - auth-disabled path records `local-operator`
+  - denied/auth-failure paths record `anonymous`/`unknown` with route context
+  - auth-enabled success paths include the resolved auth subject and scopes
+- Redaction policy:
+  - request bodies are normalized to metadata only where needed
+  - terminal input payloads are never written (only byte counts are recorded)
+  - tokens, tenant-like values, and transport/header credential fields are not emitted
 
 ## Messaging Files Intentionally Kept
 
@@ -133,11 +155,11 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active explicit tasks remain
-- `ROADMAP.md`: no active or queued release wave remains
-- the future third messaging attempt is deferred to `TODO-OUTLOOK.md`
-- no active near-term messaging rebuild is in progress
-- future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests
+- `TODO.md`: no active explicit tasks remain.
+- `ROADMAP.md`: no active or queued release wave currently remains.
+- The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
+- No active near-term messaging rebuild is in progress.
+- Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
 
 ## Frontend Runtime-State and Plugin Baseline
 

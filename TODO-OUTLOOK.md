@@ -37,8 +37,6 @@ This file is structured into:
 
 ### Security
 
-- [ ] `ENT-003` Owner `BE`: Add structured audit logging for security-relevant actions (session create/delete/input/resize, auth failures) with actor identity and outcome.
-- [ ] `ENT-010` Owner `QA`: Add security-focused integration tests (authz boundary checks, rate-limit enforcement checks).
 - [ ] `ENT-025` Owner `BE`: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_MODE=dev` as local-only fallback.
 
 Notes:

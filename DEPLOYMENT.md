@@ -66,6 +66,9 @@ Optional for troubleshooting:
 - Backend: `BACKEND_DEBUG_LOGS=1` for request/session/ws lifecycle logs
 - Backend: `BACKEND_DEBUG_LOG_FILE=/tmp/ptydeck-backend-debug.log` for persistent local debug traces
 - When `BACKEND_DEBUG_LOG_FILE` is set, backend debug traces are written to that file instead of flooding the interactive backend stdout/stderr stream
+- Backend: `AUDIT_LOGS=1` enables structured backend security audit logging for security-relevant REST actions.
+- Backend: `AUDIT_LOG_FILE=/tmp/ptydeck-backend-audit.jsonl` enables file output for audit logs (JSONL).
+- When `AUDIT_LOG_FILE` is not set, audit logs are written to backend stdout.
 - Backend: `SESSION_STREAM_ANALYSIS_CAPTURE_FILE=/tmp/ptydeck-session-stream-analysis.jsonl` for persisted raw PTY chunk capture during analysis-only restart and Codex stream investigations
 - Backend (optional filter, comma-separated): `SESSION_STREAM_ANALYSIS_CAPTURE_APP_LABELS=codex`
 - Backend (optional bounded file size): `SESSION_STREAM_ANALYSIS_CAPTURE_MAX_BYTES=33554432`
@@ -323,6 +326,18 @@ Use the following production logging contract for backend and frontend serving p
   - Never log bearer tokens, cookies, passwords, secret keys, session command payloads, or full terminal output bodies.
   - Redact sensitive headers/fields at source (`authorization`, `cookie`, `set-cookie`, `access_token`, `refresh_token`, `password`, `secret`, `token`).
   - For troubleshooting, log metadata only (lengths, IDs, status, timing), not sensitive values.
+- Structured audit logging:
+  - Audit events are emitted as JSON-line records with `event: "audit.event"`.
+  - Required fields include action/outcome/actor/target/http/trace plus normalized metadata.
+  - Supported security actions in the current runtime baseline:
+    - `session.create`
+    - `session.delete`
+    - `session.input`
+    - `session.resize`
+    - `auth.failure` (authN/Z failures and unauthorized/forbidden outcomes)
+  - Redaction policy is already enforced in the backend:
+    - terminal input payloads are never emitted (only byte counts/metadata are recorded),
+    - sensitive auth/token headers and raw body payloads are not included.
 - Retention policy baseline:
   - Keep hot logs for `14` days in non-prod and `30` days in prod.
   - Archive storage may keep compressed logs longer per compliance policy, but runtime logs must have enforced TTL.

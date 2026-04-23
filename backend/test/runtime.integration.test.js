@@ -153,8 +153,11 @@ async function createStartedRuntime(overrides = {}) {
   };
 }
 
-async function issueDevToken(baseUrl, scopes) {
-  const body = Array.isArray(scopes) ? { scopes } : {};
+async function issueDevToken(baseUrl, scopes, overrides = {}) {
+  const body = {
+    ...(Array.isArray(scopes) ? { scopes } : {}),
+    ...(overrides && typeof overrides === "object" && !Array.isArray(overrides) ? overrides : {})
+  };
   const tokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -171,6 +174,23 @@ function createAuthHeaders(accessToken, { json = false } = {}) {
     authorization: `Bearer ${accessToken}`,
     ...(json ? { "content-type": "application/json" } : {})
   };
+}
+
+async function readJsonLines(filePath) {
+  let content = "";
+  try {
+    content = await readFile(filePath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+  return content
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 }
 
 function extractShareToken(joinUrl) {
@@ -3261,7 +3281,12 @@ test("REST rejects malformed JSON bodies and invalid path parameter encodings wi
 });
 
 test("REST create session is rate limited per client", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-rate-audit-"));
+  const auditLogFile = join(dir, "audit.jsonl");
   const { runtime, baseUrl } = await createStartedRuntime({
+    auditLogs: true,
+    auditLogFile,
+    createPty: createFallbackAwarePtyFactory(),
     rateLimitWindowMs: 60000,
     rateLimitRestCreateMax: 1
   });
@@ -3282,6 +3307,17 @@ test("REST create session is rate limited per client", async () => {
     assert.equal(secondRes.status, 429);
     const secondBody = await secondRes.json();
     assert.equal(secondBody.error, "RateLimitExceeded");
+
+    let events = [];
+    await waitFor(async () => {
+      events = await readJsonLines(auditLogFile);
+      return events.some((event) => event.action === "session.create" && event.outcome === "denied");
+    });
+    const rateLimitAuditEvent = events.find(
+      (event) => event.action === "session.create" && event.outcome === "denied"
+    );
+    assert.equal(rateLimitAuditEvent?.error?.code, "RateLimitExceeded");
+    assert.equal(rateLimitAuditEvent?.actor?.subject, "local-operator");
   } finally {
     await runtime.stop();
   }
@@ -3534,6 +3570,190 @@ test("auth dev mode issues token and protects session routes", async () => {
     assert.equal(createRes.status, 403);
     const createBody = await createRes.json();
     assert.equal(createBody.error, "Forbidden");
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("structured audit logging captures session actions and auth failures without terminal input payloads", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-audit-"));
+  const auditLogFile = join(dir, "audit.jsonl");
+  const { runtime, baseUrl } = await createStartedRuntime({
+    auditLogs: true,
+    auditLogFile,
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900,
+    createPty: createFallbackAwarePtyFactory()
+  });
+
+  try {
+    const unauthorizedRes = await fetch(`${baseUrl}/sessions`);
+    assert.equal(unauthorizedRes.status, 401);
+
+    const accessToken = await issueDevToken(
+      baseUrl,
+      ["sessions:read", "sessions:create", "sessions:write", "sessions:delete", "ws:connect"],
+      { subject: "audit-operator" }
+    );
+    const jsonHeaders = createAuthHeaders(accessToken, { json: true });
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ name: "audit-session", shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const createdSession = await createRes.json();
+
+    const secretInput = "super-secret-terminal-input\n";
+    const inputRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ data: secretInput })
+    });
+    assert.equal(inputRes.status, 204);
+
+    const resizeRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/resize`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ cols: 100, rows: 32 })
+    });
+    assert.equal(resizeRes.status, 204);
+
+    const deleteRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`, {
+      method: "DELETE",
+      headers: createAuthHeaders(accessToken)
+    });
+    assert.equal(deleteRes.status, 204);
+
+    let events = [];
+    await waitFor(async () => {
+      events = await readJsonLines(auditLogFile);
+      return events.length >= 5;
+    });
+
+    const authFailure = events.find((event) => event.action === "auth.failure");
+    assert.equal(authFailure?.outcome, "denied");
+    assert.equal(authFailure?.actor?.subject, "anonymous");
+    assert.equal(authFailure?.error?.code, "Unauthorized");
+
+    const createEvent = events.find((event) => event.action === "session.create" && event.target?.sessionId === createdSession.id);
+    assert.equal(createEvent?.outcome, "success");
+    assert.equal(createEvent?.actor?.subject, "audit-operator");
+    assert.equal(createEvent?.metadata?.sessionKind, "local");
+
+    const inputEvent = events.find((event) => event.action === "session.input" && event.target?.sessionId === createdSession.id);
+    assert.equal(inputEvent?.outcome, "success");
+    assert.equal(inputEvent?.actor?.subject, "audit-operator");
+    assert.equal(inputEvent?.metadata?.inputBytes, Buffer.byteLength(secretInput, "utf8"));
+
+    const resizeEvent = events.find((event) => event.action === "session.resize" && event.target?.sessionId === createdSession.id);
+    assert.equal(resizeEvent?.outcome, "success");
+    assert.equal(resizeEvent?.metadata?.cols, 100);
+    assert.equal(resizeEvent?.metadata?.rows, 32);
+
+    const deleteEvent = events.find((event) => event.action === "session.delete" && event.target?.sessionId === createdSession.id);
+    assert.equal(deleteEvent?.outcome, "success");
+    assert.equal(deleteEvent?.actor?.subject, "audit-operator");
+
+    const serializedEvents = JSON.stringify(events);
+    assert.equal(serializedEvents.includes(secretInput.trim()), false);
+    assert.equal(serializedEvents.includes(accessToken), false);
+    assert.equal(serializedEvents.includes("tenantId"), false);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("security authorization boundaries deny insufficient scopes and audit denied attempts", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-authz-audit-"));
+  const auditLogFile = join(dir, "audit.jsonl");
+  const { runtime, baseUrl } = await createStartedRuntime({
+    auditLogs: true,
+    auditLogFile,
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900,
+    createPty: createFallbackAwarePtyFactory()
+  });
+
+  try {
+    const readerToken = await issueDevToken(baseUrl, ["sessions:read"], { subject: "reader-only" });
+    const readerHeaders = createAuthHeaders(readerToken, { json: true });
+
+    const listRes = await fetch(`${baseUrl}/sessions`, {
+      headers: createAuthHeaders(readerToken)
+    });
+    assert.equal(listRes.status, 200);
+
+    const deniedCreateRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: readerHeaders,
+      body: JSON.stringify({ name: "denied-session" })
+    });
+    assert.equal(deniedCreateRes.status, 403);
+
+    const creatorToken = await issueDevToken(baseUrl, ["sessions:read", "sessions:create"], { subject: "creator-only" });
+    const creatorHeaders = createAuthHeaders(creatorToken, { json: true });
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ name: "created-session", shell: "sh" })
+    });
+    assert.equal(createRes.status, 201);
+    const createdSession = await createRes.json();
+
+    const deniedInputRes = await fetch(`${baseUrl}/sessions/${createdSession.id}/input`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ data: "blocked-payload\n" })
+    });
+    assert.equal(deniedInputRes.status, 403);
+
+    const deniedDeleteRes = await fetch(`${baseUrl}/sessions/${createdSession.id}`, {
+      method: "DELETE",
+      headers: createAuthHeaders(creatorToken)
+    });
+    assert.equal(deniedDeleteRes.status, 403);
+
+    let events = [];
+    await waitFor(async () => {
+      events = await readJsonLines(auditLogFile);
+      return events.length >= 4;
+    });
+
+    const deniedCreateEvent = events.find(
+      (event) => event.action === "session.create" && event.outcome === "denied" && event.actor?.subject === "reader-only"
+    );
+    assert.equal(deniedCreateEvent?.error?.code, "Forbidden");
+
+    const successfulCreateEvent = events.find(
+      (event) => event.action === "session.create" && event.outcome === "success" && event.target?.sessionId === createdSession.id
+    );
+    assert.equal(successfulCreateEvent?.actor?.subject, "creator-only");
+
+    const deniedInputEvent = events.find(
+      (event) => event.action === "session.input" && event.outcome === "denied" && event.target?.sessionId === createdSession.id
+    );
+    assert.equal(deniedInputEvent?.actor?.subject, "creator-only");
+    assert.equal(deniedInputEvent?.error?.code, "Forbidden");
+
+    const deniedDeleteEvent = events.find(
+      (event) => event.action === "session.delete" && event.outcome === "denied" && event.target?.sessionId === createdSession.id
+    );
+    assert.equal(deniedDeleteEvent?.actor?.subject, "creator-only");
+    assert.equal(deniedDeleteEvent?.error?.code, "Forbidden");
+
+    assert.equal(JSON.stringify(events).includes("blocked-payload"), false);
   } finally {
     await runtime.stop();
   }

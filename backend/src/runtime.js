@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
+import { createAuditLogger, createHttpAuditEvent } from "./audit-log.js";
 import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
@@ -2770,6 +2771,11 @@ export function createRuntime(config) {
     }
     console.log(line);
   }
+
+  const auditLogger = createAuditLogger({
+    enabled: config.auditLogs,
+    filePath: config.auditLogFile
+  });
 
   const messagingRuntime = createMessagingRuntime({
     telegramBotToken: config.messagingTelegramBotToken,
@@ -5824,6 +5830,13 @@ function tryCreateRestoredSession({
     let pathnameForLog = req.url || "/";
     let normalizedMetricsPathForLog = pathnameForLog;
     let requestTraceContext = null;
+    let requestContextForAudit = null;
+    let routeKindForAudit = "";
+    let routeParamsForAudit = {};
+    let authForAudit = null;
+    let targetForAudit = {};
+    let metadataForAudit = {};
+    let errorCodeForAudit = "";
     let writeJsonResponse = (statusCode, body) => writeJson(req, res, statusCode, body, requestTraceContext);
     res.on("finish", () => {
       const durationMs = Date.now() - startedAt;
@@ -5844,10 +5857,25 @@ function tryCreateRestoredSession({
         statusCode: res.statusCode,
         durationMs
       }, requestTraceContext);
+      void auditLogger.write(createHttpAuditEvent({
+        auth: authForAudit,
+        authEnabled: config.authEnabled,
+        errorCode: errorCodeForAudit,
+        metadata: metadataForAudit,
+        method: methodForLog,
+        params: routeParamsForAudit,
+        pathname: pathnameForLog,
+        requestContext: requestContextForAudit,
+        routeKind: routeKindForAudit,
+        statusCode: res.statusCode,
+        target: targetForAudit,
+        traceContext: requestTraceContext
+      }));
     });
 
     try {
       const requestContext = resolveRequestContext(req, config.trustedProxy);
+      requestContextForAudit = requestContext;
       const parsedUrl = new URL(req.url || "/", `${requestContext.protocol}://${requestContext.host}`);
       pathnameForLog = parsedUrl.pathname;
       normalizedMetricsPathForLog = normalizeMetricsPath(parsedUrl.pathname);
@@ -5869,6 +5897,8 @@ function tryCreateRestoredSession({
       const match = route(parsedUrl.pathname, req.method || "GET");
       const body = await parseJsonBody(req, maxBodyBytes);
       const params = match.params || {};
+      routeKindForAudit = match.kind;
+      routeParamsForAudit = params;
 
       validateRequest({
         method: req.method || "GET",
@@ -5950,7 +5980,11 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "wsTicket") {
-        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
+        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
+          onAuthenticated: (authenticated) => {
+            authForAudit = authenticated;
+          }
+        });
         const payload = issueWsTicket(auth, body);
         validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
         writeJsonResponse(200, payload);
@@ -5959,7 +5993,11 @@ function tryCreateRestoredSession({
 
       let auth = null;
       if (match.kind !== "notFound") {
-        auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind);
+        auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
+          onAuthenticated: (authenticated) => {
+            authForAudit = authenticated;
+          }
+        });
       }
 
       if (match.kind === "listShares") {
@@ -6375,6 +6413,11 @@ function tryCreateRestoredSession({
         }
         reconcileSessionControllerForSession(payload.id);
         const apiPayload = toApiSession(payload);
+        targetForAudit = { sessionId: apiPayload.id };
+        metadataForAudit = {
+          deckId: apiPayload.deckId,
+          sessionKind: apiPayload.kind
+        };
         validateResponse({ statusCode: 201, body: apiPayload, expect: "session" });
         await persistNow("session.create");
         broadcastSessionUpdated(payload.id, {
@@ -6415,6 +6458,7 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "deleteSession") {
+        targetForAudit = { sessionId: match.params.sessionId };
         manager.delete(match.params.sessionId, {
           trace: {
             ...requestTraceContext,
@@ -6577,6 +6621,10 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "input") {
+        targetForAudit = { sessionId: match.params.sessionId };
+        metadataForAudit = {
+          inputBytes: typeof body?.data === "string" ? Buffer.byteLength(body.data, "utf8") : 0
+        };
         getApiSessionOrThrow(match.params.sessionId, auth);
         ensureSessionControllerAccess(match.params.sessionId, auth, req, "send terminal input");
         const normalizedReplyInputText =
@@ -6608,6 +6656,11 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "resize") {
+        targetForAudit = { sessionId: match.params.sessionId };
+        metadataForAudit = {
+          cols: body?.cols,
+          rows: body?.rows
+        };
         getApiSessionOrThrow(match.params.sessionId, auth);
         ensureSessionControllerAccess(match.params.sessionId, auth, req, "resize this terminal");
         manager.resize(match.params.sessionId, body.cols, body.rows, {
@@ -6761,6 +6814,7 @@ function tryCreateRestoredSession({
       throw new ApiError(404, "NotFound", `No route for ${req.method} ${parsedUrl.pathname}`);
     } catch (err) {
       const mapped = toErrorResponse(err);
+      errorCodeForAudit = typeof mapped.body?.error === "string" ? mapped.body.error : "";
       validateResponse({ statusCode: mapped.statusCode, body: mapped.body, expect: "error" });
       writeJsonResponse( mapped.statusCode, mapped.body);
       logDebug("http.request.error", {
