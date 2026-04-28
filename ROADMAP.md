@@ -14,7 +14,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - none currently
+  - `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
 - Latest completed wave in this segment:
   - `v0.4.0-H157` FE Handbook Surface Simplification
 - Queued next waves:
@@ -22,14 +22,27 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Queued Wave Order
 
-None currently.
+1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
+   - `QLT-234` Owner `PLAT`: root-tooling coverage hardening for repo-owned quality helpers.
+   - `QLT-235` Owner `BE`: backend runtime monolith reduction plus direct seam coverage.
+   - `QLT-236` Owner `BE`: backend startup/trust/PTY-write reliability coverage hardening.
+   - `QLT-237` Owner `BE`: retained transport-only messaging/identity coverage hardening.
+   - `QLT-238` Owner `FE`: frontend runtime-composition seam extraction and direct tests.
+   - `QLT-239` Owner `FE`: frontend utility/debug/search controller coverage hardening.
+   - `QLT-240` Owner `FE`: frontend composer/workflow/settings/preset coverage hardening.
 
 ## Wave Dependencies
 
-No active or queued wave dependencies currently.
+- `QLT-234` is independent and should land early so the repo-owned coverage/scaffolding toolchain remains trustworthy while the rest of the wave moves.
+- `QLT-235` should land before `QLT-236` so follow-on backend reliability tests target the reduced runtime seam instead of a larger moving monolith.
+- `QLT-237` depends on the `QLT-235` runtime seam remaining stable but is otherwise independent of the startup/trust slice in `QLT-236`.
+- `QLT-238` should land before `QLT-239` and `QLT-240` so the remaining frontend operator-path coverage work lands against a smaller, more explicit runtime-composition boundary.
 
 ## Wave Exit Criteria
 
+- Root-tooling coverage still clears the enforced threshold while the remaining repo-owned helper hotspots gain direct deterministic regressions.
+- The promoted backend runtime, startup/trust/write, and retained transport/identity hotspot files gain direct coverage and, where needed, smaller extracted seams.
+- The promoted frontend runtime-composition, utility/debug/search, and composer/workflow/settings/preset hotspot files gain direct deterministic coverage.
 - Promoted tasks leave `TODO.md` with open work only and `ROADMAP.md` with active or queued sequencing only.
 - Generated handbook/reference artifacts stay synchronized with their markdown/code sources.
 - `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.

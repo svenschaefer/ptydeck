@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (production auth baseline, auth-provider/runtime coverage hardening, root tooling coverage baseline, repo-wide quality review, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (fresh repo-wide quality/coverage review, promoted H158 gap follow-up wave, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,11 +182,41 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active explicit implementation tasks are currently promoted.
-- `ROADMAP.md`: no active or queued release wave is currently promoted.
+- `TODO.md`: `QLT-234` through `QLT-240` are now promoted as the active repo-wide quality/coverage follow-up tasks.
+- `ROADMAP.md`: `v0.4.0-H158` is now the active release wave for those quality/coverage tasks.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
+
+## Repository Quality Review (2026-04-29)
+
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone.
+
+Current validated top-line coverage remains above threshold:
+
+- root tooling: `91.13%` line / `72.90%` branch
+- backend: `93.94%` line / `87.00%` branch
+- frontend: `95.48%` line / `87.17%` branch
+
+The new review promoted only the still-relevant gaps into `TODO.md`:
+
+- Root tooling:
+  - `scripts/lib/coverage-report.mjs` remains the most relevant repo-owned quality-helper hotspot at `84.98%` line / `71.58%` branch coverage.
+  - `scripts/scaffold-ui-module.mjs` remains the other still-relevant product-tooling hotspot at `87.64%` line / `61.54%` branch coverage.
+  - The lower historical analysis scripts `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain below that level, but they were not promoted into the near-term wave because they are retained diagnostics rather than active product/runtime authority paths.
+- Backend:
+  - `backend/src/runtime.js` remains the largest backend monolith at `7552` lines and `82.15%` line / `75.77%` branch coverage.
+  - `backend/src/startup-backup.js`, `backend/src/key-provider.js`, `backend/src/ssh-host-key-probe.js`, and `backend/src/node-pty-write-retry.js` still carry relevant reliability branches in the `85%` to `87%` line-coverage range.
+  - The retained transport-only messaging/identity baseline still has direct branch blind spots in `backend/src/messaging-runtime.js`, `backend/src/messaging-custom-command-utils.js`, `backend/src/telegram-adapter.js`, `backend/src/terminal-messaging-core.js`, and `backend/src/terminal-app-identity.js`.
+- Frontend:
+  - `frontend/src/public/app-runtime-composition-controller.js` remains the largest behavior-heavy frontend monolith at `1894` lines and `86.33%` line / `62.22%` branch coverage.
+  - The next still-relevant lower-covered utility/operator seams are `command-send-safety-controller.js`, `stream-debug-trace-controller.js`, `trace-debug-controller.js`, `ui/terminal-search-controller.js`, `trusted-local-client-runtime-controller.js`, and `terminal-ctrl-c-runtime-controller.js`.
+  - The next still-relevant lower-covered composer/workflow/settings/preset seams are `command-composer-autocomplete-controller.js`, `slash-workflow-parser.js`, `theme-io.js`, `workspace-preset-runtime-actions.js`, `command-engine.js`, and `ui/session-settings-dialog-controller.js`.
+  - The large static `theme-library.js` file was not promoted as an active quality task because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
+
+The promoted follow-up wave is therefore:
+
+- `QLT-234` through `QLT-240` under `v0.4.0-H158`
 
 ## Frontend Runtime-State and Plugin Baseline
 
