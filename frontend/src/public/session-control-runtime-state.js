@@ -361,7 +361,8 @@ export function canForgetSessionControlClient(session, targetClientId, context =
 }
 
 export function getTakeOrReclaimControlLabel(session, context = {}) {
-  const reclaiming = getCurrentSessionController(session)?.active !== true && canTakeSessionControl(session, context);
+  const controller = getCurrentSessionController(session);
+  const reclaiming = Boolean(controller) && controller.active !== true && canTakeSessionControl(session, context);
   return reclaiming ? "Reclaim Control" : "Take Control";
 }
 

@@ -5,6 +5,7 @@ import {
   ORIGIN_HANDOFF_QUERY_PARAM,
   buildCanonicalOriginRedirectUrl,
   canForgetSessionControlClient,
+  canManageTrustedLocalDevice,
   canReleaseSessionControl,
   canTakeSessionControl,
   canTransferSessionControl,
@@ -16,6 +17,7 @@ import {
   isOriginHandoffRepairableSession,
   getSessionControlBadgeState,
   getSessionControlSummary,
+  getTakeOrReclaimControlLabel,
   getSessionWriteBlockMessage,
   listOriginHandoffRepairableSessions,
   normalizeOriginValue,
@@ -495,4 +497,158 @@ test("session control helpers gate transfer, release, take, and origin-handoff r
     ),
     false
   );
+});
+
+test("session control helpers expose null, attaching, attached, and remote-operator variants deterministically", () => {
+  const attachingContext = createContext({
+    runtimeClientId: "",
+    trustedLocalClientLabel: "Desk"
+  });
+  const attachedSession = {
+    id: "attached",
+    controlState: {
+      currentController: null,
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  };
+  const remoteOperatorSession = {
+    id: "remote-operator",
+    controlState: {
+      currentController: {
+        clientId: "client-remote",
+        label: "Desktop",
+        active: true,
+        subject: "user-2",
+        tenantId: "tenant-2"
+      },
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        },
+        {
+          clientId: "client-remote",
+          label: "Desktop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-2",
+          tenantId: "tenant-2"
+        }
+      ]
+    }
+  };
+
+  assert.equal(getSessionWriteBlockMessage(null, createContext()), "No active session selected.");
+  assert.equal(getSessionControlSummary(null, createContext()), "Control unavailable.");
+  assert.deepEqual(getSessionControlBadgeState(null, createContext()), {
+    label: "",
+    tone: "",
+    title: ""
+  });
+  assert.equal(normalizeOriginValue(""), "");
+
+  assert.equal(
+    getSessionControlSummary(remoteOperatorSession, attachingContext),
+    "Waiting for Desk to attach."
+  );
+  assert.deepEqual(getSessionControlBadgeState(remoteOperatorSession, attachingContext), {
+    label: "ATTACHING",
+    tone: "pending",
+    title: "Waiting for Desk to attach to session control metadata."
+  });
+
+  assert.equal(
+    getSessionControlSummary(attachedSession, createContext()),
+    "No active controller. Laptop can take control."
+  );
+  assert.equal(getTakeOrReclaimControlLabel(attachedSession, createContext()), "Take Control");
+  assert.deepEqual(getSessionControlBadgeState(attachedSession, createContext()), {
+    label: "ATTACHED",
+    tone: "owner",
+    title: "Laptop is attached and can take control."
+  });
+
+  assert.equal(
+    getSessionWriteBlockMessage(remoteOperatorSession, createContext()),
+    "Device Desktop currently controls this session. Take control to override or wait for release."
+  );
+  assert.equal(
+    getSessionControlSummary(remoteOperatorSession, createContext()),
+    "Device Desktop controls this session. Laptop can take control."
+  );
+  assert.deepEqual(getSessionControlBadgeState(remoteOperatorSession, createContext()), {
+    label: "ATTACHED",
+    tone: "owner",
+    title: "Laptop is attached and can take or transfer control."
+  });
+});
+
+test("session control helpers fail closed for spectator reconnect-reserved and management guardrail branches", () => {
+  const spectatorReservedSession = createReconnectReservedSession({
+    controlState: {
+      ...createReconnectReservedSession().controlState,
+      attachedClients: [
+        {
+          clientId: "client-local",
+          label: "Laptop",
+          active: true,
+          activeConnectionCount: 1,
+          accessMode: "spectator",
+          permissionMode: "read",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        },
+        {
+          clientId: "client-remote",
+          label: "Desktop",
+          active: false,
+          activeConnectionCount: 0,
+          accessMode: "operator",
+          permissionMode: "write",
+          subject: "user-1",
+          tenantId: "tenant-1"
+        }
+      ]
+    }
+  });
+  const context = createContext();
+  const readOnlyContext = createContext({ isReadOnlyMode: () => true });
+
+  assert.equal(
+    getSessionWriteBlockMessage(spectatorReservedSession, context),
+    "Control is reserved for reconnecting device Desktop. Input and resize are disabled on this device."
+  );
+  assert.equal(
+    getSessionControlSummary(spectatorReservedSession, context),
+    "Control is reserved for reconnecting device Desktop."
+  );
+  assert.equal(canTakeSessionControl(spectatorReservedSession, context), false);
+  assert.equal(canTakeSessionControl(spectatorReservedSession, readOnlyContext), false);
+  assert.equal(canReleaseSessionControl(spectatorReservedSession, context), false);
+  assert.equal(canReleaseSessionControl(spectatorReservedSession, createContext({ runtimeClientId: "" })), false);
+  assert.equal(canTransferSessionControl(spectatorReservedSession, "", context), false);
+  assert.equal(canTransferSessionControl(spectatorReservedSession, "client-remote", readOnlyContext), false);
+  assert.equal(canManageTrustedLocalDevice(spectatorReservedSession, context), false);
+  assert.equal(canManageTrustedLocalDevice(spectatorReservedSession, createContext({ runtimeClientId: "" })), false);
+  assert.equal(canForgetSessionControlClient(spectatorReservedSession, "client-remote", context), false);
+  assert.equal(canForgetSessionControlClient(createReconnectReservedSession(), "missing", context), false);
 });

@@ -181,8 +181,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: the only remaining active explicit task in `v0.4.0-H156` is `QLT-233`.
-- `ROADMAP.md`: `v0.4.0-H156` is the active release wave.
+- `TODO.md`: no active explicit implementation tasks are currently promoted.
+- `ROADMAP.md`: no active or queued release wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
@@ -207,6 +207,17 @@ Relevant docs:
 
 - `docs/Frontend Plugin System for Terminal Stream Interpretation.md`
 - `docs/Codebase Review - WebSocket as Single Source of Truth.md`
+
+## Session Control Runtime Behavior
+
+The extracted session-control runtime remains the authoritative seam for trusted-local attachment state, control gating, and reconnect-aware operator messaging.
+
+Current contract:
+
+- `frontend/src/public/session-control-runtime-state.js` owns the read/write gating, summaries, badges, and `Take Control` versus `Reclaim Control` label decision.
+- `Reclaim Control` is only valid when a real current controller exists but is reconnect-reserved or inactive.
+- `Take Control` remains the correct operator label when no current controller is attached, even if the local device is already attached to session metadata.
+- `frontend/src/public/session-control-runtime-controller.js` mirrors that distinction in button titles and post-action feedback so unattached-controller states are not mislabeled as reconnect reclaim events.
 
 ## Theme Import/Export Baseline
 
@@ -274,6 +285,7 @@ The next whole-repo review kept the top-line gate green but found five still-rel
 - `QLT-230` is now completed. `backend/src/runtime.js` and `backend/src/session-manager.js` now have direct regressions for restore-all-fallbacks-fail behavior, dev-auth WS-ticket denial without `ws:connect`, concurrent stop/startup release behavior, startup fallback guard cleanup, and SSH reconnect fail-closed behavior.
 - `QLT-231` is now completed. `frontend/src/public/app-runtime-composition-controller.js` and `frontend/src/public/app-runtime-state-controller.js` now have direct regressions for auth-recovery fallback, debug-trace API retry behavior, stream quiet-idle activity clearing, command-feedback action normalization, and bootstrap-fallback suppression after runtime readiness.
 - `QLT-232` is now completed. `frontend/src/public/command-executor.js`, `frontend/src/public/command-executor-domain-handlers.js`, and `frontend/src/public/connection-profile-runtime-actions.js` now have direct regressions for malformed operator input, usage-only branches, connection-profile mutation/apply flows, side-effect suppression on invalid workflow inputs, theme/settings validation failures, and template custom preview failure paths. The same closeout also fixed a frontend autocomplete race by cancelling stale suggestion-refresh timers inside `frontend/src/public/command-composer-autocomplete-controller.js` before Tab-cycle progression.
+- `QLT-233` is now completed. `frontend/src/public/session-control-runtime-state.js`, `frontend/src/public/session-control-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js` now have direct regressions for blocked-write denial, reconnect-reserved control variants, terminal-mount fallback, and missing-API terminal interaction paths. The same closeout also fixed the control-label seam so unattached sessions use `Take Control` while only reconnect-reserved sessions use `Reclaim Control`.
 - The root-tooling lane runs through `scripts/run-root-coverage-tests.mjs`, covers the root `test/` suite plus repo-owned `scripts/` modules, and filters the report to those owned roots only.
 - Incidental frontend/backend imports used by root tooling tests are now reported explicitly as omitted from the root summary instead of silently distorting that lane.
 - The root-tooling lane is enforced at `ROOT_MIN_LINES=90` through `scripts/check-coverage.sh`.
@@ -287,10 +299,11 @@ The next whole-repo review kept the top-line gate green but found five still-rel
   - validated post-`QLT-232` `frontend/src/public/command-executor-domain-handlers.js`: `91.43%` line / `78.31%` branch
   - validated post-`QLT-232` `frontend/src/public/command-executor.js`: `86.81%` line / `76.28%` branch
   - validated post-`QLT-232` `frontend/src/public/connection-profile-runtime-actions.js`: `96.35%` line / `92.94%` branch
-  - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch
-  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `86.62%` line / `78.91%` branch
-- `v0.4.0-H156` was promoted from that review to close those explicit gaps through direct seam tests and tighter local coverage enforcement rather than through another large stack-replacement refactor. After `QLT-232`, the only remaining open follow-up work is `QLT-233` on the session-control / terminal-interaction seam cluster.
+  - validated post-`QLT-233` `frontend/src/public/session-control-runtime-controller.js`: `97.99%` line / `87.65%` branch
+  - validated post-`QLT-233` `frontend/src/public/session-control-runtime-state.js`: `96.97%` line / `88.14%` branch
+  - validated post-`QLT-233` `frontend/src/public/ui/session-terminal-runtime-controller.js`: `89.05%` line / `80.43%` branch
+- `v0.4.0-H156` is now completed. The promoted root-tooling, auth, runtime/session, bootstrap/control, command/workflow, and session-control / terminal-interaction hotspots all have direct seam regressions, and no further active quality wave is promoted in `TODO.md` or `ROADMAP.md`.
 
 ## Latest Validated Coverage
 
-The latest closeout validation on 2026-04-28 for `QLT-232` passed `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`. The validated line coverage totals are root tooling `91.13%`, backend `93.93%`, and frontend `95.29%`.
+The latest closeout validation on 2026-04-28 for `QLT-233` passed `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`. The validated line coverage totals are root tooling `91.13%`, backend `93.94%`, and frontend `95.48%`.

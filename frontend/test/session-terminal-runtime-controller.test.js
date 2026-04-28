@@ -1832,3 +1832,159 @@ test("session-terminal-runtime controller skips follow-on scroll during manual r
   assert.equal(entry.terminal.scrollToBottomCalls, 0);
   assert.deepEqual(calls, ["resize:s1:true:true", "sync", "sync"]);
 });
+
+test("session-terminal-runtime controller degrades safely when clipboard APIs are unavailable by default", async () => {
+  const pasted = [];
+  const terminalWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    navigatorRef: {}
+  });
+  const refs = createTerminalCardRefs("no-clipboard-api");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData: (sessionId, data) => terminalWrites.push([sessionId, data]),
+    onTerminalPaste: (sessionId, data) => pasted.push([sessionId, data]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "copy text";
+  const enterEvent = createKeyEvent("Enter");
+  refs.mount.dispatchEvent(enterEvent);
+  await Promise.resolve();
+
+  const ctrlCEvent = createCtrlCEvent();
+  refs.mount.dispatchEvent(ctrlCEvent);
+
+  const middleDown = createMouseEvent("mousedown", 1);
+  refs.mount.dispatchEvent(middleDown);
+  await Promise.resolve();
+
+  const emptyPasteEvent = createClipboardPasteEvent("");
+  refs.mount.helperTextarea.dispatchEvent(emptyPasteEvent);
+  await Promise.resolve();
+
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.equal(ctrlCEvent.defaultPrevented, false);
+  assert.equal(middleDown.defaultPrevented, true);
+  assert.equal(emptyPasteEvent.defaultPrevented, true);
+  assert.deepEqual(pasted, []);
+  assert.deepEqual(terminalWrites, []);
+  assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller falls back to selection text coercion when hasSelection is unavailable", async () => {
+  const clipboardWrites = [];
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    writeClipboardText: async (text) => {
+      clipboardWrites.push(text);
+      return true;
+    }
+  });
+  const refs = createTerminalCardRefs("selection-fallback");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.hasSelection = undefined;
+  entry.terminal.getSelection = () => 12345;
+
+  const enterEvent = createKeyEvent("Enter");
+  refs.mount.dispatchEvent(enterEvent);
+  await Promise.resolve();
+
+  assert.equal(enterEvent.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["12345"]);
+});
+
+test("session-terminal-runtime controller tolerates missing mount listener APIs and stale terminal entries", () => {
+  const terminals = new Map([["broken", { isVisible: true, applyResizeForSession() {} }]]);
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    terminals,
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {}
+  });
+  const refs = createTerminalCardRefs("missing-mount-api");
+  refs.mount = {
+    id: "missing-mount-api",
+    querySelector() {
+      return null;
+    }
+  };
+
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals,
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  assert.equal(entry.terminal.textarea, null);
+  assert.equal(controller.refreshMountedTerminal("broken"), false);
+  entry.disposeClipboardBindings();
+});
+
+test("session-terminal-runtime controller falls back cleanly when no global scrollbar drag target exists", () => {
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    documentRef: {}
+  });
+  const refs = createTerminalCardRefs("no-global-drag");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    applyResizeForSession() {}
+  });
+
+  const downEvent = createMouseEvent("mousedown", 0);
+  downEvent.clientX = 645;
+  downEvent.clientY = 112;
+  refs.mount.dispatchEvent(downEvent);
+
+  assert.equal(downEvent.defaultPrevented, false);
+  assert.equal(entry.terminal.focusCalls, 1);
+});

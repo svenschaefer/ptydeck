@@ -14,28 +14,19 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
-  - Remaining open tasks:
-    - `QLT-233`
+  - none currently
 - Latest completed wave in this segment:
-  - `v0.4.0-H155` Production Auth Provider
+  - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
 
-1. `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
-   - `QLT-233` frontend session-control / terminal-interaction coverage hardening
+None currently.
 
 ## Wave Dependencies
 
-- `QLT-228` is completed; the root-tooling coverage lane is now part of `npm run test:coverage` and `npm run test:coverage:check`.
-- `QLT-229` is completed; `backend/src/auth.js` now has direct regressions for OIDC discovery/JWKS refresh, malformed JOSE, scope normalization, provider-failure surfaces, and internal HS256 fallback behavior in `AUTH_MODE=prod`.
-- `QLT-230` is completed; `backend/src/runtime.js` and `backend/src/session-manager.js` now have direct regressions for restore-all-fallbacks-fail behavior, dev-auth WS-ticket denial without `ws:connect`, concurrent stop/startup release behavior, startup fallback guard cleanup, and SSH reconnect fail-closed behavior.
-- `QLT-231` is completed; `frontend/src/public/app-runtime-composition-controller.js` and `frontend/src/public/app-runtime-state-controller.js` now have direct regressions for auth-recovery fallback, debug-trace API retry behavior, stream quiet-idle activity clearing, command-feedback action normalization, and bootstrap-fallback suppression after runtime readiness.
-- `QLT-232` is completed; `frontend/src/public/command-executor.js`, `frontend/src/public/command-executor-domain-handlers.js`, and `frontend/src/public/connection-profile-runtime-actions.js` now have direct regressions for malformed operator input, usage-only paths, connection-profile mutation and apply flows, workflow-side side-effect suppression, and template/settings validation failures, while `frontend/src/public/command-composer-autocomplete-controller.js` now cancels stale suggestion-refresh timers before Tab cycling so the command-ring state stays deterministic under async UI timing.
-- `QLT-233` is now the final remaining slice in `v0.4.0-H156` because the promoted residual frontend risk is concentrated in session-control and terminal-interaction branches after the command/workflow seams were hardened directly.
-- `v0.4.0-H155` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
+No active or queued wave dependencies currently.
 
 ## Wave Exit Criteria
 

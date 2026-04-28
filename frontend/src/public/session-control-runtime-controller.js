@@ -368,7 +368,8 @@ export function createSessionControlRuntimeController(options = {}) {
       clearCommandFeedbackAction({ render: false });
       throw new Error(getSessionWriteBlockMessage(session) || "This session cannot be controlled from this device.");
     }
-    const reclaiming = getCurrentSessionController(session)?.active !== true;
+    const currentController = getCurrentSessionController(session);
+    const reclaiming = Boolean(currentController) && currentController.active !== true;
     await takeSessionControlScope("session", { sessionId: normalizedSessionId });
     return completeAction(
       retryAction
@@ -501,7 +502,8 @@ export function createSessionControlRuntimeController(options = {}) {
     }
     if (entry.sessionControlTakeBtn) {
       const takeEnabled = canTakeSessionControl(session);
-      const reclaiming = getCurrentSessionController(session)?.active !== true && takeEnabled;
+      const currentController = getCurrentSessionController(session);
+      const reclaiming = Boolean(currentController) && currentController.active !== true && takeEnabled;
       entry.sessionControlTakeBtn.textContent = getTakeOrReclaimControlLabel(session);
       entry.sessionControlTakeBtn.disabled = !takeEnabled;
       entry.sessionControlTakeBtn.setAttribute(
