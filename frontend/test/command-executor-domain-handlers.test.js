@@ -158,3 +158,111 @@ test("command executor domain handlers manage share commands and return null for
     "https://example.invalid/deck/ops"
   ]);
 });
+
+test("command executor domain handlers fail closed on malformed connection draft inputs and usage-only branches", async () => {
+  let draftSetCount = 0;
+  const baseOptions = {
+    defaultDeckId: "default",
+    formatUsage: (command, subcommand = "") => `usage:${command}:${subcommand}`,
+    normalizeKeyword: (value) => String(value || "").trim().toLowerCase(),
+    parseJsonObjectToken: () => ({ deckId: "ops" }),
+    getSessionById: () => null,
+    resolveActiveOrDirectTargetSession: (_interpreted, _sessions, _activeSessionId, _missingMessage, selectorLabel) => ({
+      error: `${selectorLabel} failed`,
+      session: null
+    }),
+    listConnectionProfiles: () => [],
+    resolveConnectionProfile: (selector) => ({ profile: null, error: `Unknown connection profile: ${selector}` }),
+    getConnectionProfileDraft: () => ({ mode: "blank", name: "Draft", launch: {} }),
+    setConnectionProfileDraft: () => {
+      draftSetCount += 1;
+    },
+    saveConnectionProfileDraft: async () => "draft-saved",
+    normalizeConnectionProfileLaunch: () => null
+  };
+
+  const handlers = createCommandExecutorDomainHandlers(baseOptions);
+  assert.equal(await handlers.executeConnectionCommand({ args: ["list"] }), "No connection profiles available.");
+  assert.equal(await handlers.executeConnectionCommand({ args: ["new"] }), "usage:connection:new");
+  assert.equal(
+    await handlers.executeConnectionCommand({ args: ["save", "Ops"], interpreted: {}, sessions: [], activeSessionId: "" }),
+    "Connection profile session selector failed"
+  );
+  assert.equal(await handlers.executeConnectionCommand({ args: ["duplicate", "ops"] }), "usage:connection:duplicate");
+  assert.equal(
+    await handlers.executeConnectionCommand({ args: ["rename", "ops", " "] }),
+    "Unknown connection profile: ops"
+  );
+  assert.equal(await handlers.executeConnectionCommand({ args: ["draft", "show", "extra"] }), "usage:connection:draft");
+  assert.equal(await handlers.executeConnectionCommand({ args: ["draft", "active", "extra"] }), "usage:connection:draft");
+  assert.equal(await handlers.executeConnectionCommand({ args: ["draft", "set"] }), "usage:connection:draft");
+  assert.equal(
+    await handlers.executeConnectionCommand({ args: ["draft", "set", "{\"deckId\":\"ops\"}"] }),
+    "Connection draft launch JSON is incomplete. Required fields: shell, startCwd, activeThemeProfile, inactiveThemeProfile."
+  );
+  assert.equal(await handlers.executeConnectionCommand({ args: ["draft", "reset", "extra"] }), "usage:connection:draft");
+  assert.equal(draftSetCount, 0);
+
+  const invalidJsonHandlers = createCommandExecutorDomainHandlers({
+    ...baseOptions,
+    parseJsonObjectToken() {
+      throw new Error("Connection draft launch JSON is invalid: boom");
+    }
+  });
+  await assert.rejects(
+    invalidJsonHandlers.executeConnectionCommand({ args: ["draft", "set", "{"] }),
+    /Connection draft launch JSON is invalid: boom/
+  );
+});
+
+test("command executor domain handlers suppress workspace, share, and broadcast side effects on usage errors", async () => {
+  const calls = [];
+  const handlers = createCommandExecutorDomainHandlers({
+    defaultDeckId: "default",
+    formatUsage: (command, subcommand = "") => `usage:${command}:${subcommand}`,
+    normalizeKeyword: (value) => String(value || "").trim().toLowerCase(),
+    getActiveDeck: () => null,
+    listWorkspacePresets: () => [],
+    listWorkspaceGroupsForDeck: () => [],
+    resolveWorkspacePreset: (selector) => ({ preset: null, error: `Unknown workspace preset: ${selector}` }),
+    resolveWorkspaceGroup: (selector) => ({ group: null, error: `Unknown workspace group: ${selector}` }),
+    enableGroupBroadcast: async (selector) => {
+      calls.push(["broadcast-group", selector]);
+      return `broadcast:${selector}`;
+    },
+    disableBroadcast: async () => {
+      calls.push(["broadcast-off"]);
+      return "Broadcast disabled.";
+    },
+    listShares: async () => [],
+    resolveActiveOrDirectTargetSession: () => ({ error: "Share session selector failed", session: null }),
+    resolveDeckToken: (selector) => ({ deck: null, error: `Unknown deck: ${selector}` }),
+    createShareLink: async () => {
+      calls.push(["share-create"]);
+      return null;
+    },
+    revokeShareLink: async () => {
+      calls.push(["share-revoke"]);
+      return null;
+    }
+  });
+
+  assert.equal(await handlers.executeWorkspaceCommand({ args: ["list"] }), "No workspace presets available.");
+  assert.equal(await handlers.executeWorkspaceCommand({ args: ["group", "list"] }), "No workspace groups on deck [default].");
+  assert.equal(
+    await handlers.executeWorkspaceCommand({ args: ["group", "rename", "missing", "Build"] }),
+    "Unknown workspace group: missing"
+  );
+  assert.equal(await handlers.executeBroadcastCommand({ args: ["wat"] }), "usage:broadcast:");
+  assert.equal(await handlers.executeShareCommand({ args: ["list"] }), "No share links available.");
+  assert.equal(await handlers.executeShareCommand({ args: ["session", "extra"] }), "usage:share:session");
+  assert.equal(await handlers.executeShareCommand({ args: ["session"] }), "Share session selector failed");
+  assert.equal(await handlers.executeShareCommand({ args: ["deck"] }), "No active deck for /share deck.");
+  assert.equal(
+    await handlers.executeShareCommand({ args: ["deck", "ops"], decks: [{ id: "default", name: "Default" }] }),
+    "Unknown deck: ops"
+  );
+  assert.equal(await handlers.executeShareCommand({ args: ["revoke", "   "] }), "usage:share:revoke");
+  assert.equal(await handlers.executeShareCommand({ args: ["wat"] }), "usage:share:");
+  assert.deepEqual(calls, []);
+});

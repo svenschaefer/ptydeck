@@ -16,7 +16,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ### `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
 
-- [ ] `QLT-232` Owner `FE`: Close the command/workflow blind spots in `frontend/src/public/command-executor.js`, `frontend/src/public/command-executor-domain-handlers.js`, and `frontend/src/public/connection-profile-runtime-actions.js` with direct regressions for malformed operator input, fallback/error flows, connection-profile mutations, and workflow-side side-effect suppression.
 - [ ] `QLT-233` Owner `FE`: Close the session-control / terminal-interaction blind spots in `frontend/src/public/session-control-runtime-controller.js`, `frontend/src/public/session-control-runtime-state.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js` with direct regressions for blocked-write, reconnect-reserved, terminal-mount fallback, and missing-API branches.
 
 ## Active Ownership Role
@@ -24,5 +23,5 @@ Completed work belongs in `CHANGELOG.md`.
 - `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.
 - `PLAT` ownership role is currently inactive.
 - `BE` ownership role is currently inactive.
-- `FE` ownership role (active): deliver `QLT-232` and `QLT-233`.
+- `FE` ownership role (active): deliver `QLT-233`.
 - `QA` ownership role is currently inactive.

@@ -246,6 +246,54 @@ test("command-composer autocomplete controller schedules inline hint refresh on 
   assert.match(uiState.commandSuggestions, /^> \/close/m);
 });
 
+test("command-composer autocomplete controller cancels stale refresh timers before tab cycling", async () => {
+  const windowRef = createFakeWindow();
+  const commandInput = new FakeInput();
+  const uiState = {
+    commandSuggestions: "",
+    commandSuggestionSelectedIndex: -1,
+    commandInlineHint: "",
+    commandInlineHintPrefixPx: 0
+  };
+  const controller = createCommandComposerAutocompleteController({
+    windowRef,
+    documentRef: createFakeDocument(),
+    commandInput,
+    uiState,
+    parseAutocompleteContext: () => ({
+      replacePrefix: "/",
+      matches: [
+        { insertText: "close", label: "close", kind: "command" },
+        { insertText: "connection", label: "connection", kind: "command" },
+        { insertText: "custom", label: "custom", kind: "command" },
+        { insertText: "closeit", label: "closeit", kind: "custom-command" }
+      ]
+    })
+  });
+
+  controller.bindUiEvents();
+  commandInput.value = "/c";
+  commandInput.dispatchEvent({ type: "input" });
+
+  assert.equal(windowRef.timers.length, 1);
+
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(windowRef.timers.length, 0);
+  assert.equal(commandInput.value, "/close");
+
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/connection");
+
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/custom");
+
+  assert.equal(await controller.autocompleteInput(false), true);
+  assert.equal(commandInput.value, "/closeit");
+
+  assert.equal(await controller.autocompleteInput(true), true);
+  assert.equal(commandInput.value, "/custom");
+});
+
 test("command-composer autocomplete controller replays slash history and guards modified repeats", async () => {
   const commandInput = new FakeInput();
   const feedback = [];

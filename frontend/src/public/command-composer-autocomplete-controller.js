@@ -302,6 +302,8 @@ export function createCommandComposerAutocompleteController(options = {}) {
   }
 
   async function autocompleteInput(reverse = false) {
+    // Cancel any pending async refresh based on an older prefix before cycling candidates.
+    clearSuggestionsTimer();
     const rawInput = commandInput?.value || "";
     const parsedSlash = parseSlashInputForAutocomplete(rawInput);
     const parsedQuickSwitch = parseQuickSwitchInputForAutocomplete(rawInput);

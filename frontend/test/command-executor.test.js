@@ -2706,6 +2706,264 @@ test("command executor rejects invalid typed input safety values", async () => {
   );
 });
 
+test("command executor rejects malformed settings payloads and suppresses mutation side effects", async () => {
+  const sessions = [{ id: "s1", name: "one", deckId: "default" }];
+  let updateCalls = 0;
+  let runtimeEvents = 0;
+  let parsedSettingsPayload = { ok: false, error: "bad json" };
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession() {
+        updateCalls += 1;
+        return sessions[0];
+      }
+    },
+    systemSlashCommands: ["settings", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {
+      runtimeEvents += 1;
+    },
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions, error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    parseSettingsPayload: () => parsedSettingsPayload,
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  await assert.rejects(
+    executor.execute({
+      command: "settings",
+      args: ["startup", "env", "{"],
+      raw: "/settings startup env {"
+    }),
+    /Startup env JSON is invalid:/
+  );
+  await assert.rejects(
+    executor.execute({
+      command: "settings",
+      args: ["startup", "env", "[]"],
+      raw: "/settings startup env []"
+    }),
+    /Startup env JSON must be an object\./
+  );
+
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["apply", "{}"],
+      raw: "/settings apply {}"
+    }),
+    "bad json"
+  );
+
+  parsedSettingsPayload = { ok: true, payload: { unsupported: true } };
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["apply", "{\"unsupported\":true}"],
+      raw: "/settings apply {\"unsupported\":true}"
+    }),
+    "Unknown settings key(s): unsupported"
+  );
+
+  parsedSettingsPayload = { ok: true, payload: {} };
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["apply", "{}"],
+      raw: "/settings apply {}"
+    }),
+    "No applicable settings keys in payload."
+  );
+
+  parsedSettingsPayload = { ok: true, payload: { sendTerminator: "weird" } };
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["apply", "{\"sendTerminator\":\"weird\"}"],
+      raw: "/settings apply {\"sendTerminator\":\"weird\"}"
+    }),
+    "Invalid sendTerminator. Allowed values: auto, crlf, lf, cr, cr2, cr_delay."
+  );
+
+  assert.equal(updateCalls, 0);
+  assert.equal(runtimeEvents, 0);
+});
+
+test("command executor surfaces theme validation and template custom preview failure branches", async () => {
+  const sessions = [{ id: "s1", name: "one", deckId: "default", cwd: "/srv/one", activeThemeProfile: {}, inactiveThemeProfile: {} }];
+  const templateCommand = {
+    name: "deploy",
+    content: "echo {{param:env}} from {{var:session.cwd}}",
+    kind: "template",
+    templateVariables: ["session.cwd"],
+    scope: "project"
+  };
+  let updateCalls = 0;
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions,
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      async updateSession() {
+        updateCalls += 1;
+        return sessions[0];
+      }
+    },
+    systemSlashCommands: ["settings", "custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: () => "7",
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [templateCommand],
+    getCustomCommandState: () => null,
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: (selector) =>
+      selector === "unknown"
+        ? { sessions: [], error: "Unknown session identifier: unknown" }
+        : { sessions, error: "" },
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "auto",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "auto",
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: { background: "#000000", foreground: "#ffffff" },
+    terminalThemePresets: [
+      { id: "night", name: "Night", profile: { background: "#111111", foreground: "#eeeeee" } },
+      { id: "nimbus", name: "Nimbus", profile: { background: "#222222", foreground: "#dddddd" } }
+    ],
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCommandSubmission: () => null,
+    normalizeCustomCommandPayloadForShell: (value) => value,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 }),
+    requestRender: () => {}
+  });
+
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["theme", "preset", "active", "ni"],
+      raw: "/settings theme preset active ni"
+    }),
+    "Ambiguous theme preset: ni"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["theme", "preset", "active", "dusk"],
+      raw: "/settings theme preset active dusk"
+    }),
+    "Unknown theme preset: dusk"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["theme", "set", "active", "mystery", "#010203"],
+      raw: "/settings theme set active mystery #010203"
+    }),
+    "Unknown theme key: mystery"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "settings",
+      args: ["theme", "set", "active", "bg", "blue"],
+      raw: "/settings theme set active bg blue"
+    }),
+    "Theme value must be a #rrggbb color."
+  );
+
+  const showFeedback = await executor.execute({
+    command: "custom",
+    args: ["show", "deploy"],
+    raw: "/custom show deploy"
+  });
+  assert.match(showFeedback, /^\/deploy$/m);
+  assert.match(showFeedback, /^kind: template$/m);
+  assert.match(showFeedback, /parameters: env/);
+  assert.match(showFeedback, /templateVariables: session\.cwd/);
+
+  assert.match(
+    await executor.execute({
+      command: "custom",
+      args: ["preview", "deploy"],
+      raw: "/custom preview deploy"
+    }),
+    /Missing template parameter\(s\) for \/deploy: env\./
+  );
+  assert.equal(
+    await executor.execute({
+      command: "custom",
+      args: ["preview", "deploy", "env=prod", "--", "unknown"],
+      raw: "/custom preview deploy env=prod -- unknown"
+    }),
+    "Unknown session identifier: unknown"
+  );
+  assert.equal(
+    await executor.execute({
+      command: "custom",
+      args: ["preview", "missing"],
+      raw: "/custom preview missing"
+    }),
+    "Custom command not found: /missing"
+  );
+  assert.equal(updateCalls, 0);
+});
+
 test("command executor records correlated custom-command submissions per target session", async () => {
   const calls = [];
   const executor = createCommandExecutor({
