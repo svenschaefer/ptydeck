@@ -39,6 +39,28 @@ function parseOrigin(value, key) {
   }
 }
 
+function parseHttpUrl(value, key) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("unsupported protocol");
+    }
+    return url.toString();
+  } catch {
+    throw new Error(`${key} must be a valid http/https URL.`);
+  }
+}
+
+function ensureHttpsUrl(value, key) {
+  if (!value) {
+    return;
+  }
+  const parsed = new URL(value);
+  if (parsed.protocol !== "https:") {
+    throw new Error(`${key} must use https in production.`);
+  }
+}
+
 function readOptionalEnvText(env, key) {
   const rawValue = String(env[key] || "").trim();
   const rawFilePath = String(env[`${key}_FILE`] || "").trim();
@@ -153,8 +175,8 @@ export function loadConfig(env = process.env) {
   const authMode = authModeRaw || (legacyAuthEnabled || legacyAuthDevMode ? "dev" : "off");
   const authEnabled = authMode !== "off";
   const authDevMode = authMode === "dev";
-  if (authMode === "prod") {
-    throw new Error("AUTH_MODE=prod is not yet supported; use AUTH_MODE=off or AUTH_MODE=dev.");
+  if (authDevMode && nodeEnv === "production") {
+    throw new Error("AUTH_MODE=dev is local-only and is not allowed when NODE_ENV=production.");
   }
   const shell = String(env.SHELL || "bash").trim();
   const dataPath = String(env.DATA_PATH || "./data/sessions.json").trim();
@@ -181,6 +203,15 @@ export function loadConfig(env = process.env) {
   const authDevSecret = String(env.AUTH_DEV_SECRET || "ptydeck-dev-secret").trim();
   const authIssuer = String(env.AUTH_ISSUER || "ptydeck-dev").trim();
   const authAudience = String(env.AUTH_AUDIENCE || "ptydeck-local").trim();
+  const authProdIssuer = String(env.AUTH_PROD_ISSUER || "").trim();
+  const authProdAudience = String(env.AUTH_PROD_AUDIENCE || "").trim();
+  const authProdDiscoveryUrlRaw = String(env.AUTH_PROD_DISCOVERY_URL || "").trim();
+  const authProdJwksUrlRaw = String(env.AUTH_PROD_JWKS_URL || "").trim();
+  const authProdJwksCacheTtlSeconds = parsePositiveInt(
+    env.AUTH_PROD_JWKS_CACHE_TTL_SECONDS || 300,
+    "AUTH_PROD_JWKS_CACHE_TTL_SECONDS"
+  );
+  let authProdIssuerNormalized = "";
   if (!shell) {
     throw new Error("SHELL must not be empty.");
   }
@@ -195,6 +226,27 @@ export function loadConfig(env = process.env) {
   }
   if (authEnabled && !authAudience) {
     throw new Error("AUTH_AUDIENCE must not be empty when auth is enabled.");
+  }
+  let authProdDiscoveryUrl = "";
+  let authProdJwksUrl = "";
+  if (authMode === "prod") {
+    if (authDevSecret === "ptydeck-dev-secret") {
+      throw new Error("AUTH_DEV_SECRET must be explicitly set when AUTH_MODE=prod.");
+    }
+    if (!authProdIssuer) {
+      throw new Error("AUTH_PROD_ISSUER must not be empty when AUTH_MODE=prod.");
+    }
+    if (!authProdAudience) {
+      throw new Error("AUTH_PROD_AUDIENCE must not be empty when AUTH_MODE=prod.");
+    }
+    authProdDiscoveryUrl = authProdDiscoveryUrlRaw ? parseHttpUrl(authProdDiscoveryUrlRaw, "AUTH_PROD_DISCOVERY_URL") : "";
+    authProdJwksUrl = authProdJwksUrlRaw ? parseHttpUrl(authProdJwksUrlRaw, "AUTH_PROD_JWKS_URL") : "";
+    authProdIssuerNormalized = parseHttpUrl(authProdIssuer, "AUTH_PROD_ISSUER");
+    if (nodeEnv === "production") {
+      ensureHttpsUrl(authProdIssuerNormalized, "AUTH_PROD_ISSUER");
+      ensureHttpsUrl(authProdDiscoveryUrl, "AUTH_PROD_DISCOVERY_URL");
+      ensureHttpsUrl(authProdJwksUrl, "AUTH_PROD_JWKS_URL");
+    }
   }
   if ((messagingTelegramBotToken && messagingTelegramTargets.length === 0) || (!messagingTelegramBotToken && messagingTelegramTargets.length > 0)) {
     throw new Error("MESSAGING_TELEGRAM_BOT_TOKEN and MESSAGING_TELEGRAM_TARGETS must be configured together.");
@@ -299,6 +351,11 @@ export function loadConfig(env = process.env) {
     authAudience,
     authDevTokenTtlSeconds,
     authWsTicketTtlSeconds,
+    authProdIssuer: authMode === "prod" ? authProdIssuerNormalized : "",
+    authProdAudience: authMode === "prod" ? authProdAudience : "",
+    authProdDiscoveryUrl,
+    authProdJwksUrl,
+    authProdJwksCacheTtlSeconds,
     messagingTelegramBotToken,
     messagingTelegramTargets,
     messagingTelegramApiBaseUrl,

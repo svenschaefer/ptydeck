@@ -89,6 +89,15 @@ Optional local auth baseline (development only):
 - Backend (optional override): `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_DEV_TOKEN_TTL_SECONDS`
 - Frontend will automatically call `POST /api/v1/auth/dev-token` and attach the returned bearer token to REST/WS requests.
 
+Optional production auth baseline (single-user runtime authority, no tenant partitioning):
+
+- Backend: `AUTH_MODE=prod`
+- Backend internal-token config: `AUTH_DEV_SECRET`, `AUTH_ISSUER`, `AUTH_AUDIENCE`
+- Backend external bearer verification: `AUTH_PROD_ISSUER`, `AUTH_PROD_AUDIENCE`
+- Backend optional OIDC provider overrides: `AUTH_PROD_DISCOVERY_URL`, `AUTH_PROD_JWKS_URL`, `AUTH_PROD_JWKS_CACHE_TTL_SECONDS`
+- Runtime rule: `AUTH_MODE=prod` validates authenticated operator identity and scopes, but it does not turn ptydeck into a multi-user or tenant-partitioned product. All authenticated operator sessions still act on one shared single-user runtime authority surface.
+- Deployment expectation: the browser should reach ptydeck behind a reverse proxy or auth gateway that already holds the operator login/session and forwards the bearer token to backend HTTP routes. ptydeck then exchanges that authenticated HTTP request for its own short-lived WS ticket on `POST /api/v1/auth/ws-ticket`.
+
 Optional single-user Telegram messaging adapter baseline:
 
 - Backend: `MESSAGING_TELEGRAM_BOT_TOKEN` or `MESSAGING_TELEGRAM_BOT_TOKEN_FILE`
@@ -175,8 +184,8 @@ Runtime secret injection pattern:
 
 Minimum secret inventory (current baseline):
 
-- `AUTH_DEV_SECRET` (when `AUTH_MODE=dev`)
-- Future production auth credentials/keys (OIDC/JWKS-related values)
+- `AUTH_DEV_SECRET` (whenever auth is enabled; used for local/internal HS256 share and WS-ticket tokens)
+- Production auth provider and proxy/session secrets needed to obtain and forward the external bearer token validated through OIDC/JWKS
 - Any future encryption-at-rest keys
 
 Rotation procedure baseline:
@@ -272,7 +281,8 @@ Behavior summary:
 - `development` without `CORS_ORIGIN`: wildcard CORS (`*`) for local dev convenience.
 - `production` without `CORS_ORIGIN`: startup fails fast (`CORS_ORIGIN` is required).
 - `production` with `CORS_ORIGIN=*`: startup fails fast (wildcard is blocked in production).
-- `AUTH_MODE=prod`: startup fails currently (production provider is not implemented in current baseline).
+- `AUTH_MODE=dev` with `NODE_ENV=production`: startup fails fast (`dev` auth is local-only).
+- `AUTH_MODE=prod`: startup prewarms OIDC discovery/JWKS and fails fast if the configured provider metadata or key set cannot be loaded.
 Keep provider-specific local proxy configuration files outside tracked docs/code in a gitignored local path.
 
 ### 7.1 Provider-Agnostic HTTPS/WSS Reverse-Proxy Contract

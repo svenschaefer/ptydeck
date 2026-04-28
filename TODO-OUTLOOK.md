@@ -37,7 +37,7 @@ This file is structured into:
 
 ### Security
 
-- [ ] `ENT-025` Owner `BE`: Add production OIDC/JWKS auth provider integration (issuer/audience/JWKS validation) and keep `AUTH_MODE=dev` as local-only fallback.
+- No deferred explicit security items currently remain.
 
 Notes:
 

@@ -40,6 +40,11 @@ test("loadConfig applies defaults", () => {
   assert.equal(config.authAudience, "ptydeck-local");
   assert.equal(config.authDevTokenTtlSeconds, 900);
   assert.equal(config.authWsTicketTtlSeconds, 30);
+  assert.equal(config.authProdIssuer, "");
+  assert.equal(config.authProdAudience, "");
+  assert.equal(config.authProdDiscoveryUrl, "");
+  assert.equal(config.authProdJwksUrl, "");
+  assert.equal(config.authProdJwksCacheTtlSeconds, 300);
   assert.equal(config.messagingTelegramBotToken, "");
   assert.deepEqual(config.messagingTelegramTargets, []);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.org");
@@ -138,6 +143,11 @@ test("loadConfig maps environment values", () => {
   assert.equal(config.authAudience, "aud-a");
   assert.equal(config.authDevTokenTtlSeconds, 1200);
   assert.equal(config.authWsTicketTtlSeconds, 45);
+  assert.equal(config.authProdIssuer, "");
+  assert.equal(config.authProdAudience, "");
+  assert.equal(config.authProdDiscoveryUrl, "");
+  assert.equal(config.authProdJwksUrl, "");
+  assert.equal(config.authProdJwksCacheTtlSeconds, 300);
   assert.equal(config.messagingTelegramBotToken, "telegram-token");
   assert.deepEqual(config.messagingTelegramTargets, [{ sessionName: "build", chatId: "1001" }]);
   assert.equal(config.messagingTelegramApiBaseUrl, "https://api.telegram.example");
@@ -283,12 +293,83 @@ test("loadConfig rejects insecure production CORS wildcard and TLS ingress misma
   );
 });
 
-test("loadConfig derives dev mode from legacy flags and rejects unsupported prod mode", () => {
+test("loadConfig derives dev mode from legacy flags and keeps prod auth config disabled by default", () => {
   const legacy = loadConfig({ AUTH_ENABLED: "true", AUTH_DEV_MODE: "true" });
   assert.equal(legacy.authMode, "dev");
+  assert.equal(legacy.authProdIssuer, "");
+});
+
+test("loadConfig maps prod auth provider settings", () => {
+  const config = loadConfig({
+    AUTH_MODE: "prod",
+    AUTH_DEV_SECRET: "internal-secret",
+    AUTH_ISSUER: "ptydeck-internal",
+    AUTH_AUDIENCE: "ptydeck-share",
+    AUTH_PROD_ISSUER: "https://issuer.example",
+    AUTH_PROD_AUDIENCE: "ptydeck-web",
+    AUTH_PROD_DISCOVERY_URL: "https://issuer.example/.well-known/openid-configuration",
+    AUTH_PROD_JWKS_URL: "https://issuer.example/keys",
+    AUTH_PROD_JWKS_CACHE_TTL_SECONDS: "900"
+  });
+
+  assert.equal(config.authMode, "prod");
+  assert.equal(config.authEnabled, true);
+  assert.equal(config.authDevMode, false);
+  assert.equal(config.authDevSecret, "internal-secret");
+  assert.equal(config.authIssuer, "ptydeck-internal");
+  assert.equal(config.authAudience, "ptydeck-share");
+  assert.equal(config.authProdIssuer, "https://issuer.example/");
+  assert.equal(config.authProdAudience, "ptydeck-web");
+  assert.equal(config.authProdDiscoveryUrl, "https://issuer.example/.well-known/openid-configuration");
+  assert.equal(config.authProdJwksUrl, "https://issuer.example/keys");
+  assert.equal(config.authProdJwksCacheTtlSeconds, 900);
+});
+
+test("loadConfig rejects invalid dev/prod auth combinations", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        NODE_ENV: "production",
+        CORS_ORIGIN: "https://app.example.com",
+        TRUST_PROXY: "loopback",
+        AUTH_MODE: "dev"
+      }),
+    /AUTH_MODE=dev is local-only and is not allowed when NODE_ENV=production\./
+  );
   assert.throws(
     () => loadConfig({ AUTH_MODE: "prod" }),
-    /AUTH_MODE=prod is not yet supported; use AUTH_MODE=off or AUTH_MODE=dev\./
+    /AUTH_DEV_SECRET must be explicitly set when AUTH_MODE=prod\./
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        AUTH_MODE: "prod",
+        AUTH_DEV_SECRET: "internal-secret",
+        AUTH_PROD_AUDIENCE: "ptydeck-web"
+      }),
+    /AUTH_PROD_ISSUER must not be empty when AUTH_MODE=prod\./
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        AUTH_MODE: "prod",
+        AUTH_DEV_SECRET: "internal-secret",
+        AUTH_PROD_ISSUER: "https://issuer.example"
+      }),
+    /AUTH_PROD_AUDIENCE must not be empty when AUTH_MODE=prod\./
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        NODE_ENV: "production",
+        CORS_ORIGIN: "https://app.example.com",
+        TRUST_PROXY: "loopback",
+        AUTH_MODE: "prod",
+        AUTH_DEV_SECRET: "internal-secret",
+        AUTH_PROD_ISSUER: "http://issuer.example",
+        AUTH_PROD_AUDIENCE: "ptydeck-web"
+      }),
+    /AUTH_PROD_ISSUER must use https in production\./
   );
 });
 

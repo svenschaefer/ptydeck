@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { mkdtemp } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -95,6 +96,49 @@ function createAuthHeaders(accessToken, { json = false } = {}) {
   };
 }
 
+function base64UrlEncodeJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function createJsonResponse(payload) {
+  return {
+    ok: true,
+    async json() {
+      return payload;
+    }
+  };
+}
+
+function createRs256Token({
+  privateKey,
+  issuer,
+  audience,
+  subject = "operator",
+  scope = "sessions:read sessions:create sessions:write sessions:delete ws:connect",
+  kid = "kid-1",
+  ttlSeconds = 300
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: "RS256",
+    typ: "JWT",
+    kid
+  };
+  const payload = {
+    iss: issuer,
+    aud: audience,
+    sub: subject,
+    scope,
+    iat: now,
+    exp: now + ttlSeconds
+  };
+  const encodedHeader = base64UrlEncodeJson(header);
+  const encodedPayload = base64UrlEncodeJson(payload);
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = crypto.sign("RSA-SHA256", Buffer.from(signingInput), privateKey).toString("base64url");
+  return `${signingInput}.${signature}`;
+}
+
 function extractShareToken(joinUrl) {
   const token = new URL(joinUrl).searchParams.get("share_token");
   assert.equal(typeof token, "string");
@@ -175,6 +219,67 @@ test("WS connection creation is rate limited per client", async () => {
     await waitFor(() => secondEvents.includes("close"));
 
     firstWs.close();
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("WS upgrade accepts prod OIDC bearer auth through ws-ticket bootstrap", async () => {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = publicKey.export({ format: "jwk" });
+  const discoveryUrl = "https://issuer.example/.well-known/openid-configuration";
+  const jwksUrl = "https://issuer.example/keys";
+  const authFetchCalls = [];
+  const accessToken = createRs256Token({
+    privateKey,
+    issuer: "https://issuer.example",
+    audience: "ptydeck-web"
+  });
+  const { runtime, baseUrl, wsUrl } = await createStartedRuntime({
+    authMode: "prod",
+    authEnabled: true,
+    authDevMode: false,
+    authDevSecret: "internal-secret",
+    authIssuer: "ptydeck-internal",
+    authAudience: "ptydeck-share",
+    authProdIssuer: "https://issuer.example",
+    authProdAudience: "ptydeck-web",
+    authProdDiscoveryUrl: discoveryUrl,
+    authFetch: async (url) => {
+      authFetchCalls.push(url);
+      if (url === discoveryUrl) {
+        return createJsonResponse({
+          issuer: "https://issuer.example",
+          jwks_uri: jwksUrl
+        });
+      }
+      if (url === jwksUrl) {
+        return createJsonResponse({
+          keys: [{ ...jwk, kid: "kid-1", use: "sig", alg: "RS256" }]
+        });
+      }
+      throw new Error(`Unexpected auth fetch: ${url}`);
+    }
+  });
+
+  try {
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: createAuthHeaders(accessToken, { json: true }),
+      body: JSON.stringify({})
+    });
+    assert.equal(wsTicketRes.status, 200);
+    const wsTicketPayload = await wsTicketRes.json();
+
+    const events = [];
+    const ws = new WebSocket(wsUrl, ["ptydeck.v1", `ptydeck.auth.${wsTicketPayload.ticket}`]);
+    ws.on("message", (buffer) => {
+      events.push(JSON.parse(buffer.toString()));
+    });
+    await waitFor(() => events.some((event) => event.type === "snapshot"));
+    ws.close();
+
+    assert.deepEqual(authFetchCalls, [discoveryUrl, jwksUrl]);
   } finally {
     await runtime.stop();
   }

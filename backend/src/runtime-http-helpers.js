@@ -1,4 +1,4 @@
-import { ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
+import { ensureScope, resolveBearerToken } from "./auth.js";
 import { ApiError } from "./errors.js";
 
 export function requiredScopeForRoute(kind) {
@@ -81,6 +81,7 @@ export function createRuntimeHttpHelpers({
   traceHeaderCorrelationId,
   sessionControlClientIdHeader,
   normalizeTraceSeed,
+  verifyAccessToken = async () => null,
   ensureShareLinkAuthActive = () => null,
   ensureShareRouteAllowed = () => {}
 }) {
@@ -147,16 +148,12 @@ export function createRuntimeHttpHelpers({
     res.end(JSON.stringify(body));
   }
 
-  function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "", options = {}) {
+  async function authenticateRequest(req, parsedUrl, requiredScope, routeKind = "", options = {}) {
     if (!config.authEnabled) {
       return null;
     }
     const token = resolveBearerToken(req, parsedUrl);
-    const auth = verifyDevToken(token, {
-      secret: config.authDevSecret,
-      issuer: config.authIssuer,
-      audience: config.authAudience
-    });
+    const auth = await verifyAccessToken(token);
     if (typeof options.onAuthenticated === "function") {
       options.onAuthenticated(auth);
     }

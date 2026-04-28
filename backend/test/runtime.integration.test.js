@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
@@ -176,6 +177,49 @@ function createAuthHeaders(accessToken, { json = false } = {}) {
   };
 }
 
+function base64UrlEncodeJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function createJsonResponse(payload) {
+  return {
+    ok: true,
+    async json() {
+      return payload;
+    }
+  };
+}
+
+function createRs256Token({
+  privateKey,
+  issuer,
+  audience,
+  subject = "operator",
+  scope = "sessions:read sessions:create sessions:write sessions:delete ws:connect",
+  kid = "kid-1",
+  ttlSeconds = 300
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: "RS256",
+    typ: "JWT",
+    kid
+  };
+  const payload = {
+    iss: issuer,
+    aud: audience,
+    sub: subject,
+    scope,
+    iat: now,
+    exp: now + ttlSeconds
+  };
+  const encodedHeader = base64UrlEncodeJson(header);
+  const encodedPayload = base64UrlEncodeJson(payload);
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = crypto.sign("RSA-SHA256", Buffer.from(signingInput), privateKey).toString("base64url");
+  return `${signingInput}.${signature}`;
+}
+
 async function readJsonLines(filePath) {
   let content = "";
   try {
@@ -297,6 +341,89 @@ test("REST lifecycle endpoints work end-to-end", async () => {
       method: "DELETE"
     });
     assert.equal(deleteRes.status, 204);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("runtime accepts prod OIDC bearer auth while keeping internal share tokens valid", async () => {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = publicKey.export({ format: "jwk" });
+  const discoveryUrl = "https://issuer.example/.well-known/openid-configuration";
+  const jwksUrl = "https://issuer.example/keys";
+  const authFetchCalls = [];
+  const operatorToken = createRs256Token({
+    privateKey,
+    issuer: "https://issuer.example",
+    audience: "ptydeck-web"
+  });
+  const { runtime, baseUrl } = await createStartedRuntime({
+    authMode: "prod",
+    authEnabled: true,
+    authDevMode: false,
+    authDevSecret: "internal-secret",
+    authIssuer: "ptydeck-internal",
+    authAudience: "ptydeck-share",
+    authProdIssuer: "https://issuer.example",
+    authProdAudience: "ptydeck-web",
+    authProdDiscoveryUrl: discoveryUrl,
+    authFetch: async (url) => {
+      authFetchCalls.push(url);
+      if (url === discoveryUrl) {
+        return createJsonResponse({
+          issuer: "https://issuer.example",
+          jwks_uri: jwksUrl
+        });
+      }
+      if (url === jwksUrl) {
+        return createJsonResponse({
+          keys: [{ ...jwk, kid: "kid-1", use: "sig", alg: "RS256" }]
+        });
+      }
+      throw new Error(`Unexpected auth fetch: ${url}`);
+    }
+  });
+
+  try {
+    const devTokenRes = await fetch(`${baseUrl}/auth/dev-token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(devTokenRes.status, 404);
+
+    const unauthorizedListRes = await fetch(`${baseUrl}/sessions`);
+    assert.equal(unauthorizedListRes.status, 401);
+
+    const createRes = await fetch(`${baseUrl}/sessions`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken, { json: true }),
+      body: JSON.stringify({ shell: "sh", name: "prod-auth" })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+
+    const shareRes = await fetch(`${baseUrl}/shares`, {
+      method: "POST",
+      headers: createAuthHeaders(operatorToken, { json: true }),
+      body: JSON.stringify({
+        targetType: "session",
+        targetId: created.id,
+        expiresInSeconds: 600
+      })
+    });
+    assert.equal(shareRes.status, 201);
+    const sharePayload = await shareRes.json();
+    const shareToken = extractShareToken(sharePayload.joinUrl);
+
+    const sharedSessionRes = await fetch(`${baseUrl}/sessions/${created.id}`, {
+      headers: createAuthHeaders(shareToken)
+    });
+    assert.equal(sharedSessionRes.status, 200);
+    const sharedSession = await sharedSessionRes.json();
+    assert.equal(sharedSession.id, created.id);
+
+    assert.deepEqual(authFetchCalls, [discoveryUrl, jwksUrl]);
   } finally {
     await runtime.stop();
   }

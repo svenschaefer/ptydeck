@@ -70,7 +70,7 @@ test("runtime http helpers build cors/security/trace headers deterministically",
   assert.equal(response.headers["x-ptydeck-trace-id"], "trc-2");
 });
 
-test("runtime http helpers authenticate requests through the shared auth seam", () => {
+test("runtime http helpers authenticate requests through the shared auth seam", async () => {
   const observed = [];
   const secret = "dev-secret";
   const helpers = createRuntimeHttpHelpers({
@@ -86,6 +86,20 @@ test("runtime http helpers authenticate requests through the shared auth seam", 
     traceHeaderCorrelationId: "x-ptydeck-correlation-id",
     sessionControlClientIdHeader: "x-ptydeck-client-id",
     normalizeTraceSeed: (trace) => trace,
+    verifyAccessToken: async (token) =>
+      token === expectedToken
+        ? {
+            subject: "alice",
+            tenantId: "tenant-a",
+            scopes: ["sessions:read"],
+            accessMode: "operator",
+            permissionMode: "",
+            shareLinkId: "",
+            shareTargetType: "",
+            shareTargetId: "",
+            shareTokenId: ""
+          }
+        : Promise.reject(new Error("unexpected token")),
     ensureShareLinkAuthActive(auth) {
       observed.push(["share", auth.subject]);
     },
@@ -94,7 +108,7 @@ test("runtime http helpers authenticate requests through the shared auth seam", 
     }
   });
 
-  const token = createDevToken({
+  const expectedToken = createDevToken({
     secret,
     issuer: "ptydeck",
     audience: "ptydeck-users",
@@ -104,10 +118,10 @@ test("runtime http helpers authenticate requests through the shared auth seam", 
     ttlSeconds: 60
   });
 
-  const auth = helpers.authenticateRequest(
+  const auth = await helpers.authenticateRequest(
     {
       headers: {
-        authorization: `Bearer ${token}`
+        authorization: `Bearer ${expectedToken}`
       }
     },
     new URL("https://ptydeck.local.secos.rocks/api/v1/sessions"),

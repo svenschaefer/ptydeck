@@ -6,7 +6,7 @@ import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { createAuditLogger, createHttpAuditEvent } from "./audit-log.js";
-import { createDevToken, ensureScope, resolveBearerToken, verifyDevToken } from "./auth.js";
+import { createAccessTokenVerifier, createDevToken, ensureScope, resolveBearerToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
@@ -2618,6 +2618,7 @@ export function createRuntime(config) {
   });
   const createSessionRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
   const wsConnectRateLimiter = new FixedWindowRateLimiter({ windowMs: config.rateLimitWindowMs });
+  const accessTokenVerifier = createAccessTokenVerifier(config);
   const wsServer = new WebSocketServer({
     noServer: true,
     handleProtocols(protocols) {
@@ -2821,6 +2822,7 @@ export function createRuntime(config) {
     traceHeaderCorrelationId: TRACE_HEADER_CORRELATION_ID,
     sessionControlClientIdHeader: SESSION_CONTROL_CLIENT_ID_HEADER,
     normalizeTraceSeed,
+    verifyAccessToken: (token) => accessTokenVerifier.verifyAccessToken(token),
     ensureShareLinkAuthActive,
     ensureShareRouteAllowed
   });
@@ -5980,7 +5982,7 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "wsTicket") {
-        const auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
+        const auth = await authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
           onAuthenticated: (authenticated) => {
             authForAudit = authenticated;
           }
@@ -5993,7 +5995,7 @@ function tryCreateRestoredSession({
 
       let auth = null;
       if (match.kind !== "notFound") {
-        auth = authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
+        auth = await authenticateRequest(req, parsedUrl, requiredScopeForRoute(match.kind), match.kind, {
           onAuthenticated: (authenticated) => {
             authForAudit = authenticated;
           }
@@ -6828,6 +6830,7 @@ function tryCreateRestoredSession({
   });
 
   server.on("upgrade", (request, socket, head) => {
+    void (async () => {
     const requestContext = resolveRequestContext(request, config.trustedProxy);
     const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
     const requestOrigin = typeof request.headers.origin === "string" ? request.headers.origin : "";
@@ -6897,11 +6900,7 @@ function tryCreateRestoredSession({
       try {
         const token = resolveBearerToken(request, requestUrl);
         const auth = token
-          ? verifyDevToken(token, {
-              secret: config.authDevSecret,
-              issuer: config.authIssuer,
-              audience: config.authAudience
-            })
+          ? await accessTokenVerifier.verifyAccessToken(token)
           : consumeWsTicket(resolveWsTicketFromProtocols(request));
         ensureShareLinkAuthActive(auth);
         ensureScope(auth, "ws:connect");
@@ -7022,6 +7021,19 @@ function tryCreateRestoredSession({
       }, snapshotPayload.trace || ws.traceContext);
       broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
     });
+    })().catch((err) => {
+      const mapped = toErrorResponse(err);
+      logDebug("ws.upgrade.error", {
+        statusCode: mapped.statusCode,
+        error: mapped.body.error,
+        message: mapped.body.message
+      });
+      recordWsError("upgrade_internal_error");
+      socket.write(
+        `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
+      );
+      socket.destroy();
+    });
   });
 
   const heartbeat = setInterval(() => {
@@ -7041,6 +7053,7 @@ function tryCreateRestoredSession({
     isStopped = false;
     isStopping = false;
     isReady = false;
+    await accessTokenVerifier.prewarm();
     messagingRuntime.prepareForRuntimeStart();
     startupWarmupEnabled = false;
     startupWarmupGateReleased = false;

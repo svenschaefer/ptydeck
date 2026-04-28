@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (docs governance and current runtime baseline synced after latest review)
+Last updated: 2026-04-28 (production auth baseline, docs governance, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -40,7 +40,32 @@ Structured Audit Baseline (v0.4.0-H154):
 - Redaction policy:
   - request bodies are normalized to metadata only where needed
   - terminal input payloads are never written (only byte counts are recorded)
-  - tokens, tenant-like values, and transport/header credential fields are not emitted
+- tokens, tenant-like values, and transport/header credential fields are not emitted
+
+## Production Auth Baseline
+
+`v0.4.0-H155` completed the production auth provider seam without changing the product into a multi-user runtime.
+
+Current contract:
+
+- `AUTH_MODE=off` keeps auth disabled.
+- `AUTH_MODE=dev` remains local-only and exposes `POST /api/v1/auth/dev-token` for browser bootstrap.
+- `AUTH_MODE=prod` validates external operator bearer tokens through OIDC discovery/JWKS using:
+  - `AUTH_PROD_ISSUER`
+  - `AUTH_PROD_AUDIENCE`
+  - optional `AUTH_PROD_DISCOVERY_URL`
+  - optional `AUTH_PROD_JWKS_URL`
+  - optional `AUTH_PROD_JWKS_CACHE_TTL_SECONDS`
+- The backend still keeps one internal HS256 bearer path, backed by `AUTH_DEV_SECRET`, `AUTH_ISSUER`, and `AUTH_AUDIENCE`, for:
+  - dev-token bootstrap in `AUTH_MODE=dev`
+  - read-only share-link tokens
+  - short-lived WebSocket ticket admission after authenticated HTTP bootstrap
+- Runtime startup now prewarms OIDC discovery/JWKS metadata in `AUTH_MODE=prod` and fails fast if provider metadata or signing keys cannot be loaded.
+- REST and WebSocket admission both use the same auth verifier seam instead of separate dev-only verification branches.
+- Runtime authority remains single-user:
+  - authenticated operator tokens still act on one shared ptydeck runtime authority surface
+  - no tenant partitioning or per-user data separation was added
+  - when external tokens do not carry a tenant-style claim, the normalized runtime principal falls back to `tenantId: "default"` only as internal metadata compatibility, not as a multi-tenant boundary
 
 ## Messaging Files Intentionally Kept
 
@@ -238,4 +263,4 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
 
 ## Latest Validated Coverage
 
-The latest closeout validation on 2026-04-23 for `v0.4.0-H153` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`. The validated repo-wide line coverage totals are backend `93.65%` and frontend `95.00%`.
+The latest closeout validation on 2026-04-28 for `v0.4.0-H155` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`. The validated repo-wide line coverage totals are backend `93.60%` and frontend `95.00%`.

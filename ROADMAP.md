@@ -15,7 +15,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - No active release waves are currently open.
 - Latest completed wave in this segment:
-  - `v0.4.0-H154` Security/Auditability Foundation
+  - `v0.4.0-H155` Production Auth Provider
 - Queued next waves:
   - none currently
 
@@ -25,7 +25,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `v0.4.0-H154` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
+- `v0.4.0-H155` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
 
 ## Sequencing Rules
 
