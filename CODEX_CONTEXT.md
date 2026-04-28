@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (production auth baseline, auth-provider/runtime coverage hardening, root tooling coverage baseline, repo-wide quality review, historical-review markers, and current runtime baseline synced after latest review)
+Last updated: 2026-04-28 (production auth baseline, auth-provider/runtime coverage hardening, root tooling coverage baseline, repo-wide quality review, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -19,6 +19,7 @@ The shipped runtime now keeps only a transport-only messaging baseline:
 
 The live runtime no longer performs automatic PTY-stream or terminal-output interpretation into outbound Telegram/Discord messages.
 The live runtime also no longer infers app-specific trigger profiles such as `coding-agent` or `build-test` for target routing.
+The operator-facing frontend handbook no longer advertises messaging adapters as a current workflow surface while the third messaging attempt remains deferred.
 
 Structured Audit Baseline (v0.4.0-H154):
 

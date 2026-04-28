@@ -16,7 +16,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active wave:
   - none currently
 - Latest completed wave in this segment:
-  - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
+  - `v0.4.0-H157` FE Handbook Surface Simplification
 - Queued next waves:
   - none currently
 
@@ -30,9 +30,9 @@ No active or queued wave dependencies currently.
 
 ## Wave Exit Criteria
 
-- The local quality gate reports backend, frontend, and root-tooling coverage deterministically.
-- The promoted backend and frontend hotspot files gain direct regression coverage for the branches listed in `TODO.md`.
-- `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.
+- Promoted tasks leave `TODO.md` with open work only and `ROADMAP.md` with active or queued sequencing only.
+- Generated handbook/reference artifacts stay synchronized with their markdown/code sources.
+- `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.
 
 ## Sequencing Rules
 

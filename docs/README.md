@@ -79,5 +79,6 @@ Obsolete stack-replacement evaluations and branch-specific deployment gates are 
 Current interpretation:
 
 - `docs/manual/` stays curated and workflow-oriented
+- deferred or non-final operator flows are intentionally kept out of `docs/manual/`; messaging adapter background remains in architecture/context documents until a future messaging attempt is explicitly promoted again
 - `docs/reference/` stays generated from code/contracts through `npm run docs:generate`
 - `frontend/src/public/handbook/` is generated output, not a hand-edited documentation source

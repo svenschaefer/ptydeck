@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, posix, resolve } from "node:path";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSlashCommandRegistry } from "../../frontend/src/public/command-schema.js";
 import { DEFAULT_SESSION_INPUT_SAFETY_PROFILE } from "../../frontend/src/public/input-safety-profile.js";
@@ -310,13 +310,6 @@ const HANDBOOK_PAGE_DEFINITIONS = Object.freeze([
     handbookHref: "/handbook/manual/replay-copy-paste.html"
   },
   {
-    sourcePath: "docs/manual/messaging-adapters.md",
-    outputPath: "frontend/src/public/handbook/manual/messaging-adapters.html",
-    section: "Manual",
-    navTitle: "Messaging Adapters",
-    handbookHref: "/handbook/manual/messaging-adapters.html"
-  },
-  {
     sourcePath: "docs/manual/workspace-library.md",
     outputPath: "frontend/src/public/handbook/manual/workspace-library.html",
     section: "Manual",
@@ -365,6 +358,9 @@ const GENERATED_OUTPUTS = Object.freeze([
   ...HANDBOOK_PAGE_DEFINITIONS.map((entry) => entry.outputPath),
   "frontend/src/public/handbook/styles.css"
 ]);
+const GENERATED_HANDBOOK_OUTPUTS = new Set(
+  GENERATED_OUTPUTS.filter((entry) => entry.startsWith("frontend/src/public/handbook/"))
+);
 
 export function getRepositoryRoot() {
   return REPOSITORY_ROOT;
@@ -405,6 +401,35 @@ export async function buildGeneratedArtifacts(rootDir = REPOSITORY_ROOT) {
   };
 }
 
+async function listFilesRecursive(directoryPath) {
+  const entries = await readdir(directoryPath, { withFileTypes: true });
+  const nestedFiles = await Promise.all(
+    entries.map(async (entry) => {
+      const absolutePath = resolve(directoryPath, entry.name);
+      if (entry.isDirectory()) {
+        return listFilesRecursive(absolutePath);
+      }
+      return [absolutePath];
+    })
+  );
+  return nestedFiles.flat();
+}
+
+export async function findStaleGeneratedHandbookOutputs(rootDir = REPOSITORY_ROOT) {
+  const handbookRoot = resolve(rootDir, "frontend/src/public/handbook");
+  if (!existsSync(handbookRoot)) {
+    return [];
+  }
+  const stalePaths = [];
+  for (const absolutePath of await listFilesRecursive(handbookRoot)) {
+    const outputPath = relative(rootDir, absolutePath).replace(/\\/g, "/");
+    if (!GENERATED_HANDBOOK_OUTPUTS.has(outputPath)) {
+      stalePaths.push(outputPath);
+    }
+  }
+  return stalePaths.sort((left, right) => left.localeCompare(right));
+}
+
 export async function generateHandbook(rootDir = REPOSITORY_ROOT, options = {}) {
   const check = options.check === true;
   const { artifacts } = await buildGeneratedArtifacts(rootDir);
@@ -430,10 +455,19 @@ export async function generateHandbook(rootDir = REPOSITORY_ROOT, options = {}) 
     }
   }
 
+  const stalePaths = await findStaleGeneratedHandbookOutputs(rootDir);
+  for (const outputPath of stalePaths) {
+    changedPaths.push(outputPath);
+    if (!check) {
+      await rm(resolve(rootDir, outputPath), { force: true });
+    }
+  }
+
   return {
     check,
     changedPaths,
     missingPaths,
+    stalePaths,
     wrotePaths: check ? [] : changedPaths,
     isClean: changedPaths.length === 0
   };

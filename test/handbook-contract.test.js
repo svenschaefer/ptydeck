@@ -34,6 +34,21 @@ test('handbook artifacts are current', async () => {
   assert.equal(result.changedPaths.length, 0, `Expected generated handbook artifacts to be current, got: ${result.changedPaths.join(', ')}`);
 });
 
+test('stale generated handbook outputs are detected outside the owned page list', async () => {
+  const staleRelativePath = 'frontend/src/public/handbook/manual/__stale-contract-test__.html';
+  const staleAbsolutePath = path.join(repoRoot, staleRelativePath);
+  fs.mkdirSync(path.dirname(staleAbsolutePath), { recursive: true });
+  fs.writeFileSync(staleAbsolutePath, '<!doctype html><title>stale</title>\n', 'utf8');
+
+  try {
+    const { findStaleGeneratedHandbookOutputs } = await loadModule('scripts/lib/handbook.mjs');
+    const stalePaths = await findStaleGeneratedHandbookOutputs(repoRoot);
+    assert.ok(stalePaths.includes(staleRelativePath), `Expected stale handbook output detection for ${staleRelativePath}.`);
+  } finally {
+    fs.rmSync(staleAbsolutePath, { force: true });
+  }
+});
+
 test('generated command reference covers every canonical slash command', async () => {
   const commandReference = fs.readFileSync(commandReferencePath, 'utf8');
   const { SYSTEM_SLASH_COMMANDS } = await loadModule('frontend/src/public/system-slash-commands.js');
@@ -54,9 +69,6 @@ test('documented slash-command examples resolve to known command topics', async 
   assert.ok(examples.length > 0, 'Expected at least one documented slash-command example.');
   for (const { sourceFile, example } of examples) {
     const parsed = interpretComposerInput(example);
-    if (sourceFile === 'messaging-adapters.md' && (!parsed || parsed.kind !== 'control' || !registry.get(parsed.command))) {
-      continue;
-    }
     assert.equal(parsed.kind, 'control', `Expected ${example} to resolve as a control command.`);
     assert.ok(registry.get(parsed.command), `Expected ${example} to resolve to a known slash command or alias.`);
   }
@@ -78,4 +90,14 @@ test('main UI handbook entry and deep links resolve to generated handbook pages'
       assert.match(html, new RegExp(`id="${anchorId}"`), `Expected anchor ${url.hash} to exist in ${href}.`);
     }
   }
+});
+
+test('generated handbook no longer advertises the deferred messaging adapter guide', () => {
+  const handbookOverviewPath = path.join(repoRoot, 'frontend/src/public/handbook/index.html');
+  const overviewHtml = fs.readFileSync(handbookOverviewPath, 'utf8');
+  assert.doesNotMatch(
+    overviewHtml,
+    /\/handbook\/manual\/messaging-adapters\.html/,
+    'Expected the generated handbook overview to exclude the deferred messaging adapter guide.'
+  );
 });
