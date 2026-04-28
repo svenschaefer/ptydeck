@@ -382,6 +382,39 @@ test("SessionManager answers startup terminal cursor-position queries so Windows
   assert.equal(responseEvent.bytes, Buffer.byteLength("\u001b[1;1R", "utf8"));
 });
 
+test("SessionManager clears exhausted startup fallback guards without writing to the PTY", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => 1000
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash"
+  });
+  const session = manager.get(created.id);
+
+  assert.equal(manager.dispatchLaunchPostStartInput(session), false);
+  assert.equal(manager.scheduleLaunchPostStartInputDispatch(session, "noop", 0), false);
+
+  session.pendingStartupTerminalQueryFallback = {
+    expiresAt: 999,
+    remainingResponses: 1,
+    trace: null
+  };
+  assert.equal(manager.observeStartupTerminalQueryFallback(session, { rawData: "\u001b[6n" }), false);
+  assert.equal(session.pendingStartupTerminalQueryFallback, null);
+
+  session.pendingStartupTerminalQueryFallback = {
+    expiresAt: 2000,
+    remainingResponses: 0,
+    trace: null
+  };
+  assert.equal(manager.observeStartupTerminalQueryFallback(session, { rawData: "\u001b[6n" }), false);
+  assert.equal(session.pendingStartupTerminalQueryFallback, null);
+});
+
 test("SessionManager emits input write failed events when the PTY write throws", () => {
   const fakePty = createFakePty();
   fakePty.write = () => {
@@ -898,6 +931,50 @@ test("SessionManager marks ssh sessions offline after bounded reconnect failures
     () => manager.sendInput(created.id, "pwd\n"),
     /Remote SSH session '.*' is offline/
   );
+});
+
+test("SessionManager reconnect guards fail closed for unsupported, degraded, and exhausted sessions", () => {
+  const queued = createQueuedFakePtyFactory();
+  const manager = new SessionManager({
+    createPty: () => queued.createPty(),
+    nowFn: () => 1710000000000
+  });
+
+  const local = manager.create({
+    cwd: "/tmp",
+    shell: "bash"
+  });
+  assert.equal(manager.scheduleRemoteReconnect(manager.get(local.id), { reason: "not-ssh" }), false);
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+  const session = manager.get(created.id);
+
+  session.meta.remoteRuntime.reconnectPolicy.maxAttempts = 0;
+  assert.equal(manager.scheduleRemoteReconnect(session, { timestamp: 1710000000123, reason: "disabled" }), false);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "offline");
+  assert.equal(session.meta.remoteRuntime.nextReconnectAt, null);
+
+  session.meta.remoteRuntime.connectivityState = "degraded";
+  session.ptyProcess = null;
+  assert.throws(
+    () => manager.resize(created.id, 120, 40),
+    /reconnecting\. Wait for recovery or restart the session explicitly\./
+  );
+
+  session.meta.remoteRuntime.reconnectPolicy.maxAttempts = 1;
+  session.meta.remoteRuntime.reconnectAttempts = 1;
+  assert.equal(manager.scheduleRemoteReconnect(session, { timestamp: 1710000000456, reason: "exhausted" }), false);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "offline");
+  assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "exhausted");
 });
 
 test("SessionManager delete clears pending ssh reconnect timers so degraded sessions do not respawn", async () => {

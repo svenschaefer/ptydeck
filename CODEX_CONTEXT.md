@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (production auth baseline, auth-provider coverage hardening, root tooling coverage baseline, repo-wide quality review, historical-review markers, and current runtime baseline synced after latest review)
+Last updated: 2026-04-28 (production auth baseline, auth-provider/runtime coverage hardening, root tooling coverage baseline, repo-wide quality review, historical-review markers, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -181,7 +181,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active explicit tasks now exist in `v0.4.0-H156` (`QLT-230` through `QLT-233`).
+- `TODO.md`: active explicit tasks now exist in `v0.4.0-H156` (`QLT-231` through `QLT-233`).
 - `ROADMAP.md`: `v0.4.0-H156` is the active release wave.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -269,21 +269,22 @@ The next whole-repo review kept the top-line gate green but found five still-rel
 - `QLT-228` is now completed. The local coverage gate now enforces a third root-tooling lane in addition to backend and frontend.
 - `QLT-229` is now completed. `backend/src/auth.js` now has direct regression coverage for derived discovery resolution, explicit JWKS override bypass, JWKS cache expiry, forced refresh on missing `kid`, mixed scope-claim normalization, malformed JOSE rejection, provider availability failures, and internal HS256 fallback behavior in `AUTH_MODE=prod`.
 - The validated post-`QLT-229` auth hotspot moved from `81.28%` line / `61.33%` branch to `94.45%` line / `90.73%` branch coverage.
+- `QLT-230` is now completed. `backend/src/runtime.js` and `backend/src/session-manager.js` now have direct regressions for restore-all-fallbacks-fail behavior, dev-auth WS-ticket denial without `ws:connect`, concurrent stop/startup release behavior, startup fallback guard cleanup, and SSH reconnect fail-closed behavior.
 - The root-tooling lane runs through `scripts/run-root-coverage-tests.mjs`, covers the root `test/` suite plus repo-owned `scripts/` modules, and filters the report to those owned roots only.
 - Incidental frontend/backend imports used by root tooling tests are now reported explicitly as omitted from the root summary instead of silently distorting that lane.
 - The root-tooling lane is enforced at `ROOT_MIN_LINES=90` through `scripts/check-coverage.sh`.
 - A direct root-only experimental coverage run over `test/*.test.js` currently reports `87.58%` line coverage overall, with `scripts/lib/coverage-report.mjs` at `66.27%` line / `74.51%` branch, `scripts/analyze-pty-write-eintr.mjs` at `77.17%` line / `43.48%` branch, `scripts/analyze-startup-timeline.mjs` at `80.77%` line / `49.09%` branch, and `scripts/scaffold-ui-module.mjs` at `87.64%` line / `61.54%` branch.
 - The backend's most relevant remaining hotspots are now the runtime/session lifecycle seams rather than the already-closed auth seam:
-  - `backend/src/runtime.js`: `82.06%` line / `75.63%` branch
-  - `backend/src/session-manager.js`: `93.61%` line / `76.70%` branch
+  - pre-`QLT-230` baseline: `backend/src/runtime.js` at `82.06%` line / `75.63%` branch and `backend/src/session-manager.js` at `93.61%` line / `76.70%` branch
+  - validated post-`QLT-230` snapshot: `backend/src/runtime.js` at `81.98%` line / `75.66%` branch and `backend/src/session-manager.js` at `94.34%` line / `78.80%` branch
 - The frontend's most relevant remaining hotspots are still the composition and operator-command seams rather than generated/static assets such as `theme-library.js`:
   - `frontend/src/public/app-runtime-composition-controller.js`: `86.46%` line / `62.22%` branch
   - `frontend/src/public/command-executor.js`: `83.29%` line / `73.33%` branch
   - `frontend/src/public/connection-profile-runtime-actions.js`: `77.37%` line / `74.19%` branch
   - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch
   - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `86.62%` line / `78.91%` branch
-- `v0.4.0-H156` was promoted from that review to close those explicit gaps through direct seam tests and tighter local coverage enforcement rather than through another large stack-replacement refactor.
+- `v0.4.0-H156` was promoted from that review to close those explicit gaps through direct seam tests and tighter local coverage enforcement rather than through another large stack-replacement refactor. After `QLT-230`, the active open follow-up work is now frontend-only (`QLT-231` through `QLT-233`).
 
 ## Latest Validated Coverage
 
-The latest closeout validation on 2026-04-28 for `QLT-229` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`. The validated line coverage totals are root tooling `91.13%`, backend `93.86%`, and frontend `95.00%`.
+The latest closeout validation on 2026-04-28 for `QLT-230` passed `npm run lint`, `npm run test`, `npm run test:coverage:check`, `npm run docs:check`, and `git diff --check`. The validated line coverage totals are root tooling `91.13%`, backend `93.90%`, and frontend `95.00%`.

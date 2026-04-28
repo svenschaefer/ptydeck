@@ -3702,6 +3702,36 @@ test("auth dev mode issues token and protects session routes", async () => {
   }
 });
 
+test("auth dev mode denies ws-ticket bootstrap when the bearer token lacks ws:connect", async () => {
+  const { runtime, baseUrl } = await createStartedRuntime({
+    authMode: "dev",
+    authEnabled: true,
+    authDevMode: true,
+    authDevSecret: "test-secret",
+    authIssuer: "test-issuer",
+    authAudience: "test-audience",
+    authDevTokenTtlSeconds: 900
+  });
+
+  try {
+    const readOnlyToken = await issueDevToken(baseUrl, ["sessions:read"], { subject: "reader-only" });
+    const wsTicketRes = await fetch(`${baseUrl}/auth/ws-ticket`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${readOnlyToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    assert.equal(wsTicketRes.status, 403);
+    const wsTicketBody = await wsTicketRes.json();
+    assert.equal(wsTicketBody.error, "Forbidden");
+    assert.match(wsTicketBody.message, /ws:connect/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("structured audit logging captures session actions and auth failures without terminal input payloads", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-audit-"));
   const auditLogFile = join(dir, "audit.jsonl");
@@ -5145,6 +5175,59 @@ test("runtime restore falls back to home when persisted startCwd is invalid", as
   }
 });
 
+test("runtime restore marks local sessions unrestored when every launch fallback attempt fails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const dataPath = join(dir, "sessions.json");
+  const sessionId = "restore-all-fallbacks-failed";
+  await writeFile(
+    dataPath,
+    JSON.stringify(
+      {
+        sessions: [
+          {
+            id: sessionId,
+            cwd: "/definitely/not/a/real/path",
+            shell: "/definitely/not/a/real/shell",
+            name: "fully-broken-restore",
+            startCwd: "/definitely/not/a/real/path",
+            startCommand: "",
+            env: {},
+            tags: [],
+            themeProfile: {},
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        customCommands: []
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  const { runtime, baseUrl } = await createStartedRuntime({
+    dataPath,
+    shell: "/definitely/not/a/configured/shell",
+    createPty: createFallbackAwarePtyFactory()
+  });
+  try {
+    const res = await fetch(`${baseUrl}/sessions/${sessionId}`);
+    assert.equal(res.status, 200);
+    const restored = await res.json();
+    assert.equal(restored.id, sessionId);
+    assert.equal(restored.state, "unrestored");
+
+    const metricsRes = await fetch(`${baseUrl.replace("/api/v1", "")}/metrics`);
+    assert.equal(metricsRes.status, 200);
+    const metrics = await metricsRes.text();
+    assert.match(metrics, /ptydeck_sessions_unrestored_total 1/);
+    assert.match(metrics, /ptydeck_sessions_active_by_lifecycle\{state="unrestored"\} 1/);
+  } finally {
+    await runtime.stop();
+  }
+});
+
 test("ssh session contract persists normalized metadata and restores through the same session model", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
   const dataPath = join(dir, "sessions.json");
@@ -6206,4 +6289,42 @@ test("runtime stop is idempotent", async () => {
   const { runtime } = await createStartedRuntime();
   await runtime.stop();
   await runtime.stop();
+});
+
+test("runtime stop releases pending startup and deduplicates concurrent stop calls", async () => {
+  let releaseReadyGate = null;
+  const readyGate = new Promise((resolve) => {
+    releaseReadyGate = resolve;
+  });
+
+  const dir = await mkdtemp(join(tmpdir(), "ptydeck-runtime-"));
+  const runtime = createRuntime({
+    port: 0,
+    shell: "sh",
+    dataPath: join(dir, "sessions.json"),
+    corsOrigin: "*",
+    corsAllowedOrigins: ["*"],
+    maxBodyBytes: 1024 * 1024,
+    onBeforeReady: async () => {
+      await readyGate;
+    }
+  });
+
+  const startPromise = runtime.start();
+  try {
+    while (!runtime.getAddress()) {
+      await sleep(5);
+    }
+
+    const stopPromiseA = runtime.stop();
+    const stopPromiseB = runtime.stop();
+
+    releaseReadyGate();
+    await Promise.all([startPromise, stopPromiseA, stopPromiseB]);
+    assert.equal(runtime.getAddress(), null);
+  } finally {
+    releaseReadyGate?.();
+    await runtime.stop();
+    await startPromise;
+  }
 });

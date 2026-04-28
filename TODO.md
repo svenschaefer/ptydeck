@@ -16,7 +16,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ### `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
 
-- [ ] `QLT-230` Owner `BE`: Close the highest-risk remaining runtime/session lifecycle blind spots in `backend/src/runtime.js` and `backend/src/session-manager.js` with focused request/lifecycle regressions for startup-restore failure, auth-denied admission, WebSocket bootstrap/ticket error paths, and PTY/session fallback branches that are still covered only indirectly.
 - [ ] `QLT-231` Owner `FE`: Close the bootstrap/control blind spots in `frontend/src/public/app-runtime-composition-controller.js` and `frontend/src/public/app-runtime-state-controller.js` with direct regressions for canonical-origin handoff, reclaim/retry flows, startup-backup failure handling, auth-recovery fallback, and trace/debug side paths.
 - [ ] `QLT-232` Owner `FE`: Close the command/workflow blind spots in `frontend/src/public/command-executor.js`, `frontend/src/public/command-executor-domain-handlers.js`, and `frontend/src/public/connection-profile-runtime-actions.js` with direct regressions for malformed operator input, fallback/error flows, connection-profile mutations, and workflow-side side-effect suppression.
 - [ ] `QLT-233` Owner `FE`: Close the session-control / terminal-interaction blind spots in `frontend/src/public/session-control-runtime-controller.js`, `frontend/src/public/session-control-runtime-state.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js` with direct regressions for blocked-write, reconnect-reserved, terminal-mount fallback, and missing-API branches.
@@ -25,6 +24,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency and keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized.
 - `PLAT` ownership role is currently inactive.
-- `BE` ownership role (active): deliver `QLT-230`.
+- `BE` ownership role is currently inactive.
 - `FE` ownership role (active): deliver `QLT-231`, `QLT-232`, and `QLT-233`.
 - `QA` ownership role is currently inactive.

@@ -16,7 +16,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Active wave:
   - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
   - Remaining open tasks:
-    - `QLT-230`
     - `QLT-231`
     - `QLT-232`
     - `QLT-233`
@@ -28,7 +27,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
-   - `QLT-230` backend runtime/session lifecycle coverage hardening
    - `QLT-231` frontend bootstrap/control coverage hardening
    - `QLT-232` frontend command/workflow coverage hardening
    - `QLT-233` frontend session-control / terminal-interaction coverage hardening
@@ -37,7 +35,8 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - `QLT-228` is completed; the root-tooling coverage lane is now part of `npm run test:coverage` and `npm run test:coverage:check`.
 - `QLT-229` is completed; `backend/src/auth.js` now has direct regressions for OIDC discovery/JWKS refresh, malformed JOSE, scope normalization, provider-failure surfaces, and internal HS256 fallback behavior in `AUTH_MODE=prod`.
-- `QLT-230` is now the next backend slice because the remaining runtime-admission edge coverage depends on the now-expanded auth-provider seam.
+- `QLT-230` is completed; `backend/src/runtime.js` and `backend/src/session-manager.js` now have direct regressions for restore-all-fallbacks-fail behavior, dev-auth WS-ticket denial without `ws:connect`, concurrent stop/startup release behavior, startup fallback guard cleanup, and SSH reconnect fail-closed behavior.
+- `QLT-231` is now the next slice because the remaining promoted risk has shifted to frontend bootstrap/control seams after the backend auth and runtime/session lifecycle slices were closed.
 - `QLT-231` precedes `QLT-232` and `QLT-233` because the runtime bootstrap/control surface is the higher-risk frontend authority boundary for later command and session-control tests.
 - `v0.4.0-H155` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
 
