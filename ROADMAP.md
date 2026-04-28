@@ -15,6 +15,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Active wave:
   - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
+  - Remaining open tasks:
+    - `QLT-229`
+    - `QLT-230`
+    - `QLT-231`
+    - `QLT-232`
+    - `QLT-233`
 - Latest completed wave in this segment:
   - `v0.4.0-H155` Production Auth Provider
 - Queued next waves:
@@ -23,7 +29,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
-   - `QLT-228` root tooling coverage lane
    - `QLT-229` backend auth-provider coverage hardening
    - `QLT-230` backend runtime/session lifecycle coverage hardening
    - `QLT-231` frontend bootstrap/control coverage hardening
@@ -32,7 +37,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-228` goes first because the root-tooling coverage lane must become visible in the local gate before the rest of the wave closes.
+- `QLT-228` is completed; the root-tooling coverage lane is now part of `npm run test:coverage` and `npm run test:coverage:check`.
 - `QLT-229` precedes `QLT-230` because the remaining runtime-admission edge coverage depends on the now-expanded auth-provider seam.
 - `QLT-231` precedes `QLT-232` and `QLT-233` because the runtime bootstrap/control surface is the higher-risk frontend authority boundary for later command and session-control tests.
 - `v0.4.0-H155` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.

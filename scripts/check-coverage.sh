@@ -8,6 +8,7 @@ ptydeck_log_script_start "scripts/check-coverage.sh"
 
 BACKEND_MIN_LINES="${BACKEND_MIN_LINES:-90}"
 FRONTEND_MIN_LINES="${FRONTEND_MIN_LINES:-85}"
+ROOT_MIN_LINES="${ROOT_MIN_LINES:-90}"
 
 run_and_check() {
   local label="$1"
@@ -53,6 +54,7 @@ run_and_check() {
   rm -f "${output_file}"
 }
 
+run_and_check "root" "${ROOT_MIN_LINES}" "npm run test:root:coverage"
 run_and_check "backend" "${BACKEND_MIN_LINES}" "npm --prefix backend run test:coverage"
 run_and_check "frontend" "${FRONTEND_MIN_LINES}" "npm --prefix frontend run test:coverage"
 

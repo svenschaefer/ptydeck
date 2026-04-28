@@ -20,6 +20,7 @@ Notes:
 
 - `npm run lint` now includes the ADR-process structure check (`./scripts/check-adr-process.sh`) in addition to the existing script-log and workspace lint gates.
 - `npm run test` now includes root-level tooling regression checks for the ADR generator/checker and frontend UI scaffold generator before the backend/frontend workspace suites.
+- `npm run test:coverage:check` now enforces three deterministic line-coverage lanes: root tooling (`test/` plus `scripts/`), backend, and frontend. The root-tooling lane reports incidental frontend/backend imports explicitly as omitted instead of counting them silently toward the root summary.
 
 ## Optional Extended Local Validation
 

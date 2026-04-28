@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 const COVERAGE_START = "# start of coverage report";
@@ -23,6 +23,52 @@ function formatPercent(value) {
 
 function formatUncoveredLines(lines) {
   return lines.length ? lines.join(", ") : "";
+}
+
+function normalizeCoverageFilePath(filePath, rootDir) {
+  const normalizedInput = typeof filePath === "string" ? filePath.trim().replaceAll("\\", "/") : "";
+  if (!normalizedInput) {
+    return "";
+  }
+  if (!rootDir) {
+    return normalizedInput;
+  }
+  const absolutePath = resolve(rootDir, normalizedInput);
+  return relative(rootDir, absolutePath).replaceAll("\\", "/");
+}
+
+function normalizeSourcePrefixes(prefixes) {
+  if (!Array.isArray(prefixes)) {
+    return [];
+  }
+  const seen = new Set();
+  const normalized = [];
+  for (const entry of prefixes) {
+    const value = typeof entry === "string" ? entry.trim().replaceAll("\\", "/") : "";
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
+function sourcePathMatchesPrefixes(filePath, prefixes) {
+  if (!prefixes.length) {
+    return true;
+  }
+  return prefixes.some((prefix) => filePath === prefix || filePath.startsWith(prefix));
+}
+
+function buildCoverageChildEnv(env) {
+  const childEnv = { ...env };
+  for (const key of Object.keys(childEnv)) {
+    if (key.startsWith("NODE_TEST_") || key === "NODE_V8_COVERAGE") {
+      delete childEnv[key];
+    }
+  }
+  return childEnv;
 }
 
 function writeStream(stream, text) {
@@ -89,7 +135,7 @@ export async function collectWorkspaceCoverageTestFiles(rootDir, { excludedTestN
     .sort((a, b) => a.localeCompare(b, "en-US"));
 }
 
-export function normalizeCoverageReport(text, { rootDir } = {}) {
+export function normalizeCoverageReport(text, { rootDir, includeSourcePrefixes = [], excludeSourcePrefixes = [] } = {}) {
   const lines = text.split(/\r?\n/);
   const startIndex = lines.indexOf(COVERAGE_START);
   const endIndex = lines.indexOf(COVERAGE_END);
@@ -97,6 +143,7 @@ export function normalizeCoverageReport(text, { rootDir } = {}) {
     return {
       text,
       duplicateFiles: [],
+      omittedFiles: [],
       normalizedFileCount: 0
     };
   }
@@ -112,7 +159,7 @@ export function normalizeCoverageReport(text, { rootDir } = {}) {
       continue;
     }
     rows.push({
-      file: match[1],
+      file: normalizeCoverageFilePath(match[1], rootDir),
       linePercent: Number.parseFloat(match[2]),
       branchPercent: Number.parseFloat(match[3]),
       functionPercent: Number.parseFloat(match[4]),
@@ -121,8 +168,22 @@ export function normalizeCoverageReport(text, { rootDir } = {}) {
   }
 
   const detailRows = rows.filter((row) => row.file !== "all files");
+  const normalizedIncludeSourcePrefixes = normalizeSourcePrefixes(includeSourcePrefixes);
+  const normalizedExcludeSourcePrefixes = normalizeSourcePrefixes(excludeSourcePrefixes);
+  const omittedFiles = new Set();
+  const filteredDetailRows = detailRows.filter((row) => {
+    const included = sourcePathMatchesPrefixes(row.file, normalizedIncludeSourcePrefixes);
+    const excluded =
+      normalizedExcludeSourcePrefixes.length > 0 &&
+      sourcePathMatchesPrefixes(row.file, normalizedExcludeSourcePrefixes);
+    const keep = included && !excluded;
+    if (!keep) {
+      omittedFiles.add(row.file);
+    }
+    return keep;
+  });
   const grouped = new Map();
-  for (const row of detailRows) {
+  for (const row of filteredDetailRows) {
     const existing = grouped.get(row.file) ?? [];
     existing.push(row);
     grouped.set(row.file, existing);
@@ -190,6 +251,7 @@ export function normalizeCoverageReport(text, { rootDir } = {}) {
   return {
     text: normalizedText,
     duplicateFiles,
+    omittedFiles: Array.from(omittedFiles).sort((a, b) => a.localeCompare(b, "en-US")),
     normalizedFileCount: normalizedRows.length
   };
 }
@@ -197,6 +259,8 @@ export function normalizeCoverageReport(text, { rootDir } = {}) {
 export async function runWorkspaceCoverage({
   rootDir,
   excludedTestNames = new Set(),
+  includeSourcePrefixes = [],
+  excludeSourcePrefixes = [],
   stdout = process.stdout,
   stderr = process.stderr,
   listOnly = false
@@ -214,7 +278,7 @@ export async function runWorkspaceCoverage({
 
   const child = spawn(process.execPath, ["--test", "--experimental-test-coverage", ...testFiles], {
     cwd: rootDir,
-    env: process.env,
+    env: buildCoverageChildEnv(process.env),
     stdio: ["ignore", "pipe", "pipe"]
   });
 
@@ -235,12 +299,29 @@ export async function runWorkspaceCoverage({
     await writeStream(stderr, capturedStderr);
   }
 
-  const normalized = normalizeCoverageReport(capturedStdout, { rootDir });
+  const normalized = normalizeCoverageReport(capturedStdout, {
+    rootDir,
+    includeSourcePrefixes,
+    excludeSourcePrefixes
+  });
+  if (!normalized.normalizedFileCount) {
+    const omittedNote = normalized.omittedFiles.length
+      ? ` Omitted files: ${normalized.omittedFiles.join(", ")}.`
+      : "";
+    await writeStream(stderr, `[coverage] no source files matched configured roots.${omittedNote}\n`);
+    return 1;
+  }
   await writeStream(stdout, normalized.text);
   if (normalized.duplicateFiles.length) {
     await writeStream(
       stdout,
       `\n[coverage] normalized duplicate file rows: ${normalized.duplicateFiles.join(", ")}.\n`
+    );
+  }
+  if (normalized.omittedFiles.length) {
+    await writeStream(
+      stdout,
+      `[coverage] omitted files outside configured roots: ${normalized.omittedFiles.join(", ")}.\n`
     );
   }
 

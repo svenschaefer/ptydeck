@@ -91,6 +91,8 @@ npm run test:coverage
 npm run test:coverage:check
 ```
 
+`npm run test:coverage` and `npm run test:coverage:check` now include a dedicated root-tooling coverage lane for `test/` plus repo-owned `scripts/` modules. Incidental frontend/backend imports used by root tooling tests are reported explicitly as omitted from that root summary instead of silently distorting it.
+
 Backend only:
 
 ```bash

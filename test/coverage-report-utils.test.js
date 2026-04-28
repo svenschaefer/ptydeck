@@ -3,12 +3,25 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { Writable } = require("node:stream");
 const { pathToFileURL } = require("node:url");
 
 const repoRoot = path.resolve(__dirname, "..");
 
 async function loadModule(relativePath) {
   return import(pathToFileURL(path.join(repoRoot, relativePath)).href);
+}
+
+class CaptureStream extends Writable {
+  constructor() {
+    super();
+    this.buffer = "";
+  }
+
+  _write(chunk, encoding, callback) {
+    this.buffer += chunk.toString();
+    callback();
+  }
 }
 
 test("collectWorkspaceCoverageTestFiles keeps backend integration/request-seam tests in coverage selection", async () => {
@@ -49,4 +62,106 @@ test("normalizeCoverageReport collapses duplicate file rows into one determinist
   assert.deepEqual(normalized.duplicateFiles, ["src/sample.js"]);
   assert.match(normalized.text, /# src\/sample\.js \| 40\.00 \| 60\.00 \| 50\.00 \| 1, 2, 5/);
   assert.match(normalized.text, /# all files \| 50\.00 \|/);
+});
+
+test("normalizeCoverageReport filters incidental non-owned files and reports them explicitly", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-filter-"));
+  fs.mkdirSync(path.join(tempRoot, "scripts", "lib"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "frontend", "src", "public"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "scripts", "lib", "helper.mjs"), "a\nb\nc\nd\n", "utf8");
+  fs.writeFileSync(path.join(tempRoot, "test", "sample.test.js"), "a\nb\nc\n", "utf8");
+  fs.writeFileSync(path.join(tempRoot, "frontend", "src", "public", "foreign.mjs"), "a\nb\n", "utf8");
+
+  const { normalizeCoverageReport } = await loadModule("scripts/lib/coverage-report.mjs");
+  const input = [
+    "# start of coverage report",
+    "# file | line % | branch % | funcs % | uncovered lines",
+    "# scripts/lib/helper.mjs | 75.00 | 50.00 | 100.00 | 4",
+    "# test/sample.test.js | 100.00 | 100.00 | 100.00 |",
+    "# frontend/src/public/foreign.mjs | 50.00 | 0.00 | 0.00 | 2",
+    "# all files | 80.00 | 60.00 | 80.00 |",
+    "# end of coverage report"
+  ].join("\n");
+
+  const normalized = normalizeCoverageReport(input, {
+    rootDir: tempRoot,
+    includeSourcePrefixes: ["scripts/", "test/"]
+  });
+
+  assert.deepEqual(normalized.omittedFiles, ["frontend/src/public/foreign.mjs"]);
+  assert.doesNotMatch(normalized.text, /^# frontend\/src\/public\/foreign\.mjs \|/m);
+  assert.match(normalized.text, /^# scripts\/lib\/helper\.mjs \| 75\.00 \| 50\.00 \| 100\.00 \| 4$/m);
+  assert.match(normalized.text, /^# test\/sample\.test\.js \| 100\.00 \| 100\.00 \| 100\.00 \| ?$/m);
+  assert.match(normalized.text, /^# all files \| 85\.71 \| 71\.43 \| 100\.00 \|$/m);
+});
+
+test("runWorkspaceCoverage returns an error when no test files are selected", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-empty-"));
+  fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
+
+  const { runWorkspaceCoverage } = await loadModule("scripts/lib/coverage-report.mjs");
+  const stdout = new CaptureStream();
+  const stderr = new CaptureStream();
+  const exitCode = await runWorkspaceCoverage({
+    rootDir: tempRoot,
+    stdout,
+    stderr
+  });
+
+  assert.equal(exitCode, 1);
+  assert.equal(stdout.buffer, "");
+  assert.match(stderr.buffer, /\[coverage\] no test files selected\./);
+});
+
+test("runWorkspaceCoverage limits the root lane to owned files and reports omitted imports", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-run-"));
+  fs.mkdirSync(path.join(tempRoot, "scripts", "lib"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "frontend", "src", "public"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "scripts", "lib", "helper.mjs"), "export function double(value) {\n  return value * 2;\n}\n", "utf8");
+  fs.writeFileSync(
+    path.join(tempRoot, "frontend", "src", "public", "foreign.mjs"),
+    "export function offset(value) {\n  return value + 1;\n}\n",
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(tempRoot, "test", "sample.test.js"),
+    [
+      "const test = require('node:test');",
+      "const assert = require('node:assert/strict');",
+      "",
+      "test('owned root coverage lane ignores incidental frontend imports', async () => {",
+      "  const { double } = await import('../scripts/lib/helper.mjs');",
+      "  const { offset } = await import('../frontend/src/public/foreign.mjs');",
+      "  assert.equal(double(2), 4);",
+      "  assert.equal(offset(2), 3);",
+      "});"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const { runWorkspaceCoverage } = await loadModule("scripts/lib/coverage-report.mjs");
+  const stdout = new CaptureStream();
+  const stderr = new CaptureStream();
+  const exitCode = await runWorkspaceCoverage({
+    rootDir: tempRoot,
+    includeSourcePrefixes: ["scripts/", "test/"],
+    stdout,
+    stderr
+  });
+
+  assert.equal(
+    exitCode,
+    0,
+    `Expected runWorkspaceCoverage to succeed.\nSTDOUT:\n${stdout.buffer}\nSTDERR:\n${stderr.buffer}`
+  );
+  assert.equal(stderr.buffer, "");
+  assert.match(stdout.buffer, /^# test\/sample\.test\.js \|/m);
+  assert.match(stdout.buffer, /^# scripts\/lib\/helper\.mjs \|/m);
+  assert.doesNotMatch(stdout.buffer, /^# frontend\/src\/public\/foreign\.mjs \|/m);
+  assert.match(
+    stdout.buffer,
+    /\[coverage\] omitted files outside configured roots: frontend\/src\/public\/foreign\.mjs\./
+  );
 });
