@@ -4,6 +4,7 @@ Completed and validated release history belongs here.
 
 ## 2026-04-28
 
+- [x] Documentation hygiene was tightened after `v0.4.0-H155`: retained review/concept markdown now marks pre-`H155` auth wording and pre-reset messaging concepts more explicitly, while `docs/README.md` and `CODEX_CONTEXT.md` now state that the source-of-truth documents override superseded review terminology when historical notes diverge from current shipped behavior.
 - [x] `v0.4.0-H155` is now completed on `main`, closing `ENT-025` and leaving no active or queued release wave in `TODO.md` or `ROADMAP.md`.
 - [x] Backend production auth now supports `AUTH_MODE=prod` through one unified bearer-verification seam. `backend/src/auth.js` now keeps internal HS256 token verification for dev bootstrap, share links, and WS tickets while also validating external operator bearer tokens through OIDC discovery/JWKS in production mode. `backend/src/runtime-http-helpers.js` and `backend/src/runtime.js` now use that same verifier for REST and WebSocket admission instead of carrying separate dev-only verification branches.
 - [x] Backend auth configuration is now production-safe and explicit. `backend/src/config.js` adds `AUTH_PROD_ISSUER`, `AUTH_PROD_AUDIENCE`, optional `AUTH_PROD_DISCOVERY_URL` / `AUTH_PROD_JWKS_URL`, and `AUTH_PROD_JWKS_CACHE_TTL_SECONDS`; rejects `AUTH_MODE=dev` when `NODE_ENV=production`; requires an explicit internal `AUTH_DEV_SECRET` in `AUTH_MODE=prod`; and keeps the runtime authority single-user only rather than reopening tenant or multi-user partitioning.

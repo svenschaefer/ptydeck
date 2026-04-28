@@ -67,6 +67,7 @@ This document records the closed trusted-local second-client LAN acceptance proc
 - `Slash Workflow Chains.md`
 
 These remain useful as review or design references, but not as implementation-status documents.
+They may contain superseded terminology or review-time observations; when they differ from current behavior, `CODEX_CONTEXT.md`, `DEPLOYMENT.md`, `TODO.md`, `ROADMAP.md`, and `CHANGELOG.md` are authoritative.
 
 Obsolete stack-replacement evaluations and branch-specific deployment gates are intentionally not retained in the active docs index. Current task authority remains limited to `TODO.md`, `ROADMAP.md`, and `TODO-OUTLOOK.md`.
 

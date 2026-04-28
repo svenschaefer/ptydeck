@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (production auth baseline, docs governance, and current runtime baseline synced after latest review)
+Last updated: 2026-04-28 (production auth baseline, docs governance, historical-review markers, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -150,6 +150,7 @@ The 2026-04-23 documentation cleanup established these current rules:
 - `DEPLOYMENT.md` is reserved for the current runbook and no longer carries closed feature-branch rollback or merge-readiness gates.
 - Closed branch-acceptance sheets may remain only when clearly marked as historical evidence, not as active deployment gates.
 - Older codebase review notes are retained as review input only; they do not create active work unless a concrete owned task is promoted into `TODO.md` or `TODO-OUTLOOK.md`.
+- When retained review/design notes still mention older auth or messaging terminology, `CODEX_CONTEXT.md`, `DEPLOYMENT.md`, `TODO.md`, `ROADMAP.md`, and `CHANGELOG.md` override them as the current product truth.
 
 ## Messaging Reset Learnings
 

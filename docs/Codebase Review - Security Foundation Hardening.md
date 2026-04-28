@@ -1,6 +1,6 @@
 # Refactoring Plan: Security Foundation Hardening
 
-Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`. Large parts of the auth split proposed here landed later in `v0.4.0-H155`; references below to `AUTH_DEV_MODE`, query-token transport, or missing production auth describe the review-time baseline rather than the current shipped state.
 
 ## 1. Objective
 
@@ -13,7 +13,7 @@ Establish a **clear, production-ready security foundation** for ptydeck by:
 
 ---
 
-## 2. Current Risk Profile
+## 2. Historical Risk Profile at Review Time
 
 The system currently contains several **development-oriented shortcuts** that become critical risks outside localhost:
 
@@ -123,7 +123,7 @@ Connecting to WebSocket endpoint
 
 ## 6. Authentication Model Separation
 
-### 6.1 Current Problem
+### 6.1 Historical Problem at Review Time
 
 * dev and production auth are conflated
 * `AUTH_DEV_MODE` acts as primary mechanism

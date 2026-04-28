@@ -1,6 +1,6 @@
 # ptydeck Codebase Review
 
-Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`.
+Review note: this document is retained as architecture review input. Its recommendations are not active tasks unless they are explicitly present in `TODO.md` or `TODO-OUTLOOK.md`. Some observations below describe the pre-`v0.4.0-H155` auth/runtime baseline and are preserved as historical review input rather than current product truth.
 
 ## 1. Executive Summary
 
@@ -220,7 +220,7 @@ Appears callable without authentication.
 
 ### 4.3 Auth Model is Dev-Centric
 
-Current model:
+Historical model at review time:
 
 - `AUTH_ENABLED` tied to `AUTH_DEV_MODE`
 - default secret fallback

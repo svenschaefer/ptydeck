@@ -6,7 +6,7 @@ Historical note: this concept predates the 2026-04-16 messaging reset and is ret
 
 ### 1. Document Purpose
 
-This document defines a generic messaging-adapter concept for ptydeck that fits the current product and architecture.
+This document defines a generic messaging-adapter concept for ptydeck that fit the then-current product and architecture at the time of writing.
 
 The framework is intended to:
 - translate meaningful ptydeck session activity into external updates
