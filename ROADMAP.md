@@ -13,7 +13,8 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Current Execution Status
 
-- No active release waves are currently open.
+- Active wave:
+  - `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
 - Latest completed wave in this segment:
   - `v0.4.0-H155` Production Auth Provider
 - Queued next waves:
@@ -21,11 +22,26 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Queued Wave Order
 
-1. none currently queued.
+1. `v0.4.0-H156` Repo-Wide Quality and Coverage Hardening
+   - `QLT-228` root tooling coverage lane
+   - `QLT-229` backend auth-provider coverage hardening
+   - `QLT-230` backend runtime/session lifecycle coverage hardening
+   - `QLT-231` frontend bootstrap/control coverage hardening
+   - `QLT-232` frontend command/workflow coverage hardening
+   - `QLT-233` frontend session-control / terminal-interaction coverage hardening
 
 ## Wave Dependencies
 
+- `QLT-228` goes first because the root-tooling coverage lane must become visible in the local gate before the rest of the wave closes.
+- `QLT-229` precedes `QLT-230` because the remaining runtime-admission edge coverage depends on the now-expanded auth-provider seam.
+- `QLT-231` precedes `QLT-232` and `QLT-233` because the runtime bootstrap/control surface is the higher-risk frontend authority boundary for later command and session-control tests.
 - `v0.4.0-H155` is now completed and no longer active. See `CHANGELOG.md` for closure criteria and evidence.
+
+## Wave Exit Criteria
+
+- The local quality gate reports backend, frontend, and root-tooling coverage deterministically.
+- The promoted backend and frontend hotspot files gain direct regression coverage for the branches listed in `TODO.md`.
+- `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.
 
 ## Sequencing Rules
 

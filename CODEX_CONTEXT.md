@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-28 (production auth baseline, docs governance, historical-review markers, and current runtime baseline synced after latest review)
+Last updated: 2026-04-28 (production auth baseline, repo-wide quality review, historical-review markers, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -181,8 +181,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active explicit tasks remain.
-- `ROADMAP.md`: no active or queued release wave currently remains.
+- `TODO.md`: active explicit tasks now exist in `v0.4.0-H156` (`QLT-228` through `QLT-233`).
+- `ROADMAP.md`: `v0.4.0-H156` is the active release wave.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
@@ -261,6 +261,24 @@ The repo-wide quality gates still pass at the top line. `v0.4.0-H146` repaired t
   - post-`H151` repo-wide validated coverage totals: backend `93.65%` line coverage, frontend `95.07%` line coverage
 - The repo-wide review that promoted `v0.4.0-H151` is now closed: the command/workspace hotspot cluster has direct extracted seams plus focused tests, and no further active or queued quality wave remains in `TODO.md` or `ROADMAP.md`.
 - Smaller low-coverage utilities and UI controllers still exist, but they were not promoted in this review because they are either already bounded, substantially better covered than the newly promoted monoliths, or lower risk than the backend runtime and frontend composition/command/workspace surfaces now queued in `TODO.md`.
+
+## Repository Quality Review (2026-04-28)
+
+The next whole-repo review kept the top-line gate green but found five still-relevant hotspots plus one repo-level tooling gap worth promoting into `v0.4.0-H156`:
+
+- The current enforced workspace coverage gate still checks backend and frontend only. Root tooling under `test/` plus `scripts/lib/*.mjs` has regression tests, but no explicit coverage threshold is enforced in `npm run test:coverage:check`.
+- A direct root-only experimental coverage run over `test/*.test.js` currently reports `87.58%` line coverage overall, with `scripts/lib/coverage-report.mjs` at `66.27%` line / `74.51%` branch, `scripts/analyze-pty-write-eintr.mjs` at `77.17%` line / `43.48%` branch, `scripts/analyze-startup-timeline.mjs` at `80.77%` line / `49.09%` branch, and `scripts/scaffold-ui-module.mjs` at `87.64%` line / `61.54%` branch.
+- The backend's most relevant remaining hotspots are still the auth/runtime authority seams rather than already-bounded smaller helpers:
+  - `backend/src/auth.js`: `81.28%` line / `61.33%` branch
+  - `backend/src/runtime.js`: `81.93%` line / `75.61%` branch
+  - `backend/src/session-manager.js`: `93.61%` line / `76.70%` branch
+- The frontend's most relevant remaining hotspots are still the composition and operator-command seams rather than generated/static assets such as `theme-library.js`:
+  - `frontend/src/public/app-runtime-composition-controller.js`: `86.46%` line / `62.22%` branch
+  - `frontend/src/public/command-executor.js`: `83.29%` line / `73.33%` branch
+  - `frontend/src/public/connection-profile-runtime-actions.js`: `77.37%` line / `74.19%` branch
+  - `frontend/src/public/session-control-runtime-controller.js`: `87.71%` line / `66.38%` branch
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `86.62%` line / `78.91%` branch
+- `v0.4.0-H156` was promoted from that review to close those explicit gaps through direct seam tests and tighter local coverage enforcement rather than through another large stack-replacement refactor.
 
 ## Latest Validated Coverage
 
