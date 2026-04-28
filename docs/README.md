@@ -1,11 +1,12 @@
 # Docs Review Index
 
-This directory contains three document classes:
+This directory contains five document classes:
 
 - active repository-native architecture and operational notes
 - historical analysis notes kept for learnings after the 2026-04-16 messaging reset
 - historical branch-acceptance notes kept as evidence only
-- handbook source under `docs/manual/` plus generated reference output under `docs/reference/`
+- ADR process/templates under `docs/adr/`
+- handbook source under `docs/manual/`, generated reference markdown under `docs/reference/`, and supporting captured examples under `docs/examples/`
 
 Authoritative repository documents remain:
 
@@ -54,6 +55,21 @@ The following documents are retained for learnings only. They describe removed l
 
 This document records the closed trusted-local second-client LAN acceptance process. It is not part of the current deployment runbook and should not be treated as an active branch gate.
 
+### ADR and Example Assets
+
+- `adr/README.md`
+  - role: ADR workflow and inventory index
+  - status: active process note
+- `adr/0000-template.md`
+  - role: ADR authoring template
+  - status: active template
+- `adr/0001-local-validation-is-the-authoritative-quality-gate.md`
+  - role: accepted ADR for the local quality-gate policy
+  - status: active decision record
+- `examples/`
+  - role: captured supporting artifacts for historical analysis and review references
+  - status: retained evidence only, not current product truth
+
 ### Other Architecture / Review Notes
 
 - `Codebase Review.md`
@@ -80,5 +96,5 @@ Current interpretation:
 
 - `docs/manual/` stays curated and workflow-oriented
 - deferred or non-final operator flows are intentionally kept out of `docs/manual/`; messaging adapter background remains in architecture/context documents until a future messaging attempt is explicitly promoted again
-- `docs/reference/` stays generated from code/contracts through `npm run docs:generate`
+- `docs/reference/` stays generated as markdown from code/contracts through `npm run docs:generate`
 - `frontend/src/public/handbook/` is generated output, not a hand-edited documentation source
