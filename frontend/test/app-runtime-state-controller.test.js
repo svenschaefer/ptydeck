@@ -220,3 +220,70 @@ test("app-runtime state controller tracks workflow control-pane state", () => {
   assert.equal(uiState.workflowCanKill, false);
   assert.deepEqual(renders, ["render", "render"]);
 });
+
+test("app-runtime state controller normalizes command feedback actions and clears them without redundant renders", () => {
+  const renders = [];
+  const uiState = {};
+  const controller = createAppRuntimeStateController({
+    uiState,
+    requestRender: () => renders.push("render")
+  });
+
+  controller.setCommandFeedbackAction({
+    visible: true,
+    label: "Take control",
+    title: "Reclaim control for this session.",
+    sessionId: "s-1"
+  });
+  controller.clearCommandFeedbackAction({ render: false });
+  controller.clearCommandFeedbackAction();
+  controller.setCommandFeedbackAction({
+    visible: false,
+    label: 123,
+    title: null,
+    sessionId: {}
+  });
+
+  assert.equal(uiState.commandFeedbackActionVisible, false);
+  assert.equal(uiState.commandFeedbackActionLabel, "");
+  assert.equal(uiState.commandFeedbackActionTitle, "");
+  assert.equal(uiState.commandFeedbackActionSessionId, "");
+  assert.deepEqual(renders, ["render", "render"]);
+});
+
+test("app-runtime state controller suppresses bootstrap fallback once runtime bootstrap is no longer pending", async () => {
+  let fallbackCalls = 0;
+  const controller = createAppRuntimeStateController({
+    uiState: {},
+    runBootstrapFallback: async () => {
+      fallbackCalls += 1;
+    }
+  });
+
+  controller.markRuntimeBootstrapReady("ws");
+  const result = await controller.bootstrapRuntimeFallback();
+
+  assert.equal(result, undefined);
+  assert.equal(fallbackCalls, 0);
+});
+
+test("app-runtime state controller ignores scheduled bootstrap fallback callbacks after runtime becomes ready", async () => {
+  const windowRef = createFakeWindow();
+  let fallbackCalls = 0;
+  const controller = createAppRuntimeStateController({
+    windowRef,
+    uiState: {},
+    runBootstrapFallback: async () => {
+      fallbackCalls += 1;
+    }
+  });
+
+  controller.scheduleBootstrapFallback();
+  assert.equal(windowRef.timers.length, 1);
+
+  controller.markRuntimeBootstrapReady("rest");
+  assert.equal(windowRef.timers[0].cleared, true);
+  await windowRef.timers[0].fn();
+
+  assert.equal(fallbackCalls, 0);
+});

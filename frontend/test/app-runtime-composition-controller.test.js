@@ -330,6 +330,21 @@ function createWindowFixture(documentRef) {
   };
 }
 
+function createJsonResponse(status, payload, headers = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get(name) {
+        return Object.prototype.hasOwnProperty.call(headers, name) ? headers[name] : "";
+      }
+    },
+    async json() {
+      return payload;
+    }
+  };
+}
+
 function createControllerHarness(options = {}) {
   const fixture = createMinimalDocumentFixture();
   const hooks = {};
@@ -947,4 +962,170 @@ test("app-runtime composition controller renders transfer and forget actions for
 
   assert.equal(remoteRow.find((node) => node.textContent === "Transfer")?.textContent, "Transfer");
   assert.equal(staleRow.find((node) => node.textContent === "Forget")?.textContent, "Forget");
+});
+
+test("app-runtime composition controller fails closed on unauthorized api recovery when auth refresh does not recover", async () => {
+  const harness = createControllerHarness();
+  const originalFetch = globalThis.fetch;
+  let bootstrapCalls = 0;
+  let fetchCalls = 0;
+  harness.hooks.setCollaborators({
+    appRuntimeStateController: {
+      async bootstrapDevAuthToken() {
+        bootstrapCalls += 1;
+        return false;
+      }
+    }
+  });
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return createJsonResponse(401, {
+      message: "Unauthorized.",
+      error: "Unauthorized"
+    });
+  };
+
+  try {
+    await assert.rejects(harness.hooks.getApi().listSessions(), /Unauthorized\./);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(bootstrapCalls, 1);
+  assert.equal(fetchCalls, 1);
+});
+
+test("app-runtime composition controller retries unauthorized api requests and records debug traces when debug is enabled", async () => {
+  const fixture = createMinimalDocumentFixture();
+  const windowRef = createWindowFixture(fixture.document);
+  windowRef.location.search = "?debug=1";
+  const originalFetch = globalThis.fetch;
+  const originalConsoleDebug = console.debug;
+  const debugCalls = [];
+  let fetchCalls = 0;
+  let bootstrapCalls = 0;
+  const harness = createControllerHarness({ windowRef });
+  harness.hooks.setCollaborators({
+    appRuntimeStateController: {
+      async bootstrapDevAuthToken() {
+        bootstrapCalls += 1;
+        return true;
+      }
+    }
+  });
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    if (fetchCalls === 1) {
+      return createJsonResponse(
+        401,
+        {
+          message: "Unauthorized.",
+          error: "Unauthorized"
+        },
+        {
+          "x-ptydeck-trace-id": "trace-401",
+          "x-ptydeck-correlation-id": "corr-401"
+        }
+      );
+    }
+    return createJsonResponse(
+      200,
+      [],
+      {
+        "x-ptydeck-trace-id": "trace-200",
+        "x-ptydeck-correlation-id": "corr-200"
+      }
+    );
+  };
+  console.debug = (...args) => debugCalls.push(args);
+
+  try {
+    const sessions = await harness.hooks.getApi().listSessions();
+    assert.deepEqual(sessions, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.debug = originalConsoleDebug;
+  }
+
+  const traceEntries = windowRef.__PTYDECK_TRACE_DEBUG__.listEntries();
+  assert.equal(bootstrapCalls, 1);
+  assert.equal(fetchCalls, 2);
+  assert.deepEqual(
+    traceEntries.map((entry) => entry.type),
+    ["api.response", "api.response"]
+  );
+  assert.deepEqual(
+    traceEntries.map((entry) => entry.payload.status),
+    [401, 200]
+  );
+  const debugMessages = debugCalls.map(([message]) => String(message));
+  assert.ok(debugMessages.some((message) => message.includes("api.request.start")));
+  assert.ok(debugMessages.some((message) => message.includes("api.request.error")));
+  assert.ok(debugMessages.some((message) => message.includes("api.request.retry_after_unauthorized")));
+  assert.ok(debugMessages.some((message) => message.includes("api.request.ok")));
+});
+
+test("app-runtime composition controller stream adapter records debug traces and clears activity after quiet idle", async () => {
+  const fixture = createMinimalDocumentFixture();
+  const windowRef = createWindowFixture(fixture.document);
+  windowRef.location.search = "?debug=1";
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn, delay) => {
+    const token = { fn, delay, cleared: false };
+    timers.push(token);
+    return token;
+  };
+  globalThis.clearTimeout = (token) => {
+    if (token && typeof token === "object") {
+      token.cleared = true;
+    }
+  };
+
+  try {
+    const harness = createControllerHarness({ windowRef });
+    const appendedChunks = [];
+    harness.hooks.setCollaborators({
+      appSessionRuntimeFacadeController: {
+        appendTerminalChunk(sessionId, chunk) {
+          appendedChunks.push([sessionId, chunk]);
+        }
+      }
+    });
+    harness.hooks.setSessionsForTest([
+      {
+        id: "s-1",
+        name: "Session 1",
+        shell: "/bin/bash",
+        cwd: "/tmp",
+        activityState: "active",
+        hasLiveActivity: true
+      }
+    ]);
+
+    const streamAdapter = harness.hooks.getStreamAdapter();
+    assert.equal(streamAdapter.push("s-1", "hello"), true);
+    assert.deepEqual(appendedChunks, [["s-1", "hello"]]);
+    assert.equal(timers.length, 1);
+    assert.equal(timers[0].delay, 1400);
+    assert.equal(
+      harness.hooks.getStoreState().sessions.find((session) => session.id === "s-1")?.activityState,
+      "active"
+    );
+
+    await timers[0].fn();
+
+    assert.deepEqual(
+      windowRef.__PTYDECK_STREAM_DEBUG__.getSessionTrace("s-1").map((entry) => entry.type),
+      ["stream.data", "stream.idle"]
+    );
+    assert.equal(
+      harness.hooks.getStoreState().sessions.find((session) => session.id === "s-1")?.activityState,
+      "inactive"
+    );
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
 });

@@ -629,6 +629,9 @@ function installTestHooks() {
   }
   Object.assign(testHooks, {
     uiState,
+    getApi: () => api,
+    getStoreState: () => store.getState(),
+    getStreamAdapter: () => streamAdapter,
     setAccessState,
     setRuntimeClientId,
     setTrustedLocalClientLabel(label) {
