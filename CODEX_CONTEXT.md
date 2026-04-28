@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-23 (structured auditability closeout and current runtime baseline)
+Last updated: 2026-04-28 (docs governance and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
