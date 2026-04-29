@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (H159 remains active after closing the two backend seam slices plus the frontend runtime-state/stream-authority seam, with production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (H160 is now active after a fresh repo-wide quality review promoted the remaining backend runtime/identity and frontend operator-surface gaps while keeping the transport-only messaging baseline deferred)
 
 ## Current Product Truth
 
@@ -182,8 +182,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active promoted task remains after the `QLT-249` / `v0.4.0-H159` closeout.
-- `ROADMAP.md`: no active or queued wave remains after the `v0.4.0-H159` closeout.
+- `TODO.md`: active promoted tasks are now `QLT-250` through `QLT-254` under `v0.4.0-H160`.
+- `ROADMAP.md`: the active wave is now `v0.4.0-H160`, with no additional queued follow-up wave behind it.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
@@ -215,7 +215,22 @@ The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
   - `QLT-249` is now complete as the final delivered slice of `v0.4.0-H159`. `frontend/test/send-history-runtime-controller.test.js`, `frontend/test/session-ui-facade-controller.test.js`, `frontend/test/session-card-meta-controller.test.js`, and `frontend/test/share-access-state.test.js` now lock down retained send-history persistence failure pruning, dialogless/event-driven guards, delegated theme/input-safety fallback contracts, missing UI-slot behavior, and share-token decode fallbacks that were previously only hit indirectly. The validated hotspot snapshot now reports `frontend/src/public/send-history-runtime-controller.js` at `97.22%` line / `86.85%` branch coverage, `frontend/src/public/ui/session-ui-facade-controller.js` at `100.00%` line / `98.42%` branch coverage, `frontend/src/public/ui/session-card-meta-controller.js` at `100.00%` line / `88.37%` branch coverage, and `frontend/src/public/share-access-state.js` at `100.00%` line / `82.86%` branch coverage.
   - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
-`v0.4.0-H159` is now complete; no additional root-tooling, frontend, or messaging-specific near-term wave is promoted in `TODO.md` or `ROADMAP.md`.
+The fresh post-`H159` review then promoted one more same-day follow-up wave, `v0.4.0-H160`, but kept the scope narrow to product-facing runtime/operator seams only:
+
+- Root tooling:
+  - Top-line root coverage remains `92.77%` line / `76.81%` branch after the fresh rerun of `npm run test:root:coverage`.
+  - The remaining lower-covered root files are still `scripts/analyze-pty-write-eintr.mjs` (`77.17%` line / `43.48%` branch) and `scripts/analyze-startup-timeline.mjs` (`80.77%` line / `49.09%` branch), but they remain intentionally unpromoted because they are retained diagnostics rather than active product/runtime authority paths.
+- Backend:
+  - `backend/src/runtime.js` still remains the largest shipped backend monolith at `6820` lines with `80.54%` line / `71.73%` branch coverage even after the earlier route-table, resource-dispatch, status-reporting, and HTTP-helper extractions. `QLT-250` now promotes another backend lifecycle cut focused on the remaining startup-ready, auth, WebSocket-admission, and session-control request branches that still live inline in the runtime.
+  - `backend/src/terminal-app-identity.js` (`1191` lines, `94.54%` line / `75.00%` branch) and `backend/src/runtime-session-control-attachments.js` (`215` lines, `90.70%` line / `75.71%` branch) remain product-facing backend seams with weaker residual branch coverage, so `QLT-251` now promotes direct reconnect ownership, alias/label shaping, prune timing, and controller-transfer coverage instead of leaving those branches covered only indirectly.
+  - The retained transport-only messaging branch gaps in `backend/src/discord-adapter.js`, `backend/src/delivery-adapter-utils.js`, `backend/src/messaging-runtime.js`, and related adapter helpers remain intentionally unpromoted because automatic outbound messaging is still deferred behind the third-attempt contract in `TODO-OUTLOOK.md`.
+- Frontend:
+  - `frontend/src/public/command-executor.js` still remains the largest retained operator-side monolith at `2047` lines with `86.81%` line / `76.28%` branch coverage even after the earlier domain-handler extraction, so `QLT-252` now promotes another command-dispatch seam plus direct coverage for the remaining selection-resolution, side-effect-gating, and operator feedback/failure branches that still live inline in the executor.
+  - `QLT-253` now promotes the next operator controller cluster because `frontend/src/public/command-palette-runtime-controller.js` (`613` lines, `90.21%` line / `70.35%` branch), `frontend/src/public/slash-workflow-runtime-controller.js` (`412` lines, `89.56%` line / `74.17%` branch), `frontend/src/public/paste-observation-runtime-controller.js` (`455` lines, `90.33%` line / `74.67%` branch), and `frontend/src/public/replay-export-runtime-controller.js` (`190` lines, `91.58%` line / `71.67%` branch) still carry fallback, malformed-input, and cancel/error paths that are reached mainly through larger operator flows.
+  - `QLT-254` now promotes the remaining workspace/view-model/search cluster because `frontend/src/public/workspace-preset-runtime-controller.js` (`1135` lines, `91.63%` line / `80.00%` branch), `frontend/src/public/workspace-manager-runtime-controller.js` (`180` lines, `92.78%` line / `66.67%` branch), `frontend/src/public/session-view-model.js` (`302` lines, `90.73%` line / `81.90%` branch), `frontend/src/public/terminal-search.js` (`100` lines, `92.00%` line / `69.23%` branch), and `frontend/src/public/ui/layout-settings-controller.js` (`180` lines, `97.78%` line / `55.56%` branch) still hold preset fallback, workspace guard, derived-label, search-failure, and layout-guard branches that deserve direct deterministic coverage.
+  - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
+
+`v0.4.0-H160` is now active; no root-diagnostic or messaging-specific near-term wave is promoted alongside it.
 
 ## Frontend Runtime-State and Plugin Baseline
 

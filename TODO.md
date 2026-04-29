@@ -14,12 +14,16 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-None.
+- [ ] `QLT-250` Owner `BE`: extract another backend startup/auth/WebSocket lifecycle seam out of `backend/src/runtime.js` (`6820` lines, `80.54%` line / `71.73%` branch) and add direct deterministic coverage for the remaining runtime-ready, startup-warmup, WebSocket-admission, and session-control request branches that still live inline in the monolith.
+- [ ] `QLT-251` Owner `BE`: harden backend identity/control seams in `backend/src/terminal-app-identity.js` (`1191` lines, `94.54%` line / `75.00%` branch) and `backend/src/runtime-session-control-attachments.js` (`215` lines, `90.70%` line / `75.71%` branch) with direct coverage for reconnect ownership, alias/label shaping, attachment-prune timing, and controller-transfer edge cases.
+- [ ] `QLT-252` Owner `FE`: extract another command-dispatch seam out of `frontend/src/public/command-executor.js` (`2047` lines, `86.81%` line / `76.28%` branch) and add direct deterministic coverage for selection resolution, side-effect gating, and operator feedback/failure branches that still live inline in the executor.
+- [ ] `QLT-253` Owner `FE`: harden operator command/export/observation controllers in `frontend/src/public/command-palette-runtime-controller.js` (`613` lines, `90.21%` line / `70.35%` branch), `frontend/src/public/slash-workflow-runtime-controller.js` (`412` lines, `89.56%` line / `74.17%` branch), `frontend/src/public/paste-observation-runtime-controller.js` (`455` lines, `90.33%` line / `74.67%` branch), and `frontend/src/public/replay-export-runtime-controller.js` (`190` lines, `91.58%` line / `71.67%` branch) with direct coverage for fallback, cancel/error, and malformed-input branches still reached mainly through larger operator flows.
+- [ ] `QLT-254` Owner `FE`: harden workspace/view-model/search surfaces in `frontend/src/public/workspace-preset-runtime-controller.js` (`1135` lines, `91.63%` line / `80.00%` branch), `frontend/src/public/workspace-manager-runtime-controller.js` (`180` lines, `92.78%` line / `66.67%` branch), `frontend/src/public/session-view-model.js` (`302` lines, `90.73%` line / `81.90%` branch), `frontend/src/public/terminal-search.js` (`100` lines, `92.00%` line / `69.23%` branch), and `frontend/src/public/ui/layout-settings-controller.js` (`180` lines, `97.78%` line / `55.56%` branch) with direct coverage for preset fallback, workspace load/save guards, derived-session label edge cases, terminal search failure handling, and layout-settings guard branches.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role is currently inactive.
-- `BE` ownership role is currently inactive.
+- `BE` ownership role (active): deliver `QLT-250` and `QLT-251`.
+- `FE` ownership role (active): deliver `QLT-252` through `QLT-254`.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

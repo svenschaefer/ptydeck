@@ -14,7 +14,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - none currently
+  - `v0.4.0-H160` Repo-Wide Quality and Coverage Gap Follow-Up After H159
 - Latest completed wave in this segment:
   - `v0.4.0-H159` Repo-Wide Quality and Coverage Gap Follow-Up After H158
 - Queued next waves:
@@ -22,15 +22,26 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Queued Wave Order
 
-- none currently
+- `v0.4.0-H160`
+  - `QLT-250` Owner `BE`: backend runtime startup/auth/WebSocket seam extraction
+  - `QLT-251` Owner `BE`: backend terminal-identity and control-attachment coverage hardening
+  - `QLT-252` Owner `FE`: command-executor dispatch seam extraction
+  - `QLT-253` Owner `FE`: operator command/export/observation coverage hardening
+  - `QLT-254` Owner `FE`: workspace/view-model/search coverage hardening
 
 ## Wave Dependencies
 
-- none currently
+- `QLT-250`: no dependency; this remains the highest-risk backend monolith and the first backend cut in `v0.4.0-H160`.
+- `QLT-251`: follows `QLT-250` so the remaining backend control/identity seams are tightened after the larger runtime lifecycle cut.
+- `QLT-252`: no dependency; this is the highest-risk frontend operator monolith and the first frontend cut in `v0.4.0-H160`.
+- `QLT-253`: follows `QLT-252` because command-palette, slash-workflow, replay-export, and paste-observation behavior depend on the same executor and operator feedback boundaries.
+- `QLT-254`: follows `QLT-252` because workspace preset, workspace manager, session-view-model, terminal-search, and layout-settings behavior depend on the same retained command-selection and workspace authority contracts.
 
 ## Wave Exit Criteria
 
-- no active wave currently
+- `QLT-250` through `QLT-254` completed with direct deterministic coverage for the promoted seams.
+- Validated top-line coverage remains above threshold across the root, backend, and frontend lanes.
+- No new catch-all residual quality task remains for the `H160` segment.
 
 ## Sequencing Rules
 
