@@ -322,3 +322,105 @@ test("paste observation runtime controller replaces prior observation state when
 
   controller.dispose();
 });
+
+test("paste observation runtime controller recognizes full placeholder acknowledgements and suppresses overlapping continue dispatches", async () => {
+  const windowRef = createFakeWindow();
+  const panelEl = new FakeTextNode();
+  const summaryEl = new FakeTextNode();
+  const detailEl = new FakeTextNode();
+  const continueBtn = new FakeButton();
+  const activeSession = {
+    id: "s1",
+    name: "alpha",
+    appIdentity: {
+      family: "coding-agent",
+      label: "codex",
+      source: "foreground-process",
+      confidence: 0.92,
+      details: {},
+      updatedAt: 42
+    }
+  };
+  const continueCalls = [];
+  let resolveContinue = null;
+  const continuePending = new Promise((resolve) => {
+    resolveContinue = resolve;
+  });
+
+  const controller = createPasteObservationRuntimeController({
+    windowRef,
+    panelEl,
+    summaryEl,
+    detailEl,
+    continueBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: () => activeSession,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name,
+    requestContinuePaste: async (sessionId, options) => {
+      continueCalls.push([sessionId, options.source, options.auto]);
+      await continuePending;
+      return true;
+    }
+  });
+
+  controller.recordTerminalPaste("s1", "1234", { autoContinueEnabled: false });
+  controller.observeSessionOutput("s1", "[Pasted Content 4 chars]");
+
+  assert.match(summaryEl.textContent, /acknowledged the full payload as a codex placeholder acknowledgement block/i);
+  assert.match(detailEl.textContent, /reported 4 pasted chars/i);
+  assert.equal(await controller.continuePasteForActiveSession(), false);
+
+  controller.recordTerminalPaste("s1", "abcdef", { autoContinueEnabled: false });
+  controller.observeSessionOutput("s1", "abc");
+  await windowRef.timers[0].fn();
+
+  continueBtn.click();
+  continueBtn.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(continueCalls, [["s1", "manual", false]]);
+
+  resolveContinue(true);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  controller.dispose();
+});
+
+test("paste observation runtime controller ignores invalid inputs and dispose clears retained timers and observations", async () => {
+  const windowRef = createFakeWindow();
+  const panelEl = new FakeTextNode();
+  const summaryEl = new FakeTextNode();
+  const detailEl = new FakeTextNode();
+  const continueBtn = new FakeButton();
+  const activeSession = { id: "s1", name: "alpha" };
+
+  const controller = createPasteObservationRuntimeController({
+    windowRef,
+    panelEl,
+    summaryEl,
+    detailEl,
+    continueBtn,
+    getActiveSession: () => activeSession,
+    getSessionById: () => activeSession,
+    formatSessionToken: () => "1",
+    formatSessionDisplayName: (session) => session.name
+  });
+
+  assert.equal(controller.recordTerminalPaste("", "payload"), null);
+  assert.equal(controller.recordTerminalPaste("s1", ""), null);
+  assert.equal(controller.observeSessionOutput("s1", ""), false);
+  assert.equal(controller.observeSessionOutput("missing", "payload"), false);
+  assert.equal(await controller.continuePasteForActiveSession(), false);
+
+  controller.recordTerminalPaste("s1", "payload", { autoContinueEnabled: false });
+  assert.equal(windowRef.timers.length, 1);
+
+  controller.dispose();
+
+  assert.equal(windowRef.timers.length, 0);
+  assert.equal(controller.getObservation("s1"), null);
+  assert.equal(await controller.continuePasteForActiveSession(), false);
+});

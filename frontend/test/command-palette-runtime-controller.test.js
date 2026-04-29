@@ -66,6 +66,9 @@ function createElement(tagName = "div") {
       listeners.set(type, list);
     },
     dispatchEvent(event) {
+      if (!event || !event.type) {
+        return;
+      }
       const list = listeners.get(String(event.type)) || [];
       for (const handler of list) {
         handler(event);
@@ -94,12 +97,16 @@ function createElement(tagName = "div") {
 function createWindowStub() {
   const listeners = new Map();
   return {
+    listeners,
     addEventListener(type, handler) {
       const list = listeners.get(type) || [];
       list.push(handler);
       listeners.set(type, list);
     },
     dispatchEvent(event) {
+      if (!event || !event.type) {
+        return;
+      }
       const list = listeners.get(String(event.type)) || [];
       for (const handler of list) {
         handler(event);
@@ -199,7 +206,7 @@ test("buildCommandPaletteEntries aggregates scoped custom commands into one entr
 test("command palette entry builders normalize fallback labels and ignore malformed inputs deterministically", () => {
   const entries = buildCommandPaletteEntries({
     systemSlashCommands: [],
-    customCommands: [],
+    customCommands: [null, { name: " ", content: "ignored" }, { name: "saved", content: "echo ok" }],
     sessions: [
       { id: "session-1", name: "", deckId: "ops", tags: ["", " qa "] },
       { name: "broken" }
@@ -215,10 +222,12 @@ test("command palette entry builders normalize fallback labels and ignore malfor
 
   const sessionEntry = entries.find((entry) => entry.group === "sessions");
   const deckEntry = entries.find((entry) => entry.group === "decks");
+  const customEntry = entries.find((entry) => entry.group === "commands" && entry.kind === "custom-command");
   assert.equal(sessionEntry.title, "[session-] session-");
   assert.equal(sessionEntry.subtitle, "Active deck (ops)");
   assert.equal(sessionEntry.detail, "Tags: qa");
   assert.equal(deckEntry.title, "[ops] ops");
+  assert.equal(customEntry?.title, "/saved");
   assert.deepEqual(filterCommandPaletteEntries(null, "ops"), []);
 });
 
@@ -473,4 +482,87 @@ test("command palette records usage for explicit selections", () => {
   });
 
   assert.deepEqual(usage, ["slash:help"]);
+});
+
+test("command palette controller handles empty matches, result clicks, shortcut toggles, and DOM-light fallbacks", () => {
+  const win = createWindowStub();
+  const dialogEl = createElement("dialog");
+  const searchInputEl = createElement("input");
+  const resultsEl = createElement("div");
+  const emptyEl = createElement("p");
+  const metaEl = createElement("p");
+  const commandInput = createElement("textarea");
+
+  const controller = createCommandPaletteRuntimeController({
+    windowRef: win,
+    documentRef: createDocumentStub(),
+    dialogEl,
+    searchInputEl,
+    resultsEl,
+    emptyEl,
+    metaEl,
+    closeBtn: createElement("button"),
+    commandInput,
+    systemSlashCommands: ["help", "rename"],
+    getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" })
+  });
+
+  controller.openPalette("zzz");
+  assert.equal(controller.getSelectedEntry(), null);
+  assert.equal(emptyEl.hidden, false);
+  assert.equal(metaEl.textContent, "No matches · Esc closes");
+
+  searchInputEl.dispatchEvent({
+    type: "keydown",
+    key: "Enter",
+    preventDefault() {}
+  });
+  assert.equal(commandInput.value, "");
+  assert.equal(controller.isOpen(), true);
+
+  win.dispatchEvent(null);
+
+  controller.openPalette("help");
+  const resultButton = resultsEl.children.find((child) => child.tagName === "BUTTON");
+  assert.ok(resultButton);
+  resultButton.click();
+  assert.equal(commandInput.value, "/help");
+  assert.equal(controller.isOpen(), false);
+
+  win.dispatchEvent({
+    type: "keydown",
+    key: "k",
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    preventDefault() {}
+  });
+  assert.equal(controller.isOpen(), true);
+  win.dispatchEvent({
+    type: "keydown",
+    key: "k",
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    preventDefault() {}
+  });
+  assert.equal(controller.isOpen(), false);
+
+  const domLightController = createCommandPaletteRuntimeController({
+    windowRef: { addEventListener() {} },
+    documentRef: null,
+    dialogEl: null,
+    searchInputEl: createElement("input"),
+    resultsEl: null,
+    emptyEl: null,
+    metaEl: null,
+    closeBtn: null,
+    commandInput: null,
+    systemSlashCommands: ["help"],
+    getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" })
+  });
+
+  assert.doesNotThrow(() => domLightController.openPalette("help"));
+  assert.doesNotThrow(() => domLightController.closePalette());
+  assert.doesNotThrow(() => domLightController.refresh());
 });

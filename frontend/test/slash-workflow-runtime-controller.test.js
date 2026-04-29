@@ -355,3 +355,37 @@ test("slash-workflow runtime controller recovers cleanly after a failed run and 
     [["execute", "/list"]]
   );
 });
+
+test("slash-workflow runtime controller clears bound engine state after listener-thrown engine failures and supports a later retry", async () => {
+  let renderCount = 0;
+  let throwOnSecondRender = true;
+  const { controller, uiStates } = createControllerContext({
+    requestRender: () => {
+      renderCount += 1;
+      if (throwOnSecondRender && renderCount === 2) {
+        throw new Error("boom");
+      }
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      controller.runWorkflowDetailed({
+        kind: "control-script",
+        mode: "multiline",
+        raw: "/list"
+      }),
+    /boom/
+  );
+  assert.deepEqual(uiStates.at(-1), { cleared: true });
+
+  throwOnSecondRender = false;
+  renderCount = 0;
+  const retried = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/list"
+  });
+  assert.equal(retried.ok, true);
+  assert.equal(retried.status, "succeeded");
+});

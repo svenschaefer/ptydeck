@@ -197,3 +197,100 @@ test("replay export runtime controller formats replay excerpt previews", () => {
     "Preview from [4] alpha (sp:2 -> 1/2 units, 44 chars, 6 lines, partial).\n\nprompt\noutput\n"
   );
 });
+
+test("replay export runtime controller falls back to documentElement removal and unavailable shell-block summaries", async () => {
+  const removedAnchors = [];
+  const controller = createReplayExportRuntimeController({
+    documentRef: {
+      documentElement: {
+        removeChild(node) {
+          removedAnchors.push(node);
+        }
+      },
+      createElement(tagName) {
+        assert.equal(tagName, "a");
+        return {
+          href: "",
+          download: "",
+          style: {},
+          click() {}
+        };
+      }
+    },
+    URLRef: {
+      createObjectURL() {
+        return "blob:fallback";
+      },
+      revokeObjectURL() {}
+    },
+    BlobCtor: class FakeBlob {
+      constructor(parts, options) {
+        this.parts = parts;
+        this.options = options;
+      }
+    },
+    formatSessionToken: () => "5",
+    formatSessionDisplayName: () => "beta"
+  });
+
+  const outcome = await controller.exportSessionReplay(
+    { id: "s5", name: "beta" },
+    {
+      mode: "download",
+      payload: {
+        data: "tail\n",
+        retainedChars: 5,
+        retentionLimitChars: 32,
+        truncated: false
+      }
+    }
+  );
+  const preview = controller.previewSessionReplayExcerpt(
+    { id: "s5", name: "beta" },
+    {
+      selector: "sp:4",
+      selectorKind: "shell_blocks",
+      resolvedCount: -1,
+      availableCount: -2,
+      chars: -3,
+      lines: -4,
+      selectorSatisfied: false,
+      shellBlocksSupported: false,
+      data: ""
+    }
+  );
+
+  assert.equal(outcome.feedback, "Downloaded replay tail for [5] beta (5 chars retained).");
+  assert.equal(removedAnchors.length, 1);
+  assert.equal(preview, "Preview from [5] beta (sp:4 -> 0/0 units, 0 chars, 0 lines, unavailable).\n\n");
+});
+
+test("replay export runtime controller fails closed for missing browser support and API/session guards", async () => {
+  const controller = createReplayExportRuntimeController({
+    formatSessionToken: () => "6",
+    formatSessionDisplayName: () => "gamma"
+  });
+
+  await assert.rejects(
+    controller.exportSessionReplay(
+      { id: "s6", name: "gamma" },
+      {
+        mode: "download",
+        payload: {
+          data: "tail\n",
+          retainedChars: 5,
+          retentionLimitChars: 5,
+          truncated: false
+        }
+      }
+    ),
+    /Replay export download is unavailable in this browser\./
+  );
+  await assert.rejects(controller.loadSessionReplay(null), /Replay export requires a session\./);
+  await assert.rejects(controller.loadSessionReplay({ id: "s6", name: "gamma" }), /Replay export API is unavailable\./);
+  await assert.rejects(controller.loadSessionReplayExcerpt({ id: "s6", name: "gamma" }, ""), /Replay excerpt selector is required\./);
+  await assert.rejects(
+    controller.loadSessionReplayExcerpt({ id: "s6", name: "gamma" }, "l:1"),
+    /Replay excerpt API is unavailable\./
+  );
+});
