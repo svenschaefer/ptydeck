@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (QLT-243 parser/settings/theme coverage hardening completed, H158 fully closed, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (fresh repo-wide quality review promoted H159 follow-up tasks after the H158 closeout, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,45 +182,39 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active promoted tasks remain after `QLT-234` through `QLT-243` closed the root-tooling plus backend runtime/reliability/transport plus frontend runtime-composition/utility/workspace/command/parser/settings/theme slices.
-- `ROADMAP.md`: no active or queued release wave remains after `v0.4.0-H158` closed.
+- `TODO.md`: active promoted tasks are now `QLT-244` through `QLT-249`, covering the next repo-wide backend and frontend quality slices that still remain product-relevant after `v0.4.0-H158`.
+- `ROADMAP.md`: the active wave is now `v0.4.0-H159`, with no additional queued wave behind it yet.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
 
 ## Repository Quality Review (2026-04-29)
 
-The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` through `QLT-243` have now closed the root-tooling plus backend runtime/reliability/transport plus frontend runtime-composition, utility/debug/search, workspace-preset, command-composer/engine, and parser/settings/theme slices from that review.
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` through `QLT-243` closed the root-tooling plus backend runtime/reliability/transport plus frontend runtime-composition, utility/debug/search, workspace-preset, command-composer/engine, and parser/settings/theme slices from that first pass. A same-day follow-up pass against fresh coverage evidence now promotes `v0.4.0-H159` for the still-relevant monolith and operator-surface gaps that remain after the H158 closeout.
 
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
 - backend: `94.44%` line / `87.88%` branch
-- frontend: `96.18%` line / `88.16%` branch
+- frontend: `96.18%` line / `88.17%` branch
 
-The new review promoted only the still-relevant gaps into `TODO.md`:
+The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
 
 - Root tooling:
-  - `QLT-234` lifted `scripts/lib/coverage-report.mjs` to `91.69%` line / `85.22%` branch coverage by closing the weighted-summary aggregation and omission/error branches that previously made root-level line totals look like `0` when aggregate line counts were unavailable.
-  - `QLT-234` also lifted `scripts/scaffold-ui-module.mjs` to `97.62%` line / `87.10%` branch coverage by making the scaffold import-safe and directly testable, adding explicit overwrite protection, and failing closed when template placeholders remain unresolved.
-  - The lower historical analysis scripts `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain below that level, but they were not promoted into the near-term wave because they are retained diagnostics rather than active product/runtime authority paths.
+  - The root lane remains stable at `92.77%` line / `76.81%` branch coverage after `QLT-234`.
+  - The remaining lower-covered root files are still `scripts/analyze-pty-write-eintr.mjs` (`77.17%` line / `43.48%` branch) and `scripts/analyze-startup-timeline.mjs` (`80.77%` line / `49.09%` branch), but they were not promoted into `H159` because they are retained diagnostics rather than active product/runtime authority paths.
 - Backend:
-  - `QLT-235` extracted startup warmup lifecycle and WebSocket ticket admission/disconnect classification into `backend/src/runtime-startup-warmup.js` and `backend/src/runtime-ws-tickets.js`, removing `165` inline lines from `backend/src/runtime.js` while adding direct deterministic seam coverage for those lifecycle/admission branches.
-  - `backend/src/runtime-startup-warmup.js` now validates at `95.16%` line / `83.33%` branch coverage, and `backend/src/runtime-ws-tickets.js` validates at `100.00%` line / `92.31%` branch coverage.
-  - `QLT-236` then closed the promoted reliability/supporting seams without reopening runtime product logic: `backend/src/startup-backup.js` now validates at `97.21%` line / `97.20%` branch coverage, `backend/src/key-provider.js` at `95.00%` line / `94.74%` branch coverage, `backend/src/ssh-host-key-probe.js` at `89.88%` line / `89.01%` branch coverage, and `backend/src/node-pty-write-retry.js` at `97.22%` line / `82.86%` branch coverage.
-  - `QLT-237` then closed the promoted retained transport/identity seams without reopening automatic outbound behavior: `backend/src/messaging-runtime.js` now validates at `91.75%` line / `80.00%` branch coverage, `backend/src/messaging-custom-command-utils.js` at `92.38%` line / `83.53%` branch coverage, `backend/src/telegram-adapter.js` at `91.22%` line / `79.45%` branch coverage, `backend/src/terminal-messaging-core.js` at `92.66%` line / `75.00%` branch coverage, and `backend/src/terminal-app-identity.js` at `94.54%` line / `75.00%` branch coverage.
-  - `backend/src/runtime.js` remains the largest backend monolith at `82.12%` line / `76.04%` branch coverage, but the active quality wave no longer carries an open backend slice after `QLT-237`.
+  - `QLT-244` now targets `backend/src/runtime.js`, which remains the largest backend monolith at `7432` lines and `82.08%` line / `76.04%` branch coverage. The still-product-relevant risk is not only raw coverage percentage, but that route matching plus HTTP request dispatch for shares, custom commands, decks, profiles, presets, and SSH-trust flows still live inline inside one oversized runtime closure.
+  - `QLT-245` now targets `backend/src/session-manager.js` (`2333` lines, `94.34%` line / `78.77%` branch) and `backend/src/replay-excerpt.js` (`89.82%` line / `80.85%` branch), because local/SSH launch normalization, remote-auth/secret shaping, and replay slice behavior still carry broad branch surfaces with too much indirect coverage.
+  - The retained transport-only messaging branch gaps in `backend/src/discord-adapter.js`, `backend/src/delivery-adapter-utils.js`, and related adapter helpers were not promoted into `H159` because automatic outbound messaging remains intentionally deferred behind the third-attempt contract in `TODO-OUTLOOK.md`.
 - Frontend:
-  - `QLT-238` extracted canonical-origin redirect, startup-backup gating, trusted-local identity bootstrap, and initialization-error normalization into `frontend/src/public/app-runtime-initialization-controller.js`, which now validates at `100.00%` line / `97.83%` branch coverage through direct deterministic tests.
-  - `frontend/src/public/app-runtime-composition-controller.js` remains the largest behavior-heavy frontend monolith, but it is now down to `1873` lines and `88.04%` line / `62.22%` branch coverage after the initialization seam moved out of the monolith and into direct coverage.
-  - `QLT-239` then closed the promoted utility/debug/search seams with direct deterministic regressions: `frontend/src/public/command-send-safety-controller.js` now validates at `97.95%` line / `90.82%` branch coverage, `frontend/src/public/stream-debug-trace-controller.js` at `96.49%` line / `91.18%` branch coverage, `frontend/src/public/trace-debug-controller.js` at `96.88%` line / `90.91%` branch coverage, `frontend/src/public/terminal-ctrl-c-runtime-controller.js` at `92.77%` line / `92.11%` branch coverage, `frontend/src/public/trusted-local-client-runtime-controller.js` at `97.35%` line / `97.35%` branch coverage, and `frontend/src/public/ui/terminal-search-controller.js` at `91.81%` line / `83.87%` branch coverage.
-  - `QLT-241` then closed the promoted workspace preset runtime-actions seam with direct deterministic regressions in `frontend/test/workspace-preset-runtime-actions.test.js`, lifting `frontend/src/public/workspace-preset-runtime-actions.js` to `95.54%` line / `85.27%` branch coverage across direct preset CRUD helpers, selected-preset flows, local group mutation guards, persisted-vs-local feedback, and the preset/group confirmation branches that had previously relied too heavily on indirect traversal.
-  - `QLT-242` then closed the promoted command-composer/command-engine seam with direct deterministic regressions in `frontend/test/command-composer-autocomplete-controller.test.js` and `frontend/test/command-engine.test.js`, lifting `frontend/src/public/command-composer-autocomplete-controller.js` to `95.23%` line / `82.49%` branch coverage and `frontend/src/public/command-engine.js` to `91.78%` line / `84.38%` branch coverage during the focused seam-coverage run. The added cases now lock down slash-history truncation, clipboard fallback behavior, no-op event/parser branches, session/deck selector edge cases, malformed cross-deck handling, quick-switch ambiguity, and empty help-subcommand contexts directly instead of relying on broader app traversal.
-  - `QLT-243` then closed the final parser/settings/theme slice with direct deterministic regressions in `frontend/test/slash-workflow-parser.test.js`, `frontend/test/theme-io.test.js`, and `frontend/test/session-settings-dialog-controller.test.js`. On the validated closeout tree, `frontend/src/public/slash-workflow-parser.js` now reaches `95.08%` line / `88.79%` branch coverage, `frontend/src/public/theme-io.js` reaches `94.74%` line / `81.08%` branch coverage, and `frontend/src/public/ui/session-settings-dialog-controller.js` reaches `100.00%` line / `100.00%` branch coverage while locking down duration/regex failure handling, empty-workflow guardrails, theme format aliasing and fallback normalization, and dialog fallback/no-op branches directly.
-  - The earlier broad residual FE follow-up was decomposed into explicit slices instead of one catch-all task: `QLT-241` targeted `workspace-preset-runtime-actions.js`, `QLT-242` targeted `command-composer-autocomplete-controller.js` plus `command-engine.js`, and `QLT-243` targeted `slash-workflow-parser.js`, `theme-io.js`, and `ui/session-settings-dialog-controller.js`; all three are now closed.
-  - The large static `theme-library.js` file was not promoted as an active quality task because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
+  - `QLT-246` now targets the remaining runtime-state authority seam: `frontend/src/public/app-runtime-composition-controller.js` still sits at `1873` lines and `88.04%` line / `62.22%` branch coverage, `frontend/src/public/store.js` at `1331` lines and `92.19%` line / `79.40%` branch coverage, and `frontend/src/public/terminal-stream.js` at `88.84%` line / `77.42%` branch coverage.
+  - `QLT-247` now targets the next operator layout/profile/settings surfaces: `frontend/src/public/connection-profile-runtime-controller.js` (`91.38%` line / `70.33%` branch), `frontend/src/public/layout-profile-runtime-controller.js` (`87.16%` / `75.97%`), `frontend/src/public/split-layout-runtime-controller.js` (`88.38%` / `68.40%`), `frontend/src/public/ui/session-settings-state-controller.js` (`89.19%` / `73.44%`), `frontend/src/public/deck-runtime-controller.js` (`89.22%` / `65.96%`), and `frontend/src/public/file-transfer-runtime-controller.js` (`89.33%` / `76.53%`).
+  - `QLT-248` now targets the remaining operator command/workflow surfaces: `frontend/src/public/command-palette-runtime-controller.js` (`86.95%` line / `60.49%` branch), `frontend/src/public/custom-command-model.js` (`88.16%` / `78.81%`), `frontend/src/public/slash-workflow-engine.js` (`86.82%` / `83.58%`), `frontend/src/public/slash-workflow-runtime-controller.js` (`88.11%` / `71.81%`), and `frontend/src/public/slash-workflow-source-adapter.js` (`86.40%` / `61.54%`).
+  - `QLT-249` now targets the retained operator-history and session-UI glue surfaces that still carry notable branch gaps: `frontend/src/public/send-history-runtime-controller.js` (`88.48%` line / `76.51%` branch), `frontend/src/public/ui/session-ui-facade-controller.js` (`87.06%` / `67.54%`), `frontend/src/public/ui/session-card-meta-controller.js` (`87.74%` / `68.57%`), and `frontend/src/public/share-access-state.js` (`90.32%` / `69.70%`).
+  - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
-No promoted follow-up wave remains from the 2026-04-29 review; `v0.4.0-H158` is fully closed.
+The fresh post-H158 evidence now promotes `v0.4.0-H159`; no additional root-tooling or messaging-specific near-term wave was promoted beyond that.
 
 ## Frontend Runtime-State and Plugin Baseline
 
