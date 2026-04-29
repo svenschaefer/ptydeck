@@ -23,17 +23,16 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-242` Owner `FE`: command-composer autocomplete and command-engine coverage hardening.
    - `QLT-243` Owner `FE`: slash-workflow/theme/settings-dialog coverage hardening.
 
 ## Wave Dependencies
 
-- The remaining `v0.4.0-H158` FE slices have no hard technical dependency edges; the execution order is driven by the current hotspot severity (`QLT-242` first, then `QLT-243`).
+- `QLT-243` has no hard dependency edge now that `QLT-242` is closed; it is the remaining active `H158` closeout slice.
 
 ## Wave Exit Criteria
 
 - Root-tooling coverage still clears the enforced threshold while the remaining repo-owned helper hotspots gain direct deterministic regressions.
-- The promoted frontend runtime-composition, utility/debug/search, and workspace-preset hotspot files stay closed while the remaining command-composer/parser/settings/theme hotspot files gain direct deterministic coverage.
+- The promoted frontend runtime-composition, utility/debug/search, workspace-preset, and command-composer hotspot files stay closed while the remaining parser/settings/theme hotspot files gain direct deterministic coverage.
 - Promoted tasks leave `TODO.md` with open work only and `ROADMAP.md` with active or queued sequencing only.
 - Generated handbook/reference artifacts stay synchronized with their markdown/code sources.
 - `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.
