@@ -14,12 +14,13 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-240` Owner `FE`: Add direct coverage for the remaining lower-covered composer/workflow/settings/preset surfaces: `frontend/src/public/command-composer-autocomplete-controller.js`, `frontend/src/public/slash-workflow-parser.js`, `frontend/src/public/theme-io.js`, `frontend/src/public/workspace-preset-runtime-actions.js`, `frontend/src/public/command-engine.js`, and `frontend/src/public/ui/session-settings-dialog-controller.js`.
+- [ ] `QLT-242` Owner `FE`: Add direct coverage for the remaining command-composer discovery/runtime seams centered on `frontend/src/public/command-composer-autocomplete-controller.js` and `frontend/src/public/command-engine.js`, including the still-underexercised autocomplete/discovery branches they own directly.
+- [ ] `QLT-243` Owner `FE`: Add direct coverage for the remaining parser/settings/theme seams in `frontend/src/public/slash-workflow-parser.js`, `frontend/src/public/theme-io.js`, and `frontend/src/public/ui/session-settings-dialog-controller.js`.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `BE` ownership role is currently inactive.
-- `FE` ownership role (active): deliver `QLT-240`.
+- `FE` ownership role (active): deliver `QLT-242` and `QLT-243`.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.
