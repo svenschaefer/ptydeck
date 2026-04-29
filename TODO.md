@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-235` Owner `BE`: Reduce the remaining `backend/src/runtime.js` monolith and close its lowest still-relevant lifecycle/admission blind spots with direct seam tests instead of relying only on broad integration traversal.
 - [ ] `QLT-236` Owner `BE`: Add direct deterministic reliability coverage for `backend/src/startup-backup.js`, `backend/src/key-provider.js`, `backend/src/ssh-host-key-probe.js`, and `backend/src/node-pty-write-retry.js`, focusing on fail-closed restore, malformed key/trust inputs, and async PTY retry exhaustion branches.
 - [ ] `QLT-237` Owner `BE`: Harden the retained transport-only messaging and identity baseline with direct regression coverage for `backend/src/messaging-runtime.js`, `backend/src/messaging-custom-command-utils.js`, `backend/src/telegram-adapter.js`, `backend/src/terminal-messaging-core.js`, and `backend/src/terminal-app-identity.js`.
 - [ ] `QLT-238` Owner `FE`: Extract another cohesive seam from `frontend/src/public/app-runtime-composition-controller.js` and add direct deterministic tests for the moved contract so the remaining composition monolith stops carrying broad branch risk by incidental traversal alone.
@@ -24,7 +23,7 @@ Completed work belongs in `CHANGELOG.md`.
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `BE` ownership role (active): deliver `QLT-235`, `QLT-236`, and `QLT-237`.
+- `BE` ownership role (active): deliver `QLT-236` and `QLT-237`.
 - `FE` ownership role (active): deliver `QLT-238`, `QLT-239`, and `QLT-240`.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

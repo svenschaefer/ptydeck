@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (QLT-234 root-tooling hardening completed, H158 remains active for backend/frontend quality follow-up, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (QLT-235 runtime lifecycle/admission seam extraction completed, H158 remains active for backend/frontend quality follow-up, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: `QLT-235` through `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` closed the root-tooling slice.
+- `TODO.md`: `QLT-236` through `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` and `QLT-235` closed the root-tooling and backend runtime-seam slices.
 - `ROADMAP.md`: `v0.4.0-H158` is now the active release wave for those quality/coverage tasks.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -190,12 +190,12 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Repository Quality Review (2026-04-29)
 
-The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` has now closed the first promoted root-tooling slice from that review.
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` plus `QLT-235` have now closed the first root-tooling and backend runtime-seam slices from that review.
 
 Current validated top-line coverage remains above threshold:
 
-- root tooling: `92.77%` line / `76.94%` branch
-- backend: `93.94%` line / `86.99%` branch
+- root tooling: `92.77%` line / `76.81%` branch
+- backend: `94.01%` line / `87.11%` branch
 - frontend: `95.48%` line / `87.17%` branch
 
 The new review promoted only the still-relevant gaps into `TODO.md`:
@@ -205,7 +205,9 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
   - `QLT-234` also lifted `scripts/scaffold-ui-module.mjs` to `97.62%` line / `87.10%` branch coverage by making the scaffold import-safe and directly testable, adding explicit overwrite protection, and failing closed when template placeholders remain unresolved.
   - The lower historical analysis scripts `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain below that level, but they were not promoted into the near-term wave because they are retained diagnostics rather than active product/runtime authority paths.
 - Backend:
-  - `backend/src/runtime.js` remains the largest backend monolith at `7552` lines and `82.15%` line / `75.77%` branch coverage.
+  - `QLT-235` extracted startup warmup lifecycle and WebSocket ticket admission/disconnect classification into `backend/src/runtime-startup-warmup.js` and `backend/src/runtime-ws-tickets.js`, removing `165` inline lines from `backend/src/runtime.js` while adding direct deterministic seam coverage for those lifecycle/admission branches.
+  - `backend/src/runtime-startup-warmup.js` now validates at `95.16%` line / `83.33%` branch coverage, and `backend/src/runtime-ws-tickets.js` validates at `100.00%` line / `92.31%` branch coverage.
+  - `backend/src/runtime.js` remains the largest backend monolith at `7432` lines and `82.08%` line / `75.97%` branch coverage, so the remaining backend wave should now focus on reliability/supporting seams rather than reopening the just-extracted warmup/ticket path.
   - `backend/src/startup-backup.js`, `backend/src/key-provider.js`, `backend/src/ssh-host-key-probe.js`, and `backend/src/node-pty-write-retry.js` still carry relevant reliability branches in the `85%` to `87%` line-coverage range.
   - The retained transport-only messaging/identity baseline still has direct branch blind spots in `backend/src/messaging-runtime.js`, `backend/src/messaging-custom-command-utils.js`, `backend/src/telegram-adapter.js`, `backend/src/terminal-messaging-core.js`, and `backend/src/terminal-app-identity.js`.
 - Frontend:
@@ -216,7 +218,7 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
 
 The remaining promoted follow-up wave is therefore:
 
-- `QLT-235` through `QLT-240` under `v0.4.0-H158`
+- `QLT-236` through `QLT-240` under `v0.4.0-H158`
 
 ## Frontend Runtime-State and Plugin Baseline
 

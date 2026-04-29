@@ -13,6 +13,8 @@ import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messa
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { createRuntimeHttpHelpers, requiredScopeForRoute } from "./runtime-http-helpers.js";
+import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
+import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
 import {
   buildRuntimeHealthPayload,
   buildRuntimeReadyPayload,
@@ -2625,7 +2627,6 @@ export function createRuntime(config) {
       return protocols.has("ptydeck.v1") ? "ptydeck.v1" : false;
     }
   });
-  const wsTickets = new Map();
   const sockets = new Set();
   const customCommands = new Map();
   const unrestoredSessions = new Map();
@@ -2683,10 +2684,6 @@ export function createRuntime(config) {
       ? config.customCommandMaxContentLength
       : DEFAULT_CUSTOM_COMMAND_MAX_CONTENT_LENGTH;
   let isReady = false;
-  let startupWarmupEnabled = false;
-  let startupWarmupGateReleased = false;
-  let startupWarmupQuietTimer = null;
-  let startupWarmupQuietDeadlineAt = 0;
   let startupWarmupResolve = null;
   let startupWarmupReadyPromise = Promise.resolve();
   let isStopping = false;
@@ -2842,110 +2839,35 @@ export function createRuntime(config) {
       broadcastSessionControlRefreshForAuth(null, { source: "ws" });
     }
   });
-
-  function clearStartupWarmupQuietTimer() {
-    if (!startupWarmupQuietTimer) {
-      return;
-    }
-    clearTimeout(startupWarmupQuietTimer);
-    startupWarmupQuietTimer = null;
-    startupWarmupQuietDeadlineAt = 0;
-  }
-
-  function markRuntimeReady() {
-    if (isReady) {
-      return;
-    }
-    clearStartupWarmupQuietTimer();
-    messagingRuntime.markRuntimeReady();
-    isReady = true;
-    if (typeof startupWarmupResolve === "function") {
-      startupWarmupResolve();
-    }
-    startupWarmupResolve = null;
-    logDebug("runtime.ready", {
-      port: config.port,
-      sessionCount: manager.list().length,
-      startupWarmupEnabled,
-      startupWarmupQuietMs
-    });
-  }
-
-  function reconcileStartupWarmup() {
-    if (isReady || isStopping) {
-      clearStartupWarmupQuietTimer();
-      return;
-    }
-    if (!startupWarmupEnabled) {
-      markRuntimeReady();
-      return;
-    }
-    if (!startupWarmupGateReleased) {
-      clearStartupWarmupQuietTimer();
-      return;
-    }
-
-    const activeSessionCount = countActiveRuntimeSessions(manager.list());
-    if (activeSessionCount > 0) {
-      clearStartupWarmupQuietTimer();
-      logDebug("runtime.startup_warmup.active", { activeSessionCount });
-      return;
-    }
-    if (startupWarmupQuietTimer) {
-      return;
-    }
-
-    startupWarmupQuietDeadlineAt = Date.now() + startupWarmupQuietMs;
-    logDebug("runtime.startup_warmup.quiet_wait", { quietMs: startupWarmupQuietMs });
-    startupWarmupQuietTimer = setTimeout(() => {
-      startupWarmupQuietTimer = null;
-      startupWarmupQuietDeadlineAt = 0;
-      if (isStopping || isReady || !startupWarmupGateReleased) {
+  const startupWarmup = createRuntimeStartupWarmup({
+    quietMs: startupWarmupQuietMs,
+    countActiveSessions: () => countActiveRuntimeSessions(manager.list()),
+    onReady: () => {
+      if (isReady) {
         return;
       }
-      if (countActiveRuntimeSessions(manager.list()) > 0) {
-        reconcileStartupWarmup();
-        return;
+      messagingRuntime.markRuntimeReady();
+      isReady = true;
+      if (typeof startupWarmupResolve === "function") {
+        startupWarmupResolve();
       }
-      markRuntimeReady();
-    }, startupWarmupQuietMs);
-  }
-
-  function pruneExpiredWsTickets(now = Date.now()) {
-    for (const [ticket, entry] of wsTickets.entries()) {
-      if (entry.expiresAt <= now) {
-        wsTickets.delete(ticket);
-      }
+      startupWarmupResolve = null;
+      const startupWarmupState = startupWarmup.getState();
+      logDebug("runtime.ready", {
+        port: config.port,
+        sessionCount: manager.list().length,
+        startupWarmupEnabled: startupWarmupState.enabled,
+        startupWarmupQuietMs: startupWarmupState.quietMs
+      });
+    },
+    onDebug: (event, details) => {
+      logDebug(event, details);
     }
-  }
-
-  function issueWsTicket(auth, input = {}) {
-    pruneExpiredWsTickets();
-    const requestedClientId = typeof input?.clientId === "string" ? input.clientId.trim() : "";
-    const requestedLabel = normalizeSessionControlClientLabel(input?.label);
-    const ticket = crypto.randomBytes(24).toString("base64url");
-    wsTickets.set(ticket, {
-      expiresAt: Date.now() + (authWsTicketTtlSeconds * 1000),
-      auth: {
-        subject: auth.subject,
-        tenantId: auth.tenantId,
-        scopes: Array.isArray(auth.scopes) ? auth.scopes.slice() : [],
-        accessMode: typeof auth.accessMode === "string" ? auth.accessMode : "operator",
-        permissionMode: typeof auth.permissionMode === "string" ? auth.permissionMode : "",
-        shareLinkId: typeof auth.shareLinkId === "string" ? auth.shareLinkId : "",
-        shareTargetType: typeof auth.shareTargetType === "string" ? auth.shareTargetType : "",
-        shareTargetId: typeof auth.shareTargetId === "string" ? auth.shareTargetId : "",
-        shareTokenId: typeof auth.shareTokenId === "string" ? auth.shareTokenId : "",
-        sessionControlClientId: requestedClientId || "",
-        sessionControlClientLabel: requestedLabel || ""
-      }
-    });
-    return {
-      ticket,
-      tokenType: "WsTicket",
-      expiresIn: authWsTicketTtlSeconds
-    };
-  }
+  });
+  const wsTicketRegistry = createRuntimeWsTicketRegistry({
+    ttlSeconds: authWsTicketTtlSeconds,
+    normalizeSessionControlClientLabel
+  });
 
   function isSpectatorAuth(auth) {
     return (
@@ -3016,45 +2938,6 @@ export function createRuntime(config) {
         bumpMetricCounter(metrics.httpRequestDurationMsBuckets, bucketLimitMs);
       }
     }
-  }
-
-  function normalizeWsDisconnectReason(code, wsReasonText, wsReasonHint) {
-    if (typeof wsReasonHint === "string" && wsReasonHint) {
-      return wsReasonHint;
-    }
-    if (code === 1000) {
-      return "normal_closure";
-    }
-    if (code === 1001) {
-      return "going_away";
-    }
-    if (code === 1006) {
-      return "abnormal_closure";
-    }
-    if (code >= 4000 && code <= 4999) {
-      return "app_code_4xxx";
-    }
-    if (code >= 3000 && code <= 3999) {
-      return "library_code_3xxx";
-    }
-    if (typeof wsReasonText === "string" && wsReasonText.toLowerCase().includes("timeout")) {
-      return "timeout";
-    }
-    return "other";
-  }
-
-  function consumeWsTicket(ticket) {
-    pruneExpiredWsTickets();
-    const normalized = typeof ticket === "string" ? ticket.trim() : "";
-    if (!normalized) {
-      throw new ApiError(401, "Unauthorized", "Missing WebSocket ticket.");
-    }
-    const entry = wsTickets.get(normalized);
-    if (!entry) {
-      throw new ApiError(401, "Unauthorized", "Invalid or expired WebSocket ticket.");
-    }
-    wsTickets.delete(normalized);
-    return entry.auth;
   }
 
   function parseRequestedProtocols(headerValue) {
@@ -5666,7 +5549,7 @@ function tryCreateRestoredSession({
       sessionId: event.sessionId,
       trace: event.trace
     });
-    reconcileStartupWarmup();
+    startupWarmup.reconcile();
     persistSoon();
   });
 
@@ -5692,7 +5575,7 @@ function tryCreateRestoredSession({
 
   manager.on("session.activity.completed", async (event) => {
     logDebug("session.event", { type: "session.activity.completed", sessionId: event.sessionId || null }, event.trace);
-    reconcileStartupWarmup();
+    startupWarmup.reconcile();
     try {
       await persistNow("session.activity.completed");
       const apiSession = getApiSessionOrThrow(event.sessionId);
@@ -5813,7 +5696,7 @@ function tryCreateRestoredSession({
         }
         if (eventName !== "session.data") {
           if (eventName === "session.created" || eventName === "session.started" || eventName === "session.exit" || eventName === "session.closed") {
-            reconcileStartupWarmup();
+            startupWarmup.reconcile();
           }
           persistSoon();
         }
@@ -5920,12 +5803,13 @@ function tryCreateRestoredSession({
       }
 
       if (match.kind === "ready") {
+        const startupWarmupState = startupWarmup.getState();
         writeJsonResponse(200, buildRuntimeReadyPayload({
           isReady,
-          startupWarmupGateReleased,
-          startupWarmupEnabled,
-          startupWarmupQuietMs,
-          startupWarmupQuietDeadlineAt,
+          startupWarmupGateReleased: startupWarmupState.gateReleased,
+          startupWarmupEnabled: startupWarmupState.enabled,
+          startupWarmupQuietMs: startupWarmupState.quietMs,
+          startupWarmupQuietDeadlineAt: startupWarmupState.quietDeadlineAt,
           sessions: manager.list(),
           messagingStatusSummary: messagingRuntime.buildStatusSummary(),
           streamAnalysisStatusSummary: sessionStreamAnalysisCapture.buildStatusSummary()
@@ -5987,7 +5871,7 @@ function tryCreateRestoredSession({
             authForAudit = authenticated;
           }
         });
-        const payload = issueWsTicket(auth, body);
+        const payload = wsTicketRegistry.issue(auth, body);
         validateResponse({ statusCode: 200, body: payload, expect: "wsTicket" });
         writeJsonResponse(200, payload);
         return;
@@ -6901,7 +6785,7 @@ function tryCreateRestoredSession({
         const token = resolveBearerToken(request, requestUrl);
         const auth = token
           ? await accessTokenVerifier.verifyAccessToken(token)
-          : consumeWsTicket(resolveWsTicketFromProtocols(request));
+          : wsTicketRegistry.consume(resolveWsTicketFromProtocols(request));
         ensureShareLinkAuthActive(auth);
         ensureScope(auth, "ws:connect");
         ensureShareRouteAllowed(auth, "wsTicket");
@@ -7055,9 +6939,7 @@ function tryCreateRestoredSession({
     isReady = false;
     await accessTokenVerifier.prewarm();
     messagingRuntime.prepareForRuntimeStart();
-    startupWarmupEnabled = false;
-    startupWarmupGateReleased = false;
-    clearStartupWarmupQuietTimer();
+    startupWarmup.prepareForStart();
     startupWarmupReadyPromise = new Promise((resolve) => {
       startupWarmupResolve = resolve;
     });
@@ -7084,7 +6966,7 @@ function tryCreateRestoredSession({
             ])
         : []
     );
-    startupWarmupEnabled = Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0;
+    startupWarmup.setEnabled(Array.isArray(persistedState.sessions) && persistedState.sessions.length > 0);
     decks.clear();
     connectionProfiles.clear();
     layoutProfiles.clear();
@@ -7447,17 +7329,15 @@ function tryCreateRestoredSession({
     if (typeof config.onBeforeReady === "function") {
       await config.onBeforeReady();
     }
-    startupWarmupGateReleased = true;
-    reconcileStartupWarmup();
+    startupWarmup.releaseGate();
+    startupWarmup.reconcile();
     await startupWarmupReadyPromise;
   }
 
   async function stopInternal() {
     isStopping = true;
     isReady = false;
-    startupWarmupEnabled = false;
-    startupWarmupGateReleased = false;
-    clearStartupWarmupQuietTimer();
+    startupWarmup.abort();
     if (typeof startupWarmupResolve === "function") {
       startupWarmupResolve();
     }

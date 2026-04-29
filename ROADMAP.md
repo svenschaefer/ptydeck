@@ -23,7 +23,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-235` Owner `BE`: backend runtime monolith reduction plus direct seam coverage.
    - `QLT-236` Owner `BE`: backend startup/trust/PTY-write reliability coverage hardening.
    - `QLT-237` Owner `BE`: retained transport-only messaging/identity coverage hardening.
    - `QLT-238` Owner `FE`: frontend runtime-composition seam extraction and direct tests.
@@ -32,8 +31,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-235` should land before `QLT-236` so follow-on backend reliability tests target the reduced runtime seam instead of a larger moving monolith.
-- `QLT-237` depends on the `QLT-235` runtime seam remaining stable but is otherwise independent of the startup/trust slice in `QLT-236`.
+- `QLT-236` and `QLT-237` should now target the reduced runtime seam delivered in `QLT-235` and are otherwise independent of each other.
 - `QLT-238` should land before `QLT-239` and `QLT-240` so the remaining frontend operator-path coverage work lands against a smaller, more explicit runtime-composition boundary.
 
 ## Wave Exit Criteria
