@@ -65,6 +65,24 @@ test("slash-workflow runtime controller executes multiline slash workflows throu
   ]);
 });
 
+test("slash-workflow runtime controller publishes idle UI state and dispose clears it deterministically", () => {
+  const { controller, uiStates } = createControllerContext();
+
+  assert.deepEqual(uiStates[0], {
+    workflowStatus: "Workflow: ready.",
+    workflowTarget: "Target: no workflow session.",
+    workflowProgress: "Progress: 0/0.",
+    workflowDetail: "Detail: no workflow running.",
+    workflowResult: "",
+    workflowCanStop: false,
+    workflowCanInterrupt: false,
+    workflowCanKill: false
+  });
+
+  controller.dispose();
+  assert.deepEqual(uiStates.at(-1), { cleared: true });
+});
+
 test("slash-workflow runtime controller strips /run and stops waiting workflows deterministically", async () => {
   const { controller, calls } = createControllerContext();
 
@@ -81,6 +99,37 @@ test("slash-workflow runtime controller strips /run and stops waiting workflows 
   assert.equal(result.ok, false);
   assert.equal(result.status, "stopped");
   assert.equal(calls.some((entry) => entry[0] === "execute"), false);
+});
+
+test("slash-workflow runtime controller preserves action payloads and fails closed when the bound session disappears", async () => {
+  const executedRaw = [];
+  const { controller, store } = createControllerContext({
+    executeControlCommandDetailed: async (interpreted) => {
+      executedRaw.push(interpreted.raw);
+      return { ok: true, feedback: "" };
+    }
+  });
+
+  const payloadResult = await controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/status\n---\nfirst line\n---"
+  });
+  assert.equal(payloadResult.ok, true);
+  assert.equal(executedRaw[0], "/status\n---\nfirst line\n---");
+  assert.equal(controller.stopActiveWorkflow(), false);
+
+  const pending = controller.runWorkflowDetailed({
+    kind: "control-script",
+    mode: "multiline",
+    raw: "/wait until session-state /^exited$/ timeout 1h"
+  });
+  assert.equal(controller.getState().status, "waiting");
+  store.setSessions([]);
+  assert.equal(await controller.interruptWorkflowSession(), "No workflow session available to interrupt.");
+  assert.equal(await controller.killWorkflowSession(), "No workflow session available to kill.");
+  assert.equal(controller.stopActiveWorkflow(), true);
+  await pending;
 });
 
 test("slash-workflow runtime controller reports terminal-backed wait sources explicitly when no terminal is mounted", async () => {

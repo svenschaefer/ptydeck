@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSlashWorkflowSourceAdapter, readSessionStateSource, readSummarySource, readTerminalLineSource, readTerminalVisibleLineSource } from "../src/public/slash-workflow-source-adapter.js";
+import {
+  createSlashWorkflowSourceAdapter,
+  readSessionStateSource,
+  readSourceValue,
+  readSummarySource,
+  readTerminalLineSource,
+  readTerminalVisibleLineSource
+} from "../src/public/slash-workflow-source-adapter.js";
 import { createStore } from "../src/public/store.js";
 
 function createTerminal(lines, { rows = 3, ydisp = 0 } = {}) {
@@ -173,4 +180,56 @@ test("workflow source adapter ignores non-function listeners and returns a safe 
 
   assert.equal(typeof unsubscribe, "function");
   assert.doesNotThrow(() => unsubscribe());
+});
+
+test("workflow source helpers handle malformed buffers, fallback lengths, and explicit source reads fail closed", () => {
+  const fallbackLengthTerminal = {
+    rows: 2,
+    buffer: {
+      active: {
+        baseY: 1,
+        ydisp: 1,
+        getLine(index) {
+          if (index !== 2) {
+            return null;
+          }
+          return {
+            translateToString() {
+              return "tail";
+            }
+          };
+        }
+      }
+    }
+  };
+
+  assert.equal(readTerminalLineSource(fallbackLengthTerminal), "tail");
+  assert.equal(readTerminalVisibleLineSource({}), "");
+  assert.equal(
+    readSummarySource({
+      artifacts: [null, { id: "summary", kind: "summary", text: 7 }, { id: "note", kind: "note", text: "ignore" }]
+    }),
+    ""
+  );
+  assert.equal(readSourceValue("exit-code", { exitCode: 7 }, null), "7");
+  assert.equal(readSourceValue("session-state", { lifecycleState: "", state: "running" }, null), "running");
+  assert.throws(
+    () => readSourceValue("mystery", {}, null),
+    (error) => error?.code === "workflow.source_unavailable" && error?.source === "mystery"
+  );
+});
+
+test("workflow source adapter deduplicates unchanged values and ignores missing sessions after subscription", () => {
+  const store = createStore();
+  store.setSessions([{ id: "s1", state: "running", lifecycleState: "running", statusText: "ready" }]);
+  const adapter = createSlashWorkflowSourceAdapter({ store });
+  const values = [];
+
+  const unsubscribe = adapter.resolveSubscription("s1", "status")((value) => values.push(value));
+  store.applySessionInterpretationActions("s1", [{ type: "setSessionStatus", value: "ready" }]);
+  store.applySessionInterpretationActions("s1", [{ type: "setSessionStatus", value: "busy" }]);
+  store.setSessions([]);
+  unsubscribe();
+
+  assert.deepEqual(values, ["ready", "busy"]);
 });

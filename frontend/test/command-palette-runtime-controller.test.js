@@ -196,6 +196,32 @@ test("buildCommandPaletteEntries aggregates scoped custom commands into one entr
   assert.match(customEntry.subtitle, /Saved custom command · session \[2\] beta · project · global/);
 });
 
+test("command palette entry builders normalize fallback labels and ignore malformed inputs deterministically", () => {
+  const entries = buildCommandPaletteEntries({
+    systemSlashCommands: [],
+    customCommands: [],
+    sessions: [
+      { id: "session-1", name: "", deckId: "ops", tags: ["", " qa "] },
+      { name: "broken" }
+    ],
+    decks: [
+      { id: "ops", name: "" },
+      { name: "invalid" }
+    ],
+    activeDeckId: "ops",
+    formatSessionToken: () => "",
+    formatSessionDisplayName: () => ""
+  });
+
+  const sessionEntry = entries.find((entry) => entry.group === "sessions");
+  const deckEntry = entries.find((entry) => entry.group === "decks");
+  assert.equal(sessionEntry.title, "[session-] session-");
+  assert.equal(sessionEntry.subtitle, "Active deck (ops)");
+  assert.equal(sessionEntry.detail, "Tags: qa");
+  assert.equal(deckEntry.title, "[ops] ops");
+  assert.deepEqual(filterCommandPaletteEntries(null, "ops"), []);
+});
+
 test("command palette opens from the global shortcut and fills the composer for command picks", () => {
   const win = createWindowStub();
   const dialogEl = createElement("dialog");
@@ -254,6 +280,86 @@ test("command palette opens from the global shortcut and fills the composer for 
   assert.equal(composerValue, "/note [text...]");
   assert.equal(commandInput.value, "/note [text...]");
   assert.equal(controller.isOpen(), false);
+});
+
+test("command palette controller degrades safely without dialog primitives or DOM event constructors", () => {
+  const win = createWindowStub();
+  const dialogEl = createElement("div");
+  dialogEl.showModal = undefined;
+  dialogEl.close = undefined;
+  const searchInputEl = createElement("input");
+  const resultsEl = createElement("div");
+  resultsEl.replaceChildren = undefined;
+  const emptyEl = createElement("p");
+  const metaEl = createElement("p");
+  const closeBtn = createElement("button");
+  const commandInput = createElement("textarea");
+  const dispatchedEvents = [];
+  commandInput.dispatchEvent = (event) => {
+    dispatchedEvents.push(event);
+  };
+
+  const originalEvent = globalThis.Event;
+  Object.defineProperty(globalThis, "Event", {
+    configurable: true,
+    writable: true,
+    value: undefined
+  });
+
+  try {
+    const controller = createCommandPaletteRuntimeController({
+      windowRef: win,
+      documentRef: createDocumentStub(),
+      dialogEl,
+      searchInputEl,
+      resultsEl,
+      emptyEl,
+      metaEl,
+      closeBtn,
+      commandInput,
+      systemSlashCommands: ["help"],
+      getState: () => ({ sessions: [], decks: [], activeSessionId: "", activeDeckId: "" })
+    });
+
+    controller.openPalette("help");
+    assert.equal(dialogEl.open, true);
+    assert.equal(dialogEl.classList.contains("open"), true);
+
+    searchInputEl.dispatchEvent({
+      type: "keydown",
+      key: "Enter",
+      preventDefault() {}
+    });
+    assert.equal(commandInput.value, "/help");
+    assert.equal(dispatchedEvents.length, 1);
+    assert.equal(dispatchedEvents[0].type, "input");
+    assert.equal(commandInput.selectionStart, commandInput.value.length);
+    assert.equal(commandInput.selectionEnd, commandInput.value.length);
+
+    controller.openPalette("help");
+    dialogEl.dispatchEvent({
+      type: "cancel",
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    });
+    assert.equal(dialogEl.open, false);
+    assert.equal(dialogEl.classList.contains("open"), false);
+
+    const searchKeydown = searchInputEl.listeners.get("keydown")[0];
+    const windowKeydown = win.addEventListener ? undefined : undefined;
+    assert.doesNotThrow(() => searchKeydown(null));
+    assert.doesNotThrow(() => win.dispatchEvent({ type: "keydown", key: "k", ctrlKey: true, metaKey: false, altKey: false, preventDefault() {} }));
+    assert.equal(controller.isOpen(), true);
+    assert.doesNotThrow(() => win.dispatchEvent({ type: "keydown", key: "Escape", ctrlKey: false, metaKey: false, altKey: false, preventDefault() {} }));
+    assert.equal(controller.isOpen(), false);
+  } finally {
+    Object.defineProperty(globalThis, "Event", {
+      configurable: true,
+      writable: true,
+      value: originalEvent
+    });
+  }
 });
 
 test("command palette can switch sessions and decks directly", () => {

@@ -244,3 +244,64 @@ test("custom command model handles reference parsing edge cases", () => {
   assert.match(parseCustomCommandReferenceArgs(["scope:session:"]).error, /requires a non-empty selector/i);
   assert.match(parseCustomCommandReferenceArgs([]).error, /name is required/i);
 });
+
+test("custom command model rejects malformed scoped definitions and invocation parameter edge cases", () => {
+  assert.equal(normalizeCustomCommandRecord("bad"), null);
+  assert.ok(compareCustomCommandRecords(null, { name: "deploy", content: "echo ok" }) > 0);
+  assert.ok(compareCustomCommandRecords({ name: "deploy", content: "echo ok" }, null) < 0);
+
+  assert.match(parseCustomCommandDefinition("deploy").error, /Invalid \/custom command input/i);
+  assert.match(parseCustomCommandDefinition("/custom @bad deploy echo hi").error, /Invalid scope token/i);
+  assert.match(parseCustomCommandDefinition("/custom scope:session: deploy echo hi").error, /requires a non-empty selector/i);
+  assert.match(parseCustomCommandDefinition("/custom scope:project deploy ").error, /cannot be empty/i);
+  assert.match(parseCustomCommandDefinition("/custom deploy\n---\n---").error, /cannot be empty/i);
+
+  const noParamTemplate = {
+    name: "whoami",
+    kind: "template",
+    scope: "project",
+    content: "echo {{var:session.id}}"
+  };
+  assert.match(parseCustomCommandInvocation("/whoami target-a", noParamTemplate).error, /uses 'key=value' parameters/i);
+  assert.match(parseCustomCommandInvocation("/whoami env=prod", noParamTemplate).error, /Unknown template parameter/i);
+  assert.deepEqual(parseCustomCommandInvocation("/whoami", null), {
+    ok: false,
+    error: "Unknown custom command."
+  });
+  assert.match(parseCustomCommandReferenceArgs(["scope:nope"]).error, /Invalid scope token/i);
+});
+
+test("custom command model formats unresolved scopes and render helpers fail closed deterministically", () => {
+  const templateCommand = {
+    name: "deploy",
+    kind: "template",
+    scope: "session",
+    sessionId: "s9",
+    content: "echo {{param:env}} {{var:session.cwd}} {{var:session.note}} {{var:deck.id}}"
+  };
+
+  assert.equal(formatCustomCommandScopeLabel(templateCommand), "session s9");
+  assert.equal(formatCustomCommandScopeLabel(null), "");
+  assert.equal(formatCustomCommandDetail(null), "");
+  assert.equal(
+    formatCustomCommandDetail({ name: "broken", kind: "template", scope: "project", content: "{{var:bad}}" }),
+    "{{var:bad}}"
+  );
+  assert.deepEqual(renderCustomCommandForSession(null, {}, null, {}), {
+    ok: false,
+    error: "Unknown custom command."
+  });
+  assert.deepEqual(
+    renderCustomCommandForSession(templateCommand, { id: "s1", cwd: "/tmp", note: "memo", deckId: "deck-a" }, null, {
+      env: "prod"
+    }),
+    { ok: true, text: "echo prod /tmp memo deck-a" }
+  );
+  assert.match(
+    renderCustomCommandForSession(templateCommand, { id: "s1", cwd: "/tmp", note: "memo", deckId: "deck-a" }, null, {
+      env: "prod",
+      extra: "x"
+    }).error,
+    /Unknown template parameter/i
+  );
+});

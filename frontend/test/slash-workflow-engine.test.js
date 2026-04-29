@@ -128,3 +128,66 @@ test("slash workflow engine can stop an in-flight wait immediately", async () =>
   const finalState = await runPromise;
   assert.equal(finalState.status, "stopped");
 });
+
+test("slash workflow engine freezes manual workflow snapshots and tolerates idle stop or cancel calls", async () => {
+  const workflow = {
+    steps: [{ type: "action", command: "list", raw: "/list", line: 1 }]
+  };
+  const snapshots = [];
+  const engine = createSlashWorkflowEngine({
+    executeActionStep() {
+      return Promise.resolve("ok");
+    }
+  });
+
+  const noopUnsubscribe = engine.subscribe(null);
+  assert.doesNotThrow(() => noopUnsubscribe());
+  assert.equal(engine.stop().status, "ready");
+  assert.equal(engine.cancel().status, "ready");
+
+  engine.subscribe((state) => snapshots.push(state));
+  const finalState = await engine.run(workflow);
+  assert.equal(finalState.status, "succeeded");
+  assert.equal(Object.isFrozen(snapshots[0]), true);
+  assert.equal(Object.isFrozen(snapshots[0].workflow), true);
+  assert.equal(Object.isFrozen(snapshots[0].workflow.steps), true);
+});
+
+test("slash workflow engine supports post-step cancel or stop finalization and surfaces non-Error failures", async () => {
+  const workflow = {
+    steps: [{ type: "action", command: "list", raw: "/list", line: 1 }]
+  };
+
+  let cancelEngine = null;
+  cancelEngine = createSlashWorkflowEngine({
+    executeActionStep() {
+      cancelEngine.cancel();
+      return Promise.resolve("cancelled");
+    }
+  });
+  const cancelled = await cancelEngine.run(workflow);
+  assert.equal(cancelled.status, "cancelled");
+
+  let stopEngine = null;
+  stopEngine = createSlashWorkflowEngine({
+    executeActionStep() {
+      stopEngine.stop();
+      return Promise.resolve("stopped");
+    }
+  });
+  const stopped = await stopEngine.run(workflow);
+  assert.equal(stopped.status, "stopped");
+
+  const deferred = createDeferred();
+  const concurrentEngine = createSlashWorkflowEngine({
+    executeActionStep() {
+      return deferred.promise;
+    }
+  });
+  const running = concurrentEngine.run(workflow);
+  await assert.rejects(() => concurrentEngine.run(workflow), /already running/i);
+  deferred.reject("boom");
+  const failed = await running;
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.failure.message, "boom");
+});
