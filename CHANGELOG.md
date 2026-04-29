@@ -2,6 +2,14 @@
 
 Completed and validated release history belongs here.
 
+## 2026-04-29
+
+- [x] `QLT-234` is now completed as the first delivered slice of `v0.4.0-H158`, leaving `QLT-235` through `QLT-240` open in the active repo-wide quality follow-up wave.
+- [x] `scripts/lib/coverage-report.mjs` now falls back to weighted per-file line percentages when aggregate summary line counts are unavailable instead of collapsing the top-line line percentage to `0`, and `test/coverage-report-utils.test.js` now locks down the weighted-summary fallback, exclude-prefix filtering, list-only behavior, no-match failure handling, and passthrough behavior for output that does not contain coverage markers.
+- [x] `scripts/scaffold-ui-module.mjs` is now import-safe and directly testable, exports explicit parse/render/scaffold seams, refuses to overwrite generated files unless `--force` is passed, and rejects unresolved template placeholders before writing output files. `test/scaffolding.test.js` now locks down overwrite protection, malformed usage failures, and fail-closed template-resolution behavior, while `README.md` and `templates/frontend-ui-module/README.md` document the new overwrite contract.
+- [x] The validated root-tooling hotspot snapshot moved to `scripts/lib/coverage-report.mjs` at `91.69%` line / `85.22%` branch coverage and `scripts/scaffold-ui-module.mjs` at `97.62%` line / `87.10%` branch coverage, lifting both promoted root-tooling seams out of the remaining active hotspot set and raising validated root-tooling coverage to `92.77%` line.
+- [x] Closeout validation for `QLT-234` passed with `node --test test/coverage-report-utils.test.js test/scaffolding.test.js`, `npm run test:root:coverage`, `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`.
+
 ## 2026-04-28
 
 - [x] `v0.4.0-H157` is now completed on `main`, closing `DOC-234` and leaving no active or queued release wave in `TODO.md` or `ROADMAP.md`.

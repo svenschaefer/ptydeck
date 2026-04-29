@@ -228,7 +228,11 @@ export function normalizeCoverageReport(text, { rootDir, includeSourcePrefixes =
         0
       )
     : 0;
-  const summaryLinePercent = totalLines > 0 ? ((totalLines - totalUncovered) / totalLines) * 100 : 0;
+  const summaryLinePercent = allRowsHaveLineCounts
+    ? totalLines > 0
+      ? ((totalLines - totalUncovered) / totalLines) * 100
+      : 0
+    : aggregatePercent(normalizedRows, "linePercent");
   const summaryBranchPercent = aggregatePercent(normalizedRows, "branchPercent");
   const summaryFunctionPercent = aggregatePercent(normalizedRows, "functionPercent");
 

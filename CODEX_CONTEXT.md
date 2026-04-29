@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (fresh repo-wide quality/coverage review, promoted H158 gap follow-up wave, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (QLT-234 root-tooling hardening completed, H158 remains active for backend/frontend quality follow-up, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: `QLT-234` through `QLT-240` are now promoted as the active repo-wide quality/coverage follow-up tasks.
+- `TODO.md`: `QLT-235` through `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` closed the root-tooling slice.
 - `ROADMAP.md`: `v0.4.0-H158` is now the active release wave for those quality/coverage tasks.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -190,19 +190,19 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Repository Quality Review (2026-04-29)
 
-The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone.
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` has now closed the first promoted root-tooling slice from that review.
 
 Current validated top-line coverage remains above threshold:
 
-- root tooling: `91.13%` line / `72.90%` branch
-- backend: `93.94%` line / `87.00%` branch
+- root tooling: `92.77%` line / `76.94%` branch
+- backend: `93.94%` line / `86.99%` branch
 - frontend: `95.48%` line / `87.17%` branch
 
 The new review promoted only the still-relevant gaps into `TODO.md`:
 
 - Root tooling:
-  - `scripts/lib/coverage-report.mjs` remains the most relevant repo-owned quality-helper hotspot at `84.98%` line / `71.58%` branch coverage.
-  - `scripts/scaffold-ui-module.mjs` remains the other still-relevant product-tooling hotspot at `87.64%` line / `61.54%` branch coverage.
+  - `QLT-234` lifted `scripts/lib/coverage-report.mjs` to `91.69%` line / `85.22%` branch coverage by closing the weighted-summary aggregation and omission/error branches that previously made root-level line totals look like `0` when aggregate line counts were unavailable.
+  - `QLT-234` also lifted `scripts/scaffold-ui-module.mjs` to `97.62%` line / `87.10%` branch coverage by making the scaffold import-safe and directly testable, adding explicit overwrite protection, and failing closed when template placeholders remain unresolved.
   - The lower historical analysis scripts `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain below that level, but they were not promoted into the near-term wave because they are retained diagnostics rather than active product/runtime authority paths.
 - Backend:
   - `backend/src/runtime.js` remains the largest backend monolith at `7552` lines and `82.15%` line / `75.77%` branch coverage.
@@ -214,9 +214,9 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
   - The next still-relevant lower-covered composer/workflow/settings/preset seams are `command-composer-autocomplete-controller.js`, `slash-workflow-parser.js`, `theme-io.js`, `workspace-preset-runtime-actions.js`, `command-engine.js`, and `ui/session-settings-dialog-controller.js`.
   - The large static `theme-library.js` file was not promoted as an active quality task because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
-The promoted follow-up wave is therefore:
+The remaining promoted follow-up wave is therefore:
 
-- `QLT-234` through `QLT-240` under `v0.4.0-H158`
+- `QLT-235` through `QLT-240` under `v0.4.0-H158`
 
 ## Frontend Runtime-State and Plugin Baseline
 

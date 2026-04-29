@@ -14,7 +14,6 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-234` Owner `PLAT`: Harden root-tooling coverage for the repo-owned quality helpers. Add direct regression coverage for `scripts/lib/coverage-report.mjs` aggregation/omission/error branches and `scripts/scaffold-ui-module.mjs` overwrite/failure/template-resolution branches; do not spend this wave on the lower-priority historical analysis scripts unless they become active product tooling.
 - [ ] `QLT-235` Owner `BE`: Reduce the remaining `backend/src/runtime.js` monolith and close its lowest still-relevant lifecycle/admission blind spots with direct seam tests instead of relying only on broad integration traversal.
 - [ ] `QLT-236` Owner `BE`: Add direct deterministic reliability coverage for `backend/src/startup-backup.js`, `backend/src/key-provider.js`, `backend/src/ssh-host-key-probe.js`, and `backend/src/node-pty-write-retry.js`, focusing on fail-closed restore, malformed key/trust inputs, and async PTY retry exhaustion branches.
 - [ ] `QLT-237` Owner `BE`: Harden the retained transport-only messaging and identity baseline with direct regression coverage for `backend/src/messaging-runtime.js`, `backend/src/messaging-custom-command-utils.js`, `backend/src/telegram-adapter.js`, `backend/src/terminal-messaging-core.js`, and `backend/src/terminal-app-identity.js`.
@@ -25,7 +24,7 @@ Completed work belongs in `CHANGELOG.md`.
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `PLAT` ownership role (active): deliver `QLT-234`.
 - `BE` ownership role (active): deliver `QLT-235`, `QLT-236`, and `QLT-237`.
 - `FE` ownership role (active): deliver `QLT-238`, `QLT-239`, and `QLT-240`.
+- `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

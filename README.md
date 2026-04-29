@@ -210,6 +210,8 @@ Scaffold a frontend UI controller/test pair:
 node ./scripts/scaffold-ui-module.mjs example-widget-controller
 ```
 
+The scaffold fails closed when target files already exist; add `--force` only when an explicit overwrite is intended.
+
 ## Debugging Notes
 
 Enable backend debug logging:

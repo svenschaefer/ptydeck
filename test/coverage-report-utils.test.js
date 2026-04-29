@@ -96,6 +96,38 @@ test("normalizeCoverageReport filters incidental non-owned files and reports the
   assert.match(normalized.text, /^# all files \| 85\.71 \| 71\.43 \| 100\.00 \|$/m);
 });
 
+test("normalizeCoverageReport leaves non-coverage output untouched when report markers are missing", async () => {
+  const { normalizeCoverageReport } = await loadModule("scripts/lib/coverage-report.mjs");
+  const input = "plain output without coverage markers\n";
+  const normalized = normalizeCoverageReport(input, { rootDir: repoRoot });
+
+  assert.equal(normalized.text, input);
+  assert.deepEqual(normalized.duplicateFiles, []);
+  assert.deepEqual(normalized.omittedFiles, []);
+  assert.equal(normalized.normalizedFileCount, 0);
+});
+
+test("normalizeCoverageReport honors exclude prefixes and falls back to weighted file percentages without line counts", async () => {
+  const { normalizeCoverageReport } = await loadModule("scripts/lib/coverage-report.mjs");
+  const input = [
+    "# start of coverage report",
+    "# file | line % | branch % | funcs % | uncovered lines",
+    "# scripts/lib/helper.mjs | 75.00 | 50.00 | 100.00 | 4",
+    "# test/sample.test.js | 100.00 | 100.00 | 100.00 |",
+    "# all files | 80.00 | 60.00 | 80.00 |",
+    "# end of coverage report"
+  ].join("\n");
+
+  const normalized = normalizeCoverageReport(input, {
+    includeSourcePrefixes: ["scripts/", "test/"],
+    excludeSourcePrefixes: ["test/"]
+  });
+
+  assert.deepEqual(normalized.omittedFiles, ["test/sample.test.js"]);
+  assert.match(normalized.text, /^# scripts\/lib\/helper\.mjs \| 75\.00 \| 50\.00 \| 100\.00 \| 4$/m);
+  assert.match(normalized.text, /^# all files \| 75\.00 \| 50\.00 \| 100\.00 \|$/m);
+});
+
 test("runWorkspaceCoverage returns an error when no test files are selected", async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-empty-"));
   fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
@@ -112,6 +144,55 @@ test("runWorkspaceCoverage returns an error when no test files are selected", as
   assert.equal(exitCode, 1);
   assert.equal(stdout.buffer, "");
   assert.match(stderr.buffer, /\[coverage\] no test files selected\./);
+});
+
+test("runWorkspaceCoverage lists selected test files without running coverage when listOnly is enabled", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-list-"));
+  fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "test", "alpha.test.js"), "", "utf8");
+  fs.writeFileSync(path.join(tempRoot, "test", "beta.test.js"), "", "utf8");
+
+  const { runWorkspaceCoverage } = await loadModule("scripts/lib/coverage-report.mjs");
+  const stdout = new CaptureStream();
+  const stderr = new CaptureStream();
+  const exitCode = await runWorkspaceCoverage({
+    rootDir: tempRoot,
+    excludedTestNames: new Set(["beta.test.js"]),
+    listOnly: true,
+    stdout,
+    stderr
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(stdout.buffer.trim(), "test/alpha.test.js");
+  assert.equal(stderr.buffer, "");
+});
+
+test("runWorkspaceCoverage returns an error when no covered source files match the configured prefixes", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptydeck-coverage-miss-"));
+  fs.mkdirSync(path.join(tempRoot, "test"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tempRoot, "test", "sample.test.js"),
+    [
+      "const test = require('node:test');",
+      "test('passes', () => {});"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const { runWorkspaceCoverage } = await loadModule("scripts/lib/coverage-report.mjs");
+  const stdout = new CaptureStream();
+  const stderr = new CaptureStream();
+  const exitCode = await runWorkspaceCoverage({
+    rootDir: tempRoot,
+    includeSourcePrefixes: ["scripts/"],
+    stdout,
+    stderr
+  });
+
+  assert.equal(exitCode, 1);
+  assert.equal(stdout.buffer, "");
+  assert.match(stderr.buffer, /\[coverage\] no source files matched configured roots\./);
 });
 
 test("runWorkspaceCoverage limits the root lane to owned files and reports omitted imports", async () => {
