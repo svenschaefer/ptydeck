@@ -13,6 +13,8 @@ import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messa
 import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { createRuntimeHttpHelpers, requiredScopeForRoute } from "./runtime-http-helpers.js";
+import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
+import { matchRuntimeRoute, normalizeRuntimeMetricsPath } from "./runtime-route-table.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
 import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
 import {
@@ -188,14 +190,6 @@ const DEFAULT_SESSION_THEME_PROFILE = {
   brightWhite: "#f5f7fa"
 };
 
-function decodePathParam(value, name) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    throw new ApiError(400, "ValidationError", `Invalid path parameter encoding for '${name}'.`);
-  }
-}
-
 function normalizeTraceToken(value) {
   if (typeof value !== "string") {
     return "";
@@ -368,353 +362,6 @@ function parseJsonBody(req, maxBodyBytes) {
 
     req.on("error", (err) => rejectOnce(err));
   });
-}
-
-function route(pathname, method) {
-  if (pathname === "/health" && method === "GET") {
-    return { kind: "health" };
-  }
-  if (pathname === "/ready" && method === "GET") {
-    return { kind: "ready" };
-  }
-  if (pathname === "/metrics" && method === "GET") {
-    return { kind: "metrics" };
-  }
-  if (pathname === "/api/v1/sessions" && method === "GET") {
-    return { kind: "listSessions" };
-  }
-  if (pathname === "/api/v1/sessions" && method === "POST") {
-    return { kind: "createSession" };
-  }
-  if (pathname === "/api/v1/auth/dev-token" && method === "POST") {
-    return { kind: "devToken" };
-  }
-  if (pathname === "/api/v1/auth/ws-ticket" && method === "POST") {
-    return { kind: "wsTicket" };
-  }
-  if (pathname === "/api/v1/shares" && method === "GET") {
-    return { kind: "listShares" };
-  }
-  if (pathname === "/api/v1/shares" && method === "POST") {
-    return { kind: "createShareLink" };
-  }
-  if (pathname === "/api/v1/custom-commands" && method === "GET") {
-    return { kind: "listCustomCommands" };
-  }
-  if (pathname === "/api/v1/decks" && method === "GET") {
-    return { kind: "listDecks" };
-  }
-  if (pathname === "/api/v1/decks" && method === "POST") {
-    return { kind: "createDeck" };
-  }
-  if (pathname === "/api/v1/layout-profiles" && method === "GET") {
-    return { kind: "listLayoutProfiles" };
-  }
-  if (pathname === "/api/v1/layout-profiles" && method === "POST") {
-    return { kind: "createLayoutProfile" };
-  }
-  if (pathname === "/api/v1/connection-profiles" && method === "GET") {
-    return { kind: "listConnectionProfiles" };
-  }
-  if (pathname === "/api/v1/connection-profiles" && method === "POST") {
-    return { kind: "createConnectionProfile" };
-  }
-  if (pathname === "/api/v1/workspace-presets" && method === "GET") {
-    return { kind: "listWorkspacePresets" };
-  }
-  if (pathname === "/api/v1/workspace-presets" && method === "POST") {
-    return { kind: "createWorkspacePreset" };
-  }
-  if (pathname === "/api/v1/ssh-trust-entries" && method === "GET") {
-    return { kind: "listSshTrustEntries" };
-  }
-  if (pathname === "/api/v1/ssh-trust-entries" && method === "POST") {
-    return { kind: "createSshTrustEntry" };
-  }
-  if (pathname === "/api/v1/ssh-host-key-probe" && method === "POST") {
-    return { kind: "probeSshHostKeys" };
-  }
-
-  const customCommandMatch = pathname.match(/^\/api\/v1\/custom-commands\/([^/]+)$/);
-  if (customCommandMatch && method === "GET") {
-    return { kind: "getCustomCommand", params: { commandName: decodePathParam(customCommandMatch[1], "commandName") } };
-  }
-  if (customCommandMatch && method === "PUT") {
-    return {
-      kind: "upsertCustomCommand",
-      params: { commandName: decodePathParam(customCommandMatch[1], "commandName") }
-    };
-  }
-  if (customCommandMatch && method === "DELETE") {
-    return {
-      kind: "deleteCustomCommand",
-      params: { commandName: decodePathParam(customCommandMatch[1], "commandName") }
-    };
-  }
-
-  const deckMatch = pathname.match(/^\/api\/v1\/decks\/([^/]+)$/);
-  if (deckMatch && method === "GET") {
-    return { kind: "getDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
-  }
-  if (deckMatch && method === "PATCH") {
-    return { kind: "updateDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
-  }
-  if (deckMatch && method === "DELETE") {
-    return { kind: "deleteDeck", params: { deckId: decodePathParam(deckMatch[1], "deckId") } };
-  }
-
-  const moveSessionMatch = pathname.match(/^\/api\/v1\/decks\/([^/]+)\/sessions\/([^/]+):move$/);
-  if (moveSessionMatch && method === "POST") {
-    return {
-      kind: "moveSessionToDeck",
-      params: {
-        deckId: decodePathParam(moveSessionMatch[1], "deckId"),
-        sessionId: decodePathParam(moveSessionMatch[2], "sessionId")
-      }
-    };
-  }
-
-  const layoutProfileMatch = pathname.match(/^\/api\/v1\/layout-profiles\/([^/]+)$/);
-  if (layoutProfileMatch && method === "GET") {
-    return { kind: "getLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
-  }
-  if (layoutProfileMatch && method === "PATCH") {
-    return { kind: "updateLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
-  }
-  if (layoutProfileMatch && method === "DELETE") {
-    return { kind: "deleteLayoutProfile", params: { profileId: decodePathParam(layoutProfileMatch[1], "profileId") } };
-  }
-
-  const connectionProfileMatch = pathname.match(/^\/api\/v1\/connection-profiles\/([^/]+)$/);
-  if (connectionProfileMatch && method === "GET") {
-    return {
-      kind: "getConnectionProfile",
-      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
-    };
-  }
-  if (connectionProfileMatch && method === "PATCH") {
-    return {
-      kind: "updateConnectionProfile",
-      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
-    };
-  }
-  if (connectionProfileMatch && method === "DELETE") {
-    return {
-      kind: "deleteConnectionProfile",
-      params: { profileId: decodePathParam(connectionProfileMatch[1], "profileId") }
-    };
-  }
-
-  const workspacePresetMatch = pathname.match(/^\/api\/v1\/workspace-presets\/([^/]+)$/);
-  if (workspacePresetMatch && method === "GET") {
-    return { kind: "getWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
-  }
-  if (workspacePresetMatch && method === "PATCH") {
-    return { kind: "updateWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
-  }
-  if (workspacePresetMatch && method === "DELETE") {
-    return { kind: "deleteWorkspacePreset", params: { presetId: decodePathParam(workspacePresetMatch[1], "presetId") } };
-  }
-
-  const sshTrustEntryMatch = pathname.match(/^\/api\/v1\/ssh-trust-entries\/([^/]+)$/);
-  if (sshTrustEntryMatch && method === "DELETE") {
-    return {
-      kind: "deleteSshTrustEntry",
-      params: { entryId: decodePathParam(sshTrustEntryMatch[1], "entryId") }
-    };
-  }
-
-  const shareLinkMatch = pathname.match(/^\/api\/v1\/shares\/([^/]+)$/);
-  if (shareLinkMatch && method === "GET") {
-    return { kind: "getShareLink", params: { shareId: decodePathParam(shareLinkMatch[1], "shareId") } };
-  }
-
-  const revokeShareLinkMatch = pathname.match(/^\/api\/v1\/shares\/([^/]+)\/revoke$/);
-  if (revokeShareLinkMatch && method === "POST") {
-    return { kind: "revokeShareLink", params: { shareId: decodePathParam(revokeShareLinkMatch[1], "shareId") } };
-  }
-
-  const getSessionMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)$/);
-  if (getSessionMatch && method === "GET") {
-    return { kind: "getSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
-  }
-  if (getSessionMatch && method === "PATCH") {
-    return { kind: "updateSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
-  }
-  if (getSessionMatch && method === "DELETE") {
-    return { kind: "deleteSession", params: { sessionId: decodePathParam(getSessionMatch[1], "sessionId") } };
-  }
-
-  const inputMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/input$/);
-  if (inputMatch && method === "POST") {
-    return { kind: "input", params: { sessionId: decodePathParam(inputMatch[1], "sessionId") } };
-  }
-
-  const swapQuickIdMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/swap-quick-id$/);
-  if (swapQuickIdMatch && method === "POST") {
-    return { kind: "swapSessionQuickId", params: { sessionId: decodePathParam(swapQuickIdMatch[1], "sessionId") } };
-  }
-
-  const replayExportMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-export$/);
-  if (replayExportMatch && method === "GET") {
-    return { kind: "getSessionReplayExport", params: { sessionId: decodePathParam(replayExportMatch[1], "sessionId") } };
-  }
-
-  const replayExcerptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/replay-excerpt$/);
-  if (replayExcerptMatch && method === "GET") {
-    return { kind: "getSessionReplayExcerpt", params: { sessionId: decodePathParam(replayExcerptMatch[1], "sessionId") } };
-  }
-
-  const fileTransferUploadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/upload$/);
-  if (fileTransferUploadMatch && method === "POST") {
-    return { kind: "uploadSessionFile", params: { sessionId: decodePathParam(fileTransferUploadMatch[1], "sessionId") } };
-  }
-
-  const fileTransferDownloadMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/file-transfer\/download$/);
-  if (fileTransferDownloadMatch && method === "POST") {
-    return { kind: "downloadSessionFile", params: { sessionId: decodePathParam(fileTransferDownloadMatch[1], "sessionId") } };
-  }
-
-  const resizeMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/resize$/);
-  if (resizeMatch && method === "POST") {
-    return { kind: "resize", params: { sessionId: decodePathParam(resizeMatch[1], "sessionId") } };
-  }
-
-  const takeControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/take$/);
-  if (takeControlMatch && method === "POST") {
-    return { kind: "takeSessionControl", params: { sessionId: decodePathParam(takeControlMatch[1], "sessionId") } };
-  }
-
-  if (pathname === "/api/v1/session-control/take" && method === "POST") {
-    return { kind: "takeSessionControlScope", params: {} };
-  }
-
-  const releaseControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/release$/);
-  if (releaseControlMatch && method === "POST") {
-    return { kind: "releaseSessionControl", params: { sessionId: decodePathParam(releaseControlMatch[1], "sessionId") } };
-  }
-
-  const transferControlMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/transfer$/);
-  if (transferControlMatch && method === "POST") {
-    return { kind: "transferSessionControl", params: { sessionId: decodePathParam(transferControlMatch[1], "sessionId") } };
-  }
-
-  const renameControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/rename-client$/);
-  if (renameControlClientMatch && method === "POST") {
-    return {
-      kind: "renameSessionControlClient",
-      params: { sessionId: decodePathParam(renameControlClientMatch[1], "sessionId") }
-    };
-  }
-
-  const forgetControlClientMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/control\/forget-client$/);
-  if (forgetControlClientMatch && method === "POST") {
-    return {
-      kind: "forgetSessionControlClient",
-      params: { sessionId: decodePathParam(forgetControlClientMatch[1], "sessionId") }
-    };
-  }
-
-  const restartMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/restart$/);
-  if (restartMatch && method === "POST") {
-    return { kind: "restart", params: { sessionId: decodePathParam(restartMatch[1], "sessionId") } };
-  }
-
-  const interruptMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/interrupt$/);
-  if (interruptMatch && method === "POST") {
-    return { kind: "interrupt", params: { sessionId: decodePathParam(interruptMatch[1], "sessionId") } };
-  }
-
-  const terminateMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/terminate$/);
-  if (terminateMatch && method === "POST") {
-    return { kind: "terminate", params: { sessionId: decodePathParam(terminateMatch[1], "sessionId") } };
-  }
-
-  const killMatch = pathname.match(/^\/api\/v1\/sessions\/([^/]+)\/kill$/);
-  if (killMatch && method === "POST") {
-    return { kind: "kill", params: { sessionId: decodePathParam(killMatch[1], "sessionId") } };
-  }
-
-  return { kind: "notFound" };
-}
-
-function normalizeMetricsPath(pathname) {
-  if (/^\/api\/v1\/decks\/[^/]+\/sessions\/[^/]+:move$/.test(pathname)) {
-    return "/api/v1/decks/{deckId}/sessions/{sessionId}:move";
-  }
-  if (/^\/api\/v1\/decks\/[^/]+$/.test(pathname)) {
-    return "/api/v1/decks/{deckId}";
-  }
-  if (/^\/api\/v1\/layout-profiles\/[^/]+$/.test(pathname)) {
-    return "/api/v1/layout-profiles/{profileId}";
-  }
-  if (/^\/api\/v1\/workspace-presets\/[^/]+$/.test(pathname)) {
-    return "/api/v1/workspace-presets/{presetId}";
-  }
-  if (/^\/api\/v1\/shares\/[^/]+\/revoke$/.test(pathname)) {
-    return "/api/v1/shares/{shareId}/revoke";
-  }
-  if (/^\/api\/v1\/shares\/[^/]+$/.test(pathname)) {
-    return "/api/v1/shares/{shareId}";
-  }
-  if (/^\/api\/v1\/custom-commands\/[^/]+$/.test(pathname)) {
-    return "/api/v1/custom-commands/{commandName}";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/input$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/input";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/swap-quick-id$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/swap-quick-id";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/replay-export$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/replay-export";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/replay-excerpt$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/replay-excerpt";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/upload$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/file-transfer/upload";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/file-transfer\/download$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/file-transfer/download";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/resize$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/resize";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/control\/take$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/control/take";
-  }
-  if (pathname === "/api/v1/session-control/take") {
-    return "/api/v1/session-control/take";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/control\/release$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/control/release";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/control\/transfer$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/control/transfer";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/control\/rename-client$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/control/rename-client";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/control\/forget-client$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/control/forget-client";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/restart$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/restart";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/interrupt$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/interrupt";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/terminate$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/terminate";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+\/kill$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}/kill";
-  }
-  if (/^\/api\/v1\/sessions\/[^/]+$/.test(pathname)) {
-    return "/api/v1/sessions/{sessionId}";
-  }
-  return pathname;
 }
 
 function escapePrometheusLabel(value) {
@@ -5610,6 +5257,60 @@ function tryCreateRestoredSession({
     }, traceSeed);
   }
 
+  const resourceDispatch = createRuntimeResourceDispatch({
+    validateResponse,
+    parseBooleanQueryParam,
+    normalizeCustomCommandScope,
+    normalizeCustomCommandSessionId,
+    listShareLinks,
+    createShareLink,
+    getApiShareLinkOrThrow,
+    revokeShareLink,
+    persistNow,
+    getApiSessionOrThrow,
+    listApiSessions,
+    listCustomCommands,
+    getCustomCommandOrThrow,
+    hasCustomCommand,
+    upsertCustomCommand,
+    deleteCustomCommand,
+    broadcast,
+    listDecks,
+    createDeck,
+    getDeckOrThrow,
+    toApiDeck,
+    updateDeck,
+    deleteDeck,
+    broadcastSessionUpdated,
+    broadcastDeckUpsert,
+    broadcastDeckDeleted,
+    moveSessionToDeck,
+    listLayoutProfiles,
+    createLayoutProfile,
+    getLayoutProfileOrThrow,
+    toApiLayoutProfile,
+    updateLayoutProfile,
+    deleteLayoutProfile,
+    listConnectionProfiles,
+    createConnectionProfile,
+    getConnectionProfileOrThrow,
+    toApiConnectionProfile,
+    updateConnectionProfile,
+    deleteConnectionProfile,
+    listWorkspacePresets,
+    createWorkspacePreset,
+    getWorkspacePresetOrThrow,
+    toApiWorkspacePreset,
+    updateWorkspacePreset,
+    deleteWorkspacePreset,
+    listSshTrustEntries,
+    upsertSshTrustEntry,
+    syncSshKnownHostsFile,
+    probeSshHostKeysOrThrow,
+    deleteSshTrustEntry,
+    messagingRuntime
+  });
+
   const wsEventNames = ["session.created", "session.started", "session.updated", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
     manager.on(eventName, (event) => {
@@ -5763,7 +5464,7 @@ function tryCreateRestoredSession({
       requestContextForAudit = requestContext;
       const parsedUrl = new URL(req.url || "/", `${requestContext.protocol}://${requestContext.host}`);
       pathnameForLog = parsedUrl.pathname;
-      normalizedMetricsPathForLog = normalizeMetricsPath(parsedUrl.pathname);
+      normalizedMetricsPathForLog = normalizeRuntimeMetricsPath(parsedUrl.pathname);
       requestTraceContext = buildRequestTraceContext(req, requestContext, parsedUrl.pathname);
       logDebug("http.request.start", {
         method: methodForLog,
@@ -5779,7 +5480,7 @@ function tryCreateRestoredSession({
         return;
       }
 
-      const match = route(parsedUrl.pathname, req.method || "GET");
+      const match = matchRuntimeRoute(parsedUrl.pathname, req.method || "GET");
       const body = await parseJsonBody(req, maxBodyBytes);
       const params = match.params || {};
       routeKindForAudit = match.kind;
@@ -5886,329 +5587,16 @@ function tryCreateRestoredSession({
         });
       }
 
-      if (match.kind === "listShares") {
-        const payload = listShareLinks();
-        validateResponse({ statusCode: 200, body: payload, expect: "shareLinkList" });
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      if (match.kind === "createShareLink") {
-        const payload = createShareLink(body, auth, req, requestContext);
-        validateResponse({ statusCode: 201, body: payload, expect: "shareLink" });
-        await persistNow("share-link.create");
-        if (payload.targetType === SHARE_LINK_TARGET_TYPE_SESSION) {
-          await messagingRuntime.observeShareChange({
-            action: "created",
-            shareLink: payload,
-            session: getApiSessionOrThrow(payload.targetId),
-            trace: requestTraceContext
-          });
-        } else if (payload.targetType === SHARE_LINK_TARGET_TYPE_DECK) {
-          for (const session of listApiSessions(null).filter((entry) => entry.deckId === payload.targetId)) {
-            await messagingRuntime.observeShareChange({
-              action: "created",
-              shareLink: payload,
-              session,
-              trace: requestTraceContext
-            });
-          }
-        }
-        writeJsonResponse(201, payload);
-        return;
-      }
-
-      if (match.kind === "getShareLink") {
-        const payload = getApiShareLinkOrThrow(match.params.shareId);
-        validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      if (match.kind === "revokeShareLink") {
-        const payload = revokeShareLink(match.params.shareId);
-        validateResponse({ statusCode: 200, body: payload, expect: "shareLink" });
-        await persistNow("share-link.revoke");
-        if (payload.targetType === SHARE_LINK_TARGET_TYPE_SESSION) {
-          await messagingRuntime.observeShareChange({
-            action: "revoked",
-            shareLink: payload,
-            session: getApiSessionOrThrow(payload.targetId),
-            trace: requestTraceContext
-          });
-        } else if (payload.targetType === SHARE_LINK_TARGET_TYPE_DECK) {
-          for (const session of listApiSessions(null).filter((entry) => entry.deckId === payload.targetId)) {
-            await messagingRuntime.observeShareChange({
-              action: "revoked",
-              shareLink: payload,
-              session,
-              trace: requestTraceContext
-            });
-          }
-        }
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      if (match.kind === "listCustomCommands") {
-        const scope = parsedUrl.searchParams.get("scope");
-        const sessionId = parsedUrl.searchParams.get("sessionId");
-        const payload = listCustomCommands({
-          scope: scope ? normalizeCustomCommandScope(scope) : null,
-          sessionId
-        });
-        validateResponse({ statusCode: 200, body: payload, expect: "customCommandList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "getCustomCommand") {
-        const scope = parsedUrl.searchParams.get("scope");
-        const sessionId = parsedUrl.searchParams.get("sessionId");
-        const payload = getCustomCommandOrThrow(match.params.commandName, {
-          scope: scope ? normalizeCustomCommandScope(scope) : null,
-          sessionId
-        });
-        validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "upsertCustomCommand") {
-        const targetScope = normalizeCustomCommandScope(body?.scope);
-        const targetSessionId = targetScope === "session" ? normalizeCustomCommandSessionId(body?.sessionId) : "";
-        const existed = hasCustomCommand(match.params.commandName, {
-          scope: targetScope,
-          sessionId: targetSessionId
-        });
-        const payload = upsertCustomCommand(match.params.commandName, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "customCommand" });
-        broadcast({
-          type: existed ? "custom-command.updated" : "custom-command.created",
-          command: payload
-        }, requestTraceContext);
-        await persistNow("custom-command.upsert");
-        await messagingRuntime.syncTelegramCommandCatalog(requestTraceContext);
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteCustomCommand") {
-        const scope = parsedUrl.searchParams.get("scope");
-        const sessionId = parsedUrl.searchParams.get("sessionId");
-        const deletedCommand = deleteCustomCommand(match.params.commandName, {
-          scope: scope ? normalizeCustomCommandScope(scope) : null,
-          sessionId
-        });
-        broadcast({
-          type: "custom-command.deleted",
-          command: deletedCommand
-        }, requestTraceContext);
-        await persistNow("custom-command.delete");
-        await messagingRuntime.syncTelegramCommandCatalog(requestTraceContext);
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "listDecks") {
-        const payload = listDecks(auth);
-        validateResponse({ statusCode: 200, body: payload, expect: "deckList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "createDeck") {
-        const payload = createDeck(body);
-        validateResponse({ statusCode: 201, body: payload, expect: "deck" });
-        await persistNow("deck.create");
-        broadcastDeckUpsert("deck.created", payload, requestTraceContext);
-        writeJsonResponse( 201, payload);
-        return;
-      }
-
-      if (match.kind === "getDeck") {
-        const payload = toApiDeck(getDeckOrThrow(match.params.deckId, auth));
-        validateResponse({ statusCode: 200, body: payload, expect: "deck" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "updateDeck") {
-        const payload = updateDeck(match.params.deckId, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "deck" });
-        await persistNow("deck.update");
-        broadcastDeckUpsert("deck.updated", payload, requestTraceContext);
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteDeck") {
-        const force = parseBooleanQueryParam(parsedUrl.searchParams.get("force"), "force");
-        const result = deleteDeck(match.params.deckId, { force });
-        await persistNow("deck.delete");
-        for (const sessionId of result.reassignedSessionIds) {
-          broadcastSessionUpdated(sessionId, {
-            ...requestTraceContext,
-            sessionId,
-            deckId: result.fallbackDeckId
-          });
-        }
-        broadcastDeckDeleted(result.deckId, result.fallbackDeckId, requestTraceContext);
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "moveSessionToDeck") {
-        moveSessionToDeck(match.params.sessionId, match.params.deckId);
-        await persistNow("deck.move-session");
-        broadcastSessionUpdated(match.params.sessionId, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId,
-          deckId: match.params.deckId
-        });
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "listLayoutProfiles") {
-        const payload = listLayoutProfiles();
-        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfileList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "createLayoutProfile") {
-        const payload = createLayoutProfile(body);
-        validateResponse({ statusCode: 201, body: payload, expect: "layoutProfile" });
-        await persistNow("layout-profile.create");
-        writeJsonResponse( 201, payload);
-        return;
-      }
-
-      if (match.kind === "getLayoutProfile") {
-        const payload = toApiLayoutProfile(getLayoutProfileOrThrow(match.params.profileId));
-        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "updateLayoutProfile") {
-        const payload = updateLayoutProfile(match.params.profileId, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "layoutProfile" });
-        await persistNow("layout-profile.update");
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteLayoutProfile") {
-        deleteLayoutProfile(match.params.profileId);
-        await persistNow("layout-profile.delete");
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "listConnectionProfiles") {
-        const payload = listConnectionProfiles();
-        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfileList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "createConnectionProfile") {
-        const payload = createConnectionProfile(body);
-        validateResponse({ statusCode: 201, body: payload, expect: "connectionProfile" });
-        await persistNow("connection-profile.create");
-        writeJsonResponse( 201, payload);
-        return;
-      }
-
-      if (match.kind === "getConnectionProfile") {
-        const payload = toApiConnectionProfile(getConnectionProfileOrThrow(match.params.profileId));
-        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "updateConnectionProfile") {
-        const payload = updateConnectionProfile(match.params.profileId, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "connectionProfile" });
-        await persistNow("connection-profile.update");
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteConnectionProfile") {
-        deleteConnectionProfile(match.params.profileId);
-        await persistNow("connection-profile.delete");
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "listWorkspacePresets") {
-        const payload = listWorkspacePresets();
-        validateResponse({ statusCode: 200, body: payload, expect: "workspacePresetList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "createWorkspacePreset") {
-        const payload = createWorkspacePreset(body);
-        validateResponse({ statusCode: 201, body: payload, expect: "workspacePreset" });
-        await persistNow("workspace-preset.create");
-        writeJsonResponse( 201, payload);
-        return;
-      }
-
-      if (match.kind === "getWorkspacePreset") {
-        const payload = toApiWorkspacePreset(getWorkspacePresetOrThrow(match.params.presetId));
-        validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "updateWorkspacePreset") {
-        const payload = updateWorkspacePreset(match.params.presetId, body);
-        validateResponse({ statusCode: 200, body: payload, expect: "workspacePreset" });
-        await persistNow("workspace-preset.update");
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteWorkspacePreset") {
-        deleteWorkspacePreset(match.params.presetId);
-        await persistNow("workspace-preset.delete");
-        writeJsonResponse( 204);
-        return;
-      }
-
-      if (match.kind === "listSshTrustEntries") {
-        const payload = listSshTrustEntries();
-        validateResponse({ statusCode: 200, body: payload, expect: "sshTrustEntryList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "createSshTrustEntry") {
-        const { created, entry } = upsertSshTrustEntry(body);
-        await syncSshKnownHostsFile();
-        await persistNow(created ? "ssh-trust-entry.create" : "ssh-trust-entry.reuse");
-        validateResponse({ statusCode: created ? 201 : 200, body: entry, expect: "sshTrustEntry" });
-        writeJsonResponse( created ? 201 : 200, entry);
-        return;
-      }
-
-      if (match.kind === "probeSshHostKeys") {
-        const payload = await probeSshHostKeysOrThrow(body);
-        validateResponse({ statusCode: 200, body: payload, expect: "sshHostKeyProbeCandidateList" });
-        writeJsonResponse( 200, payload);
-        return;
-      }
-
-      if (match.kind === "deleteSshTrustEntry") {
-        deleteSshTrustEntry(match.params.entryId);
-        await syncSshKnownHostsFile();
-        await persistNow("ssh-trust-entry.delete");
-        writeJsonResponse( 204);
+      if (await resourceDispatch.dispatchResourceRequest({
+        match,
+        parsedUrl,
+        body,
+        auth,
+        req,
+        requestContext,
+        requestTraceContext,
+        writeJsonResponse
+      })) {
         return;
       }
 
