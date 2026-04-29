@@ -175,6 +175,72 @@ test("telegram inbound command parsing stays deterministic for catalog-backed co
   assert.equal(parseTelegramInboundCommand({ text: "/unknown" }, catalog), null);
 });
 
+test("telegram transport fails closed on malformed API responses and normalizes default request values", async () => {
+  assert.throws(() => createTelegramTransport({ botToken: "" }), /requires a bot token/);
+
+  const requests = [];
+  const transport = createTelegramTransport({
+    botToken: "bot-token",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      if (url.endsWith("/getUpdates")) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              ok: true,
+              result: []
+            };
+          }
+        };
+      }
+      if (url.endsWith("/createForumTopic")) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              ok: true,
+              result: {
+                message_thread_id: 77,
+                name: ""
+              }
+            };
+          }
+        };
+      }
+      if (url.endsWith("/sendMessage")) {
+        return {
+          ok: false,
+          async json() {
+            return {
+              ok: false,
+              description: "Too Many Requests: retry after 9"
+            };
+          }
+        };
+      }
+      return {
+        ok: false,
+        status: 500,
+        async json() {
+          throw new Error("bad json");
+        }
+      };
+    }
+  });
+
+  const updates = await transport.getUpdates({ timeoutSeconds: " 7 " });
+  const topic = await transport.createForumTopic({ chatId: "-1001", name: "   " });
+  await assert.rejects(() => transport.sendMessage({ chatId: "1001", text: "hello" }), /retry after 9/i);
+  await assert.rejects(() => transport.answerCallbackQuery({ callbackQueryId: "cb-1" }), /status 500/i);
+
+  assert.deepEqual(updates, []);
+  assert.equal(topic.messageThreadId, 77);
+  assert.equal(topic.name, "ptydeck");
+  assert.deepEqual(JSON.parse(requests[0].options.body), { timeout: 7 });
+  assert.deepEqual(JSON.parse(requests[1].options.body), { chat_id: "-1001", name: "ptydeck" });
+});
+
 test("telegram adapter syncs published commands and uses the synced catalog for inbound parsing", async () => {
   const commandSyncCalls = [];
   const inboundCalls = [];

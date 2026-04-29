@@ -75,3 +75,57 @@ test("terminal messaging core rejects malformed explicit message intent input", 
     /deliveryAdapters entries must be DeliveryAdapter descriptors/
   );
 });
+
+test("terminal messaging core normalizes descriptor and intent payload metadata deterministically", () => {
+  const deliveryAdapter = createDeliveryAdapterDescriptor({
+    adapterId: " telegram ",
+    channel: " chat ",
+    capabilities: [" send_message ", "", null, "thread_topics"],
+    metadata: {
+      " display ": " Telegram ",
+      enabled: true,
+      retries: 2,
+      empty: "   ",
+      skip: null,
+      nested: { nope: true }
+    }
+  });
+
+  const intent = createMessageIntent({
+    sessionId: " session-4 ",
+    text: "  Multi   word  summary  ",
+    deliveryAdapters: "invalid",
+    routing: {
+      " deliveryBlockKey ": " block-4 ",
+      active: true,
+      retryCount: 1,
+      empty: " ",
+      nested: { skip: true }
+    },
+    metadata: {
+      " actor ": " operator ",
+      muted: false,
+      attempts: 3,
+      empty: "",
+      nested: ["skip"]
+    }
+  });
+
+  assert.deepEqual(deliveryAdapter, {
+    entityType: "DeliveryAdapter",
+    adapterId: "telegram",
+    channel: "chat",
+    capabilities: Object.freeze(["send_message", "thread_topics"]),
+    metadata: Object.freeze({
+      display: "Telegram",
+      enabled: true,
+      retries: 2
+    })
+  });
+  assert.match(intent.intentId, /^intent:/u);
+  assert.equal(intent.sessionId, "session-4");
+  assert.equal(intent.comparableText, "multi word summary");
+  assert.deepEqual(intent.deliveryAdapters, Object.freeze([]));
+  assert.deepEqual(intent.routing, Object.freeze({ deliveryBlockKey: "block-4", active: true, retryCount: 1 }));
+  assert.deepEqual(intent.metadata, Object.freeze({ actor: "operator", muted: false, attempts: 3 }));
+});

@@ -132,3 +132,55 @@ test('normalizeCustomCommandPayloadForShell escapes only unmatched single quotes
   assert.equal(normalizeCustomCommandPayloadForShell('echo \\\\'), 'echo \\\\');
   assert.equal(normalizeCustomCommandPayloadForShell("echo 'open\nsecond \\\\'quoted"), "echo \\\'open\nsecond \\\\\\'quoted");
 });
+
+test('custom command transport helpers fail closed on malformed inputs and preserve deterministic tie-breaking', () => {
+  assert.equal(normalizeCustomCommandRecord(null), null);
+  assert.equal(
+    resolveCustomCommandForSession(
+      [
+        { name: 'deploy', scope: 'session', sessionId: 's-1', content: 'echo session', createdAt: 5, updatedAt: 10 },
+        { name: 'deploy', scope: 'session', sessionId: 's-1', content: 'echo session-later', createdAt: 5, updatedAt: 11 },
+        { name: 'deploy', scope: 'session', sessionId: 's-1', content: 'echo session-earlier', createdAt: 4, updatedAt: 11 },
+        { name: 'deploy', scope: 'session', sessionId: 's-2', content: 'echo hidden' },
+        { bogus: true }
+      ],
+      'deploy',
+      's-1'
+    )?.content,
+    'echo session-earlier'
+  );
+
+  assert.deepEqual(
+    parseCustomCommandInvocation('/plain -- deck:ops', { name: 'plain', scope: 'project', kind: 'plain', content: 'echo hi' }),
+    { ok: true, parameterAssignments: {}, targetSelector: '-- deck:ops' }
+  );
+  assert.match(
+    parseCustomCommandInvocation('/doc-u invalid-token', {
+      name: 'doc-u',
+      kind: 'template',
+      scope: 'project',
+      content: 'echo {{param:topic}}'
+    }).error,
+    /uses 'key=value' parameters/
+  );
+  assert.equal(parseCustomCommandInvocation('/missing topic=a', null).ok, false);
+
+  assert.deepEqual(
+    renderCustomCommandForSession(
+      {
+        name: 'doc-u',
+        kind: 'template',
+        scope: 'project',
+        content: 'echo {{param:topic}} {{var:session.cwd}} {{var:session.note}} {{var:deck.id}}'
+      },
+      { id: 's-1', cwd: '/tmp/work', note: 'keep', deckId: 'ops' },
+      { id: 'ops', name: 'Operations' },
+      { topic: 'health' }
+    ),
+    {
+      ok: true,
+      text: 'echo health /tmp/work keep ops'
+    }
+  );
+  assert.equal(renderCustomCommandForSession(null, {}, null, {}).ok, false);
+});

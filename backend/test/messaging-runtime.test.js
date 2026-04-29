@@ -210,6 +210,43 @@ test("messaging message policy returns explicit new, update, alert, and suppress
   assert.deepEqual(suppressed, { action: "suppress", messageKey: "status", reason: "duplicate_signature" });
 });
 
+test("messaging runtime normalization helpers fail closed on malformed targets and empty message-policy input", () => {
+  assert.deepEqual(normalizeMessagingTargets("invalid"), []);
+  assert.deepEqual(
+    normalizeMessagingTargets(
+      [
+        { adapterId: "discord", channelId: "ops-room", sessionName: "build-run" },
+        { adapterId: "telegram", chatId: "1001" },
+        { adapterId: "telegram", chatId: "1002", topicMode: "deck-session" }
+      ],
+      { includeAdapterId: true }
+    ),
+    [
+      {
+        adapterId: "telegram",
+        chatId: "1002",
+        channelId: "1002",
+        sessionId: "",
+        quickIdToken: "",
+        sessionName: "",
+        topicMode: "deck-session"
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    applyMessagingMessagePolicy({ threadKey: "status", text: "   " }, { messageCreated: true }),
+    { action: "suppress", messageKey: "status", reason: "empty" }
+  );
+  assert.deepEqual(
+    applyMessagingMessagePolicy(
+      { threadKey: "status", text: "summary", comparableText: "summary", deliveryBlockKey: "block-2" },
+      { messageCreated: true, lastComparableText: "summary", lastDeliveryBlockKey: "block-1" }
+    ),
+    { action: "update", messageKey: "status", reason: "status_update" }
+  );
+});
+
 test("transport-only messaging runtime reports adapter status and captures session traces", async () => {
   const telegram = createTelegramTransportStub();
   const runtime = createMessagingRuntime({
@@ -500,6 +537,61 @@ test("transport-only messaging runtime covers retry-unavailable and custom-comma
     assert.match(telegram.sentMessages[1].text, /Template custom command \/bad is invalid\./u);
     assert.match(telegram.sentMessages[2].text, /resolved to empty terminal input/u);
     assert.match(telegram.sentMessages[3].text, /cannot redirect to another target/u);
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test("transport-only messaging runtime falls back deterministically for unavailable sessions, cached retries, and missing custom commands", async () => {
+  const telegram = createTelegramTransportStub();
+  const session = createSession({ id: "s-fallback", name: "build-run", state: "running" });
+  let commandRegistry = [
+    {
+      name: "docu",
+      scope: "project",
+      kind: "plain",
+      content: "echo hi"
+    }
+  ];
+  let resolveCalls = 0;
+  const retryRequests = [];
+  const runtime = createMessagingRuntime({
+    telegramBotToken: "telegram-token",
+    telegramTargets: [{ sessionName: "build-run", chatId: "-100200300" }],
+    telegramOutboundEnabled: true,
+    telegramInboundEnabled: true,
+    telegramPollTimeoutSeconds: 1,
+    createTelegramTransport: () => telegram.transport,
+    resolveSessionForMessagingTarget: async () => {
+      resolveCalls += 1;
+      if (resolveCalls === 1) {
+        throw new Error("Live session lookup failed.");
+      }
+      throw new Error("Transient live lookup failed.");
+    },
+    requestMessagingRetry: async (...args) => {
+      retryRequests.push(args);
+      return null;
+    },
+    listCustomCommands: () => commandRegistry,
+    logDebug() {}
+  });
+
+  await runtime.start();
+  try {
+    commandRegistry = [];
+    telegram.updateQueue.push(createTelegramCallbackUpdate(1, "ptydeck:status"));
+    await waitFor(() => telegram.sentMessages.length >= 1, 2000);
+    assert.match(telegram.sentMessages[0].text, /Live session lookup failed\./u);
+
+    await runtime.ensureSessionTarget(session, { traceId: "t-cache", correlationId: "c-cache" });
+    telegram.updateQueue.push(createTelegramCallbackUpdate(2, "ptydeck:retry"));
+    telegram.updateQueue.push(createTelegramMessageUpdate(3, "/docu"));
+    await waitFor(() => telegram.sentMessages.length >= 3, 2000);
+
+    assert.equal(retryRequests.length, 1);
+    assert.match(telegram.sentMessages[1].text, /Retry started for \[4\] build-run\./u);
+    assert.match(telegram.sentMessages[2].text, /Custom command \/docu is unavailable for \[4\] build-run\./u);
   } finally {
     await runtime.stop();
   }

@@ -454,3 +454,80 @@ test("terminal app identity arbitration keeps stronger explicit coding-agent lab
   assert.equal(reconciled.current.label, "codex");
   assert.equal(reconciled.current.source, "explicit-hint");
 });
+
+test("deriveTerminalAppIdentityFromForegroundProcess preserves a known identity when later inspections become unknown", () => {
+  const existingIdentity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 510,
+        executableName: "codex",
+        comm: "codex",
+        name: "codex",
+        commandLine: ["codex", "--json"]
+      }
+    },
+    { updatedAt: 1710000000017 }
+  );
+
+  const identity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 511,
+        executableName: "",
+        comm: "",
+        name: "",
+        commandLine: []
+      }
+    },
+    { existingIdentity, updatedAt: 1710000000018 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
+  assert.equal(identity.updatedAt, existingIdentity.updatedAt);
+});
+
+test("deriveTerminalAppIdentityFromTerminalSignals preserves updatedAt when reconciliation keeps the same identity", () => {
+  const existingIdentity = deriveTerminalAppIdentityFromTerminalSignals(
+    {
+      shellPhase: "prompt",
+      lastShellMarkerProtocol: "osc-133",
+      lastShellMarker: "prompt-start",
+      lastShellMarkerAt: 1710000000019,
+      currentDirectory: "/workspace/code/ptydeck",
+      currentDirectoryProtocol: "osc-1337",
+      currentDirectoryUpdatedAt: 1710000000019,
+      alternateScreenActive: false,
+      alternateScreenCode: null,
+      alternateScreenUpdatedAt: null
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000019 }
+  );
+
+  const identity = deriveTerminalAppIdentityFromTerminalSignals(
+    {
+      shellPhase: "prompt",
+      lastShellMarkerProtocol: "osc-133",
+      lastShellMarker: "prompt-start",
+      lastShellMarkerAt: 1710000000019,
+      currentDirectory: "/workspace/code/ptydeck",
+      currentDirectoryProtocol: "osc-1337",
+      currentDirectoryUpdatedAt: 1710000000019,
+      alternateScreenActive: false,
+      alternateScreenCode: null,
+      alternateScreenUpdatedAt: null
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { existingIdentity, updatedAt: 1710000000999 }
+  );
+
+  assert.equal(identity.family, "shell");
+  assert.equal(identity.label, "bash");
+  assert.equal(identity.source, "shell-marker");
+  assert.equal(identity.updatedAt, existingIdentity.updatedAt);
+});
