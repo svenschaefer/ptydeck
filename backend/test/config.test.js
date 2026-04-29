@@ -385,7 +385,7 @@ test("loadConfig rejects invalid data encryption configuration", () => {
   );
   assert.throws(
     () => loadConfig({ DATA_ENCRYPTION_KEYS: "key-a:not-base64", DATA_ENCRYPTION_ACTIVE_KEY_ID: "key-a" }),
-    /must be 32 bytes/
+    /contains invalid base64 key/
   );
 });
 

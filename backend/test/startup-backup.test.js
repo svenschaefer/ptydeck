@@ -106,6 +106,99 @@ test("startup data backup blocks startup when payload copy is missing for an exi
   );
 });
 
+test("startup data backup fails closed for malformed manifest field combinations and unexpected manifest read errors", async () => {
+  const dataPath = "/tmp/ptydeck-startup-backup-malformed.json";
+  const malformedCases = [
+    "",
+    "[]",
+    JSON.stringify({
+      format: "wrong",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: "",
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: "1",
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: "",
+      sourceExisted: false,
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: "yes",
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: true,
+      payloadBackupPath: ""
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: "/tmp/stray-payload"
+    }),
+    JSON.stringify({
+      format: "ptydeck.startup-backup.v1",
+      backupId: STARTUP_BACKUP_ID,
+      createdAt: 1,
+      sourcePath: dataPath,
+      sourceExisted: false,
+      payloadBackupPath: 42
+    })
+  ];
+
+  for (const manifestRaw of malformedCases) {
+    await assert.rejects(
+      readStartupDataBackup({
+        dataPath,
+        readFileFn: async () => manifestRaw
+      }),
+      /invalid or incompatible rollback backup manifest/
+    );
+  }
+
+  const unexpectedError = Object.assign(new Error("permission denied"), { code: "EACCES" });
+  await assert.rejects(
+    ensureStartupDataBackup({
+      dataPath,
+      readFileFn: async () => {
+        throw unexpectedError;
+      }
+    }),
+    (error) => error === unexpectedError
+  );
+});
+
 test("startup data backup read helper rejects a manifest whose backup id no longer matches", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ptydeck-startup-backup-"));
   const dataPath = join(dir, "sessions.json");
@@ -125,6 +218,21 @@ test("startup data backup read helper rejects a manifest whose backup id no long
   await assert.rejects(
     readStartupDataBackup({ dataPath }),
     /invalid or incompatible rollback backup manifest/
+  );
+});
+
+test("startup data backup read helper fails closed when no manifest exists", async () => {
+  const dataPath = "/tmp/ptydeck-startup-backup-missing.json";
+  await assert.rejects(
+    readStartupDataBackup({
+      dataPath,
+      readFileFn: async () => {
+        const error = new Error("missing");
+        error.code = "ENOENT";
+        throw error;
+      }
+    }),
+    /no rollback backup manifest exists/
   );
 });
 
@@ -264,6 +372,82 @@ test("startup data backup restore fails when the restored payload cannot be veri
       }
     }),
     /restored data .* did not verify/
+  );
+});
+
+test("startup data backup restore and creation rethrow unexpected read failures outside ENOENT fallbacks", async () => {
+  const dataPath = "/tmp/ptydeck-startup-backup-error-paths.json";
+  const manifestPath = `${dataPath}.pre-h62-backup.json`;
+  const payloadBackupPath = `${dataPath}.pre-h62-backup`;
+  const manifest = JSON.stringify({
+    format: "ptydeck.startup-backup.v1",
+    backupId: STARTUP_BACKUP_ID,
+    createdAt: 1,
+    sourcePath: dataPath,
+    sourceExisted: true,
+    payloadBackupPath
+  }, null, 2);
+
+  const payloadReadError = Object.assign(new Error("payload unavailable"), { code: "EIO" });
+  await assert.rejects(
+    ensureStartupDataBackup({
+      dataPath,
+      readFileFn: async (path) => {
+        if (path === manifestPath) {
+          return manifest;
+        }
+        if (path === payloadBackupPath) {
+          throw payloadReadError;
+        }
+        throw new Error(`unexpected path ${path}`);
+      }
+    }),
+    (error) => error === payloadReadError
+  );
+
+  const sourceReadError = Object.assign(new Error("source unavailable"), { code: "EACCES" });
+  await assert.rejects(
+    ensureStartupDataBackup({
+      dataPath,
+      mkdirFn: async () => {},
+      readFileFn: async (path) => {
+        if (path === manifestPath) {
+          const error = new Error("missing manifest");
+          error.code = "ENOENT";
+          throw error;
+        }
+        if (path === dataPath) {
+          throw sourceReadError;
+        }
+        throw new Error(`unexpected path ${path}`);
+      }
+    }),
+    (error) => error === sourceReadError
+  );
+
+  const restoreReadError = Object.assign(new Error("unexpected restore read"), { code: "EIO" });
+  await assert.rejects(
+    restoreStartupDataBackup({
+      dataPath,
+      rmFn: async () => {},
+      readFileFn: async (path) => {
+        if (path === manifestPath) {
+          return JSON.stringify({
+            format: "ptydeck.startup-backup.v1",
+            backupId: STARTUP_BACKUP_ID,
+            createdAt: 1,
+            sourcePath: dataPath,
+            sourceExisted: false,
+            payloadBackupPath: ""
+          }, null, 2);
+        }
+        if (path === dataPath) {
+          throw restoreReadError;
+        }
+        throw new Error(`unexpected path ${path}`);
+      }
+    }),
+    (error) => error === restoreReadError
   );
 });
 

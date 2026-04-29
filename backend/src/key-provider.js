@@ -1,8 +1,19 @@
 function decodeKeyBase64(base64Value, keyId) {
+  if (
+    typeof base64Value !== "string" ||
+    !base64Value ||
+    base64Value.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/u.test(base64Value)
+  ) {
+    throw new Error(`DATA_ENCRYPTION_KEYS contains invalid base64 key for id '${keyId}'.`);
+  }
   let keyBuffer;
   try {
     keyBuffer = Buffer.from(base64Value, "base64");
   } catch {
+    throw new Error(`DATA_ENCRYPTION_KEYS contains invalid base64 key for id '${keyId}'.`);
+  }
+  if (keyBuffer.toString("base64") !== base64Value) {
     throw new Error(`DATA_ENCRYPTION_KEYS contains invalid base64 key for id '${keyId}'.`);
   }
   if (keyBuffer.length !== 32) {
@@ -46,7 +57,7 @@ export function createDataEncryptionProvider(rawKeys, rawActiveKeyId) {
     .filter(Boolean)
     .map((entry) => {
       const separatorIndex = entry.indexOf(":");
-      if (separatorIndex <= 0 || separatorIndex === entry.length - 1) {
+      if (separatorIndex === -1 || separatorIndex === entry.length - 1) {
         throw new Error("DATA_ENCRYPTION_KEYS entries must use 'keyId:base64Key' format.");
       }
       const id = entry.slice(0, separatorIndex).trim();

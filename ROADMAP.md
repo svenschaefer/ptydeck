@@ -23,7 +23,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-236` Owner `BE`: backend startup/trust/PTY-write reliability coverage hardening.
    - `QLT-237` Owner `BE`: retained transport-only messaging/identity coverage hardening.
    - `QLT-238` Owner `FE`: frontend runtime-composition seam extraction and direct tests.
    - `QLT-239` Owner `FE`: frontend utility/debug/search controller coverage hardening.
@@ -31,13 +30,13 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-236` and `QLT-237` should now target the reduced runtime seam delivered in `QLT-235` and are otherwise independent of each other.
+- `QLT-237` should now target the reduced runtime seam delivered in `QLT-235` plus the fail-closed reliability baseline completed in `QLT-236`, without reopening removed automatic outbound behavior.
 - `QLT-238` should land before `QLT-239` and `QLT-240` so the remaining frontend operator-path coverage work lands against a smaller, more explicit runtime-composition boundary.
 
 ## Wave Exit Criteria
 
 - Root-tooling coverage still clears the enforced threshold while the remaining repo-owned helper hotspots gain direct deterministic regressions.
-- The promoted backend runtime, startup/trust/write, and retained transport/identity hotspot files gain direct coverage and, where needed, smaller extracted seams.
+- The promoted backend retained transport/identity hotspot files gain direct coverage and, where needed, smaller extracted seams on top of the already-closed runtime and reliability slices.
 - The promoted frontend runtime-composition, utility/debug/search, and composer/workflow/settings/preset hotspot files gain direct deterministic coverage.
 - Promoted tasks leave `TODO.md` with open work only and `ROADMAP.md` with active or queued sequencing only.
 - Generated handbook/reference artifacts stay synchronized with their markdown/code sources.

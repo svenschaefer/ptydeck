@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   attachNodePtyAsyncWritePatch,
+  clearNodePtyAsyncWriteMeta,
   queueNodePtyAsyncWriteMeta
 } from "../src/node-pty-write-retry.js";
 
@@ -133,4 +134,111 @@ test("node-pty async write patch surfaces structured failure after EINTR retry e
     ]
   );
   assert.equal(pty._writeStream._writeQueue.length, 0);
+});
+
+test("node-pty async write patch handles EAGAIN scheduling, patch reuse, and queued-meta clearing deterministically", async () => {
+  const pty = createPatchablePty();
+  const events = [];
+  const scheduled = [];
+  const cleared = [];
+  let fsWriteCalls = 0;
+
+  attachNodePtyAsyncWritePatch(pty, {
+    fsWrite(fd, buffer, offset, callback) {
+      callback(null, buffer.byteLength - offset);
+    },
+    setImmediateFn(callback) {
+      const token = { callback };
+      scheduled.push(token);
+      return token;
+    },
+    clearImmediateFn(token) {
+      cleared.push(token);
+    },
+    onAsyncWriteEvent() {
+      throw new Error("observer failure should be swallowed");
+    }
+  });
+
+  assert.equal(
+    attachNodePtyAsyncWritePatch(pty, {
+      maxEintrRetries: 0,
+      fsWrite(fd, buffer, offset, callback) {
+        fsWriteCalls += 1;
+        if (fsWriteCalls === 1 || fsWriteCalls === 3) {
+          callback(Object.assign(new Error("busy"), { code: "EAGAIN" }), 0);
+          return;
+        }
+        callback(null, buffer.byteLength - offset);
+      },
+      setImmediateFn(callback) {
+        const token = { callback };
+        scheduled.push(token);
+        return token;
+      },
+      clearImmediateFn(token) {
+        cleared.push(token);
+      },
+      onAsyncWriteEvent(event) {
+        events.push(event);
+      }
+    }),
+    true
+  );
+
+  queueNodePtyAsyncWriteMeta(pty, {
+    sessionId: "session-2",
+    writeKind: "body",
+    bytes: 3,
+    trace: { correlationId: "corr-3" }
+  });
+  clearNodePtyAsyncWriteMeta(pty);
+  pty.write("");
+  assert.equal(pty._writeStream._writeQueue.length, 0);
+
+  queueNodePtyAsyncWriteMeta(pty, {
+    sessionId: "session-2",
+    writeKind: "body",
+    bytes: 3,
+    trace: { correlationId: "corr-3" }
+  });
+  pty.write("abc");
+
+  assert.equal(pty._writeStream._writeQueue.length, 1);
+  assert.equal(scheduled.length, 1);
+  const [scheduledToken] = scheduled.splice(0, 1);
+  scheduledToken.callback();
+
+  await waitFor(() => events.some((event) => event.phase === "committed"));
+
+  assert.deepEqual(events, [
+    {
+      sessionId: "session-2",
+      phase: "committed",
+      writeKind: "body",
+      bytes: 3,
+      trace: { correlationId: "corr-3" },
+      failureStage: "async",
+      retryCount: 0
+    }
+  ]);
+  assert.equal(pty._writeStream._writeQueue.length, 0);
+
+  queueNodePtyAsyncWriteMeta(pty, {
+    sessionId: "session-2",
+    writeKind: "body",
+    bytes: 3
+  });
+  pty.write("xyz");
+  assert.ok(pty._writeStream._writeImmediate);
+  pty._writeStream.dispose();
+  assert.equal(pty._writeStream._writeImmediate, undefined);
+  assert.equal(cleared.length > 0, true);
+  assert.equal(pty._writeStream._writeQueue.length, 1);
+});
+
+test("node-pty async write patch rejects unpatchable PTYs and tolerates absent meta helpers", () => {
+  assert.equal(attachNodePtyAsyncWritePatch(null), false);
+  assert.equal(attachNodePtyAsyncWritePatch({ _writeStream: {}, _write() {} }), false);
+  clearNodePtyAsyncWriteMeta({});
 });

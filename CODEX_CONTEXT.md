@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (QLT-235 runtime lifecycle/admission seam extraction completed, H158 remains active for backend/frontend quality follow-up, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (QLT-236 backend reliability coverage hardening completed, H158 remains active for transport-only messaging plus frontend quality follow-up, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: `QLT-236` through `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` and `QLT-235` closed the root-tooling and backend runtime-seam slices.
+- `TODO.md`: `QLT-237` through `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` through `QLT-236` closed the root-tooling plus backend runtime/reliability slices.
 - `ROADMAP.md`: `v0.4.0-H158` is now the active release wave for those quality/coverage tasks.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -190,12 +190,12 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Repository Quality Review (2026-04-29)
 
-The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` plus `QLT-235` have now closed the first root-tooling and backend runtime-seam slices from that review.
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` through `QLT-236` have now closed the root-tooling plus backend runtime/reliability slices from that review.
 
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.01%` line / `87.11%` branch
+- backend: `94.20%` line / `87.39%` branch
 - frontend: `95.48%` line / `87.17%` branch
 
 The new review promoted only the still-relevant gaps into `TODO.md`:
@@ -207,8 +207,8 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
 - Backend:
   - `QLT-235` extracted startup warmup lifecycle and WebSocket ticket admission/disconnect classification into `backend/src/runtime-startup-warmup.js` and `backend/src/runtime-ws-tickets.js`, removing `165` inline lines from `backend/src/runtime.js` while adding direct deterministic seam coverage for those lifecycle/admission branches.
   - `backend/src/runtime-startup-warmup.js` now validates at `95.16%` line / `83.33%` branch coverage, and `backend/src/runtime-ws-tickets.js` validates at `100.00%` line / `92.31%` branch coverage.
-  - `backend/src/runtime.js` remains the largest backend monolith at `7432` lines and `82.08%` line / `75.97%` branch coverage, so the remaining backend wave should now focus on reliability/supporting seams rather than reopening the just-extracted warmup/ticket path.
-  - `backend/src/startup-backup.js`, `backend/src/key-provider.js`, `backend/src/ssh-host-key-probe.js`, and `backend/src/node-pty-write-retry.js` still carry relevant reliability branches in the `85%` to `87%` line-coverage range.
+  - `QLT-236` then closed the promoted reliability/supporting seams without reopening runtime product logic: `backend/src/startup-backup.js` now validates at `97.21%` line / `97.20%` branch coverage, `backend/src/key-provider.js` at `95.00%` line / `94.74%` branch coverage, `backend/src/ssh-host-key-probe.js` at `89.88%` line / `89.01%` branch coverage, and `backend/src/node-pty-write-retry.js` at `97.22%` line / `82.86%` branch coverage.
+  - `backend/src/runtime.js` remains the largest backend monolith at `82.12%` line / `76.04%` branch coverage, so the remaining backend wave should now stay on the retained transport/identity seams rather than reopening the just-closed reliability baseline.
   - The retained transport-only messaging/identity baseline still has direct branch blind spots in `backend/src/messaging-runtime.js`, `backend/src/messaging-custom-command-utils.js`, `backend/src/telegram-adapter.js`, `backend/src/terminal-messaging-core.js`, and `backend/src/terminal-app-identity.js`.
 - Frontend:
   - `frontend/src/public/app-runtime-composition-controller.js` remains the largest behavior-heavy frontend monolith at `1894` lines and `86.33%` line / `62.22%` branch coverage.
@@ -218,7 +218,7 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
 
 The remaining promoted follow-up wave is therefore:
 
-- `QLT-236` through `QLT-240` under `v0.4.0-H158`
+- `QLT-237` through `QLT-240` under `v0.4.0-H158`
 
 ## Frontend Runtime-State and Plugin Baseline
 
