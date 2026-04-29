@@ -28,6 +28,12 @@ import {
 } from "./custom-command-model.js";
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
 import {
+  createCommandExecutorSessionHandlers,
+  resolveActiveOrDirectTargetSession as resolveActiveOrDirectTargetSessionWithSelectors,
+  resolveDirectTargetSession as resolveDirectTargetSessionWithSelectors,
+  resolveSingleSessionForCommand as resolveSingleSessionForCommandWithSelectors
+} from "./command-executor-session-handlers.js";
+import {
   formatThemeIoFormats,
   parseExternalThemeProfile,
   serializeExternalThemeProfile
@@ -537,42 +543,36 @@ export function createCommandExecutor(options = {}) {
   }
 
   function resolveSingleSessionForCommand(selectorText, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
-    const normalizedSelector = String(selectorText || "").trim();
-    if (!normalizedSelector || normalizedSelector.toLowerCase() === "active") {
-      if (!activeSessionId) {
-        return { error: missingActiveMessage, session: null };
-      }
-      const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
-      if (!activeSession) {
-        return { error: missingActiveMessage, session: null };
-      }
-      return { error: "", session: activeSession };
-    }
-
-    const resolvedTargets = resolveTargetSelectors(normalizedSelector, sessions, { source: "slash" });
-    if (resolvedTargets.error) {
-      return { error: resolvedTargets.error, session: null };
-    }
-    if (resolvedTargets.sessions.length !== 1) {
-      return { error: `${selectorLabel} must resolve to exactly one session.`, session: null };
-    }
-    return { error: "", session: resolvedTargets.sessions[0] };
+    return resolveSingleSessionForCommandWithSelectors(
+      selectorText,
+      sessions,
+      activeSessionId,
+      missingActiveMessage,
+      selectorLabel,
+      resolveTargetSelectors
+    );
   }
 
   function resolveDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
-    const targetSelector = String(interpreted?.targetSelector || "").trim();
-    if (!targetSelector) {
-      return { error: "", session: null };
-    }
-    return resolveSingleSessionForCommand(targetSelector, sessions, activeSessionId, missingActiveMessage, selectorLabel);
+    return resolveDirectTargetSessionWithSelectors(
+      interpreted,
+      sessions,
+      activeSessionId,
+      missingActiveMessage,
+      selectorLabel,
+      resolveTargetSelectors
+    );
   }
 
   function resolveActiveOrDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel) {
-    const directTarget = resolveDirectTargetSession(interpreted, sessions, activeSessionId, missingActiveMessage, selectorLabel);
-    if (directTarget.error || directTarget.session) {
-      return directTarget;
-    }
-    return resolveSingleSessionForCommand("", sessions, activeSessionId, missingActiveMessage, selectorLabel);
+    return resolveActiveOrDirectTargetSessionWithSelectors(
+      interpreted,
+      sessions,
+      activeSessionId,
+      missingActiveMessage,
+      selectorLabel,
+      resolveTargetSelectors
+    );
   }
 
   function buildReplayExcerptSummary(payload) {
@@ -739,6 +739,26 @@ export function createCommandExecutor(options = {}) {
     writeClipboardText,
     resolveDeckToken,
     formatShareLinkSummary
+  });
+
+  const sessionHandlers = createCommandExecutorSessionHandlers({
+    formatUsage,
+    getActiveDeck,
+    setActiveDeck,
+    setActiveSession: (sessionId) => store.setActiveSession(sessionId),
+    resolveTargetSelectors,
+    resolveSessionDeckId,
+    formatSessionToken,
+    formatSessionDisplayName,
+    isSessionExited,
+    isSessionActionBlocked,
+    getBlockedSessionActionMessage,
+    requestRender,
+    resolveDirectTargetSession,
+    resolveActiveOrDirectTargetSession,
+    swapSessionTokens,
+    applyRuntimeEvent,
+    api
   });
 
   function renderCustomCommandForTargets(commandName, exactCustom, targetSessions, parameterAssignments, decks, commands, sessions) {
@@ -1066,232 +1086,15 @@ export function createCommandExecutor(options = {}) {
       return `Created session [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
     }
 
-    if (command === "close") {
-      if (sessions.length === 0) {
-        return "No sessions available.";
-      }
-      let targetSessions = [];
-      if (args.length === 0) {
-        if (!activeSessionId) {
-          return "No active session to close.";
-        }
-        const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
-        if (!activeSession) {
-          return "No active session to close.";
-        }
-        targetSessions = [activeSession];
-      } else {
-        const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
-        if (resolvedTargets.error) {
-          return resolvedTargets.error;
-        }
-        targetSessions = resolvedTargets.sessions;
-      }
-      if (targetSessions.length === 0) {
-        return "No active session to close.";
-      }
-      const exitedTargets = targetSessions.filter((session) => isSessionExited(session));
-      const liveTargets = targetSessions.filter((session) => !isSessionExited(session));
-      await Promise.all(liveTargets.map((session) => api.deleteSession(session.id)));
-      for (const session of targetSessions) {
-        applyRuntimeEvent({ type: "session.closed", sessionId: session.id });
-      }
-      if (exitedTargets.length > 0 && liveTargets.length === 0) {
-        return exitedTargets.length === 1
-          ? `Removed exited session [${formatSessionToken(exitedTargets[0].id)}] ${formatSessionDisplayName(exitedTargets[0])}.`
-          : `Removed ${exitedTargets.length} exited sessions.`;
-      }
-      if (targetSessions.length === 1) {
-        return `Closed session ${targetSessions[0].id.slice(0, 8)}.`;
-      }
-      return `Closed ${targetSessions.length} sessions.`;
-    }
-
-    if (command === "switch") {
-      if (args.length === 0) {
-        return formatUsage("switch");
-      }
-      const activeDeckId = getActiveDeck()?.id || "";
-      const resolvedTargets = resolveTargetSelectors(args[0], sessions, {
-        source: "slash",
-        scopeMode: "active-deck",
-        activeDeckId
-      });
-      if (resolvedTargets.error) {
-        return resolvedTargets.error;
-      }
-      if (resolvedTargets.sessions.length !== 1) {
-        return "Switch selector must resolve to exactly one session.";
-      }
-      const target = resolvedTargets.sessions[0];
-      const targetDeckId = resolveSessionDeckId(target);
-      if (targetDeckId && targetDeckId !== activeDeckId) {
-        setActiveDeck(targetDeckId);
-      }
-      store.setActiveSession(target.id);
-      return `Active session: [${formatSessionToken(target.id)}] ${formatSessionDisplayName(target)}.`;
-    }
-
-    if (command === "swap") {
-      if (args.length !== 2 || !args[0] || !args[1]) {
-        return formatUsage("swap");
-      }
-      const leftResolved = resolveTargetSelectors(args[0], sessions, { source: "slash" });
-      if (leftResolved.error) {
-        return leftResolved.error;
-      }
-      if (leftResolved.sessions.length !== 1) {
-        return "Swap selector A must resolve to exactly one session.";
-      }
-      const rightResolved = resolveTargetSelectors(args[1], sessions, { source: "slash" });
-      if (rightResolved.error) {
-        return rightResolved.error;
-      }
-      if (rightResolved.sessions.length !== 1) {
-        return "Swap selector B must resolve to exactly one session.";
-      }
-      const leftSession = leftResolved.sessions[0];
-      const rightSession = rightResolved.sessions[0];
-      if (leftSession.id === rightSession.id) {
-        return "Swap targets resolve to the same session.";
-      }
-      const leftTokenBefore = formatSessionToken(leftSession.id);
-      const rightTokenBefore = formatSessionToken(rightSession.id);
-      if (!api || typeof api.swapSessionQuickIds !== "function") {
-        if (!swapSessionTokens(leftSession.id, rightSession.id)) {
-          return "Failed to swap session quick IDs.";
-        }
-      } else {
-        const result = await api.swapSessionQuickIds(leftSession.id, rightSession.id);
-        if (!result?.leftSession || !result?.rightSession) {
-          return "Failed to swap session quick IDs.";
-        }
-        applyRuntimeEvent({ type: "session.updated", session: result.leftSession });
-        applyRuntimeEvent({ type: "session.updated", session: result.rightSession });
-      }
-      requestRender();
-      return `Swapped quick IDs: [${leftTokenBefore}] ${formatSessionDisplayName(leftSession)} <-> [${rightTokenBefore}] ${formatSessionDisplayName(rightSession)}.`;
-    }
-
-    if (command === "next" || command === "prev") {
-      const activeDeckId = getActiveDeck()?.id || "";
-      const scopedSessions = activeDeckId
-        ? sessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
-        : sessions.slice();
-      if (scopedSessions.length === 0) {
-        return "No sessions available.";
-      }
-      const currentIndex = Math.max(
-        0,
-        scopedSessions.findIndex((session) => session.id === activeSessionId)
-      );
-      const delta = command === "next" ? 1 : -1;
-      const nextIndex = (currentIndex + delta + scopedSessions.length) % scopedSessions.length;
-      const nextSession = scopedSessions[nextIndex];
-      store.setActiveSession(nextSession.id);
-      return `Active session: [${formatSessionToken(nextSession.id)}] ${formatSessionDisplayName(nextSession)}.`;
-    }
-
-    if (command === "rename") {
-      if (args.length === 0) {
-        return formatUsage("rename");
-      }
-      const resolvedTarget = resolveActiveOrDirectTargetSession(
-        interpreted,
-        sessions,
-        activeSessionId,
-        "No active session to rename.",
-        "Rename selector"
-      );
-      if (resolvedTarget.error) {
-        return resolvedTarget.error;
-      }
-      const name = args.join(" ").trim();
-      if (!name) {
-        return formatUsage("rename");
-      }
-      if (isSessionExited(resolvedTarget.session)) {
-        return getBlockedSessionActionMessage([resolvedTarget.session], "Rename");
-      }
-      const updated = await api.updateSession(resolvedTarget.session.id, { name });
-      applyRuntimeEvent({ type: "session.updated", session: updated });
-      return `Renamed session [${formatSessionToken(updated.id)}] to ${updated.name}.`;
-    }
-
-    if (command === "restart") {
-      if (sessions.length === 0) {
-        return "No sessions available.";
-      }
-      let targetSessions = [];
-      if (args.length === 0) {
-        const directTarget = resolveDirectTargetSession(
-          interpreted,
-          sessions,
-          activeSessionId,
-          "No active session to restart.",
-          "Restart selector"
-        );
-        if (directTarget.error) {
-          return directTarget.error;
-        }
-        if (directTarget.session) {
-          targetSessions = [directTarget.session];
-        } else {
-        if (!activeSessionId) {
-          return "No active session to restart.";
-        }
-        const activeSession = sessions.find((session) => session.id === activeSessionId) || null;
-        if (!activeSession) {
-          return "No active session to restart.";
-        }
-        targetSessions = [activeSession];
-        }
-      } else {
-        const resolvedTargets = resolveTargetSelectors(args.join(" "), sessions, { source: "slash" });
-        if (resolvedTargets.error) {
-          return resolvedTargets.error;
-        }
-        targetSessions = resolvedTargets.sessions;
-      }
-      if (targetSessions.length === 0) {
-        return "No active session to restart.";
-      }
-      const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
-      if (blockedSessions.length > 0) {
-        return getBlockedSessionActionMessage(blockedSessions, "Restart");
-      }
-      const restartedSessions = await Promise.all(targetSessions.map((session) => api.restartSession(session.id)));
-      for (const restarted of restartedSessions) {
-        applyRuntimeEvent({ type: "session.updated", session: restarted });
-      }
-      if (restartedSessions.length > 0) {
-        store.setActiveSession(restartedSessions[0].id);
-      }
-      if (restartedSessions.length === 1) {
-        const restarted = restartedSessions[0];
-        return `Restarted session [${formatSessionToken(restarted.id)}] ${formatSessionDisplayName(restarted)}.`;
-      }
-      return `Restarted ${restartedSessions.length} sessions.`;
-    }
-
-    if (command === "note") {
-      const resolvedTarget = resolveActiveOrDirectTargetSession(
-        interpreted,
-        sessions,
-        activeSessionId,
-        "No active session for /note.",
-        "Note selector"
-      );
-      if (resolvedTarget.error) {
-        return resolvedTarget.error;
-      }
-      const note = args.join(" ").trim();
-      const updated = await api.updateSession(resolvedTarget.session.id, { note });
-      applyRuntimeEvent({ type: "session.updated", session: updated });
-      if (updated?.note) {
-        return `Updated note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
-      }
-      return `Cleared note for [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}.`;
+    const sessionCommandFeedback = await sessionHandlers.executeStructuredCommand({
+      command,
+      args,
+      interpreted,
+      sessions,
+      activeSessionId
+    });
+    if (sessionCommandFeedback !== null) {
+      return sessionCommandFeedback;
     }
 
     if (command === "replay") {
