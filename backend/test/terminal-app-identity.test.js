@@ -4,10 +4,14 @@ import {
   buildUnknownTerminalAppIdentity,
   createTerminalAppIdentityRuntimeState,
   deriveTerminalAppIdentityCandidateFromOutputHeuristics,
+  deriveTerminalAppIdentityCandidateFromForegroundProcess,
+  deriveTerminalAppIdentityCandidateFromSessionHints,
+  deriveTerminalAppIdentityCandidatesFromTerminalSignals,
   deriveTerminalAppIdentityFromForegroundProcess,
   deriveTerminalAppIdentityFromSessionHints,
   deriveTerminalAppIdentityFromTerminalSignals,
   normalizeTerminalAppIdentity,
+  normalizeTerminalAppIdentityRuntimeState,
   reconcileTerminalAppIdentityRuntimeState,
   terminalAppIdentityEquals
 } from "../src/terminal-app-identity.js";
@@ -529,5 +533,474 @@ test("deriveTerminalAppIdentityFromTerminalSignals preserves updatedAt when reco
   assert.equal(identity.family, "shell");
   assert.equal(identity.label, "bash");
   assert.equal(identity.source, "shell-marker");
+  assert.equal(identity.updatedAt, existingIdentity.updatedAt);
+});
+
+test("terminal app identity candidate helpers fail closed and expose direct signal candidates", () => {
+  const unknownHint = deriveTerminalAppIdentityCandidateFromSessionHints(
+    {
+      shell: "/usr/bin/python",
+      startCommand: "",
+      name: ""
+    },
+    { updatedAt: 1710000000020 }
+  );
+  assert.deepEqual(unknownHint, buildUnknownTerminalAppIdentity(1710000000020));
+
+  const unknownForeground = deriveTerminalAppIdentityCandidateFromForegroundProcess(null, {
+    updatedAt: 1710000000021
+  });
+  assert.deepEqual(unknownForeground, buildUnknownTerminalAppIdentity(1710000000021));
+
+  const signalCandidates = deriveTerminalAppIdentityCandidatesFromTerminalSignals(
+    {
+      shellPhase: "prompt",
+      lastShellMarkerProtocol: "osc-133",
+      lastShellMarker: "prompt-start",
+      lastShellMarkerAt: 1710000000022,
+      currentDirectory: "/workspace",
+      currentDirectoryProtocol: "osc-1337",
+      currentDirectoryUpdatedAt: 1710000000022,
+      alternateScreenActive: true,
+      alternateScreenCode: 1049,
+      alternateScreenUpdatedAt: 1710000000022
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000022 }
+  );
+  assert.equal(signalCandidates["shell-marker"].family, "shell");
+  assert.equal(signalCandidates["terminal-mode"].family, "tui");
+
+  const blankOutput = deriveTerminalAppIdentityCandidateFromOutputHeuristics("   ", {
+    updatedAt: 1710000000023
+  });
+  const unmatchedOutput = deriveTerminalAppIdentityCandidateFromOutputHeuristics("plain output", {
+    updatedAt: 1710000000024
+  });
+  assert.deepEqual(blankOutput, buildUnknownTerminalAppIdentity(1710000000023));
+  assert.deepEqual(unmatchedOutput, buildUnknownTerminalAppIdentity(1710000000024));
+});
+
+test("terminal app identity foreground and signal candidate helpers fail closed for generic processes and missing markers", () => {
+  const genericProcessIdentity = deriveTerminalAppIdentityCandidateFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 700,
+        executableName: "python",
+        comm: "python",
+        name: "python",
+        commandLine: ["python", "script.py"]
+      }
+    },
+    { updatedAt: 1710000000024 }
+  );
+  assert.equal(genericProcessIdentity.family, "unknown");
+  assert.equal(genericProcessIdentity.label, "python");
+  assert.equal(genericProcessIdentity.source, "foreground-process");
+
+  const missingRepresentativeIdentity = deriveTerminalAppIdentityCandidateFromForegroundProcess(
+    {},
+    { updatedAt: 1710000000025 }
+  );
+  assert.deepEqual(missingRepresentativeIdentity, buildUnknownTerminalAppIdentity(1710000000025));
+
+  const noSignalCandidates = deriveTerminalAppIdentityCandidatesFromTerminalSignals(
+    {
+      shellPhase: "output",
+      lastShellMarkerProtocol: "",
+      lastShellMarker: "",
+      lastShellMarkerAt: null,
+      currentDirectory: "",
+      currentDirectoryProtocol: "",
+      currentDirectoryUpdatedAt: null,
+      alternateScreenActive: false,
+      alternateScreenCode: null,
+      alternateScreenUpdatedAt: null
+    },
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000026 }
+  );
+  assert.deepEqual(noSignalCandidates["shell-marker"], buildUnknownTerminalAppIdentity(1710000000026));
+  assert.deepEqual(noSignalCandidates["terminal-mode"], buildUnknownTerminalAppIdentity(1710000000026));
+});
+
+test("normalizeTerminalAppIdentityRuntimeState falls back for invalid state and restores explicit-hint candidates", () => {
+  const fallback = normalizeTerminalAppIdentityRuntimeState(null, {
+    session: {
+      shell: "/bin/bash",
+      startCommand: "codex"
+    },
+    updatedAt: 1710000000025
+  });
+  assert.equal(fallback.current.family, "coding-agent");
+  assert.equal(fallback.current.source, "explicit-hint");
+
+  const normalized = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: {
+        family: "bogus",
+        source: "nope",
+        updatedAt: 1710000000026
+      },
+      candidates: {
+        "explicit-hint": buildUnknownTerminalAppIdentity(1710000000026),
+        "foreground-process": {
+          family: "coding-agent",
+          label: "codex",
+          source: "foreground-process",
+          confidence: 0.91,
+          details: {
+            weird: [1, Number.POSITIVE_INFINITY, { b: true, a: "x" }]
+          },
+          updatedAt: 1710000000026
+        }
+      },
+      recentCandidates: Array.from({ length: 15 }, (_, index) => ({
+        source: `source-${index}`,
+        candidateSource: "foreground-process",
+        family: "coding-agent",
+        label: `agent-${index}`,
+        confidence: index / 10,
+        observedAt: index + 1
+      })).concat([null, "bad"])
+    },
+    {
+      session: {
+        shell: "/bin/bash",
+        startCommand: "codex"
+      },
+      updatedAt: 1710000000026
+    }
+  );
+
+  assert.equal(normalized.current.family, "unknown");
+  assert.equal(normalized.candidates["explicit-hint"].family, "coding-agent");
+  assert.equal(normalized.candidates["foreground-process"].details.weird[1], null);
+  assert.deepEqual(Object.keys(normalized.candidates["foreground-process"].details.weird[2]), ["a", "b"]);
+  assert.equal(normalized.recentCandidates.length, 12);
+  assert.equal(normalized.recentCandidates[0].label, "agent-3");
+  assert.equal(normalized.recentCandidates.at(-1).label, "agent-14");
+});
+
+test("terminal app identity arbitration promotes alternate-screen tui, upgrades shell to specific foreground apps, and preserves same-family label continuity", () => {
+  const shellState = createTerminalAppIdentityRuntimeState(
+    {
+      shell: "/bin/bash"
+    },
+    { updatedAt: 1710000000027 }
+  );
+
+  const tuiReconciled = reconcileTerminalAppIdentityRuntimeState(
+    shellState,
+    {
+      "terminal-mode": {
+        family: "tui",
+        label: "",
+        source: "terminal-mode",
+        confidence: 0.64,
+        details: {
+          terminalMode: {
+            alternateScreenActive: true
+          }
+        },
+        updatedAt: 1710000000028
+      }
+    },
+    {
+      session: {
+        shell: "/bin/bash"
+      },
+      currentIdentity: shellState.current,
+      updatedAt: 1710000000028
+    }
+  );
+  assert.equal(tuiReconciled.current.family, "tui");
+  assert.equal(tuiReconciled.current.source, "terminal-mode");
+
+  const editorReconciled = reconcileTerminalAppIdentityRuntimeState(
+    shellState,
+    {
+      "foreground-process": {
+        family: "editor",
+        label: "nvim",
+        source: "foreground-process",
+        confidence: 0.94,
+        details: {
+          foregroundProcess: {
+            representativeProcess: {
+              executableName: "nvim"
+            }
+          }
+        },
+        updatedAt: 1710000000029
+      }
+    },
+    {
+      session: {
+        shell: "/bin/bash"
+      },
+      currentIdentity: shellState.current,
+      updatedAt: 1710000000029
+    }
+  );
+  assert.equal(editorReconciled.current.family, "editor");
+  assert.equal(editorReconciled.current.label, "nvim");
+
+  const continuityState = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: {
+        family: "coding-agent",
+        label: "claude",
+        source: "explicit-hint",
+        confidence: 0.87,
+        details: {},
+        updatedAt: 1710000000030
+      },
+      candidates: {
+        "explicit-hint": {
+          family: "coding-agent",
+          label: "claude",
+          source: "explicit-hint",
+          confidence: 0.87,
+          details: {},
+          updatedAt: 1710000000030
+        }
+      }
+    },
+    {
+      updatedAt: 1710000000030
+    }
+  );
+  const continuityReconciled = reconcileTerminalAppIdentityRuntimeState(
+    continuityState,
+    {
+      "foreground-process": {
+        family: "coding-agent",
+        label: "codex",
+        source: "foreground-process",
+        confidence: 0.89,
+        details: {
+          foregroundProcess: {
+            representativeProcess: {
+              executableName: "codex"
+            }
+          }
+        },
+        updatedAt: 1710000000031
+      }
+    },
+    {
+      currentIdentity: continuityState.current,
+      updatedAt: 1710000000031
+    }
+  );
+  assert.equal(continuityReconciled.current.family, "coding-agent");
+  assert.equal(continuityReconciled.current.label, "claude");
+});
+
+test("terminal app identity arbitration keeps current identity for weak tui continuity and empty candidate groups", () => {
+  const editorState = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: {
+        family: "editor",
+        label: "nvim",
+        source: "explicit-hint",
+        confidence: 0.6,
+        details: {},
+        updatedAt: 1710000000032
+      },
+      candidates: {
+        "explicit-hint": {
+          family: "editor",
+          label: "nvim",
+          source: "explicit-hint",
+          confidence: 0.6,
+          details: {},
+          updatedAt: 1710000000032
+        }
+      }
+    },
+    {
+      updatedAt: 1710000000032
+    }
+  );
+  const tuiContinuity = reconcileTerminalAppIdentityRuntimeState(
+    editorState,
+    {
+      "terminal-mode": {
+        family: "tui",
+        label: "",
+        source: "terminal-mode",
+        confidence: 0.64,
+        details: {
+          terminalMode: {
+            alternateScreenActive: true
+          }
+        },
+        updatedAt: 1710000000033
+      }
+    },
+    {
+      currentIdentity: editorState.current,
+      updatedAt: 1710000000033
+    }
+  );
+  assert.equal(tuiContinuity.current.family, "editor");
+  assert.equal(tuiContinuity.current.label, "nvim");
+
+  const knownCurrent = {
+    family: "coding-agent",
+    label: "codex",
+    source: "foreground-process",
+    confidence: 0.94,
+    details: {},
+    updatedAt: 1710000000034
+  };
+  const noGroupState = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: knownCurrent
+    },
+    {
+      session: {
+        shell: ""
+      },
+      currentIdentity: knownCurrent,
+      updatedAt: 1710000000034
+    }
+  );
+  const noGroupReconciled = reconcileTerminalAppIdentityRuntimeState(
+    noGroupState,
+    {
+      "explicit-hint": buildUnknownTerminalAppIdentity(1710000000035),
+      "foreground-process": buildUnknownTerminalAppIdentity(1710000000035),
+      "shell-marker": buildUnknownTerminalAppIdentity(1710000000035),
+      "terminal-mode": buildUnknownTerminalAppIdentity(1710000000035),
+      "output-heuristic": buildUnknownTerminalAppIdentity(1710000000035)
+    },
+    {
+      session: {
+        shell: ""
+      },
+      currentIdentity: knownCurrent,
+      updatedAt: 1710000000035
+    }
+  );
+  assert.equal(noGroupReconciled.current.family, "coding-agent");
+  assert.equal(noGroupReconciled.current.label, "codex");
+});
+
+test("terminal app identity arbitration keeps the current family when a challenger wins by less than the replacement delta", () => {
+  const currentIdentity = {
+    family: "build-test",
+    label: "pytest",
+    source: "foreground-process",
+    confidence: 0.9,
+    details: {},
+    updatedAt: 1710000000036
+  };
+  const state = normalizeTerminalAppIdentityRuntimeState(
+    {
+      current: currentIdentity,
+      candidates: {
+        "foreground-process": currentIdentity
+      }
+    },
+    {
+      currentIdentity,
+      updatedAt: 1710000000036
+    }
+  );
+
+  const reconciled = reconcileTerminalAppIdentityRuntimeState(
+    state,
+    {
+      "explicit-hint": {
+        family: "coding-agent",
+        label: "codex",
+        source: "explicit-hint",
+        confidence: 0.91,
+        details: {},
+        updatedAt: 1710000000037
+      }
+    },
+    {
+      currentIdentity,
+      updatedAt: 1710000000037
+    }
+  );
+
+  assert.equal(reconciled.current.family, "build-test");
+  assert.equal(reconciled.current.label, "pytest");
+});
+
+test("terminal app identity arbitration promotes the winner when the current identity is unknown", () => {
+  const reconciled = reconcileTerminalAppIdentityRuntimeState(
+    normalizeTerminalAppIdentityRuntimeState(
+      {
+        current: buildUnknownTerminalAppIdentity(1710000000038)
+      },
+      {
+        updatedAt: 1710000000038
+      }
+    ),
+    {
+      "foreground-process": {
+        family: "coding-agent",
+        label: "codex",
+        source: "foreground-process",
+        confidence: 0.94,
+        details: {
+          foregroundProcess: {
+            representativeProcess: {
+              executableName: "codex"
+            }
+          }
+        },
+        updatedAt: 1710000000039
+      }
+    },
+    {
+      updatedAt: 1710000000039
+    }
+  );
+
+  assert.equal(reconciled.current.family, "coding-agent");
+  assert.equal(reconciled.current.label, "codex");
+  assert.equal(reconciled.current.source, "foreground-process");
+});
+
+test("deriveTerminalAppIdentityFromForegroundProcess preserves updatedAt when the foreground identity does not change", () => {
+  const existingIdentity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 610,
+        executableName: "codex",
+        comm: "codex",
+        name: "codex",
+        commandLine: ["codex", "--json"]
+      }
+    },
+    { updatedAt: 1710000000038 }
+  );
+
+  const identity = deriveTerminalAppIdentityFromForegroundProcess(
+    {
+      representativeProcess: {
+        pid: 610,
+        executableName: "codex",
+        comm: "codex",
+        name: "codex",
+        commandLine: ["codex", "--json"]
+      }
+    },
+    { existingIdentity, updatedAt: 1710000000999 }
+  );
+
+  assert.equal(identity.family, "coding-agent");
+  assert.equal(identity.label, "codex");
   assert.equal(identity.updatedAt, existingIdentity.updatedAt);
 });

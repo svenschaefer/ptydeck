@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (`QLT-250` completed as the first delivered slice of active `H160`, extracting backend WebSocket-upgrade and session-control dispatch seams while keeping the transport-only messaging baseline deferred)
+Last updated: 2026-04-29 (`QLT-251` completed as the second delivered slice of active `H160`, hardening backend identity/control seams while keeping the transport-only messaging baseline deferred)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are now `QLT-251` through `QLT-254` under `v0.4.0-H160`.
+- `TODO.md`: active promoted tasks are now `QLT-252` through `QLT-254` under `v0.4.0-H160`.
 - `ROADMAP.md`: the active wave is now `v0.4.0-H160`, with no additional queued follow-up wave behind it.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -195,8 +195,8 @@ The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.74%` line / `87.96%` branch
-- frontend: `96.70%` line / `89.04%` branch
+- backend: `94.90%` line / `88.35%` branch
+- frontend: `96.70%` line / `89.03%` branch
 
 The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
 
@@ -224,7 +224,7 @@ The fresh post-`H159` review then promoted one more same-day follow-up wave, `v0
   - The remaining lower-covered root files are still `scripts/analyze-pty-write-eintr.mjs` (`77.17%` line / `43.48%` branch) and `scripts/analyze-startup-timeline.mjs` (`80.77%` line / `49.09%` branch), but they remain intentionally unpromoted because they are retained diagnostics rather than active product/runtime authority paths.
 - Backend:
   - `QLT-250` is now complete as the first delivered backend slice in `v0.4.0-H160`. `backend/src/runtime.js` no longer keeps the WebSocket upgrade admission path or the REST session-control request fan-out inline; those now live in `backend/src/runtime-ws-upgrade.js` and `backend/src/runtime-session-control-dispatch.js` with direct deterministic seam tests. The runtime monolith drops from `6820` to `6665` lines through this cut while keeping the shipped REST/WS contract stable.
-  - `backend/src/terminal-app-identity.js` (`1191` lines, `94.54%` line / `75.00%` branch) and `backend/src/runtime-session-control-attachments.js` (`215` lines, `90.70%` line / `75.71%` branch) now remain as the next open backend seams under `QLT-251`, with direct reconnect ownership, alias/label shaping, prune timing, and controller-transfer coverage still promoted instead of leaving those branches covered only indirectly.
+  - `QLT-251` is now complete as the second delivered backend slice in `v0.4.0-H160`. `backend/test/terminal-app-identity.test.js` now locks down helper fail-closed behavior, alternate-screen promotion, same-family continuity, replacement-delta arbitration, stale-history normalization, and unchanged-identity timestamp preservation across the retained `terminal-app-identity` seam. `backend/test/runtime-session-control-attachments.test.js` now locks down reconnect reuse, missing/empty attachment inputs, alias/label shaping, active-prune guards, timer clearing/rescheduling, detached-entry pruning, and no-op label updates across the retained control-attachment seam. The validated hotspot snapshot now reports `backend/src/terminal-app-identity.js` at `96.47%` line / `80.86%` branch coverage and `backend/src/runtime-session-control-attachments.js` at `100.00%` line / `87.80%` branch coverage.
   - The retained transport-only messaging branch gaps in `backend/src/discord-adapter.js`, `backend/src/delivery-adapter-utils.js`, `backend/src/messaging-runtime.js`, and related adapter helpers remain intentionally unpromoted because automatic outbound messaging is still deferred behind the third-attempt contract in `TODO-OUTLOOK.md`.
 - Frontend:
   - `frontend/src/public/command-executor.js` still remains the largest retained operator-side monolith at `2047` lines with `86.81%` line / `76.28%` branch coverage even after the earlier domain-handler extraction, so `QLT-252` now promotes another command-dispatch seam plus direct coverage for the remaining selection-resolution, side-effect-gating, and operator feedback/failure branches that still live inline in the executor.
@@ -232,7 +232,7 @@ The fresh post-`H159` review then promoted one more same-day follow-up wave, `v0
   - `QLT-254` now promotes the remaining workspace/view-model/search cluster because `frontend/src/public/workspace-preset-runtime-controller.js` (`1135` lines, `91.63%` line / `80.00%` branch), `frontend/src/public/workspace-manager-runtime-controller.js` (`180` lines, `92.78%` line / `66.67%` branch), `frontend/src/public/session-view-model.js` (`302` lines, `90.73%` line / `81.90%` branch), `frontend/src/public/terminal-search.js` (`100` lines, `92.00%` line / `69.23%` branch), and `frontend/src/public/ui/layout-settings-controller.js` (`180` lines, `97.78%` line / `55.56%` branch) still hold preset fallback, workspace guard, derived-label, search-failure, and layout-guard branches that deserve direct deterministic coverage.
   - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
-`v0.4.0-H160` is now active; no root-diagnostic or messaging-specific near-term wave is promoted alongside it.
+`v0.4.0-H160` remains active with the frontend-only `QLT-252` through `QLT-254` slices still open; no root-diagnostic or messaging-specific near-term wave is promoted alongside it.
 
 ## Frontend Runtime-State and Plugin Baseline
 
