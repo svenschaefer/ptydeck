@@ -77,11 +77,12 @@ test("runtime composition keeps raw stream data on the terminal path and activit
 
   const requiredMarkers = [
     'import { createStore } from "./store.js";',
+    'import { createSessionStreamAuthorityController } from "./session-stream-authority-controller.js";',
     "const store = createStore();",
-    'streamDebugTraceController.record(sessionId, "stream.data", {',
-    "appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);",
-    'streamDebugTraceController.record(sessionId, "stream.idle", {});',
-    "store.clearSessionActivity(sessionId);"
+    "const streamAdapter = createSessionStreamAuthorityController({",
+    "recordTrace: (sessionId, eventType, payload) => streamDebugTraceController.record(sessionId, eventType, payload),",
+    "appendTerminalChunk: (sessionId, chunk) => appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk),",
+    "clearSessionActivity: (sessionId) => store.clearSessionActivity(sessionId)"
   ];
 
   for (const marker of requiredMarkers) {

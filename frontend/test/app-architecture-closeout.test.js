@@ -62,6 +62,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createDeckRuntimeController",
     "createRuntimeEventController",
     "createSessionRuntimeController",
+    "createSessionStreamAuthorityController",
     "createSessionViewModel",
     "createLayoutRuntimeController",
     "createSessionGridController",

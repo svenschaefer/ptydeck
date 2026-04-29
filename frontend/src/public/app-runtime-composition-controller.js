@@ -40,9 +40,7 @@ import {
   refreshTerminalViewport,
   syncTerminalScrollArea
 } from "./terminal-compat.js";
-import {
-  createSessionStreamAdapter
-} from "./terminal-stream.js";
+import { createSessionStreamAuthorityController } from "./session-stream-authority-controller.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { SYSTEM_SLASH_COMMANDS } from "./system-slash-commands.js";
 import { createDeckActionsController } from "./ui/deck-actions-controller.js";
@@ -408,18 +406,11 @@ const SESSION_ACTIVITY_QUIET_MS = 1400;
 const DEV_AUTH_REFRESH_SAFETY_MS = 60_000;
 const DEV_AUTH_RETRY_DELAY_MS = 30_000;
 const DEV_AUTH_REFRESH_MIN_DELAY_MS = 15_000;
-const streamAdapter = createSessionStreamAdapter({
+const streamAdapter = createSessionStreamAuthorityController({
   idleMs: SESSION_ACTIVITY_QUIET_MS,
-  onData(sessionId, chunk) {
-    streamDebugTraceController.record(sessionId, "stream.data", {
-      chunk
-    });
-    appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk);
-  },
-  onIdle(sessionId) {
-    streamDebugTraceController.record(sessionId, "stream.idle", {});
-    store.clearSessionActivity(sessionId);
-  }
+  recordTrace: (sessionId, eventType, payload) => streamDebugTraceController.record(sessionId, eventType, payload),
+  appendTerminalChunk: (sessionId, chunk) => appSessionRuntimeFacadeController?.appendTerminalChunk(sessionId, chunk),
+  clearSessionActivity: (sessionId) => store.clearSessionActivity(sessionId)
 });
 const DEFAULT_TERMINAL_THEME = {
   background: "#0a0d12",

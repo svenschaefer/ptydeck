@@ -6,6 +6,14 @@ import {
   resolveCustomCommandForSession,
   resolveExactCustomCommand
 } from "./custom-command-model.js";
+import {
+  deriveSessionLifecycleState,
+  maybeMatchCommandCorrelation,
+  normalizeActivityTimestamp,
+  normalizeSessionActivityState,
+  reduceSessionActivityBump,
+  reduceSessionActivityClear
+} from "./session-activity-state.js";
 import { normalizeSessionAppIdentity } from "./session-app-identity.js";
 
 const DEFAULT_CONNECTION_STATE = "connecting";
@@ -15,7 +23,6 @@ const SESSION_ARTIFACT_LIMIT = 20;
 const SESSION_BADGE_LIMIT = 8;
 const SESSION_COMMAND_CORRELATION_LIMIT = 8;
 const COMMAND_CORRELATION_ARTIFACT_LIMIT = 3;
-const COMMAND_CORRELATION_MATCH_WINDOW_MS = 30_000;
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -130,35 +137,6 @@ function cloneSessionRecord(session) {
     activityUpdatedAt: normalizeActivityTimestamp(session.activityUpdatedAt),
     activityCompletedAt: normalizeActivityTimestamp(session.activityCompletedAt)
   };
-}
-
-function normalizeActivityTimestamp(value) {
-  return Number.isFinite(value) ? Number(value) : null;
-}
-
-function normalizeSessionActivityState(value) {
-  const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "active" || normalized === "inactive") {
-    return normalized;
-  }
-  return "inactive";
-}
-
-function normalizeRawSessionState(value) {
-  const state = normalizeText(value).toLowerCase();
-  if (
-    state === "created" ||
-    state === "starting" ||
-    state === "running" ||
-    state === "busy" ||
-    state === "idle" ||
-    state === "unrestored" ||
-    state === "exited" ||
-    state === "closed"
-  ) {
-    return state;
-  }
-  return "running";
 }
 
 function normalizePluginSessionState(value) {
@@ -375,26 +353,6 @@ function normalizeNotificationRecord(notification) {
   };
 }
 
-function deriveSessionLifecycleState(rawState, session) {
-  const normalizedRawState = normalizeRawSessionState(rawState || session?.state);
-  if (normalizedRawState === "unrestored" || normalizedRawState === "exited" || normalizedRawState === "closed") {
-    return normalizedRawState;
-  }
-  if (normalizedRawState === "created" || normalizedRawState === "starting") {
-    return normalizedRawState;
-  }
-  if (session?.hasLiveActivity === true || normalizeSessionActivityState(session?.activityState) === "active") {
-    return "busy";
-  }
-  if (
-    normalizeActivityTimestamp(session?.lastOutputAt) !== null ||
-    normalizeActivityTimestamp(session?.activityCompletedAt) !== null
-  ) {
-    return "idle";
-  }
-  return "running";
-}
-
 function withSessionActivityDefaults(session) {
   if (!session || typeof session !== "object") {
     return session;
@@ -500,22 +458,6 @@ function appendCommandCorrelation(session, submission) {
   return {
     ...session,
     commandCorrelations: correlations.slice(-SESSION_COMMAND_CORRELATION_LIMIT)
-  };
-}
-
-function maybeMatchCommandCorrelation(record, timestamp) {
-  if (!record || normalizeActivityTimestamp(record.matchedAt) !== null) {
-    return record;
-  }
-  const submittedAt = normalizeActivityTimestamp(record.submittedAt);
-  const nextTimestamp = normalizeActivityTimestamp(timestamp) ?? Date.now();
-  if (submittedAt === null || nextTimestamp < submittedAt || nextTimestamp - submittedAt > COMMAND_CORRELATION_MATCH_WINDOW_MS) {
-    return record;
-  }
-  return {
-    ...record,
-    matchedAt: nextTimestamp,
-    firstOutputAt: normalizeActivityTimestamp(record.firstOutputAt) ?? nextTimestamp
   };
 }
 
@@ -862,97 +804,14 @@ export function reduceRuntimeState(state, action, options = {}) {
       };
     }
     case "session.activity.bump": {
-      const sessionId = normalizeText(action.sessionId);
-      if (!sessionId) {
-        return runtimeState;
-      }
-      const activityTimestamp = normalizeActivityTimestamp(action.timestamp) || Date.now();
-      let changed = false;
-      const nextSessions = runtimeState.sessions.map((session) => {
-        if (session.id !== sessionId) {
-          return session;
-        }
-        const hasUnreadActivity = sessionId === runtimeState.activeSessionId ? false : true;
-        let nextSession = session;
-        if (!(session.hasLiveActivity === true && session.hasUnreadActivity === hasUnreadActivity)) {
-          changed = true;
-          nextSession = {
-            ...nextSession,
-            activityState: "active",
-            activityUpdatedAt: activityTimestamp,
-            activityCompletedAt: null,
-            hasLiveActivity: true,
-            hasUnreadActivity,
-            lastOutputAt: activityTimestamp,
-            lifecycleState: "busy"
-          };
-        }
-        const matchedSession = updateLatestCommandCorrelation(nextSession, (record) => {
-          const nextRecord = maybeMatchCommandCorrelation(record, activityTimestamp);
-          return nextRecord === record ? record : nextRecord;
-        });
-        if (matchedSession !== nextSession) {
-          changed = true;
-          return matchedSession;
-        }
-        return nextSession;
+      return reduceSessionActivityBump(runtimeState, action, {
+        updateLatestCommandCorrelation
       });
-      if (!changed) {
-        return runtimeState;
-      }
-      return {
-        ...runtimeState,
-        sessions: nextSessions
-      };
     }
     case "session.activity.clear": {
-      const sessionId = normalizeText(action.sessionId);
-      if (!sessionId) {
-        return runtimeState;
-      }
-      let changed = false;
-      const cutoffTimestamp = normalizeActivityTimestamp(action.timestamp);
-      const nextSessions = runtimeState.sessions.map((session) => {
-        if (session.id !== sessionId || session.hasLiveActivity !== true) {
-          return session;
-        }
-        const lastOutputAt = normalizeActivityTimestamp(session.lastOutputAt);
-        if (cutoffTimestamp !== null && lastOutputAt !== null && lastOutputAt > cutoffTimestamp) {
-          return session;
-        }
-        changed = true;
-        const nextTimestamp = cutoffTimestamp !== null ? cutoffTimestamp : normalizeActivityTimestamp(session.lastOutputAt);
-        const nextSession = {
-          ...session,
-          activityState: "inactive",
-          activityUpdatedAt: nextTimestamp,
-          activityCompletedAt: nextTimestamp,
-          hasLiveActivity: false,
-          lifecycleState: deriveSessionLifecycleState(session.state, {
-            ...session,
-            hasLiveActivity: false,
-            activityState: "inactive",
-            activityCompletedAt: nextTimestamp
-          })
-        };
-        return updateLatestCommandCorrelation(nextSession, (record) => {
-          const matchedAt = normalizeActivityTimestamp(record.matchedAt);
-          if (matchedAt === null || normalizeActivityTimestamp(record.completedAt) !== null) {
-            return record;
-          }
-          return {
-            ...record,
-            completedAt: nextTimestamp ?? Date.now()
-          };
-        });
+      return reduceSessionActivityClear(runtimeState, action, {
+        updateLatestCommandCorrelation
       });
-      if (!changed) {
-        return runtimeState;
-      }
-      return {
-        ...runtimeState,
-        sessions: nextSessions
-      };
     }
     case "session.interpretation.apply": {
       const sessionId = normalizeText(action.sessionId);

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (H159 now in progress after closing the two backend seam slices, with production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (H159 remains active after closing the two backend seam slices plus the frontend runtime-state/stream-authority seam, with production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are now `QLT-246` through `QLT-249`, covering the remaining frontend runtime-state, operator-surface, workflow, and session-UI quality slices that still remain product-relevant after the two backend `v0.4.0-H159` seam cuts.
+- `TODO.md`: active promoted tasks are now `QLT-247` through `QLT-249`, covering the remaining frontend operator-surface, workflow, and session-UI quality slices that still remain product-relevant after the two backend seam cuts plus the frontend runtime-state seam extraction in `v0.4.0-H159`.
 - `ROADMAP.md`: the active wave is now `v0.4.0-H159`, with no additional queued wave behind it yet.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -195,8 +195,8 @@ The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.64%` line / `87.82%` branch
-- frontend: `96.18%` line / `88.17%` branch
+- backend: `94.65%` line / `87.84%` branch
+- frontend: `96.20%` line / `88.13%` branch
 
 The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
 
@@ -209,8 +209,8 @@ The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
   - `QLT-245` is now complete as the second delivered slice of `v0.4.0-H159`. `backend/src/session-manager.js` now delegates local/SSH launch normalization, remote-auth/secret shaping, shell quoting, and PTY launch-spec construction into `backend/src/session-launch-spec.js`, which now validates at `99.35%` line / `95.90%` branch coverage under direct tests. `backend/test/session-launch-spec.test.js` covers the extracted local and SSH launch variants directly, while `backend/test/replay-excerpt.test.js` now closes the empty-slice and invalid-shell-block edge cases that lift `backend/src/replay-excerpt.js` to `95.21%` line / `86.27%` branch coverage. The reduced `backend/src/session-manager.js` now validates at `94.40%` line / `77.00%` branch coverage without re-inlining the extracted launch logic.
   - The retained transport-only messaging branch gaps in `backend/src/discord-adapter.js`, `backend/src/delivery-adapter-utils.js`, and related adapter helpers were not promoted into `H159` because automatic outbound messaging remains intentionally deferred behind the third-attempt contract in `TODO-OUTLOOK.md`.
 - Frontend:
-  - `QLT-246` now targets the remaining runtime-state authority seam: `frontend/src/public/app-runtime-composition-controller.js` still sits at `1873` lines and `88.04%` line / `62.22%` branch coverage, `frontend/src/public/store.js` at `1331` lines and `92.19%` line / `79.40%` branch coverage, and `frontend/src/public/terminal-stream.js` at `88.84%` line / `77.42%` branch coverage.
-  - `QLT-247` now targets the next operator layout/profile/settings surfaces: `frontend/src/public/connection-profile-runtime-controller.js` (`91.38%` line / `70.33%` branch), `frontend/src/public/layout-profile-runtime-controller.js` (`87.16%` / `75.97%`), `frontend/src/public/split-layout-runtime-controller.js` (`88.38%` / `68.40%`), `frontend/src/public/ui/session-settings-state-controller.js` (`89.19%` / `73.44%`), `frontend/src/public/deck-runtime-controller.js` (`89.22%` / `65.96%`), and `frontend/src/public/file-transfer-runtime-controller.js` (`89.33%` / `76.53%`).
+  - `QLT-246` is now complete as the first delivered frontend slice of `v0.4.0-H159`. `frontend/src/public/app-runtime-composition-controller.js` no longer wires stream authority inline; it now delegates that path into `frontend/src/public/session-stream-authority-controller.js`, while `frontend/src/public/store.js` now delegates activity bump/clear transitions and lifecycle derivation into `frontend/src/public/session-activity-state.js` instead of carrying the full activity-state reducer logic inline. Direct deterministic coverage now lives in `frontend/test/session-stream-authority-controller.test.js` and `frontend/test/session-activity-state.test.js`, while `frontend/test/app-runtime-composition-controller.test.js`, `frontend/test/app-architecture-closeout.test.js`, and `frontend/test/layered-architecture-boundaries.test.js` now lock down the retained composition and architecture boundary. The extracted seams validate at `100.00%` line / `92.31%` branch coverage for `session-stream-authority-controller.js` and `96.41%` line / `90.24%` branch coverage for `session-activity-state.js`, while the retained shared runtime-state/stream baseline now validates at `92.02%` line / `77.53%` branch for `store.js` and `88.84%` line / `77.42%` branch for `terminal-stream.js`.
+  - `QLT-247` now targets the next operator layout/profile/settings surfaces: `frontend/src/public/connection-profile-runtime-controller.js` (`91.38%` line / `70.33%` branch), `frontend/src/public/layout-profile-runtime-controller.js` (`87.16%` / `75.68%`), `frontend/src/public/split-layout-runtime-controller.js` (`88.38%` / `68.40%`), `frontend/src/public/ui/session-settings-state-controller.js` (`89.19%` / `73.44%`), `frontend/src/public/deck-runtime-controller.js` (`89.22%` / `65.96%`), and `frontend/src/public/file-transfer-runtime-controller.js` (`89.33%` / `76.53%`).
   - `QLT-248` now targets the remaining operator command/workflow surfaces: `frontend/src/public/command-palette-runtime-controller.js` (`86.95%` line / `60.49%` branch), `frontend/src/public/custom-command-model.js` (`88.16%` / `78.81%`), `frontend/src/public/slash-workflow-engine.js` (`86.82%` / `83.58%`), `frontend/src/public/slash-workflow-runtime-controller.js` (`88.11%` / `71.81%`), and `frontend/src/public/slash-workflow-source-adapter.js` (`86.40%` / `61.54%`).
   - `QLT-249` now targets the retained operator-history and session-UI glue surfaces that still carry notable branch gaps: `frontend/src/public/send-history-runtime-controller.js` (`88.48%` line / `76.51%` branch), `frontend/src/public/ui/session-ui-facade-controller.js` (`87.06%` / `67.54%`), `frontend/src/public/ui/session-card-meta-controller.js` (`87.74%` / `68.57%`), and `frontend/src/public/share-access-state.js` (`90.32%` / `69.70%`).
   - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
@@ -237,6 +237,18 @@ Relevant docs:
 
 - `docs/Frontend Plugin System for Terminal Stream Interpretation.md`
 - `docs/Codebase Review - WebSocket as Single Source of Truth.md`
+
+## Frontend Activity / Stream Authority Baseline
+
+`v0.4.0-H159 / QLT-246` extracted the FE-side activity and idle authority into explicit non-DOM seams so the runtime-state baseline no longer depends on inline composition callbacks.
+
+Current contract:
+
+- `frontend/src/public/session-activity-state.js` owns lifecycle/activity derivation plus the pure `session.activity.bump` and `session.activity.clear` reducers used by the shared runtime store.
+- `frontend/src/public/session-stream-authority-controller.js` owns raw stream trace recording, terminal append forwarding, and idle-driven activity clearing on top of `createSessionStreamAdapter(...)`.
+- `frontend/src/public/app-runtime-composition-controller.js` now wires session stream authority through `createSessionStreamAuthorityController(...)` instead of holding that callback fan-out inline.
+- `frontend/src/public/store.js` still keeps normalized command-correlation rewriting locally, but it now delegates the core activity-state transitions into the extracted reducer seam.
+- Architecture regression coverage in `frontend/test/app-architecture-closeout.test.js` and `frontend/test/layered-architecture-boundaries.test.js` now enforces that raw stream delivery stays on the terminal path and idle completion stays on the store path through the delegated controller.
 
 ## Session Control Runtime Behavior
 
