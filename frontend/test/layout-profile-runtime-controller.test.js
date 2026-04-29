@@ -736,3 +736,99 @@ test("layout profile runtime controller rejects malformed create and update payl
     /Layout profile API returned an invalid profile record for layout profile rename/
   );
 });
+
+test("layout profile runtime controller handles fail-closed helper branches deterministically", async () => {
+  const errors = [];
+  const controller = createLayoutProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl: createElement("select"),
+    statusEl: createElement("p"),
+    requestText: async () => "",
+    confirmAction: async () => false,
+    setError: (message) => errors.push(message),
+    getErrorMessage: (error, fallback) => `${fallback} ${error.message}`,
+    api: {
+      async listLayoutProfiles() {
+        throw new Error("offline");
+      }
+    },
+    getDecks: () => [{ id: "" }, { id: "ops" }],
+    getActiveDeckId: () => "",
+    getSessionFilterText: () => " current ",
+    getSidebarVisible: () => true,
+    getDeckTerminalGeometry: (deckId) => (deckId === "ops" ? { cols: 120, rows: 40 } : { cols: "bad", rows: 0 })
+  });
+
+  assert.deepEqual(await controller.loadProfiles(), []);
+  assert.match(errors[0], /Failed to load layout profiles\./);
+  assert.equal(controller.getProfile(""), null);
+  assert.equal(controller.getProfile("missing"), null);
+  assert.equal(controller.removeProfile(""), false);
+  assert.equal(controller.removeProfile("missing"), false);
+  assert.deepEqual(controller.captureCurrentLayout(), {
+    activeDeckId: "default",
+    sidebarVisible: true,
+    sessionFilterText: "current",
+    controlPaneVisible: true,
+    controlPanePosition: "bottom",
+    controlPaneSize: 185,
+    deckTerminalSettings: {
+      ops: { cols: 120, rows: 40 }
+    },
+    deckSplitLayouts: {}
+  });
+
+  await assert.rejects(() => controller.applyProfileById("missing"), /Unknown layout profile/);
+  await assert.rejects(() => controller.renameProfileById("missing", "Renamed"), /Unknown layout profile/);
+  await assert.rejects(() => controller.deleteProfileById("missing"), /Unknown layout profile/);
+  await assert.rejects(() => controller.createProfileFromCurrentLayout(""), /Layout profile name is required/);
+
+  assert.equal(await controller.createProfileFlow(""), "");
+  assert.equal(await controller.renameSelectedProfileFlow(""), "");
+  assert.equal(await controller.deleteSelectedProfileFlow(), "");
+});
+
+test("layout profile runtime controller tolerates missing API helpers and cancelled prompt flows", async () => {
+  const selectEl = createElement("select");
+  const statusEl = createElement("p");
+  const controller = createLayoutProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    selectEl,
+    statusEl,
+    requestText: async () => null,
+    confirmAction: async () => false,
+    api: {},
+    getDecks: () => [{ id: "default" }],
+    getActiveDeckId: () => "default",
+    getSessionFilterText: () => "",
+    getSidebarVisible: () => true,
+    getDeckTerminalGeometry: () => ({ cols: 96, rows: 24 })
+  });
+
+  assert.deepEqual(await controller.loadProfiles(), []);
+  assert.equal(statusEl.textContent, "No saved layout profiles.");
+  assert.equal(selectEl.children.length, 1);
+  assert.equal(await controller.applySelectedProfileFlow(), "");
+  assert.equal(await controller.createProfileFlow(), "");
+
+  controller.replaceProfiles([
+    {
+      id: "focus",
+      name: "Focus Layout",
+      createdAt: 1,
+      updatedAt: 2,
+      layout: {
+        activeDeckId: "default",
+        sidebarVisible: true,
+        sessionFilterText: "",
+        controlPaneVisible: true,
+        controlPanePosition: "bottom",
+        controlPaneSize: 240,
+        deckTerminalSettings: {}
+      }
+    }
+  ]);
+
+  assert.equal(await controller.renameSelectedProfileFlow(), "");
+  assert.equal(await controller.deleteSelectedProfileFlow(), "");
+});

@@ -149,3 +149,84 @@ test("deck-runtime controller switches active deck and routes sidebar helpers", 
   assert.equal(controller.setActiveDeck("missing"), false);
   assert.deepEqual(controller.getSessionTerminalGeometry("s1"), { cols: 120, rows: 40 });
 });
+
+test("deck-runtime controller handles storage failures and empty deck state safely", () => {
+  const controller = createDeckRuntimeController({
+    store: createStore(),
+    windowRef: {
+      localStorage: {
+        getItem() {
+          throw new Error("storage offline");
+        },
+        setItem() {
+          throw new Error("storage offline");
+        },
+        removeItem() {
+          throw new Error("storage offline");
+        }
+      }
+    }
+  });
+
+  assert.equal(controller.loadStoredActiveDeckId(), "");
+  controller.saveStoredActiveDeckId("ops");
+  controller.saveStoredActiveDeckId("");
+  assert.equal(controller.getActiveDeck(), null);
+  assert.equal(controller.syncActiveDeckGeometryFromState(), false);
+  assert.equal(
+    controller.getSessionCountForDeck("ops", [
+      { id: "s1", deckId: "ops" },
+      { id: "s2", deckId: "default" }
+    ]),
+    1
+  );
+  assert.equal(controller.setActiveDeck(""), false);
+});
+
+test("deck-runtime controller normalizes fallback geometry during upsert and remove flows", () => {
+  const store = createStore();
+  const localStorage = createLocalStorage();
+  let terminalSettings = { cols: 80, rows: 20 };
+  const calls = [];
+  const controller = createDeckRuntimeController({
+    store,
+    windowRef: { localStorage },
+    defaultDeckId: "default",
+    getTerminalSettings: () => terminalSettings,
+    setTerminalSettings: (nextSettings) => {
+      terminalSettings = nextSettings;
+    },
+    persistTerminalSettings: () => calls.push("persist"),
+    syncSettingsUi: () => calls.push("sync-ui"),
+    applySettingsToAllTerminals: (payload) => calls.push(["apply", payload]),
+    scheduleGlobalResize: (payload) => calls.push(["global", payload])
+  });
+
+  controller.setDecks(
+    [
+      { id: "default", name: "Default", settings: { terminal: { cols: 100, rows: 30 } } },
+      { id: "ops", name: "Ops", settings: { terminal: { cols: "wide", rows: "tall" } } }
+    ],
+    { preferredActiveDeckId: "ops" }
+  );
+
+  assert.equal(store.getState().activeDeckId, "ops");
+  assert.deepEqual(controller.getDeckTerminalGeometry("ops"), { cols: 80, rows: 20 });
+  assert.equal(controller.syncActiveDeckGeometryFromState(), false);
+
+  controller.upsertDeckInState({
+    id: "ops",
+    name: "Ops Updated",
+    settings: { terminal: { cols: 140, rows: 50 } }
+  });
+  assert.deepEqual(controller.getDeckTerminalGeometry("ops"), { cols: 140, rows: 50 });
+
+  controller.removeDeckFromState("ops", { fallbackDeckId: "default" });
+  assert.equal(controller.getDeckById("ops"), null);
+  assert.equal(store.getState().activeDeckId, "default");
+
+  controller.upsertDeckInState({ id: "", name: "Ignored" });
+  controller.removeDeckFromState("");
+  assert.ok(calls.includes("persist"));
+  assert.equal(localStorage.getItem("ptydeck.active-deck.v1"), "default");
+});

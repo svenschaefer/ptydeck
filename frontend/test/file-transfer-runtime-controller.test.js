@@ -451,3 +451,216 @@ test("file transfer runtime controller removes download anchors when remove() is
   assert.deepEqual(anchors, [])
   assert.deepEqual(revoked, ["blob:remove-child"])
 })
+
+test("file transfer runtime controller uses browser base64 fallbacks when Buffer is unavailable", async () => {
+  const originalBuffer = globalThis.Buffer
+  const originalBtoa = globalThis.btoa
+  const originalAtob = globalThis.atob
+  const uploadCalls = []
+  const objectUrls = []
+
+  try {
+    Object.defineProperty(globalThis, "Buffer", { value: undefined, writable: true, configurable: true })
+    globalThis.btoa = () => "cGljay1tZQ=="
+    globalThis.atob = () => "pick-me"
+
+    const uploadController = createFileTransferRuntimeController({
+      api: {
+        async uploadSessionFile(sessionId, payload) {
+          uploadCalls.push([sessionId, payload])
+          return {
+            sessionId,
+            path: payload.path,
+            fileName: "picked.txt",
+            sizeBytes: 7
+          }
+        }
+      }
+    })
+
+    const uploadOutcome = await uploadController.uploadSessionFile(
+      { id: "s1", name: "ops" },
+      {
+        remotePath: "logs/picked.txt",
+        file: {
+          name: "picked.txt",
+          async arrayBuffer() {
+            return Uint8Array.from([112, 105, 99, 107, 45, 109, 101]).buffer
+          }
+        }
+      }
+    )
+
+    assert.equal(uploadOutcome.feedback, "Uploaded logs/picked.txt to [s1] ops (7 bytes).")
+    assert.deepEqual(uploadCalls, [["s1", { path: "logs/picked.txt", contentBase64: "cGljay1tZQ==" }]])
+
+    const downloadController = createFileTransferRuntimeController({
+      documentRef: createDocumentRef(),
+      URLRef: {
+        createObjectURL(blob) {
+          objectUrls.push(blob)
+          return "blob:fallback"
+        },
+        revokeObjectURL() {}
+      },
+      BlobCtor: class FakeBlob {
+        constructor(parts, options = {}) {
+          this.parts = parts
+          this.type = options.type
+        }
+      }
+    })
+
+    const downloadOutcome = await downloadController.downloadSessionFile(
+      { id: "s1", name: "ops" },
+      {
+        remotePath: "logs/picked.txt",
+        payload: {
+          sessionId: "s1",
+          path: "logs/picked.txt",
+          fileName: "picked.txt",
+          contentType: "text/plain",
+          encoding: "base64",
+          contentBase64: "cGljay1tZQ==",
+          sizeBytes: 7
+        }
+      }
+    )
+
+    assert.equal(downloadOutcome.feedback, "Downloaded logs/picked.txt from [s1] ops (7 bytes).")
+    assert.equal(objectUrls[0].type, "text/plain")
+  } finally {
+    Object.defineProperty(globalThis, "Buffer", { value: originalBuffer, writable: true, configurable: true })
+    globalThis.btoa = originalBtoa
+    globalThis.atob = originalAtob
+  }
+})
+
+test("file transfer runtime controller fails closed when browser primitives are missing", async () => {
+  const originalBuffer = globalThis.Buffer
+  const originalBtoa = globalThis.btoa
+  const originalAtob = globalThis.atob
+
+  try {
+    Object.defineProperty(globalThis, "Buffer", { value: undefined, writable: true, configurable: true })
+    globalThis.btoa = undefined
+    globalThis.atob = undefined
+
+    const uploadController = createFileTransferRuntimeController({
+      api: {
+        async uploadSessionFile() {
+          return {}
+        }
+      }
+    })
+
+    await assert.rejects(
+      () =>
+        uploadController.uploadSessionFile(
+          { id: "s1", name: "ops" },
+          {
+            remotePath: "logs/broken.txt",
+            file: {
+              name: "broken.txt",
+              async arrayBuffer() {
+                return Uint8Array.from([1, 2, 3]).buffer
+              }
+            }
+          }
+        ),
+      /base64 encoding is unavailable/
+    )
+
+    const downloadController = createFileTransferRuntimeController({
+      documentRef: createDocumentRef(),
+      URLRef: {
+        createObjectURL() {
+          return "blob:missing"
+        },
+        revokeObjectURL() {}
+      },
+      BlobCtor: class FakeBlob {
+        constructor(parts, options = {}) {
+          this.parts = parts
+          this.type = options.type
+        }
+      }
+    })
+
+    await assert.rejects(
+      () =>
+        downloadController.downloadSessionFile(
+          { id: "s1", name: "ops" },
+          {
+            remotePath: "logs/broken.txt",
+            payload: {
+              sessionId: "s1",
+              path: "logs/broken.txt",
+              fileName: "broken.txt",
+              contentType: "text/plain",
+              contentBase64: "AQID",
+              sizeBytes: 3
+            }
+          }
+        ),
+      /base64 decoding is unavailable/
+    )
+  } finally {
+    Object.defineProperty(globalThis, "Buffer", { value: originalBuffer, writable: true, configurable: true })
+    globalThis.btoa = originalBtoa
+    globalThis.atob = originalAtob
+  }
+
+  const missingReaderController = createFileTransferRuntimeController({
+    api: {
+      async uploadSessionFile() {
+        return {}
+      }
+    }
+  })
+
+  await assert.rejects(
+    () =>
+      missingReaderController.uploadSessionFile(
+        { id: "s1", name: "ops" },
+        {
+          remotePath: "logs/broken.txt",
+          file: { name: "broken.txt" }
+        }
+      ),
+    /upload is unavailable/
+  )
+
+  const pickerController = createFileTransferRuntimeController({
+    api: {
+      async uploadSessionFile() {
+        throw new Error("picker cancel should not upload")
+      }
+    },
+    documentRef: {
+      body: {
+        appendChild() {},
+        removeChild() {}
+      },
+      createElement() {
+        return {
+          style: {},
+          files: [],
+          addEventListener() {},
+          remove() {}
+        }
+      }
+    },
+    windowRef: {
+      addEventListener() {},
+      removeEventListener() {},
+      setTimeout(callback) {
+        callback()
+      }
+    }
+  })
+
+  const canceledOutcome = await pickerController.uploadSessionFile({ id: "s1", name: "ops" })
+  assert.equal(canceledOutcome.canceled, true)
+  assert.equal(canceledOutcome.feedback, "Upload canceled.")
+})

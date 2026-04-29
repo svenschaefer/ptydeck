@@ -1109,3 +1109,221 @@ test("connection profile runtime controller rejects malformed create and update 
     /Connection profile API returned an invalid profile record for connection profile rename/
   );
 });
+
+test("connection profile runtime controller exposes fail-closed draft and trust helper branches", async () => {
+  const ui = createConnectionProfileUiRefs();
+  const controller = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...ui,
+    api: {},
+    getSessionById: () => null,
+    getActiveSessionId: () => "",
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  assert.equal(controller.getProfile(""), null);
+  assert.equal(controller.getProfile("missing"), null);
+  assert.equal(controller.removeProfile(""), false);
+  assert.equal(controller.removeProfile("missing"), false);
+  assert.deepEqual(await controller.refreshSshTrustEntries(), []);
+  assert.throws(
+    () => controller.loadDraftFromActiveSession(),
+    /No active session to load into a connection profile draft/
+  );
+  assert.throws(
+    () => controller.loadDraftFromActiveSession({ id: "s-broken", name: "Broken" }),
+    /Session launch settings are incomplete/
+  );
+  await assert.rejects(() => controller.applyProfileById("missing"), /Unknown connection profile/);
+
+  await controller.newDraftFlow("ssh");
+  await assert.rejects(() => controller.saveTrustEntryFlow(), /Enter an SSH host and port before trusting a host key/);
+  await assert.rejects(() => controller.deleteTrustEntryFlow(), /Select a trusted SSH host key to delete/);
+});
+
+test("connection profile runtime controller surfaces secret and probing precondition errors deterministically", async () => {
+  const inlineUi = createConnectionProfileUiRefs();
+  const inlineSecretController = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...inlineUi,
+    api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-inline",
+            name: "Ops Inline",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: [],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+              remoteAuth: { method: "password" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [
+          {
+            id: "trust-inline",
+            host: "ops.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await inlineSecretController.loadProfiles();
+  await assert.rejects(
+    () => inlineSecretController.applyProfileById("ops-inline"),
+    /Enter the SSH runtime secret before launching this saved profile/
+  );
+
+  const promptUi = createConnectionProfileUiRefs();
+  promptUi.runtimeSecretInputEl = null;
+  const promptController = createConnectionProfileRuntimeController({
+    windowRef: {
+      prompt() {
+        return "   ";
+      }
+    },
+    documentRef: createDocumentRef(),
+    ...promptUi,
+    api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-prompt",
+            name: "Ops Prompt",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: [],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+              remoteAuth: { method: "keyboardInteractive" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [
+          {
+            id: "trust-prompt",
+            host: "ops.example",
+            port: 22,
+            keyType: "ssh-ed25519",
+            publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAexisting",
+            fingerprintSha256: "SHA256:existing"
+          }
+        ];
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await promptController.loadProfiles();
+  await assert.rejects(
+    () => promptController.applyProfileById("ops-prompt"),
+    /SSH secret is required for password and keyboard-interactive connection profiles/
+  );
+
+  const invalidHostUi = createConnectionProfileUiRefs();
+  invalidHostUi.runtimeSecretInputEl.value = "secret";
+  const invalidHostController = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...invalidHostUi,
+    api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-invalid",
+            name: "Ops Invalid",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: [],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "", port: 0, username: "ops" },
+              remoteAuth: { method: "password" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [];
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await invalidHostController.loadProfiles();
+  await assert.rejects(
+    () => invalidHostController.applyProfileById("ops-invalid"),
+    /Enter an SSH host and port before launching this saved profile/
+  );
+
+  const probingUi = createConnectionProfileUiRefs();
+  probingUi.runtimeSecretInputEl.value = "secret";
+  const probingController = createConnectionProfileRuntimeController({
+    documentRef: createDocumentRef(),
+    ...probingUi,
+    api: {
+      async listConnectionProfiles() {
+        return [
+          {
+            id: "ops-probe",
+            name: "Ops Probe",
+            launch: {
+              kind: "ssh",
+              deckId: "ops",
+              shell: "ssh",
+              startCwd: "~",
+              startCommand: "",
+              env: {},
+              tags: [],
+              activeThemeProfile: createThemeProfile("#111111"),
+              inactiveThemeProfile: createThemeProfile("#121212"),
+              remoteConnection: { host: "ops.example", port: 22, username: "ops" },
+              remoteAuth: { method: "password" }
+            }
+          }
+        ];
+      },
+      async listSshTrustEntries() {
+        return [];
+      }
+    },
+    defaultThemeProfile: createThemeProfile("#090909")
+  });
+
+  await probingController.loadProfiles();
+  probingController.setDraftState({
+    mode: "profile",
+    profileId: "ops-probe",
+    name: "Ops Probe",
+    launch: probingController.getProfile("ops-probe").launch
+  });
+  await assert.rejects(() => probingController.applyProfileById("ops-probe"), /SSH host-key probing is not available/);
+});

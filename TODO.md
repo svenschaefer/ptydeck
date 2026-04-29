@@ -14,14 +14,13 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-247` Owner `FE`: harden operator layout/profile/settings surfaces in `frontend/src/public/connection-profile-runtime-controller.js` (`91.38%` line / `70.33%` branch), `frontend/src/public/layout-profile-runtime-controller.js` (`87.16%` line / `75.68%` branch), `frontend/src/public/split-layout-runtime-controller.js` (`88.38%` line / `68.40%` branch), `frontend/src/public/ui/session-settings-state-controller.js` (`89.19%` line / `73.44%` branch), `frontend/src/public/deck-runtime-controller.js` (`89.22%` line / `65.96%` branch), and `frontend/src/public/file-transfer-runtime-controller.js` (`89.33%` line / `76.53%` branch).
 - [ ] `QLT-248` Owner `FE`: harden operator command/workflow surfaces in `frontend/src/public/command-palette-runtime-controller.js` (`86.95%` line / `60.49%` branch), `frontend/src/public/custom-command-model.js` (`88.16%` line / `78.81%` branch), `frontend/src/public/slash-workflow-engine.js` (`86.82%` line / `83.58%` branch), `frontend/src/public/slash-workflow-runtime-controller.js` (`88.11%` line / `71.81%` branch), and `frontend/src/public/slash-workflow-source-adapter.js` (`86.40%` line / `61.54%` branch).
 - [ ] `QLT-249` Owner `FE`: harden retained operator-history and session-UI glue in `frontend/src/public/send-history-runtime-controller.js` (`88.48%` line / `76.51%` branch), `frontend/src/public/ui/session-ui-facade-controller.js` (`87.06%` line / `67.54%` branch), `frontend/src/public/ui/session-card-meta-controller.js` (`87.74%` line / `68.57%` branch), and `frontend/src/public/share-access-state.js` (`90.32%` line / `69.70%` branch).
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role (active): deliver `QLT-247` through `QLT-249`.
+- `FE` ownership role (active): deliver `QLT-248` and `QLT-249`.
 - `BE` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

@@ -23,15 +23,13 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 - `v0.4.0-H159`
-  - `QLT-247` Owner `FE`: operator layout/profile/settings coverage hardening
   - `QLT-248` Owner `FE`: operator command/workflow coverage hardening
   - `QLT-249` Owner `FE`: retained send-history and session-UI glue coverage hardening
 
 ## Wave Dependencies
 
-- `QLT-247`: active next slice in `v0.4.0-H159`; it is now the highest-risk remaining operator-surface hardening step after `QLT-246` extracted the frontend runtime-state and stream-authority seam.
-- `QLT-248`: follows `QLT-247` in the active wave order so command/workflow hardening lands on top of the latest runtime-state and operator-surface baseline.
-- `QLT-249`: follows `QLT-247` and `QLT-248` so the remaining session-UI glue is tightened only after the underlying operator domains are stabilized.
+- `QLT-248`: active next slice in `v0.4.0-H159`; it now lands on top of the hardened runtime-state plus operator layout/profile/settings baseline delivered by `QLT-246` and `QLT-247`.
+- `QLT-249`: follows `QLT-248` so the remaining session-UI glue is tightened only after the underlying operator command/workflow surfaces are stabilized.
 
 ## Wave Exit Criteria
 

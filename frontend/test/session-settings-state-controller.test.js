@@ -757,3 +757,199 @@ test("session-settings state controller imports and exports external theme paylo
     cursorColor: "#ff00ff"
   });
 });
+
+test("session-settings state controller preserves filtered preset selections and applies theme through terminal options fallback", () => {
+  const themeProfileKeys = ["background", "foreground"];
+  const defaultTheme = {
+    background: "#000000",
+    foreground: "#ffffff"
+  };
+  const nordProfile = {
+    background: "#2e3440",
+    foreground: "#eceff4"
+  };
+  const lightProfile = {
+    background: "#fefefe",
+    foreground: "#111111"
+  };
+  const terminals = new Map([["s1", { terminal: { options: {} } }]]);
+  const sessionThemeDrafts = new Map([
+    [
+      "s1",
+      {
+        selectedSlot: "active",
+        active: {
+          preset: "nord",
+          profile: nordProfile,
+          category: "light",
+          search: "missing"
+        },
+        inactive: {
+          preset: "custom",
+          profile: lightProfile,
+          category: "all",
+          search: ""
+        }
+      }
+    ]
+  ]);
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys,
+    defaultTerminalTheme: defaultTheme,
+    themeFilterCategorySet: new Set(["all", "dark", "light"]),
+    terminalThemePresetMap: new Map([
+      ["nord", { id: "nord", name: "Nord", category: "dark", profile: nordProfile }],
+      ["light", { id: "light", name: "Light", category: "light", profile: lightProfile }]
+    ]),
+    terminalThemePresets: [
+      { id: "nord", name: "Nord", category: "dark", profile: nordProfile },
+      { id: "light", name: "Light", category: "light", profile: lightProfile }
+    ],
+    terminalThemeModeSet: new Set(["custom", "nord", "light"]),
+    sessionThemeDrafts,
+    terminals,
+    getSessionById: () => ({
+      id: "s1",
+      activeThemeProfile: nordProfile,
+      inactiveThemeProfile: lightProfile
+    }),
+    getActiveSessionId: () => "s2",
+    documentRef: createFakeDocument()
+  });
+
+  const entry = {
+    themeSlotSelect: new FakeSelect(),
+    themeCategory: createInput(),
+    themeSearch: createInput(),
+    themeSelect: new FakeSelect(),
+    themeBg: createInput("#010203"),
+    themeFg: createInput("bad"),
+    themeExportPayload: createInput("stale")
+  };
+
+  controller.syncSessionThemeControls(entry, "s1");
+  assert.equal(entry.themeSelect.children[0].value, "nord");
+  assert.equal(entry.themeSelect.value, "nord");
+  assert.equal(controller.getThemePresetById("missing"), null);
+
+  entry.themeSelect.value = "custom";
+  entry.themeBg.value = "#010203";
+  entry.themeFg.value = "bad";
+  const draft = controller.updateSessionThemeDraftFromControls(entry, "s1", { selectedSlot: "active" });
+  assert.deepEqual(draft.active.profile, {
+    background: "#010203",
+    foreground: "#ffffff"
+  });
+
+  controller.applyThemeForSession("s1", { themeSlot: "active" });
+  assert.deepEqual(terminals.get("s1").terminal.options.theme, {
+    background: "#010203",
+    foreground: "#ffffff"
+  });
+  assert.equal(entry.themeExportPayload.value, "");
+});
+
+test("session-settings state controller handles inert fallbacks and dirty mismatch branches", () => {
+  const session = {
+    id: "s1",
+    note: "stable note",
+    inputSafetyProfile: {
+      confirmOnAnyInput: false
+    },
+    activeThemeProfile: {
+      background: "#111111",
+      foreground: "#eeeeee"
+    },
+    inactiveThemeProfile: {
+      background: "#111111",
+      foreground: "#eeeeee"
+    }
+  };
+  const controller = createSessionSettingsStateController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    },
+    parseSessionEnv: (raw) => ({ ok: true, env: raw ? { FOO: "bar" } : {} }),
+    parseSessionTags: (raw) => ({ ok: true, tags: raw ? raw.split(/\s+/).filter(Boolean) : [] }),
+    normalizeSessionStartupFromSession: () => ({
+      startCwd: "/workspace",
+      startCommand: "",
+      env: { FOO: "bar" },
+      tags: ["ops"],
+      mouseForwardingMode: "off"
+    }),
+    getSessionById: () => session,
+    getSessionSendTerminator: () => "auto"
+  });
+
+  const startupPanel = {
+    ...createPanel(),
+    style: undefined
+  };
+  delete startupPanel.inert;
+  const themePanel = {
+    ...createPanel({ hidden: true }),
+    style: {},
+    parentNode: { clientWidth: 420 }
+  };
+  delete themePanel.inert;
+  themePanel.getBoundingClientRect = () => ({ height: 144 });
+
+  const tabEntry = {
+    settingsLayout: { style: {} },
+    settingsTabStartupBtn: createInput(),
+    settingsTabInputBtn: createInput(),
+    settingsTabNoteBtn: createInput(),
+    settingsTabThemeBtn: createInput(),
+    settingsPanelStartup: startupPanel,
+    settingsPanelInput: createPanel({ hidden: true }),
+    settingsPanelNote: createPanel({ hidden: true }),
+    settingsPanelTheme: themePanel
+  };
+
+  assert.equal(controller.stabilizeSettingsLayout({ settingsLayout: null }), 0);
+  controller.setActiveSettingsTab(tabEntry, "theme");
+  assert.equal(tabEntry.settingsPanelStartup.attributes.has("inert"), true);
+  assert.equal(tabEntry.settingsPanelTheme.attributes.has("inert"), false);
+
+  const cleanEntry = {
+    themeSlotSelect: createInput("active"),
+    startCwdInput: createInput("/workspace"),
+    startCommandInput: createInput(""),
+    startEnvInput: createInput("FOO=bar"),
+    mouseForwardingModeSelect: createInput("off"),
+    sessionNoteInput: createInput("stable note"),
+    sessionTagsInput: createInput("ops"),
+    sessionSendTerminatorSelect: createInput("auto"),
+    inputSafetyControls: createInputSafetyControls(),
+    themeInputs: {
+      background: createInput("#111111"),
+      foreground: createInput("#eeeeee")
+    }
+  };
+
+  assert.equal(controller.isSessionSettingsDirty(null, session), false);
+  assert.equal(controller.isSessionSettingsDirty(cleanEntry, session), false);
+
+  const envMismatchEntry = {
+    ...cleanEntry,
+    startEnvInput: createInput("")
+  };
+  assert.equal(controller.isSessionSettingsDirty(envMismatchEntry, session), true);
+
+  const tagMismatchEntry = {
+    ...cleanEntry,
+    sessionTagsInput: createInput("ops prod")
+  };
+  assert.equal(controller.isSessionSettingsDirty(tagMismatchEntry, session), true);
+
+  const inputSafetyMismatchEntry = {
+    ...cleanEntry,
+    inputSafetyControls: createInputSafetyControls({
+      confirmOnAnyInput: { checked: true }
+    })
+  };
+  assert.equal(controller.isSessionSettingsDirty(inputSafetyMismatchEntry, session), true);
+});

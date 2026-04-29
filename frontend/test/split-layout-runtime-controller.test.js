@@ -526,3 +526,80 @@ test("split-layout runtime wires pane action buttons and resize handles through 
     { deckId: "ops", force: true }
   ]);
 });
+
+test("split-layout runtime degrades safely without a render root and rejects malformed mutations", () => {
+  const controller = createSplitLayoutRuntimeController();
+
+  assert.equal(controller.getCardParkingContainer(), null);
+  assert.equal(controller.assignSessionToPane("ops", "", "s1"), null);
+  assert.equal(controller.splitPane("ops", "main", "diagonal"), null);
+  assert.equal(controller.removePane("ops", ""), null);
+  assert.equal(controller.setContainerWeightRatio("ops", [], "bad", 0.5), null);
+});
+
+test("split-layout runtime handles stale pane refs, loose grid children, and no-op pane actions", () => {
+  const gridEl = new FakeElement("main");
+  const looseNode = new FakeElement("article");
+  gridEl.appendChild(looseNode);
+  const documentRef = {
+    createElement(tagName) {
+      const element = new FakeElement(tagName);
+      element.classList = null;
+      return element;
+    }
+  };
+  const requestRenderCalls = [];
+  const resizeCalls = [];
+  const deferredResizeCalls = [];
+  const controller = createSplitLayoutRuntimeController({
+    documentRef,
+    gridEl,
+    defaultDeckId: "default",
+    requestRender: () => requestRenderCalls.push("render"),
+    scheduleGlobalResize: (payload) => resizeCalls.push(payload),
+    scheduleDeferredResizePasses: (payload) => deferredResizeCalls.push(payload),
+    sortSessionsByQuickId: (sessions) => sessions.slice()
+  });
+
+  const terminals = new Map([["s1", { element: new FakeElement("article") }]]);
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: [{ id: "s1" }],
+    deckSessions: [],
+    activeSessionId: "",
+    terminals
+  });
+
+  const canvasEl = gridEl.children[0];
+  const stashEl = gridEl.children[1];
+  assert.equal(gridEl.className.includes("split-layout-active"), true);
+  assert.equal(stashEl.children.includes(looseNode), true);
+
+  const paneEl = canvasEl.children[0];
+  const actionsEl = paneEl.children[0].children[1];
+  const assignBtn = actionsEl.children[1];
+  const useActiveBtn = actionsEl.children[2];
+  const splitColumnBtn = actionsEl.children[4];
+
+  assignBtn.click();
+  useActiveBtn.click();
+  splitColumnBtn.click();
+
+  assert.equal(controller.getDeckSplitLayout("ops").root.type, "column");
+  assert.deepEqual(requestRenderCalls, ["render"]);
+  assert.deepEqual(resizeCalls, [{ deckId: "ops", force: true }]);
+  assert.deepEqual(deferredResizeCalls, [{ deckId: "ops", force: true }]);
+
+  controller.renderDeckLayout({
+    deckId: "ops",
+    orderedSessions: [{ id: "s1" }],
+    deckSessions: [{ id: "s1", name: "one" }],
+    activeSessionId: "",
+    terminals: new Map()
+  });
+
+  const parked = controller.getCardParkingContainer();
+  assert.equal(parked.children.length, 2);
+  assert.equal(parked.children.includes(looseNode), true);
+});
