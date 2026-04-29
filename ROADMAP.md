@@ -23,13 +23,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-238` Owner `FE`: frontend runtime-composition seam extraction and direct tests.
    - `QLT-239` Owner `FE`: frontend utility/debug/search controller coverage hardening.
    - `QLT-240` Owner `FE`: frontend composer/workflow/settings/preset coverage hardening.
 
 ## Wave Dependencies
 
-- `QLT-238` should land before `QLT-239` and `QLT-240` so the remaining frontend operator-path coverage work lands against a smaller, more explicit runtime-composition boundary.
+- none within the remaining `v0.4.0-H158` slice after `QLT-238` landed.
 
 ## Wave Exit Criteria
 

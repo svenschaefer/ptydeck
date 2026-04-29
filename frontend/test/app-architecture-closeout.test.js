@@ -56,6 +56,7 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createAppBootstrapCompositionController",
     "createAppCommandUiFacadeController",
     "createAppLayoutDeckFacadeController",
+    "createAppRuntimeInitializationController",
     "createAppRuntimeStateController",
     "createAppSessionRuntimeFacadeController",
     "createDeckRuntimeController",
@@ -70,8 +71,9 @@ test("runtime composition controller owns the delegated runtime assembly contrac
     "createSessionSettingsDialogController",
     "createSessionSettingsStateController",
     "createWorkspaceRenderController",
-    "appBootstrapCompositionController.bootstrapUiAndRuntime()",
-    "return {\n  initialize,\n  setInitializationError\n};"
+    "bootstrapUiAndRuntime: () => appBootstrapCompositionController.bootstrapUiAndRuntime()",
+    "initialize: () => appRuntimeInitializationController.initialize(),",
+    "setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)"
   ];
 
   for (const marker of requiredDelegationMarkers) {

@@ -3,6 +3,7 @@ import { createAppBootstrapCompositionController } from "./app-bootstrap-composi
 import { createAppCommandUiFacadeController } from "./app-command-ui-facade-controller.js";
 import { createAppLayoutDeckFacadeController } from "./app-layout-deck-facade-controller.js";
 import { collectAppRuntimeDomRefs } from "./app-runtime-dom-refs.js";
+import { createAppRuntimeInitializationController } from "./app-runtime-initialization-controller.js";
 import { createAppRuntimeStateController } from "./app-runtime-state-controller.js";
 import { createAppSessionRuntimeFacadeController } from "./app-session-runtime-facade-controller.js";
 import { createBroadcastInputRuntimeController } from "./broadcast-input-runtime-controller.js";
@@ -156,7 +157,6 @@ const store = createStore();
 const streamInterpretationPluginEngine = createStreamInterpretationPluginEngine({
   plugins: Array.isArray(options.streamInterpretationPlugins) ? options.streamInterpretationPlugins : []
 });
-let initializationErrorMessage = "";
 
 const {
   appShellEl,
@@ -534,6 +534,8 @@ let sendHistoryRuntimeController = null;
 let broadcastInputRuntimeController = null;
 let splitLayoutRuntimeController = null;
 let slashWorkflowRuntimeController = null;
+let appBootstrapCompositionController = null;
+let appRuntimeInitializationController = null;
 appSessionRuntimeFacadeController = createAppSessionRuntimeFacadeController({
   store,
   defaultDeckId: DEFAULT_DECK_ID,
@@ -637,7 +639,7 @@ function installTestHooks() {
     setTrustedLocalClientLabel(label) {
       sessionControlRuntimeController.setTrustedLocalClientLabel(label);
     },
-    getInitializationErrorMessage: () => initializationErrorMessage,
+    getInitializationErrorMessage: () => appRuntimeInitializationController?.getInitializationErrorMessage?.() || "",
     getSessionWriteBlockMessage: sessionControlRuntimeController.getSessionWriteBlockMessage,
     getSessionControlSummary: sessionControlRuntimeController.getSessionControlSummary,
     getSessionControlBadgeState: sessionControlRuntimeController.getSessionControlBadgeState,
@@ -1687,7 +1689,7 @@ sessionGridController = createSessionGridController({
   themeProfileKeys: THEME_PROFILE_KEYS,
   debugLog
 });
-const appBootstrapCompositionController = createAppBootstrapCompositionController({
+appBootstrapCompositionController = createAppBootstrapCompositionController({
   store,
   api,
   config,
@@ -1850,45 +1852,22 @@ commandPaletteRuntimeController = createCommandPaletteRuntimeController({
   }
 });
 
-function setInitializationError(message) {
-  const normalizedMessage =
-    typeof message === "string" && message.trim() ? message.trim() : "Failed to initialize application runtime.";
-  if (
-    initializationErrorMessage &&
-    normalizedMessage === "Failed to initialize application runtime." &&
-    initializationErrorMessage !== normalizedMessage
-  ) {
-    return;
-  }
-  initializationErrorMessage = normalizedMessage;
-  appCommandUiFacadeController?.setError(normalizedMessage);
-}
-
-async function initialize() {
-  try {
-    if (maybeRedirectToCanonicalOrigin()) {
-      return { redirected: true };
-    }
-    sessionControlRuntimeController.consumeOriginHandoffSourceFromWindow();
-    await startupBackupRuntimeController.ensureStartupBackup();
-    const existingTrustedLocalClient = trustedLocalClientRuntimeController.getClientIdentity?.() || null;
-    const trustedLocalClient = await trustedLocalClientRuntimeController.ensureClientIdentity();
-    sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(
-      !existingTrustedLocalClient && Boolean(trustedLocalClient?.clientId)
-    );
-    sessionControlRuntimeController.setTrustedLocalClientLabel(trustedLocalClient?.label);
-    setRuntimeClientId(trustedLocalClient?.clientId || "");
-    return await appBootstrapCompositionController.bootstrapUiAndRuntime();
-  } catch (error) {
-    if (error && typeof error === "object" && typeof error.message === "string" && error.message.trim()) {
-      setInitializationError(error.message);
-    }
-    throw error;
-  }
-}
+appRuntimeInitializationController = createAppRuntimeInitializationController({
+  maybeRedirectToCanonicalOrigin,
+  consumeOriginHandoffSourceFromWindow: () => sessionControlRuntimeController.consumeOriginHandoffSourceFromWindow(),
+  ensureStartupBackup: () => startupBackupRuntimeController.ensureStartupBackup(),
+  getTrustedLocalClientIdentity: () => trustedLocalClientRuntimeController.getClientIdentity?.() || null,
+  ensureTrustedLocalClientIdentity: () => trustedLocalClientRuntimeController.ensureClientIdentity(),
+  setRuntimeClientIdentityCreatedOnThisOrigin: (value) =>
+    sessionControlRuntimeController.setRuntimeClientIdentityCreatedOnThisOrigin(value),
+  setTrustedLocalClientLabel: (label) => sessionControlRuntimeController.setTrustedLocalClientLabel(label),
+  setRuntimeClientId,
+  bootstrapUiAndRuntime: () => appBootstrapCompositionController.bootstrapUiAndRuntime(),
+  applyInitializationError: (message) => appCommandUiFacadeController?.setError?.(message)
+});
 
 return {
-  initialize,
-  setInitializationError
+  initialize: () => appRuntimeInitializationController.initialize(),
+  setInitializationError: (message) => appRuntimeInitializationController.setInitializationError(message)
 };
 }
