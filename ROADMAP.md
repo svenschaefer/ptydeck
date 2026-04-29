@@ -14,28 +14,23 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
+  - none currently
 - Latest completed wave in this segment:
-  - `v0.4.0-H157` FE Handbook Surface Simplification
+  - `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
 
-1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-243` Owner `FE`: slash-workflow/theme/settings-dialog coverage hardening.
+- none currently
 
 ## Wave Dependencies
 
-- `QLT-243` has no hard dependency edge now that `QLT-242` is closed; it is the remaining active `H158` closeout slice.
+- none currently
 
 ## Wave Exit Criteria
 
-- Root-tooling coverage still clears the enforced threshold while the remaining repo-owned helper hotspots gain direct deterministic regressions.
-- The promoted frontend runtime-composition, utility/debug/search, workspace-preset, and command-composer hotspot files stay closed while the remaining parser/settings/theme hotspot files gain direct deterministic coverage.
-- Promoted tasks leave `TODO.md` with open work only and `ROADMAP.md` with active or queued sequencing only.
-- Generated handbook/reference artifacts stay synchronized with their markdown/code sources.
-- `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check` pass on the closeout tree.
+- no active wave currently
 
 ## Sequencing Rules
 

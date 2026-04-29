@@ -14,12 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-243` Owner `FE`: Add direct coverage for the remaining parser/settings/theme seams in `frontend/src/public/slash-workflow-parser.js`, `frontend/src/public/theme-io.js`, and `frontend/src/public/ui/session-settings-dialog-controller.js`.
+- None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
 - `BE` ownership role is currently inactive.
-- `FE` ownership role (active): deliver `QLT-243`.
+- `FE` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

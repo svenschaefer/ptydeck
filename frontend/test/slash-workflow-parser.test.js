@@ -133,3 +133,83 @@ test("parseSlashWorkflow supports composite duration tokens", () => {
   const result = parseSlashWorkflow("/wait idle 1m30s");
   assert.deepEqual(result.steps[0].duration, { text: "1m30s", ms: 90000 });
 });
+
+test("parseSlashWorkflow freezes parsed workflow state and accepts hours, milliseconds, and escaped regex flags", () => {
+  const result = parseSlashWorkflow("/wait delay 1h30m5s250ms\n/wait until visible-line /a\\/b/i timeout 500ms\n/STATUS now");
+  assert.equal(result.steps[0].duration.ms, 5405250);
+  assert.deepEqual(result.steps[1].pattern, {
+    literal: "/a\\/b/i",
+    source: "a\\/b",
+    flags: "i"
+  });
+  assert.equal(result.steps[2].command, "status");
+  assert.deepEqual(result.steps[2].args, ["now"]);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.steps), true);
+  assert.equal(Object.isFrozen(result.steps[0].duration), true);
+  assert.equal(Object.isFrozen(result.steps[1].pattern), true);
+});
+
+test("parseSlashWorkflow rejects invalid duration variants explicitly", () => {
+  for (const input of ["/wait delay 0s", "/wait delay 10", "/wait until line /^done$/ timeout 0s"]) {
+    assert.throws(
+      () => parseSlashWorkflow(input),
+      (error) => {
+        assert.ok(error instanceof SlashWorkflowParseError);
+        assert.equal(error.code, "workflow.invalid_duration");
+        assert.equal(error.line, 1);
+        return true;
+      }
+    );
+  }
+});
+
+test("parseSlashWorkflow rejects invalid wait forms, empty steps, and empty workflows explicitly", () => {
+  assert.throws(
+    () => parseSlashWorkflow("/wait"),
+    (error) => {
+      assert.ok(error instanceof SlashWorkflowParseError);
+      assert.equal(error.code, "workflow.invalid_wait");
+      return true;
+    }
+  );
+
+  assert.throws(
+    () => parseSlashWorkflow("/"),
+    (error) => {
+      assert.ok(error instanceof SlashWorkflowParseError);
+      assert.equal(error.code, "workflow.empty_step");
+      return true;
+    }
+  );
+
+  assert.throws(
+    () => parseSlashWorkflow("\n  \n"),
+    (error) => {
+      assert.ok(error instanceof SlashWorkflowParseError);
+      assert.equal(error.code, "workflow.empty");
+      return true;
+    }
+  );
+});
+
+test("parseSlashWorkflow rejects invalid regex forms, unknown sources, and malformed timeout tails", () => {
+  const expectations = [
+    ["/wait until line plain timeout 1s", "workflow.invalid_regex"],
+    ["/wait until line /^ok$/oops timeout 1s", "workflow.invalid_regex"],
+    ["/wait until unknown /^ok$/ timeout 1s", "workflow.unknown_source"],
+    ["/wait until line /^ok$/ later timeout 1s", "workflow.invalid_wait"]
+  ];
+
+  for (const [input, code] of expectations) {
+    assert.throws(
+      () => parseSlashWorkflow(input),
+      (error) => {
+        assert.ok(error instanceof SlashWorkflowParseError);
+        assert.equal(error.code, code);
+        assert.equal(error.line, 1);
+        return true;
+      }
+    );
+  }
+});

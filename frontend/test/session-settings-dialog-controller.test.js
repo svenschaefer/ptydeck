@@ -74,3 +74,49 @@ test("session-settings dialog controller uses native modal methods and confirmat
   assert.equal(confirmCalls.length, 1);
   assert.match(confirmCalls[0], /Delete session 'Alpha' permanently\?/);
 });
+
+test("session-settings dialog controller no-ops on missing dialogs and uses confirm fallback semantics", async () => {
+  const confirmMessages = [];
+  const controller = createSessionSettingsDialogController({
+    windowRef: {
+      confirm(message) {
+        confirmMessages.push(message);
+        return false;
+      }
+    }
+  });
+
+  controller.open(null);
+  controller.close(null);
+  controller.toggle(null);
+
+  assert.equal(await controller.confirmSessionDelete({ id: "sess-9" }), false);
+  assert.match(confirmMessages[0], /Delete session 'sess-9' permanently\?/);
+  assert.equal(await createSessionSettingsDialogController({ windowRef: null }).confirmSessionDelete({}), true);
+});
+
+test("session-settings dialog controller avoids duplicate native open/close calls", () => {
+  const controller = createSessionSettingsDialogController({ windowRef: null });
+  const dialog = {
+    open: true,
+    showModalCalls: 0,
+    closeCalls: 0,
+    showModal() {
+      this.showModalCalls += 1;
+      this.open = true;
+    },
+    close() {
+      this.closeCalls += 1;
+      this.open = false;
+    }
+  };
+
+  controller.open(dialog);
+  assert.equal(dialog.showModalCalls, 0);
+
+  controller.close(dialog);
+  assert.equal(dialog.closeCalls, 1);
+
+  controller.close(dialog);
+  assert.equal(dialog.closeCalls, 1);
+});
