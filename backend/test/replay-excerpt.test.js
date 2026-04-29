@@ -175,3 +175,41 @@ test("replay excerpt utilities preserve shell-block unavailability and normalize
     unavailableReason: "shell_blocks_unavailable"
   });
 });
+
+test("replay excerpt utilities return empty excerpts for empty visible text and invalid shell block ranges", () => {
+  const emptyLines = buildReplayExcerpt({
+    selector: "l:2",
+    text: ""
+  });
+  assert.deepEqual(emptyLines, {
+    selector: "l:2",
+    selectorKind: "lines",
+    requestedCount: 2,
+    selectorSatisfied: false,
+    availableCount: 0,
+    resolvedCount: 0,
+    data: "",
+    chars: 0,
+    lines: 0,
+    shellBlocksSupported: false
+  });
+
+  const emptyShellBlocks = buildReplayExcerpt({
+    selector: "sp:1",
+    text: "prompt$ ",
+    shellBlocksSupported: true,
+    shellBlocks: [{ start: 1, end: 1 }]
+  });
+  assert.deepEqual(emptyShellBlocks, {
+    selector: "sp:1",
+    selectorKind: "shell_blocks",
+    requestedCount: 1,
+    selectorSatisfied: false,
+    availableCount: 0,
+    resolvedCount: 0,
+    data: "",
+    chars: 0,
+    lines: 0,
+    shellBlocksSupported: true
+  });
+});

@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (H159 now in progress after closing the first backend runtime seam slice, with production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (H159 now in progress after closing the two backend seam slices, with production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,7 +182,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are now `QLT-245` through `QLT-249`, covering the remaining repo-wide backend and frontend quality slices that still remain product-relevant after the first `v0.4.0-H159` backend seam cut.
+- `TODO.md`: active promoted tasks are now `QLT-246` through `QLT-249`, covering the remaining frontend runtime-state, operator-surface, workflow, and session-UI quality slices that still remain product-relevant after the two backend `v0.4.0-H159` seam cuts.
 - `ROADMAP.md`: the active wave is now `v0.4.0-H159`, with no additional queued wave behind it yet.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
@@ -195,7 +195,7 @@ The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.51%` line / `87.68%` branch
+- backend: `94.64%` line / `87.82%` branch
 - frontend: `96.18%` line / `88.17%` branch
 
 The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
@@ -206,7 +206,7 @@ The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
 - Backend:
   - `QLT-244` is now complete as the first delivered slice of `v0.4.0-H159`. `backend/src/runtime.js` now delegates HTTP route matching and metrics-path normalization into `backend/src/runtime-route-table.js`, and the share/custom-command/deck/profile/preset/SSH-trust REST resource block now lives in `backend/src/runtime-resource-dispatch.js` instead of staying inline inside the monolith. Direct deterministic seam coverage now lives in `backend/test/runtime-route-table.test.js` and `backend/test/runtime-resource-dispatch.test.js`, while `backend/test/runtime.request-seams.test.js` still proves the retained live REST call path against the integrated runtime.
   - The validated `QLT-244` hotspot snapshot now reports `backend/src/runtime-route-table.js` at `97.51%` line / `98.36%` branch coverage and `backend/src/runtime-resource-dispatch.js` at `100.00%` line / `100.00%` branch coverage. The extracted paths remove roughly `680` lines of inline route/dispatch logic from `backend/src/runtime.js` without widening the shipped REST contract.
-  - `QLT-245` now remains the active backend target: `backend/src/session-manager.js` (`2333` lines, `94.34%` line / `78.99%` branch) and `backend/src/replay-excerpt.js` (`89.82%` line / `80.85%` branch) still carry broad branch surfaces around local/SSH launch normalization, remote-auth/secret shaping, replay slice behavior, and launch-spec failure handling with too much indirect coverage.
+  - `QLT-245` is now complete as the second delivered slice of `v0.4.0-H159`. `backend/src/session-manager.js` now delegates local/SSH launch normalization, remote-auth/secret shaping, shell quoting, and PTY launch-spec construction into `backend/src/session-launch-spec.js`, which now validates at `99.35%` line / `95.90%` branch coverage under direct tests. `backend/test/session-launch-spec.test.js` covers the extracted local and SSH launch variants directly, while `backend/test/replay-excerpt.test.js` now closes the empty-slice and invalid-shell-block edge cases that lift `backend/src/replay-excerpt.js` to `95.21%` line / `86.27%` branch coverage. The reduced `backend/src/session-manager.js` now validates at `94.40%` line / `77.00%` branch coverage without re-inlining the extracted launch logic.
   - The retained transport-only messaging branch gaps in `backend/src/discord-adapter.js`, `backend/src/delivery-adapter-utils.js`, and related adapter helpers were not promoted into `H159` because automatic outbound messaging remains intentionally deferred behind the third-attempt contract in `TODO-OUTLOOK.md`.
 - Frontend:
   - `QLT-246` now targets the remaining runtime-state authority seam: `frontend/src/public/app-runtime-composition-controller.js` still sits at `1873` lines and `88.04%` line / `62.22%` branch coverage, `frontend/src/public/store.js` at `1331` lines and `92.19%` line / `79.40%` branch coverage, and `frontend/src/public/terminal-stream.js` at `88.84%` line / `77.42%` branch coverage.

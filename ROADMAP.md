@@ -23,7 +23,6 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 - `v0.4.0-H159`
-  - `QLT-245` Owner `BE`: session-manager launch/replay lifecycle seam hardening
   - `QLT-246` Owner `FE`: runtime-state and stream-authority seam extraction
   - `QLT-247` Owner `FE`: operator layout/profile/settings coverage hardening
   - `QLT-248` Owner `FE`: operator command/workflow coverage hardening
@@ -31,8 +30,7 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-245`: active next backend slice in `v0.4.0-H159`; it follows the completed route-table/request-dispatch extraction so the next lifecycle hardening can reuse the now-isolated runtime HTTP seams and keep backend monolith reduction ordered.
-- `QLT-246`: no dependency; this is the highest-risk frontend runtime-state/stream authority cut in `v0.4.0-H159`.
+- `QLT-246`: active next slice in `v0.4.0-H159`; it is now the highest-risk remaining runtime-state/stream authority cut after the two backend seam slices were completed first.
 - `QLT-247`: follows `QLT-246` because the layout/profile/settings operator surfaces depend on the same runtime-state and deck/profile authority contracts.
 - `QLT-248`: follows `QLT-246` because command-palette and slash-workflow paths depend on the same runtime-state/session metadata authority.
 - `QLT-249`: follows `QLT-247` and `QLT-248` so the remaining session-UI glue is tightened only after the underlying operator domains are stabilized.
