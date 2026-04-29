@@ -302,3 +302,70 @@ test("command send safety controller detects additional destructive commands and
 
   assert.deepEqual(directRoute.reasons.map((entry) => entry.code), ["multiline_input"]);
 });
+
+test("command send safety controller covers shell-block, quote, and trailing-operator syntax branches", () => {
+  assert.deepEqual(analyzeShellSyntax(""), {
+    valid: false,
+    incomplete: false,
+    code: "empty",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("printf '%s' \"ok\""), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("echo \"unterminated"), {
+    valid: false,
+    incomplete: true,
+    code: "incomplete_shell_construct",
+    label: "Input looks like an incomplete shell construct."
+  });
+  assert.deepEqual(analyzeShellSyntax("echo `date`"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("echo $(date"), {
+    valid: false,
+    incomplete: true,
+    code: "incomplete_shell_construct",
+    label: "Input looks like an incomplete shell construct."
+  });
+  assert.deepEqual(analyzeShellSyntax("# comment only\necho ok"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("for item in a b; do echo \"$item\"; done"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("{ echo ok; }"), {
+    valid: true,
+    incomplete: false,
+    code: "valid_shell_syntax",
+    label: ""
+  });
+  assert.deepEqual(analyzeShellSyntax("echo hi \\"), {
+    valid: false,
+    incomplete: true,
+    code: "incomplete_shell_construct",
+    label: "Input looks like an incomplete shell construct."
+  });
+});
+
+test("command send safety controller distinguishes additional natural-language and shell-command head branches", () => {
+  assert.equal(isLikelyNaturalLanguageInput(""), false);
+  assert.equal(isLikelyNaturalLanguageInput("....."), false);
+  assert.equal(isLikelyNaturalLanguageInput("deploy/service --help"), false);
+  assert.equal(isLikelyNaturalLanguageInput("C:\\tools\\deploy.bat"), false);
+  assert.equal(isLikelyNaturalLanguageInput("we want to review the latest deployment plan"), true);
+  assert.equal(isLikelyNaturalLanguageInput("this is the current state of the deployment"), true);
+  assert.equal(isLikelyNaturalLanguageInput("the state of the system is currently unclear"), true);
+});

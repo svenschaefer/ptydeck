@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (QLT-238 frontend runtime-initialization seam extraction completed, H158 remains active for frontend utility/composer quality follow-up only, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
+Last updated: 2026-04-29 (QLT-239 frontend utility/debug/search coverage hardening completed, H158 remains active for frontend composer/workflow/settings/preset follow-up only, production auth baseline, historical-review markers, FE handbook messaging cleanup, and current runtime baseline synced after latest review)
 
 ## Current Product Truth
 
@@ -182,21 +182,21 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: `QLT-239` and `QLT-240` are now the active repo-wide quality/coverage follow-up tasks after `QLT-234` through `QLT-238` closed the root-tooling plus backend runtime/reliability/transport/frontend-runtime-composition slices.
-- `ROADMAP.md`: `v0.4.0-H158` is now the active release wave for those quality/coverage tasks.
+- `TODO.md`: `QLT-240` is now the only active repo-wide quality/coverage follow-up task after `QLT-234` through `QLT-239` closed the root-tooling plus backend runtime/reliability/transport/frontend-runtime-composition plus frontend utility/debug/search slices.
+- `ROADMAP.md`: `v0.4.0-H158` remains the active release wave for that remaining frontend quality/coverage task.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
 
 ## Repository Quality Review (2026-04-29)
 
-The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` through `QLT-238` have now closed the root-tooling plus backend runtime/reliability/transport plus frontend runtime-composition slices from that review.
+The 2026-04-29 review refreshed the repo-wide evidence instead of relying on the earlier `H156` baseline alone, and `QLT-234` through `QLT-239` have now closed the root-tooling plus backend runtime/reliability/transport plus frontend runtime-composition and frontend utility/debug/search slices from that review.
 
 Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.43%` line / `87.86%` branch
-- frontend: `95.52%` line / `87.22%` branch
+- backend: `94.44%` line / `87.85%` branch
+- frontend: `95.78%` line / `87.57%` branch
 
 The new review promoted only the still-relevant gaps into `TODO.md`:
 
@@ -213,13 +213,13 @@ The new review promoted only the still-relevant gaps into `TODO.md`:
 - Frontend:
   - `QLT-238` extracted canonical-origin redirect, startup-backup gating, trusted-local identity bootstrap, and initialization-error normalization into `frontend/src/public/app-runtime-initialization-controller.js`, which now validates at `100.00%` line / `97.83%` branch coverage through direct deterministic tests.
   - `frontend/src/public/app-runtime-composition-controller.js` remains the largest behavior-heavy frontend monolith, but it is now down to `1873` lines and `88.04%` line / `62.22%` branch coverage after the initialization seam moved out of the monolith and into direct coverage.
-  - The next still-relevant lower-covered utility/operator seams are `command-send-safety-controller.js`, `stream-debug-trace-controller.js`, `trace-debug-controller.js`, `ui/terminal-search-controller.js`, `trusted-local-client-runtime-controller.js`, and `terminal-ctrl-c-runtime-controller.js`.
+  - `QLT-239` then closed the promoted utility/debug/search seams with direct deterministic regressions: `frontend/src/public/command-send-safety-controller.js` now validates at `97.95%` line / `90.82%` branch coverage, `frontend/src/public/stream-debug-trace-controller.js` at `96.49%` line / `91.18%` branch coverage, `frontend/src/public/trace-debug-controller.js` at `96.88%` line / `90.91%` branch coverage, `frontend/src/public/terminal-ctrl-c-runtime-controller.js` at `92.77%` line / `92.11%` branch coverage, `frontend/src/public/trusted-local-client-runtime-controller.js` at `97.35%` line / `97.35%` branch coverage, and `frontend/src/public/ui/terminal-search-controller.js` at `91.81%` line / `83.87%` branch coverage.
   - The next still-relevant lower-covered composer/workflow/settings/preset seams are `command-composer-autocomplete-controller.js`, `slash-workflow-parser.js`, `theme-io.js`, `workspace-preset-runtime-actions.js`, `command-engine.js`, and `ui/session-settings-dialog-controller.js`.
   - The large static `theme-library.js` file was not promoted as an active quality task because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
 The remaining promoted follow-up wave is therefore:
 
-- `QLT-239` and `QLT-240` under `v0.4.0-H158`
+- `QLT-240` under `v0.4.0-H158`
 
 ## Frontend Runtime-State and Plugin Baseline
 

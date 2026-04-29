@@ -205,3 +205,86 @@ test("terminal-search controller binds input controls for search, navigation, an
   assert.equal(statusEl.textContent, "");
   assert.equal(clearBtn.disabled, true);
 });
+
+test("terminal-search controller resets stale selection and reports missing active sessions deterministically", () => {
+  const staleTerminal = createTerminalFixture(["alpha"], 4);
+  const state = createState();
+  state.query = "alpha";
+  state.sessionId = "stale";
+  state.selectedSessionId = "stale";
+  state.matches = [{ row: 0, column: 0, length: 5 }];
+  state.activeIndex = 0;
+  const statusEl = createElement();
+  const controller = createTerminalSearchController({
+    terminalSearchState: state,
+    terminals: new Map([["stale", { terminal: staleTerminal, searchRevision: 1 }]]),
+    statusEl,
+    getActiveSessionId: () => ""
+  });
+
+  state.query = "   ";
+  controller.syncActiveTerminalSearch({ preserveSelection: false });
+  assert.equal(state.query, "");
+  assert.equal(state.selectedSessionId, "");
+  assert.equal(staleTerminal.clearSelectionCalls, 1);
+  assert.equal(statusEl.textContent, "");
+
+  state.query = "alpha";
+  controller.syncActiveTerminalSearch({ preserveSelection: false });
+  assert.equal(state.missingActiveSession, true);
+  assert.equal(state.sessionId, "");
+  assert.equal(statusEl.textContent, "Search needs an active terminal.");
+
+  const missingEntryState = createState();
+  const missingEntryStatusEl = createElement();
+  const missingEntryController = createTerminalSearchController({
+    terminalSearchState: missingEntryState,
+    terminals: new Map(),
+    statusEl: missingEntryStatusEl,
+    getActiveSessionId: () => "missing"
+  });
+
+  missingEntryState.query = "alpha";
+  missingEntryController.syncActiveTerminalSearch({ preserveSelection: false });
+  assert.equal(missingEntryState.sessionId, "missing");
+  assert.equal(missingEntryState.missingActiveSession, true);
+  missingEntryController.navigateActiveTerminalSearch("next");
+  assert.equal(missingEntryStatusEl.textContent, "Search needs an active terminal.");
+});
+
+test("terminal-search controller binds handlers idempotently and detaches them on dispose", () => {
+  const terminal = createTerminalFixture(["alpha beta", "beta alpha"], 4);
+  const state = createState();
+  const inputEl = createElement();
+  const prevBtn = createElement();
+  const nextBtn = createElement();
+  const clearBtn = createElement();
+  const statusEl = createElement();
+  const controller = createTerminalSearchController({
+    terminalSearchState: state,
+    terminals: new Map([["s1", { terminal, searchRevision: 1 }]]),
+    inputEl,
+    prevBtn,
+    nextBtn,
+    clearBtn,
+    statusEl,
+    getActiveSessionId: () => "s1"
+  });
+
+  const detachA = controller.bindUiEvents();
+  const detachB = controller.bindUiEvents();
+  assert.equal(detachA, detachB);
+
+  inputEl.value = "alpha";
+  inputEl.dispatchEvent({ type: "input" });
+  assert.equal(statusEl.textContent, "Match 1/2");
+
+  controller.dispose();
+  inputEl.value = "beta";
+  inputEl.dispatchEvent({ type: "input" });
+  nextBtn.click();
+  clearBtn.click();
+
+  assert.equal(state.query, "alpha");
+  assert.equal(statusEl.textContent, "Match 1/2");
+});

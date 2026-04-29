@@ -23,12 +23,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Queued Wave Order
 
 1. `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
-   - `QLT-239` Owner `FE`: frontend utility/debug/search controller coverage hardening.
    - `QLT-240` Owner `FE`: frontend composer/workflow/settings/preset coverage hardening.
 
 ## Wave Dependencies
 
-- none within the remaining `v0.4.0-H158` slice after `QLT-238` landed.
+- none within the remaining `v0.4.0-H158` slice after `QLT-239` landed.
 
 ## Wave Exit Criteria
 

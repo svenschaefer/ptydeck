@@ -236,3 +236,159 @@ test("trusted local client controller surfaces clear rename persistence failures
     /Failed to persist the updated trusted local device name/
   );
 });
+
+test("trusted local client controller supports custom storage keys, window fallbacks, and truncated labels", async () => {
+  const storage = createStorage();
+  const controller = createTrustedLocalClientRuntimeController({
+    storageKey: "custom.trusted-local-client",
+    windowRef: {
+      localStorage: storage,
+      navigator: {
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/123.0 Safari/537.36",
+        userAgentData: { platform: "Windows" }
+      },
+      crypto: {}
+    },
+    nowFn: () => 9876
+  });
+
+  const identity = await controller.ensureClientIdentity();
+  const renamed = controller.renameClientIdentity("X".repeat(90));
+
+  assert.match(identity.clientId, /^trusted-/);
+  assert.match(identity.label, /^Edge on Windows \([A-Z0-9]{4}\)$/);
+  assert.equal(controller.getStorageKey(), "custom.trusted-local-client");
+  assert.equal(controller.getLabelMaxLength(), 64);
+  assert.equal(renamed.label.length, 64);
+  assert.equal(typeof storage.getItem("custom.trusted-local-client"), "string");
+});
+
+test("trusted local client controller fails closed for invalid stored records and unstuck rename verification", () => {
+  const invalidController = createTrustedLocalClientRuntimeController({
+    localStorageRef: createStorage({
+      [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: JSON.stringify([])
+    })
+  });
+  assert.equal(invalidController.getClientIdentity(), null);
+  assert.deepEqual(invalidController.getWsTicketPayload(), {});
+
+  const staleJson = JSON.stringify({
+    format: "ptydeck.trusted-local-client.v1",
+    clientId: "trusted-existing-client",
+    label: "Desk Browser",
+    createdAt: 77
+  });
+  const staleController = createTrustedLocalClientRuntimeController({
+    storageRef: {
+      getItem() {
+        return staleJson;
+      },
+      setItem() {
+        // Pretend the write succeeded but keep returning the stale label.
+      }
+    }
+  });
+
+  assert.throws(
+    () => staleController.renameClientIdentity("Updated Label"),
+    /Failed to persist the updated trusted local device name/
+  );
+});
+
+test("trusted local client controller derives browser and platform labels across navigator variants", async () => {
+  const cases = [
+    {
+      navigatorRef: {
+        userAgent: "Mozilla/5.0 Version/17.4 Safari/605.1.15",
+        platform: "MacIntel"
+      },
+      expectedLabelPrefix: "Safari on macOS"
+    },
+    {
+      navigatorRef: {
+        userAgent: "Mozilla/5.0 Firefox/124.0",
+        platform: "Android"
+      },
+      expectedLabelPrefix: "Firefox on Android"
+    },
+    {
+      navigatorRef: {
+        userAgent: "",
+        platform: "iPhone"
+      },
+      expectedLabelPrefix: "Browser on iOS"
+    },
+    {
+      navigatorRef: {
+        userAgent: "Custom Windows Agent",
+        platform: ""
+      },
+      expectedLabelPrefix: "Browser on Windows"
+    },
+    {
+      navigatorRef: {
+        userAgent: "Custom Linux Agent",
+        platform: ""
+      },
+      expectedLabelPrefix: "Browser on Linux"
+    },
+    {
+      navigatorRef: {
+        userAgent: "CompletelyUnknownAgent/1.0",
+        platform: "Unknown"
+      },
+      expectedLabelPrefix: "Browser on Device"
+    }
+  ];
+
+  for (const [index, testCase] of cases.entries()) {
+    const controller = createTrustedLocalClientRuntimeController({
+      storageRef: createStorage(),
+      navigatorRef: testCase.navigatorRef,
+      cryptoRef: {
+        randomUUID() {
+          return `00000000-0000-0000-0000-0000000000${index}`;
+        }
+      },
+      nowFn: () => 1000 + index
+    });
+    const identity = await controller.ensureClientIdentity();
+    assert.match(identity.label, new RegExp(`^${testCase.expectedLabelPrefix} \\([A-Z0-9]{4}\\)$`));
+  }
+});
+
+test("trusted local client controller tolerates invalid stored json and fails when a created identity cannot be re-read", async () => {
+  const invalidJsonController = createTrustedLocalClientRuntimeController({
+    storageRef: createStorage({
+      [TRUSTED_LOCAL_CLIENT_STORAGE_KEY]: "{"
+    })
+  });
+  assert.equal(invalidJsonController.getClientIdentity(), null);
+
+  let persistedValue = null;
+  const unverifiableController = createTrustedLocalClientRuntimeController({
+    storageRef: {
+      getItem() {
+        return persistedValue;
+      },
+      setItem() {
+        persistedValue = JSON.stringify({
+          format: "wrong-format",
+          clientId: "trusted-bad",
+          label: "Bad",
+          createdAt: 1
+        });
+      }
+    },
+    cryptoRef: {
+      randomUUID() {
+        return "12345678-1234-1234-1234-1234567890ab";
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => unverifiableController.ensureClientIdentity(),
+    /Failed to verify the trusted local device identity/
+  );
+});

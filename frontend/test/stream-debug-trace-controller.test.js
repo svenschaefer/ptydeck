@@ -49,3 +49,82 @@ test("stream debug trace controller records, persists, and reloads bounded per-s
   assert.equal(reloaded.getSessionTrace("s3")[0].payload.chunk, "ghi");
 });
 
+test("stream debug trace controller tolerates malformed storage, normalizes payloads, and ignores persistence failures", () => {
+  const storage = new Map([
+    [
+      "ptydeck.stream-debug.v1",
+      JSON.stringify({
+        sessions: [
+          { sessionId: " ", entries: [{ recordedAt: 1, type: "skip" }] },
+          { sessionId: "empty", entries: [] },
+          { sessionId: "kept", entries: [{ recordedAt: 2, type: "stream.data", payload: { chunk: "ok" } }] }
+        ]
+      })
+    ]
+  ]);
+  const windowRef = {
+    localStorage: {
+      getItem(key) {
+        return storage.get(key) ?? null;
+      },
+      setItem() {
+        throw new Error("quota exceeded");
+      }
+    }
+  };
+
+  const controller = createStreamDebugTraceController({
+    windowRef,
+    now: () => 5000,
+    maxEntriesPerSession: 1
+  });
+
+  assert.equal(windowRef.__PTYDECK_STREAM_DEBUG__, controller);
+  assert.deepEqual(controller.listSessionIds(), ["kept"]);
+
+  controller.record(" ", "stream.data", { ignored: true });
+  controller.record("kept", "", { ignored: true });
+  controller.record("fresh", "stream.data", {
+    text: "x".repeat(2505),
+    count: 3,
+    ok: true,
+    nested: ["y".repeat(2505), { fallback: Symbol("trace") }]
+  });
+
+  const freshEntry = controller.getSessionTrace("fresh")[0];
+  assert.equal(freshEntry.recordedAt, 5000);
+  assert.equal(freshEntry.payload.text.length, 2001);
+  assert.equal(freshEntry.payload.text.endsWith("…"), true);
+  assert.equal(freshEntry.payload.nested[0].length, 2001);
+  assert.equal(freshEntry.payload.nested[1].fallback, "Symbol(trace)");
+
+  controller.clearSession(" ");
+  controller.clearSession("kept");
+  assert.deepEqual(controller.listSessionIds(), ["fresh"]);
+
+  controller.clear();
+  controller.dispose();
+  assert.deepEqual(controller.listSessionIds(), []);
+});
+
+test("stream debug trace controller works without localStorage-backed persistence", () => {
+  const windowRef = {};
+  const controller = createStreamDebugTraceController({
+    windowRef,
+    now: () => 77
+  });
+
+  assert.equal(windowRef.__PTYDECK_STREAM_DEBUG__, controller);
+  controller.record("session-a", "stream.data", "hello");
+  controller.record("session-a", "activity", 12);
+  controller.record("session-a", "flag", false);
+
+  assert.equal(controller.getSessionTrace("session-a").length, 3);
+  controller.clearSession("session-a");
+  assert.deepEqual(controller.getSessionTrace("session-a"), []);
+
+  controller.record("session-b", "stream.data", { nested: ["ok"] });
+  controller.clear();
+  controller.dispose();
+  assert.deepEqual(controller.listSessionIds(), []);
+});

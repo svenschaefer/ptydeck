@@ -92,3 +92,36 @@ test("terminal-ctrl-c runtime controller resolves cancel and dismisses on dialog
   assert.equal(await dismissPending, null);
   assert.equal(cancelEvent.defaultPrevented, true);
 });
+
+test("terminal-ctrl-c runtime controller falls back cleanly for duplicate requests and missing modal controls", async () => {
+  const dialogEl = new FakeElement();
+  dialogEl.showModal = undefined;
+  const messageEl = new FakeElement();
+  const copyBtn = new FakeElement();
+  const cancelBtn = new FakeElement();
+  const controller = createTerminalCtrlCRuntimeController({
+    dialogEl,
+    messageEl,
+    copyBtn,
+    cancelBtn
+  });
+
+  const pending = controller.requestIntent({
+    session: { id: "s2" }
+  });
+  assert.equal(dialogEl.open, true);
+  assert.match(messageEl.textContent, /s2/);
+  assert.equal(await controller.requestIntent({ session: { id: "s3" } }), null);
+  cancelBtn.click();
+  assert.equal(await pending, "cancel");
+
+  const fallbackPending = controller.requestIntent({
+    session: {}
+  });
+  assert.match(messageEl.textContent, /this session/);
+  copyBtn.click();
+  assert.equal(await fallbackPending, "copy");
+
+  const noControlsController = createTerminalCtrlCRuntimeController();
+  assert.equal(await noControlsController.requestIntent({ session: { id: "s4" } }), "cancel");
+});
