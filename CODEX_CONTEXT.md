@@ -182,8 +182,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: the only remaining active promoted task is now `QLT-254` under `v0.4.0-H160`.
-- `ROADMAP.md`: the active wave is now `v0.4.0-H160`, with no additional queued follow-up wave behind it.
+- `TODO.md`: there are no active promoted tasks.
+- `ROADMAP.md`: there is no active or queued wave after the `v0.4.0-H160` closeout.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
@@ -196,7 +196,7 @@ Current validated top-line coverage remains above threshold:
 
 - root tooling: `92.77%` line / `76.81%` branch
 - backend: `94.93%` line / `88.35%` branch
-- frontend: `96.78%` line / `89.11%` branch
+- frontend: `96.82%` line / `89.29%` branch
 
 The fresh post-H158 review promoted only the still-relevant gaps into `TODO.md`:
 
@@ -230,10 +230,10 @@ The fresh post-`H159` review then promoted one more same-day follow-up wave, `v0
   - `QLT-252` is now complete as the third delivered slice in `v0.4.0-H160`. `frontend/src/public/command-executor.js` now delegates the `close`, `switch`, `swap`, `next`, `prev`, `rename`, `restart`, and `note` command cluster into `frontend/src/public/command-executor-session-handlers.js`, which also centralizes the active/direct target-resolution helpers that were previously kept inline in the executor. The extraction reduces `frontend/src/public/command-executor.js` from `2047` to `1850` lines without widening the shipped command contract, and `frontend/package.json` now includes the new seam file in the explicit frontend `build` / `lint` `node --check` lists so the extracted module stays inside the deterministic syntax gate.
   - Direct deterministic seam coverage for `QLT-252` now lives in `frontend/test/command-executor-session-handlers.test.js`, while `frontend/test/command-executor.test.js` remains green against the retained integrated executor. The validated hotspot snapshot now reports `frontend/src/public/command-executor-session-handlers.js` at `92.48%` line / `70.76%` branch coverage and `frontend/src/public/command-executor.js` at `86.38%` line / `75.22%` branch coverage.
   - `QLT-253` is now complete as the fourth delivered slice in `v0.4.0-H160`. `frontend/test/command-palette-runtime-controller.test.js` now locks down malformed custom-command filtering, no-match commit guards, result-button click selection, shortcut-toggle close behavior, and DOM-light fallback rendering across the retained command-palette seam. `frontend/test/slash-workflow-runtime-controller.test.js` now locks down listener-thrown engine cleanup and retry recovery so the slash-workflow runtime proves fail-closed cleanup outside normal engine-produced `failed` states. `frontend/test/paste-observation-runtime-controller.test.js` now locks down full placeholder completion, overlapping continue suppression, invalid-input guards, and dispose cleanup. `frontend/test/replay-export-runtime-controller.test.js` now locks down document-element removal fallback, unavailable shell-block summaries, unsupported browser download paths, and API/session guard failures. The validated hotspot snapshot now reports `frontend/src/public/command-palette-runtime-controller.js` at `93.64%` line / `80.16%` branch coverage, `frontend/src/public/slash-workflow-runtime-controller.js` at `90.78%` line / `74.83%` branch coverage, `frontend/src/public/paste-observation-runtime-controller.js` at `92.97%` line / `82.63%` branch coverage, and `frontend/src/public/replay-export-runtime-controller.js` at `98.95%` line / `94.12%` branch coverage.
-  - `QLT-254` now promotes the remaining workspace/view-model/search cluster because `frontend/src/public/workspace-preset-runtime-controller.js` (`1135` lines, `91.63%` line / `80.00%` branch), `frontend/src/public/workspace-manager-runtime-controller.js` (`180` lines, `92.78%` line / `66.67%` branch), `frontend/src/public/session-view-model.js` (`302` lines, `90.73%` line / `81.90%` branch), `frontend/src/public/terminal-search.js` (`100` lines, `92.00%` line / `69.23%` branch), and `frontend/src/public/ui/layout-settings-controller.js` (`180` lines, `97.78%` line / `55.56%` branch) still hold preset fallback, workspace guard, derived-label, search-failure, and layout-guard branches that deserve direct deterministic coverage.
+  - `QLT-254` is now complete as the fifth and final delivered slice in `v0.4.0-H160`. `frontend/test/workspace-preset-runtime-controller.test.js` now locks down exact-name/prefix selector resolution and `loadPresets()` fail-closed behavior when no preset API hook exists. `frontend/test/workspace-manager-runtime-controller.test.js` now locks down select-driven rerendering and repeated open/close cycles. `frontend/test/session-view-model.test.js` now locks down blocked-state messaging, environment/tag guardrails, and startup normalization. `frontend/test/terminal-search.test.js` now locks down case-sensitive matching, buffer fallbacks, and empty/wrapped status branches. `frontend/test/layout-settings-controller.test.js` now locks down invalid-value clamping and measurement/DOM fallback behavior. The validated hotspot snapshot now reports `frontend/src/public/workspace-preset-runtime-controller.js` at `92.60%` line / `81.36%` branch coverage, `frontend/src/public/workspace-manager-runtime-controller.js` at `94.44%` line / `72.15%` branch coverage, `frontend/src/public/session-view-model.js` at `95.36%` line / `84.68%` branch coverage, `frontend/src/public/terminal-search.js` at `96.00%` line / `88.46%` branch coverage, and `frontend/src/public/ui/layout-settings-controller.js` at `98.89%` line / `95.65%` branch coverage.
   - The large static `theme-library.js` file still remains intentionally unpromoted because it is primarily data inventory rather than an uncovered behavior-heavy runtime seam.
 
-`v0.4.0-H160` remains active with only the frontend `QLT-254` slice still open; no root-diagnostic or messaging-specific near-term wave is promoted alongside it.
+`v0.4.0-H160` is now fully closed on `main`; no root-diagnostic or messaging-specific near-term wave is promoted alongside it.
 
 ## Frontend Runtime-State and Plugin Baseline
 

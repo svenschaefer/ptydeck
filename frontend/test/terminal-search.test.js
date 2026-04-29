@@ -87,3 +87,29 @@ test("formatTerminalSearchStatus distinguishes match, wrap, and no-match states"
     "Search needs an active terminal."
   );
 });
+
+test("terminal search handles case-sensitive matching, buffer fallbacks, and empty status branches", () => {
+  const terminal = createTerminalFixture(["Alpha", "alpha", "ALPHA"], 3);
+  const caseSensitiveMatches = collectTerminalSearchMatches(terminal, "ALPHA", { caseSensitive: true });
+  assert.deepEqual(caseSensitiveMatches.map((entry) => ({ row: entry.row, column: entry.column })), [{ row: 2, column: 0 }]);
+
+  const degradedTerminal = {
+    rows: 2,
+    buffer: {
+      active: {
+        baseY: 1,
+        getLine() {
+          return {};
+        }
+      }
+    }
+  };
+  assert.deepEqual(collectTerminalSearchMatches(degradedTerminal, "alpha"), []);
+  assert.equal(applyTerminalSearchMatch(null, { row: 0, column: 0, length: 1 }), false);
+  assert.equal(applyTerminalSearchMatch({}, { row: 1, column: 2, length: 3 }), true);
+  assert.equal(formatTerminalSearchStatus({ query: "" }), "");
+  assert.equal(
+    formatTerminalSearchStatus({ query: "alpha", matches: [{}], activeIndex: 0, wrapped: true, direction: "previous" }),
+    "Wrapped to previous match (Match 1/1)."
+  );
+});

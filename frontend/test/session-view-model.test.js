@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSessionViewModel } from "../src/public/session-view-model.js";
+import { createSessionViewModel, formatSessionDisplayName } from "../src/public/session-view-model.js";
 
 const model = createSessionViewModel({
   defaultDeckId: "default",
@@ -104,4 +104,56 @@ test("session view model appends visible active app labels to the session header
   assert.equal(model.getSessionHeaderLabel(plainSession), "ptydeck");
   assert.equal(model.getSessionHeaderLabel(codexSession), "ptydeck (codex)");
   assert.equal(model.getSessionHeaderLabel(duplicateSession), "codex");
+});
+
+test("session view model covers blocked-state messaging, env/tag guardrails, and startup normalization", () => {
+  const unrestored = {
+    id: "uvwx1234",
+    name: "ops",
+    lifecycleState: "unrestored",
+    hasLiveActivity: true
+  };
+  const exited = {
+    id: "yzab5678",
+    name: "build",
+    state: "exited",
+    exitSignal: "SIGTERM",
+    hasUnreadActivity: true
+  };
+
+  assert.equal(formatSessionDisplayName({ id: "1234567890" }), "12345678");
+  assert.equal(model.resolveSessionDeckId({ deckId: "" }), "default");
+  assert.equal(model.isSessionUnrestored(unrestored), true);
+  assert.equal(model.isSessionActionBlocked(unrestored), true);
+  assert.equal(model.getSessionActivityIndicatorState(unrestored), "live");
+  assert.equal(model.getSessionActivityIndicatorState(exited), "unseen");
+  assert.match(model.getSessionStateHintText(unrestored), /could not be restored/i);
+  assert.match(model.getUnrestoredSessionMessage(unrestored), /Session \[uv\] ops is unrestored/);
+  assert.match(model.getBlockedSessionActionMessage([unrestored], "Restart"), /Restart blocked for unrestored session \[uv\] ops\./);
+  assert.match(
+    model.getBlockedSessionActionMessage([unrestored, exited], "Restart"),
+    /Restart blocked for non-interactive sessions: \[uv\] ops \[unrestored\], \[yz\] build \[exited\]\./
+  );
+  assert.equal(model.formatSessionEnv({ BETA: "2", ALPHA: "1", DROP: 3 }), "ALPHA=1\nBETA=2");
+  assert.equal(model.formatSessionTags(["Beta", "alpha", "beta"]), "alpha, beta");
+  assert.equal(model.parseSessionTags("one two three four").ok, false);
+  assert.equal(model.parseSessionTags("bad*tag").ok, false);
+  assert.equal(model.parseSessionEnv("NOVALUE").ok, false);
+  assert.equal(model.parseSessionEnv("1BAD=value").ok, false);
+  assert.deepEqual(
+    model.normalizeSessionStartupFromSession({
+      startCwd: 7,
+      startCommand: null,
+      env: "bad",
+      mouseForwardingMode: "bogus",
+      tags: ["Beta", "beta", "bad tag"]
+    }),
+    {
+      startCwd: "",
+      startCommand: "",
+      env: {},
+      mouseForwardingMode: "off",
+      tags: ["beta"]
+    }
+  );
 });

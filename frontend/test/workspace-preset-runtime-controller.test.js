@@ -888,3 +888,62 @@ test("workspace preset runtime controller clears stale preset state when reload 
   assert.equal(controller.getSelectedPreset(), null);
   assert.equal(errors[0], "Failed to load workspace presets.");
 });
+
+test("workspace preset helpers resolve exact names and prefixes, and loadPresets fails closed without an API hook", async () => {
+  const presets = [
+    {
+      id: "ops-east",
+      name: "Ops East",
+      workspace: {
+        activeDeckId: "ops"
+      }
+    },
+    {
+      id: "ops-west",
+      name: "Ops West",
+      workspace: {
+        activeDeckId: "ops"
+      }
+    }
+  ];
+
+  assert.equal(resolveWorkspacePresetToken(presets, "Ops East").preset?.id, "ops-east");
+  assert.equal(resolveWorkspacePresetToken(presets, "ops-ea").preset?.id, "ops-east");
+  assert.equal(
+    resolveWorkspaceGroupToken(
+      [
+        { id: "build-core", name: "Build Core" },
+        { id: "deploy", name: "Deploy" }
+      ],
+      "Build Core"
+    ).group?.id,
+    "build-core"
+  );
+  assert.equal(
+    resolveWorkspaceGroupToken(
+      [
+        { id: "build-core", name: "Build Core" },
+        { id: "deploy", name: "Deploy" }
+      ],
+      "bui"
+    ).group?.id,
+    "build-core"
+  );
+
+  const controller = createWorkspacePresetRuntimeController({
+    documentRef: createDocumentRef(),
+    presetSelectEl: new FakeElement("select"),
+    groupSelectEl: new FakeElement("select"),
+    statusEl: new FakeElement("p"),
+    getDecks: () => [{ id: "default" }],
+    getSessions: () => [],
+    getActiveDeckId: () => "default",
+    getSessionFilterText: () => "",
+    resolveSessionDeckId: (session) => session.deckId,
+    sortSessionsByQuickId: (sessions) => sessions.slice()
+  });
+
+  const loaded = await controller.loadPresets();
+  assert.deepEqual(loaded, []);
+  assert.deepEqual(controller.listPresets(), []);
+});

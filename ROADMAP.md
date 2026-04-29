@@ -14,26 +14,23 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H160` Repo-Wide Quality and Coverage Gap Follow-Up After H159
+  - none currently
 - Latest completed wave in this segment:
-  - `v0.4.0-H159` Repo-Wide Quality and Coverage Gap Follow-Up After H158
+  - `v0.4.0-H160` Repo-Wide Quality and Coverage Gap Follow-Up After H159
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
 
-- `v0.4.0-H160`
-  - `QLT-254` Owner `FE`: workspace/view-model/search coverage hardening
+- none currently
 
 ## Wave Dependencies
 
-- `QLT-254`: follows completed `QLT-253` as the final remaining workspace/view-model/search cut in `v0.4.0-H160` and still depends on the same retained command-selection and workspace authority contracts.
+- none currently
 
 ## Wave Exit Criteria
 
-- `QLT-254` completed with direct deterministic coverage for the promoted seams.
-- Validated top-line coverage remains above threshold across the root, backend, and frontend lanes.
-- No new catch-all residual quality task remains for the `H160` segment.
+- none currently
 
 ## Sequencing Rules
 

@@ -168,3 +168,74 @@ test("layout-settings controller syncs UI and CSS geometry", () => {
     }
   });
 });
+
+test("layout-settings controller clamps invalid values and degrades safely without measurement primitives", () => {
+  const settingsColsEl = createEl();
+  const settingsRowsEl = createEl();
+  const appShellEl = { classList: new ClassList() };
+  const sidebarToggleBtn = createEl();
+  const sidebarLauncherBtn = createEl();
+  const controller = createLayoutSettingsController({
+    documentRef: {
+      createElement() {
+        return {
+          getContext() {
+            return null;
+          }
+        };
+      },
+      documentElement: {
+        style: {
+          setProperty() {}
+        }
+      }
+    },
+    appShellEl,
+    sidebarToggleBtn,
+    sidebarLauncherBtn,
+    settingsColsEl,
+    settingsRowsEl
+  });
+
+  controller.syncSettingsUi({
+    cols: 80,
+    rows: 24,
+    sidebarVisible: false,
+    sidebarPanels: null
+  });
+
+  settingsColsEl.value = "999";
+  settingsRowsEl.value = "bad";
+
+  assert.deepEqual(controller.sidebarPanelIds, ["find", "terminalSize", "savedLayouts"]);
+  assert.equal(appShellEl.classList.contains("sidebar-collapsed"), true);
+  assert.equal(sidebarToggleBtn.hidden, true);
+  assert.equal(sidebarLauncherBtn.hidden, false);
+  assert.equal(controller.computeFixedCardWidthPx(10), 260);
+  assert.equal(controller.computeFixedMountHeightPx(1), 120);
+  assert.deepEqual(
+    controller.readSettingsFromUi({
+      cols: 80,
+      rows: 24,
+      sidebarVisible: false,
+      sidebarPanels: ["bad"]
+    }),
+    {
+      cols: 400,
+      rows: 24,
+      sidebarVisible: false,
+      sidebarPanels: {
+        find: false,
+        terminalSize: false,
+        savedLayouts: false
+      }
+    }
+  );
+
+  assert.doesNotThrow(() =>
+    createLayoutSettingsController({ documentRef: null }).syncTerminalGeometryCss({
+      cols: 80,
+      rows: 24
+    })
+  );
+});

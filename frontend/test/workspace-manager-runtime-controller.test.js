@@ -48,10 +48,14 @@ class FakeElement {
     this.listeners.set(type, list);
   }
 
-  click() {
-    for (const handler of this.listeners.get("click") || []) {
-      handler({ type: "click" });
+  dispatchEvent(type) {
+    for (const handler of this.listeners.get(type) || []) {
+      handler({ type, target: this });
     }
+  }
+
+  click() {
+    this.dispatchEvent("click");
   }
 
   showModal() {
@@ -251,5 +255,82 @@ test("workspace manager runtime controller falls back cleanly without modal help
   openBtn.click();
   assert.equal(dialogEl.open, true);
   closeBtn.click();
+  assert.equal(dialogEl.open, false);
+});
+
+test("workspace manager runtime controller rerenders from select changes and tolerates repeated open-close cycles", () => {
+  const dialogEl = new FakeElement("dialog");
+  const connectionSelectEl = new FakeElement("select");
+  const workspacePresetSelectEl = new FakeElement("select");
+  const workspaceGroupSelectEl = new FakeElement("select");
+  const connectionSummaryEl = new FakeElement("p");
+  const workspacePresetSummaryEl = new FakeElement("p");
+  const workspaceGroupSummaryEl = new FakeElement("p");
+  const openBtn = new FakeElement("button");
+  const closeBtn = new FakeElement("button");
+  const metaEl = new FakeElement("p");
+  const connectionsTabBtn = new FakeElement("button");
+  const workspaceTabBtn = new FakeElement("button");
+  const connectionsPanelEl = new FakeElement("section");
+  const workspacePanelEl = new FakeElement("section");
+  let selectedConnection = {
+    id: "ops",
+    name: "Ops",
+    launch: { kind: "local", deckId: "ops", shell: "bash", startCwd: "~", startCommand: "", env: {}, tags: [] }
+  };
+  let selectedPreset = {
+    id: "ops",
+    name: "Ops Workspace",
+    workspace: { activeDeckId: "ops", layoutProfileId: "", deckGroups: {} }
+  };
+  let groups = [{ id: "build", name: "Build", sessionIds: ["s1"] }];
+  let activeGroupId = "build";
+
+  const controller = createWorkspaceManagerRuntimeController({
+    dialogEl,
+    openBtn,
+    closeBtn,
+    metaEl,
+    connectionsTabBtn,
+    workspaceTabBtn,
+    connectionsPanelEl,
+    workspacePanelEl,
+    connectionSelectEl,
+    workspacePresetSelectEl,
+    workspaceGroupSelectEl,
+    connectionSummaryEl,
+    workspacePresetSummaryEl,
+    workspaceGroupSummaryEl,
+    getConnectionProfileRuntimeController: () => ({
+      getSelectedProfile: () => selectedConnection
+    }),
+    getWorkspacePresetRuntimeController: () => ({
+      getSelectedPreset: () => selectedPreset,
+      listGroupsForDeck: () => groups,
+      getActiveGroupIdForDeck: () => activeGroupId
+    }),
+    getActiveDeckId: () => "ops"
+  });
+
+  controller.open();
+  controller.open();
+  assert.equal(dialogEl.open, true);
+
+  selectedConnection = null;
+  connectionSelectEl.dispatchEvent("change");
+  assert.match(connectionSummaryEl.textContent, /No saved connection profile selected/);
+
+  controller.setActiveTab("workspace");
+  selectedPreset = null;
+  groups = [];
+  activeGroupId = "";
+  workspacePresetSelectEl.dispatchEvent("change");
+  workspaceGroupSelectEl.dispatchEvent("change");
+
+  assert.match(workspacePresetSummaryEl.textContent, /No saved workspace preset selected/);
+  assert.match(workspaceGroupSummaryEl.textContent, /Deck \[ops\] · no active group/i);
+
+  controller.close();
+  controller.close();
   assert.equal(dialogEl.open, false);
 });
