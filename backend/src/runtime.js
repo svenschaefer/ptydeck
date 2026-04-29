@@ -6,7 +6,7 @@ import { basename, dirname, join, posix, relative, resolve } from "node:path";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import { createAuditLogger, createHttpAuditEvent } from "./audit-log.js";
-import { createAccessTokenVerifier, createDevToken, ensureScope, resolveBearerToken } from "./auth.js";
+import { createAccessTokenVerifier, createDevToken } from "./auth.js";
 import { ApiError, toErrorResponse } from "./errors.js";
 import { JsonPersistence } from "./persistence.js";
 import { createMessagingRuntime, normalizeMessagingTopicBindings } from "./messaging-runtime.js";
@@ -14,8 +14,10 @@ import { resolveRequestContext } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limiter.js";
 import { createRuntimeHttpHelpers, requiredScopeForRoute } from "./runtime-http-helpers.js";
 import { createRuntimeResourceDispatch } from "./runtime-resource-dispatch.js";
+import { createRuntimeSessionControlDispatch } from "./runtime-session-control-dispatch.js";
 import { matchRuntimeRoute, normalizeRuntimeMetricsPath } from "./runtime-route-table.js";
 import { createRuntimeStartupWarmup } from "./runtime-startup-warmup.js";
+import { createRuntimeWsUpgradeHandler } from "./runtime-ws-upgrade.js";
 import { createRuntimeWsTicketRegistry, normalizeWsDisconnectReason } from "./runtime-ws-tickets.js";
 import {
   buildRuntimeHealthPayload,
@@ -2514,6 +2516,120 @@ export function createRuntime(config) {
   const wsTicketRegistry = createRuntimeWsTicketRegistry({
     ttlSeconds: authWsTicketTtlSeconds,
     normalizeSessionControlClientLabel
+  });
+  const handleWsUpgrade = createRuntimeWsUpgradeHandler({
+    config,
+    resolveRequestContext,
+    buildRequestTraceContext,
+    resolveAllowedRequestOrigin: (origin) => runtimeHttpHelpers.resolveAllowedRequestOrigin(origin),
+    wsConnectRateLimiter,
+    accessTokenVerifier,
+    wsTicketRegistry,
+    resolveWsTicketFromProtocols,
+    ensureShareLinkAuthActive,
+    ensureShareRouteAllowed,
+    logDebug,
+    recordWsError,
+    wsServer,
+    onAccepted: (ws, { auth: wsAuth, requestContext, upgradeTraceContext }) => {
+      sockets.add(ws);
+      metrics.wsConnectionsOpenedTotal += 1;
+      const normalizedClientIp = typeof requestContext.clientIp === "string" && requestContext.clientIp ? requestContext.clientIp : "unknown";
+      const wsClientState = wsClientConnections.get(normalizedClientIp) || {
+        activeConnections: 0,
+        acceptedConnections: 0,
+        lastDisconnectReason: "none"
+      };
+      if (wsClientState.acceptedConnections > 0 && wsClientState.activeConnections === 0) {
+        metrics.wsReconnectsTotal += 1;
+        const reconnectReason =
+          typeof wsClientState.lastDisconnectReason === "string" && wsClientState.lastDisconnectReason
+            ? wsClientState.lastDisconnectReason
+            : "unknown";
+        bumpMetricCounter(metrics.wsReconnectsByReason, reconnectReason);
+      }
+      wsClientState.acceptedConnections += 1;
+      wsClientState.activeConnections += 1;
+      wsClientConnections.set(normalizedClientIp, wsClientState);
+      ws.connectionId = createTraceId("ws");
+      ws.traceContext = {
+        ...upgradeTraceContext,
+        connectionId: ws.connectionId,
+        source: "ws"
+      };
+      ws.clientIp = normalizedClientIp;
+      ws.auth = wsAuth;
+      const sessionControlClientId =
+        typeof wsAuth?.sessionControlClientId === "string" && wsAuth.sessionControlClientId.trim()
+          ? wsAuth.sessionControlClientId.trim()
+          : ws.connectionId;
+      const sessionControlClientLabel =
+        typeof wsAuth?.sessionControlClientLabel === "string" ? wsAuth.sessionControlClientLabel : "";
+      ws.sessionControlAttachmentKey = sessionControlAttachmentRegistry.getAttachmentKey({
+        clientId: sessionControlClientId,
+        auth: wsAuth
+      });
+      ws.sessionControlClient = sessionControlAttachmentRegistry.registerAttachment({
+        clientId: sessionControlClientId,
+        label: sessionControlClientLabel,
+        auth: wsAuth
+      });
+      ws.isAlive = true;
+      logDebug("ws.upgrade.accepted", {
+        socketCount: sockets.size,
+        clientIp: requestContext.clientIp,
+        protocol: requestContext.protocol,
+        trustedProxy: requestContext.trustedProxy
+      }, ws.traceContext);
+
+      ws.on("pong", () => {
+        ws.isAlive = true;
+      });
+
+      ws.on("close", (code, reasonBuffer) => {
+        sockets.delete(ws);
+        sessionControlAttachmentRegistry.unregisterAttachment(ws);
+        metrics.wsConnectionsClosedTotal += 1;
+        const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
+        const wsClientState = wsClientConnections.get(clientIp);
+        const reasonText = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString("utf8") : "";
+        const disconnectReason = normalizeWsDisconnectReason(code, reasonText, ws.closeReasonHint);
+        bumpMetricCounter(metrics.wsDisconnectsByReason, disconnectReason);
+        if (wsClientState) {
+          wsClientState.activeConnections = Math.max(0, wsClientState.activeConnections - 1);
+          wsClientState.lastDisconnectReason = disconnectReason;
+          wsClientConnections.set(clientIp, wsClientState);
+        }
+        logDebug("ws.client.closed", { socketCount: sockets.size }, ws.traceContext || upgradeTraceContext);
+        broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext || upgradeTraceContext);
+      });
+      ws.on("error", () => {
+        recordWsError("socket_error");
+      });
+
+      for (const sessionId of listSessionIdsForAuth(ws.auth || null)) {
+        reconcileSessionControllerForSession(sessionId);
+      }
+      const snapshot = manager.getSnapshot();
+      const snapshotPayload = filterPayloadForAuth(
+        withTracePayload({
+          type: "snapshot",
+          clientId: ws.sessionControlClient?.clientId || sessionControlClientId,
+          sessions: listApiSessions(ws.auth || null),
+          outputs: snapshot.outputs,
+          customCommands: listCustomCommands(),
+          decks: listDecks(ws.auth || null)
+        }, ws.traceContext),
+        ws.auth || null
+      );
+      ws.send(JSON.stringify(snapshotPayload));
+      logDebug("ws.snapshot.sent", {
+        sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
+        outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
+        customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
+      }, snapshotPayload.trace || ws.traceContext);
+      broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
+    }
   });
 
   function isSpectatorAuth(auth) {
@@ -5310,6 +5426,17 @@ function tryCreateRestoredSession({
     deleteSshTrustEntry,
     messagingRuntime
   });
+  const sessionControlDispatch = createRuntimeSessionControlDispatch({
+    validateResponse,
+    takeSessionControlOrThrow,
+    takeSessionControlScopeOrThrow,
+    releaseSessionControlOrThrow,
+    transferSessionControlOrThrow,
+    renameSessionControlClientOrThrow,
+    forgetSessionControlClientOrThrow,
+    getApiSessionOrThrow,
+    persistNow
+  });
 
   const wsEventNames = ["session.created", "session.started", "session.updated", "session.data", "session.exit", "session.closed"];
   for (const eventName of wsEventNames) {
@@ -5947,93 +6074,14 @@ function tryCreateRestoredSession({
         return;
       }
 
-      if (match.kind === "takeSessionControl") {
-        const payload = takeSessionControlOrThrow(match.params.sessionId, auth, req, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId
-        });
-        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
-        const nextPayload = {
-          ...apiSession,
-          controlState: payload
-        };
-        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
-        await persistNow("session.control.take");
-        writeJsonResponse( 200, nextPayload);
-        return;
-      }
-
-      if (match.kind === "takeSessionControlScope") {
-        const payload = takeSessionControlScopeOrThrow(body.scope, body, auth, req, {
-          ...requestTraceContext,
-          scope: typeof body?.scope === "string" ? body.scope : ""
-        });
-        await persistNow("session.control.scope_take");
-        writeJsonResponse(200, payload);
-        return;
-      }
-
-      if (match.kind === "releaseSessionControl") {
-        const payload = releaseSessionControlOrThrow(match.params.sessionId, auth, req, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId
-        });
-        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
-        const nextPayload = {
-          ...apiSession,
-          controlState: payload
-        };
-        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
-        await persistNow("session.control.release");
-        writeJsonResponse( 200, nextPayload);
-        return;
-      }
-
-      if (match.kind === "transferSessionControl") {
-        const payload = transferSessionControlOrThrow(match.params.sessionId, body.clientId, auth, req, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId
-        });
-        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
-        const nextPayload = {
-          ...apiSession,
-          controlState: payload
-        };
-        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
-        await persistNow("session.control.transfer");
-        writeJsonResponse( 200, nextPayload);
-        return;
-      }
-
-      if (match.kind === "renameSessionControlClient") {
-        const payload = renameSessionControlClientOrThrow(match.params.sessionId, body.label, auth, req, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId
-        });
-        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
-        const nextPayload = {
-          ...apiSession,
-          controlState: payload
-        };
-        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
-        await persistNow("session.control.rename_client");
-        writeJsonResponse(200, nextPayload);
-        return;
-      }
-
-      if (match.kind === "forgetSessionControlClient") {
-        const payload = forgetSessionControlClientOrThrow(match.params.sessionId, body.clientId, auth, req, {
-          ...requestTraceContext,
-          sessionId: match.params.sessionId
-        });
-        const apiSession = getApiSessionOrThrow(match.params.sessionId, auth);
-        const nextPayload = {
-          ...apiSession,
-          controlState: payload
-        };
-        validateResponse({ statusCode: 200, body: nextPayload, expect: "session" });
-        await persistNow("session.control.forget_client");
-        writeJsonResponse(200, nextPayload);
+      if (await sessionControlDispatch.dispatchSessionControlRequest({
+        match,
+        body,
+        auth,
+        req,
+        requestTraceContext,
+        writeJsonResponse
+      })) {
         return;
       }
 
@@ -6102,210 +6150,7 @@ function tryCreateRestoredSession({
   });
 
   server.on("upgrade", (request, socket, head) => {
-    void (async () => {
-    const requestContext = resolveRequestContext(request, config.trustedProxy);
-    const requestUrl = new URL(request.url || "/", `${requestContext.protocol}://${requestContext.host}`);
-    const requestOrigin = typeof request.headers.origin === "string" ? request.headers.origin : "";
-    const upgradeTraceContext = buildRequestTraceContext(request, requestContext, requestUrl.pathname);
-    if (requestUrl.pathname !== "/ws") {
-      recordWsError("upgrade_path_rejected");
-      logDebug("ws.upgrade.rejected", { pathname: requestUrl.pathname }, upgradeTraceContext);
-      socket.destroy();
-      return;
-    }
-    if (config.enforceTlsIngress && requestContext.protocol !== "https") {
-      const payload = {
-        error: "TlsRequired",
-        message: "TLS is required for this endpoint."
-      };
-      logDebug("ws.upgrade.tls_rejected", {
-        clientIp: requestContext.clientIp,
-        trustedProxy: requestContext.trustedProxy,
-        protocol: requestContext.protocol
-      }, upgradeTraceContext);
-      recordWsError("upgrade_tls_rejected");
-      socket.write(
-        `HTTP/1.1 426 Upgrade Required\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(payload)}`
-      );
-      socket.destroy();
-      return;
-    }
-    const allowedRequestOrigin = runtimeHttpHelpers.resolveAllowedRequestOrigin(requestOrigin);
-    if (!allowedRequestOrigin) {
-      const payload = {
-        error: "UnauthorizedOrigin",
-        message: "WebSocket origin is not allowed."
-      };
-      logDebug("ws.upgrade.origin_rejected", {
-        clientIp: requestContext.clientIp,
-        trustedProxy: requestContext.trustedProxy,
-        origin: requestOrigin || null
-      }, upgradeTraceContext);
-      recordWsError("upgrade_origin_rejected");
-      socket.write(
-        `HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nConnection: close\r\nVary: Origin\r\n\r\n${JSON.stringify(payload)}`
-      );
-      socket.destroy();
-      return;
-    }
-
-    const wsRateLimitResult = wsConnectRateLimiter.check(requestContext.clientIp, config.rateLimitWsConnectMax);
-    if (!wsRateLimitResult.allowed) {
-      const payload = {
-        error: "RateLimitExceeded",
-        message: `WebSocket connection rate limit exceeded. Retry in ${wsRateLimitResult.retryAfterSeconds} seconds.`
-      };
-      logDebug("ws.upgrade.rate_limited", {
-        clientIp: requestContext.clientIp,
-        trustedProxy: requestContext.trustedProxy
-      }, upgradeTraceContext);
-      recordWsError("upgrade_rate_limited");
-      socket.write(
-        `HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nConnection: close\r\nRetry-After: ${wsRateLimitResult.retryAfterSeconds}\r\n\r\n${JSON.stringify(payload)}`
-      );
-      socket.destroy();
-      return;
-    }
-
-    let wsAuth = null;
-    if (config.authEnabled) {
-      try {
-        const token = resolveBearerToken(request, requestUrl);
-        const auth = token
-          ? await accessTokenVerifier.verifyAccessToken(token)
-          : wsTicketRegistry.consume(resolveWsTicketFromProtocols(request));
-        ensureShareLinkAuthActive(auth);
-        ensureScope(auth, "ws:connect");
-        ensureShareRouteAllowed(auth, "wsTicket");
-        wsAuth = auth;
-      } catch (err) {
-        const mapped = toErrorResponse(err);
-        logDebug("ws.upgrade.auth_rejected", {
-          statusCode: mapped.statusCode,
-          error: mapped.body.error,
-          message: mapped.body.message
-        }, upgradeTraceContext);
-        recordWsError("upgrade_auth_rejected");
-        socket.write(
-          `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
-        );
-        socket.destroy();
-        return;
-      }
-    }
-
-    wsServer.handleUpgrade(request, socket, head, (ws) => {
-      sockets.add(ws);
-      metrics.wsConnectionsOpenedTotal += 1;
-      const normalizedClientIp = typeof requestContext.clientIp === "string" && requestContext.clientIp ? requestContext.clientIp : "unknown";
-      const wsClientState = wsClientConnections.get(normalizedClientIp) || {
-        activeConnections: 0,
-        acceptedConnections: 0,
-        lastDisconnectReason: "none"
-      };
-      if (wsClientState.acceptedConnections > 0 && wsClientState.activeConnections === 0) {
-        metrics.wsReconnectsTotal += 1;
-        const reconnectReason =
-          typeof wsClientState.lastDisconnectReason === "string" && wsClientState.lastDisconnectReason
-            ? wsClientState.lastDisconnectReason
-            : "unknown";
-        bumpMetricCounter(metrics.wsReconnectsByReason, reconnectReason);
-      }
-      wsClientState.acceptedConnections += 1;
-      wsClientState.activeConnections += 1;
-      wsClientConnections.set(normalizedClientIp, wsClientState);
-      ws.connectionId = createTraceId("ws");
-      ws.traceContext = {
-        ...upgradeTraceContext,
-        connectionId: ws.connectionId,
-        source: "ws"
-      };
-      ws.clientIp = normalizedClientIp;
-      ws.auth = wsAuth;
-      const sessionControlClientId =
-        typeof wsAuth?.sessionControlClientId === "string" && wsAuth.sessionControlClientId.trim()
-          ? wsAuth.sessionControlClientId.trim()
-          : ws.connectionId;
-      const sessionControlClientLabel =
-        typeof wsAuth?.sessionControlClientLabel === "string" ? wsAuth.sessionControlClientLabel : "";
-      ws.sessionControlAttachmentKey = sessionControlAttachmentRegistry.getAttachmentKey({
-        clientId: sessionControlClientId,
-        auth: wsAuth
-      });
-      ws.sessionControlClient = sessionControlAttachmentRegistry.registerAttachment({
-        clientId: sessionControlClientId,
-        label: sessionControlClientLabel,
-        auth: wsAuth
-      });
-      ws.isAlive = true;
-      logDebug("ws.upgrade.accepted", {
-        socketCount: sockets.size,
-        clientIp: requestContext.clientIp,
-        protocol: requestContext.protocol,
-        trustedProxy: requestContext.trustedProxy
-      }, ws.traceContext);
-
-      ws.on("pong", () => {
-        ws.isAlive = true;
-      });
-
-      ws.on("close", (code, reasonBuffer) => {
-        sockets.delete(ws);
-        sessionControlAttachmentRegistry.unregisterAttachment(ws);
-        metrics.wsConnectionsClosedTotal += 1;
-        const clientIp = typeof ws.clientIp === "string" ? ws.clientIp : "unknown";
-        const wsClientState = wsClientConnections.get(clientIp);
-        const reasonText = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString("utf8") : "";
-        const disconnectReason = normalizeWsDisconnectReason(code, reasonText, ws.closeReasonHint);
-        bumpMetricCounter(metrics.wsDisconnectsByReason, disconnectReason);
-        if (wsClientState) {
-          wsClientState.activeConnections = Math.max(0, wsClientState.activeConnections - 1);
-          wsClientState.lastDisconnectReason = disconnectReason;
-          wsClientConnections.set(clientIp, wsClientState);
-        }
-        logDebug("ws.client.closed", { socketCount: sockets.size }, ws.traceContext || upgradeTraceContext);
-        broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext || upgradeTraceContext);
-      });
-      ws.on("error", () => {
-        recordWsError("socket_error");
-      });
-
-      for (const sessionId of listSessionIdsForAuth(ws.auth || null)) {
-        reconcileSessionControllerForSession(sessionId);
-      }
-      const snapshot = manager.getSnapshot();
-      const snapshotPayload = filterPayloadForAuth(
-        withTracePayload({
-          type: "snapshot",
-          clientId: ws.sessionControlClient?.clientId || sessionControlClientId,
-          sessions: listApiSessions(ws.auth || null),
-          outputs: snapshot.outputs,
-          customCommands: listCustomCommands(),
-          decks: listDecks(ws.auth || null)
-        }, ws.traceContext),
-        ws.auth || null
-      );
-      ws.send(JSON.stringify(snapshotPayload));
-      logDebug("ws.snapshot.sent", {
-        sessionCount: Array.isArray(snapshotPayload.sessions) ? snapshotPayload.sessions.length : 0,
-        outputCount: Array.isArray(snapshotPayload.outputs) ? snapshotPayload.outputs.length : 0,
-        customCommandCount: Array.isArray(snapshotPayload.customCommands) ? snapshotPayload.customCommands.length : 0
-      }, snapshotPayload.trace || ws.traceContext);
-      broadcastSessionControlRefreshForAuth(ws.auth || null, ws.traceContext);
-    });
-    })().catch((err) => {
-      const mapped = toErrorResponse(err);
-      logDebug("ws.upgrade.error", {
-        statusCode: mapped.statusCode,
-        error: mapped.body.error,
-        message: mapped.body.message
-      });
-      recordWsError("upgrade_internal_error");
-      socket.write(
-        `HTTP/1.1 ${mapped.statusCode} ${mapped.body.error}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n${JSON.stringify(mapped.body)}`
-      );
-      socket.destroy();
-    });
+    void handleWsUpgrade(request, socket, head);
   });
 
   const heartbeat = setInterval(() => {
