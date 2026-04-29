@@ -14,26 +14,23 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Active wave:
-  - `v0.4.0-H159` Repo-Wide Quality and Coverage Gap Follow-Up After H158
+  - none currently
 - Latest completed wave in this segment:
-  - `v0.4.0-H158` Repo-Wide Quality and Coverage Gap Follow-Up
+  - `v0.4.0-H159` Repo-Wide Quality and Coverage Gap Follow-Up After H158
 - Queued next waves:
   - none currently
 
 ## Queued Wave Order
 
-- `v0.4.0-H159`
-  - `QLT-249` Owner `FE`: retained send-history and session-UI glue coverage hardening
+- none currently
 
 ## Wave Dependencies
 
-- `QLT-249`: active next slice in `v0.4.0-H159`; it now lands on top of the hardened runtime-state, operator layout/profile/settings, and operator command/workflow baselines delivered by `QLT-246`, `QLT-247`, and `QLT-248`.
+- none currently
 
 ## Wave Exit Criteria
 
-- `QLT-244` through `QLT-249` completed with direct deterministic coverage for the promoted seams.
-- Validated top-line coverage remains above threshold across the root, backend, and frontend lanes.
-- No new catch-all residual quality task remains for the `H159` segment.
+- no active wave currently
 
 ## Sequencing Rules
 

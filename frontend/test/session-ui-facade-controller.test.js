@@ -166,6 +166,17 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
         search: "gruv"
       };
     },
+    normalizeThemeSlot(value) {
+      calls.push(["theme-slot", value]);
+      return "inactive";
+    },
+    getSessionThemeSelectedSlot(sessionId) {
+      calls.push(["selected-slot", sessionId]);
+      return "inactive";
+    },
+    setSessionThemeSelectedSlot(sessionId, slot) {
+      calls.push(["set-slot", sessionId, slot]);
+    },
     buildThemeFromConfig(config) {
       calls.push(["build-theme", config.preset]);
       return { background: "#111111", foreground: "#eeeeee" };
@@ -176,6 +187,25 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     readThemeProfileFromControls(entry) {
       calls.push(["read-theme", entry.id]);
       return { background: "#222222", foreground: "#dddddd" };
+    },
+    importThemeProfileIntoDraft(entry, sessionId, options) {
+      calls.push(["import-theme", entry.id, sessionId, options.format]);
+      return { ok: true, format: options.format };
+    },
+    exportThemeProfileFromDraft(entry, sessionId, options) {
+      calls.push(["export-theme", entry.id, sessionId, options.format]);
+      return { ok: true, payload: "exported-theme" };
+    },
+    updateSessionThemeDraftFromControls(entry, sessionId, overrides) {
+      calls.push(["update-theme-draft", entry.id, sessionId, overrides.search]);
+      return { sessionId, overrides };
+    },
+    readSessionThemeProfilesForSave(entry, sessionId, session) {
+      calls.push(["read-theme-save", entry.id, sessionId, session.id]);
+      return {
+        activeThemeProfile: { background: "#101010", foreground: "#efefef" },
+        inactiveThemeProfile: { background: "#202020", foreground: "#dfdfdf" }
+      };
     },
     syncSessionThemeControls(entry, sessionId) {
       calls.push(["sync-theme", entry.id, sessionId]);
@@ -188,6 +218,9 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     },
     syncSessionNoteControls(entry, session) {
       calls.push(["sync-note", entry.id, session.id]);
+    },
+    syncSessionInputSafetyControls(entry, session) {
+      calls.push(["sync-input-safety", entry.id, session.id]);
     },
     readSessionStartupFromControls(entry) {
       calls.push(["read-startup", entry.id]);
@@ -215,6 +248,14 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     isSessionSettingsDirty(entry, session) {
       calls.push(["dirty", entry.id, session.id]);
       return true;
+    },
+    readSessionInputSafetyFromControls(entry, session) {
+      calls.push(["read-input-safety", entry.id, session.id]);
+      return { mode: "confirm" };
+    },
+    stabilizeSettingsLayout(entry) {
+      calls.push(["stabilize", entry.id]);
+      return 2;
     }
   };
   const controller = createSessionUiFacadeController({
@@ -237,6 +278,9 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     category: "dark",
     search: "gruv"
   });
+  assert.equal(controller.normalizeThemeSlot("active"), "inactive");
+  assert.equal(controller.getSessionThemeSelectedSlot("s1"), "inactive");
+  controller.setSessionThemeSelectedSlot("s1", "inactive");
   assert.deepEqual(controller.buildThemeFromConfig({ preset: "gruvbox-dark" }), {
     background: "#111111",
     foreground: "#eeeeee"
@@ -246,10 +290,27 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     background: "#222222",
     foreground: "#dddddd"
   });
+  assert.deepEqual(controller.importThemeProfileIntoDraft({ id: "entry-1" }, "s1", { format: "iterm2" }), {
+    ok: true,
+    format: "iterm2"
+  });
+  assert.deepEqual(controller.exportThemeProfileFromDraft({ id: "entry-1" }, "s1", { format: "xresources" }), {
+    ok: true,
+    payload: "exported-theme"
+  });
+  assert.deepEqual(controller.updateSessionThemeDraftFromControls({ id: "entry-1" }, "s1", { search: "gruv" }), {
+    sessionId: "s1",
+    overrides: { search: "gruv" }
+  });
+  assert.deepEqual(controller.readSessionThemeProfilesForSave({ id: "entry-1" }, "s1", { id: "s1" }), {
+    activeThemeProfile: { background: "#101010", foreground: "#efefef" },
+    inactiveThemeProfile: { background: "#202020", foreground: "#dfdfdf" }
+  });
   controller.syncSessionThemeControls({ id: "entry-1" }, "s1");
   controller.setStartupSettingsFeedback({ id: "entry-1" }, "Saved", false);
   controller.syncSessionStartupControls({ id: "entry-1" }, { id: "s1" });
   controller.syncSessionNoteControls({ id: "entry-1" }, { id: "s1" });
+  controller.syncSessionInputSafetyControls({ id: "entry-1" }, { id: "s1" });
   assert.deepEqual(controller.readSessionStartupFromControls({ id: "entry-1" }), {
     startCwd: "/workspace",
     startCommand: "npm run dev",
@@ -259,9 +320,11 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     tagResult: { ok: true, tags: ["ops"] }
   });
   assert.equal(controller.readSessionNoteFromControls({ id: "entry-1" }), "first line\nsecond line");
+  assert.deepEqual(controller.readSessionInputSafetyFromControls({ id: "entry-1" }, { id: "s1" }), { mode: "confirm" });
   assert.equal(controller.normalizeSessionNoteText("line one\r\nline two"), "line one\nline two");
   assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "input"), "input");
   assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "note"), "note");
+  assert.equal(controller.stabilizeSettingsLayout({ id: "entry-1" }), 2);
   assert.equal(controller.isSessionSettingsDirty({ id: "entry-1" }, { id: "s1" }), true);
 
   assert.deepEqual(calls, [
@@ -271,18 +334,28 @@ test("session-ui facade controller delegates settings/theme behavior and preserv
     ["preset", "gruvbox-dark"],
     ["detect", { background: "#111111" }],
     ["theme-config", "s1"],
+    ["theme-slot", "active"],
+    ["selected-slot", "s1"],
+    ["set-slot", "s1", "inactive"],
     ["build-theme", "gruvbox-dark"],
     ["apply-theme", "s1"],
     ["read-theme", "entry-1"],
+    ["import-theme", "entry-1", "s1", "iterm2"],
+    ["export-theme", "entry-1", "s1", "xresources"],
+    ["update-theme-draft", "entry-1", "s1", "gruv"],
+    ["read-theme-save", "entry-1", "s1", "s1"],
     ["sync-theme", "entry-1", "s1"],
     ["feedback", "entry-1", "Saved", false],
     ["sync-startup", "entry-1", "s1"],
     ["sync-note", "entry-1", "s1"],
+    ["sync-input-safety", "entry-1", "s1"],
     ["read-startup", "entry-1"],
     ["read-note", "entry-1"],
+    ["read-input-safety", "entry-1", "s1"],
     ["normalize-note", "line one\r\nline two"],
     ["tab", "entry-1", "input"],
     ["tab", "entry-1", "note"],
+    ["stabilize", "entry-1"],
     ["dirty", "entry-1", "s1"]
   ]);
 });
@@ -340,4 +413,110 @@ test("session-ui facade controller delegates meta rendering and falls back safel
     tagResult: { ok: true, tags: [] }
   });
   assert.equal(fallbackController.isSessionSettingsDirty({}, {}), false);
+});
+
+test("session-ui facade controller exposes deterministic defaults when subcontrollers are absent", () => {
+  const controller = createSessionUiFacadeController({
+    themeProfileKeys: ["background", "foreground"],
+    defaultTerminalTheme: { background: "#000000", foreground: "#ffffff" }
+  });
+
+  assert.equal(controller.isValidHexColor("#abcdef"), true);
+  assert.equal(controller.isValidHexColor("bad"), false);
+  assert.deepEqual(controller.normalizeThemeProfile({ background: "#123456", foreground: "bad" }), {
+    background: "#123456",
+    foreground: "#ffffff"
+  });
+  assert.equal(controller.normalizeThemeFilterCategory("light"), "light");
+  assert.equal(controller.normalizeThemeFilterCategory("nope"), "all");
+  assert.equal(controller.getThemePresetById("missing"), null);
+  assert.equal(controller.detectThemePreset({ background: "#123456" }), "custom");
+  assert.equal(controller.getSessionRuntimeState({ id: "s1" }), "running");
+  assert.equal(controller.isSessionUnrestored({ id: "s1" }), false);
+  assert.equal(controller.isSessionExited({ id: "s1" }), false);
+  assert.equal(controller.isSessionActionBlocked({ id: "s1" }), false);
+  assert.equal(controller.getSessionStateBadgeText({ id: "s1" }), "");
+  assert.equal(controller.getExitedSessionStatusSuffix({ id: "s1" }), "");
+  assert.equal(controller.getSessionStateHintText({ id: "s1" }), "");
+  assert.equal(controller.getSessionActivityIndicatorState({ id: "s1" }), "");
+  assert.equal(controller.getUnrestoredSessionMessage({ id: "s1" }), "");
+  assert.equal(controller.getExitedSessionMessage({ id: "s1" }), "");
+  assert.equal(controller.getBlockedSessionActionMessage([{ id: "s1" }], "Delete"), "");
+  assert.deepEqual(controller.getSessionThemeConfig("s1"), {
+    preset: "custom",
+    profile: { background: "#000000", foreground: "#ffffff" },
+    category: "all",
+    search: ""
+  });
+  assert.equal(controller.normalizeThemeSlot("inactive"), "inactive");
+  assert.equal(controller.normalizeThemeSlot("active"), "active");
+  assert.equal(controller.getSessionThemeSelectedSlot("s1"), "active");
+  controller.setSessionThemeSelectedSlot("s1", "inactive");
+  assert.deepEqual(controller.buildThemeFromConfig({ profile: { background: "#111111", foreground: "bad" } }), {
+    background: "#111111",
+    foreground: "#ffffff"
+  });
+  assert.deepEqual(controller.importThemeProfileIntoDraft({}, "s1"), {
+    ok: false,
+    error: "Theme import is unavailable."
+  });
+  assert.deepEqual(controller.exportThemeProfileFromDraft({}, "s1"), {
+    ok: false,
+    error: "Theme export is unavailable."
+  });
+  assert.equal(controller.updateSessionThemeDraftFromControls({}, "s1"), null);
+  assert.deepEqual(controller.readSessionThemeProfilesForSave({}, "s1", {}), {
+    activeThemeProfile: { background: "#000000", foreground: "#ffffff" },
+    inactiveThemeProfile: { background: "#000000", foreground: "#ffffff" }
+  });
+  controller.syncSessionThemeControls({}, "s1");
+  assert.equal(controller.formatSessionEnv({ FOO: "bar" }), "");
+  assert.deepEqual(controller.normalizeSessionTags("bad"), []);
+  assert.equal(controller.formatSessionTags(["ops"]), "");
+  assert.deepEqual(controller.parseSessionTags("ops"), { ok: true, tags: [] });
+  assert.deepEqual(controller.parseSessionEnv("FOO=bar"), { ok: true, env: {} });
+  controller.setStartupSettingsFeedback({}, "Saved", false);
+  controller.syncSessionStartupControls({}, { id: "s1" });
+  controller.syncSessionNoteControls({}, { id: "s1" });
+  controller.syncSessionInputSafetyControls({}, { id: "s1" });
+  assert.deepEqual(controller.normalizeSessionStartupFromSession({ id: "s1" }), {
+    startCwd: "",
+    startCommand: "",
+    env: {},
+    mouseForwardingMode: "off",
+    tags: []
+  });
+  assert.deepEqual(controller.getSessionAppIdentity({ id: "s1" }), {
+    family: "unknown",
+    label: "",
+    source: "unknown",
+    confidence: 0,
+    details: {},
+    updatedAt: null
+  });
+  assert.equal(controller.getSessionAppIdentityText({ id: "s1" }), "");
+  assert.equal(controller.getSessionAppIdentityTitle({ id: "s1" }), "");
+  assert.equal(controller.getSessionHeaderLabel({ id: "s1" }), "");
+  assert.deepEqual(controller.readSessionStartupFromControls({ id: "entry-1" }), {
+    startCwd: "",
+    startCommand: "",
+    envResult: { ok: true, env: {} },
+    mouseForwardingMode: "off",
+    sendTerminator: "auto",
+    tagResult: { ok: true, tags: [] }
+  });
+  assert.equal(controller.readSessionNoteFromControls({ id: "entry-1" }), "");
+  assert.deepEqual(controller.readSessionInputSafetyFromControls({}, { inputSafetyProfile: { mode: "strict" } }), {
+    mode: "strict"
+  });
+  assert.deepEqual(controller.readSessionInputSafetyFromControls({}, null), {});
+  assert.equal(controller.normalizeSessionNoteText("  keep logs ready  "), "keep logs ready");
+  assert.equal(controller.normalizeSessionNoteText(42), "");
+  assert.equal(controller.setActiveSettingsTab({ id: "entry-1" }, "note"), "startup");
+  assert.equal(controller.stabilizeSettingsLayout({ id: "entry-1" }), 0);
+  controller.setSettingsDirty({ id: "entry-1" }, true);
+  assert.equal(controller.isSessionSettingsDirty({ id: "entry-1" }, { id: "s1" }), false);
+  controller.renderSessionAppIdentity({ id: "entry-1" }, { id: "s1" });
+  controller.renderSessionTagList({ id: "entry-1" }, { id: "s1" });
+  controller.renderSessionNote({ id: "entry-1" }, { id: "s1" });
 });

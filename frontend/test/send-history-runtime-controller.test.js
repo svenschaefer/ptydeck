@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 import {
   createSendHistoryRuntimeController,
   SEND_HISTORY_STORAGE_KEY,
+  formatHistoryStats,
+  formatHistoryTimestamp,
+  normalizeSendHistoryText,
   summarizeSendHistoryText
 } from "../src/public/send-history-runtime-controller.js";
 
@@ -124,6 +127,21 @@ class ThrowingReadStorage extends FakeStorage {
   }
 }
 
+class ThrowingWriteStorage extends FakeStorage {
+  constructor(initial = {}, failuresBeforeSuccess = Number.POSITIVE_INFINITY) {
+    super(initial);
+    this.failuresBeforeSuccess = failuresBeforeSuccess;
+  }
+
+  setItem(key, value) {
+    if (this.failuresBeforeSuccess > 0) {
+      this.failuresBeforeSuccess -= 1;
+      throw new Error("storage write failed");
+    }
+    super.setItem(key, value);
+  }
+}
+
 function createFakeWindow() {
   const timers = [];
   return {
@@ -148,6 +166,20 @@ function flushTimers(windowRef) {
     timer.fn();
   }
 }
+
+async function flushMicrotasks() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+test("send-history utility helpers normalize whitespace, line counts, and invalid timestamps deterministically", () => {
+  assert.equal(normalizeSendHistoryText("one\r\ntwo\rthree"), "one\ntwo\nthree");
+  assert.equal(summarizeSendHistoryText("  \n \t "), "(whitespace only input)");
+  assert.equal(formatHistoryStats({}), "0 lines · 0 chars");
+  assert.equal(formatHistoryStats({ text: "one\ntwo" }), "2 lines · 7 chars");
+  assert.equal(formatHistoryTimestamp("bad"), "");
+  assert.equal(formatHistoryTimestamp(1e20), "");
+});
 
 test("send-history runtime controller records, searches, persists, and restores entries", () => {
   const windowRef = createFakeWindow();
@@ -422,5 +454,187 @@ test("send-history runtime controller falls back cleanly when storage reads fail
   assert.deepEqual(
     controller.listEntriesForSession("s1").map((entry) => entry.text),
     ["echo hi"]
+  );
+});
+
+test("send-history runtime controller tolerates dialogless guards, duplicate bindings, and pending search cleanup", async () => {
+  const windowRef = createFakeWindow();
+  const documentRef = new FakeDocument();
+  const openBtn = new FakeElement({ id: "send-history-open", tagName: "button" });
+  const searchInputEl = new FakeElement({ id: "send-history-search", tagName: "input" });
+  const emptyEl = new FakeElement({ id: "send-history-empty", tagName: "p" });
+  const detailMetaEl = new FakeElement({ id: "send-history-detail-meta", tagName: "p" });
+  const detailTextEl = new FakeElement({ id: "send-history-detail-text", tagName: "pre" });
+  const useBtn = new FakeElement({ id: "send-history-use", tagName: "button" });
+  let activeSession = null;
+
+  const controller = createSendHistoryRuntimeController({
+    windowRef,
+    documentRef,
+    openBtn,
+    searchInputEl,
+    emptyEl,
+    detailMetaEl,
+    detailTextEl,
+    useBtn,
+    getActiveSession: () => activeSession
+  });
+
+  assert.equal(emptyEl.textContent, "Select an active session to browse send history.");
+  assert.equal(openBtn.disabled, true);
+  assert.equal(openBtn.getAttribute("title"), "No active session available for send history");
+  assert.equal(controller.open(), false);
+  assert.equal(await controller.useSelectedEntry(), false);
+  assert.equal(await controller.deleteSelectedEntry(), false);
+  assert.equal(await controller.clearSessionHistory(), false);
+  assert.equal(controller.recordSend("", "echo hi"), null);
+  assert.equal(controller.recordSend("s1", ""), null);
+
+  controller.bindUiEvents();
+
+  searchInputEl.value = "alpha";
+  searchInputEl.dispatchEvent({ type: "input", target: searchInputEl });
+  searchInputEl.value = "beta";
+  searchInputEl.dispatchEvent({ type: "input", target: searchInputEl });
+  assert.equal(windowRef.timers.length, 1);
+
+  activeSession = { id: "s1", name: "ops" };
+  controller.recordSend("s1", "echo hi", { submittedAt: 10 });
+  assert.equal(controller.open(), true);
+  controller.close();
+  controller.dispose();
+  assert.equal(windowRef.timers.length, 0);
+
+  const plainDialogController = createSendHistoryRuntimeController({
+    windowRef: createFakeWindow(),
+    documentRef,
+    dialogEl: { open: false },
+    getActiveSession: () => ({ id: "s1", name: "ops" })
+  });
+  assert.equal(plainDialogController.open(), true);
+  assert.equal(plainDialogController.getState().pinnedSessionId, "s1");
+  plainDialogController.close();
+  assert.equal(plainDialogController.getState().pinnedSessionId, "");
+});
+
+test("send-history runtime controller tolerates malformed source payloads, write failures, and event-driven actions", async () => {
+  const malformedSourceController = createSendHistoryRuntimeController({
+    windowRef: createFakeWindow(),
+    documentRef: new FakeDocument(),
+    localStorageRef: new FakeStorage({
+      [SEND_HISTORY_STORAGE_KEY]: JSON.stringify({ foo: "bar" })
+    }),
+    getActiveSession: () => ({ id: "s1", name: "ops" })
+  });
+  assert.deepEqual(malformedSourceController.listEntriesForSession("s1"), []);
+
+  const malformedJsonController = createSendHistoryRuntimeController({
+    windowRef: createFakeWindow(),
+    documentRef: new FakeDocument(),
+    localStorageRef: new FakeStorage({
+      [SEND_HISTORY_STORAGE_KEY]: "{"
+    }),
+    getActiveSession: () => ({ id: "s1", name: "ops" })
+  });
+  assert.deepEqual(malformedJsonController.listEntriesForSession("s1"), []);
+
+  const windowRef = createFakeWindow();
+  const documentRef = new FakeDocument();
+  const localStorageRef = new ThrowingWriteStorage({}, Number.POSITIVE_INFINITY);
+  const dialogEl = new FakeElement({ id: "send-history-dialog", tagName: "dialog" });
+  const openBtn = new FakeElement({ id: "send-history-open", tagName: "button" });
+  const closeBtn = new FakeElement({ id: "send-history-close", tagName: "button" });
+  const switchSessionBtn = new FakeElement({ id: "send-history-switch-session", tagName: "button" });
+  const metaEl = new FakeElement({ id: "send-history-meta", tagName: "p" });
+  const searchInputEl = new FakeElement({ id: "send-history-search", tagName: "input" });
+  const deleteSelectedBtn = new FakeElement({ id: "send-history-delete-selected", tagName: "button" });
+  const clearSessionBtn = new FakeElement({ id: "send-history-clear-session", tagName: "button" });
+  const emptyEl = new FakeElement({ id: "send-history-empty", tagName: "p" });
+  const listEl = new FakeElement({ id: "send-history-list", tagName: "div" });
+  const detailMetaEl = new FakeElement({ id: "send-history-detail-meta", tagName: "p" });
+  const detailTextEl = new FakeElement({ id: "send-history-detail-text", tagName: "pre" });
+  const useBtn = new FakeElement({ id: "send-history-use", tagName: "button" });
+  const sessionsById = {
+    s1: { id: "s1", name: "ops" },
+    s2: { id: "s2", name: "deploy" }
+  };
+  let activeSession = sessionsById.s1;
+  const confirmResults = new Map([
+    ["Delete Send History Entry", false],
+    ["Clear Session History", false]
+  ]);
+
+  const controller = createSendHistoryRuntimeController({
+    windowRef,
+    documentRef,
+    localStorageRef,
+    dialogEl,
+    openBtn,
+    closeBtn,
+    switchSessionBtn,
+    metaEl,
+    searchInputEl,
+    deleteSelectedBtn,
+    clearSessionBtn,
+    emptyEl,
+    listEl,
+    detailMetaEl,
+    detailTextEl,
+    useBtn,
+    maxTotalChars: 15,
+    getActiveSession: () => activeSession,
+    getSessionById: (sessionId) => sessionsById[sessionId] || null,
+    formatSessionToken: (sessionId) => sessionId.toUpperCase(),
+    formatSessionDisplayName: (session) => session?.name || session?.id || "session",
+    confirmAction: async (options) => confirmResults.get(options.title) ?? true
+  });
+
+  controller.recordSend("s1", "12345", { submittedAt: 10 });
+  controller.recordSend("s1", "67890", { submittedAt: 20 });
+  openBtn.click();
+  assert.equal(dialogEl.open, true);
+  controller.recordSend("s1", "abcde", { submittedAt: 30 });
+  assert.equal(listEl.children.length, 3);
+
+  activeSession = sessionsById.s2;
+  controller.recordSend("s2", "other", { submittedAt: 40 });
+  switchSessionBtn.click();
+  assert.match(metaEl.textContent, /History for \[S2\] deploy/);
+
+  let prevented = false;
+  dialogEl.dispatchEvent({
+    type: "cancel",
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(prevented, true);
+  assert.equal(dialogEl.open, false);
+
+  activeSession = sessionsById.s1;
+  openBtn.click();
+  listEl.children[0].click();
+  deleteSelectedBtn.click();
+  await flushMicrotasks();
+  assert.equal(controller.listEntriesForSession("s1").length, 2);
+
+  clearSessionBtn.click();
+  await flushMicrotasks();
+  assert.equal(controller.listEntriesForSession("s1").length, 2);
+
+  closeBtn.click();
+  assert.equal(dialogEl.open, false);
+
+  flushTimers(windowRef);
+  assert.deepEqual(
+    controller.listEntriesForSession("s1").map((entry) => entry.text),
+    ["abcde"]
+  );
+
+  controller.recordSend("s1", "vwxyz", { submittedAt: 50 });
+  controller.dispose();
+  assert.deepEqual(
+    controller.listEntriesForSession("s1").map((entry) => entry.text),
+    ["vwxyz"]
   );
 });

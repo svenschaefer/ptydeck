@@ -115,3 +115,39 @@ test("session-card-meta controller hides meta row when note and tags are empty",
   controller.renderSessionNote(entry, { note: "keep logs ready" });
   assert.equal(entry.sessionMetaRowEl.hidden, false);
 });
+
+test("session-card-meta controller tolerates missing UI slots and clears empty app identity titles", () => {
+  const removeAttributeCalls = [];
+  const controller = createSessionCardMetaController({
+    normalizeSessionTags: () => [],
+    getSessionAppIdentityText: () => "",
+    getSessionAppIdentityTitle: () => ""
+  });
+
+  controller.setSettingsStatus({}, "Ignored", "dirty");
+  controller.setSettingsDirty(null, true);
+  controller.syncMetaRowVisibility({});
+  controller.renderSessionAppIdentity({}, { id: "s1" });
+  controller.renderSessionTagList({}, { tags: ["ops"] });
+  controller.renderSessionNote({}, { note: "note" });
+
+  const entry = {
+    sessionMetaRowEl: { hidden: false },
+    sessionAppIdentityEl: {
+      textContent: "old",
+      title: "old",
+      hidden: false,
+      removeAttribute(name) {
+        removeAttributeCalls.push(name);
+      }
+    },
+    sessionNoteEl: { textContent: "", title: "", hidden: true },
+    tagListEl: { textContent: "", title: "", classList: createClassList() }
+  };
+
+  controller.renderSessionAppIdentity(entry, { id: "s1" });
+  assert.equal(entry.sessionAppIdentityEl.hidden, true);
+  assert.equal(entry.sessionAppIdentityEl.textContent, "");
+  assert.equal(entry.sessionAppIdentityEl.title, "");
+  assert.deepEqual(removeAttributeCalls, ["title"]);
+});
