@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-04-29 (`QLT-251` completed as the second delivered slice of active `H160`, hardening backend identity/control seams while keeping the transport-only messaging baseline deferred)
+Last updated: 2026-05-01 (`CMD-301` through `CMD-303` promoted into planned `H161` as a frontend-local session quick-send favorites feature wave)
 
 ## Current Product Truth
 
@@ -142,6 +142,35 @@ The source-of-truth documents now mean:
 
 Large stack-replacement evaluations are not part of the current or deferred project outlook. Future work should extend the existing runtime shape in place unless `SAS` explicitly reopens that direction.
 
+## Session Quick Send Favorites Planning Baseline
+
+On 2026-05-01, `v0.4.0-H161` was promoted as a frontend-local operator-UX feature wave for per-session quick-send favorites.
+
+Planned contract:
+
+- The feature tracks custom-command usage per terminal session, keyed by `sessionId` plus the existing custom-command `lookupKey`.
+- Ranking should prefer highest total send count first and use recency only as a deterministic tie-breaker.
+- The visible UI target is a subtle session-card hover surface, not a new persistent control pane or settings panel.
+- Each session card should expose:
+  - up to five direct custom-command quick actions
+  - one `Send Clipboard` action
+- `Send Clipboard` should reuse the existing frontend clipboard and send-input seams and must fail closed when:
+  - the browser clipboard cannot be read
+  - the session is exited or unrestored
+  - the runtime is in read-only mode
+- The planned baseline intentionally stays browser-local and frontend-first:
+  - no backend schema change
+  - no persistence change in `backend/src/persistence.js`
+  - no new REST or WebSocket contract
+- Existing implementation seams intended for reuse:
+  - `frontend/src/public/send-history-runtime-controller.js`
+  - `frontend/src/public/command-discovery-ranking.js`
+  - `frontend/src/public/ui/session-card-factory-controller.js`
+  - `frontend/src/public/ui/session-card-interactions-controller.js`
+  - `frontend/src/public/command-executor.js`
+  - `frontend/src/public/terminal-stream.js`
+  - `frontend/src/public/clipboard-runtime-controller.js`
+
 ## Documentation Cleanup Baseline
 
 The 2026-04-23 documentation cleanup established these current rules:
@@ -182,8 +211,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: there are no active promoted tasks.
-- `ROADMAP.md`: there is no active or queued wave after the `v0.4.0-H160` closeout.
+- `TODO.md`: active promoted tasks are `CMD-301`, `CMD-302`, and `CMD-303`.
+- `ROADMAP.md`: active wave is `v0.4.0-H161` for session quick-send favorites.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
