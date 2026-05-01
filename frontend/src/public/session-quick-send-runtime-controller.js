@@ -1,0 +1,578 @@
+import {
+  compareCustomCommandRecords,
+  formatCustomCommandScopeLabel,
+  isCustomCommandVisibleForSession,
+  normalizeCustomCommandRecord,
+  renderCustomCommandForSession
+} from "./custom-command-model.js";
+
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function clearElementChildren(element) {
+  if (!element || typeof element.removeChild !== "function") {
+    return;
+  }
+  while (element.firstChild) {
+    element.removeChild(element.firstChild);
+  }
+}
+
+function normalizeUsageEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const lookupKey = normalizeText(entry.lookupKey);
+  if (!lookupKey) {
+    return null;
+  }
+  const count = Number.isInteger(entry.count) ? entry.count : Number.parseInt(entry.count, 10);
+  const lastUsedAt = Number.isFinite(entry.lastUsedAt) ? Number(entry.lastUsedAt) : Number.parseInt(entry.lastUsedAt, 10);
+  return {
+    lookupKey,
+    count: Number.isFinite(count) && count > 0 ? count : 1,
+    lastUsedAt: Number.isFinite(lastUsedAt) && lastUsedAt > 0 ? lastUsedAt : 0
+  };
+}
+
+function cloneUsageEntry(entry) {
+  return entry && typeof entry === "object" ? { ...entry } : entry;
+}
+
+function cloneUsageState(state) {
+  const next = {};
+  for (const [sessionId, entries] of Object.entries(state || {})) {
+    next[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneUsageEntry(entry)) : [];
+  }
+  return next;
+}
+
+function compareUsageEntries(left, right) {
+  const leftCount = Number(left?.count) || 0;
+  const rightCount = Number(right?.count) || 0;
+  if (leftCount !== rightCount) {
+    return rightCount - leftCount;
+  }
+  const leftLastUsedAt = Number(left?.lastUsedAt) || 0;
+  const rightLastUsedAt = Number(right?.lastUsedAt) || 0;
+  if (leftLastUsedAt !== rightLastUsedAt) {
+    return rightLastUsedAt - leftLastUsedAt;
+  }
+  return normalizeText(left?.lookupKey).localeCompare(normalizeText(right?.lookupKey), "en-US", { sensitivity: "base" });
+}
+
+function mergeUsageEntries(entries) {
+  const merged = new Map();
+  for (const rawEntry of Array.isArray(entries) ? entries : []) {
+    const normalized = normalizeUsageEntry(rawEntry);
+    if (!normalized) {
+      continue;
+    }
+    const current = merged.get(normalized.lookupKey);
+    if (!current) {
+      merged.set(normalized.lookupKey, normalized);
+      continue;
+    }
+    merged.set(normalized.lookupKey, {
+      lookupKey: normalized.lookupKey,
+      count: current.count + normalized.count,
+      lastUsedAt: Math.max(current.lastUsedAt, normalized.lastUsedAt)
+    });
+  }
+  return Array.from(merged.values()).sort(compareUsageEntries);
+}
+
+function readInitialUsagePayload(localStorageRef, storageKey) {
+  if (!localStorageRef || typeof localStorageRef.getItem !== "function") {
+    return "";
+  }
+  try {
+    return localStorageRef.getItem(storageKey);
+  } catch {
+    return "";
+  }
+}
+
+function safeParseUsagePayload(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.sessions : null;
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      return {};
+    }
+    const next = {};
+    for (const [sessionId, entries] of Object.entries(source)) {
+      const normalizedSessionId = normalizeText(sessionId);
+      if (!normalizedSessionId || !Array.isArray(entries)) {
+        continue;
+      }
+      const mergedEntries = mergeUsageEntries(entries);
+      if (mergedEntries.length > 0) {
+        next[normalizedSessionId] = mergedEntries;
+      }
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function serializeUsageState(state) {
+  return JSON.stringify({ sessions: state });
+}
+
+function pruneUsageState(state, { maxEntriesPerSession, maxSessions }) {
+  const next = {};
+  for (const [sessionId, entries] of Object.entries(state || {})) {
+    const normalizedSessionId = normalizeText(sessionId);
+    if (!normalizedSessionId) {
+      continue;
+    }
+    const mergedEntries = mergeUsageEntries(entries).slice(0, maxEntriesPerSession);
+    if (mergedEntries.length > 0) {
+      next[normalizedSessionId] = mergedEntries;
+    }
+  }
+
+  const rankedSessions = Object.entries(next)
+    .map(([sessionId, entries]) => ({
+      sessionId,
+      entries,
+      lastUsedAt: entries.reduce((max, entry) => Math.max(max, Number(entry?.lastUsedAt) || 0), 0)
+    }))
+    .sort((left, right) => right.lastUsedAt - left.lastUsedAt || left.sessionId.localeCompare(right.sessionId, "en-US", { sensitivity: "base" }));
+
+  return Object.fromEntries(rankedSessions.slice(0, maxSessions).map((entry) => [entry.sessionId, entry.entries]));
+}
+
+function formatUsageCount(count) {
+  const normalizedCount = Number.isInteger(count) && count > 0 ? count : 0;
+  return `${normalizedCount} send${normalizedCount === 1 ? "" : "s"}`;
+}
+
+function formatQuickSendScopeText(command, session, formatSessionToken, formatSessionDisplayName) {
+  return formatCustomCommandScopeLabel(command, {
+    getSessionById: (sessionId) => (session?.id === sessionId ? session : null),
+    formatSessionToken,
+    formatSessionDisplayName
+  });
+}
+
+function buildQuickSendButtonLabel(command, duplicateNames) {
+  const normalized = normalizeCustomCommandRecord(command);
+  if (!normalized) {
+    return "";
+  }
+  if (!duplicateNames.has(normalized.name)) {
+    return `/${normalized.name}`;
+  }
+  if (normalized.scope === "global") {
+    return `/${normalized.name} · global`;
+  }
+  if (normalized.scope === "session") {
+    return `/${normalized.name} · session`;
+  }
+  return `/${normalized.name} · project`;
+}
+
+export const SESSION_QUICK_SEND_USAGE_STORAGE_KEY = "ptydeck.session-quick-send-usage.v1";
+export const SESSION_QUICK_SEND_USAGE_MAX_ENTRIES_PER_SESSION = 32;
+export const SESSION_QUICK_SEND_USAGE_MAX_SESSIONS = 200;
+export const SESSION_QUICK_SEND_TOP_LIMIT = 5;
+
+export function createSessionQuickSendRuntimeController(options = {}) {
+  const windowRef = options.windowRef || globalThis;
+  const documentRef = options.documentRef || windowRef?.document || globalThis.document || null;
+  const localStorageRef = options.localStorageRef || windowRef?.localStorage || null;
+  const storageKey = normalizeText(options.storageKey) || SESSION_QUICK_SEND_USAGE_STORAGE_KEY;
+  const maxEntriesPerSession = Number.isInteger(options.maxEntriesPerSession)
+    ? options.maxEntriesPerSession
+    : SESSION_QUICK_SEND_USAGE_MAX_ENTRIES_PER_SESSION;
+  const maxSessions = Number.isInteger(options.maxSessions) ? options.maxSessions : SESSION_QUICK_SEND_USAGE_MAX_SESSIONS;
+  const nowMs = typeof options.nowMs === "function" ? options.nowMs : () => Date.now();
+  const listCustomCommands = typeof options.listCustomCommands === "function" ? options.listCustomCommands : () => [];
+  const getSessionById = typeof options.getSessionById === "function" ? options.getSessionById : () => null;
+  const getSessions = typeof options.getSessions === "function" ? options.getSessions : () => [];
+  const resolveDeckForSession = typeof options.resolveDeckForSession === "function" ? options.resolveDeckForSession : () => null;
+  const canReadClipboardText = typeof options.canReadClipboardText === "function" ? options.canReadClipboardText : () => false;
+  const readClipboardText = typeof options.readClipboardText === "function" ? options.readClipboardText : async () => "";
+  const submitTerminalPaste = typeof options.submitTerminalPaste === "function" ? options.submitTerminalPaste : async () => ({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." });
+  const apiSendInput = typeof options.apiSendInput === "function" ? options.apiSendInput : async () => undefined;
+  const sendInputWithConfiguredTerminator =
+    typeof options.sendInputWithConfiguredTerminator === "function" ? options.sendInputWithConfiguredTerminator : async () => undefined;
+  const normalizeCustomCommandPayloadForShell =
+    typeof options.normalizeCustomCommandPayloadForShell === "function"
+      ? options.normalizeCustomCommandPayloadForShell
+      : (value) => String(value ?? "");
+  const normalizeSendTerminatorMode = typeof options.normalizeSendTerminatorMode === "function" ? options.normalizeSendTerminatorMode : () => "auto";
+  const getSessionSendTerminator = typeof options.getSessionSendTerminator === "function" ? options.getSessionSendTerminator : () => "auto";
+  const delayedSubmitMs = Number.isFinite(options.delayedSubmitMs) ? options.delayedSubmitMs : 90;
+  const recordCommandSubmission = typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
+  const canWriteToSession = typeof options.canWriteToSession === "function" ? options.canWriteToSession : () => true;
+  const isSessionActionBlocked = typeof options.isSessionActionBlocked === "function" ? options.isSessionActionBlocked : () => false;
+  const getBlockedSessionActionMessage =
+    typeof options.getBlockedSessionActionMessage === "function"
+      ? options.getBlockedSessionActionMessage
+      : () => "Quick send is unavailable for this session.";
+  const isReadOnlyMode = typeof options.isReadOnlyMode === "function" ? options.isReadOnlyMode : () => false;
+  const getReadOnlyModeMessage =
+    typeof options.getReadOnlyModeMessage === "function" ? options.getReadOnlyModeMessage : () => "Read-only spectator mode. Write actions are disabled.";
+  const getSessionWriteBlockedMessage =
+    typeof options.getSessionWriteBlockedMessage === "function"
+      ? options.getSessionWriteBlockedMessage
+      : () => "This client cannot send input to the selected session.";
+  const setCommandFeedback = typeof options.setCommandFeedback === "function" ? options.setCommandFeedback : () => {};
+  const setError = typeof options.setError === "function" ? options.setError : () => {};
+  const clearError = typeof options.clearError === "function" ? options.clearError : () => {};
+  const getErrorMessage =
+    typeof options.getErrorMessage === "function"
+      ? options.getErrorMessage
+      : (error, fallback) => (error instanceof Error && error.message ? error.message : fallback);
+  const requestRender = typeof options.requestRender === "function" ? options.requestRender : () => {};
+  const formatSessionToken = typeof options.formatSessionToken === "function" ? options.formatSessionToken : (sessionId) => String(sessionId || "");
+  const formatSessionDisplayName =
+    typeof options.formatSessionDisplayName === "function"
+      ? options.formatSessionDisplayName
+      : (session) => String(session?.name || session?.id || "session");
+
+  let usageBySession = pruneUsageState(safeParseUsagePayload(readInitialUsagePayload(localStorageRef, storageKey)), {
+    maxEntriesPerSession,
+    maxSessions
+  });
+
+  function persist() {
+    if (!localStorageRef || typeof localStorageRef.setItem !== "function") {
+      return;
+    }
+    try {
+      localStorageRef.setItem(storageKey, serializeUsageState(usageBySession));
+    } catch {
+      // Ignore browser persistence write failures and keep the in-memory state alive.
+    }
+  }
+
+  function replaceUsageState(nextState) {
+    usageBySession = pruneUsageState(nextState, { maxEntriesPerSession, maxSessions });
+    persist();
+  }
+
+  function syncSessions(sessions = getSessions()) {
+    const knownSessionIds = new Set((Array.isArray(sessions) ? sessions : []).map((session) => normalizeText(session?.id)).filter(Boolean));
+    const nextState = {};
+    let changed = false;
+    for (const [sessionId, entries] of Object.entries(usageBySession)) {
+      if (!knownSessionIds.has(sessionId)) {
+        changed = true;
+        continue;
+      }
+      nextState[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneUsageEntry(entry)) : [];
+    }
+    if (changed) {
+      replaceUsageState(nextState);
+    }
+  }
+
+  function recordCustomCommandUsage(sessionId, command, runtimeOptions = {}) {
+    const normalizedSessionId = normalizeText(sessionId);
+    const normalizedCommand = normalizeCustomCommandRecord(command);
+    if (!normalizedSessionId || !normalizedCommand?.lookupKey) {
+      return false;
+    }
+    const nextEntries = Array.isArray(usageBySession[normalizedSessionId])
+      ? usageBySession[normalizedSessionId].map((entry) => cloneUsageEntry(entry))
+      : [];
+    const usedAt = Number.isFinite(runtimeOptions.usedAt) ? Number(runtimeOptions.usedAt) : nowMs();
+    const index = nextEntries.findIndex((entry) => entry.lookupKey === normalizedCommand.lookupKey);
+    if (index >= 0) {
+      nextEntries[index] = {
+        lookupKey: normalizedCommand.lookupKey,
+        count: (Number(nextEntries[index]?.count) || 0) + 1,
+        lastUsedAt: usedAt
+      };
+    } else {
+      nextEntries.push({
+        lookupKey: normalizedCommand.lookupKey,
+        count: 1,
+        lastUsedAt: usedAt
+      });
+    }
+    replaceUsageState({
+      ...usageBySession,
+      [normalizedSessionId]: nextEntries
+    });
+    return true;
+  }
+
+  function resolveVisibleCustomCommands(sessionId, commands = listCustomCommands()) {
+    const normalizedSessionId = normalizeText(sessionId);
+    return (Array.isArray(commands) ? commands : [])
+      .map((entry) => normalizeCustomCommandRecord(entry))
+      .filter((entry) => entry && isCustomCommandVisibleForSession(entry, normalizedSessionId));
+  }
+
+  function listTopCustomCommands(sessionId, commands = listCustomCommands(), options = {}) {
+    const normalizedSessionId = normalizeText(sessionId);
+    if (!normalizedSessionId) {
+      return [];
+    }
+    const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : SESSION_QUICK_SEND_TOP_LIMIT;
+    const visibleCommands = resolveVisibleCustomCommands(normalizedSessionId, commands);
+    const visibleByLookupKey = new Map(visibleCommands.map((entry) => [entry.lookupKey, entry]));
+    const currentEntries = Array.isArray(usageBySession[normalizedSessionId]) ? usageBySession[normalizedSessionId] : [];
+    const nextEntries = [];
+    const ranked = [];
+    let changed = false;
+    for (const entry of currentEntries) {
+      const normalizedEntry = normalizeUsageEntry(entry);
+      if (!normalizedEntry) {
+        changed = true;
+        continue;
+      }
+      const command = visibleByLookupKey.get(normalizedEntry.lookupKey);
+      if (!command) {
+        changed = true;
+        continue;
+      }
+      nextEntries.push(normalizedEntry);
+      ranked.push({
+        command,
+        count: normalizedEntry.count,
+        lastUsedAt: normalizedEntry.lastUsedAt
+      });
+    }
+    if (changed) {
+      const nextState = { ...usageBySession };
+      if (nextEntries.length > 0) {
+        nextState[normalizedSessionId] = nextEntries;
+      } else {
+        delete nextState[normalizedSessionId];
+      }
+      replaceUsageState(nextState);
+    }
+    ranked.sort((left, right) => {
+      if (left.count !== right.count) {
+        return right.count - left.count;
+      }
+      if (left.lastUsedAt !== right.lastUsedAt) {
+        return right.lastUsedAt - left.lastUsedAt;
+      }
+      return compareCustomCommandRecords(left.command, right.command);
+    });
+    return ranked.slice(0, limit).map((entry) => ({ ...entry, command: normalizeCustomCommandRecord(entry.command) }));
+  }
+
+  function resolveBlockedMessage(session) {
+    if (!session) {
+      return "Quick send is unavailable for this session.";
+    }
+    if (isReadOnlyMode()) {
+      return getReadOnlyModeMessage();
+    }
+    if (isSessionActionBlocked(session)) {
+      return getBlockedSessionActionMessage([session], "Quick send");
+    }
+    if (!canWriteToSession(session)) {
+      return getSessionWriteBlockedMessage(session);
+    }
+    return "";
+  }
+
+  function resolveCurrentSession(sessionOrId) {
+    if (sessionOrId && typeof sessionOrId === "object" && !Array.isArray(sessionOrId)) {
+      return getSessionById(sessionOrId.id) || sessionOrId;
+    }
+    return getSessionById(sessionOrId) || null;
+  }
+
+  function resolveCustomCommandByLookupKey(sessionId, lookupKey, commands = listCustomCommands()) {
+    const normalizedLookupKey = normalizeText(lookupKey);
+    if (!normalizedLookupKey) {
+      return null;
+    }
+    return resolveVisibleCustomCommands(sessionId, commands).find((entry) => entry.lookupKey === normalizedLookupKey) || null;
+  }
+
+  async function sendCustomCommand(sessionOrId, lookupKey) {
+    const session = resolveCurrentSession(sessionOrId);
+    if (!session) {
+      const message = "Quick-send command target is unavailable.";
+      setError(message);
+      return { ok: false, status: "missing-session", feedback: message };
+    }
+    const blockedMessage = resolveBlockedMessage(session);
+    if (blockedMessage) {
+      setError(blockedMessage);
+      return { ok: false, status: "blocked", feedback: blockedMessage };
+    }
+    const command = resolveCustomCommandByLookupKey(session.id, lookupKey);
+    if (!command) {
+      const message = `Quick-send command is no longer available for [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`;
+      setError(message);
+      requestRender();
+      return { ok: false, status: "missing-command", feedback: message };
+    }
+    const deck = resolveDeckForSession(session);
+    const rendered = renderCustomCommandForSession(command, session, deck, {});
+    if (!rendered.ok) {
+      const message = rendered.error || `Custom command /${command.name} is invalid.`;
+      setError(message);
+      return { ok: false, status: "invalid", feedback: message };
+    }
+
+    const submittedAt = nowMs();
+    try {
+      const payload = normalizeCustomCommandPayloadForShell(rendered.text);
+      await sendInputWithConfiguredTerminator(apiSendInput, session.id, payload, getSessionSendTerminator(session.id), {
+        normalizeMode: normalizeSendTerminatorMode,
+        delayedSubmitMs
+      });
+      recordCustomCommandUsage(session.id, command, { usedAt: submittedAt });
+      recordCommandSubmission(session.id, {
+        source: "custom-command",
+        commandName: command.name,
+        label: `/${command.name}`,
+        text: payload,
+        submittedAt
+      });
+      clearError();
+      setCommandFeedback(`Executed /${command.name} on [${formatSessionToken(session.id)}].`);
+      requestRender();
+      return { ok: true, status: "sent", feedback: `Executed /${command.name} on [${formatSessionToken(session.id)}].` };
+    } catch (error) {
+      const message = getErrorMessage(error, "Failed to execute quick-send custom command.");
+      setError(message);
+      return { ok: false, status: "error", feedback: message };
+    }
+  }
+
+  async function sendClipboard(sessionOrId) {
+    const session = resolveCurrentSession(sessionOrId);
+    if (!session) {
+      const message = "Clipboard send target is unavailable.";
+      setError(message);
+      return { ok: false, status: "missing-session", feedback: message };
+    }
+    const blockedMessage = resolveBlockedMessage(session);
+    if (blockedMessage) {
+      setError(blockedMessage);
+      return { ok: false, status: "blocked", feedback: blockedMessage };
+    }
+    if (!canReadClipboardText()) {
+      const message = "Clipboard read is unavailable in this browser.";
+      setError(message);
+      return { ok: false, status: "clipboard-unavailable", feedback: message };
+    }
+    let text = "";
+    try {
+      text = await readClipboardText();
+    } catch (error) {
+      const message = getErrorMessage(error, "Failed to read the browser clipboard.");
+      setError(message);
+      return { ok: false, status: "clipboard-error", feedback: message };
+    }
+    if (!text) {
+      clearError();
+      setCommandFeedback("Clipboard is empty.");
+      return { ok: false, status: "empty", feedback: "Clipboard is empty." };
+    }
+    const result = await submitTerminalPaste(session.id, text, {
+      source: "paste",
+      activateTargetBeforeSend: false
+    });
+    if (result?.ok === true) {
+      clearError();
+      setCommandFeedback(`Sent clipboard to [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.`);
+      return { ok: true, status: "sent", feedback: `Sent clipboard to [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}.` };
+    }
+    return result || { ok: false, status: "error", feedback: "Failed to send clipboard to the session." };
+  }
+
+  function renderSessionQuickSend(entry, sessionOrId) {
+    const panelEl = entry?.quickSendPanelEl;
+    const actionsEl = entry?.quickSendActionsEl;
+    if (!panelEl || !actionsEl || !documentRef || typeof documentRef.createElement !== "function") {
+      return;
+    }
+    const session = resolveCurrentSession(sessionOrId);
+    clearElementChildren(actionsEl);
+    if (!session) {
+      panelEl.hidden = true;
+      return;
+    }
+    const blockedMessage = resolveBlockedMessage(session);
+    if (blockedMessage) {
+      panelEl.hidden = true;
+      return;
+    }
+
+    const topCommands = listTopCustomCommands(session.id);
+    const showClipboardAction = canReadClipboardText();
+    if (topCommands.length === 0 && !showClipboardAction) {
+      panelEl.hidden = true;
+      return;
+    }
+
+    const duplicateNames = new Set();
+    const names = new Map();
+    for (const entry of topCommands) {
+      const name = normalizeText(entry?.command?.name).toLowerCase();
+      if (!name) {
+        continue;
+      }
+      names.set(name, (names.get(name) || 0) + 1);
+    }
+    for (const [name, count] of names.entries()) {
+      if (count > 1) {
+        duplicateNames.add(name);
+      }
+    }
+
+    for (const favorite of topCommands) {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "session-quick-send-chip session-quick-send-command";
+      button.textContent = buildQuickSendButtonLabel(favorite.command, duplicateNames);
+      button.title = `${button.textContent} · ${formatQuickSendScopeText(favorite.command, session, formatSessionToken, formatSessionDisplayName)} · ${formatUsageCount(favorite.count)}`;
+      button.addEventListener?.("click", () => {
+        Promise.resolve(sendCustomCommand(session.id, favorite.command.lookupKey)).catch(() => {});
+      });
+      actionsEl.appendChild?.(button);
+    }
+
+    if (showClipboardAction) {
+      const clipboardButton = documentRef.createElement("button");
+      clipboardButton.type = "button";
+      clipboardButton.className = "session-quick-send-chip session-quick-send-clipboard";
+      clipboardButton.textContent = "Clipboard";
+      clipboardButton.title = "Read the browser clipboard and send it to this terminal.";
+      clipboardButton.addEventListener?.("click", () => {
+        Promise.resolve(sendClipboard(session.id)).catch(() => {});
+      });
+      actionsEl.appendChild?.(clipboardButton);
+    }
+
+    panelEl.hidden = actionsEl.childNodes?.length === 0 && actionsEl.children?.length === 0;
+    if (!panelEl.hidden) {
+      panelEl.setAttribute?.("aria-label", `Quick send actions for [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`);
+    }
+  }
+
+  function snapshot() {
+    return cloneUsageState(usageBySession);
+  }
+
+  return {
+    syncSessions,
+    recordCustomCommandUsage,
+    listTopCustomCommands,
+    sendCustomCommand,
+    sendClipboard,
+    renderSessionQuickSend,
+    snapshot,
+    dispose() {}
+  };
+}

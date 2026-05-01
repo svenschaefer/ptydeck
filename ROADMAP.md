@@ -13,19 +13,14 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Current Execution Status
 
-- Active wave:
-  - `v0.4.0-H161` Session Quick Send Favorites
 - Latest completed wave in this segment:
-  - `v0.4.0-H160` Repo-Wide Quality and Coverage Gap Follow-Up After H159
+  - `v0.4.0-H161` Session Quick Send Favorites
 - Queued next waves:
   - none currently
 
 ## Active Wave Order
 
-- `v0.4.0-H161` Session Quick Send Favorites
-  - `CMD-301` Owner `FE`
-  - `CMD-302` Owner `FE`
-  - `CMD-303` Owner `QA`
+- none currently
 
 ## Queued Wave Order
 
@@ -33,14 +28,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `CMD-301` -> `CMD-302` -> `CMD-303`
+- none currently
 
 ## Wave Exit Criteria
 
-- `v0.4.0-H161` is complete only when:
-  - per-session quick-send usage is persisted browser-locally and pruned deterministically
-  - each session card can expose at most five direct custom-command quick actions plus one `Send Clipboard` action without widening the current backend contract
-  - blocked, empty, stale-command, and clipboard-unavailable states are covered by direct regression tests
+- no active wave currently
 
 ## Sequencing Rules
 

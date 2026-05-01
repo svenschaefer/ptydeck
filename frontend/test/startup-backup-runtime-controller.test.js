@@ -30,7 +30,8 @@ test("startup backup controller creates a verified rollback snapshot on first ru
   const localStorageRef = createLocalStorage({
     "ptydeck.settings.v1": '{"sidebarVisible":true}',
     "ptydeck.active-deck.v1": "ops",
-    "ptydeck.session-filter.v1": "ssh"
+    "ptydeck.session-filter.v1": "ssh",
+    "ptydeck.session-quick-send-usage.v1": '{"sessions":{"s1":[{"lookupKey":"project::deploy","count":2,"lastUsedAt":123}]}}'
   });
   const controller = createStartupBackupRuntimeController({
     localStorageRef,
@@ -49,7 +50,8 @@ test("startup backup controller creates a verified rollback snapshot on first ru
   assert.deepEqual(parsed.entries, {
     "ptydeck.settings.v1": '{"sidebarVisible":true}',
     "ptydeck.active-deck.v1": "ops",
-    "ptydeck.session-filter.v1": "ssh"
+    "ptydeck.session-filter.v1": "ssh",
+    "ptydeck.session-quick-send-usage.v1": '{"sessions":{"s1":[{"lookupKey":"project::deploy","count":2,"lastUsedAt":123}]}}'
   });
 });
 

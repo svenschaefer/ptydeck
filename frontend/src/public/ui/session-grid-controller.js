@@ -28,6 +28,7 @@ export function createSessionGridController(options = {}) {
   const sessionCardRenderController = options.sessionCardRenderController || null;
   const sessionCardFactoryController = options.sessionCardFactoryController || null;
   const sessionCardInteractionsController = options.sessionCardInteractionsController || null;
+  const syncSessionQuickSendState = options.syncSessionQuickSendState || (() => {});
   const sessionTerminalRuntimeController = options.sessionTerminalRuntimeController || null;
   const onSessionMounted = options.onSessionMounted || (() => {});
   const resolveInitialTheme = options.resolveInitialTheme || (() => ({}));
@@ -132,6 +133,7 @@ export function createSessionGridController(options = {}) {
     const activeDeckSessions = activeDeckId
       ? orderedSessions.filter((session) => resolveSessionDeckId(session) === activeDeckId)
       : orderedSessions.slice();
+    syncSessionQuickSendState(orderedSessions);
     const deckSessions = resolveDeckSessions(activeDeckId, activeDeckSessions, {
       activeDeck,
       sessions: orderedSessions
@@ -341,6 +343,8 @@ export function createSessionGridController(options = {}) {
           sessionMetaRowEl: refs.sessionMetaRowEl,
           sessionAppIdentityEl: refs.sessionAppIdentityEl,
           sessionNoteEl: refs.sessionNoteEl,
+          quickSendPanelEl: refs.quickSendPanelEl,
+          quickSendActionsEl: refs.quickSendActionsEl,
           unrestoredHintEl: refs.unrestoredHintEl,
           refreshBtn: refs.refreshBtn,
           settingsDialog: refs.settingsDialog,

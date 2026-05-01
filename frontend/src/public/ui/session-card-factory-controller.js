@@ -11,6 +11,7 @@ export function createSessionCardFactoryController(options = {}) {
   const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
+  const renderSessionQuickSend = options.renderSessionQuickSend || (() => {});
   const setSessionCardVisibility = options.setSessionCardVisibility || (() => {});
 
   function createSessionCardView({ template, session, themeProfileKeys = [], activeSessionId = "", visible = true }) {
@@ -25,6 +26,8 @@ export function createSessionCardFactoryController(options = {}) {
     const unrestoredHintEl = node.querySelector(".session-unrestored-hint");
     const refreshBtn = node.querySelector(".session-refresh");
     const settingsBtn = node.querySelector(".session-settings");
+    const quickSendPanelEl = node.querySelector(".session-quick-send-panel");
+    const quickSendActionsEl = node.querySelector(".session-quick-send-actions");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
     const settingsDialog = node.querySelector(".session-settings-dialog");
@@ -139,6 +142,7 @@ export function createSessionCardFactoryController(options = {}) {
     renderSessionAppIdentity({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
     renderSessionTagList({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
     renderSessionNote({ sessionMetaRowEl, sessionAppIdentityEl, sessionNoteEl, tagListEl }, session);
+    renderSessionQuickSend({ quickSendPanelEl, quickSendActionsEl }, session);
     setSessionCardVisibility(node, visible);
 
     return {
@@ -153,6 +157,8 @@ export function createSessionCardFactoryController(options = {}) {
       unrestoredHintEl,
       refreshBtn,
       settingsBtn,
+      quickSendPanelEl,
+      quickSendActionsEl,
       renameBtn,
       closeBtn,
       settingsDialog,

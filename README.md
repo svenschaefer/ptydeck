@@ -12,6 +12,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Local and SSH-backed sessions through one shared session model
 - Slash-command control plane with direct session routing via `@<sessionSelector> /...`
 - Quick switching via `>` and backend-persisted quick-ID ordering via `/swap`
+- Session-card hover quick actions with per-session top custom-command favorites plus direct `Clipboard` send
 - Session replay/export, replay-excerpt clipboard relay via `/replay ...` and `/ccp`, file transfer, read-only sharing, and saved connection profiles
 - Multi-device terminal-control foundation with visible control metadata, take/release/transfer control actions, trusted-local scope takeover (`all sessions`, `this deck`, `this session`), and automatic device-local layout recall on successful takeover
 - Dedicated `Workspace Library` manager for guided local/SSH connection profiles, first-connect SSH trust verification, workspace presets, and deck-group management outside the sidebar
@@ -37,6 +38,7 @@ It combines a PTY/runtime backend with a browser frontend built around `xterm.js
 - Central command/composer flow plus slash-command plane
 - Decks, layout profiles, split-layout support, and a dedicated `Workspace Library` surface for guided connection setup with `Advanced` disclosure, SSH trust verification, workspace presets, and deck-group management
 - Session-level control badges/actions, trusted-local device identity/handoff states, subtle startup/anytime takeover prompts, blocked-write `Take Control and Retry` recovery, and browser-side write blocking for non-controller clients in the mainline single-user runtime
+- Browser-local per-session quick-send ranking for custom commands, including direct hover-triggered clipboard relay through the existing guarded paste path
 - Runtime/debug helpers for traceability and troubleshooting
 
 ## Quick Start

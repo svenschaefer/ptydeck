@@ -46,6 +46,8 @@ function createEntry() {
     terminal,
     focusBtn: { textContent: "" },
     quickIdEl: { textContent: "" },
+    quickSendPanelEl: {},
+    quickSendActionsEl: {},
     stateBadgeEl: { hidden: true, textContent: "" },
     sessionAppIdentityEl: { hidden: true, textContent: "", title: "" },
     unrestoredHintEl: { hidden: true, textContent: "" },
@@ -72,6 +74,7 @@ test("session-card-render controller updates visibility and metadata", () => {
     renderSessionAppIdentity: () => calls.push("app"),
     renderSessionTagList: () => calls.push("tags"),
     renderSessionNote: () => calls.push("note"),
+    renderSessionQuickSend: () => calls.push("quick"),
     syncSessionStartupControls: () => calls.push("startup"),
     syncSessionNoteControls: () => calls.push("note-sync"),
     syncSessionThemeControls: () => calls.push("theme"),
@@ -100,6 +103,7 @@ test("session-card-render controller updates visibility and metadata", () => {
   assert.deepEqual(calls.includes("app"), true);
   assert.deepEqual(calls.includes("tags"), true);
   assert.deepEqual(calls.includes("note"), true);
+  assert.deepEqual(calls.includes("quick"), true);
   assert.deepEqual(calls.includes("theme"), false);
 });
 

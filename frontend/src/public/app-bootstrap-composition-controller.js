@@ -236,6 +236,7 @@ export function createAppBootstrapCompositionController(options = {}) {
       getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
       sendInputWithConfiguredTerminator,
       recordCommandSubmission: (sessionId, submission) => store?.recordSessionCommandSubmission?.(sessionId, submission),
+      recordCustomCommandUsage: (sessionId, command, runtimeOptions) => options.recordCustomCommandUsage?.(sessionId, command, runtimeOptions),
       normalizeCustomCommandPayloadForShell,
       normalizeSessionTags: sessionUiFacadeController?.normalizeSessionTags,
       normalizeThemeProfile: sessionUiFacadeController?.normalizeThemeProfile,

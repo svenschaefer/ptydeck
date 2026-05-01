@@ -82,6 +82,7 @@ test("session-grid controller updates existing cards without creating new termin
       renderEmptyState: () => calls.push("empty"),
       renderStatus: () => calls.push("status")
     },
+    syncSessionQuickSendState: (sessions) => calls.push(["quick-sync", sessions.map((session) => session.id)]),
     pruneQuickIds: () => calls.push("prune"),
     syncActiveTerminalSearch: () => calls.push("search"),
     sessionDisposalController: {
@@ -116,6 +117,7 @@ test("session-grid controller updates existing cards without creating new termin
 
   assert.equal(result.aborted, false);
   assert.deepEqual(calls, [
+    ["quick-sync", ["s1"]],
     "tabs",
     "prune",
     "perf",

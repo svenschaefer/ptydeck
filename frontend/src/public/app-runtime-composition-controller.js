@@ -20,6 +20,7 @@ import { createTerminalCtrlCRuntimeController } from "./terminal-ctrl-c-runtime-
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { createRuntimeEventController } from "./runtime-event-controller.js";
 import { createSessionRuntimeController } from "./session-runtime-controller.js";
+import { createSessionQuickSendRuntimeController } from "./session-quick-send-runtime-controller.js";
 import { createSessionViewModel } from "./session-view-model.js";
 import { createSlashWorkflowRuntimeController } from "./slash-workflow-runtime-controller.js";
 import { createSplitLayoutRuntimeController } from "./split-layout-runtime-controller.js";
@@ -40,6 +41,10 @@ import {
   refreshTerminalViewport,
   syncTerminalScrollArea
 } from "./terminal-compat.js";
+import {
+  normalizeCustomCommandPayloadForShell,
+  sendInputWithConfiguredTerminator
+} from "./terminal-stream.js";
 import { createSessionStreamAuthorityController } from "./session-stream-authority-controller.js";
 import { ITERM2_THEME_LIBRARY } from "./theme-library.js";
 import { SYSTEM_SLASH_COMMANDS } from "./system-slash-commands.js";
@@ -497,6 +502,7 @@ let commandTargetRuntimeController = null;
 let deckSidebarController = null;
 let deckActionsController = null;
 let sessionRuntimeController = null;
+let sessionQuickSendRuntimeController = null;
 let sessionDisposalController = null;
 let sessionCardMetaController = null;
 let sessionCardFactoryController = null;
@@ -611,6 +617,49 @@ const showBlockedWriteReclaimUi = sessionControlRuntimeController.showBlockedWri
 const renderSessionControl = sessionControlRuntimeController.renderSessionControl;
 const maybeRedirectToCanonicalOrigin = sessionControlRuntimeController.maybeRedirectToCanonicalOrigin;
 const maybeAutoRepairOriginHandoffControl = () => sessionControlRuntimeController.maybeAutoRepairOriginHandoffControl();
+
+sessionQuickSendRuntimeController = createSessionQuickSendRuntimeController({
+  windowRef: window,
+  documentRef: document,
+  localStorageRef: window?.localStorage || null,
+  listCustomCommands: () => appCommandUiFacadeController?.listCustomCommands?.() || [],
+  getSessionById: (sessionId) => appSessionRuntimeFacadeController?.getSessionById?.(sessionId) || null,
+  getSessions: () => store.getState().sessions,
+  resolveDeckForSession: (session) => {
+    const deckId = appSessionRuntimeFacadeController?.resolveSessionDeckId?.(session) || DEFAULT_DECK_ID;
+    const deck = store.getState().decks.find((entry) => entry.id === deckId) || null;
+    return {
+      id: deck?.id || deckId,
+      name: deck?.name || deckId || "Default"
+    };
+  },
+  canReadClipboardText: () => clipboardRuntimeController.canReadText(),
+  readClipboardText: () => clipboardRuntimeController.readText(),
+  submitTerminalPaste: (sessionId, text, runtimeOptions) =>
+    commandComposerRuntimeController?.submitProgrammaticPaste?.(sessionId, text, runtimeOptions) ||
+    Promise.resolve({ ok: false, status: "unavailable", feedback: "Clipboard send is unavailable." }),
+  apiSendInput: (sessionId, data) => api.sendInput(sessionId, data),
+  sendInputWithConfiguredTerminator,
+  normalizeCustomCommandPayloadForShell,
+  normalizeSendTerminatorMode: (value) => appLayoutDeckFacadeController?.normalizeSendTerminatorMode?.(value) || "auto",
+  getSessionSendTerminator: (sessionId) => appLayoutDeckFacadeController?.getSessionSendTerminator?.(sessionId) || "auto",
+  delayedSubmitMs: DELAYED_SUBMIT_MS,
+  recordCommandSubmission: (sessionId, submission) => store.recordSessionCommandSubmission(sessionId, submission),
+  canWriteToSession,
+  isSessionActionBlocked: (session) => sessionUiFacadeController?.isSessionActionBlocked?.(session) === true,
+  getBlockedSessionActionMessage: (sessions, actionLabel) =>
+    sessionUiFacadeController?.getBlockedSessionActionMessage?.(sessions, actionLabel) || "",
+  isReadOnlyMode,
+  getReadOnlyModeMessage,
+  getSessionWriteBlockedMessage: getSessionWriteBlockMessage,
+  setCommandFeedback: (message) => appCommandUiFacadeController?.setCommandFeedback?.(message),
+  setError: (message) => appCommandUiFacadeController?.setError?.(message),
+  clearError: () => appRuntimeStateController?.clearError?.(),
+  getErrorMessage: (error, fallback) => appCommandUiFacadeController?.getErrorMessage?.(error, fallback) || fallback,
+  requestRender: () => appCommandUiFacadeController?.render?.(),
+  formatSessionToken: (sessionId) => appSessionRuntimeFacadeController?.formatSessionToken?.(sessionId) || "?",
+  formatSessionDisplayName: (session) => appSessionRuntimeFacadeController?.formatSessionDisplayName?.(session) || ""
+});
 
 function handleCommandFeedbackAction() {
   return sessionControlRuntimeController.handleCommandFeedbackAction(uiState.commandFeedbackActionSessionId);
@@ -1264,6 +1313,7 @@ sessionCardFactoryController = createSessionCardFactoryController({
   renderSessionAppIdentity: sessionUiFacadeController.renderSessionAppIdentity,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
+  renderSessionQuickSend: (entry, session) => sessionQuickSendRuntimeController?.renderSessionQuickSend?.(entry, session),
   setSessionCardVisibility: (node, visible) => appSessionRuntimeFacadeController?.setSessionCardVisibility(node, visible)
 });
 
@@ -1328,6 +1378,7 @@ sessionCardRenderController = createSessionCardRenderController({
   renderSessionAppIdentity: sessionUiFacadeController.renderSessionAppIdentity,
   renderSessionTagList: sessionUiFacadeController.renderSessionTagList,
   renderSessionNote: sessionUiFacadeController.renderSessionNote,
+  renderSessionQuickSend: (entry, session) => sessionQuickSendRuntimeController?.renderSessionQuickSend?.(entry, session),
   syncSessionStartupControls: sessionUiFacadeController.syncSessionStartupControls,
   syncSessionNoteControls: sessionUiFacadeController.syncSessionNoteControls,
   syncSessionInputSafetyControls: sessionUiFacadeController.syncSessionInputSafetyControls,
@@ -1607,6 +1658,7 @@ sessionGridController = createSessionGridController({
   sessionCardRenderController,
   sessionCardFactoryController,
   sessionCardInteractionsController,
+  syncSessionQuickSendState: (sessions) => sessionQuickSendRuntimeController?.syncSessions?.(sessions),
   sessionTerminalRuntimeController,
   onSessionMounted: (session) => appSessionRuntimeFacadeController?.ensureSessionRuntime(session),
   resolveInitialTheme: (sessionId) =>
@@ -1739,6 +1791,8 @@ appBootstrapCompositionController = createAppBootstrapCompositionController({
   sessionViewModel,
   runtimeEventController,
   deckRuntimeController,
+  recordCustomCommandUsage: (sessionId, command, runtimeOptions) =>
+    sessionQuickSendRuntimeController?.recordCustomCommandUsage?.(sessionId, command, runtimeOptions),
   getDiscoveryUsageScore: (key) => commandDiscoveryUsageStore.getUsageScore(key),
   recordDiscoveryUsage: (key) => commandDiscoveryUsageStore.record(key),
   readClipboardText: () => clipboardRuntimeController.readText(),

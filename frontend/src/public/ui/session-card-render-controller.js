@@ -15,6 +15,7 @@ export function createSessionCardRenderController(options = {}) {
   const renderSessionAppIdentity = options.renderSessionAppIdentity || (() => {});
   const renderSessionTagList = options.renderSessionTagList || (() => {});
   const renderSessionNote = options.renderSessionNote || (() => {});
+  const renderSessionQuickSend = options.renderSessionQuickSend || (() => {});
   const syncSessionStartupControls = options.syncSessionStartupControls || (() => {});
   const syncSessionNoteControls = options.syncSessionNoteControls || (() => {});
   const syncSessionInputSafetyControls = options.syncSessionInputSafetyControls || (() => {});
@@ -87,6 +88,7 @@ export function createSessionCardRenderController(options = {}) {
     renderSessionAppIdentity(entry, session);
     renderSessionTagList(entry, session);
     renderSessionNote(entry, session);
+    renderSessionQuickSend(entry, session);
     renderSessionControl(entry, session);
 
     for (const control of [entry.settingsBtn, entry.renameBtn, entry.closeBtn, entry.settingsApplyBtn]) {

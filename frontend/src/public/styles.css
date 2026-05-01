@@ -1503,6 +1503,66 @@ button:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+}
+
+.session-quick-send-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 4;
+  min-width: min(26rem, 72vw);
+  padding: 6px;
+  border: 1px solid #23384e;
+  border-radius: 10px;
+  background: rgba(10, 18, 29, 0.96);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.session-quick-send-panel[hidden] {
+  display: none !important;
+}
+
+.terminal-card:hover .session-quick-send-panel:not([hidden]),
+.terminal-card:focus-within .session-quick-send-panel:not([hidden]) {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.session-quick-send-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.session-quick-send-chip {
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.1;
+  border-color: #29425a;
+  color: #b9d8ef;
+  background: #132131;
+}
+
+.session-quick-send-chip:hover,
+.session-quick-send-chip:focus-visible {
+  border-color: #4d7698;
+  color: #eef8ff;
+  background: #1a3044;
+}
+
+.session-quick-send-clipboard {
+  border-color: #35526d;
+  color: #9fd3ff;
+  background: #182534;
 }
 
 .terminal-toolbar-meta {

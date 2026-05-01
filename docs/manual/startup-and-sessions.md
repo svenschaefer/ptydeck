@@ -45,6 +45,13 @@ Use slash commands when you already know the session selector, or use the sessio
 
 If the session has startup settings, restart uses the current persisted startup contract from the session settings dialog.
 
+When you work from the session cards, hover the toolbar area to reveal quick actions for that specific session:
+
+- up to five of the most frequently sent custom commands for that session
+- one `Clipboard` action that reads the browser clipboard and routes it through the existing guarded paste/send path
+
+The quick-send ranking is browser-local and origin-local. It follows the current browser profile plus origin in the same way other browser-local operator state does.
+
 ## When to Use Session Settings
 
 Open the session settings dialog when you need to change how the session starts or behaves the next time you use it.

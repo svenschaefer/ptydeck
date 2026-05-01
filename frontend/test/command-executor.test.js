@@ -52,6 +52,7 @@ function createExecutor(overrides = {}) {
     getSessionSendTerminator: overrides.getSessionSendTerminator || (() => "auto"),
     sendInputWithConfiguredTerminator: overrides.sendInputWithConfiguredTerminator || (async () => {}),
     recordCommandSubmission: overrides.recordCommandSubmission || (() => null),
+    recordCustomCommandUsage: overrides.recordCustomCommandUsage || (() => false),
     normalizeCustomCommandPayloadForShell: overrides.normalizeCustomCommandPayloadForShell || ((value) => value),
     normalizeSessionTags: overrides.normalizeSessionTags || ((tags) => (Array.isArray(tags) ? tags : [])),
     normalizeThemeProfile: overrides.normalizeThemeProfile || ((profile) => profile || {}),
@@ -3024,6 +3025,70 @@ test("command executor records correlated custom-command submissions per target 
   assert.deepEqual(calls, [
     ["send", "s1", "echo hi\n"],
     ["record", "s1", "custom-command", "go", "/go", "echo hi\n"]
+  ]);
+});
+
+test("command executor records quick-send usage when executing custom commands", async () => {
+  const calls = [];
+  const executor = createCommandExecutor({
+    store: {
+      getState() {
+        return {
+          sessions: [{ id: "s1", name: "one" }],
+          decks: [{ id: "default", name: "Default" }],
+          activeSessionId: "s1"
+        };
+      }
+    },
+    api: {
+      sendInput() {}
+    },
+    systemSlashCommands: ["custom", "help"],
+    getActiveDeck: () => ({ id: "default", name: "Default" }),
+    getSessionCountForDeck: () => 1,
+    applyRuntimeEvent: () => {},
+    setActiveDeck: () => true,
+    resolveSessionDeckId: () => "default",
+    formatSessionToken: (id) => id,
+    formatSessionDisplayName: (session) => session.name,
+    getSessionRuntimeState: () => ({}),
+    isSessionExited: () => false,
+    isSessionActionBlocked: () => false,
+    getBlockedSessionActionMessage: () => "",
+    listCustomCommandState: () => [{ name: "go", content: "echo hi", kind: "plain", scope: "project", templateVariables: [] }],
+    getCustomCommandState: () => ({ name: "go", content: "echo hi", kind: "plain", scope: "project", templateVariables: [] }),
+    removeCustomCommandState: () => false,
+    parseCustomDefinition: () => ({ ok: false, error: "unsupported" }),
+    upsertCustomCommandState: () => null,
+    resolveTargetSelectors: () => ({ sessions: [], error: "" }),
+    resolveDeckToken: () => ({ deck: null, error: "unknown deck" }),
+    parseSizeCommandArgs: () => ({ ok: false, error: "bad size" }),
+    applyTerminalSizeSettings: () => {},
+    setSessionFilterText: () => {},
+    resolveSettingsTargets: () => ({ sessions: [], error: "" }),
+    parseSettingsPayload: () => ({ ok: false, error: "bad json" }),
+    normalizeSendTerminatorMode: () => "crlf",
+    setSessionSendTerminator: () => {},
+    getSessionSendTerminator: () => "CRLF",
+    sendInputWithConfiguredTerminator: async () => {},
+    recordCustomCommandUsage: (sessionId, command, runtimeOptions) => {
+      calls.push(["usage", sessionId, command.name, command.scope, Number.isFinite(runtimeOptions.usedAt)]);
+    },
+    recordCommandSubmission: (sessionId, submission) => {
+      calls.push(["record", sessionId, submission.commandName, submission.label]);
+    },
+    normalizeCustomCommandPayloadForShell: (value) => `${value}\n`,
+    normalizeSessionTags: (tags) => (Array.isArray(tags) ? tags : []),
+    normalizeThemeProfile: (profile) => profile || {},
+    getTerminalSettings: () => ({ cols: 80, rows: 20 })
+  });
+
+  const feedback = await executor.execute({ command: "go", args: [], raw: "/go" });
+
+  assert.equal(feedback, "Executed /go on [s1].");
+  assert.deepEqual(calls, [
+    ["usage", "s1", "go", "project", true],
+    ["record", "s1", "go", "/go"]
   ]);
 });
 

@@ -39,7 +39,10 @@ function createNodeStub() {
     ".terminal-toolbar-meta",
     ".session-note-text",
     ".session-unrestored-hint",
+    ".session-refresh",
     ".session-settings",
+    ".session-quick-send-panel",
+    ".session-quick-send-actions",
     ".session-rename",
     ".session-close",
     ".session-settings-dialog",
@@ -113,6 +116,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
     renderSessionAppIdentity: () => calls.push("app"),
     renderSessionTagList: () => calls.push("tags"),
     renderSessionNote: () => calls.push("note"),
+    renderSessionQuickSend: () => calls.push("quick"),
     setSessionCardVisibility: (_node, visible) => calls.push(`visible:${visible}`)
   });
 
@@ -132,6 +136,8 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.equal(result.unrestoredHintEl.textContent, "hint");
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
+  assert.ok(result.quickSendPanelEl);
+  assert.ok(result.quickSendActionsEl);
   assert.ok(result.settingsTabStartupBtn);
   assert.ok(result.settingsTabInputBtn);
   assert.ok(result.settingsTabNoteBtn);
@@ -144,7 +150,7 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.themeSlotSelect);
   assert.equal(result.node.classList.contains("active"), true);
   assert.ok(result.themeInputs.brightRed);
-  assert.deepEqual(calls, ["app", "tags", "note", "visible:true"]);
+  assert.deepEqual(calls, ["app", "tags", "note", "quick", "visible:true"]);
 });
 
 test("session-card-factory controller uses the derived session header label", () => {

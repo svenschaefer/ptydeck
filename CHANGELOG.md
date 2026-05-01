@@ -2,6 +2,15 @@
 
 Completed and validated release history belongs here.
 
+## 2026-05-01
+
+- [x] `v0.4.0-H161` is now completed on `main`, closing `CMD-301` through `CMD-303` and leaving no active or queued wave in `TODO.md` or `ROADMAP.md`.
+- [x] Browser-local per-session quick-send favorites are now part of the shipped frontend operator surface. The new `frontend/src/public/session-quick-send-runtime-controller.js` persists custom-command usage by `sessionId` plus custom-command `lookupKey`, caps and prunes stale usage deterministically, and exposes the top-five ranking without widening the backend contract. `frontend/src/public/command-executor.js` now records custom-command sends into that ranking path, and `frontend/src/public/startup-backup-runtime-controller.js` now includes the quick-send store in the verified browser rollback snapshot source set.
+- [x] Session-card hover quick actions now expose up to five direct custom-command favorites plus one `Clipboard` action through the existing guarded send/paste seams. `frontend/src/public/index.html`, `frontend/src/public/styles.css`, `frontend/src/public/ui/session-card-factory-controller.js`, `frontend/src/public/ui/session-card-render-controller.js`, `frontend/src/public/ui/session-grid-controller.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/app-bootstrap-composition-controller.js`, and `frontend/src/public/app-runtime-composition-controller.js` now wire the subtle hover-only surface without introducing a new backend, REST, or WebSocket contract.
+- [x] Direct regression coverage now closes the `H161` quick-send slice. `frontend/test/session-quick-send-runtime-controller.test.js` locks down ranking, malformed persistence tolerance, deterministic pruning, hover rendering, duplicate-name labeling, click dispatch, missing/invalid/error command cases, clipboard failure branches, and blocked fail-closed behavior. `frontend/test/command-executor.test.js`, `frontend/test/session-card-factory-controller.test.js`, `frontend/test/session-card-render-controller.test.js`, `frontend/test/session-grid-controller.test.js`, and `frontend/test/startup-backup-runtime-controller.test.js` now also prove the command-executor recording seam, session-card/grid wiring, and rollback-source persistence contract.
+- [x] Operator-facing docs now reflect the shipped surface. `README.md` now lists the session-card quick-send favorites feature, and `docs/manual/startup-and-sessions.md` now documents the hover-only `top 5` custom-command plus `Clipboard` quick-action flow.
+- [x] Closeout validation for `v0.4.0-H161` passed with focused quick-send/frontend wiring tests, focused `--experimental-test-coverage` for the changed slice, `npm run docs:generate`, `npm run docs:check`, `npm run lint`, `npm run test`, `npm run test:coverage:check`, and `git diff --check`.
+
 ## 2026-04-29
 
 - [x] `v0.4.0-H160` is now completed on `main`, closing `QLT-250` through `QLT-254` and leaving no active or queued quality wave in `TODO.md` or `ROADMAP.md`.

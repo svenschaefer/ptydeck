@@ -81,6 +81,8 @@ export function createCommandExecutor(options = {}) {
   const sendInputWithConfiguredTerminator = options.sendInputWithConfiguredTerminator;
   const recordCommandSubmission =
     typeof options.recordCommandSubmission === "function" ? options.recordCommandSubmission : () => null;
+  const recordCustomCommandUsage =
+    typeof options.recordCustomCommandUsage === "function" ? options.recordCustomCommandUsage : () => false;
   const normalizeCustomCommandPayloadForShell = options.normalizeCustomCommandPayloadForShell;
   const normalizeSessionTags = options.normalizeSessionTags;
   const normalizeThemeProfile = options.normalizeThemeProfile;
@@ -1821,6 +1823,9 @@ export function createCommandExecutor(options = {}) {
       );
       for (const entry of rendered.entries) {
         const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
+        recordCustomCommandUsage(entry.session.id, entry.custom || custom, {
+          usedAt: Date.now()
+        });
         recordCommandSubmission(entry.session.id, {
           source: "custom-command",
           commandName: custom.name,
