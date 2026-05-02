@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-02 (`v0.4.0-H162` completed; no active quality wave)
+Last updated: 2026-05-02 (`v0.4.0-H162` completed; no active quality wave; quick-send hover click contract fixed)
 
 ## Current Product Truth
 
@@ -152,6 +152,10 @@ Delivered contract:
 - The browser-local persistence key is `ptydeck.session-quick-send-usage.v1`.
 - Ranking should prefer highest total send count first and use recency only as a deterministic tie-breaker.
 - The visible UI target is a subtle session-card hover surface, not a new persistent control pane or settings panel.
+- The hover surface must remain directly clickable after it appears:
+  - keep a toolbar-to-overlay hover bridge so the pointer can move into the panel without dropping the hit area
+  - keep the overlay in its own higher stacking context above the terminal viewport
+  - keep the overlay visible on its own hover/focus state instead of tying clickability only to whole-card hover
 - Each session card now exposes:
   - up to five direct custom-command quick actions
   - one `Send Clipboard` action

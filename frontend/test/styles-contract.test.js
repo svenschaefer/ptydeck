@@ -68,3 +68,19 @@ test("blocked-write reclaim and trusted-local device controls have explicit layo
     /\.session-control-client-actions \{[\s\S]*display: flex;[\s\S]*flex-wrap: wrap;[\s\S]*\}/m
   );
 });
+
+test("session quick-send hover actions stay clickable while moving from the toolbar into the overlay", () => {
+  const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
+  assert.match(
+    stylesCss,
+    /\.session-toolbar-actions \{[\s\S]*position: relative;[\s\S]*z-index: 2;[\s\S]*padding-bottom: 6px;[\s\S]*margin-bottom: -6px;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-quick-send-panel \{[\s\S]*top: 100%;[\s\S]*z-index: 6;[\s\S]*pointer-events: none;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-toolbar-actions:hover \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-toolbar-actions:focus-within \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:hover:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:focus-within:not\(\[hidden\]\) \{[\s\S]*pointer-events: auto;[\s\S]*\}/m
+  );
+});

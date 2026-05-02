@@ -4,6 +4,7 @@ Completed and validated release history belongs here.
 
 ## 2026-05-02
 
+- [x] The session-card quick-send hover overlay now keeps its buttons clickable after the panel opens. `frontend/src/public/styles.css` now gives the toolbar action area an explicit hover bridge and stronger stacking context, while the quick-send panel itself stays open on direct hover/focus instead of depending on the whole card hover state. `frontend/test/styles-contract.test.js` now locks that interaction contract down so the `Top 5` and `Clipboard` quick actions do not regress into a visible-but-unclickable state.
 - [x] `v0.4.0-H162` is now completed on `main`, closing `QLT-255` through `QLT-259` and leaving no active or queued quality wave in `TODO.md` or `ROADMAP.md`.
 - [x] `QLT-259` is now completed as the fifth and final delivered slice of `v0.4.0-H162`.
 - [x] `QLT-258` is now completed as the fourth delivered slice of `v0.4.0-H162`, leaving only `QLT-259` open in the active repo-wide quality follow-up wave before the final closeout.

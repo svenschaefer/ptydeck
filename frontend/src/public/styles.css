@@ -1504,13 +1504,16 @@ button:hover {
   align-items: center;
   gap: 6px;
   position: relative;
+  z-index: 2;
+  padding-bottom: 6px;
+  margin-bottom: -6px;
 }
 
 .session-quick-send-panel {
   position: absolute;
   right: 0;
-  top: calc(100% + 6px);
-  z-index: 4;
+  top: 100%;
+  z-index: 6;
   min-width: min(26rem, 72vw);
   padding: 6px;
   border: 1px solid #23384e;
@@ -1527,8 +1530,10 @@ button:hover {
   display: none !important;
 }
 
-.terminal-card:hover .session-quick-send-panel:not([hidden]),
-.terminal-card:focus-within .session-quick-send-panel:not([hidden]) {
+.session-toolbar-actions:hover .session-quick-send-panel:not([hidden]),
+.session-toolbar-actions:focus-within .session-quick-send-panel:not([hidden]),
+.session-quick-send-panel:hover:not([hidden]),
+.session-quick-send-panel:focus-within:not([hidden]) {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
