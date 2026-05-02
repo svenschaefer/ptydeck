@@ -280,6 +280,82 @@ test("connection profile helpers report missing and ambiguous selectors with sta
   assert.match(formatConnectionProfileReport(profiles[0]), /remoteConnection=null/);
 });
 
+test("connection profile helpers fail closed on malformed ssh details and empty formatting targets", () => {
+  assert.equal(buildConnectionProfileLaunchFromSession(null), null);
+  assert.equal(buildConnectionProfileLaunchFromSession({ kind: "ssh", shell: "ssh" }), null);
+  assert.equal(formatConnectionProfileSummary(null), "");
+  assert.equal(formatConnectionProfileReport(null), "");
+
+  const launch = normalizeConnectionProfileLaunch({
+    kind: "ssh",
+    deckId: " ops ",
+    shell: " ssh ",
+    startCwd: " ~ ",
+    startCommand: "tmux a",
+    env: { LANG: "en_US.UTF-8", PORT: 22, " ": "ignored" },
+    tags: ["ops", "ops", "prod", " "],
+    themeProfile: createThemeProfile("#121212"),
+    remoteConnection: { host: "ops.example", port: "70000", username: "ops" },
+    remoteAuth: { method: "token", privateKeyPath: "/ignored" }
+  });
+
+  assert.deepEqual(launch, {
+    kind: "ssh",
+    deckId: "ops",
+    shell: "ssh",
+    startCwd: "~",
+    startCommand: "tmux a",
+    env: { LANG: "en_US.UTF-8" },
+    tags: ["ops", "prod"],
+    themeProfile: createThemeProfile("#121212"),
+    activeThemeProfile: createThemeProfile("#121212"),
+    inactiveThemeProfile: createThemeProfile("#121212")
+  });
+  assert.equal(
+    normalizeConnectionProfileLaunch({
+      kind: "local",
+      deckId: "default",
+      shell: "bash",
+      startCwd: "/srv/app"
+    }),
+    null
+  );
+});
+
+test("connection profile helper selectors sort duplicate names by id for ambiguous prefix matches", () => {
+  const profiles = [
+    {
+      id: "ops-b",
+      name: "Ops",
+      launch: {
+        kind: "local",
+        deckId: "default",
+        shell: "bash",
+        startCwd: "/srv/b",
+        activeThemeProfile: createThemeProfile("#111111"),
+        inactiveThemeProfile: createThemeProfile("#222222")
+      }
+    },
+    {
+      id: "ops-a",
+      name: "Ops",
+      launch: {
+        kind: "local",
+        deckId: "default",
+        shell: "bash",
+        startCwd: "/srv/a",
+        activeThemeProfile: createThemeProfile("#333333"),
+        inactiveThemeProfile: createThemeProfile("#444444")
+      }
+    }
+  ];
+
+  assert.equal(
+    resolveConnectionProfileToken(profiles, "op").error,
+    "Ambiguous connection profile 'op': ops-a, ops-b"
+  );
+});
+
 test("connection profile runtime controller manages backend-backed lifecycle and launches sessions from profiles", async () => {
   const sessions = [
     {

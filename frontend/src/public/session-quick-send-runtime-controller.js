@@ -5,6 +5,15 @@ import {
   normalizeCustomCommandRecord,
   renderCustomCommandForSession
 } from "./custom-command-model.js";
+import {
+  cloneQuickSendUsageEntry,
+  cloneQuickSendUsageState,
+  normalizeQuickSendUsageEntry,
+  parseSessionQuickSendUsagePayload,
+  pruneSessionQuickSendUsageState,
+  readSessionQuickSendUsagePayload,
+  serializeSessionQuickSendUsageState
+} from "./session-quick-send-usage.js";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -17,136 +26,6 @@ function clearElementChildren(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
   }
-}
-
-function normalizeUsageEntry(entry) {
-  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    return null;
-  }
-  const lookupKey = normalizeText(entry.lookupKey);
-  if (!lookupKey) {
-    return null;
-  }
-  const count = Number.isInteger(entry.count) ? entry.count : Number.parseInt(entry.count, 10);
-  const lastUsedAt = Number.isFinite(entry.lastUsedAt) ? Number(entry.lastUsedAt) : Number.parseInt(entry.lastUsedAt, 10);
-  return {
-    lookupKey,
-    count: Number.isFinite(count) && count > 0 ? count : 1,
-    lastUsedAt: Number.isFinite(lastUsedAt) && lastUsedAt > 0 ? lastUsedAt : 0
-  };
-}
-
-function cloneUsageEntry(entry) {
-  return entry && typeof entry === "object" ? { ...entry } : entry;
-}
-
-function cloneUsageState(state) {
-  const next = {};
-  for (const [sessionId, entries] of Object.entries(state || {})) {
-    next[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneUsageEntry(entry)) : [];
-  }
-  return next;
-}
-
-function compareUsageEntries(left, right) {
-  const leftCount = Number(left?.count) || 0;
-  const rightCount = Number(right?.count) || 0;
-  if (leftCount !== rightCount) {
-    return rightCount - leftCount;
-  }
-  const leftLastUsedAt = Number(left?.lastUsedAt) || 0;
-  const rightLastUsedAt = Number(right?.lastUsedAt) || 0;
-  if (leftLastUsedAt !== rightLastUsedAt) {
-    return rightLastUsedAt - leftLastUsedAt;
-  }
-  return normalizeText(left?.lookupKey).localeCompare(normalizeText(right?.lookupKey), "en-US", { sensitivity: "base" });
-}
-
-function mergeUsageEntries(entries) {
-  const merged = new Map();
-  for (const rawEntry of Array.isArray(entries) ? entries : []) {
-    const normalized = normalizeUsageEntry(rawEntry);
-    if (!normalized) {
-      continue;
-    }
-    const current = merged.get(normalized.lookupKey);
-    if (!current) {
-      merged.set(normalized.lookupKey, normalized);
-      continue;
-    }
-    merged.set(normalized.lookupKey, {
-      lookupKey: normalized.lookupKey,
-      count: current.count + normalized.count,
-      lastUsedAt: Math.max(current.lastUsedAt, normalized.lastUsedAt)
-    });
-  }
-  return Array.from(merged.values()).sort(compareUsageEntries);
-}
-
-function readInitialUsagePayload(localStorageRef, storageKey) {
-  if (!localStorageRef || typeof localStorageRef.getItem !== "function") {
-    return "";
-  }
-  try {
-    return localStorageRef.getItem(storageKey);
-  } catch {
-    return "";
-  }
-}
-
-function safeParseUsagePayload(raw) {
-  if (typeof raw !== "string" || !raw.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.sessions : null;
-    if (!source || typeof source !== "object" || Array.isArray(source)) {
-      return {};
-    }
-    const next = {};
-    for (const [sessionId, entries] of Object.entries(source)) {
-      const normalizedSessionId = normalizeText(sessionId);
-      if (!normalizedSessionId || !Array.isArray(entries)) {
-        continue;
-      }
-      const mergedEntries = mergeUsageEntries(entries);
-      if (mergedEntries.length > 0) {
-        next[normalizedSessionId] = mergedEntries;
-      }
-    }
-    return next;
-  } catch {
-    return {};
-  }
-}
-
-function serializeUsageState(state) {
-  return JSON.stringify({ sessions: state });
-}
-
-function pruneUsageState(state, { maxEntriesPerSession, maxSessions }) {
-  const next = {};
-  for (const [sessionId, entries] of Object.entries(state || {})) {
-    const normalizedSessionId = normalizeText(sessionId);
-    if (!normalizedSessionId) {
-      continue;
-    }
-    const mergedEntries = mergeUsageEntries(entries).slice(0, maxEntriesPerSession);
-    if (mergedEntries.length > 0) {
-      next[normalizedSessionId] = mergedEntries;
-    }
-  }
-
-  const rankedSessions = Object.entries(next)
-    .map(([sessionId, entries]) => ({
-      sessionId,
-      entries,
-      lastUsedAt: entries.reduce((max, entry) => Math.max(max, Number(entry?.lastUsedAt) || 0), 0)
-    }))
-    .sort((left, right) => right.lastUsedAt - left.lastUsedAt || left.sessionId.localeCompare(right.sessionId, "en-US", { sensitivity: "base" }));
-
-  return Object.fromEntries(rankedSessions.slice(0, maxSessions).map((entry) => [entry.sessionId, entry.entries]));
 }
 
 function formatUsageCount(count) {
@@ -239,24 +118,27 @@ export function createSessionQuickSendRuntimeController(options = {}) {
       ? options.formatSessionDisplayName
       : (session) => String(session?.name || session?.id || "session");
 
-  let usageBySession = pruneUsageState(safeParseUsagePayload(readInitialUsagePayload(localStorageRef, storageKey)), {
-    maxEntriesPerSession,
-    maxSessions
-  });
+  let usageBySession = pruneSessionQuickSendUsageState(
+    parseSessionQuickSendUsagePayload(readSessionQuickSendUsagePayload(localStorageRef, storageKey)),
+    {
+      maxEntriesPerSession,
+      maxSessions
+    }
+  );
 
   function persist() {
     if (!localStorageRef || typeof localStorageRef.setItem !== "function") {
       return;
     }
     try {
-      localStorageRef.setItem(storageKey, serializeUsageState(usageBySession));
+      localStorageRef.setItem(storageKey, serializeSessionQuickSendUsageState(usageBySession));
     } catch {
       // Ignore browser persistence write failures and keep the in-memory state alive.
     }
   }
 
   function replaceUsageState(nextState) {
-    usageBySession = pruneUsageState(nextState, { maxEntriesPerSession, maxSessions });
+    usageBySession = pruneSessionQuickSendUsageState(nextState, { maxEntriesPerSession, maxSessions });
     persist();
   }
 
@@ -269,7 +151,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
         changed = true;
         continue;
       }
-      nextState[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneUsageEntry(entry)) : [];
+      nextState[sessionId] = Array.isArray(entries) ? entries.map((entry) => cloneQuickSendUsageEntry(entry)) : [];
     }
     if (changed) {
       replaceUsageState(nextState);
@@ -283,7 +165,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
       return false;
     }
     const nextEntries = Array.isArray(usageBySession[normalizedSessionId])
-      ? usageBySession[normalizedSessionId].map((entry) => cloneUsageEntry(entry))
+      ? usageBySession[normalizedSessionId].map((entry) => cloneQuickSendUsageEntry(entry))
       : [];
     const usedAt = Number.isFinite(runtimeOptions.usedAt) ? Number(runtimeOptions.usedAt) : nowMs();
     const index = nextEntries.findIndex((entry) => entry.lookupKey === normalizedCommand.lookupKey);
@@ -327,7 +209,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
     const ranked = [];
     let changed = false;
     for (const entry of currentEntries) {
-      const normalizedEntry = normalizeUsageEntry(entry);
+      const normalizedEntry = normalizeQuickSendUsageEntry(entry);
       if (!normalizedEntry) {
         changed = true;
         continue;
@@ -562,7 +444,7 @@ export function createSessionQuickSendRuntimeController(options = {}) {
   }
 
   function snapshot() {
-    return cloneUsageState(usageBySession);
+    return cloneQuickSendUsageState(usageBySession);
   }
 
   return {

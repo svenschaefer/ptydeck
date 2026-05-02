@@ -477,3 +477,96 @@ test("store correlates submitted commands with output, interpretation, artifacts
   assert.ok(session.commandCorrelations[0].firstOutputAt >= session.commandCorrelations[0].matchedAt);
   assert.ok(session.commandCorrelations[0].completedAt >= session.commandCorrelations[0].firstOutputAt);
 });
+
+test("store wrapper APIs fail closed for invalid deck, command, and submission operations", () => {
+  const store = createStore();
+  store.setDecks([{ id: "default", name: "Default" }]);
+  store.setSessions([{ id: "s1", deckId: "default" }]);
+  store.replaceCustomCommands([{ name: "deploy", scope: "session", sessionId: "s1", content: "echo session" }]);
+
+  const listed = store.listCustomCommands();
+  listed[0].content = "mutated";
+  assert.equal(store.listCustomCommands()[0].content, "echo session");
+  assert.equal(store.getCustomCommand("   "), null);
+  assert.equal(store.getCustomCommand("deploy", { scope: "global" }), null);
+
+  assert.equal(store.upsertCustomCommand({ name: "   ", content: "echo ignored" }), null);
+  assert.equal(store.removeCustomCommand("missing"), false);
+  assert.equal(store.removeCustomCommand("", { scope: "session", sessionId: "s1" }), false);
+  assert.equal(store.recordSessionCommandSubmission("", { label: "ignored", text: "pwd" }), null);
+  assert.equal(store.recordSessionCommandSubmission("missing", { label: "ignored", text: "pwd" }), null);
+
+  store.removeSession("missing");
+  store.markSessionClosed("missing");
+  store.upsertDeck({ id: "ops", name: "Ops" }, { preferredActiveDeckId: "ops" });
+  assert.equal(store.getState().activeDeckId, "ops");
+  assert.equal(store.setActiveDeck("ops"), false);
+  store.removeDeck("missing");
+
+  assert.deepEqual(
+    store.getState().decks.map((deck) => deck.id),
+    ["default", "ops"]
+  );
+});
+
+test("store reducer clears unread on same-session activation and removes commands by lookup key or scope fallback", () => {
+  const initial = {
+    sessions: [{ id: "s1", deckId: "default", hasUnreadActivity: true }],
+    activeSessionId: "s1",
+    connectionState: "connected",
+    decks: [{ id: "default", name: "Default" }],
+    activeDeckId: "default",
+    customCommands: [],
+    sessionFilterText: ""
+  };
+
+  const clearedUnread = reduceRuntimeState(initial, { type: "session.active.set", sessionId: "s1" });
+  assert.equal(clearedUnread.sessions[0].hasUnreadActivity, false);
+  assert.equal(reduceRuntimeState(clearedUnread, { type: "session.active.set", sessionId: "s1" }), clearedUnread);
+
+  const withCommands = reduceRuntimeState(clearedUnread, {
+    type: "commands.replace",
+    commands: [
+      { name: "deploy", scope: "global", content: "echo global" },
+      { name: "deploy", scope: "session", sessionId: "s1", content: "echo session" },
+      { name: "logs", scope: "project", content: "echo logs" }
+    ]
+  });
+  assert.deepEqual(
+    withCommands.customCommands.map((command) => [command.scope, command.sessionId || "", command.name]),
+    [
+      ["session", "s1", "deploy"],
+      ["global", "", "deploy"],
+      ["project", "", "logs"]
+    ]
+  );
+
+  const removedByObject = reduceRuntimeState(withCommands, {
+    type: "command.remove",
+    command: { name: "deploy", scope: "session", sessionId: "s1", content: "echo session" }
+  });
+  assert.deepEqual(
+    removedByObject.customCommands.map((command) => [command.scope, command.sessionId || "", command.name]),
+    [
+      ["global", "", "deploy"],
+      ["project", "", "logs"]
+    ]
+  );
+
+  const removedByScopeFallback = reduceRuntimeState(removedByObject, {
+    type: "command.remove",
+    name: "logs",
+    scope: "project"
+  });
+  assert.deepEqual(
+    removedByScopeFallback.customCommands.map((command) => [command.scope, command.sessionId || "", command.name]),
+    [["global", "", "deploy"]]
+  );
+  assert.equal(
+    reduceRuntimeState(removedByScopeFallback, {
+      type: "command.remove",
+      name: "missing"
+    }),
+    removedByScopeFallback
+  );
+});

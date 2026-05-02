@@ -221,6 +221,10 @@ function createMouseEvent(type, button) {
   };
 }
 
+function flushAsyncEvents() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 class FakeWindowEventTarget extends FakeEventTarget {
   constructor() {
     super("window");
@@ -1987,4 +1991,54 @@ test("session-terminal-runtime controller falls back cleanly when no global scro
 
   assert.equal(downEvent.defaultPrevented, false);
   assert.equal(entry.terminal.focusCalls, 1);
+});
+
+test("session-terminal-runtime controller uses the default browser clipboard helpers when custom overrides are absent", async () => {
+  const clipboardWrites = [];
+  const pasted = [];
+  const navigatorRef = {
+    clipboard: {
+      async writeText(text) {
+        clipboardWrites.push(text);
+      },
+      async readText() {
+        return 55;
+      }
+    }
+  };
+  const controller = createSessionTerminalRuntimeController({
+    windowRef: {
+      Terminal: FakeTerminal,
+      ResizeObserver: FakeResizeObserver,
+      setTimeout(fn) {
+        return fn;
+      }
+    },
+    navigatorRef,
+    refreshTerminalViewport: (terminal) => terminal.refresh(0, terminal.rows - 1),
+    syncTerminalScrollArea: () => {},
+    requestTerminalCtrlCAction: async () => "copy"
+  });
+  const refs = createTerminalCardRefs("clipboard-defaults");
+  const entry = controller.mountSessionTerminalCard({
+    session: { id: "s1" },
+    refs,
+    initialVisible: true,
+    gridEl: { appendChild() {} },
+    terminals: new Map(),
+    terminalObservers: new Map(),
+    onTerminalData() {},
+    onTerminalPaste: (sessionId, text) => pasted.push([sessionId, text]),
+    applyResizeForSession() {}
+  });
+
+  entry.terminal.selection = "pwd";
+  refs.mount.helperTextarea.dispatchEvent(createKeyEvent("Enter"));
+  await flushAsyncEvents();
+
+  refs.mount.dispatchEvent(createMouseEvent("mousedown", 1));
+  await flushAsyncEvents();
+
+  assert.deepEqual(clipboardWrites, ["pwd"]);
+  assert.deepEqual(pasted, [["s1", "55"]]);
 });

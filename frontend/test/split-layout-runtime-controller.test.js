@@ -244,6 +244,62 @@ test("split-layout runtime captures cloned layout snapshots without leaking inte
   assert.deepEqual(current.paneSessions.main, ["s1"]);
 });
 
+test("split-layout runtime normalizes malformed roots, skips invalid deck ids, and dedupes pane sessions", () => {
+  const controller = createSplitLayoutRuntimeController();
+
+  controller.replaceDeckSplitLayouts({
+    " ": {
+      root: { type: "pane", paneId: "ignored" },
+      paneSessions: { ignored: ["sx"] }
+    },
+    ops: {
+      root: {
+        type: "row",
+        weights: [0, "bad", 2],
+        children: [
+          { type: "pane", paneId: "left" },
+          { type: "pane", paneId: " " },
+          { type: "pane", paneId: "right" }
+        ]
+      },
+      paneSessions: {
+        left: ["s1", "s1", " ", "s2"],
+        right: "invalid",
+        ghost: ["sx"]
+      }
+    },
+    docs: {
+      root: {
+        type: "column",
+        children: [{ type: "pane", paneId: "solo" }]
+      },
+      paneSessions: { solo: ["s9"] }
+    }
+  });
+
+  const ops = controller.getDeckSplitLayout("ops");
+  assert.deepEqual(ops.root, {
+    type: "row",
+    children: [
+      { type: "pane", paneId: "left" },
+      { type: "pane", paneId: "right" }
+    ],
+    weights: [0.5, 0.5]
+  });
+  assert.deepEqual(ops.paneSessions, {
+    left: ["s1", "s2"],
+    right: []
+  });
+
+  const docs = controller.getDeckSplitLayout("docs");
+  assert.deepEqual(docs.root, { type: "pane", paneId: "solo" });
+  assert.deepEqual(docs.paneSessions, { solo: ["s9"] });
+  assert.deepEqual(controller.getDeckSplitLayout(""), {
+    root: { type: "pane", paneId: "main" },
+    paneSessions: { main: [] }
+  });
+});
+
 test("split-layout runtime orders pane contents by current quick-id session order", () => {
   const gridEl = new FakeElement("main");
   const controller = createSplitLayoutRuntimeController({

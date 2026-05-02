@@ -14,13 +14,12 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- [ ] `QLT-258` Owner `FE`: Harden frontend runtime-state and quick-send/session-terminal coverage across `frontend/src/public/store.js`, `frontend/src/public/session-quick-send-runtime-controller.js`, and `frontend/src/public/ui/session-terminal-runtime-controller.js`, and cut another small wiring seam if needed to keep the composition surface shrinking.
-- [ ] `QLT-259` Owner `FE`: Harden operator layout/profile coverage across `frontend/src/public/split-layout-runtime-controller.js` and `frontend/src/public/connection-profile-runtime-controller.js`.
+- None.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role (active): own `QLT-258` and `QLT-259`.
+- `FE` ownership role is currently inactive.
 - `BE` ownership role is currently inactive.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

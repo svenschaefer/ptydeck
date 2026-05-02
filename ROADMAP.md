@@ -14,20 +14,15 @@ Completed and validated release history lives in `CHANGELOG.md`.
 ## Current Execution Status
 
 - Latest completed wave in this segment:
-  - `v0.4.0-H161` Session Quick Send Favorites
-- Active wave:
   - `v0.4.0-H162` Repo-Wide Quality and Coverage Follow-Up
-- Delivered in the active wave:
-  - `QLT-255` Owner `BE`: Extract accepted WebSocket connection lifecycle handling from `backend/src/runtime.js` into `backend/src/runtime-ws-connection.js` and close that seam with direct deterministic coverage.
-  - `QLT-256` Owner `BE`: Harden `backend/src/session-manager.js` restart/replay/persistence/error-path coverage with new direct lifecycle regressions.
-  - `QLT-257` Owner `FE`: Extract custom-command send/selection dispatch from `frontend/src/public/command-executor.js` into a direct seam with deterministic regression coverage.
+- Active wave:
+  - none currently
 - Queued next waves:
   - none currently
 
 ## Active Wave Order
 
-1. `QLT-258` Owner `FE`: Harden shared runtime-state plus quick-send/session-terminal coverage and reduce another small frontend wiring seam if needed.
-2. `QLT-259` Owner `FE`: Harden operator layout/profile coverage across split-layout and connection-profile controllers.
+- none currently
 
 ## Queued Wave Order
 
@@ -35,12 +30,11 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-258` should prefer a small extracted state/wiring seam if another targeted split is justified by the direct regressions.
-- `QLT-259` depends only on the active wave sequencing and may proceed after `QLT-258` if no tighter coupling is discovered during implementation.
+- none currently
 
 ## Wave Exit Criteria
 
-- `v0.4.0-H162` closes only when `QLT-258` and `QLT-259` are implemented, validated, documented, and moved out of `TODO.md`.
+- no active wave currently
 
 ## Sequencing Rules
 
