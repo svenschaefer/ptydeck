@@ -1466,6 +1466,7 @@ button:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
 }
 
 .terminal-card.active {
@@ -1481,6 +1482,8 @@ button:hover {
   border-bottom: 1px solid var(--border);
   background: #0f151f;
   min-width: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .terminal-toolbar-main {
@@ -1562,6 +1565,8 @@ button:hover {
   display: none !important;
 }
 
+.terminal-toolbar:hover .session-quick-send-panel:not([hidden]),
+.terminal-toolbar:focus-within .session-quick-send-panel:not([hidden]),
 .session-toolbar-actions:hover .session-quick-send-panel:not([hidden]),
 .session-toolbar-actions:focus-within .session-quick-send-panel:not([hidden]),
 .session-quick-send-panel:hover:not([hidden]),

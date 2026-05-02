@@ -157,6 +157,7 @@ Delivered contract:
   - show target/session context inside the overlay itself
   - size the overlay from its actual content instead of forcing a fixed wide panel
 - The hover surface must remain directly clickable after it appears:
+  - reveal from the broader session-toolbar hover/focus surface, not only from a tiny right-side icon hotspot
   - keep a toolbar-to-overlay hover bridge so the pointer can move into the panel without dropping the hit area
   - keep the overlay in its own higher stacking context above the terminal viewport
   - keep the overlay visible on its own hover/focus state instead of tying clickability only to whole-card hover

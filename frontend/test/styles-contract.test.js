@@ -73,6 +73,10 @@ test("session quick-send hover actions stay clickable while moving from the tool
   const stylesCss = fs.readFileSync(stylesCssPath, "utf8");
   assert.match(
     stylesCss,
+    /\.terminal-toolbar \{[\s\S]*position: relative;[\s\S]*z-index: 2;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
     /\.session-toolbar-actions \{[\s\S]*position: relative;[\s\S]*z-index: 2;[\s\S]*padding-bottom: 6px;[\s\S]*margin-bottom: -6px;[\s\S]*\}/m
   );
   assert.match(
@@ -81,7 +85,7 @@ test("session quick-send hover actions stay clickable while moving from the tool
   );
   assert.match(
     stylesCss,
-    /\.session-toolbar-actions:hover \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-toolbar-actions:focus-within \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:hover:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:focus-within:not\(\[hidden\]\) \{[\s\S]*pointer-events: auto;[\s\S]*\}/m
+    /\.terminal-toolbar:hover \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.terminal-toolbar:focus-within \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-toolbar-actions:hover \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-toolbar-actions:focus-within \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:hover:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:focus-within:not\(\[hidden\]\) \{[\s\S]*pointer-events: auto;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
