@@ -14,12 +14,17 @@ Completed work belongs in `CHANGELOG.md`.
 
 ## Active Open Tasks (Current)
 
-- None.
+- `QLT-260` Owner `BE`: extract the next startup/request/session-authority seam from `backend/src/runtime.js` and add direct deterministic regression coverage for the extracted path.
+- `QLT-261` Owner `BE`: harden the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
+- `QLT-262` Owner `BE`: harden SSH/foreground/runtime reliability coverage across `backend/src/ssh-host-key-probe.js`, `backend/src/terminal-foreground-process.js`, and the retained runtime config/error-path helpers that gate them.
+- `QLT-263` Owner `FE`: extract the next bootstrap/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and close it with direct deterministic regressions.
+- `QLT-264` Owner `FE`: harden operator command-entry coverage across `frontend/src/public/command-executor.js`, `frontend/src/public/command-composer-runtime-controller.js`, `frontend/src/public/command-completion.js`, and the retained command handler seams.
+- `QLT-265` Owner `FE`: harden terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
 
 ## Active Ownership Role
 
 - `CODY` ownership role (active): maintain documentation/task-governance consistency, keep `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`, `TODO-OUTLOOK.md`, and `CODEX_CONTEXT.md` synchronized, and record the current quality-review evidence.
-- `FE` ownership role is currently inactive.
-- `BE` ownership role is currently inactive.
+- `BE` ownership role (active): deliver `QLT-260`, `QLT-261`, and `QLT-262`.
+- `FE` ownership role (active): deliver `QLT-263`, `QLT-264`, and `QLT-265`.
 - `PLAT` ownership role is currently inactive.
 - `QA` ownership role is currently inactive.

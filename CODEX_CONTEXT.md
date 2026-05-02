@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-02 (`v0.4.0-H162` completed; no active quality wave; quick-send hover click contract fixed)
+Last updated: 2026-05-02 (`v0.4.0-H163` promoted; fresh repo-wide quality evidence captured; quick-send overlay UX refined)
 
 ## Current Product Truth
 
@@ -222,6 +222,46 @@ The validated `H162` closeout hotspot snapshot is:
 - `frontend/src/public/command-executor.js` and `frontend/src/public/app-runtime-composition-controller.js` remain large authority surfaces, but no further follow-up was promoted after `H162`.
 - Transport-only messaging remains intentionally unpromoted; the third messaging attempt is still deferred behind `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md`.
 
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H163` promoted)
+
+On 2026-05-02, a fresh repo-wide review was rerun after the session quick-send overlay UX refinement so the next quality wave is based on the current tree instead of only on the earlier `H162` closeout snapshot.
+
+Validated top-line coverage on the `H163` promotion tree:
+
+- root tooling: `92.77%` line / `76.81%` branch
+- backend: `95.06%` line / `88.51%` branch
+- frontend: `96.84%` line / `89.30%` branch
+
+Most relevant still-open hotspots promoted into `TODO.md` / `ROADMAP.md`:
+
+- `backend/src/runtime.js`: `6588` lines, `80.49%` line / `71.72%` branch
+- `backend/src/ssh-host-key-probe.js`: `247` lines, `89.88%` line / `89.01%` branch
+- `backend/src/telegram-adapter.js`: `1423` lines, `91.22%` line / `79.45%` branch
+- `backend/src/messaging-runtime.js`: `1030` lines, `91.75%` line / `80.00%` branch
+- `backend/src/discord-adapter.js`: `404` lines, `92.08%` line / `54.90%` branch
+- `frontend/src/public/app-runtime-composition-controller.js`: `1918` lines, `88.32%` line / `61.96%` branch
+- `frontend/src/public/command-executor.js`: `1816` lines, `86.45%` line / `75.45%` branch
+- `frontend/src/public/command-composer-runtime-controller.js`: `773` lines, `86.55%` line / `73.02%` branch
+- `frontend/src/public/terminal-stream.js`: `242` lines, `88.84%` line / `79.57%` branch
+- `frontend/src/public/ui/session-terminal-runtime-controller.js`: `89.32%` line / `81.91%` branch
+- `frontend/src/public/session-quick-send-runtime-controller.js`: `91.24%` line / `80.30%` branch
+
+Promoted `H163` tasks:
+
+- `QLT-260` extracts the next startup/request/session-authority seam from `backend/src/runtime.js` and closes it with direct deterministic regressions.
+- `QLT-261` hardens the shipped transport-only messaging baseline across `backend/src/messaging-runtime.js`, `backend/src/telegram-adapter.js`, `backend/src/discord-adapter.js`, `backend/src/telegram-command-surface.js`, `backend/src/delivery-adapter-utils.js`, and `backend/src/terminal-messaging-core.js`.
+- `QLT-262` hardens SSH/foreground/runtime reliability coverage across `backend/src/ssh-host-key-probe.js`, `backend/src/terminal-foreground-process.js`, and the retained runtime config/error-path helpers that gate them.
+- `QLT-263` extracts the next bootstrap/runtime-composition seam from `frontend/src/public/app-runtime-composition-controller.js` and closes it with direct deterministic regressions.
+- `QLT-264` hardens operator command-entry coverage across `frontend/src/public/command-executor.js`, `frontend/src/public/command-composer-runtime-controller.js`, `frontend/src/public/command-completion.js`, and the retained command handler seams.
+- `QLT-265` hardens terminal/stream/operator-interaction coverage across `frontend/src/public/terminal-stream.js`, `frontend/src/public/ui/session-terminal-runtime-controller.js`, `frontend/src/public/slash-workflow-runtime-controller.js`, and `frontend/src/public/session-quick-send-runtime-controller.js`.
+
+Not promoted from the fresh review:
+
+- `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain intentionally unpromoted because they are retained diagnostics, not live product/runtime authority paths.
+- `scripts/lib/coverage-report.mjs` remains above the current root threshold and was not promoted into a near-term wave.
+- `frontend/src/public/app.js` remains intentionally unpromoted despite low function coverage because it is still the thin bootstrap-only entrypoint, while the real runtime authority remains in `frontend/src/public/app-runtime-composition-controller.js`.
+- No third-attempt messaging semantics were promoted. `H163` only targets the currently shipped transport-only adapter baseline, while `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md` remain the explicit gate for any future automatic outbound rebuild.
+
 ## Documentation Cleanup Baseline
 
 The 2026-04-23 documentation cleanup established these current rules:
@@ -262,10 +302,10 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active promoted tasks.
-- `ROADMAP.md`: no active or queued wave is currently promoted.
+- `TODO.md`: active promoted tasks are `QLT-260` through `QLT-265`.
+- `ROADMAP.md`: active wave is `v0.4.0-H163`; no queued next wave is currently promoted.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
-- No active near-term messaging rebuild is in progress.
+- No active near-term automatic-outbound messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
 
 ## Repository Quality Review (2026-04-29)
