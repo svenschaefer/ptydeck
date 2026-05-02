@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-02 (`QLT-256` completed in active `v0.4.0-H162`)
+Last updated: 2026-05-02 (`QLT-257` completed in active `v0.4.0-H162`)
 
 ## Current Product Truth
 
@@ -178,23 +178,28 @@ Delivered contract:
 
 On 2026-05-02, a fresh full-repo quality review reran the current coverage lanes before promoting new work.
 
-Validated top-line coverage on the current active tree after `QLT-256`:
+Validated top-line coverage on the current active tree after `QLT-257`:
 
 - root tooling: `92.77%` line / `76.81%` branch
 - backend: `95.03%` line / `88.49%` branch
-- frontend: `96.78%` line / `89.18%` branch
+- frontend: `96.78%` line / `89.14%` branch
 
 Delivered so far in `H162`:
 
 - `QLT-255` is complete.
 - `QLT-256` is complete.
+- `QLT-257` is complete.
 - `backend/src/runtime.js` now delegates accepted WebSocket connection lifecycle handling into `backend/src/runtime-ws-connection.js` instead of keeping socket registration, reconnect metric bookkeeping, snapshot publication, trusted-local refresh propagation, and event cleanup inline inside the main runtime file.
 - `backend/test/runtime-ws-connection.test.js` now provides the direct deterministic coverage seam for that accepted-connection path.
 - `backend/test/session-manager.test.js` now directly locks down restart/replay/persistence/error-path behavior for startup terminal-query response exhaustion, empty truncated replay markers, reconnect retry failure transitions, offline signal rejection, and quick-id/env restart normalization.
+- `frontend/src/public/command-executor.js` now delegates custom-command send/selection execution into `frontend/src/public/command-executor-custom-handlers.js` instead of keeping target resolution, blocked-session gating, rendered payload dispatch, quick-send usage updates, and command-submission recording inline inside the operator executor.
+- `frontend/test/command-executor-custom-handlers.test.js` now provides the direct deterministic coverage seam for unrelated-command fallthrough, selector-driven multi-target dispatch, normalized payload sends, quick-send usage/submission recording, blocked target fail-closed behavior, and template invocation validation.
 - The current validated hotspot snapshot for the extracted backend seam is:
   - `backend/src/runtime-ws-connection.js`: `100.00%` line / `74.29%` branch
   - `backend/src/runtime.js`: `80.30%` line / `71.60%` branch
   - `backend/src/session-manager.js`: `96.12%` line / `78.16%` branch
+  - `frontend/src/public/command-executor-custom-handlers.js`: `98.41%` line / `56.25%` branch
+  - `frontend/src/public/command-executor.js`: `86.45%` line / `75.45%` branch
 
 Only live product/runtime paths were promoted into the new wave. Retained diagnostics and intentionally deferred messaging epics were kept out of `TODO.md`.
 
@@ -218,6 +223,7 @@ Quality-review conclusions for `H162`:
 - `backend/src/session-manager.js` is no longer the launch-spec monolith it used to be, and `QLT-256` raised its direct lifecycle confidence with explicit restart/replay/persistence/error-path regressions instead of another structural rewrite.
 - The frontend command path still carries too much authority in one file. `frontend/src/public/command-executor.js` should keep shrinking via seam extraction rather than relying only on broader app-level coverage.
 - The new quick-send feature is shipped, but the retained FE runtime surface around store state, quick-send ranking, and terminal session wiring still needs another direct hardening slice.
+- `QLT-257` removed the custom-command dispatch cluster from the inline executor body, reducing `frontend/src/public/command-executor.js` from `1855` to `1816` lines without changing the slash-command surface.
 - `frontend/src/public/app-runtime-composition-controller.js` remains a large wiring surface at `1918` lines, so follow-up frontend hardening should prefer extracting small, explicit seams rather than adding more indirect composition-only tests.
 - Transport-only messaging adapter gaps remain intentionally unpromoted because the third messaging attempt is still deferred behind `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md`.
 
@@ -261,7 +267,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-257`, `QLT-258`, and `QLT-259`.
+- `TODO.md`: active promoted tasks are `QLT-258` and `QLT-259`.
 - `ROADMAP.md`: active wave is `v0.4.0-H162`; no queued wave currently remains behind it.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.

@@ -26,6 +26,7 @@ import {
   resolveExactCustomCommand,
   renderCustomCommandForSession
 } from "./custom-command-model.js";
+import { createCommandExecutorCustomHandlers } from "./command-executor-custom-handlers.js";
 import { createCommandExecutorDomainHandlers } from "./command-executor-domain-handlers.js";
 import {
   createCommandExecutorSessionHandlers,
@@ -760,6 +761,22 @@ export function createCommandExecutor(options = {}) {
     resolveActiveOrDirectTargetSession,
     swapSessionTokens,
     applyRuntimeEvent,
+    api
+  });
+
+  const customHandlers = createCommandExecutorCustomHandlers({
+    resolveCustomCommandTargets,
+    renderCustomCommandForTargets,
+    isSessionActionBlocked,
+    getBlockedSessionActionMessage,
+    sendInputWithConfiguredTerminator,
+    getSessionSendTerminator,
+    normalizeSendTerminatorMode,
+    delayedSubmitMs,
+    recordCustomCommandUsage,
+    recordCommandSubmission,
+    normalizeCustomCommandPayloadForShell,
+    formatSessionToken,
     api
   });
 
@@ -1772,72 +1789,16 @@ export function createCommandExecutor(options = {}) {
       return `Applied settings to [${formatSessionToken(updated.id)}] ${formatSessionDisplayName(updated)}: ${appliedKeys.join(", ")}.`;
     }
 
-    const allCustomCommands = listNormalizedCustomCommands();
-    const candidateCustom = listScopedCustomCommandsByName(allCustomCommands, commandRaw)[0] || null;
-    const custom = normalizeCustomCommandRecord(candidateCustom);
-    if (custom) {
-      const invocation = parseCustomCommandInvocation(interpreted.raw || `/${custom.name}`, custom);
-      if (!invocation.ok) {
-        return invocation.error;
-      }
-      const targetResolution = resolveCustomCommandTargets(
-        invocation.targetSelector,
-        sessions,
-        activeSessionId,
-        "No active session for custom command execution."
-      );
-      if (targetResolution.error) {
-        return targetResolution.error;
-      }
-      const targetSessions = targetResolution.sessions;
-      const blockedSessions = targetSessions.filter((session) => isSessionActionBlocked(session));
-      if (blockedSessions.length > 0) {
-        return getBlockedSessionActionMessage(blockedSessions, "Custom command execution");
-      }
-      const rendered = renderCustomCommandForTargets(
-        custom.name,
-        null,
-        targetSessions,
-        invocation.parameterAssignments,
-        decks,
-        allCustomCommands,
-        sessions
-      );
-      if (rendered.error) {
-        return rendered.error;
-      }
-      await Promise.all(
-        rendered.entries.map((entry) => {
-          const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
-          return sendInputWithConfiguredTerminator(
-            api.sendInput.bind(api),
-            entry.session.id,
-            normalizedPayload,
-            getSessionSendTerminator(entry.session.id),
-            {
-              normalizeMode: normalizeSendTerminatorMode,
-              delayedSubmitMs
-            }
-          );
-        })
-      );
-      for (const entry of rendered.entries) {
-        const normalizedPayload = normalizeCustomCommandPayloadForShell(entry.text);
-        recordCustomCommandUsage(entry.session.id, entry.custom || custom, {
-          usedAt: Date.now()
-        });
-        recordCommandSubmission(entry.session.id, {
-          source: "custom-command",
-          commandName: custom.name,
-          label: `/${custom.name}`,
-          text: normalizedPayload,
-          submittedAt: Date.now()
-        });
-      }
-      if (targetSessions.length === 1) {
-        return `Executed /${custom.name} on [${formatSessionToken(targetSessions[0].id)}].`;
-      }
-      return `Executed /${custom.name} on ${targetSessions.length} sessions.`;
+    const customFeedback = await customHandlers.executeCustomCommand({
+      commandRaw,
+      interpreted,
+      sessions,
+      decks,
+      activeSessionId,
+      allCustomCommands: listNormalizedCustomCommands()
+    });
+    if (customFeedback !== null) {
+      return customFeedback;
     }
 
     return `Unknown command: /${commandRaw}`;

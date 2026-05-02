@@ -20,14 +20,14 @@ Completed and validated release history lives in `CHANGELOG.md`.
 - Delivered in the active wave:
   - `QLT-255` Owner `BE`: Extract accepted WebSocket connection lifecycle handling from `backend/src/runtime.js` into `backend/src/runtime-ws-connection.js` and close that seam with direct deterministic coverage.
   - `QLT-256` Owner `BE`: Harden `backend/src/session-manager.js` restart/replay/persistence/error-path coverage with new direct lifecycle regressions.
+  - `QLT-257` Owner `FE`: Extract custom-command send/selection dispatch from `frontend/src/public/command-executor.js` into a direct seam with deterministic regression coverage.
 - Queued next waves:
   - none currently
 
 ## Active Wave Order
 
-1. `QLT-257` Owner `FE`: Extract the next command-dispatch seam from `frontend/src/public/command-executor.js`.
-2. `QLT-258` Owner `FE`: Harden shared runtime-state plus quick-send/session-terminal coverage and reduce another small frontend wiring seam if needed.
-3. `QLT-259` Owner `FE`: Harden operator layout/profile coverage across split-layout and connection-profile controllers.
+1. `QLT-258` Owner `FE`: Harden shared runtime-state plus quick-send/session-terminal coverage and reduce another small frontend wiring seam if needed.
+2. `QLT-259` Owner `FE`: Harden operator layout/profile coverage across split-layout and connection-profile controllers.
 
 ## Queued Wave Order
 
@@ -35,12 +35,12 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- `QLT-257` -> `QLT-258`
+- `QLT-258` should prefer a small extracted state/wiring seam if another targeted split is justified by the direct regressions.
 - `QLT-259` depends only on the active wave sequencing and may proceed after `QLT-258` if no tighter coupling is discovered during implementation.
 
 ## Wave Exit Criteria
 
-- `v0.4.0-H162` closes only when `QLT-257` through `QLT-259` are implemented, validated, documented, and moved out of `TODO.md`.
+- `v0.4.0-H162` closes only when `QLT-258` and `QLT-259` are implemented, validated, documented, and moved out of `TODO.md`.
 
 ## Sequencing Rules
 
