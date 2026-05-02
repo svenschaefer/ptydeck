@@ -15,12 +15,18 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 - Latest completed wave in this segment:
   - `v0.4.0-H161` Session Quick Send Favorites
+- Active wave:
+  - `v0.4.0-H162` Repo-Wide Quality and Coverage Follow-Up
 - Queued next waves:
   - none currently
 
 ## Active Wave Order
 
-- none currently
+1. `QLT-255` Owner `BE`: Extract the next backend runtime startup/request/connection seam from `backend/src/runtime.js`.
+2. `QLT-256` Owner `BE`: Harden `backend/src/session-manager.js` restart/replay/persistence/error-path coverage.
+3. `QLT-257` Owner `FE`: Extract the next command-dispatch seam from `frontend/src/public/command-executor.js`.
+4. `QLT-258` Owner `FE`: Harden shared runtime-state plus quick-send/session-terminal coverage and reduce another small frontend wiring seam if needed.
+5. `QLT-259` Owner `FE`: Harden operator layout/profile coverage across split-layout and connection-profile controllers.
 
 ## Queued Wave Order
 
@@ -28,11 +34,13 @@ Completed and validated release history lives in `CHANGELOG.md`.
 
 ## Wave Dependencies
 
-- none currently
+- `QLT-255` -> `QLT-256`
+- `QLT-257` -> `QLT-258`
+- `QLT-259` depends only on the active wave sequencing and may proceed after `QLT-258` if no tighter coupling is discovered during implementation.
 
 ## Wave Exit Criteria
 
-- no active wave currently
+- `v0.4.0-H162` closes only when `QLT-255` through `QLT-259` are implemented, validated, documented, and moved out of `TODO.md`.
 
 ## Sequencing Rules
 

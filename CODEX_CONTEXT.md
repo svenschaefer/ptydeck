@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-01 (`v0.4.0-H161` completed as the browser-local session quick-send favorites wave)
+Last updated: 2026-05-02 (`v0.4.0-H162` promoted from a fresh repo-wide quality review)
 
 ## Current Product Truth
 
@@ -174,6 +174,41 @@ Delivered contract:
   - `frontend/src/public/terminal-stream.js`
   - `frontend/src/public/clipboard-runtime-controller.js`
 
+## Repo-Wide Quality Review Follow-Up (`v0.4.0-H162`)
+
+On 2026-05-02, a fresh full-repo quality review reran the current coverage lanes before promoting new work.
+
+Validated top-line coverage from that pass:
+
+- root tooling: `92.77%` line / `76.81%` branch
+- backend: `94.91%` line / `88.38%` branch
+- frontend: `96.78%` line / `89.19%` branch
+
+Only live product/runtime paths were promoted into the new wave. Retained diagnostics and intentionally deferred messaging epics were kept out of `TODO.md`.
+
+Promoted hotspots:
+
+- Backend:
+  - `backend/src/runtime.js`: `6665` lines, `80.54%` line / `71.55%` branch
+  - `backend/src/session-manager.js`: `2035` lines, `94.40%` line / `77.00%` branch
+- Frontend:
+  - `frontend/src/public/command-executor.js`: `1855` lines, `86.42%` line / `75.22%` branch
+  - `frontend/src/public/store.js`: `1190` lines, `92.10%` line / `78.11%` branch
+  - `frontend/src/public/session-quick-send-runtime-controller.js`: `578` lines, `89.79%` line / `75.00%` branch
+  - `frontend/src/public/ui/session-terminal-runtime-controller.js`: `824` lines, `89.08%` line / `80.43%` branch
+  - `frontend/src/public/split-layout-runtime-controller.js`: `895` lines, `90.73%` line / `75.56%` branch
+  - `frontend/src/public/connection-profile-runtime-controller.js`: `1752` lines, `93.04%` line / `74.20%` branch
+
+Quality-review conclusions for `H162`:
+
+- The root lane remains above threshold, but `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain intentionally unpromoted because they are retained diagnostics rather than active product/runtime authority paths.
+- The backend runtime monolith remains the dominant quality risk after the earlier seam extractions. Another focused extraction from `backend/src/runtime.js` is still the highest-value backend follow-up.
+- `backend/src/session-manager.js` is no longer the launch-spec monolith it used to be, but the remaining restart/replay/persistence/error branches are still broad enough to justify one more direct hardening pass.
+- The frontend command path still carries too much authority in one file. `frontend/src/public/command-executor.js` should keep shrinking via seam extraction rather than relying only on broader app-level coverage.
+- The new quick-send feature is shipped, but the retained FE runtime surface around store state, quick-send ranking, and terminal session wiring still needs another direct hardening slice.
+- `frontend/src/public/app-runtime-composition-controller.js` remains a large wiring surface at `1918` lines, so follow-up frontend hardening should prefer extracting small, explicit seams rather than adding more indirect composition-only tests.
+- Transport-only messaging adapter gaps remain intentionally unpromoted because the third messaging attempt is still deferred behind `MSG-201` through `MSG-205` in `TODO-OUTLOOK.md`.
+
 ## Documentation Cleanup Baseline
 
 The 2026-04-23 documentation cleanup established these current rules:
@@ -214,8 +249,8 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: no active promoted tasks.
-- `ROADMAP.md`: no active or queued wave.
+- `TODO.md`: active promoted tasks are `QLT-255`, `QLT-256`, `QLT-257`, `QLT-258`, and `QLT-259`.
+- `ROADMAP.md`: active wave is `v0.4.0-H162`; no queued wave currently remains behind it.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.
 - Future semantic stream-interpretation plugins are deferred until they are promoted as explicit tasks with acceptance tests.
