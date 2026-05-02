@@ -1,6 +1,6 @@
 # CODEX CONTEXT - ptydeck
 
-Last updated: 2026-05-02 (`QLT-255` completed in active `v0.4.0-H162`)
+Last updated: 2026-05-02 (`QLT-256` completed in active `v0.4.0-H162`)
 
 ## Current Product Truth
 
@@ -178,20 +178,23 @@ Delivered contract:
 
 On 2026-05-02, a fresh full-repo quality review reran the current coverage lanes before promoting new work.
 
-Validated top-line coverage on the current active tree after `QLT-255`:
+Validated top-line coverage on the current active tree after `QLT-256`:
 
 - root tooling: `92.77%` line / `76.81%` branch
-- backend: `94.95%` line / `88.39%` branch
+- backend: `95.03%` line / `88.49%` branch
 - frontend: `96.78%` line / `89.18%` branch
 
 Delivered so far in `H162`:
 
 - `QLT-255` is complete.
+- `QLT-256` is complete.
 - `backend/src/runtime.js` now delegates accepted WebSocket connection lifecycle handling into `backend/src/runtime-ws-connection.js` instead of keeping socket registration, reconnect metric bookkeeping, snapshot publication, trusted-local refresh propagation, and event cleanup inline inside the main runtime file.
 - `backend/test/runtime-ws-connection.test.js` now provides the direct deterministic coverage seam for that accepted-connection path.
+- `backend/test/session-manager.test.js` now directly locks down restart/replay/persistence/error-path behavior for startup terminal-query response exhaustion, empty truncated replay markers, reconnect retry failure transitions, offline signal rejection, and quick-id/env restart normalization.
 - The current validated hotspot snapshot for the extracted backend seam is:
   - `backend/src/runtime-ws-connection.js`: `100.00%` line / `74.29%` branch
   - `backend/src/runtime.js`: `80.30%` line / `71.60%` branch
+  - `backend/src/session-manager.js`: `96.12%` line / `78.16%` branch
 
 Only live product/runtime paths were promoted into the new wave. Retained diagnostics and intentionally deferred messaging epics were kept out of `TODO.md`.
 
@@ -199,7 +202,7 @@ Promoted hotspots:
 
 - Backend:
   - `backend/src/runtime.js`: `6588` lines, `80.30%` line / `71.60%` branch
-  - `backend/src/session-manager.js`: `2035` lines, `94.40%` line / `77.00%` branch
+  - `backend/src/session-manager.js`: `2035` lines, `96.12%` line / `78.16%` branch
 - Frontend:
   - `frontend/src/public/command-executor.js`: `1855` lines, `86.42%` line / `75.22%` branch
   - `frontend/src/public/store.js`: `1190` lines, `92.10%` line / `78.11%` branch
@@ -211,8 +214,8 @@ Promoted hotspots:
 Quality-review conclusions for `H162`:
 
 - The root lane remains above threshold, but `scripts/analyze-pty-write-eintr.mjs` and `scripts/analyze-startup-timeline.mjs` remain intentionally unpromoted because they are retained diagnostics rather than active product/runtime authority paths.
-- The backend runtime monolith remains the dominant quality risk after the earlier seam extractions. `QLT-255` reduced one more live authority cluster, but another focused extraction from `backend/src/runtime.js` still remains one of the highest-value backend follow-ups after the session-manager slice.
-- `backend/src/session-manager.js` is no longer the launch-spec monolith it used to be, but the remaining restart/replay/persistence/error branches are still broad enough to justify one more direct hardening pass.
+- The backend runtime monolith remains the dominant quality risk after the earlier seam extractions. `QLT-255` reduced one more live authority cluster, and the remaining backend work in `H162` is now complete after the session-manager hardening pass.
+- `backend/src/session-manager.js` is no longer the launch-spec monolith it used to be, and `QLT-256` raised its direct lifecycle confidence with explicit restart/replay/persistence/error-path regressions instead of another structural rewrite.
 - The frontend command path still carries too much authority in one file. `frontend/src/public/command-executor.js` should keep shrinking via seam extraction rather than relying only on broader app-level coverage.
 - The new quick-send feature is shipped, but the retained FE runtime surface around store state, quick-send ranking, and terminal session wiring still needs another direct hardening slice.
 - `frontend/src/public/app-runtime-composition-controller.js` remains a large wiring surface at `1918` lines, so follow-up frontend hardening should prefer extracting small, explicit seams rather than adding more indirect composition-only tests.
@@ -258,7 +261,7 @@ Any future automatic outbound rebuild must start from these constraints:
 
 ## Current Planning State
 
-- `TODO.md`: active promoted tasks are `QLT-256`, `QLT-257`, `QLT-258`, and `QLT-259`.
+- `TODO.md`: active promoted tasks are `QLT-257`, `QLT-258`, and `QLT-259`.
 - `ROADMAP.md`: active wave is `v0.4.0-H162`; no queued wave currently remains behind it.
 - The future third messaging attempt is deferred to `TODO-OUTLOOK.md`.
 - No active near-term messaging rebuild is in progress.

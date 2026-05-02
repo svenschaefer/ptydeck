@@ -415,6 +415,33 @@ test("SessionManager clears exhausted startup fallback guards without writing to
   assert.equal(session.pendingStartupTerminalQueryFallback, null);
 });
 
+test("SessionManager answers only the remaining startup terminal-query budget and then clears it", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    nowFn: () => 1000
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    shell: "bash"
+  });
+  const session = manager.get(created.id);
+  session.pendingStartupTerminalQueryFallback = {
+    expiresAt: 2000,
+    remainingResponses: 1,
+    trace: {
+      correlationId: "startup-fallback-1",
+      requestId: "startup-fallback-1",
+      source: "rest"
+    }
+  };
+
+  assert.equal(manager.observeStartupTerminalQueryFallback(session, { rawData: "\u001b[6n\u001b[6n" }), true);
+  assert.deepEqual(fakePty.writes, ["\u001b[1;1R"]);
+  assert.equal(session.pendingStartupTerminalQueryFallback, null);
+});
+
 test("SessionManager emits input write failed events when the PTY write throws", () => {
   const fakePty = createFakePty();
   fakePty.write = () => {
@@ -1220,6 +1247,29 @@ test("SessionManager replay export reports truncation when replay retention is d
   assert.equal(replayExport.retainedChars, 0);
   assert.equal(replayExport.retentionLimitChars, 0);
   assert.equal(replayExport.truncated, true);
+});
+
+test("SessionManager snapshot can retain empty truncated replay markers when explicitly requested", () => {
+  const fakePty = createFakePty();
+  const manager = new SessionManager({
+    createPty: () => fakePty,
+    sessionReplayMemoryMaxChars: 0
+  });
+
+  const created = manager.create({
+    replayOutput: "abcdef",
+    replayOutputTruncated: true
+  });
+
+  assert.equal(manager.trimReplayOutput("abcdef", 3), "def");
+  assert.deepEqual(manager.getSnapshot({ includeTruncationMetadata: true }).outputs, []);
+  assert.deepEqual(manager.getSnapshot({ includeTruncationMetadata: true, includeEmptyOutputs: true }).outputs, [
+    {
+      sessionId: created.id,
+      data: "",
+      truncated: true
+    }
+  ]);
 });
 
 test("SessionManager builds replay excerpts for visible line and char selectors", () => {
@@ -2067,6 +2117,71 @@ test("SessionManager restart preserves ssh auth context and secret-backed reconn
   assert.equal(manager.get(created.id).ptyProcess, secondPty);
 });
 
+test("SessionManager reconnect retry failures degrade first, then fail closed offline, and block signal helpers", () => {
+  const firstPty = createFakePty();
+  const scheduled = [];
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: () => {
+      spawnCount += 1;
+      if (spawnCount === 1) {
+        return firstPty;
+      }
+      throw new Error(`reconnect spawn failed ${spawnCount}`);
+    },
+    remoteReconnectMaxAttempts: 2,
+    remoteReconnectDelayMs: 25,
+    remoteReconnectStableMs: 25,
+    setTimeoutFn(fn, delayMs) {
+      const timer = { fn, delayMs };
+      scheduled.push(timer);
+      return timer;
+    },
+    clearTimeoutFn(timer) {
+      const index = scheduled.indexOf(timer);
+      if (index >= 0) {
+        scheduled.splice(index, 1);
+      }
+    }
+  });
+
+  const created = manager.create({
+    kind: "ssh",
+    remoteConnection: {
+      host: "example.internal",
+      port: 22
+    },
+    remoteAuth: {
+      method: "privateKey"
+    }
+  });
+  scheduled.length = 0;
+
+  firstPty.kill();
+  let session = manager.get(created.id);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "degraded");
+  assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "ssh-transport-exit");
+  assert.equal(scheduled.length, 1);
+
+  const firstReconnectTimer = scheduled.shift();
+  firstReconnectTimer.fn();
+  session = manager.get(created.id);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "degraded");
+  assert.equal(session.meta.remoteRuntime.reconnectAttempts, 1);
+  assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "reconnect spawn failed 2");
+  assert.equal(session.ptyProcess, null);
+  assert.equal(scheduled.length, 1);
+
+  const secondReconnectTimer = scheduled.shift();
+  secondReconnectTimer.fn();
+  session = manager.get(created.id);
+  assert.equal(session.meta.remoteRuntime.connectivityState, "offline");
+  assert.equal(session.meta.remoteRuntime.reconnectAttempts, 2);
+  assert.equal(session.meta.remoteRuntime.lastDisconnectReason, "reconnect spawn failed 3");
+  assert.equal(scheduled.length, 0);
+  assert.throws(() => manager.interrupt(created.id), /is offline\. Restart the session to retry immediately\./);
+});
+
 test("SessionManager passes startup env overrides to PTY spawn", () => {
   const fakePty = createFakePty();
   let spawnOptions = null;
@@ -2088,6 +2203,42 @@ test("SessionManager passes startup env overrides to PTY spawn", () => {
   assert.equal(spawnOptions.cwd, "/opt/work");
   assert.equal(spawnOptions.env.FOO, "BAR");
   assert.equal(spawnOptions.env.HELLO, "WORLD");
+});
+
+test("SessionManager updateSession clears quick IDs, normalizes env patches, and keeps the normalized state across restart", () => {
+  const firstPty = createFakePty();
+  const secondPty = createFakePty();
+  let spawnCount = 0;
+  const manager = new SessionManager({
+    createPty: () => {
+      spawnCount += 1;
+      return spawnCount === 1 ? firstPty : secondPty;
+    }
+  });
+
+  const created = manager.create({
+    cwd: "/tmp",
+    quickIdToken: "q7",
+    env: {
+      FOO: "BAR"
+    }
+  });
+  assert.equal(created.quickIdToken, "q7");
+
+  const updated = manager.updateSession(created.id, {
+    quickIdToken: "   ",
+    env: {
+      FOO: "NEXT",
+      INVALID_NUMBER: 42,
+      INVALID_OBJECT: { nested: true }
+    }
+  });
+  assert.equal(updated.quickIdToken, undefined);
+  assert.deepEqual(updated.env, { FOO: "NEXT" });
+
+  const restarted = manager.restart(created.id);
+  assert.equal(restarted.quickIdToken, undefined);
+  assert.deepEqual(restarted.env, { FOO: "NEXT" });
 });
 
 test("SessionManager normalizes tags deterministically", () => {
