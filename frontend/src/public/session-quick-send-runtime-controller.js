@@ -58,6 +58,20 @@ function buildQuickSendButtonLabel(command, duplicateNames) {
   return `/${normalized.name} · project`;
 }
 
+function buildQuickSendMetaText(session, topCommands, showClipboardAction, formatSessionToken, formatSessionDisplayName) {
+  if (!session) {
+    return "";
+  }
+  const parts = [`[${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`];
+  if (topCommands.length > 0) {
+    parts.push(`${topCommands.length} favorite${topCommands.length === 1 ? "" : "s"}`);
+  }
+  if (showClipboardAction) {
+    parts.push("clipboard");
+  }
+  return parts.join(" · ");
+}
+
 export const SESSION_QUICK_SEND_USAGE_STORAGE_KEY = "ptydeck.session-quick-send-usage.v1";
 export const SESSION_QUICK_SEND_USAGE_MAX_ENTRIES_PER_SESSION = 32;
 export const SESSION_QUICK_SEND_USAGE_MAX_SESSIONS = 200;
@@ -375,12 +389,20 @@ export function createSessionQuickSendRuntimeController(options = {}) {
 
   function renderSessionQuickSend(entry, sessionOrId) {
     const panelEl = entry?.quickSendPanelEl;
+    const titleEl = entry?.quickSendTitleEl || null;
+    const targetEl = entry?.quickSendTargetEl || null;
     const actionsEl = entry?.quickSendActionsEl;
     if (!panelEl || !actionsEl || !documentRef || typeof documentRef.createElement !== "function") {
       return;
     }
     const session = resolveCurrentSession(sessionOrId);
     clearElementChildren(actionsEl);
+    if (titleEl) {
+      titleEl.textContent = "Send to Session";
+    }
+    if (targetEl) {
+      targetEl.textContent = "";
+    }
     if (!session) {
       panelEl.hidden = true;
       return;
@@ -439,7 +461,16 @@ export function createSessionQuickSendRuntimeController(options = {}) {
 
     panelEl.hidden = actionsEl.childNodes?.length === 0 && actionsEl.children?.length === 0;
     if (!panelEl.hidden) {
-      panelEl.setAttribute?.("aria-label", `Quick send actions for [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`);
+      if (targetEl) {
+        targetEl.textContent = buildQuickSendMetaText(
+          session,
+          topCommands,
+          showClipboardAction,
+          formatSessionToken,
+          formatSessionDisplayName
+        );
+      }
+      panelEl.setAttribute?.("aria-label", `Send quick actions to [${formatSessionToken(session.id)}] ${formatSessionDisplayName(session)}`);
     }
   }
 

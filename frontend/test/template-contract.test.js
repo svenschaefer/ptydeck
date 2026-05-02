@@ -18,3 +18,11 @@ test("workspace library and session settings expose progressive-disclosure struc
   assert.match(indexHtml, /<details class="workspace-manager-advanced"/);
   assert.match(indexHtml, /<details class="session-settings-advanced">/);
 });
+
+test("session quick-send overlay keeps a minimal heading and session target context", () => {
+  const indexHtml = fs.readFileSync(indexHtmlPath, "utf8");
+  assert.match(indexHtml, /<div class="session-quick-send-panel" hidden>/);
+  assert.match(indexHtml, /<p class="session-quick-send-title">Send to Session<\/p>/);
+  assert.match(indexHtml, /<p class="session-quick-send-target"><\/p>/);
+  assert.match(indexHtml, /<div class="session-quick-send-actions"><\/div>/);
+});

@@ -27,6 +27,8 @@ export function createSessionCardFactoryController(options = {}) {
     const refreshBtn = node.querySelector(".session-refresh");
     const settingsBtn = node.querySelector(".session-settings");
     const quickSendPanelEl = node.querySelector(".session-quick-send-panel");
+    const quickSendTitleEl = node.querySelector(".session-quick-send-title");
+    const quickSendTargetEl = node.querySelector(".session-quick-send-target");
     const quickSendActionsEl = node.querySelector(".session-quick-send-actions");
     const renameBtn = node.querySelector(".session-rename");
     const closeBtn = node.querySelector(".session-close");
@@ -158,6 +160,8 @@ export function createSessionCardFactoryController(options = {}) {
       refreshBtn,
       settingsBtn,
       quickSendPanelEl,
+      quickSendTitleEl,
+      quickSendTargetEl,
       quickSendActionsEl,
       renameBtn,
       closeBtn,

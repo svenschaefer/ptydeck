@@ -152,6 +152,10 @@ Delivered contract:
 - The browser-local persistence key is `ptydeck.session-quick-send-usage.v1`.
 - Ranking should prefer highest total send count first and use recency only as a deterministic tie-breaker.
 - The visible UI target is a subtle session-card hover surface, not a new persistent control pane or settings panel.
+- The hover surface should still read as an intentional feature, not as an unlabeled raw button tray:
+  - render a compact heading such as `Send to Session`
+  - show target/session context inside the overlay itself
+  - size the overlay from its actual content instead of forcing a fixed wide panel
 - The hover surface must remain directly clickable after it appears:
   - keep a toolbar-to-overlay hover bridge so the pointer can move into the panel without dropping the hit area
   - keep the overlay in its own higher stacking context above the terminal viewport

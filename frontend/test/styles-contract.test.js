@@ -77,10 +77,18 @@ test("session quick-send hover actions stay clickable while moving from the tool
   );
   assert.match(
     stylesCss,
-    /\.session-quick-send-panel \{[\s\S]*top: 100%;[\s\S]*z-index: 6;[\s\S]*pointer-events: none;[\s\S]*\}/m
+    /\.session-quick-send-panel \{[\s\S]*top: 100%;[\s\S]*z-index: 6;[\s\S]*inline-size: max-content;[\s\S]*max-inline-size: min\(30rem, calc\(100vw - 32px\)\);[\s\S]*pointer-events: none;[\s\S]*\}/m
   );
   assert.match(
     stylesCss,
     /\.session-toolbar-actions:hover \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-toolbar-actions:focus-within \.session-quick-send-panel:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:hover:not\(\[hidden\]\),[\s\S]*\.session-quick-send-panel:focus-within:not\(\[hidden\]\) \{[\s\S]*pointer-events: auto;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-quick-send-title \{[\s\S]*text-transform: uppercase;[\s\S]*\}/m
+  );
+  assert.match(
+    stylesCss,
+    /\.session-quick-send-target \{[\s\S]*text-overflow: ellipsis;[\s\S]*\}/m
   );
 });

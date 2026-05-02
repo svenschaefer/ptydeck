@@ -349,12 +349,24 @@ test("session quick-send controller renders hover actions, differentiates duplic
   controller.recordCustomCommandUsage("s1", commands[0], { usedAt: 100 });
   controller.recordCustomCommandUsage("s1", commands[1], { usedAt: 200 });
   const panelEl = new FakeElement("div");
+  const titleEl = new FakeElement("p");
+  const targetEl = new FakeElement("p");
   const actionsEl = new FakeElement("div");
 
-  controller.renderSessionQuickSend({ quickSendPanelEl: panelEl, quickSendActionsEl: actionsEl }, sessions[0]);
+  controller.renderSessionQuickSend(
+    {
+      quickSendPanelEl: panelEl,
+      quickSendTitleEl: titleEl,
+      quickSendTargetEl: targetEl,
+      quickSendActionsEl: actionsEl
+    },
+    sessions[0]
+  );
 
   assert.equal(panelEl.hidden, false);
-  assert.equal(panelEl.getAttribute("aria-label"), "Quick send actions for [1] Alpha");
+  assert.equal(panelEl.getAttribute("aria-label"), "Send quick actions to [1] Alpha");
+  assert.equal(titleEl.textContent, "Send to Session");
+  assert.equal(targetEl.textContent, "[1] Alpha · 2 favorites · clipboard");
   assert.deepEqual(
     actionsEl.children.map((child) => child.textContent),
     ["/deploy · project", "/deploy · global", "Clipboard"]

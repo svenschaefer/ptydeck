@@ -42,6 +42,8 @@ function createNodeStub() {
     ".session-refresh",
     ".session-settings",
     ".session-quick-send-panel",
+    ".session-quick-send-title",
+    ".session-quick-send-target",
     ".session-quick-send-actions",
     ".session-rename",
     ".session-close",
@@ -137,6 +139,8 @@ test("session-card-factory controller builds refs and applies initial UI state",
   assert.ok(result.sessionMetaRowEl);
   assert.ok(result.sessionNoteEl);
   assert.ok(result.quickSendPanelEl);
+  assert.ok(result.quickSendTitleEl);
+  assert.ok(result.quickSendTargetEl);
   assert.ok(result.quickSendActionsEl);
   assert.ok(result.settingsTabStartupBtn);
   assert.ok(result.settingsTabInputBtn);
